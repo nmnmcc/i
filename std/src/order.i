@@ -45,8 +45,8 @@ negate = (order: Order) -> Order {
 /// list.sort([1, 3, 2], order.reverse(int.compare))  // [3, 2, 1]
 /// ```
 reverse(A, E, N) = (
-	orderer: (A, A) -> Order ? E ! N
-) -> (A, A) -> Order ? E ! N { (a, b) { orderer(b, a) } }
+	orderer: (A, A) -> Order ^ E ! N
+) -> (A, A) -> Order ^ E ! N { (a, b) { orderer(b, a) } }
 
 /// `-1` for `Less`, `0` for `Equal`, and `1` for `Greater`.
 to_int = (order: Order) -> Int {
@@ -101,7 +101,7 @@ break_tie = (in: Order, with: Order) -> Order {
 }
 
 /// Like `break_tie`, but `with` is only called when it is needed.
-lazy_break_tie(E, N) = (in: Order, with: () -> Order ? E ! N) -> Order ? E ! N {
+lazy_break_tie(E, N) = (in: Order, with: () -> Order ^ E ! N) -> Order ^ E ! N {
 	in |> {
 		Equal -> with()
 		_     -> in

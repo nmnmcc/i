@@ -4,7 +4,6 @@
 	std/string
 )
 
-@main
 main = () {
 	res = http.get("https://example.com")
 	assert(res.status == http.Status(200))

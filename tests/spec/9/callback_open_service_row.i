@@ -11,13 +11,12 @@ Second {
 
 operation = (second ! Second) { second.run() }
 
-handle(A, E, N) = (body: () -> A ? E ! N) -> A ? E ! First | N - First {
+handle(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! First | N - First {
 	body()
 }
 
 wrapper = (p) { handle(() { p.send() }) }
 
-@main
 main = () {
 	! First = First(() { Nil })
 	! Second = Second(() { Nil })

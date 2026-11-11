@@ -27,7 +27,7 @@ broken = () -> stream.Stream(Int, String, Never) {
 	stream.make(() { fail.raise("bad") })
 }
 
-head(A, E, N) = (s: stream.Stream(A, E, N)) -> option.Option(A) ? E ! N {
+head(A, E, N) = (s: stream.Stream(A, E, N)) -> option.Option(A) ^ E ! N {
 	stream.pull(s) |> {
 		stream.Done       -> None
 		stream.Next(x, _) -> Some(x)
@@ -313,7 +313,7 @@ stream_error_positions = () {
 		}))
 	}) == Error(CallbackError))
 	outer = stream.from_results([Ok(1), Error(OuterError)])
-	f = (x: Int) -> stream.Stream(Int, InnerError, Never) ? CallbackError {
+	f = (x: Int) -> stream.Stream(Int, InnerError, Never) ^ CallbackError {
 		{ x < 0 } |> {
 			True  -> fail.raise(CallbackError)
 			False -> stream.from_results([Ok(x), Error(InnerError)])
@@ -334,8 +334,8 @@ stream_error_positions = () {
 			[Ok(1), Error(OuterError)]
 	)
 	runner = (
-		body: () -> stream.Step(Int, String, Never) ? String
-	) -> stream.Step(Int, String, Never) ? String {
+		body: () -> stream.Step(Int, String, Never) ^ String
+	) -> stream.Step(Int, String, Never) ^ String {
 		body()
 		fail.raise("runner")
 	}
@@ -409,7 +409,7 @@ stream_runner_demand = () {
 	Nil
 }
 
-reject = (x: Int) -> Int ? String {
+reject = (x: Int) -> Int ^ String {
 	{ x == 2 } |> {
 		True  -> fail.raise("callback")
 		False -> x
@@ -467,8 +467,8 @@ stream_callback_failures = () {
 			[Error("deferred")]
 	)
 	runner = (
-		body: () -> stream.Step(Int, String, Never) ? String
-	) -> stream.Step(Int, String, Never) ? String {
+		body: () -> stream.Step(Int, String, Never) ^ String
+	) -> stream.Step(Int, String, Never) ^ String {
 		body()
 		fail.raise("runner")
 	}
@@ -493,7 +493,7 @@ stream_callback_order = () {
 		! Trace = Trace((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
-		s = stream.map(traced([1, 2, 3]), (x) -> Int ? String ! Trace {
+		s = stream.map(traced([1, 2, 3]), (x) -> Int ^ String ! Trace {
 			visit(x + 10)
 			reject(x)
 		})
@@ -613,7 +613,7 @@ stream_factory_demand = () {
 			}
 		})
 		failing = stream.make(
-			() -> stream.Step(Int, String, Trace) ? String ! Trace {
+			() -> stream.Step(Int, String, Trace) ^ String ! Trace {
 				visit(88)
 				fail.raise("bad")
 			}

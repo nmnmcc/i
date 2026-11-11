@@ -41,7 +41,7 @@
 )
 
 Stream(A, E, N) {
-	Stream(() -> Step(A, E, N) ? E ! N, (N) -> Nil)
+	Stream(() -> Step(A, E, N) ^ E ! N, (N) -> Nil)
 }
 
 Step(A, E, N) {
@@ -68,19 +68,19 @@ from_list(A, N) = (items: List(A)) -> Stream(A, Never, N) {
 }
 
 /// Stores a step without calling it. The private marker makes N invariant.
-make(A, E, N) = (step: () -> Step(A, E, N) ? E ! N) -> Stream(A, E, N) {
+make(A, E, N) = (step: () -> Step(A, E, N) ^ E ! N) -> Stream(A, E, N) {
 	Stream(step, (_: N) { Nil })
 }
 
 /// Defers both construction and the first pull until demand.
-defer(A, E, N) = (body: () -> Stream(A, E, N) ? E ! N) -> Stream(A, E, N) {
+defer(A, E, N) = (body: () -> Stream(A, E, N) ^ E ! N) -> Stream(A, E, N) {
 	make(() { pull(body()) })
 }
 
 /// Calls the state transition once per pull.
 unfold(S, A, E, N) = (
 	from: S
-	with: (S) -> Option((A, S)) ? E ! N
+	with: (S) -> Option((A, S)) ^ E ! N
 ) -> Stream(A, E, N) {
 	make(() {
 		with(from) |> {
@@ -91,7 +91,7 @@ unfold(S, A, E, N) = (
 }
 
 /// Calls the stored step once. Repeated pulls do not cache or advance.
-pull(A, E, N) = (stream: Stream(A, E, N)) -> Step(A, E, N) ? E ! N {
+pull(A, E, N) = (stream: Stream(A, E, N)) -> Step(A, E, N) ^ E ! N {
 	Stream(step, _) = stream
 	step()
 }
@@ -99,7 +99,7 @@ pull(A, E, N) = (stream: Stream(A, E, N)) -> Step(A, E, N) ? E ! N {
 /// Transforms only the demanded cell.
 map(A, B, E, F, N) = (
 	over: Stream(A, E, N)
-	with: (A) -> B ? F ! N
+	with: (A) -> B ^ F ! N
 ) -> Stream(B, E | F, N) {
 	make(() {
 		pull(over) |> {
@@ -112,7 +112,7 @@ map(A, B, E, F, N) = (
 /// Seeks the next retained item using tail calls.
 filter(A, E, F, N) = (
 	over: Stream(A, E, N)
-	keeping: (A) -> Bool ? F ! N
+	keeping: (A) -> Bool ^ F ! N
 ) -> Stream(A, E | F, N) {
 	filter_map(over, (x) {
 		keeping(x) |> {
@@ -125,9 +125,9 @@ filter(A, E, F, N) = (
 /// Seeks the next present mapped item using tail calls.
 filter_map(A, B, E, F, N) = (
 	over: Stream(A, E, N)
-	with: (A) -> Option(B) ? F ! N
+	with: (A) -> Option(B) ^ F ! N
 ) -> Stream(B, E | F, N) {
-	seek = (source: Stream(A, E, N)) -> Step(B, E | F, N) ? E | F ! N {
+	seek = (source: Stream(A, E, N)) -> Step(B, E | F, N) ^ E | F ! N {
 		pull(source) |> {
 			Done -> Done
 			Next(x, tail) -> with(x) |> {
@@ -142,7 +142,7 @@ filter_map(A, B, E, F, N) = (
 /// Drains each inner stream before demanding another outer item.
 flat_map(A, B, E, F, G, N) = (
 	over: Stream(A, E, N)
-	with: (A) -> Stream(B, F, N) ? G ! N
+	with: (A) -> Stream(B, F, N) ^ G ! N
 ) -> Stream(B, E | F | G, N) { flatten(over, new(), with) }
 
 /// Exhausts first before pulling second; arguments themselves are strict.
@@ -189,7 +189,7 @@ take(A, E, N) = (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N) {
 
 /// Skips only on demand; negative counts skip nothing.
 drop(A, E, N) = (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N) {
-	seek = (source: Stream(A, E, N), n: Int) -> Step(A, E, N) ? E ! N {
+	seek = (source: Stream(A, E, N), n: Int) -> Step(A, E, N) ^ E ! N {
 		{ n <= 0 } |> {
 			True -> pull(source)
 			False -> pull(source) |> {
@@ -204,7 +204,7 @@ drop(A, E, N) = (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N) {
 /// Consumes the first rejected item, without pulling its tail.
 take_while(A, E, F, N) = (
 	from: Stream(A, E, N)
-	keeping: (A) -> Bool ? F ! N
+	keeping: (A) -> Bool ^ F ! N
 ) -> Stream(A, E | F, N) {
 	make(() {
 		pull(from) |> {
@@ -221,8 +221,8 @@ take_while(A, E, F, N) = (
 fold(A, Acc, E, F, N) = (
 	over: Stream(A, E, N)
 	from: Acc
-	with: (Acc, A) -> Acc ? F ! N
-) -> Acc ? E | F ! N {
+	with: (Acc, A) -> Acc ^ F ! N
+) -> Acc ^ E | F ! N {
 	pull(over) |> {
 		Done          -> from
 		Next(x, tail) -> fold(tail, with(from, x), with)
@@ -233,8 +233,8 @@ fold(A, Acc, E, F, N) = (
 fold_until(A, Acc, E, F, N) = (
 	over: Stream(A, E, N)
 	from: Acc
-	with: (Acc, A) -> list.ContinueOrStop(Acc) ? F ! N
-) -> Acc ? E | F ! N {
+	with: (Acc, A) -> list.ContinueOrStop(Acc) ^ F ! N
+) -> Acc ^ E | F ! N {
 	pull(over) |> {
 		Done -> from
 		Next(x, tail) -> with(from, x) |> {
@@ -247,8 +247,8 @@ fold_until(A, Acc, E, F, N) = (
 /// Discards callback results; an infinite input may never finish.
 each(A, B, E, F, N) = (
 	over: Stream(A, E, N)
-	with: (A) -> B ? F ! N
-) -> Nil ? E | F ! N {
+	with: (A) -> B ^ F ! N
+) -> Nil ^ E | F ! N {
 	fold(over, Nil, (_, x) {
 		with(x)
 		Nil
@@ -256,7 +256,7 @@ each(A, B, E, F, N) = (
 }
 
 /// Collects in order with one reversal, using O(k) space.
-to_list(A, E, N) = (stream: Stream(A, E, N)) -> List(A) ? E ! N {
+to_list(A, E, N) = (stream: Stream(A, E, N)) -> List(A) ^ E ! N {
 	list.reverse(fold(stream, [], (acc, x) { [x, ..acc] }))
 }
 
@@ -284,7 +284,7 @@ attempt(A, E, N) = (stream: Stream(A, E, N)) -> Stream(Result(A, E), Never, N) {
 /// Runs each input pull through a fixed-result runner, rebuilding every tail.
 map_environment(A, E, N, M) = (
 	stream: Stream(A, E, N)
-	run: (body: () -> Step(A, E, N) ? E ! N) -> Step(A, E, N) ? E ! M
+	run: (body: () -> Step(A, E, N) ^ E ! N) -> Step(A, E, N) ^ E ! M
 ) -> Stream(A, E, M) {
 	make(() {
 		run(() { pull(stream) }) |> {
@@ -297,12 +297,12 @@ map_environment(A, E, N, M) = (
 flatten(A, B, E, F, G, N) = (
 	outer: Stream(A, E, N)
 	inner: Stream(B, F, N)
-	f: (A) -> Stream(B, F, N) ? G ! N
+	f: (A) -> Stream(B, F, N) ^ G ! N
 ) -> Stream(B, E | F | G, N) {
 	seek = (
 		out: Stream(A, E, N)
 		current: Stream(B, F, N)
-	) -> Step(B, E | F | G, N) ? E | F | G ! N {
+	) -> Step(B, E | F | G, N) ^ E | F | G ! N {
 		pull(current) |> {
 			Next(x, tail) -> Next(x, flatten(out, tail, f))
 			Done -> pull(out) |> {

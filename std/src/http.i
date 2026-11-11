@@ -261,8 +261,8 @@ feed_request_limit = (
 	}
 }
 
-check_head = (xs: List(Int), limit: Int) -> Nil ? HttpError {
-	go = (rest: List(Int), count: Int) -> Nil ? HttpError {
+check_head = (xs: List(Int), limit: Int) -> Nil ^ HttpError {
+	go = (rest: List(Int), count: Int) -> Nil ^ HttpError {
 		{ count > limit } |> {
 			True -> fail.raise(BadMessage("head too large"))
 			False -> rest |> {
@@ -278,13 +278,13 @@ check_head = (xs: List(Int), limit: Int) -> Nil ? HttpError {
 	go(xs, 0)
 }
 
-parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
+parse_request = (xs: List(Int)) -> (Request, List(Int)) ^ HttpError {
 	(req, after) = parse_request_head(xs)
 	(body, trailers, tail) = read_body(req.headers, after)
 	(Request(..req, body: body, trailers: trailers), tail)
 }
 
-parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
+parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ^ HttpError {
 	(line, rest) = line(xs)
 	parts = string.split(text(line), " ")
 	parts |> {
@@ -307,7 +307,7 @@ parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
 	}
 }
 
-parse_response = (xs: List(Int)) -> (Response, List(Int)) ? HttpError {
+parse_response = (xs: List(Int)) -> (Response, List(Int)) ^ HttpError {
 	parse_response_for(xs, Method("GET"), True)
 }
 
@@ -315,7 +315,7 @@ parse_response_for = (
 	xs: List(Int)
 	method: Method
 	eof: Bool
-) -> (Response, List(Int)) ? HttpError {
+) -> (Response, List(Int)) ^ HttpError {
 	(first, rest) = line(xs)
 	raw = first |> {
 		[72, 84, 84, 80, 47, 49, 46, 49, 32, a, b, c, 32, ..phrase] ? digit(
@@ -356,7 +356,7 @@ parse_response_for = (
 read_headers = (
 	xs: List(Int)
 	acc: List((String, BitArray))
-) -> (Headers, List(Int)) ? HttpError {
+) -> (Headers, List(Int)) ^ HttpError {
 	(head, rest) = line(xs)
 	head |> {
 		[] -> (make_headers(list.reverse(acc)), rest)
@@ -393,7 +393,7 @@ text_unchecked = (xs: List(Int)) -> String {
 	}
 }
 
-validate_framing = (hs: Headers) -> Nil ? HttpError {
+validate_framing = (hs: Headers) -> Nil ^ HttpError {
 	length = header_bytes(hs, "content-length")
 	transfer = header_bytes(hs, "transfer-encoding")
 	require(
@@ -440,7 +440,7 @@ validate_framing = (hs: Headers) -> Nil ? HttpError {
 read_body = (
 	hs: Headers
 	xs: List(Int)
-) -> (BitArray, Headers, List(Int)) ? HttpError {
+) -> (BitArray, Headers, List(Int)) ^ HttpError {
 	validate_framing(hs)
 	lengths = list.concat(list.map(headers(hs, "content-length"), (value) {
 		list.map(string.split(value, ","), (part) {
@@ -474,7 +474,7 @@ read_body = (
 	}
 }
 
-transfer_codings = (hs: Headers) -> List(String) ? HttpError {
+transfer_codings = (hs: Headers) -> List(String) ^ HttpError {
 	codings = list.concat(list.map(headers(hs, "transfer-encoding"), (value) {
 		list.map(string.split(value, ","), (part) {
 			lowercase(text_unchecked(trim(octets(<<part:utf8>>))))
@@ -496,7 +496,7 @@ transfer_codings = (hs: Headers) -> List(String) ? HttpError {
 	codings
 }
 
-parse_length = (value: String) -> Int ? HttpError {
+parse_length = (value: String) -> Int ^ HttpError {
 	raw = octets(<<value:utf8>>)
 	require(raw != [] && list.all(raw, digit), "invalid content-length")
 	int.parse(value) |> {
@@ -508,7 +508,7 @@ parse_length = (value: String) -> Int ? HttpError {
 chunks = (
 	xs: List(Int)
 	acc: List(BitArray)
-) -> (BitArray, Headers, List(Int)) ? HttpError {
+) -> (BitArray, Headers, List(Int)) ^ HttpError {
 	(size_line, rest) = line(xs)
 	size = chunk_size(size_line)
 	{ size == 0 } |> {
@@ -529,7 +529,7 @@ chunks = (
 	}
 }
 
-chunk_size = (size_line: List(Int)) -> Int ? HttpError {
+chunk_size = (size_line: List(Int)) -> Int ^ HttpError {
 	(size_raw, extension, has_extension) = cut(size_line, 59)
 	size_bytes = list.reverse(list.drop_while(list.reverse(size_raw), space))
 	require(has_extension || size_bytes == size_raw, "invalid chunk size")
@@ -546,7 +546,7 @@ chunk_size = (size_line: List(Int)) -> Int ? HttpError {
 	size
 }
 
-valid_trailers = (trailers: Headers) -> Nil ? HttpError {
+valid_trailers = (trailers: Headers) -> Nil ^ HttpError {
 	require(
 		header_bytes(trailers, "content-length") == None &&
 			header_bytes(trailers, "transfer-encoding") == None &&
@@ -562,7 +562,7 @@ token_prefix = (xs: List(Int), acc: List(Int)) -> (List(Int), List(Int)) {
 	}
 }
 
-validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
+validate_extensions = (xs: List(Int)) -> Nil ^ HttpError {
 	(name, after_name) = token_prefix(list.drop_while(xs, space), [])
 	rest = list.drop_while(after_name, space)
 	require(name != [], "invalid chunk extension")
@@ -589,7 +589,7 @@ validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
 	}
 }
 
-extension_quoted = (xs: List(Int)) -> List(Int) ? HttpError {
+extension_quoted = (xs: List(Int)) -> List(Int) ^ HttpError {
 	xs |> {
 		[34, ..tail]                            -> tail
 		[92, x, ..tail] ? field_value(x)        -> extension_quoted(tail)
@@ -598,11 +598,11 @@ extension_quoted = (xs: List(Int)) -> List(Int) ? HttpError {
 	}
 }
 
-line = (xs: List(Int)) -> (List(Int), List(Int)) ? HttpError {
+line = (xs: List(Int)) -> (List(Int), List(Int)) ^ HttpError {
 	go = (
 		rest: List(Int)
 		acc: List(Int)
-	) -> (List(Int), List(Int)) ? HttpError {
+	) -> (List(Int), List(Int)) ^ HttpError {
 		rest |> {
 			[]               -> fail.raise(NeedMore)
 			[13]             -> fail.raise(NeedMore)
@@ -619,7 +619,7 @@ take = (
 	xs: List(Int)
 	n: Int
 	acc: List(Int)
-) -> (List(Int), List(Int)) ? HttpError {
+) -> (List(Int), List(Int)) ^ HttpError {
 	{ n == 0 } |> {
 		True -> (list.reverse(acc), xs)
 		False -> xs |> {
@@ -671,7 +671,7 @@ token = (x: Int) -> Bool {
 		)
 }
 
-require = (ok: Bool, why: String) -> Nil ? HttpError {
+require = (ok: Bool, why: String) -> Nil ^ HttpError {
 	ok |> {
 		True  -> Nil
 		False -> fail.raise(BadMessage(why))
@@ -692,7 +692,7 @@ bits = (xs: List(Int)) -> BitArray {
 	bit_array.concat(list.map(xs, (x) { <<x>> }))
 }
 
-text = (xs: List(Int)) -> String ? HttpError {
+text = (xs: List(Int)) -> String ^ HttpError {
 	bit_array.to_string(bits(xs)) |> {
 		Ok(s)    -> s
 		Error(_) -> fail.raise(BadMessage("invalid UTF-8"))
@@ -1030,7 +1030,7 @@ BodyCursor {
 	BodyCursor(buffer: BitArray, framing: BodyFraming, trailers: Headers)
 }
 
-request_framing = (hs: Headers) -> BodyFraming ? HttpError {
+request_framing = (hs: Headers) -> BodyFraming ^ HttpError {
 	validate_framing(hs)
 	transfer_codings(hs) |> {
 		[] -> header(hs, "content-length") |> {

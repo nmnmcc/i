@@ -447,8 +447,8 @@ range(Acc, E, N) = (
 	from: Int
 	to: Int
 	with: Acc
-	run: (Acc, Int) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	run: (Acc, Int) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	step = { from <= to } |> {
 		True  -> 1
 		False -> -1

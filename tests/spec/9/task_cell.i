@@ -4,7 +4,6 @@
 	i/task
 )
 
-@main
 main = () {
 	task.run(() {
 		state = task.cell(0)

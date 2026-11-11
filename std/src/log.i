@@ -84,12 +84,12 @@ Entry {
 }
 
 Sink(E, N) {
-	Sink((Level) -> Bool, (Entry) -> Nil ? E ! N, (N) -> Nil)
+	Sink((Level) -> Bool, (Entry) -> Nil ^ E ! N, (N) -> Nil)
 }
 
 make(E, N) = (
 	accept: (Level) -> Bool
-	send: (Entry) -> Nil ? E ! N
+	send: (Entry) -> Nil ^ E ! N
 ) -> Sink(E, N) { Sink(accept, send, (_: N) { Nil }) }
 
 silent(N) = () -> Sink(Never, N) {
@@ -121,7 +121,7 @@ write(E, N) = (entry: Entry, sink ! Sink(E, N)) {
 
 lazy(E, F, N) = (
 	level: Level
-	message: () -> String ? F ! N
+	message: () -> String ^ F ! N
 	sink ! Sink(E, N)
 ) {
 	Sink(accept, send, _) = sink

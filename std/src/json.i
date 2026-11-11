@@ -62,7 +62,7 @@ whitespace = (xs: List(Int), at: Int) -> (List(Int), Int) {
 	}
 }
 
-value = (input: List(Int), offset: Int) -> (Json, List(Int), Int) ? JsonError {
+value = (input: List(Int), offset: Int) -> (Json, List(Int), Int) ^ JsonError {
 	(xs, at) = whitespace(input, offset)
 	xs |> {
 		[110, 117, 108, 108, ..rest]     -> (Null, rest, at + 4)
@@ -79,7 +79,7 @@ value = (input: List(Int), offset: Int) -> (Json, List(Int), Int) ? JsonError {
 	}
 }
 
-array_start = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ? JsonError {
+array_start = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 	(rest, pos) = whitespace(xs, at)
 	rest |> {
 		[93, ..tail] -> (Array([]), tail, pos + 1)
@@ -91,7 +91,7 @@ array_items = (
 	xs: List(Int)
 	at: Int
 	acc: List(Json)
-) -> (Json, List(Int), Int) ? JsonError {
+) -> (Json, List(Int), Int) ^ JsonError {
 	(v, rest, pos) = value(xs, at)
 	(tail, end) = whitespace(rest, pos)
 	tail |> {
@@ -101,7 +101,7 @@ array_items = (
 	}
 }
 
-object_start = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ? JsonError {
+object_start = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 	(rest, pos) = whitespace(xs, at)
 	rest |> {
 		[125, ..tail] -> (Object([]), tail, pos + 1)
@@ -113,7 +113,7 @@ object_items = (
 	xs: List(Int)
 	at: Int
 	acc: List((String, Json))
-) -> (Json, List(Int), Int) ? JsonError {
+) -> (Json, List(Int), Int) ^ JsonError {
 	(rest, pos) = whitespace(xs, at)
 	rest |> {
 		[34, ..tail] -> {
@@ -153,7 +153,7 @@ read_string = (
 	xs: List(Int)
 	at: Int
 	acc: List(BitArray)
-) -> (String, List(Int), Int) ? JsonError {
+) -> (String, List(Int), Int) ^ JsonError {
 	xs |> {
 		[] -> fail.raise(JsonError(at, "unterminated string"))
 		[34, ..tail] -> {
@@ -174,7 +174,7 @@ escape = (
 	xs: List(Int)
 	at: Int
 	acc: List(BitArray)
-) -> (String, List(Int), Int) ? JsonError {
+) -> (String, List(Int), Int) ^ JsonError {
 	xs |> {
 		[117, ..tail] -> {
 			(n, after, end) = hex4(tail, at + 1)
@@ -230,7 +230,7 @@ escape = (
 	}
 }
 
-hex4 = (xs: List(Int), at: Int) -> (Int, List(Int), Int) ? JsonError {
+hex4 = (xs: List(Int), at: Int) -> (Int, List(Int), Int) ^ JsonError {
 	xs |> {
 		[a, b, c, d, ..tail] -> {
 			digits = [hex(a), hex(b), hex(c), hex(d)]
@@ -265,7 +265,7 @@ scalar = (n: Int) -> BitArray {
 
 digit = (x: Int) -> Bool { x >= 48 && x <= 57 }
 
-number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ? JsonError {
+number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 	(negative, start, pos) = xs |> {
 		[45, ..tail] -> (True, tail, at + 1)
 		_            -> (False, xs, at)

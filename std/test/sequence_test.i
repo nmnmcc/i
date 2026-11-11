@@ -135,7 +135,7 @@ sequence_walks = () {
 	Nil
 }
 
-reject_two = (x: Int) -> Int ? String {
+reject_two = (x: Int) -> Int ^ String {
 	x |> {
 		2 -> fail.raise("two")
 		3 -> panic("callback after first error")
@@ -402,7 +402,7 @@ sequence_callback_types_and_order = () {
 		})) ==
 			["a!", "é!"]
 	)
-	union_error = (x: Int) -> Int ? String | Bool {
+	union_error = (x: Int) -> Int ^ String | Bool {
 		{ x == 1 } |> {
 			True  -> fail.raise(True)
 			False -> fail.raise("other")
