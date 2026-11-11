@@ -325,6 +325,39 @@ impl ResourceContext {
         })
     }
 
+    /// Consume an idle resource atomically, for operations such as upgrading a
+    /// TCP stream. Existing operations make the upgrade busy; after success no
+    /// new operation can acquire the old identity.
+    pub fn take_idle<T: Any + Send + Sync>(
+        &self,
+        id: &BigInt,
+        kind: &str,
+    ) -> Result<Arc<T>, ResourceError> {
+        let mut table = self.table.lock().unwrap();
+        if table.ended {
+            return Err(ResourceError::Closed);
+        }
+        let entry = table
+            .entries
+            .get(id)
+            .filter(|e| e.kind == kind)
+            .ok_or(ResourceError::Closed)?;
+        let value = entry
+            .value
+            .clone()
+            .downcast::<T>()
+            .map_err(|_| ResourceError::Closed)?;
+        if !entry.leases.is_empty() {
+            return Err(ResourceError::Busy);
+        }
+        let (cleanup, done) = self
+            .remove(&mut table, id, kind)
+            .expect("idle resource exists");
+        drop(table);
+        cleanup(done);
+        Ok(value)
+    }
+
     fn remove(&self, table: &mut Table, id: &BigInt, kind: &str) -> Option<(Cleanup, CleanupDone)> {
         if !table
             .entries
@@ -616,6 +649,28 @@ mod tests {
         assert_eq!(lease.commit(1), Err(ResourceError::Closed));
         assert!(context.close(&id, "test").is_complete());
         assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+    #[test]
+    fn take_idle_requires_all_lanes_and_consumes_identity() {
+        let context = ResourceHost::default().context();
+        let id = insert(&context, &Arc::new(AtomicUsize::new(0)));
+        let read = context.acquire::<u32>(&id, "test", "read").unwrap();
+        assert!(matches!(
+            context.take_idle::<u32>(&id, "test"),
+            Err(ResourceError::Busy)
+        ));
+        drop(read);
+        let write = context.acquire::<u32>(&id, "test", "write").unwrap();
+        assert!(matches!(
+            context.take_idle::<u32>(&id, "test"),
+            Err(ResourceError::Busy)
+        ));
+        drop(write);
+        assert_eq!(*context.take_idle::<u32>(&id, "test").unwrap(), 42);
+        assert!(matches!(
+            context.acquire::<u32>(&id, "test", "read"),
+            Err(ResourceError::Closed)
+        ));
     }
     #[test]
     fn concurrent_closes_and_teardown_join_cleanup_without_tombstones() {

@@ -34,6 +34,8 @@ export interface BitArray { bytes: Uint8Array; bitLength: number }
 export type Value = undefined | null | boolean | bigint | number | string | BitArray | unknown;
 export type ModuleSource = WebAssembly.Module | BufferSource | Response | Request | URL | string;
 export interface Options {
+  /** Install the standard IO services; args are passed to i/process. */
+  standardServices?: boolean | { args?: string[] };
   /** Context registrations are restricted to approved resolved declarations. */
   contextImports?: Record<string, Record<string, (context: ResourceContext, ...args: any[]) => unknown>>;
   /** Host approval from authorizeBindings; a plain manifest cannot grant itself. */
@@ -146,7 +148,11 @@ export class ResourceContext {
   cleanupJob(): { readonly receipt: Promise<void>; complete(): void };
   insert<T>(kind: string, value: T, cleanup: (value: T) => void | Promise<void>): bigint;
   acquire<T = unknown>(id: bigint, kind: string, lane: string): ResourceLease<T>;
+  takeIdle<T = unknown>(id: bigint, kind: string): T;
   close(id: bigint, kind: string): Promise<void>;
   teardown(): Promise<void>;
   provisional(id: bigint, kind: string): ProvisionalResource;
 }
+
+/** Construct context-aware standard service registrations. */
+export function standardServices(options?: { args?: string[] }): Record<string, Record<string, (context: ResourceContext, ...args: any[]) => unknown>>;

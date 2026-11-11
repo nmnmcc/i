@@ -32,6 +32,7 @@ ilang-syntax.workspace = true
 
 [dev-dependencies]
 num-bigint.workspace = true
+rcgen = "0.14.10"
 wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-drc", "runtime", "std"] }
 
 [[test]]

@@ -3464,7 +3464,7 @@ scope_call(A, E, N) = (
 	own: Scheduler
 ) -> ScopeResult(A) ? E ! N {
 	kept = control.keep_env((_: Nil) {
-		scope_call_body(body, witness, mode, own)
+		request.within(() { scope_call_body(body, witness, mode, own) })
 	})
 	retain(kept(Nil))
 }

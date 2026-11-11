@@ -380,6 +380,8 @@ No library can infer that arbitrary callbacks meet this contract.
 
 ## 4. Additions to `std/float`
 
+Stage 3 targets error under 1 ulp; correct rounding (F1) is deferred to a later optimisation task.
+
 implementation withheld: feasibility gate not met, see lane/std3-float
 
 The accepted contract and algorithm below remain the specification for that

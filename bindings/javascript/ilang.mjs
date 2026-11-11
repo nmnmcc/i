@@ -1,3 +1,5 @@
+import { standardServices } from "./standard.mjs";
+export { standardServices } from "./standard.mjs";
 import { ResourceHost, ResourceError } from "./resources.mjs";
 export { ResourceHost, ResourceContext, ResourceError } from "./resources.mjs";
 const defaultResourceHost = new ResourceHost();
@@ -859,6 +861,7 @@ export async function instantiate(source, options = {}) {
   const module = await compile(source);
   const abi = readAbi(module, options.abi);
   const collections = readCollections(module);
+  const standard = options.standardServices ? standardServices(options.standardServices === true ? {} : options.standardServices) : {};
   checkBindings(module, abi, options);
   const bridge = new Bridge();
   const resourceHost = options.resourceHost ?? defaultResourceHost;
@@ -920,7 +923,7 @@ export async function instantiate(source, options = {}) {
       imports[moduleName] ??= Object.create(null);
       for (const [name, signature] of Object.entries(entries)) {
         const legacy = options.imports?.[moduleName]?.[name];
-        const contextFn = options.contextImports?.[moduleName]?.[name];
+        const contextFn = options.contextImports?.[moduleName]?.[name] ?? (!legacy ? standard[moduleName]?.[name] : undefined);
         expect(!(legacy && contextFn), `Host function ${moduleName} ${name} is registered twice`);
         expect(typeof (contextFn ?? legacy) === "function", `Missing host function ${moduleName} ${name}`);
         expect(!Object.hasOwn(imports[moduleName], name), `Host function ${moduleName} ${name} is registered twice`);

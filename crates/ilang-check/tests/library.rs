@@ -32,6 +32,7 @@ fn library_resolves_cleanly() {
             "i/fs",
             "i/process",
             "i/net",
+            "i/tls",
             "i/stdio"
         ]
     );
@@ -56,24 +57,6 @@ fn library_modules_have_sources() {
         count += 1;
     }
     assert_eq!(package.modules.len(), count);
-}
-
-/// The reserved modules parse with no problems, and hold only a module
-/// documentation comment: no imports, no exports and no items.
-#[test]
-fn reserved_modules_are_placeholders() {
-    for path in RESERVED {
-        let (_, text) = ilang_package::library::MODULES
-            .iter()
-            .find(|(p, _)| *p == path)
-            .unwrap_or_else(|| panic!("{path} is not registered"));
-        let (module, diags) = ilang_syntax::parse_module(text);
-        assert!(diags.is_empty(), "{path}: {diags:#?}");
-        assert!(!module.doc.is_empty(), "{path}");
-        assert!(module.imports.is_empty(), "{path}");
-        assert!(module.exports.is_empty(), "{path}");
-        assert!(module.items.is_empty(), "{path}");
-    }
 }
 
 /// The exported names of each library module, as in §9.3–§9.6, §9.10 and §13.
@@ -188,15 +171,61 @@ fn library_names() {
                 "map_concurrently",
             ],
         ),
-        ("i/clock", &[]),
+        ("i/clock", &["monotonic_ns", "unix_ns", "sleep_ns"]),
         (
             "i/random",
             &["from_seed", "word", "int", "float", "split", "at_path"],
         ),
-        ("i/fs", &[]),
-        ("i/process", &[]),
-        ("i/net", &[]),
-        ("i/stdio", &[]),
+        (
+            "i/fs",
+            &[
+                "open",
+                "read",
+                "write",
+                "flush",
+                "close",
+                "remove",
+                "rename",
+                "mkdir",
+                "list",
+                "metadata",
+                "temp_dir",
+                "read_file",
+                "write_file",
+                "read_lines",
+            ],
+        ),
+        ("i/process", &["args", "env", "cwd", "entropy", "spawn", "spawn_piped", "spawn_config", "read_stdout", "read_stderr", "write_stdin", "close_stdin", "wait", "terminate", "close"]),
+        (
+            "i/net",
+            &[
+                "listen",
+                "local_port",
+                "accept",
+                "connect",
+                "resolve",
+                "read",
+                "write",
+                "shutdown_write",
+                "close_stream",
+                "close_listener",
+                "stream_number",
+                "byte_stream",
+            ],
+        ),
+        ("i/tls", &["options", "identity", "connect", "accept", "dial", "alpn", "read", "write", "shutdown_write", "close", "byte_stream"]),
+        (
+            "i/stdio",
+            &[
+                "read",
+                "write",
+                "write_error",
+                "flush",
+                "flush_error",
+                "print",
+                "print_error",
+            ],
+        ),
     ];
     for (path, names) in expect {
         let m = program.module(common::module(&program, path));
@@ -313,11 +342,11 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 5] = ["i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
+const RESERVED: [&str; 6] = ["i/clock", "i/fs", "i/process", "i/net", "i/tls", "i/stdio"];
 
 /// User code imports every reserved module with no problems.
 ///
-/// The paths in RESERVED are explicitly kept as empty modules (§0, §2.1).
+/// These standard paths are registered in the library (§0, §2.1).
 #[test]
 fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();

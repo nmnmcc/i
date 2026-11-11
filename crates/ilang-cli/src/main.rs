@@ -66,6 +66,9 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
+        /// Arguments passed to the program after --.
+        #[arg(last = true)]
+        args: Vec<String>,
         /// Select a function declared in [entries].
         #[arg(long)]
         entry: Option<String>,
@@ -160,7 +163,8 @@ fn main() -> ExitCode {
             offline,
             opt,
             entry,
-        } => cmd_run(&project, opt, offline, entry.as_deref()),
+            args,
+        } => cmd_run(&project, opt, offline, entry.as_deref(), args),
         Command::Collections {
             project,
             offline,
@@ -317,6 +321,7 @@ fn cmd_run(
     opt: u8,
     offline: bool,
     entry: Option<&str>,
+    args: Vec<String>,
 ) -> anyhow::Result<ExitCode> {
     let Some(b) = built_entry(project, options(opt, false, offline)?, entry)? else {
         return Ok(ExitCode::FAILURE);
@@ -327,7 +332,11 @@ fn cmd_run(
             "the package has no program entry; define `main` in `src/main.i` or select `--entry NAME` (§10.2)"
         );
     }
-    match program.run_entry(b.host_options())? {
+    let mut options = ilang_host::HostOptions::new(ilang_host::services::stdout_with_args(args));
+    options
+        .imports
+        .grant_package(&b.binding_plan, &b.trusted_package);
+    match program.run_entry(options)? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
         Outcome::Stop(stop) => {
             eprintln!("{stop}");

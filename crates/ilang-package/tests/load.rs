@@ -85,6 +85,7 @@ fn graph_with_path_dependencies() {
             "i/fs",
             "i/process",
             "i/net",
+            "i/tls",
             "i/stdio"
         ]
     );
@@ -117,4 +118,47 @@ fn circles_and_missing() {
     let (graph, diags) = load(&dir.path().join("nothing"));
     assert!(graph.root.is_none());
     assert_eq!(diags[0].code, code::NO_PACKAGE);
+}
+
+#[test]
+fn standard_library_modules() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let (graph, diags) = load(&path);
+    assert!(diags.is_empty(), "{diags:?}");
+    let root = &graph.packages[graph.root.unwrap()];
+    let paths: Vec<&str> = root
+        .modules
+        .iter()
+        .filter(|m| m.kind == ModuleKind::Src)
+        .map(|m| m.path.as_str())
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "std/bit_array",
+            "std/bool",
+            "std/calendar",
+            "std/cli",
+            "std/dict",
+            "std/float",
+            "std/http",
+            "std/int",
+            "std/json",
+            "std/list",
+            "std/log",
+            "std/option",
+            "std/order",
+            "std/pair",
+            "std/path",
+            "std/property",
+            "std/result",
+            "std/schema",
+            "std/sequence",
+            "std/set",
+            "std/stream",
+            "std/string",
+            "std/time",
+            "std/uri",
+        ]
+    );
 }
