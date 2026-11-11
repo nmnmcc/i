@@ -828,6 +828,23 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
         target: (),
     }];
     assert!(registry.resolve(caller, None, &exported, &locals).is_none());
+    let mut expanded = parsed.clone();
+    let module = expanded.iter_mut().find(|p| p.source == caller).unwrap();
+    let mut scoped =
+        ilang_syntax::lisp::scoped::ScopedSource::new(graph.sources.get(caller).text.clone());
+    let generated = Syntax::from_datum(&parse("(= exported 1)").unwrap()[0], &scope).flip_mark(99);
+    module
+        .ast
+        .items
+        .extend(scoped.items(&generated, &exported).unwrap());
+    module.scoped = Some(scoped);
+    let registry = Registry::new(&graph, &expanded).unwrap();
+    assert!(registry.resolve(caller, None, &exported, &[]).is_some());
+    assert!(
+        registry
+            .resolve(caller, None, &exported.flip_mark(99), &[])
+            .is_none()
+    );
 }
 
 #[test]

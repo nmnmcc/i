@@ -25,6 +25,7 @@ enum Value {
 #[derive(Default)]
 struct Module {
     values: HashMap<String, (Value, bool)>,
+    generated: Vec<hygiene::Binding<Value>>,
 }
 
 /// Names are indexed in the value namespace, including non-macro bindings:
@@ -58,7 +59,19 @@ impl Registry {
                 if let ItemKind::Binding(binding) = &item.kind {
                     let mut names = Vec::new();
                     binding_names(&binding.pattern, &mut names);
-                    for name in names {
+                    for (name, span) in names {
+                        if let Some(origin) =
+                            p.scoped.as_ref().and_then(|scoped| scoped.origin(span))
+                            && !origin.syntax.scope().marks.is_empty()
+                        {
+                            module.generated.push(hygiene::Binding {
+                                text: name.to_owned(),
+                                scope: origin.syntax.scope().clone(),
+                                identity: origin.syntax.scope_identity().cloned(),
+                                target: Value::Other,
+                            });
+                            continue;
+                        }
                         let exported = p.ast.exports.iter().any(|e| e.name.name == name);
                         module
                             .values
@@ -174,7 +187,9 @@ impl Registry {
                 atom,
                 caller.0,
                 &locals,
-                &[],
+                self.modules
+                    .get(&caller.0)
+                    .map_or(&[], |module| module.generated.as_slice()),
                 |module, text| self.modules.get(&module)?.values.get(text).map(
                     |(target, exported)| hygiene::ModuleName {
                         target: target.clone(),
@@ -211,7 +226,9 @@ impl Registry {
                 atom,
                 caller.0,
                 &locals,
-                &[],
+                self.modules
+                    .get(&caller.0)
+                    .map_or(&[], |module| module.generated.as_slice()),
                 |module, text| {
                     self.modules
                         .get(&module)?
@@ -254,12 +271,14 @@ impl Registry {
     }
 }
 
-fn binding_names<'a>(p: &'a Pattern, out: &mut Vec<&'a str>) {
+fn binding_names<'a>(p: &'a Pattern, out: &mut Vec<(&'a str, ilang_syntax::span::Span)>) {
     match &p.kind {
-        PatternKind::Var(n) => out.push(n),
-        PatternKind::Typed { binder, .. } if !binder.discard => out.push(&binder.name),
+        PatternKind::Var(n) => out.push((n, p.span)),
+        PatternKind::Typed { binder, .. } if !binder.discard => {
+            out.push((&binder.name, binder.span))
+        }
         PatternKind::Named { name, pattern } => {
-            out.push(&name.name);
+            out.push((&name.name, name.span));
             binding_names(pattern, out);
         }
         PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
@@ -274,10 +293,10 @@ fn binding_names<'a>(p: &'a Pattern, out: &mut Vec<&'a str>) {
             if let Some(Some(b)) = rest
                 && !b.discard
             {
-                out.push(&b.name);
+                out.push((&b.name, b.span));
             }
         }
-        PatternKind::Prefix { rest, .. } if !rest.discard => out.push(&rest.name),
+        PatternKind::Prefix { rest, .. } if !rest.discard => out.push((&rest.name, rest.span)),
         PatternKind::BitArray(segments) => {
             for s in segments {
                 binding_names(&s.value, out);
