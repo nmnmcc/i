@@ -17,6 +17,7 @@ pub mod control;
 pub mod emit;
 pub mod ir;
 pub mod lower;
+mod lowering_stack;
 pub mod runtime;
 
 use ilang_check::hir;

@@ -38,6 +38,7 @@
 
 use crate::ir::Stmt;
 use crate::ir::{self, *};
+use crate::lowering_stack::{self, Scheduler};
 use ilang_check::hir::{self, *};
 use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
@@ -647,6 +648,11 @@ struct Lowerer<'a> {
     diags: Vec<Diagnostic>,
 }
 
+// Every `Scheduler::call` below is awaited directly. Its child returns an
+// owned result, and `lowering_stack::run` is the sole executor: a suspended
+// parent is retained until that child has completed or has been dropped on
+// unwind. This permits a child to reborrow the lowering state without keeping
+// its parent's native stack frame alive.
 impl<'a> Lowerer<'a> {
     fn new(
         graph: &'a PackageGraph,
@@ -1465,12 +1471,13 @@ impl<'a> Lowerer<'a> {
 
     /// A function expression with its captures, as a function of the
     /// intermediate form.
-    fn function(
+    async fn function_task(
         &mut self,
         module: ModuleId,
         f: &Function,
         captures: &[VarId],
         name: String,
+        __s: Scheduler,
     ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
@@ -1498,7 +1505,19 @@ impl<'a> Lowerer<'a> {
                 Param::Pattern { pattern, .. } => {
                     let v = Atom::Local(next);
                     next += 1;
-                    self.bind_checked(&mut fx, &mut out, pattern, v, pattern.span.start);
+                    unsafe {
+                        __s.call(|__child| {
+                            self.bind_checked_task(
+                                &mut fx,
+                                &mut out,
+                                pattern,
+                                v,
+                                pattern.span.start,
+                                __child,
+                            )
+                        })
+                    }
+                    .await;
                 }
                 Param::Env { var, name, .. } => {
                     let service = self.service(module, name.span);
@@ -1511,7 +1530,8 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        self.block(&mut fx, &mut out, &f.body, true);
+        unsafe { __s.call(|__child| self.block_task(&mut fx, &mut out, &f.body, true, __child)) }
+            .await;
         let pending = f
             .params
             .iter()
@@ -1677,27 +1697,53 @@ impl<'a> Lowerer<'a> {
 
     // ---- Expressions ----
 
-    fn expr(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr) -> Atom {
-        self.lower(fx, out, e, false)
+    async fn expr_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        e: &Expr,
+        __s: Scheduler,
+    ) -> Atom {
+        unsafe { __s.call(|__child| self.lower_task(fx, out, e, false, __child)) }
+            .await
             .expect("a value that is not in tail position")
     }
 
     /// Lowers `e`. In tail position, the statements end the function and
     /// there is no value.
-    fn lower(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr, tail: bool) -> Option<Atom> {
+    async fn lower_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        e: &Expr,
+        tail: bool,
+        __s: Scheduler,
+    ) -> Option<Atom> {
         let a = match &e.kind {
             ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
             ExprKind::Float(x) => Atom::Float(*x),
             ExprKind::String(s) => Atom::String(s.clone()),
             ExprKind::Name(r) => self.name(fx, e, *r),
             ExprKind::Tuple(items) => {
-                let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
+                let mut parts = Vec::with_capacity(items.len());
+                for x in items {
+                    parts.push(
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await,
+                    );
+                }
                 let_value(fx, out, Value::Tuple(parts), None)
             }
             ExprKind::List { items, rest } => {
-                let parts: Vec<Atom> = items.iter().map(|x| self.expr(fx, out, x)).collect();
+                let mut parts = Vec::with_capacity(items.len());
+                for x in items {
+                    parts.push(
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await,
+                    );
+                }
                 let mut list = match rest {
-                    Some(r) => self.expr(fx, out, r),
+                    Some(r) => {
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, r, __child)) }.await
+                    }
                     None => Atom::EmptyList,
                 };
                 for p in parts.into_iter().rev() {
@@ -1705,19 +1751,36 @@ impl<'a> Lowerer<'a> {
                 }
                 list
             }
-            ExprKind::BitArray(segs) => self.bit_array(fx, out, e, segs),
-            ExprKind::Block(b) => return self.block(fx, out, b, tail),
-            ExprKind::Fn(f) => self.closure(fx, out, f),
+            ExprKind::BitArray(segs) => {
+                unsafe { __s.call(|__child| self.bit_array_task(fx, out, e, segs, __child)) }.await
+            }
+            ExprKind::Block(b) => {
+                return unsafe { __s.call(|__child| self.block_task(fx, out, b, tail, __child)) }
+                    .await;
+            }
+            ExprKind::Fn(f) => {
+                unsafe { __s.call(|__child| self.closure_task(fx, out, f, __child)) }.await
+            }
             ExprKind::Case { subject, clauses } => {
-                let s = self.expr(fx, out, subject);
-                return self.case(fx, out, s, clauses, tail);
+                let s =
+                    unsafe { __s.call(|__child| self.expr_task(fx, out, subject, __child)) }.await;
+                return unsafe {
+                    __s.call(|__child| self.case_task(fx, out, s, clauses, tail, __child))
+                }
+                .await;
             }
             ExprKind::Call { callee, args } => {
                 let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
-                return self.call(fx, out, e.span, callee, None, &args, tail);
+                return unsafe {
+                    __s.call(|__child| {
+                        self.call_task(fx, out, e.span, callee, None, &args, tail, __child)
+                    })
+                }
+                .await;
             }
             ExprKind::Field { target, .. } => {
-                let t = self.expr(fx, out, target);
+                let t =
+                    unsafe { __s.call(|__child| self.expr_task(fx, out, target, __child)) }.await;
                 match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Field(list)) => self.field(fx, out, t, list),
                     Some(Access::Part(k)) => let_value(fx, out, Value::Field(t, *k), None),
@@ -1725,7 +1788,8 @@ impl<'a> Lowerer<'a> {
                 }
             }
             ExprKind::TupleIndex { target, index, .. } => {
-                let t = self.expr(fx, out, target);
+                let t =
+                    unsafe { __s.call(|__child| self.expr_task(fx, out, target, __child)) }.await;
                 let k = match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Part(k)) => *k,
                     _ => u32::try_from(index).unwrap_or(0),
@@ -1735,11 +1799,14 @@ impl<'a> Lowerer<'a> {
             ExprKind::RecordUpdate {
                 ctor, base, fields, ..
             } => {
-                let b = self.expr(fx, out, base);
-                let given: Vec<(String, Atom)> = fields
-                    .iter()
-                    .map(|(name, x)| (name.name.clone(), self.expr(fx, out, x)))
-                    .collect();
+                let b = unsafe { __s.call(|__child| self.expr_task(fx, out, base, __child)) }.await;
+                let mut given = Vec::with_capacity(fields.len());
+                for (name, x) in fields {
+                    given.push((
+                        name.name.clone(),
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await,
+                    ));
+                }
                 let info = self.ctors[ctor].clone();
                 let CtorRepr::Record { ctor, ty } = info.repr else {
                     unreachable!("only records have fields")
@@ -1770,16 +1837,21 @@ impl<'a> Lowerer<'a> {
                 (UnOp::Neg, ExprKind::Int(n)) => Atom::Int(-BigInt::from(n.clone())),
                 (UnOp::NegFloat, ExprKind::Float(x)) => Atom::Float(-*x),
                 (UnOp::Neg, _) => {
-                    let a = self.expr(fx, out, expr);
+                    let a =
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, expr, __child)) }.await;
                     let_value(fx, out, Value::Op(Op::IntNeg, vec![a]), None)
                 }
                 (UnOp::NegFloat, _) => {
-                    let a = self.expr(fx, out, expr);
+                    let a =
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, expr, __child)) }.await;
                     let_value(fx, out, Value::Op(Op::FloatNeg, vec![a]), None)
                 }
             },
             ExprKind::Binary { op, lhs, rhs } => {
-                return self.binary(fx, out, e, *op, lhs, rhs, tail);
+                return unsafe {
+                    __s.call(|__child| self.binary_task(fx, out, e, *op, lhs, rhs, tail, __child))
+                }
+                .await;
             }
             ExprKind::Error => {
                 out.push(Stmt::Unreachable);
@@ -1791,32 +1863,50 @@ impl<'a> Lowerer<'a> {
 
     /// A block (§6.10). An environment statement changes the environment
     /// for the rest of its block only (§9.2).
-    fn block(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Block, tail: bool) -> Option<Atom> {
-        let outer = fx.env;
-        let a = self.statements(fx, out, b, tail);
-        fx.env = outer;
-        a
-    }
-
-    fn statements(
+    async fn block_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         b: &Block,
         tail: bool,
+        __s: Scheduler,
+    ) -> Option<Atom> {
+        let outer = fx.env;
+        let a =
+            unsafe { __s.call(|__child| self.statements_task(fx, out, b, tail, __child)) }.await;
+        fx.env = outer;
+        a
+    }
+
+    async fn statements_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        b: &Block,
+        tail: bool,
+        __s: Scheduler,
     ) -> Option<Atom> {
         let last = b.stmts.len().saturating_sub(1);
         for (i, s) in b.stmts.iter().enumerate() {
             match s {
-                hir::Stmt::Expr(e) if i == last => return self.lower(fx, out, e, tail),
-                hir::Stmt::Expr(e) => {
-                    self.expr(fx, out, e);
+                hir::Stmt::Expr(e) if i == last => {
+                    return unsafe {
+                        __s.call(|__child| self.lower_task(fx, out, e, tail, __child))
+                    }
+                    .await;
                 }
-                hir::Stmt::Bind(binding) => self.binding(fx, out, binding),
+                hir::Stmt::Expr(e) => {
+                    unsafe { __s.call(|__child| self.expr_task(fx, out, e, __child)) }.await;
+                }
+                hir::Stmt::Bind(binding) => {
+                    unsafe { __s.call(|__child| self.binding_task(fx, out, binding, __child)) }
+                        .await
+                }
                 hir::Stmt::Env { value, span, .. } => {
                     // The value uses the environment from outside the
                     // statement (§4.8 rule 9).
-                    let v = self.expr(fx, out, value);
+                    let v = unsafe { __s.call(|__child| self.expr_task(fx, out, value, __child)) }
+                        .await;
                     let service = self.service(fx.module, *span);
                     let dst = fx.local(LocalType::Env);
                     out.push(Stmt::LetEnv {
@@ -1836,20 +1926,36 @@ impl<'a> Lowerer<'a> {
     /// A binding in a block (§6.10). The names of a direct value may be used
     /// in the function bodies of the value: those closures are made first and
     /// their captures are filled when the names are bound.
-    fn binding(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binding) {
+    async fn binding_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        b: &Binding,
+        __s: Scheduler,
+    ) {
         if !b.direct {
-            let v = self.expr(fx, out, &b.value);
-            self.bind_checked(fx, out, &b.pattern, v, b.span.start);
+            let v = unsafe { __s.call(|__child| self.expr_task(fx, out, &b.value, __child)) }.await;
+            unsafe {
+                __s.call(|__child| {
+                    self.bind_checked_task(fx, out, &b.pattern, v, b.span.start, __child)
+                })
+            }
+            .await;
             return;
         }
         let mut vars = HashSet::new();
         pattern_vars(&b.pattern, &mut vars);
         let saved = fx.pending.replace(vars);
         let saved_patches = std::mem::take(&mut fx.patches);
-        let v = self.expr(fx, out, &b.value);
+        let v = unsafe { __s.call(|__child| self.expr_task(fx, out, &b.value, __child)) }.await;
         fx.pending = saved;
         let patches = std::mem::replace(&mut fx.patches, saved_patches);
-        self.bind_checked(fx, out, &b.pattern, v, b.span.start);
+        unsafe {
+            __s.call(|__child| {
+                self.bind_checked_task(fx, out, &b.pattern, v, b.span.start, __child)
+            })
+        }
+        .await;
         for (closure, index, var) in patches {
             let value = Atom::Local(fx.var(var));
             out.push(Stmt::SetCapture {
@@ -1860,11 +1966,20 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn closure(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, f: &Function) -> Atom {
+    async fn closure_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        f: &Function,
+        __s: Scheduler,
+    ) -> Atom {
         let captures = captures_of(f);
         let id = self.new_func();
         let name = format!("{}:fn{}", self.program.module(fx.module).path, id.0);
-        let func = self.function(fx.module, f, &captures, name);
+        let func = unsafe {
+            __s.call(|__child| self.function_task(fx.module, f, &captures, name, __child))
+        }
+        .await;
         self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         let mut atoms = Vec::new();
         let mut later = Vec::new();
@@ -1930,7 +2045,7 @@ impl<'a> Lowerer<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn binary(
+    async fn binary_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
@@ -1939,22 +2054,36 @@ impl<'a> Lowerer<'a> {
         lhs: &Expr,
         rhs: &Expr,
         tail: bool,
+        __s: Scheduler,
     ) -> Option<Atom> {
         if op == BinOp::Pipe {
             // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)` (§6.9).
             return match &rhs.kind {
                 ExprKind::Call { callee, args } => {
                     let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
-                    self.call(fx, out, e.span, callee, Some(lhs), &args, tail)
+                    unsafe {
+                        __s.call(|__child| {
+                            self.call_task(fx, out, e.span, callee, Some(lhs), &args, tail, __child)
+                        })
+                    }
+                    .await
                 }
-                _ => self.call(fx, out, e.span, rhs, Some(lhs), &[], tail),
+                _ => {
+                    unsafe {
+                        __s.call(|__child| {
+                            self.call_task(fx, out, e.span, rhs, Some(lhs), &[], tail, __child)
+                        })
+                    }
+                    .await
+                }
             };
         }
         if matches!(op, BinOp::And | BinOp::Or) && tail {
             // The right side is in tail position (§11.6).
-            let a = self.expr(fx, out, lhs);
+            let a = unsafe { __s.call(|__child| self.expr_task(fx, out, lhs, __child)) }.await;
             let mut right = Vec::new();
-            self.lower(fx, &mut right, rhs, true);
+            unsafe { __s.call(|__child| self.lower_task(fx, &mut right, rhs, true, __child)) }
+                .await;
             let short = vec![Stmt::Return(Atom::Bool(op == BinOp::Or))];
             let (then, otherwise) = if op == BinOp::And {
                 (right, short)
@@ -1970,10 +2099,11 @@ impl<'a> Lowerer<'a> {
         }
         if matches!(op, BinOp::And | BinOp::Or) {
             // The right side is only worked out when the left is not enough.
-            let a = self.expr(fx, out, lhs);
+            let a = unsafe { __s.call(|__child| self.expr_task(fx, out, lhs, __child)) }.await;
             let dst = fx.local(LocalType::Value);
             let mut right = Vec::new();
-            let b = self.expr(fx, &mut right, rhs);
+            let b =
+                unsafe { __s.call(|__child| self.expr_task(fx, &mut right, rhs, __child)) }.await;
             right.push(Stmt::Let {
                 dst,
                 value: Value::Atom(b),
@@ -1996,8 +2126,8 @@ impl<'a> Lowerer<'a> {
             });
             return finish(out, tail, Atom::Local(dst));
         }
-        let a = self.expr(fx, out, lhs);
-        let b = self.expr(fx, out, rhs);
+        let a = unsafe { __s.call(|__child| self.expr_task(fx, out, lhs, __child)) }.await;
+        let b = unsafe { __s.call(|__child| self.expr_task(fx, out, rhs, __child)) }.await;
         let o = match op {
             BinOp::Eq => Op::Equal,
             BinOp::NotEq => Op::NotEqual,
@@ -2031,7 +2161,13 @@ impl<'a> Lowerer<'a> {
     }
 
     /// What a callee is, worked out when it is a value.
-    fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
+    async fn target_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        callee: &Expr,
+        __s: Scheduler,
+    ) -> Target {
         match &callee.kind {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 // §10.1: a call of an external function is done when it is
@@ -2057,7 +2193,9 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ExprKind::Name(ValueRef::Ctor(c)) => Target::Ctor(*c),
-            _ => Target::Callee(Callee::Value(self.expr(fx, out, callee))),
+            _ => Target::Callee(Callee::Value(
+                unsafe { __s.call(|__child| self.expr_task(fx, out, callee, __child)) }.await,
+            )),
         }
     }
 
@@ -2065,7 +2203,7 @@ impl<'a> Lowerer<'a> {
     /// worked out first, then the arguments as they are written (§6.2); for
     /// `|>`, `a` comes before both.
     #[allow(clippy::too_many_arguments)]
-    fn call(
+    async fn call_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
@@ -2074,14 +2212,16 @@ impl<'a> Lowerer<'a> {
         first: Option<&Expr>,
         args: &[&Expr],
         tail: bool,
+        __s: Scheduler,
     ) -> Option<Atom> {
         let mut written = Vec::new();
         if let Some(a) = first {
-            written.push(self.expr(fx, out, a));
+            written.push(unsafe { __s.call(|__child| self.expr_task(fx, out, a, __child)) }.await);
         }
-        let target = self.target(fx, out, callee);
+        let target =
+            unsafe { __s.call(|__child| self.target_task(fx, out, callee, __child)) }.await;
         for a in args {
-            written.push(self.expr(fx, out, a));
+            written.push(unsafe { __s.call(|__child| self.expr_task(fx, out, a, __child)) }.await);
         }
         let args: Vec<Atom> = match self.typed.args.get(&(fx.module, span)) {
             Some(order) if order.len() == written.len() => {
@@ -2150,16 +2290,17 @@ impl<'a> Lowerer<'a> {
 
     // ---- Bit arrays (§8.3) ----
 
-    fn bit_array(
+    async fn bit_array_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         e: &Expr,
         segs: &[Segment<Expr>],
+        __s: Scheduler,
     ) -> Atom {
         let mut acc: Option<Atom> = None;
         for s in segs {
-            let v = self.expr(fx, out, &s.value);
+            let v = unsafe { __s.call(|__child| self.expr_task(fx, out, &s.value, __child)) }.await;
             let fmt = format(s.format.as_ref());
             let piece = match fmt {
                 Some(Fmt::Int {
@@ -2181,7 +2322,8 @@ impl<'a> Lowerer<'a> {
                     little,
                     ..
                 }) => {
-                    let n = self.expr(fx, out, x);
+                    let n =
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await;
                     let site = self.site(fx, e.span.start);
                     let w = let_num(fx, out, NumValue::LengthOf(n, 1), site);
                     let_value(
@@ -2215,7 +2357,8 @@ impl<'a> Lowerer<'a> {
                     } else {
                         8
                     };
-                    let n = self.expr(fx, out, x);
+                    let n =
+                        unsafe { __s.call(|__child| self.expr_task(fx, out, x, __child)) }.await;
                     let site = self.site(fx, e.span.start);
                     let w = let_num(fx, out, NumValue::TakeLength(n, unit), site);
                     let_value(fx, out, Value::BitsTake(v, w), site)
@@ -2259,13 +2402,14 @@ impl<'a> Lowerer<'a> {
 
     // ---- case (§6.12) ----
 
-    fn case(
+    async fn case_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         s: Atom,
         clauses: &[Clause],
         tail: bool,
+        __s: Scheduler,
     ) -> Option<Atom> {
         let end = fx.label();
         let dst = if tail {
@@ -2278,9 +2422,13 @@ impl<'a> Lowerer<'a> {
             let next = fx.label();
             let mut cb = Vec::new();
             if let [p] = c.patterns.as_slice() {
-                self.pattern(fx, &mut cb, p, s.clone(), next);
+                unsafe {
+                    __s.call(|__child| self.pattern_task(fx, &mut cb, p, s.clone(), next, __child))
+                }
+                .await;
                 if let Some(g) = &c.guard {
-                    let g = self.expr(fx, &mut cb, g);
+                    let g = unsafe { __s.call(|__child| self.expr_task(fx, &mut cb, g, __child)) }
+                        .await;
                     guard(&mut cb, Cond::True(g), next);
                 }
             } else {
@@ -2291,9 +2439,16 @@ impl<'a> Lowerer<'a> {
                 for p in &c.patterns {
                     let no = fx.label();
                     let mut pb = Vec::new();
-                    self.pattern(fx, &mut pb, p, s.clone(), no);
+                    unsafe {
+                        __s.call(|__child| {
+                            self.pattern_task(fx, &mut pb, p, s.clone(), no, __child)
+                        })
+                    }
+                    .await;
                     if let Some(g) = &c.guard {
-                        let g = self.expr(fx, &mut pb, g);
+                        let g =
+                            unsafe { __s.call(|__child| self.expr_task(fx, &mut pb, g, __child)) }
+                                .await;
                         guard(&mut pb, Cond::True(g), no);
                     }
                     pb.push(Stmt::Break(matched));
@@ -2308,7 +2463,10 @@ impl<'a> Lowerer<'a> {
                     body: mb,
                 });
             }
-            if let Some(a) = self.lower(fx, &mut cb, &c.body, tail) {
+            if let Some(a) =
+                unsafe { __s.call(|__child| self.lower_task(fx, &mut cb, &c.body, tail, __child)) }
+                    .await
+            {
                 cb.push(Stmt::Let {
                     dst: dst.expect("a value"),
                     value: Value::Atom(a),
@@ -2359,7 +2517,15 @@ impl<'a> Lowerer<'a> {
 
     /// Matches `v` with the pattern of a `case` clause, and leaves to `fail`
     /// when it does not match (§7.2).
-    fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
+    async fn pattern_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        p: &Pattern,
+        v: Atom,
+        fail: Label,
+        __s: Scheduler,
+    ) {
         match &p.kind {
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
@@ -2378,7 +2544,10 @@ impl<'a> Lowerer<'a> {
             }
             PatternKind::Named { binder, pattern } => {
                 Self::bind_var(fx, out, binder, v.clone());
-                self.pattern(fx, out, pattern, v, fail);
+                unsafe {
+                    __s.call(|__child| self.pattern_task(fx, out, pattern, v, fail, __child))
+                }
+                .await;
             }
             PatternKind::Int { negative, value } => {
                 let mut n = BigInt::from(value.clone());
@@ -2414,14 +2583,20 @@ impl<'a> Lowerer<'a> {
                 guard(out, cond, fail);
                 for (arg, i) in self.fields_of(fx, p, args) {
                     let f = let_value(fx, out, Value::Field(v.clone(), i), None);
-                    self.pattern(fx, out, arg, f, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, arg, f, fail, __child))
+                    }
+                    .await;
                 }
             }
             PatternKind::Tuple(parts) => {
                 guard(out, Cond::Tuple(v.clone(), parts.len() as u32), fail);
                 for (i, part) in parts.iter().enumerate() {
                     let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
-                    self.pattern(fx, out, part, f, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, part, f, fail, __child))
+                    }
+                    .await;
                 }
             }
             PatternKind::List { items, rest } => {
@@ -2430,7 +2605,10 @@ impl<'a> Lowerer<'a> {
                 for item in items {
                     guard(out, Cond::Not(Box::new(Cond::Empty(cur.clone()))), fail);
                     let h = let_value(fx, out, Value::ListHead(cur.clone()), None);
-                    self.pattern(fx, out, item, h, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, item, h, fail, __child))
+                    }
+                    .await;
                     cur = let_value(fx, out, Value::ListTail(cur), None);
                 }
                 match rest {
@@ -2439,7 +2617,12 @@ impl<'a> Lowerer<'a> {
                     Some(None) => {}
                 }
             }
-            PatternKind::BitArray(segs) => self.bits_pattern(fx, out, v, segs, fail),
+            PatternKind::BitArray(segs) => {
+                unsafe {
+                    __s.call(|__child| self.bits_pattern_task(fx, out, v, segs, fail, __child))
+                }
+                .await
+            }
             PatternKind::Error(_) => out.push(Stmt::Unreachable),
         }
     }
@@ -2469,48 +2652,56 @@ impl<'a> Lowerer<'a> {
     }
 
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
-        match h {
-            Head::Tuple(n) => Cond::Tuple(v, n),
-            Head::Fn => Cond::Tag(v, 7),
-            Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
-                v,
-                match b {
-                    BuiltinType::Int => 8,
-                    BuiltinType::Float => 2,
-                    BuiltinType::String => 3,
-                    BuiltinType::List => 6,
-                    BuiltinType::BitArray => 9,
-                    BuiltinType::UtfCodepoint => 13,
-                    BuiltinType::Boundary => 11,
-                    BuiltinType::Continuation => 12,
-                    BuiltinType::Never => u32::MAX,
+        let mut head = h;
+        loop {
+            match head {
+                Head::Tuple(n) => return Cond::Tuple(v, n),
+                Head::Fn => return Cond::Tag(v, 7),
+                Head::Named(TypeRef::Builtin(b)) => {
+                    return Cond::Tag(
+                        v,
+                        match b {
+                            BuiltinType::Int => 8,
+                            BuiltinType::Float => 2,
+                            BuiltinType::String => 3,
+                            BuiltinType::List => 6,
+                            BuiltinType::BitArray => 9,
+                            BuiltinType::UtfCodepoint => 13,
+                            BuiltinType::Boundary => 11,
+                            BuiltinType::Continuation => 12,
+                            BuiltinType::Never => u32::MAX,
+                        },
+                    );
+                }
+                Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
+                    Some(TypeRepr::Bool) => return Cond::Tag(v, 1),
+                    Some(TypeRepr::Nil) => return Cond::Tag(v, 0),
+                    Some(TypeRepr::Record(id)) => return Cond::Type(v, *id),
+                    Some(TypeRepr::Host) => return Cond::Tag(v, 10),
+                    None => match &self.program.ty(t).body {
+                        TypeBody::Alias(Type {
+                            kind: TypeKind::Named { ty, .. },
+                            ..
+                        }) => {
+                            head = Head::Named(*ty);
+                        }
+                        _ => return Cond::Tag(v, u32::MAX),
+                    },
                 },
-            ),
-            Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
-                Some(TypeRepr::Bool) => Cond::Tag(v, 1),
-                Some(TypeRepr::Nil) => Cond::Tag(v, 0),
-                Some(TypeRepr::Record(id)) => Cond::Type(v, *id),
-                Some(TypeRepr::Host) => Cond::Tag(v, 10),
-                None => match &self.program.ty(t).body {
-                    TypeBody::Alias(Type {
-                        kind: TypeKind::Named { ty, .. },
-                        ..
-                    }) => self.head_cond(v, Head::Named(*ty)),
-                    _ => Cond::Tag(v, u32::MAX),
-                },
-            },
+            }
         }
     }
 
     /// §8.4: the segments are matched from the start, and all the bits must
     /// be used.
-    fn bits_pattern(
+    async fn bits_pattern_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         v: Atom,
         segs: &[Segment<Pattern>],
         fail: Label,
+        __s: Scheduler,
     ) {
         guard(out, Cond::Tag(v.clone(), 9), fail);
         let total = let_num(fx, out, NumValue::BitsLength(v.clone()), None);
@@ -2525,7 +2716,14 @@ impl<'a> Lowerer<'a> {
                 }) => {
                     let w = match width {
                         Width::Const(n) => Num::Const(n as i64),
-                        Width::Dyn(x) => self.pattern_width(fx, out, x, 1, fail),
+                        Width::Dyn(x) => {
+                            unsafe {
+                                __s.call(|__child| {
+                                    self.pattern_width_task(fx, out, x, 1, fail, __child)
+                                })
+                            }
+                            .await
+                        }
                     };
                     guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
                     let x = let_value(
@@ -2540,7 +2738,10 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    self.pattern(fx, out, &s.value, x, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
+                    }
+                    .await;
                     pos = let_num(fx, out, NumValue::Add(pos, w), None);
                 }
                 Some(Fmt::Float { width, little }) => {
@@ -2565,7 +2766,10 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    self.pattern(fx, out, &s.value, x, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
+                    }
+                    .await;
                     pos = let_num(fx, out, NumValue::Add(pos, Num::Const(width as i64)), None);
                 }
                 Some(Fmt::Bits(None)) | Some(Fmt::Bytes(None)) => {
@@ -2583,7 +2787,10 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    self.pattern(fx, out, &s.value, x, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
+                    }
+                    .await;
                     pos = total.clone();
                 }
                 Some(Fmt::Bits(Some(n))) | Some(Fmt::Bytes(Some(n))) => {
@@ -2592,7 +2799,10 @@ impl<'a> Lowerer<'a> {
                     } else {
                         8
                     };
-                    let w = self.pattern_width(fx, out, n, unit, fail);
+                    let w = unsafe {
+                        __s.call(|__child| self.pattern_width_task(fx, out, n, unit, fail, __child))
+                    }
+                    .await;
                     guard(out, Cond::BitsHas(v.clone(), pos.clone(), w.clone()), fail);
                     let x = let_value(
                         fx,
@@ -2604,7 +2814,10 @@ impl<'a> Lowerer<'a> {
                         },
                         None,
                     );
-                    self.pattern(fx, out, &s.value, x, fail);
+                    unsafe {
+                        __s.call(|__child| self.pattern_task(fx, out, &s.value, x, fail, __child))
+                    }
+                    .await;
                     pos = let_num(fx, out, NumValue::Add(pos, w), None);
                 }
                 Some(Fmt::Utf {
@@ -2664,7 +2877,12 @@ impl<'a> Lowerer<'a> {
                         little,
                     });
                     guard(out, Cond::I32(ok), fail);
-                    self.pattern(fx, out, &s.value, Atom::Local(cp), fail);
+                    unsafe {
+                        __s.call(|__child| {
+                            self.pattern_task(fx, out, &s.value, Atom::Local(cp), fail, __child)
+                        })
+                    }
+                    .await;
                     pos = let_num(fx, out, NumValue::Add(pos, Num::Local(width)), None);
                 }
                 None => out.push(Stmt::Unreachable),
@@ -2675,15 +2893,16 @@ impl<'a> Lowerer<'a> {
 
     /// The width of a segment of a pattern with a length; a length that is
     /// negative does not match.
-    fn pattern_width(
+    async fn pattern_width_task(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         n: &Expr,
         unit: u32,
         fail: Label,
+        __s: Scheduler,
     ) -> Num {
-        let n = self.expr(fx, out, n);
+        let n = unsafe { __s.call(|__child| self.expr_task(fx, out, n, __child)) }.await;
         let w = let_num(fx, out, NumValue::WidthOf(n, unit), None);
         guard(
             out,
@@ -2711,27 +2930,42 @@ impl<'a> Lowerer<'a> {
     /// Whether `bind` takes the pattern: it has no test at all, given the
     /// type of its value.
     fn plain(&self, p: &Pattern) -> bool {
-        match &p.kind {
-            PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => true,
-            PatternKind::Named { pattern, .. } => self.plain(pattern),
-            PatternKind::Tuple(parts) => parts.iter().all(|x| self.plain(x)),
-            PatternKind::Constructor { ctor, args, .. } => {
-                matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1)
-                    && args.iter().all(|x| self.plain(x))
+        let mut pending = vec![p];
+        while let Some(p) = pending.pop() {
+            match &p.kind {
+                PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => {}
+                PatternKind::Named { pattern, .. } => pending.push(pattern),
+                PatternKind::Tuple(parts) => pending.extend(parts),
+                PatternKind::Constructor { ctor, args, .. } => {
+                    if !matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1)
+                    {
+                        return false;
+                    }
+                    pending.extend(args);
+                }
+                PatternKind::List {
+                    items,
+                    rest: Some(_),
+                } if items.is_empty() => {}
+                _ => return false,
             }
-            PatternKind::List {
-                items,
-                rest: Some(_),
-            } => items.is_empty(),
-            _ => false,
         }
+        true
     }
 
     /// Binds the pattern of a binding or a parameter (§6.10, §6.11). When
     /// it may fail, a value that does not match is reported to `Assert`:
     /// `a.fail(AssertionFailure(m))`, with the message of §6.10 and the
     /// position `at` on the shadow stack.
-    fn bind_checked(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, at: u32) {
+    async fn bind_checked_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        p: &Pattern,
+        v: Atom,
+        at: u32,
+        __s: Scheduler,
+    ) {
         let fails = self
             .typed
             .may_fail
@@ -2739,13 +2973,16 @@ impl<'a> Lowerer<'a> {
             .copied()
             .unwrap_or(false);
         if !fails && self.plain(p) {
-            self.bind(fx, out, p, v);
+            unsafe { __s.call(|__child| self.bind_task(fx, out, p, v, __child)) }.await;
             return;
         }
         let ok = fx.label();
         let no = fx.label();
         let mut matching = Vec::new();
-        self.pattern(fx, &mut matching, p, v.clone(), no);
+        unsafe {
+            __s.call(|__child| self.pattern_task(fx, &mut matching, p, v.clone(), no, __child))
+        }
+        .await;
         matching.push(Stmt::Break(ok));
         let mut body = vec![Stmt::Block {
             label: no,
@@ -2814,7 +3051,14 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Binds a pattern that `plain` takes.
-    fn bind(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom) {
+    async fn bind_task(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        p: &Pattern,
+        v: Atom,
+        __s: Scheduler,
+    ) {
         match &p.kind {
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
@@ -2825,18 +3069,18 @@ impl<'a> Lowerer<'a> {
             }
             PatternKind::Named { binder, pattern } => {
                 Self::bind_var(fx, out, binder, v.clone());
-                self.bind(fx, out, pattern, v);
+                unsafe { __s.call(|__child| self.bind_task(fx, out, pattern, v, __child)) }.await;
             }
             PatternKind::Tuple(parts) => {
                 for (i, part) in parts.iter().enumerate() {
                     let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
-                    self.bind(fx, out, part, f);
+                    unsafe { __s.call(|__child| self.bind_task(fx, out, part, f, __child)) }.await;
                 }
             }
             PatternKind::Constructor { args, .. } => {
                 for (arg, i) in self.fields_of(fx, p, args) {
                     let f = let_value(fx, out, Value::Field(v.clone(), i), None);
-                    self.bind(fx, out, arg, f);
+                    unsafe { __s.call(|__child| self.bind_task(fx, out, arg, f, __child)) }.await;
                 }
             }
             PatternKind::List {
@@ -2846,6 +3090,23 @@ impl<'a> Lowerer<'a> {
             PatternKind::List { .. } => {}
             _ => out.push(Stmt::Unreachable),
         }
+    }
+    fn function(
+        &mut self,
+        module: ModuleId,
+        f: &Function,
+        captures: &[VarId],
+        name: String,
+    ) -> Func {
+        lowering_stack::run(|s| self.function_task(module, f, captures, name, s))
+    }
+
+    fn expr(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr) -> Atom {
+        lowering_stack::run(|s| self.expr_task(fx, out, e, s))
+    }
+
+    fn bind_checked(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, at: u32) {
+        lowering_stack::run(|s| self.bind_checked_task(fx, out, p, v, at, s))
     }
 }
 
@@ -2956,4 +3217,269 @@ fn abi_json(
         abi["target"] = target.name().into();
     }
     abi.to_string()
+}
+
+#[cfg(test)]
+mod deep_lower_tests {
+    use super::*;
+
+    fn context() -> (PackageGraph, hir::Program, Typed) {
+        (
+            PackageGraph {
+                sources: Default::default(),
+                packages: Vec::new(),
+                library: 0,
+                root: None,
+                entry: None,
+            },
+            hir::Program::default(),
+            Typed::default(),
+        )
+    }
+
+    #[test]
+    fn deep_expression_and_pattern_lowering_does_not_use_native_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let (graph, program, typed) = context();
+                let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
+                let span = Span::default();
+                let mut expr = Expr {
+                    kind: ExprKind::Float(1.0),
+                    span,
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        kind: ExprKind::Unary {
+                            op: UnOp::NegFloat,
+                            expr: Box::new(expr),
+                        },
+                        span,
+                    };
+                }
+                let mut fx = Fx::new(ModuleId(0), true);
+                let mut output = Vec::new();
+                let value = lowerer.expr(&mut fx, &mut output, &expr);
+                assert!(matches!(value, Atom::Local(_)));
+                assert_eq!(output.len(), 9_999);
+                // HIR ownership is independently tested by the HIR lane. Peel
+                // this test's input without recursive Rust destruction.
+                let mut e = expr;
+                loop {
+                    match e.kind {
+                        ExprKind::Unary { expr, .. } => e = *expr,
+                        ExprKind::Float(_) => break,
+                        _ => panic!("unexpected expression"),
+                    }
+                }
+
+                let mut pattern = Pattern {
+                    kind: PatternKind::Discard,
+                    span,
+                };
+                for _ in 0..10_000 {
+                    pattern = Pattern {
+                        kind: PatternKind::Tuple(vec![pattern]),
+                        span,
+                    };
+                }
+                let mut fx = Fx::new(ModuleId(0), true);
+                let mut output = Vec::new();
+                lowerer.bind_checked(&mut fx, &mut output, &pattern, Atom::Nil, 0);
+                assert_eq!(output.len(), 10_000);
+                let mut p = pattern;
+                loop {
+                    match p.kind {
+                        PatternKind::Tuple(mut parts) => p = parts.pop().unwrap(),
+                        PatternKind::Discard => break,
+                        _ => panic!("unexpected pattern"),
+                    }
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn mixed_deep_call_block_and_unary_keeps_written_order() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let (graph, program, typed) = context();
+                let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
+                let span = Span::default();
+                let mut expr = Expr {
+                    kind: ExprKind::Int(1u32.into()),
+                    span,
+                };
+                for i in 0..10_000 {
+                    expr = Expr {
+                        span,
+                        kind: match i % 3 {
+                            0 => ExprKind::Unary {
+                                op: UnOp::Neg,
+                                expr: Box::new(expr),
+                            },
+                            1 => ExprKind::Call {
+                                callee: Box::new(Expr {
+                                    span,
+                                    kind: ExprKind::Name(ValueRef::Local(VarId(0))),
+                                }),
+                                args: vec![Arg {
+                                    label: None,
+                                    value: expr,
+                                }],
+                            },
+                            _ => ExprKind::Block(Block {
+                                span,
+                                stmts: vec![hir::Stmt::Expr(expr)],
+                            }),
+                        },
+                    };
+                }
+                let mut fx = Fx::new(ModuleId(0), true);
+                let mut output = Vec::new();
+                assert!(matches!(
+                    lowerer.expr(&mut fx, &mut output, &expr),
+                    Atom::Local(_)
+                ));
+                assert_eq!(output.len(), 6_666);
+                // HIR destruction is handled independently; peel the input
+                // here to isolate lowering's continuation stack.
+                let mut e = expr;
+                loop {
+                    e = match e.kind {
+                        ExprKind::Unary { expr, .. } => *expr,
+                        ExprKind::Call { mut args, .. } => args.pop().unwrap().value,
+                        ExprKind::Block(mut block) => match block.stmts.pop().unwrap() {
+                            hir::Stmt::Expr(e) => e,
+                            _ => panic!("unexpected statement"),
+                        },
+                        ExprKind::Int(_) => break,
+                        _ => panic!("unexpected expression"),
+                    };
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn pipe_evaluates_left_then_callee_then_written_arguments() {
+        let (graph, program, typed) = context();
+        let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
+        let span = Span::default();
+        let local = |n| Expr {
+            span,
+            kind: ExprKind::Name(ValueRef::Local(VarId(n))),
+        };
+        let negate = |value| Expr {
+            span,
+            kind: ExprKind::Unary {
+                op: UnOp::Neg,
+                expr: Box::new(value),
+            },
+        };
+        let expr = Expr {
+            span,
+            kind: ExprKind::Binary {
+                op: BinOp::Pipe,
+                lhs: Box::new(negate(local(0))),
+                rhs: Box::new(Expr {
+                    span,
+                    kind: ExprKind::Call {
+                        callee: Box::new(local(1)),
+                        args: vec![Arg {
+                            label: None,
+                            value: negate(local(2)),
+                        }],
+                    },
+                }),
+            },
+        };
+        let mut fx = Fx::new(ModuleId(0), true);
+        let mut output = Vec::new();
+        lowerer.expr(&mut fx, &mut output, &expr);
+        assert!(
+            matches!(&output[0], Stmt::Let { dst: 1, value: Value::Op(Op::IntNeg, values), .. } if values == &[Atom::Local(0)])
+        );
+        assert!(
+            matches!(&output[1], Stmt::Let { dst: 4, value: Value::Op(Op::IntNeg, values), .. } if values == &[Atom::Local(3)])
+        );
+        assert!(
+            matches!(&output[2], Stmt::Let { value: Value::Call { callee: Callee::Value(Atom::Local(2)), args, env: Env::Param }, .. } if args == &[Atom::Local(1), Atom::Local(4)])
+        );
+    }
+    #[test]
+    fn deeply_nested_cases_lower_and_release_their_ir_on_a_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let (graph, program, typed) = context();
+                let mut lowerer = Lowerer::new(&graph, &program, &typed, Options::default());
+                let span = Span::default();
+                let mut expr = Expr {
+                    kind: ExprKind::Int(0u32.into()),
+                    span,
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        span,
+                        kind: ExprKind::Case {
+                            subject: Box::new(Expr {
+                                span,
+                                kind: ExprKind::Int(1u32.into()),
+                            }),
+                            clauses: vec![Clause {
+                                span,
+                                patterns: vec![Pattern {
+                                    span,
+                                    kind: PatternKind::Discard,
+                                }],
+                                guard: None,
+                                body: expr,
+                            }],
+                        },
+                    };
+                }
+                let mut fx = Fx::new(ModuleId(0), true);
+                let mut output = Vec::new();
+                assert!(matches!(
+                    lowerer.expr(&mut fx, &mut output, &expr),
+                    Atom::Local(_)
+                ));
+                let mut body = output.as_slice();
+                for _ in 0..10_000 {
+                    let Stmt::Block { body: outer, .. } = &body[0] else {
+                        panic!("expected case block")
+                    };
+                    let Stmt::Block { body: clause, .. } = &outer[0] else {
+                        panic!("expected clause block")
+                    };
+                    body = clause;
+                }
+                assert!(matches!(
+                    &body[0],
+                    Stmt::Let {
+                        value: Value::Atom(Atom::Int(_)),
+                        ..
+                    }
+                ));
+                drop(output);
+                // HIR destruction is tested by its own lane; peel this input
+                // so this test isolates lowering and IR ownership.
+                let mut e = expr;
+                loop {
+                    e = match e.kind {
+                        ExprKind::Case { mut clauses, .. } => clauses.pop().unwrap().body,
+                        ExprKind::Int(_) => break,
+                        _ => panic!("unexpected expression"),
+                    };
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
