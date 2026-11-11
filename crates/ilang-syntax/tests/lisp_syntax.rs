@@ -971,6 +971,37 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
 }
 
 #[test]
+fn deeply_nested_definition_answer_uses_bounded_host_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let prototype = root("(= (Box A) A)");
+            let Node::Round(parts) = prototype.node() else {
+                panic!("alias");
+            };
+            let mut ty = parts[2].clone();
+            for _ in 0..10_000 {
+                ty = Syntax::make(Node::Curly(vec![ty.clone()]), &ty).unwrap();
+            }
+            let item = prototype.replace_children(vec![parts[0].clone(), parts[1].clone(), ty]);
+            let answer = ilang_syntax::lisp::definitions::expanded_definition(&item, 77).unwrap();
+            assert_eq!(answer.show(), "(= (Box A) A)");
+            let wrapper = root("(@ deprecated x)");
+            let Node::Round(parts) = wrapper.node() else {
+                panic!("attribute");
+            };
+            let mut item = answer;
+            for _ in 0..10_000 {
+                item = wrapper.replace_children(vec![parts[0].clone(), parts[1].clone(), item]);
+            }
+            drop(ilang_syntax::lisp::definitions::expanded_definition(&item, 78).unwrap());
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
 fn definition_answer_preserves_a_single_field_record_type() {
     let definition = root("(= (Box A) { (: x A) })");
     let answer = ilang_syntax::lisp::definitions::expanded_definition(&definition, 91).unwrap();
