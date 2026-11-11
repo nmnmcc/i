@@ -36,3 +36,32 @@ JP implementation instead of introducing a second runner mechanism.
 
 Validation records are in `target/jp-*.log` (untracked build output). The final
 acceptance results are recorded below after the complete check finishes.
+
+Completed focused checks (all cargo/fixture commands used heavy + direnv):
+
+- `cargo check -p ilang-cli -p ilang-wasm -p ilang-check --all-targets --locked`:
+  passed.
+- `cargo test -p ilang-cli --test providers --test collections --test entries --locked`:
+  passed (17 provider tests, 3 collection tests, 7 entry tests).
+- `I=$PWD/target/debug/i scripts/build-abi-fixture.sh`: passed; regenerated
+  the conformance binding sidecars for the current trusted library identity.
+- `i run --project examples/io-{clock,fs,net} --opt 0`: clock/fs/net ok;
+  `examples/http-get`: http ok; `examples/cli-log -- --name world --count 1`:
+  last stdout line cli ok.
+- `i test --project examples/macro-tests --opt 0`: 8 passed, 0 failed, 1 skipped.
+- `i test --project std --opt 0` and `--opt 2`: 1845 passed, 0 failed each.
+- `i test --project tests/perf/many-tests --opt 0`: 2000 passed, 0 failed.
+- `cd bindings/javascript && direnv exec /home/agent/Programming/i npm test`:
+  88 passed, 0 failed.
+- `scripts/old-syntax-check`: passed, 4544 extracted literals/blocks, exact
+  expected diagnostics, 3 future-track entries, zero findings.
+
+Corrected development failures:
+
+- `scripts/syntax-2-migrate --repo --write` exited 1 after applying 1450 snippet
+  changes: `manual: 22`, `invalid: 415`. The reports include deliberate negative
+  fixtures and non-i host strings; merged redesign carries their reviewed forms.
+- The first syntax audit reported unclassified TOML, for example:
+  `crates/ilang-check/tests/provider_graph.rs:27 ... actual ['E0101: expected an item: a type definition, or a binding pattern = value, found [']`.
+  Added exact host-literal identities, retained parsing for the import fragment,
+  and removed stale manifest identities. Final audit passes.
