@@ -304,7 +304,6 @@ mod deep_tests {
             let d = nest(depth, "f");
             let s = super::super::render::render(&d, super::super::render::P::Expr).unwrap();
             assert_eq!(s, format!("{}x{}", "f(".repeat(depth), ")".repeat(depth)));
-            std::mem::forget(d);
         }
     }
     #[test]
@@ -313,7 +312,6 @@ mod deep_tests {
             let d = nest(depth, "T");
             let s = show_as(&d, super::super::syntax::Position::Type).unwrap();
             assert_eq!(s, format!("{}x{}", "T(".repeat(depth), ")".repeat(depth)));
-            std::mem::forget(d);
         }
     }
     #[test]
@@ -327,7 +325,6 @@ mod deep_tests {
             output,
             format!("{}x{}", "Some(".repeat(10000), ")".repeat(10000))
         );
-        std::mem::forget(d);
     }
     #[test]
     fn render_deep_mixed_block_and_call_without_host_stack_growth() {
@@ -348,7 +345,6 @@ mod deep_tests {
             output,
             format!("{}x{}", "f({\nv = ".repeat(10000), "\n})".repeat(10000))
         );
-        std::mem::forget(d);
     }
     #[test]
     fn render_long_list_preserves_each_element() {
