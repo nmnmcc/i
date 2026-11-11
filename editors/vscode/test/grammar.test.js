@@ -173,17 +173,14 @@ test("header scopes stop at the first item", async () => {
   assert.ok(!tokens.some((t) => t.includes("meta.header.i")));
 });
 
-test("dual syntax uses the same token classes as tree-sitter", async () => {
+test("syntax uses the same token classes as tree-sitter", async () => {
   const grammar = await loadGrammar();
   const tokens = tokenize(grammar, `@custom.rule("example")
-old = { name: "i" }
 new = (name: "i")
 run: () -> Record ^ String ! Console
-legacy: () -> Record ? String ! Console
 `);
   const has = (text, scope) => assert.ok(scopesOf(tokens, text).some((s) => s.includes(scope)));
   has("^", "keyword.operator.error.i");
-  has("?", "keyword.operator.error.i");
   has("Record", "support.type.builtin.i");
   has("name", "variable.parameter.i");
   has("rule", "storage.type.annotation.i");

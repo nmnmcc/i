@@ -215,3 +215,5 @@ WAT comparisons for the newly merged HTTP and editor work. The new Rust HTTP
 fixtures were migrated, and the editor retains both error-type spellings for
 legacy parser coverage. The post-merge syntax inventory passes for 4,117
 snippets; all seven VS Code editor tests pass.
+
+The migration tool carries a frozen legacy parser in `crates/ilang-syntax/src/parser_legacy.rs`. After bringing the migration tool and its frozen reader into another branch, run `scripts/syntax-2-migrate --repo --write` from that branch.

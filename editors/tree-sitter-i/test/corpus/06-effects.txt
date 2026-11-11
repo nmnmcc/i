@@ -2,7 +2,6 @@
 Service rows error types and environment statements
 ==================
 Service { Service(run: () -> Int ^ String ! Never) }
-legacy: () -> Nil ? String ! Service
 modern: () -> Nil ^ String ! Service
 main = (service ! Service) -> Nil ^ String ! Service {
   ! Service = service
@@ -31,19 +30,6 @@ main = (service ! Service) -> Nil ^ String ! Service {
               (service_row
                 (named_type
                   (type_identifier)))))))))
-  (declaration
-    (identifier)
-    (function_type
-      (type_parameters_list)
-      (return_type
-        (named_type
-          (type_identifier))
-        (error_type
-          (named_type
-            (type_identifier)))
-        (service_row
-          (named_type
-            (type_identifier))))))
   (declaration
     (identifier)
     (function_type
