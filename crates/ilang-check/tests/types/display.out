@@ -3,7 +3,7 @@ either : (r1: Ref(A), r2: Ref(A), c: Bool) -> Ref(A)
 make_int : (x: A & Int) -> Ref(A & Int)
 make_any : (x: A) -> Ref(A)
 one_side : (x: Int) -> Int
-errors_only : () -> Int ? 1
+errors_only : () -> Int ^ 1
 empty_list : () -> List(Never)
 inter_unions : (x: A & Int) -> A & Int
 rest : (v: A) -> 0 | 1 | 2 | 3 | A - List(_) - Result(_, _)

@@ -3,8 +3,8 @@ fixed : () -> Int
 logged : () -> Int ! Clock | Log
 half : () -> Int ! Log
 given : (c: Clock) -> Int
-fetch : (url: String) -> String ? Int ! Http
-two : () -> (String, String) ? Int | Nil ! Http
+fetch : (url: String) -> String ^ Int ! Http
+two : () -> (String, String) ^ Int | Nil ! Http
 first : (r: Result(A, B)) -> A ! Assert
 pair : (t: (A, B)) -> A
 head : (List(A)) -> A ! Assert

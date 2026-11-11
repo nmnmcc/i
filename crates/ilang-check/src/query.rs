@@ -491,7 +491,7 @@ impl<'a> Query<'a> {
                     part(ret, err.is_some() || env.is_some())
                 );
                 if let Some(e) = err {
-                    s.push_str(&format!(" ? {}", part(e, env.is_some())));
+                    s.push_str(&format!(" ^ {}", part(e, env.is_some())));
                 }
                 if let Some(n) = env {
                     s.push_str(&format!(" ! {}", part(n, false)));

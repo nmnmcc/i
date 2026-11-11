@@ -84,10 +84,10 @@ annotated_call : Int
 90:16: warning[W0503]: the two sides have the known types `(value: a) -> Box(a)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 92:19: warning[W0503]: the two sides have the known types `Nil` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 96:19: warning[W0503]: the two sides have the known types `(x: Int) -> String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-98:16: warning[W0503]: the two sides have the known types `(x: Int, y: _) -> Int ? _ ! _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-105:4: warning[W0503]: the two sides have the known types `(n: Int) -> _ ? _ ! _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+98:16: warning[W0503]: the two sides have the known types `(x: Int, y: _) -> Int ^ _ ! _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+105:4: warning[W0503]: the two sides have the known types `(n: Int) -> _ ^ _ ! _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 105:4: warning[W0502]: this value is not used, and working it out does nothing
-112:2: warning[W0503]: the two sides have the known types `(m: _) -> _ ? _ ! _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+112:2: warning[W0503]: the two sides have the known types `(m: _) -> _ ^ _ ! _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 112:2: warning[W0502]: this value is not used, and working it out does nothing
 120:3: warning[W0503]: the two sides have the known types `(n: Int) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 120:3: warning[W0502]: this value is not used, and working it out does nothing
