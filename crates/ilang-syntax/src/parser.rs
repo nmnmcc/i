@@ -40,6 +40,11 @@ pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     (module, diags)
 }
 
+/// Parses the first surface for migration tools.
+pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
+    parse_module(source)
+}
+
 #[doc(hidden)]
 pub fn parse_stats(source: &str) -> ParseStats {
     run(source, true).2
