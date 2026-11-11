@@ -2110,3 +2110,21 @@ fn collection_error_from_template_points_at_call() {
     assert_eq!(errors[0].source, Some(main.source));
     assert_eq!(errors[0].span.start as usize, source_text.find("m.emit").unwrap());
 }
+
+#[test]
+fn item_collection_resolves_qualified_import() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/anchors.i"), "(anchor)\nanchor = Nil\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(m = app/macros, a = app/anchors)\nm.emit(a.anchor, generated)\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let expanded = ilang_macro::project::expand(&mut graph).unwrap_or_else(|d| panic!("{d:?}"));
+    let checked = ilang_check::check_parsed(&graph, &expanded.parsed);
+    assert!(checked.diags.iter().all(|d| !d.is_error()), "{:?}", checked.diags);
+    let entries = ilang_macro::collections::resolve(&expanded.parsed, checked.program.as_ref().unwrap(), checked.types.as_ref().unwrap(), &expanded.transactions).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(checked.program.as_ref().unwrap().module(entries[0].collection.module).path, "app/anchors");
+}
