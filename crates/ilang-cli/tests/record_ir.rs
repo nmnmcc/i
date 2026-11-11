@@ -8,6 +8,7 @@ fn function(name: &str, arity: u32, locals: usize, body: Vec<Stmt>) -> FuncKind 
     FuncKind::Code(Func {
         name: name.into(),
         arity,
+        budget_frame: 1 + arity + u32::try_from(locals).unwrap(),
         locals: vec![LocalType::Value; locals],
         body,
         frame: false,
