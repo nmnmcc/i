@@ -1234,7 +1234,8 @@ The fields stay in i/process, but each wrapper requires only its capability's se
 | Environment / `i:environment/v1` | `env` | `(name: String) -> Request(Result(String,String))` |
 | WorkingDirectory / `i:working-directory/v1` | `cwd` | `() -> Request(Result(String,String))` |
 | Entropy / `i:entropy/v1` | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-| Process / `i:process/v1` | `spawn` | `(program: String, args: BitArray) -> Request(Result(Int,String))` |
+| Process / `i:process/v1` | `spawn`, `spawn_piped`, `spawn_config` | Start a child with inherited streams, selected streams, or selected streams and process options |
+| Process / `i:process/v1` | `own` | `(child: Int) -> Request(Nil)` |
 | Process / `i:process/v1` | `wait` | `(child: Int) -> Request(Result(Int,String))` |
 | Process / `i:process/v1` | `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
 | Process / `i:process/v1` | `close` | `(child: Int) -> Request(Nil)` |
@@ -1244,8 +1245,13 @@ and returns Child; wait/terminate/close take Child. Match Child(number)
 to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
 keep raw parameters/success values, with `? ProcessError` except
 close, which has no errors. Program args exclude the interpreter/program name;
-spawn's args exclude argv[0]. Each child inherits cwd, environment, and standard
-streams. There is no shell expansion, pipeline, or implicit command parsing.
+spawn's args exclude argv[0]. `i run -- ...` passes only the arguments after `--` to the program.
+`spawn` inherits cwd, environment and standard streams. `spawn_piped` selects
+`Inherit`, `Null`, or `Piped` separately for each stream; reads and writes use
+`read_stdout`, `read_stderr`, `write_stdin`, and `close_stdin`. `spawn_config`
+adds an inherited or replacement environment and an inherited or selected
+working directory. Environment entries of the form `NAME=value` set a variable;
+a bare `NAME` removes it. There is no shell expansion, pipeline, or implicit command parsing.
 Strings containing NUL give invalid; malformed UTF-8 OS args/env/cwd give
 not_utf8. env of an absent name gives not_found. entropy accepts 0..2^24 bytes
 and returns exactly that many bytes from the OS source, or an error. It does
@@ -1263,10 +1269,12 @@ and platforms without Unix signals map forced termination to 255. Repeated
 wait calls give the same cached status. A second simultaneous wait gives busy.
 terminate requests termination, is idempotent for an ended child, and does not
 wait; close terminates if still running and reaps, and is idempotent/error-free.
+Each task scope binds a fresh request owner. A child is registered with that owner;
+closing the owner cancels its ownership request and kills and reaps the child
+before scope cleanup returns. Explicit close also releases the child.
 An expected OS error from terminate raises ProcessError; close waits for reaping, even if it must wait for natural exit after a
 failed termination request. A raw OS process may be slow to terminate, so close/final
-completion has no bounded duration. Pipes and changed cwd/env are later API
-extensions, not unspecified behavior of this version. Missing, closed,
+completion has no bounded duration. Missing, closed,
 foreign-context or wrong-kind numbers give closed; close gives Nil. Close wakes
 a pending wait/terminate with closed unless its answer already committed.
 

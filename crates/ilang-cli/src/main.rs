@@ -245,7 +245,9 @@ fn cmd_run(project: &Path, opt: u8, offline: bool, args: Vec<String>) -> anyhow:
         anyhow::bail!("the package has no `@main` (§10.2)");
     }
     let mut options = ilang_host::HostOptions::new(ilang_host::services::stdout_with_args(args));
-    options.imports.grant_package(&b.binding_plan, &b.trusted_package);
+    options
+        .imports
+        .grant_package(&b.binding_plan, &b.trusted_package);
     match program.run_entry(options)? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
         Outcome::Stop(stop) => {

@@ -10,10 +10,39 @@ use tokio::{
 const NS: &str = "i:process/v1";
 const KIND: &str = "process child";
 struct Process {
-    child: Mutex<Child>,
+    child: std::sync::Mutex<Child>,
     stdin: Mutex<Option<tokio::process::ChildStdin>>,
     stdout: Mutex<Option<tokio::process::ChildStdout>>,
     stderr: Mutex<Option<tokio::process::ChildStderr>>,
+}
+
+// The owner request is cancelled synchronously when its scope closes. Reap
+// before its destructor returns, so the scope cannot outlive its child.
+struct ChildOwner {
+    process: Arc<Process>,
+    _resource: crate::resources::ProvisionalResource,
+}
+impl Drop for ChildOwner {
+    fn drop(&mut self) {
+        let mut child = self.process.child.lock().expect("process child lock");
+        if child
+            .try_wait()
+            .expect("poll child for owner cleanup")
+            .is_none()
+        {
+            let _ = child.start_kill();
+            loop {
+                if child
+                    .try_wait()
+                    .expect("reap child for owner cleanup")
+                    .is_some()
+                {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
 }
 fn code(s: &str) -> Value {
     Value::String(s.into())
@@ -158,16 +187,24 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                     Err(e) => return Ok(Err(error(e))),
                 };
                 let p = Process {
-                    child: Mutex::new(child),
+                    child: std::sync::Mutex::new(child),
                     stdin: Mutex::new(None),
                     stdout: Mutex::new(None),
                     stderr: Mutex::new(None),
                 };
                 match ctx.insert(KIND, p, |p, done| {
                     tokio::spawn(async move {
-                        let mut c = p.child.lock().await;
-                        let _ = c.start_kill();
-                        let _ = c.wait().await;
+                        {
+                            let mut c = p.child.lock().expect("process child lock");
+                            let _ = c.start_kill();
+                        }
+                        loop {
+                            let status = p.child.lock().expect("process child lock").try_wait();
+                            match status {
+                                Ok(Some(_)) | Err(_) => break,
+                                Ok(None) => tokio::time::sleep(Duration::from_millis(10)).await,
+                            }
+                        }
                         drop(done);
                     });
                 }) {
@@ -217,13 +254,21 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                     stdin: Mutex::new(child.stdin.take()),
                     stdout: Mutex::new(child.stdout.take()),
                     stderr: Mutex::new(child.stderr.take()),
-                    child: Mutex::new(child),
+                    child: std::sync::Mutex::new(child),
                 };
                 match ctx.insert(KIND, p, |p, done| {
                     tokio::spawn(async move {
-                        let mut c = p.child.lock().await;
-                        let _ = c.start_kill();
-                        let _ = c.wait().await;
+                        {
+                            let mut c = p.child.lock().expect("process child lock");
+                            let _ = c.start_kill();
+                        }
+                        loop {
+                            let status = p.child.lock().expect("process child lock").try_wait();
+                            match status {
+                                Ok(Some(_)) | Err(_) => break,
+                                Ok(None) => tokio::time::sleep(Duration::from_millis(10)).await,
+                            }
+                        }
                         drop(done);
                     });
                 }) {
@@ -266,26 +311,37 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                 else {
                     return Ok(Err(code("invalid")));
                 };
-                let Some(env) = (env.bit_length % 8 == 0).then(|| decode(&env.bytes)).flatten() else {
+                let Some(env) = (env.bit_length % 8 == 0)
+                    .then(|| decode(&env.bytes))
+                    .flatten()
+                else {
                     return Ok(Err(code("invalid")));
                 };
                 let mut cmd = Command::new(program);
                 match env_mode.as_str() {
-                    "replace" => { cmd.env_clear(); }
+                    "replace" => {
+                        cmd.env_clear();
+                    }
                     "inherit" => {}
                     _ => return Ok(Err(code("invalid"))),
                 }
                 for item in env {
                     if let Some((name, value)) = item.split_once('=') {
-                        if name.is_empty() || name.contains('\0') || value.contains('\0') { return Ok(Err(code("invalid"))); }
+                        if name.is_empty() || name.contains('\0') || value.contains('\0') {
+                            return Ok(Err(code("invalid")));
+                        }
                         cmd.env(name, value);
                     } else {
-                        if item.is_empty() || item.contains('\0') { return Ok(Err(code("invalid"))); }
+                        if item.is_empty() || item.contains('\0') {
+                            return Ok(Err(code("invalid")));
+                        }
                         cmd.env_remove(item);
                     }
                 }
                 match cwd_mode.as_str() {
-                    "set" => { cmd.current_dir(directory); }
+                    "set" => {
+                        cmd.current_dir(directory);
+                    }
                     "inherit" => {}
                     _ => return Ok(Err(code("invalid"))),
                 }
@@ -302,19 +358,46 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                     stdin: Mutex::new(child.stdin.take()),
                     stdout: Mutex::new(child.stdout.take()),
                     stderr: Mutex::new(child.stderr.take()),
-                    child: Mutex::new(child),
+                    child: std::sync::Mutex::new(child),
                 };
                 match ctx.insert(KIND, p, |p, done| {
                     tokio::spawn(async move {
-                        let mut c = p.child.lock().await;
-                        let _ = c.start_kill();
-                        let _ = c.wait().await;
+                        {
+                            let mut c = p.child.lock().expect("process child lock");
+                            let _ = c.start_kill();
+                        }
+                        loop {
+                            let status = p.child.lock().expect("process child lock").try_wait();
+                            match status {
+                                Ok(Some(_)) | Err(_) => break,
+                                Ok(None) => tokio::time::sleep(Duration::from_millis(10)).await,
+                            }
+                        }
                         drop(done);
                     });
                 }) {
                     Ok(id) => Ok(Ok(Value::Int(id))),
                     Err(e) => Ok(Err(code(&e.to_string()))),
                 }
+            }
+        })
+        .expect(super::ONE);
+    imports
+        .context_async_service(NS, "own", |ctx, args| {
+            let [Value::Int(id)] = args else {
+                panic!("process own arguments")
+            };
+            let lease = ctx
+                .acquire::<Process>(id, KIND, "owner")
+                .expect("new child must exist");
+            let guard = ChildOwner {
+                process: Arc::clone(lease.resource()),
+                _resource: crate::resources::ProvisionalResource::new(ctx, id.clone(), KIND),
+            };
+            async move {
+                let _guard = guard;
+                std::future::pending::<()>().await;
+                Ok(Ok(Value::Nil))
             }
         })
         .expect(super::ONE);
@@ -409,7 +492,7 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                     let p = Arc::clone(lease.resource());
                     let work = async move {
                         if operation == "terminate" {
-                            let mut c = p.child.lock().await;
+                            let mut c = p.child.lock().expect("process child lock");
                             return match c.try_wait() {
                                 Ok(Some(_)) => Ok(Value::Nil),
                                 Ok(None) => c.start_kill().map(|()| Value::Nil).map_err(error),
@@ -417,7 +500,7 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                             };
                         }
                         loop {
-                            let result = p.child.lock().await.try_wait();
+                            let result = p.child.lock().expect("process child lock").try_wait();
                             match result {
                                 Ok(Some(s)) => return Ok(Value::Int(status(s).into())),
                                 Ok(None) => tokio::time::sleep(Duration::from_millis(10)).await,
@@ -448,4 +531,36 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
             }
         })
         .expect(super::ONE);
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owner_drop_reaps_the_child_before_returning() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let child = Command::new("sleep").arg("30").spawn().unwrap();
+            let process = Arc::new(Process {
+                child: std::sync::Mutex::new(child),
+                stdin: Mutex::new(None),
+                stdout: Mutex::new(None),
+                stderr: Mutex::new(None),
+            });
+            let context = crate::ResourceHost::default().context();
+            let id = context.insert(KIND, (), |_, done| drop(done)).unwrap();
+            let owner = ChildOwner {
+                process: process.clone(),
+                _resource: crate::resources::ProvisionalResource::new(context, id, KIND),
+            };
+            let start = std::time::Instant::now();
+            drop(owner);
+            assert!(start.elapsed() < Duration::from_secs(2));
+            assert!(process.child.lock().unwrap().try_wait().unwrap().is_some());
+        });
+    }
 }
