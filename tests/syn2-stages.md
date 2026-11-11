@@ -193,7 +193,7 @@ R2 review programs retain their explicit effect annotations, extended with the
 Root and Owner services required by task operations (§9.2); all three pass
 their review checks and runs at O0/O2.
 
-Additional verification: the syntax inventory passed for 4,098 extracted
+Additional verification: the syntax inventory passed for 4,099 extracted
 snippets, with three exact future-track entries. The short generation run, the
 six editor tests, the 85 JavaScript tests, and the O0/O2 standard-library
 runs (1,836 tests each) passed. The first review regeneration reported the
