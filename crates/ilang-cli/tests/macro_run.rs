@@ -1481,3 +1481,49 @@ fn cli_check_and_run_expand_imported_macros() {
         );
     }
 }
+
+#[test]
+fn cli_expands_attribute_macros_before_checking() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\n@m.keep\nvalue = () { 42 }\nmain = () { value() }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn cli_runs_item_macro_with_exposed_caller_name() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (x (! it (. syntax Items))) _ { ((. it expose) x) `(= ~x 42) })))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.emit(value)\nmain = () { value }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
