@@ -169,6 +169,8 @@ fn library_names() {
                 "sync",
                 "share",
                 "get",
+                "cell",
+                "update",
                 "both",
                 "race",
                 "map_concurrently",

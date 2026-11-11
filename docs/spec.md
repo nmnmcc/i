@@ -1519,9 +1519,9 @@ results may change between runs or worker counts. Tests must either avoid
 that dependence or list the allowed outcomes. No task API observes workers.
 
 Export types Scheduler, Runner, Scope(E), Task(A,E), Channel(A), Event(A,E,N),
-Shared(A), and ScheduleError; export only ScheduleError's constructors. The
+Shared(A), Cell(A), and ScheduleError; export only ScheduleError's constructors. The
 other constructors and scheduler protocol are private ordinary custom types,
-not host opaque types. Scope, Task, Channel, and Shared contain invariant keys;
+not host opaque types. Scope, Task, Channel, Shared, and Cell contain invariant keys;
 their parameters are therefore invariant. Event's answer/error/environment
 parameters are covariant: its private representation keeps typed decoding
 functions, rather than Key(A) in an output field. A public Event can hold user
@@ -1560,6 +1560,8 @@ Assert and user host services remain in N where the body needs them.
 | `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ? E ! N \| Scheduler` |
 | `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
 | `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
+| `cell(A)` | `(value: A) -> Cell(A) ! Scheduler` |
+| `update(A,B)` | `(cell: Cell(A), change: (A) -> (A, B)) -> B ! Scheduler` |
 | `both(A,B,E,N)` | `(left: () -> A ? E ! N, right: () -> B ? E ! N) -> (A,B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `race(A,E,N)` | `(left: () -> A ? E ! N, right: () -> A ? E ! N) -> A ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
@@ -1699,6 +1701,15 @@ error. A stop immediately traps and runs no finals, as §9.5 requires. Host
 trap/failure/drop also invalidates the instance under ABI H8–H11; it cannot
 promise to resume i cleanup. “Cancellation runs finals” refers to i structured
 cancellation, not destruction of a trapped instance by its host.
+
+A `Cell(A)` is an immutable handle to scheduler-owned state. `cell(value)`
+creates one in the first scope of the maker's chain, or in the run at its root.
+`update(cell, change)` atomically replaces its value with the first part of
+`change(old)` and returns the second part. The callback is pure, with no typed
+errors or services. Stored values must be portable. Check the run identity and
+cell liveness before calling the callback. Owner exit frees its state; later
+updates stop with `task: shared value is gone`. Cells use the same scheduler
+arbitration as channels, and do not introduce host state or mutable i values.
 
 #### Events, FIFO behavior, and fairness
 
