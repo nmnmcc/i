@@ -322,7 +322,7 @@ fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() 
     let source = format!(
         "many = ({parameters}, last: Int) -> Int {{ last }}\n\
          f = (n: Int) -> Int {{ n |> {{ 0 -> 0 _ -> many({arguments}, f(n - 1)) }} }}\n\
-         @main\nmain = () {{ f(3300) Nil }}\n"
+         main = () {{ f(3300) Nil }}\n"
     );
     let mut usage = Vec::new();
     for optimized in [false, true] {
