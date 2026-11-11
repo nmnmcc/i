@@ -19,6 +19,23 @@ pub struct Expanded {
     pub parsed: Vec<Parsed>,
     pub diagnostics: Vec<Diagnostic>,
     pub transactions: Vec<Transaction>,
+    /// Source-scoped quotation templates for a runtime test instance.
+    pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
+}
+
+impl Expanded {
+    /// Lower source quotations only after expansion has finished. The original
+    /// expanded tree remains available to callers such as `i expand` until
+    /// this method is called.
+    pub fn lower_quotes(&mut self) {
+        for module in &mut self.parsed {
+            ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+                &mut module.ast,
+                module.source.0,
+                &mut self.templates,
+            );
+        }
+    }
 }
 
 /// Parse and expand each module after its dependencies. On failure the
@@ -39,6 +56,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             parsed,
             diagnostics,
             transactions: Vec::new(),
+            templates: Vec::new(),
         });
     }
     let order = match module_order::order(graph, &parsed) {
@@ -174,6 +192,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         parsed,
         diagnostics,
         transactions,
+        templates: Vec::new(),
     })
 }
 fn notes<'a>(transactions: impl IntoIterator<Item = &'a Transaction>) -> Vec<Diagnostic> {
@@ -215,8 +234,19 @@ fn phase(source: SourceId, error: PhaseError) -> Vec<Diagnostic> {
 
 /// Expand and type-check a project through the same path used by builds.
 pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
+    check_with_templates(graph).0
+}
+
+/// Check the expanded project and return the quote table for test instances.
+pub fn check_with_templates(
+    graph: &mut PackageGraph,
+) -> (
+    ilang_check::Checked,
+    Vec<ilang_syntax::lisp::syntax::Syntax>,
+) {
     match expand(graph) {
         Ok(mut expanded) => {
+            expanded.lower_quotes();
             let mut checked = ilang_check::check_parsed(graph, &expanded.parsed);
             if let (Some(program), Some(typed)) = (&checked.program, &checked.types)
                 && !checked.diags.iter().any(Diagnostic::is_error)
@@ -234,13 +264,16 @@ pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
             }
             expanded.diagnostics.append(&mut checked.diags);
             checked.diags = expanded.diagnostics;
-            checked
+            (checked, expanded.templates)
         }
-        Err(diagnostics) => ilang_check::Checked {
-            program: None,
-            types: None,
-            diags: diagnostics,
-        },
+        Err(diagnostics) => (
+            ilang_check::Checked {
+                program: None,
+                types: None,
+                diags: diagnostics,
+            },
+            Vec::new(),
+        ),
     }
 }
 

@@ -30,6 +30,11 @@ fn reaches_compiler(program: &Program, initial: impl IntoIterator<Item = DefId>)
 }
 
 pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic>) {
+    // A test instance is supplied with the syntax service (§8); it does not
+    // execute the normal entry or host exports.
+    if graph.test_run {
+        return;
+    }
     let Some(root) = program.root else {
         return;
     };

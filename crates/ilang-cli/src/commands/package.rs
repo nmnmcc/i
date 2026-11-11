@@ -847,11 +847,11 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
 /// Builds the package with its tests and runs them, as `i test` does.
 fn check_and_test(project: &Path) -> Result<()> {
     let built = crate_build(project)?;
-    let program = ilang_host::Program::from_bytes(&built)?;
+    let program = built.host_program()?;
     let names: Vec<String> = program.abi().tests.iter().map(|t| t.name.clone()).collect();
     let mut failed = Vec::new();
     for name in &names {
-        match ilang_cli::run_test(&program, name) {
+        match ilang_cli::run_test_with(&program, name, built.host_options()) {
             ilang_host::TestResult::Passed => {}
             ilang_host::TestResult::Stopped(stop) => failed.push(format!("FAIL {name}\n  {stop}")),
             ilang_host::TestResult::Failed(e) => failed.push(format!("FAIL {name}\n  {e:#}")),
@@ -873,7 +873,7 @@ fn check_and_test(project: &Path) -> Result<()> {
     Ok(())
 }
 
-fn crate_build(project: &Path) -> Result<Vec<u8>> {
+fn crate_build(project: &Path) -> Result<ilang_cli::Built> {
     let options = ilang_cli::BuildOptions {
         tests: true,
         opt: ilang_cli::Level::O0,
@@ -881,7 +881,7 @@ fn crate_build(project: &Path) -> Result<Vec<u8>> {
         target: Default::default(),
     };
     match ilang_cli::build(project, options) {
-        Ok(b) => Ok(b.wasm),
+        Ok(b) => Ok(b),
         Err(e) => Err(anyhow!("{e}").context("the package does not check")),
     }
 }

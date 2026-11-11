@@ -33,6 +33,8 @@ pub struct Built {
     pub warnings: Vec<String>,
     /// Whether this artifact contains test entries.
     pub tests: bool,
+    /// Source-scoped quote templates installed in each test instance.
+    pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
 }
 
 impl Built {
@@ -43,7 +45,7 @@ impl Built {
     }
     pub fn host_options(&self) -> ilang_host::HostOptions {
         let mut options = if self.tests {
-            test_options()
+            test_options_with_templates(self.templates.clone().into())
         } else {
             standard_options()
         };
@@ -146,11 +148,12 @@ pub fn build_entry(
     entry: Option<&str>,
 ) -> Result<Built, BuildError> {
     let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    graph.test_run = options.tests;
     graph.entry = entry.map(str::to_owned);
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };
-    let checked = ilang_macro::project::check(&mut graph);
+    let (checked, templates) = ilang_macro::project::check_with_templates(&mut graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
         return Err(program_error(&graph, &diags));
@@ -201,6 +204,7 @@ pub fn build_entry(
         trusted_package,
         warnings: graph.sources.render_all(&warnings),
         tests: options.tests,
+        templates,
     })
 }
 
@@ -235,8 +239,16 @@ pub fn standard_options() -> ilang_host::HostOptions {
 /// The test host includes the compiler syntax service for ordinary tests of
 /// macro helpers. Program entry hosts do not get this service.
 pub fn test_options() -> ilang_host::HostOptions {
+    test_options_with_templates(std::sync::Arc::from([]))
+}
+
+/// The test host for an artifact with source-located quote templates.
+pub fn test_options_with_templates(
+    templates: std::sync::Arc<[ilang_syntax::lisp::syntax::Syntax]>,
+) -> ilang_host::HostOptions {
     let mut options = standard_options();
-    ilang_host::syntax::install(&mut options.imports).expect("syntax service namespace is unique");
+    ilang_host::syntax::install_with_templates(&mut options.imports, templates)
+        .expect("syntax service namespace is unique");
     options
 }
 
