@@ -374,7 +374,7 @@ pub enum NumValue {
 }
 
 /// A test, as an `i32`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Cond {
     /// A Bool value that is `True`.
     True(Atom),
@@ -413,7 +413,7 @@ pub enum Cond {
     BitsEqual(Atom, Atom),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Stmt {
     /// `dst = value`. With a site, the site is put on the shadow stack first.
     Let {
@@ -763,3 +763,6 @@ pub struct Program {
     /// calls after `ilang_start` (B.7).
     pub entry: Option<String>,
 }
+
+#[path = "ir_tree.rs"]
+mod tree;
