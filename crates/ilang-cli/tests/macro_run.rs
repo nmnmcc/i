@@ -2239,8 +2239,39 @@ fn unused_compile_time_helper_does_not_break_a_normal_program() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/helpers.is"), "(= quoted (-> () _ `hello))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/helpers.is"),
+        "(= quoted (-> () _ `hello))\n",
+    )
+    .unwrap();
     std::fs::write(dir.path().join("src/main.i"), "main = () { 1 }\n").unwrap();
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i")).args(["run", "--offline", "--project"]).arg(dir.path()).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn cli_runs_task_scope_inside_expanded_macro_argument() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(i/task, m = app/macros)\nmain = () {\n  result = m.id(task.scope((s) {\n    t = task.go(s, () { 7 })\n    task.join(t)\n  }))\n  assert(result == 7)\n}\n").unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
