@@ -1210,6 +1210,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[thunk.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry body"),
             arity: 0,
+            budget_frame: 1,
             locals: vec![LocalType::Value; n as usize],
             body: thunk_body,
             frame: true,
@@ -1219,6 +1220,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
             name: format!("{module} entry"),
             arity: n,
+            budget_frame: n + 1,
             locals: vec![LocalType::Value; n as usize + 1],
             body: vec![
                 Stmt::Let {
