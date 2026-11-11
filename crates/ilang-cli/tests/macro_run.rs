@@ -1527,3 +1527,32 @@ fn cli_runs_item_macro_with_exposed_caller_name() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn a_later_macro_failure_keeps_an_earlier_committed_note() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, mark bad)\n(@ macro (= mark (-> (x (! d (. syntax Diagnostics))) _ { ((. d note) \"earlier\") x })))\n(@ macro (= bad (-> (x) _ `(= x 1))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.mark(1) m.bad(2) }\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        checked.diags
+    );
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.severity == ilang_package::Severity::Note && d.message == "earlier"),
+        "{:?}",
+        checked.diags
+    );
+}
