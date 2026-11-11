@@ -2346,7 +2346,13 @@ source and expansion locations.
 Macro programs run in the compiler with `Definitions`, `Diagnostics`,
 `Assert`, and, for item calls, `Items`. They receive no clock, file, network,
 or other program capability. An executable non-library foreign function or JS
-binding in their transitive needs is a compile error. Each run starts in fresh
+binding in their transitive needs is a compile error. A compile-time binding is
+a macro or a top-level binding whose transitive needs contain a quote or an
+`i/syntax` function. A normal entry or host export cannot depend on one, and
+compile-time bindings are not included in its program. Other bindings of a
+module containing macros are included normally. `i test` may use `i/syntax`,
+provide its own compiler services, and evaluate quotes with the test module's
+unmarked scope. Each run starts in fresh
 state, regardless of target or optimization. Tests may give their own ordinary
 service values. A diagnostic in expanded caller code points to that code; a
 diagnostic or stop from a template points to the call and notes the template.
