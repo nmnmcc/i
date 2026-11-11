@@ -392,63 +392,67 @@ impl Hook for BodyEngine<'_> {
         Error::Depth(span)
     }
     fn is_direct(&mut self, expression: &Expr, locals: &[Local], depth: u32) -> bool {
-        fn ungroup(e: &Expr) -> &Expr {
-            match &e.kind {
-                ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
-                    Stmt::Expr(inner) => ungroup(inner),
-                    _ => e,
+        fn ungroup(mut expression: &Expr) -> &Expr {
+            while let ExprKind::Block(block) = &expression.kind {
+                let [Stmt::Expr(inner)] = block.stmts.as_slice() else {
+                    break;
+                };
+                expression = inner;
+            }
+            expression
+        }
+        fn constructor(expression: &Expr) -> bool {
+            matches!(&expression.kind, ExprKind::Name { name, .. } if name.name.chars().next().is_some_and(char::is_uppercase))
+        }
+        let mut pending = vec![expression];
+        while let Some(expression) = pending.pop() {
+            match &ungroup(expression).kind {
+                ExprKind::Fn(_)
+                | ExprKind::Clauses(_)
+                | ExprKind::Int(_)
+                | ExprKind::Float(_)
+                | ExprKind::String(_)
+                | ExprKind::Name { .. } => {}
+                ExprKind::Unary { expr, .. }
+                    if matches!(
+                        ungroup(expr).kind,
+                        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_)
+                    ) => {}
+                ExprKind::Field { target, .. } => match &target.kind {
+                    ExprKind::Name { module: None, name }
+                        if self.registry.is_module(
+                            self.source,
+                            &self.atom(name),
+                            &self.locals(locals, depth),
+                        ) => {}
+                    _ => return false,
                 },
-                _ => e,
-            }
-        }
-        fn constructor(e: &Expr) -> bool {
-            matches!(&e.kind, ExprKind::Name { name, .. } if name.name.chars().next().is_some_and(char::is_uppercase))
-        }
-        let e = ungroup(expression);
-        match &e.kind {
-            ExprKind::Fn(_)
-            | ExprKind::Clauses(_)
-            | ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Name { .. } => true,
-            ExprKind::Unary { expr, .. } => matches!(
-                ungroup(expr).kind,
-                ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_)
-            ),
-            ExprKind::Field { target, .. } => match &target.kind {
-                ExprKind::Name { module: None, name } => self.registry.is_module(
-                    self.source,
-                    &self.atom(name),
-                    &self.locals(locals, depth),
-                ),
-                _ => false,
-            },
-            ExprKind::Tuple(items) => items.iter().all(|e| self.is_direct(e, locals, depth)),
-            ExprKind::List { items, rest } => items
-                .iter()
-                .chain(rest.as_deref())
-                .all(|e| self.is_direct(e, locals, depth)),
-            ExprKind::Call { callee, args } => {
-                constructor(callee) && args.iter().all(|a| self.is_direct(&a.value, locals, depth))
-            }
-            ExprKind::Binary {
-                op: ast::BinOp::Pipe,
-                lhs,
-                rhs,
-            } => {
-                self.is_direct(lhs, locals, depth)
-                    && match &rhs.kind {
-                        ExprKind::Name { .. } => constructor(rhs),
-                        ExprKind::Call { callee, args } => {
-                            constructor(callee)
-                                && args.iter().all(|a| self.is_direct(&a.value, locals, depth))
+                ExprKind::Tuple(items) => pending.extend(items),
+                ExprKind::List { items, rest } => {
+                    pending.extend(items);
+                    pending.extend(rest.as_deref());
+                }
+                ExprKind::Call { callee, args } if constructor(callee) => {
+                    pending.extend(args.iter().map(|arg| &arg.value))
+                }
+                ExprKind::Binary {
+                    op: ast::BinOp::Pipe,
+                    lhs,
+                    rhs,
+                } => {
+                    pending.push(lhs);
+                    match &rhs.kind {
+                        ExprKind::Name { .. } if constructor(rhs) => {}
+                        ExprKind::Call { callee, args } if constructor(callee) => {
+                            pending.extend(args.iter().map(|arg| &arg.value))
                         }
-                        _ => false,
+                        _ => return false,
                     }
+                }
+                _ => return false,
             }
-            _ => false,
         }
+        true
     }
 }
 

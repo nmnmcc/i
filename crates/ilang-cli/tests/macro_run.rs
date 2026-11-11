@@ -2101,3 +2101,54 @@ fn definition_query_charges_source_before_constructing_answer() {
     assert!(matches!(result.reply, DefinitionReply::CompileError { .. }));
     assert!(matches!(budget.exceeded(), Some(Limit::Work | Limit::Allocation)));
 }
+
+#[test]
+fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_macro::{body_engine::BodyEngine, body_walk::Hook, registry::Registry};
+            use ilang_syntax::{
+                ast::{Expr, ExprKind},
+                lisp::scoped::ScopedSource,
+                span::Span,
+            };
+            use std::sync::Arc;
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+            std::fs::create_dir(dir.path().join("src")).unwrap();
+            std::fs::write(dir.path().join("src/main.i"), "main = () { Nil }\n").unwrap();
+            let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+            assert!(diagnostics.is_empty());
+            let (parsed, diagnostics) = ilang_check::parse(&graph);
+            assert!(diagnostics.is_empty());
+            let registry = Registry::new(&graph, &parsed).unwrap();
+            let source = parsed.iter().find(|p| p.path == "app/main").unwrap().source;
+            let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+            let mut session = ilang_macro::session::Session::default();
+            let mut engine = BodyEngine::new(
+                &graph,
+                &parsed,
+                &registry,
+                source,
+                scoped,
+                Arc::new(|_, _| panic!("not invoked")),
+                &mut session,
+            );
+            let span = Span::new(0, 1);
+            let mut expr = Expr {
+                kind: ExprKind::Int(1u32.into()),
+                span,
+            };
+            for _ in 0..20_000 {
+                expr = Expr {
+                    kind: ExprKind::Tuple(vec![expr]),
+                    span,
+                };
+            }
+            assert!(engine.is_direct(&expr, &[], 0));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
