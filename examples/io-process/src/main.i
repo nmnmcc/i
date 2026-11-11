@@ -83,6 +83,14 @@ main = () {
 			Error(process.ProcessError("wait", "closed"))
 	)
 	assert(clock.monotonic_ns() - start < 2000000000)
+	start = clock.monotonic_ns()
+	assert(fail.catch(() {
+		task.scope((_) {
+			process.spawn("sleep", ["30"])
+			fail.raise("scope failed")
+		})
+	}) == Error("scope failed"))
+	assert(clock.monotonic_ns() - start < 2000000000)
 	check = process.spawn_piped(
 		"sh"
 		["-c", "ps -C sleep -o args= | grep -qx 'sleep 30'; test $? -eq 1"]
