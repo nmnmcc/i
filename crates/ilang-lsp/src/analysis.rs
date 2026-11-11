@@ -193,7 +193,21 @@ fn analyze(job: &Job) -> (Analysis, bool) {
         let original_graph = graph.clone();
         match ilang_macro::project::expand(&mut graph) {
             Ok(expanded) => {
-                query::check_parsed_for_queries(&graph, &expanded.parsed, expanded.diagnostics)
+                let mut checked =
+                    query::check_parsed_for_queries(&graph, &expanded.parsed, expanded.diagnostics);
+                if let (Some(program), Some(typed)) = (&checked.program, &checked.types)
+                    && !checked.diags.iter().any(Diagnostic::is_error)
+                    && let Err(mut errors) = ilang_macro::collections::resolve(
+                        &expanded.parsed,
+                        program,
+                        typed,
+                        &expanded.transactions,
+                    )
+                {
+                    ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut errors);
+                    checked.diags.extend(errors);
+                }
+                checked
             }
             Err(diagnostics) => {
                 graph = original_graph;

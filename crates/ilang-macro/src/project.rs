@@ -1,7 +1,7 @@
 //! Project-wide, dependency-ordered syntax expansion.
 use crate::{
     body_engine::BodyEngine,
-    body_walk,
+    body_walk, collections,
     definition_world::DefinitionWorld,
     diagnostics,
     item_phase::{self, PhaseError},
@@ -218,6 +218,13 @@ pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
     match expand(graph) {
         Ok(mut expanded) => {
             let mut checked = ilang_check::check_parsed(graph, &expanded.parsed);
+            if let (Some(program), Some(typed)) = (&checked.program, &checked.types)
+                && !checked.diags.iter().any(Diagnostic::is_error)
+                && let Err(errors) =
+                    collections::resolve(&expanded.parsed, program, typed, &expanded.transactions)
+            {
+                checked.diags.extend(errors);
+            }
             if let Some(program) = &checked.program {
                 ilang_check::map_expansion_diagnostics(
                     program,
