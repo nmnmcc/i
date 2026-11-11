@@ -1504,12 +1504,17 @@ impl<'a> Resolver<'a> {
                     Self::Borrowed(TypePattern::Named(_, parts) | TypePattern::Tuple(parts)) => {
                         parts.iter().map(Node::Borrowed).collect()
                     }
-                    Self::Owned(mut p) => match &mut p {
-                        TypePattern::Named(_, parts) | TypePattern::Tuple(parts) => {
-                            std::mem::take(parts).into_iter().map(Node::Owned).collect()
+                    Self::Owned(mut p) => {
+                        fn take_parts(p: &mut TypePattern) -> Vec<TypePattern> {
+                            match p {
+                                TypePattern::Named(_, parts) | TypePattern::Tuple(parts) => {
+                                    std::mem::take(parts)
+                                }
+                                _ => unreachable!("only structural patterns have children"),
+                            }
                         }
-                        _ => unreachable!("only structural patterns have children"),
-                    },
+                        take_parts(&mut p).into_iter().map(Node::Owned).collect()
+                    }
                     _ => unreachable!("only structural patterns have children"),
                 }
             }
@@ -1958,9 +1963,9 @@ impl<'a> Resolver<'a> {
             }
         }
         match self.name(module, name) {
-            ExprKind::Name(value @ (ValueRef::Local(_) | ValueRef::Def(_))) => {
-                self.new_of(value, span, self.ty_def.is_some(), None).into_kind()
-            }
+            ExprKind::Name(value @ (ValueRef::Local(_) | ValueRef::Def(_))) => self
+                .new_of(value, span, self.ty_def.is_some(), None)
+                .into_kind(),
             _ => TypeKind::Error,
         }
     }
@@ -2816,12 +2821,12 @@ impl<'a> Resolver<'a> {
         &mut self,
         b: &ast::Binding,
         top: bool,
-        pattern: Pattern,
-        binders: Vec<Binder>,
+        resolved_pattern: (Pattern, Vec<Binder>),
         ty_vars: Vec<TyVarId>,
         direct: bool,
         value: Expr,
     ) -> (Binding, Vec<Binder>) {
+        let (pattern, binders) = resolved_pattern;
         self.reserved.pop();
         if direct && !top {
             self.locals.pop();
@@ -2842,7 +2847,7 @@ impl<'a> Resolver<'a> {
     fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
         let (pattern, binders, ty_vars, direct) = self.enter_binding(b, top);
         let value = self.expr(&b.value);
-        self.leave_binding(b, top, pattern, binders, ty_vars, direct, value)
+        self.leave_binding(b, top, (pattern, binders), ty_vars, direct, value)
     }
 
     /// §6.10: a direct value is made without running code.
@@ -4281,8 +4286,14 @@ impl<'a> Resolver<'a> {
                     direct,
                 } => {
                     let value = values.pop().expect("binding value");
-                    let (binding, binders) = self
-                        .leave_binding(binding, false, pattern, binders, ty_vars, direct, value);
+                    let (binding, binders) = self.leave_binding(
+                        binding,
+                        false,
+                        (pattern, binders),
+                        ty_vars,
+                        direct,
+                        value,
+                    );
                     self.locals.push(Frame {
                         names: binders
                             .into_iter()
