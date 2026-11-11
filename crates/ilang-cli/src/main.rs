@@ -393,6 +393,47 @@ fn cmd_test(
     filter: Option<&str>,
     time: bool,
 ) -> anyhow::Result<ExitCode> {
+    let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
+    let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
+    let entries = if let Some(collection) = manifest
+        .get("test")
+        .and_then(|t| t.get("collection"))
+        .and_then(|v| v.as_str())
+    {
+        match ilang_cli::collections(project, true, offline) {
+            Ok(manifest) => manifest
+                .entries
+                .into_iter()
+                .filter(|e| e.collection == collection)
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                eprintln!("{error}");
+                return Ok(ExitCode::FAILURE);
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    let focused = entries
+        .iter()
+        .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
+    let mut seen = std::collections::HashMap::new();
+    for entry in &entries {
+        if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
+            if let Some(previous) = seen.insert(name, &entry.at) {
+                eprintln!(
+                    "duplicate test name {name:?}: {}:{}:{} and {}:{}:{}",
+                    previous.path,
+                    previous.line,
+                    previous.column,
+                    entry.at.path,
+                    entry.at.line,
+                    entry.at.column
+                );
+                return Ok(ExitCode::FAILURE);
+            }
+        }
+    }
     let Some(b) = built(project, options(opt, true, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
@@ -405,7 +446,14 @@ fn cmd_test(
         .filter(|n| filter.is_none_or(|f| n.contains(f)))
         .collect();
     let mut failed = 0;
+    let mut passed = 0;
+    let mut skipped = 0;
     for name in &tests {
+        if focused {
+            skipped += 1;
+            println!("skip {name}");
+            continue;
+        }
         let start = (std::time::Instant::now(), cpu_seconds());
         let result = ilang_cli::run_test_with(&program, name, b.host_options());
         let took = if time {
@@ -418,7 +466,10 @@ fn cmd_test(
             String::new()
         };
         match result {
-            TestResult::Passed => println!("pass {name}{took}"),
+            TestResult::Passed => {
+                passed += 1;
+                println!("pass {name}{took}");
+            }
             TestResult::Stopped(stop) => {
                 failed += 1;
                 println!("FAIL {name}{took}");
@@ -433,33 +484,40 @@ fn cmd_test(
             }
         }
     }
-    let mut passed = tests.len() - failed;
-    let mut skipped = 0;
-    let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
-    let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
-    if let Some(collection) = manifest.get("test").and_then(|t| t.get("collection")).and_then(|v| v.as_str()) {
-        let entries = match ilang_cli::collections(project, true, offline) {
-            Ok(manifest) => manifest.entries.into_iter().filter(|e| e.collection == collection).collect::<Vec<_>>(),
-            Err(error) => { eprintln!("{error}"); return Ok(ExitCode::FAILURE); }
-        };
-        let focused = entries.iter().any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
+    {
         for entry in entries {
-            let get = |key: &str| entry.data.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str());
+            let get = |key: &str| {
+                entry
+                    .data
+                    .iter()
+                    .find(|(k, _)| k == key)
+                    .map(|(_, v)| v.as_str())
+            };
             let name = get("name").unwrap_or(&entry.target.path);
             let mode = get("mode").unwrap_or("test");
-            if filter.is_some_and(|f| !name.contains(f)) { continue; }
+            if filter.is_some_and(|f| !name.contains(f)) {
+                continue;
+            }
             if mode == "skip" || (focused && mode != "only") {
                 skipped += 1;
                 println!("skip {name}");
                 continue;
             }
-            let selected = match ilang_cli::build_collection(project, options(opt, true, offline)?, &entry.handle, ilang_cli::CollectionResult::Nil) {
+            let selected = match ilang_cli::build_collection(
+                project,
+                options(opt, true, offline)?,
+                &entry.handle,
+                ilang_cli::CollectionResult::Nil,
+            ) {
                 Ok(selected) => selected,
-                Err(error) => { eprintln!("{error}"); return Ok(ExitCode::FAILURE); }
+                Err(error) => {
+                    eprintln!("{error}");
+                    return Ok(ExitCode::FAILURE);
+                }
             };
             let outcome = selected.run_with(selected.built.host_options());
             let success = matches!(outcome, Ok(Outcome::Ok(_)));
-            if success != (mode == "fails") {
+            if outcome.is_ok() && success != (mode == "fails") {
                 passed += 1;
                 println!("pass {name}");
             } else {

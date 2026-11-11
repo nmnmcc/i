@@ -20,6 +20,8 @@
       (-> `(! ~service ~value) (suite_items prefix rest (append env [statement])))
       (-> `(suite ~name (-> () _ { ~..children }))
         (append (suite_items (<> (<> prefix (text name)) " / ") children env) (suite_items prefix rest env)))
+      (-> `((. ~module suite) ~name (-> () _ { ~..children }))
+        (append (suite_items (<> (<> prefix (text name)) " / ") children env) (suite_items prefix rest env)))
       (-> `(~callee ~name ~cases ~body) {
         (= full ((. syntax make) ((. syntax Text) (<> prefix (text name))) name))
         (= wrapped `(-> (case_value) _ { ~..env (~body case_value) }))
