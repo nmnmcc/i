@@ -118,6 +118,16 @@ mod deep_tests {
         for a in &modules {
             for b in &modules {
                 assert_eq!(equivalent(a, b), canon(a) == canon(b));
+                let ItemKind::Binding(left) = &a.items[0].kind else {
+                    unreachable!()
+                };
+                let ItemKind::Binding(right) = &b.items[0].kind else {
+                    unreachable!()
+                };
+                assert_eq!(
+                    equivalent_expression(&left.value, &right.value),
+                    equivalent(a, b)
+                );
             }
         }
         let mut plus = modules[0].clone();
@@ -132,10 +142,24 @@ mod deep_tests {
         set(&mut minus, -0.0);
         assert_ne!(canon(&plus), canon(&minus));
         assert!(!equivalent(&plus, &minus));
+        let ItemKind::Binding(p) = &plus.items[0].kind else {
+            unreachable!()
+        };
+        let ItemKind::Binding(m) = &minus.items[0].kind else {
+            unreachable!()
+        };
+        assert!(!equivalent_expression(&p.value, &m.value));
         set(&mut plus, f64::NAN);
         set(&mut minus, f64::NAN);
         assert_eq!(canon(&plus), canon(&minus));
         assert!(equivalent(&plus, &minus));
+        let ItemKind::Binding(p) = &plus.items[0].kind else {
+            unreachable!()
+        };
+        let ItemKind::Binding(m) = &minus.items[0].kind else {
+            unreachable!()
+        };
+        assert!(equivalent_expression(&p.value, &m.value));
     }
 
     #[test]
