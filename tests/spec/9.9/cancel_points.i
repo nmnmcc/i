@@ -11,6 +11,7 @@
 (
 	i/task
 	i/resource
+	i/request
 	i/fail
 )
 
@@ -21,7 +22,7 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-probe = (label: String, wait: () -> Nil ! task.Scheduler) {
+probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
