@@ -3079,111 +3079,170 @@ impl<'a> Checker<'a> {
     /// generalized is a new variable with no bounds, and `Top` is a new
     /// variable.
     fn rebuild(&mut self, t: &Ty, level: u32, map: &mut HashMap<super::V, Ty>, in_h: bool) -> Ty {
-        let mut go = |c: &mut Self, x: &Ty| c.rebuild(x, level, map, in_h);
-        match t {
-            Ty::Var(v)
-                if self
-                    .s
-                    .vars
-                    .get(v.0 as usize)
-                    .is_some_and(|x| x.level <= level) =>
-            {
-                t.clone()
-            }
-            Ty::Var(v) => {
-                if let Some(n) = map.get(v) {
-                    return n.clone();
-                }
-                let n = self.s.fresh_at(level + 1);
-                self.s.vars[n.0 as usize].name =
-                    self.s.vars.get(v.0 as usize).and_then(|x| x.name.clone());
-                self.s.vars[n.0 as usize].row = self.s.vars[v.0 as usize].row;
-                map.insert(*v, Ty::Var(n));
-                Ty::Var(n)
-            }
-            // Only the type constructors of `H` matter in `A - H`, so a part
-            // of `H` with no effect stays `Top`.
-            Ty::Top if in_h => Ty::Top,
-            Ty::Top => Ty::Var(self.s.fresh_at(level + 1)),
-            Ty::Diff(a, h) => {
-                let a = go(self, a);
-                let h: Vec<Ty> = h
-                    .iter()
-                    .map(|x| self.rebuild(x, level, map, true))
-                    .collect();
-                // The scheme keeps the constraint of the difference (§4.4):
-                // a new variable has no bounds, so it is given again.
-                if let Ty::Var(v) = &a
-                    && self.s.vars[v.0 as usize].level > level
-                {
-                    let hs: Vec<Ty> = h.iter().map(|x| self.s.no_top(x, level + 1)).collect();
-                    self.s.diff_bound(&a, &hs, false);
-                }
-                Ty::Diff(Box::new(a), h)
-            }
-            Ty::Con(h, values, args) => Ty::Con(
-                *h,
-                values.clone(),
-                args.iter().map(|a| go(self, a)).collect(),
-            ),
-            Ty::Union(ms) => Ty::Union(ms.iter().map(|a| go(self, a)).collect()),
-            Ty::Inter(ms) => Ty::Inter(ms.iter().map(|a| go(self, a)).collect()),
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), go(self, p)))
-                    .collect(),
-                ret: go(self, &f.ret),
-                err: go(self, &f.err),
-                env: go(self, &f.env),
-            })),
-            Ty::Never | Ty::Both(..) => t.clone(),
+        enum Task<'a> {
+            Visit(&'a Ty, bool),
+            Con(Head, super::lits::ValueSet, usize),
+            Union(usize),
+            Inter(usize),
+            Fn(&'a FnTy),
+            Diff(usize),
         }
+        let mut tasks = vec![Task::Visit(t, in_h)];
+        let mut values = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t, in_h) => match t {
+                    Ty::Var(v)
+                        if self
+                            .s
+                            .vars
+                            .get(v.0 as usize)
+                            .is_some_and(|x| x.level <= level) =>
+                    {
+                        values.push(t.clone());
+                    }
+                    Ty::Var(v) => {
+                        let n = if let Some(n) = map.get(v) {
+                            n.clone()
+                        } else {
+                            let n = self.s.fresh_at(level + 1);
+                            self.s.vars[n.0 as usize].name =
+                                self.s.vars.get(v.0 as usize).and_then(|x| x.name.clone());
+                            self.s.vars[n.0 as usize].row = self.s.vars[v.0 as usize].row;
+                            let n = Ty::Var(n);
+                            map.insert(*v, n.clone());
+                            n
+                        };
+                        values.push(n);
+                    }
+                    Ty::Top => values.push(if in_h {
+                        Ty::Top
+                    } else {
+                        Ty::Var(self.s.fresh_at(level + 1))
+                    }),
+                    Ty::Diff(a, h) => {
+                        tasks.push(Task::Diff(h.len()));
+                        for x in h.iter().rev() {
+                            tasks.push(Task::Visit(x, true));
+                        }
+                        tasks.push(Task::Visit(a, in_h));
+                    }
+                    Ty::Con(h, v, args) => {
+                        tasks.push(Task::Con(*h, v.clone(), args.len()));
+                        tasks.extend(args.iter().rev().map(|x| Task::Visit(x, in_h)));
+                    }
+                    Ty::Union(ms) => {
+                        tasks.push(Task::Union(ms.len()));
+                        tasks.extend(ms.iter().rev().map(|x| Task::Visit(x, in_h)));
+                    }
+                    Ty::Inter(ms) => {
+                        tasks.push(Task::Inter(ms.len()));
+                        tasks.extend(ms.iter().rev().map(|x| Task::Visit(x, in_h)));
+                    }
+                    Ty::Fn(f) => {
+                        tasks.push(Task::Fn(f));
+                        tasks.push(Task::Visit(&f.env, in_h));
+                        tasks.push(Task::Visit(&f.err, in_h));
+                        tasks.push(Task::Visit(&f.ret, in_h));
+                        tasks.extend(f.params.iter().rev().map(|(_, x)| Task::Visit(x, in_h)));
+                    }
+                    Ty::Never | Ty::Both(..) => values.push(t.clone()),
+                },
+                Task::Con(h, v, count) => {
+                    let args = values.split_off(values.len() - count);
+                    values.push(Ty::Con(h, v, args));
+                }
+                Task::Union(count) => {
+                    let parts = values.split_off(values.len() - count);
+                    values.push(Ty::Union(parts));
+                }
+                Task::Inter(count) => {
+                    let parts = values.split_off(values.len() - count);
+                    values.push(Ty::Inter(parts));
+                }
+                Task::Fn(f) => {
+                    let mut parts = values
+                        .split_off(values.len() - f.params.len() - 3)
+                        .into_iter();
+                    let params = f
+                        .params
+                        .iter()
+                        .map(|(label, _)| {
+                            (label.clone(), parts.next().expect("function parameter"))
+                        })
+                        .collect();
+                    values.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: parts.next().expect("function return"),
+                        err: parts.next().expect("function error"),
+                        env: parts.next().expect("function environment"),
+                    })));
+                }
+                Task::Diff(count) => {
+                    let mut parts = values.split_off(values.len() - count - 1).into_iter();
+                    let a = parts.next().expect("difference left side");
+                    let h: Vec<_> = parts.collect();
+                    if let Ty::Var(v) = &a
+                        && self.s.vars[v.0 as usize].level > level
+                    {
+                        let hs: Vec<_> = h.iter().map(|x| self.s.no_top(x, level + 1)).collect();
+                        self.s.diff_bound(&a, &hs, false);
+                    }
+                    values.push(Ty::Diff(Box::new(a), h));
+                }
+            }
+        }
+        assert_eq!(values.len(), 1, "rebuilding type produced multiple results");
+        values.pop().expect("rebuilding type produced no result")
     }
 }
 
 /// The custom types that a type uses.
 fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
-    match t {
-        Ty::Con(h, _, xs) => {
-            if let super::Head::Named(TypeRef::Custom(id)) = h
-                && !out.contains(id)
-            {
-                out.push(*id);
+    let mut pending = vec![t];
+    while let Some(t) = pending.pop() {
+        match t {
+            Ty::Con(h, _, xs) => {
+                if let super::Head::Named(TypeRef::Custom(id)) = h
+                    && !out.contains(id)
+                {
+                    out.push(*id);
+                }
+                pending.extend(xs.iter().rev());
             }
-            xs.iter().for_each(|x| uses_types(x, out));
+            Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs.iter().rev()),
+            Ty::Fn(f) => {
+                pending.extend([&f.env, &f.err, &f.ret]);
+                pending.extend(f.params.iter().rev().map(|p| &p.1));
+            }
+            Ty::Diff(a, h) => {
+                pending.extend(h.iter().rev());
+                pending.push(a);
+            }
+            Ty::Both(a, b) => {
+                pending.push(b);
+                pending.push(a);
+            }
+            _ => {}
         }
-        Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| uses_types(x, out)),
-        Ty::Fn(f) => {
-            f.params.iter().for_each(|p| uses_types(&p.1, out));
-            [&f.ret, &f.err, &f.env]
-                .into_iter()
-                .for_each(|x| uses_types(x, out));
-        }
-        Ty::Diff(a, h) => {
-            uses_types(a, out);
-            h.iter().for_each(|x| uses_types(x, out));
-        }
-        Ty::Both(a, b) => {
-            uses_types(a, out);
-            uses_types(b, out);
-        }
-        _ => {}
     }
 }
 
 fn has_both(t: &Ty) -> bool {
-    match t {
-        Ty::Both(..) => true,
-        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
-        Ty::Fn(f) => {
-            f.params.iter().any(|p| has_both(&p.1))
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_both)
+    let mut pending = vec![t];
+    while let Some(t) = pending.pop() {
+        match t {
+            Ty::Both(..) => return true,
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs),
+            Ty::Fn(f) => {
+                pending.extend(f.params.iter().map(|p| &p.1));
+                pending.extend([&f.ret, &f.err, &f.env]);
+            }
+            Ty::Diff(a, _) => pending.push(a),
+            _ => {}
         }
-        Ty::Diff(a, _) => has_both(a),
-        _ => false,
     }
+    false
 }
 
 /// §10.3: the built-in types that the host can take.
@@ -3205,55 +3264,50 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
         acc: &mut [Mode],
         table: &HashMap<TypeId, Vec<Mode>>,
     ) {
-        match &t.kind {
-            TypeKind::Var(v) if row != Mode::Value => {
-                if let Some(i) = params.iter().position(|x| x.1 == *v) {
-                    acc[i] = acc[i].max(row);
-                }
-            }
-            TypeKind::Named { ty, args } => {
-                let modes = match ty {
-                    TypeRef::Custom(id) => table[id].clone(),
-                    TypeRef::Builtin(BuiltinType::Continuation) => {
-                        vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+        let mut pending = vec![(t, row)];
+        while let Some((t, row)) = pending.pop() {
+            match &t.kind {
+                TypeKind::Var(v) if row != Mode::Value => {
+                    if let Some(i) = params.iter().position(|x| x.1 == *v) {
+                        acc[i] = acc[i].max(row);
                     }
-                    TypeRef::Builtin(BuiltinType::Boundary) => {
-                        vec![Mode::Value, Mode::Row, Mode::Env]
+                }
+                TypeKind::Named { ty, args } => {
+                    let modes = match ty {
+                        TypeRef::Custom(id) => table[id].clone(),
+                        TypeRef::Builtin(BuiltinType::Continuation) => {
+                            vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                        }
+                        TypeRef::Builtin(BuiltinType::Boundary) => {
+                            vec![Mode::Value, Mode::Row, Mode::Env]
+                        }
+                        _ => vec![Mode::Value; args.len()],
+                    };
+                    pending.extend(args.iter().zip(modes).rev());
+                }
+                TypeKind::Fn {
+                    params: ps,
+                    ret,
+                    err,
+                    env,
+                } => {
+                    if let Some(x) = env {
+                        pending.push((x, Mode::Env));
                     }
-                    _ => vec![Mode::Value; args.len()],
-                };
-                for (a, mode) in args.iter().zip(modes) {
-                    walk(a, mode, params, acc, table);
+                    if let Some(x) = err {
+                        pending.push((x, Mode::Row));
+                    }
+                    pending.push((ret, Mode::Value));
+                    pending.extend(ps.iter().rev().map(|x| (&x.ty, Mode::Value)));
                 }
+                TypeKind::Tuple(ts) => {
+                    pending.extend(ts.iter().rev().map(|x| (x, Mode::Value)));
+                }
+                TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
+                    pending.extend(ts.iter().rev().map(|x| (x, row)));
+                }
+                _ => {}
             }
-            TypeKind::Fn {
-                params: ps,
-                ret,
-                err,
-                env,
-            } => {
-                for x in ps {
-                    walk(&x.ty, Mode::Value, params, acc, table);
-                }
-                walk(ret, Mode::Value, params, acc, table);
-                if let Some(x) = err {
-                    walk(x, Mode::Row, params, acc, table);
-                }
-                if let Some(x) = env {
-                    walk(x, Mode::Env, params, acc, table);
-                }
-            }
-            TypeKind::Tuple(ts) => {
-                for x in ts {
-                    walk(x, Mode::Value, params, acc, table);
-                }
-            }
-            TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
-                for x in ts {
-                    walk(x, row, params, acc, table);
-                }
-            }
-            _ => {}
         }
     }
     let mut table: HashMap<_, _> = p
@@ -3332,60 +3386,65 @@ fn walk_variance(
     table: &HashMap<TypeId, Vec<Variance>>,
     depth: u32,
 ) {
-    let go = |t: &Type, v: Variance, acc: &mut [Variance]| {
-        walk_variance(p, t, v, params, acc, table, depth)
-    };
-    match &t.kind {
-        TypeKind::Var(tv) => {
-            if let Some(i) = params.iter().position(|x| x.1 == *tv) {
-                acc[i] = acc[i].join(v);
-            }
-        }
-        TypeKind::Named { ty, args } => {
-            if let TypeRef::Custom(id) = ty
-                && let TypeBody::Alias(body) = &p.ty(*id).body
-            {
-                if depth < 64 {
-                    let def = p.ty(*id);
-                    let map: HashMap<TyVarId, &Type> =
-                        def.params.iter().map(|x| x.1).zip(args).collect();
-                    let expanded = subst(body, &map);
-                    walk_variance(p, &expanded, v, params, acc, table, depth + 1);
+    let mut pending = vec![(t, v)];
+    while let Some((t, v)) = pending.pop() {
+        match &t.kind {
+            TypeKind::Var(tv) => {
+                if let Some(i) = params.iter().position(|x| x.1 == *tv) {
+                    acc[i] = acc[i].join(v);
                 }
-                return;
             }
-            let vs = match ty {
-                TypeRef::Custom(id) => table[id].clone(),
-                TypeRef::Builtin(b) => builtin_variance(*b),
-            };
-            for (a, w) in args.iter().zip(vs) {
-                let pv = match w {
-                    Variance::Bi => continue,
-                    Variance::Co => v,
-                    Variance::Contra => v.flip(),
-                    Variance::Inv => Variance::Inv,
+            TypeKind::Named { ty, args } => {
+                if let TypeRef::Custom(id) = ty
+                    && let TypeBody::Alias(body) = &p.ty(*id).body
+                {
+                    if depth < 64 {
+                        let def = p.ty(*id);
+                        let map: HashMap<TyVarId, &Type> =
+                            def.params.iter().map(|x| x.1).zip(args).collect();
+                        let expanded = subst(body, &map);
+                        walk_variance(p, &expanded, v, params, acc, table, depth + 1);
+                    }
+                    continue;
+                }
+                let vs = match ty {
+                    TypeRef::Custom(id) => table[id].clone(),
+                    TypeRef::Builtin(b) => builtin_variance(*b),
                 };
-                go(a, pv, acc);
+                for (a, w) in args.iter().zip(vs).rev() {
+                    let pv = match w {
+                        Variance::Bi => continue,
+                        Variance::Co => v,
+                        Variance::Contra => v.flip(),
+                        Variance::Inv => Variance::Inv,
+                    };
+                    pending.push((a, pv));
+                }
             }
+            TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) => {
+                pending.extend(ts.iter().rev().map(|a| (a, v)));
+            }
+            TypeKind::Diff(ts) => {
+                pending.extend(ts[1..].iter().rev().map(|a| (a, Variance::Inv)));
+                pending.push((&ts[0], v));
+            }
+            TypeKind::Fn {
+                params: ps,
+                ret,
+                err,
+                env,
+            } => {
+                if let Some(env) = env {
+                    pending.push((env, v));
+                }
+                if let Some(err) = err {
+                    pending.push((err, v));
+                }
+                pending.push((ret, v));
+                pending.extend(ps.iter().rev().map(|x| (&x.ty, v.flip())));
+            }
+            TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
         }
-        TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) => {
-            ts.iter().for_each(|a| go(a, v, acc))
-        }
-        TypeKind::Diff(ts) => {
-            go(&ts[0], v, acc);
-            ts[1..].iter().for_each(|a| go(a, Variance::Inv, acc));
-        }
-        TypeKind::Fn {
-            params: ps,
-            ret,
-            err,
-            env,
-        } => {
-            ps.iter().for_each(|x| go(&x.ty, v.flip(), acc));
-            go(ret, v, acc);
-            err.iter().chain(env).for_each(|x| go(x, v, acc));
-        }
-        TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
     }
 }
 
@@ -3521,6 +3580,140 @@ mod deep_written_type_tests {
                         Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
                     ));
                 }
+                std::mem::forget(expr);
+                std::mem::forget(ty);
+                std::mem::forget(known);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_generalized_type_rebuild_uses_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut ty = Ty::Top;
+                for _ in 0..10_000 {
+                    ty = Ty::tuple(vec![ty]);
+                }
+                let rebuilt = checker.rebuild(&ty, 0, &mut HashMap::new(), false);
+                let mut cursor = &rebuilt;
+                for _ in 0..10_000 {
+                    match cursor {
+                        Ty::Con(Head::Tuple(1), _, args) => cursor = &args[0],
+                        _ => panic!("rebuilding did not preserve tuple shape"),
+                    }
+                }
+                assert!(matches!(cursor, Ty::Var(_)));
+                std::mem::forget(ty);
+                std::mem::forget(rebuilt);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_variance_walk_uses_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let variable = TyVarId(0);
+                let mut written = Type {
+                    kind: TypeKind::Var(variable),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    written = Type {
+                        kind: TypeKind::Tuple(vec![written]),
+                        span: Span::default(),
+                    };
+                }
+                let mut variance = [Variance::Bi];
+                walk_variance(
+                    &program,
+                    &written,
+                    Variance::Co,
+                    &[("x".into(), variable)],
+                    &mut variance,
+                    &HashMap::new(),
+                    0,
+                );
+                assert_eq!(variance, [Variance::Co]);
+                std::mem::forget(written);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deep_both_detection_uses_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut ty = Ty::Both(Box::new(Ty::Top), Box::new(Ty::Never));
+                for _ in 0..10_000 {
+                    ty = Ty::tuple(vec![ty]);
+                }
+                assert!(has_both(&ty));
+                let mut used = Vec::new();
+                uses_types(&ty, &mut used);
+                assert!(used.is_empty());
+                std::mem::forget(ty);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_functions_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut expr = Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        kind: ExprKind::Fn(Box::new(Function {
+                            params: vec![],
+                            ret: None,
+                            body: Block {
+                                stmts: vec![Stmt::Expr(expr)],
+                                span: Span::default(),
+                            },
+                            span: Span::default(),
+                        })),
+                        span: Span::default(),
+                    };
+                }
+                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
+                for root in [&ty, &known] {
+                    let mut cursor = root;
+                    for _ in 0..10_000 {
+                        match cursor {
+                            Ty::Fn(f) if f.params.is_empty() => cursor = &f.ret,
+                            _ => panic!("inferred function shape was not preserved"),
+                        }
+                    }
+                    assert!(matches!(
+                        cursor,
+                        Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), _, _)
+                    ));
+                }
+                assert!(checker.diags.is_empty());
                 std::mem::forget(expr);
                 std::mem::forget(ty);
                 std::mem::forget(known);
