@@ -2,6 +2,7 @@
 // expect: pass
 (i/core)
 (main)
+
 main = () {
   assert(core.inspect(()) == "()")
   assert(core.inspect((name: "ada", age: 36)) == "(age: 36, name: \"ada\")")
