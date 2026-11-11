@@ -199,3 +199,12 @@ six editor tests, the 85 JavaScript tests, and the O0/O2 standard-library
 runs (1,836 tests each) passed. The first review regeneration reported the
 three deep R2 failures above; their focused retry and the six named-entry
 review cases passed.
+
+The repository-wide `scripts/syntax-2-migrate --repo --check` audit reported
+zero changes and zero unresolved empty tuples, but exited 1 on 269 unparseable
+extracted candidates. Five documentation examples from that report were then
+corrected and their targeted migration check passed. The remaining reported
+candidates are in Rust/editor/JavaScript test strings or deliberate invalid
+fixtures; the separate old-syntax inventory verifies their registered context
+and expected diagnostics. Minimal reproduction:
+`scripts/syntax-2-migrate --repo --check --use-built-tool`.
