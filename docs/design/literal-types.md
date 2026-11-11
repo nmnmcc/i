@@ -48,12 +48,12 @@ size = (s: String) { s |> { "" -> 0  rest -> string.length(rest) } }
                                           // rest : String - ""
 send = (m: "GET" | "POST") { m |> { "GET" -> 1  "POST" -> 2 } }
                                           // covered, no `_` needed
-"a" == "b"                                // W0503: never equal
-(s: String) { s == "a" }                  // correct
-1 + 2                                     // Int, not 3
--1                                        // -1, and so is -{1}
--x                                        // Int
-1.5                                       // Float; Float has no literal types
+unequal = "a" == "b"                      // W0503: never equal
+matches = (s: String) { s == "a" }        // correct
+sum = 1 + 2                               // Int, not 3
+negative = -1                             // -1, and so is -{1}
+negate = (x: Int) { -x }                  // Int
+float = 1.5                               // Float; Float has no literal types
 ```
 
 ## 2. The problem

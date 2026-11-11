@@ -357,7 +357,7 @@ With that type, and `put` replacing the field at run time:
 ```i
 bump(R) = (r: R) -> R & (age: String) { record.put(r, "age", "old") }
 x = bump((age: 36))     // (age: 36 & String), which has no values
-x.age + 1               // checks, and at run time adds 1 to "old"
+result = x.age + 1      // checks, and at run time adds 1 to "old"
 ```
 
 With `( ..R, age: String )`, `x` has the type `( age: String )`, and the last line is a compile error. A `put` that stops the program on a key that is already there would make `R & ( K: V )` sound, but width subtyping hides fields: a `{ name, age }` value passed as `{ name }` would make code stop that looks correct.
@@ -366,8 +366,8 @@ With `( ..R, age: String )`, `x` has the type `( age: String )`, and the last li
 
 ```i
 twist(K) = (r: (a: Int), k: K) -> (..(a: Int), K: "s") { record.put(r, k, "s") }
-twist((a: 1), "a").a + 1    // E0501: the type is (a: "s")
-twist((a: 1), "b").a + 1    // correct: the type is (a: Int, b: "s")
+bad = twist((a: 1), "a").a + 1    // E0501: the type is (a: "s")
+good = twist((a: 1), "b").a + 1   // correct: the type is (a: Int, b: "s")
 ```
 
 The `->` part is needed: it is what makes `K` a label parameter (L1). Without it, `K` is an ordinary type variable, and the call of `put` in the body is E0541 with the hint of part 11.
