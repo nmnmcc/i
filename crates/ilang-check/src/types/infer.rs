@@ -723,20 +723,21 @@ impl<'a> Checker<'a> {
         };
         let mut found = Vec::new();
         uses_types(&shown, &mut found);
-        let mut names: Vec<String> = Vec::new();
+        let mut names: Vec<(String, bool)> = Vec::new();
         for id in found {
             let def = self.p.ty(id);
-            if def.module == self.module && !def.exported && !names.contains(&def.name) {
-                names.push(def.name.clone());
+            let name = (def.name.clone(), def.module != self.module);
+            if !def.exported && !names.contains(&name) {
+                names.push(name);
             }
         }
-        for name in names {
+        for (name, foreign) in names {
             self.error(
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
                 format!(
-                    "`{}` is exported, but its inferred type uses the type `{name}` of this module, which is not exported (§2.4)",
-                    d.name
+                    "`{}` is exported, but its inferred type uses the type `{name}` {}, which is not exported (§2.4)",
+                    d.name, if foreign { "of its defining module" } else { "of this module" }
                 ),
             );
         }
@@ -844,6 +845,9 @@ impl<'a> Checker<'a> {
     /// (`Pos`) or a parameter (`Neg`).
     fn check_pattern_places(&mut self, q: &Pattern, pol: Pol) {
         match &q.kind {
+            PatternKind::Quote { captures, .. } => captures
+                .iter()
+                .for_each(|(_, p)| self.check_pattern_places(p, pol)),
             PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
             PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
             PatternKind::Constructor { args: ps, .. }
@@ -1527,6 +1531,8 @@ impl<'a> Checker<'a> {
     /// argument.
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
         let (f, kf) = self.infer_k(callee, &Ty::Top);
+        let bool_pipe = first.is_some() && kf.head() == Some(Head::Named(self.b.bool_));
+        let diagnostic_start = self.diags.len();
         let kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
@@ -1659,6 +1665,32 @@ impl<'a> Checker<'a> {
                 r
             }
         };
+        if bool_pipe {
+            let start = first.unwrap().span.end;
+            let end = callee.span.start.max(start);
+            let source = &self.sources.get(self.p.module(self.module).source).text;
+            let operator = ilang_syntax::lex(&source[start as usize..end as usize])
+                .tokens
+                .into_iter()
+                .find(|t| {
+                    matches!(
+                        t.kind,
+                        ilang_syntax::token::TokenKind::Pipe
+                            | ilang_syntax::token::TokenKind::PipeGt
+                    )
+                })
+                .map(|t| Span::new(start + t.span.start, start + t.span.end));
+            for diagnostic in &mut self.diags[diagnostic_start..] {
+                if diagnostic.code == code::TYPE_MISMATCH {
+                    diagnostic.message.push_str(
+                        "; the pipe target is Bool, which is not callable; use `||` for Boolean or",
+                    );
+                    if let Some(operator) = operator {
+                        diagnostic.span = operator;
+                    }
+                }
+            }
+        }
         (t, known)
     }
 

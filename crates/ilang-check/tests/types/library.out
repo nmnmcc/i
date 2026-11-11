@@ -63,3 +63,67 @@ i/random.zeros : (h: State, count: Int) -> State
 i/random.follow : (h: State, bits: List(Int)) -> State
 i/random.derive_path : (g: Generator, path: List(Int)) -> Generator
 i/random.at_path : (g: Generator, path: List(Int)) -> Generator ? RandomError
+i/syntax.definition : (of: Syntax) -> Syntax ? SyntaxError ! Definitions
+i/syntax.raw_note : (String) -> Nil
+i/syntax._diagnostics : () -> Diagnostics
+i/syntax.raw_metadata_new : () -> ItemMetadata
+i/syntax.raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
+i/syntax.raw_items_add : (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
+i/syntax.raw_items_expose : (Syntax) -> ItemResult
+i/syntax.raw_items_ok : (ItemResult) -> Bool
+i/syntax.raw_items_message : (ItemResult) -> String
+i/syntax.raw_items_at : (ItemResult) -> Syntax
+i/syntax.build_metadata : (data: List((String, String)), result: ItemMetadata) -> ItemMetadata
+i/syntax.item_result : (result: ItemResult) -> Nil ? SyntaxError
+i/syntax._items : () -> Items
+i/syntax._report_error : (String, Syntax) -> Syntax
+i/syntax.raw_definition : (Syntax) -> DefinitionResult
+i/syntax.raw_definition_ok : (DefinitionResult) -> Bool
+i/syntax.raw_definition_value : (DefinitionResult) -> Syntax
+i/syntax.raw_definition_message : (DefinitionResult) -> String
+i/syntax.raw_definition_at : (DefinitionResult) -> Syntax
+i/syntax._definitions : () -> Definitions
+i/syntax._match : (Syntax, Syntax) -> MatchResult
+i/syntax._match_ok : (MatchResult) -> Bool
+i/syntax._match_one : (MatchResult, Int) -> Syntax
+i/syntax.raw_match_many_len : (MatchResult, Int) -> Int
+i/syntax.raw_match_many_child : (MatchResult, Int, Int) -> Syntax
+i/syntax._template : (Int) -> Syntax
+i/syntax.raw_rebuild : (Syntax, SyntaxList) -> Syntax
+i/syntax.raw_kind : (Syntax) -> Int
+i/syntax.raw_text : (Syntax) -> String
+i/syntax.raw_int : (Syntax) -> Int
+i/syntax.raw_float : (Syntax) -> Float
+i/syntax.raw_length : (Syntax) -> Int
+i/syntax.raw_child : (Syntax, Int) -> Syntax
+i/syntax.raw_list_new : () -> SyntaxList
+i/syntax.raw_list_push : (SyntaxList, Syntax) -> SyntaxList
+i/syntax.raw_make_text : (Int, String, Syntax) -> SyntaxResult
+i/syntax.raw_make_int : (Int, Syntax) -> SyntaxResult
+i/syntax.raw_make_float : (Float, Syntax) -> SyntaxResult
+i/syntax.raw_make_list : (Int, SyntaxList, Syntax) -> SyntaxResult
+i/syntax.raw_make_one : (Int, Syntax, Syntax) -> SyntaxResult
+i/syntax.raw_syntax_ok : (SyntaxResult) -> Bool
+i/syntax.raw_syntax_value : (SyntaxResult) -> Syntax
+i/syntax.raw_syntax_error : (SyntaxResult) -> String
+i/syntax.raw_same_code : (Syntax, Syntax) -> Bool
+i/syntax.raw_show : (Syntax) -> String
+i/syntax.raw_show_as : (Syntax, Int) -> TextResult
+i/syntax.raw_text_ok : (TextResult) -> Bool
+i/syntax.raw_text_value : (TextResult) -> String
+i/syntax.raw_text_error : (TextResult) -> String
+i/syntax.raw_text_error_at : (TextResult) -> Syntax
+i/syntax.reverse : (items: List(Syntax), result: List(Syntax)) -> List(Syntax)
+i/syntax.match_children : (match: MatchResult, capture: Int, index: Int, end: Int, result: List(Syntax)) -> List(Syntax)
+i/syntax._match_many : (match: MatchResult, capture: Int) -> List(Syntax)
+i/syntax.prepend_reversed : (items: List(Syntax), result: List(Syntax)) -> List(Syntax)
+i/syntax._append : (first: List(Syntax), second: List(Syntax)) -> List(Syntax)
+i/syntax.children : (syntax: Syntax, index: Int, end: Int, result: List(Syntax)) -> List(Syntax)
+i/syntax.node : (syntax: Syntax) -> Node
+i/syntax.build_list : (items: List(Syntax), result: SyntaxList) -> SyntaxList
+i/syntax._rebuild : (template: Syntax, children: List(Syntax)) -> Syntax
+i/syntax.make : (node: Node, like: Syntax) -> Syntax ? SyntaxError
+i/syntax.same_code : (a: Syntax, b: Syntax) -> Bool
+i/syntax.show : (syntax: Syntax) -> String
+i/syntax.position_id : (position: Position) -> Int
+i/syntax.show_as : (syntax: Syntax, position: Position) -> String ? SyntaxError

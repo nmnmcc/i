@@ -124,6 +124,14 @@ impl References<'_> {
 
     fn pattern(&mut self, p: &Pattern) {
         match &p.kind {
+            PatternKind::Quote {
+                functions,
+                captures,
+                ..
+            } => {
+                self.pending.extend(functions);
+                captures.iter().for_each(|(_, p)| self.pattern(p));
+            }
             PatternKind::Named { pattern, .. } => self.pattern(pattern),
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
