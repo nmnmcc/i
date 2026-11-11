@@ -686,6 +686,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml_edit",
+ "wasmparser 0.262.0",
  "wasmtime",
 ]
 
