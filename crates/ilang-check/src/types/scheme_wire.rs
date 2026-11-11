@@ -942,6 +942,387 @@ mod tests {
     }
 
     #[test]
+    fn scheme_comparison_substitutes_exact_structural_variables() {
+        let build = |extra: bool| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let a = solver.fresh_at(1);
+            let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![Ty::Var(a)]);
+            let value = if extra {
+                let b = solver.fresh_at(1);
+                solver.constrain(&list, &Ty::Var(b));
+                solver.constrain(&Ty::Var(b), &list);
+                Ty::Var(b)
+            } else {
+                list
+            };
+            assert!(solver.failures.is_empty());
+            let root = solver.records.record(vec![
+                (Label::name("value"), value),
+                (Label::name("item"), Ty::Var(a)),
+            ]);
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => unreachable!(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(false)
+                .compare(&build(true), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
+    fn scheme_comparison_uses_explicit_nonbijective_union_instantiations() {
+        let build = |two: bool| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let a = solver.fresh_at(1);
+            let value = if two {
+                let b = solver.fresh_at(1);
+                Ty::Union(vec![Ty::Var(a), Ty::Var(b)])
+            } else {
+                Ty::Var(a)
+            };
+            let root = solver.records.record(vec![(Label::name("value"), value)]);
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => unreachable!(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(false)
+                .compare(&build(true), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
+    fn scheme_coverage_preserves_keys_while_instantiating_union_variables() {
+        let build = |two: bool, id: u32, name: &str| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let key = TyVarId(id);
+            let k = solver.fresh_at(1);
+            solver.vars[k.0 as usize].label_key = Some(key);
+            solver.vars[k.0 as usize].name = Some(name.into());
+            let a = solver.fresh_at(1);
+            let value = if two {
+                let b = solver.fresh_at(1);
+                Ty::Union(vec![Ty::Var(a), Ty::Var(b)])
+            } else {
+                Ty::Var(a)
+            };
+            let root = solver
+                .records
+                .record(vec![(records::variable_label(key, name, 1), value)]);
+            let root = Ty::Fn(Box::new(FnTy {
+                params: vec![(None, root), (None, Ty::Var(k))],
+                ret: Ty::Never,
+                err: Ty::Never,
+                env: Ty::Never,
+            }));
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![(key, 1)],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => unreachable!(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(false, 7, "K")
+                .compare(&build(true, 12, "Key"), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
+    fn scheme_coverage_preserves_handlers_through_union_row_instantiation() {
+        let build = |two: bool| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let service = TypeId(5);
+            solver.variance.insert(service, vec![Variance::Co]);
+            let handler = Ty::named(
+                TypeRef::Custom(service),
+                vec![Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![])],
+            );
+            let a = solver.fresh_at(1);
+            solver.vars[a.0 as usize].row = Mode::Env;
+            solver.vars[a.0 as usize].difference = true;
+            solver.vars[a.0 as usize].handled.push(handler.clone());
+            let row = if two {
+                let b = solver.fresh_at(1);
+                solver.vars[b.0 as usize].row = Mode::Env;
+                solver.vars[b.0 as usize].difference = true;
+                solver.vars[b.0 as usize].handled.push(handler);
+                Ty::Union(vec![Ty::Var(a), Ty::Var(b)])
+            } else {
+                Ty::Var(a)
+            };
+            solver.has_handlers = true;
+            let root = Ty::Fn(Box::new(FnTy {
+                params: vec![],
+                ret: Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
+                err: Ty::Never,
+                env: row,
+            }));
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => "pkg:Svc".into(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(false)
+                .compare(&build(true), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
+    fn scheme_coverage_finds_a_counterexample_in_a_union_row_handler() {
+        let build = |second: BuiltinType| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let service = TypeId(5);
+            solver.variance.insert(service, vec![Variance::Co]);
+            let mut rows = Vec::new();
+            for parameter in [BuiltinType::Int, second] {
+                let v = solver.fresh_at(1);
+                solver.vars[v.0 as usize].row = Mode::Env;
+                solver.vars[v.0 as usize].difference = true;
+                solver.vars[v.0 as usize].handled.push(Ty::named(
+                    TypeRef::Custom(service),
+                    vec![Ty::named(TypeRef::Builtin(parameter), vec![])],
+                ));
+                rows.push(Ty::Var(v));
+            }
+            solver.has_handlers = true;
+            let row = Ty::Union(rows);
+            let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+            let body = Ty::Fn(Box::new(FnTy {
+                params: vec![],
+                ret: result.clone(),
+                err: Ty::Never,
+                env: row.clone(),
+            }));
+            let root = Ty::Fn(Box::new(FnTy {
+                params: vec![(Some("body".into()), body)],
+                ret: result,
+                err: Ty::Never,
+                env: row,
+            }));
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => "pkg:Svc".into(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(BuiltinType::Int)
+                .compare(&build(BuiltinType::String), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Different
+        );
+    }
+
+    #[test]
+    fn output_only_environment_can_choose_an_empty_row() {
+        let build = |parameter: BuiltinType| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let service = TypeId(5);
+            solver.variance.insert(service, vec![Variance::Co]);
+            let row = solver.fresh_at(1);
+            solver.vars[row.0 as usize].row = Mode::Env;
+            solver.vars[row.0 as usize].difference = true;
+            solver.vars[row.0 as usize].handled.push(Ty::named(
+                TypeRef::Custom(service),
+                vec![Ty::named(TypeRef::Builtin(parameter), vec![])],
+            ));
+            solver.has_handlers = true;
+            let root = Ty::Fn(Box::new(FnTy {
+                params: vec![],
+                ret: Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
+                err: Ty::Never,
+                env: Ty::Var(row),
+            }));
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => "pkg:Svc".into(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(BuiltinType::Int)
+                .compare(&build(BuiltinType::String), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
+    fn scheme_comparison_uses_explicit_nonbijective_intersection_instantiations() {
+        let build = |two: bool| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let a = solver.fresh_at(1);
+            let value = if two {
+                let b = solver.fresh_at(1);
+                Ty::Inter(vec![Ty::Var(a), Ty::Var(b)])
+            } else {
+                Ty::Var(a)
+            };
+            let root = solver.records.record(vec![(Label::name("value"), value)]);
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => unreachable!(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(false)
+                .compare(&build(true), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
+    fn scheme_coverage_synthesizes_a_union_of_subject_binders() {
+        let build = |two: bool| {
+            let mut solver = Solver::new(HashMap::new(), Vec::new());
+            let a = solver.fresh_at(1);
+            let b = if two { solver.fresh_at(1) } else { a };
+            let fun = Ty::Fn(Box::new(FnTy {
+                params: vec![
+                    (Some("a".into()), Ty::Var(a)),
+                    (Some("b".into()), Ty::Var(b)),
+                ],
+                ret: Ty::Top,
+                err: Ty::Never,
+                env: Ty::Never,
+            }));
+            let root = solver.records.record(vec![(Label::name("f"), fun)]);
+            let scheme = Scheme {
+                level: 0,
+                ty: root,
+                key_slots: vec![],
+            };
+            SchemeArtifact {
+                catalog: Arc::new(SchemeCatalog {
+                    solver: Mutex::new(solver),
+                    schemes: vec![scheme.clone()],
+                    externals: OnceLock::new(),
+                }),
+                scheme,
+            }
+        };
+        let mut names = |t: TypeRef| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(_) => unreachable!(),
+        };
+        let mut other_names = names;
+        assert_eq!(
+            build(false)
+                .compare(&build(true), &mut names, &mut other_names)
+                .unwrap(),
+            SchemeComparison::Equivalent(vec![vec![]])
+        );
+    }
+
+    #[test]
     fn scheme_comparison_aligns_variables_by_use_not_allocation_order() {
         let build = |reversed: bool| {
             let mut solver = Solver::new(HashMap::new(), Vec::new());
@@ -1682,6 +2063,21 @@ fn handler_witness(source: &Solver, source_root: &Ty, target: &Solver, target_ro
     if source.vars.len() != 1 || target.vars.len() != 1 {
         return false;
     }
+    let sites = source.records.graph(source_root).variable_sites(
+        source,
+        super::solve::Pol::Pos,
+        false,
+        false,
+    );
+    let positive = sites.iter().any(|(v, pol, _)| {
+        *v == V(0) && matches!(pol, super::solve::Pol::Pos | super::solve::Pol::Both)
+    });
+    let negative = sites.iter().any(|(v, pol, _)| {
+        *v == V(0) && matches!(pol, super::solve::Pol::Neg | super::solve::Pol::Both)
+    });
+    if !positive || !negative {
+        return false;
+    }
     let mut demand = records::Demand::new(records::Demand::LIMIT, true);
     if !matches!(
         proves(source, source_root, target_root, Mode::Value, &mut demand),
@@ -1847,6 +2243,18 @@ impl SchemeArtifact {
             .clone();
         let mut left_type = left.scheme.ty.clone();
         let mut right_type = right.scheme.ty.clone();
+        substitute_exact_variables(
+            &mut left_solver,
+            &mut left_type,
+            &mut left_bundle.variables,
+            closed_environment,
+        );
+        substitute_exact_variables(
+            &mut right_solver,
+            &mut right_type,
+            &mut right_bundle.variables,
+            closed_environment,
+        );
         collapse_equal_variables(
             &mut left_solver,
             &mut left_type,
@@ -1897,6 +2305,41 @@ impl SchemeArtifact {
         for (id, values) in left_solver.row_params.clone() {
             right_solver.row_params.insert(id, values);
         }
+        let raw_left = left_solver.scheme_snapshot();
+        let raw_right = right_solver.scheme_snapshot();
+        let tag_base = next;
+        let cover = || {
+            let mut demand = records::Demand::new(records::Demand::LIMIT, true);
+            let left = CoverSide {
+                solver: &raw_left,
+                root: &left_type,
+                metadata: &left_bundle.variables,
+            };
+            let right = CoverSide {
+                solver: &raw_right,
+                root: &right_type,
+                metadata: &right_bundle.variables,
+            };
+            let forward = find_cover(
+                left,
+                right,
+                &left_labels,
+                &right_bundle.labels,
+                tag_base,
+                &mut demand,
+            )?;
+            if !forward {
+                return Ok(false);
+            }
+            find_cover(
+                right,
+                left,
+                &right_labels,
+                &left_bundle.labels,
+                tag_base,
+                &mut demand,
+            )
+        };
         let mut tags = HashMap::new();
         let left_root = tag_scheme_solver(&mut left_solver, &left_type, &mut tags, &mut next);
         let right_root = tag_scheme_solver(&mut right_solver, &right_type, &mut tags, &mut next);
@@ -1924,6 +2367,11 @@ impl SchemeArtifact {
             )
         };
         if left_bundle.variables.len() != right_bundle.variables.len() {
+            match cover() {
+                Ok(true) => return Ok(SchemeComparison::Equivalent(vec![vec![]])),
+                Err(()) => return Ok(SchemeComparison::ResourceLimit),
+                Ok(false) => (),
+            }
             let all_general = left_bundle
                 .variables
                 .iter()
@@ -2011,7 +2459,7 @@ impl SchemeArtifact {
                             .collect();
                         pairs.sort_unstable();
                         pairs.dedup();
-                        if pairs.is_empty() {
+                        if pairs.is_empty() || closed_environment {
                             return Ok(SchemeComparison::Equivalent(vec![pairs]));
                         }
                         if !solutions.contains(&pairs) {
@@ -2089,6 +2537,11 @@ impl SchemeArtifact {
             .chain(&right_bundle.variables)
             .all(|v| v.depth.is_some());
         if solutions.is_empty() {
+            match cover() {
+                Ok(true) => return Ok(SchemeComparison::Equivalent(vec![vec![]])),
+                Err(()) => return Ok(SchemeComparison::ResourceLimit),
+                Ok(false) => (),
+            }
             if closed_environment || all_general {
                 Ok(witnesses())
             } else {
@@ -2206,6 +2659,7 @@ fn project_hidden(
                 }
             }
         }
+        *solver = solver.scheme_snapshot();
     }
 }
 
@@ -2301,7 +2755,7 @@ fn ground_known_scheme(
     if solver
         .vars
         .iter()
-        .any(|s| s.row != Mode::Value || s.difference || !s.handled.is_empty())
+        .any(|state| state.difference && state.handled.is_empty())
     {
         return None;
     }
@@ -2381,20 +2835,67 @@ fn ground_known_scheme(
     };
     for (i, state) in solver.vars.iter().enumerate() {
         let value = values[i].as_ref().expect("ground variable");
+        if state.row != Mode::Value && !witness_row_value(solver, value, state.row) {
+            return None;
+        }
         for lower in &state.lower {
-            scratch.constrain(&ground(lower), value);
+            witness_constraint(&mut scratch, &ground(lower), value, state.row);
         }
         for upper in &state.upper {
-            scratch.constrain(value, &ground(upper));
+            witness_constraint(&mut scratch, value, &ground(upper), state.row);
         }
         for from in &state.from {
-            scratch.constrain(values[from.0 as usize].as_ref().unwrap(), value);
+            witness_constraint(
+                &mut scratch,
+                values[from.0 as usize].as_ref().unwrap(),
+                value,
+                state.row,
+            );
         }
         for into in &state.into {
-            scratch.constrain(value, values[into.0 as usize].as_ref().unwrap());
+            witness_constraint(
+                &mut scratch,
+                value,
+                values[into.0 as usize].as_ref().unwrap(),
+                state.row,
+            );
+        }
+        for handler in &state.handled {
+            let mut demand = records::Demand::new(records::Demand::LIMIT, true);
+            if !handler_entailed(&scratch, value, &ground(handler), state.row, &mut demand).ok()? {
+                return None;
+            }
         }
     }
     scratch.failures.is_empty().then(|| ground(root))
+}
+
+fn witness_constraint(solver: &mut Solver, left: &Ty, right: &Ty, mode: Mode) {
+    match mode {
+        Mode::Value => solver.constrain(left, right),
+        Mode::Row => solver.constrain_row(left, right),
+        Mode::Env => solver.constrain_env(left, right),
+    }
+}
+
+fn witness_row_value(solver: &Solver, value: &Ty, mode: Mode) -> bool {
+    let graph = solver.records.graph(value);
+    let mut pending = vec![graph.id];
+    while let Some(id) = pending.pop() {
+        match graph.node_at(id) {
+            Node::Never | Node::Con(Head::Named(TypeRef::Custom(_)), _, _) => (),
+            Node::Union(a, b) | Node::Inter(a, b) => pending.extend([a, b]),
+            Node::Con(
+                Head::Named(TypeRef::Builtin(
+                    crate::hir::BuiltinType::Int | crate::hir::BuiltinType::String,
+                )),
+                _,
+                _,
+            ) if mode == Mode::Row => (),
+            _ => return false,
+        }
+    }
+    true
 }
 
 fn witness_labels(ty: &Ty, labels: &[usize], keys: &[String]) -> Ty {
@@ -2491,6 +2992,31 @@ fn shared_group_counterexample(
         WitnessChoice::Upper,
         WitnessChoice::Lower,
     ];
+    for solver in [source, target] {
+        for handler in solver.vars.iter().flat_map(|state| &state.handled) {
+            if !solver.records.graph(handler).variables().is_empty() {
+                continue;
+            }
+            domain.push(WitnessChoice::Type(handler.clone()));
+            let view = match handler {
+                Ty::Graph(graph) => graph.view(),
+                other => Some(other.clone()),
+            };
+            if let Some(Ty::Con(head @ Head::Named(TypeRef::Custom(_)), values, args)) = view {
+                for i in 0..args.len() {
+                    for replacement in [&integer, &string] {
+                        let mut alternate = args.clone();
+                        alternate[i] = replacement.clone();
+                        domain.push(WitnessChoice::Type(Ty::Con(
+                            head,
+                            values.clone(),
+                            alternate,
+                        )));
+                    }
+                }
+            }
+        }
+    }
     for name in &labels {
         for value in [&integer, &string] {
             domain.push(WitnessChoice::Type(
@@ -2562,7 +3088,10 @@ fn shared_group_counterexample(
             let mut backward = forward.clone();
             forward.constrain(&target_root, &ground);
             backward.constrain(&ground, &target_root);
-            if definite_failure(&forward) || definite_failure(&backward) {
+            if definite_failure(&forward)
+                || definite_failure(&backward)
+                || rejected_service_witness(target, &target_root, &ground)
+            {
                 return Some(true);
             }
         }
@@ -2775,4 +3304,505 @@ fn collapse_equal_variables(
     }
     solver.vars = merged;
     *metadata = new_meta;
+}
+
+/// Replace a variable fixed to one exact structural type. Its other bounds
+/// are imposed on that type before the binder is removed.
+fn substitute_exact_variables(
+    solver: &mut Solver,
+    root: &mut Ty,
+    metadata: &mut Vec<Variable>,
+    closed: bool,
+) {
+    loop {
+        let candidate = solver.vars.iter().enumerate().find_map(|(i, state)| {
+            if (metadata[i].depth.is_none() && !closed)
+                || state.input
+                || state.row != Mode::Value
+                || state.difference
+                || state.label_key.is_some()
+                || !state.handled.is_empty()
+            {
+                return None;
+            }
+            let v = V(i as u32);
+            state
+                .lower
+                .iter()
+                .find(|ty| {
+                    !matches!(ty, Ty::Var(_))
+                        && state.upper.contains(ty)
+                        && !solver.records.graph(ty).variables().contains(&v)
+                })
+                .cloned()
+                .map(|ty| (i, ty))
+        });
+        let Some((i, replacement)) = candidate else {
+            break;
+        };
+        let v = V(i as u32);
+        let state = solver.vars[i].clone();
+        let substitute = |ty: &Ty| {
+            super::alias::map_vars(ty, &mut |w| {
+                if w == v {
+                    replacement.clone()
+                } else {
+                    Ty::Var(w)
+                }
+            })
+        };
+        *root = substitute(root);
+        for current in &mut solver.vars {
+            for ty in current
+                .lower
+                .iter_mut()
+                .chain(&mut current.upper)
+                .chain(&mut current.handled)
+            {
+                *ty = substitute(ty);
+            }
+            current.from.retain(|w| *w != v);
+            current.into.retain(|w| *w != v);
+        }
+        for lower in state.lower.iter().filter(|t| **t != Ty::Var(v)) {
+            solver.constrain(&substitute(lower), &replacement);
+        }
+        for upper in state.upper.iter().filter(|t| **t != Ty::Var(v)) {
+            solver.constrain(&replacement, &substitute(upper));
+        }
+        for from in state.from.iter().filter(|w| **w != v) {
+            solver.constrain(&Ty::Var(*from), &replacement);
+        }
+        for into in state.into.iter().filter(|w| **w != v) {
+            solver.constrain(&replacement, &Ty::Var(*into));
+        }
+        assert!(
+            solver.failures.is_empty(),
+            "valid exact substitution must preserve consistent bounds"
+        );
+        solver.vars.remove(i);
+        metadata.remove(i);
+        let renumber = |w: V| {
+            assert_ne!(w, v, "substituted binder remains");
+            Ty::Var(V(if w.0 > v.0 { w.0 - 1 } else { w.0 }))
+        };
+        *root = super::alias::map_vars(root, &mut renumber.clone());
+        for current in &mut solver.vars {
+            for ty in current
+                .lower
+                .iter_mut()
+                .chain(&mut current.upper)
+                .chain(&mut current.handled)
+            {
+                *ty = super::alias::map_vars(ty, &mut renumber.clone());
+            }
+            for var in current.from.iter_mut().chain(&mut current.into) {
+                assert_ne!(*var, v, "substituted edge remains");
+                if var.0 > v.0 {
+                    var.0 -= 1;
+                }
+            }
+        }
+        *solver = solver.scheme_snapshot();
+    }
+}
+
+/// Find an explicit, universally valid instantiation of `cover` in terms of
+/// the subject's binders. The subject's constraints are never strengthened.
+#[derive(Clone, Copy)]
+struct CoverSide<'a> {
+    solver: &'a Solver,
+    root: &'a Ty,
+    metadata: &'a [Variable],
+}
+
+fn find_cover(
+    cover: CoverSide<'_>,
+    subject: CoverSide<'_>,
+    label_map: &[usize],
+    label_names: &[String],
+    tag_base: u32,
+    demand: &mut records::Demand,
+) -> Result<bool, ()> {
+    let CoverSide {
+        solver: cover,
+        root: cover_root,
+        metadata: cover_meta,
+    } = cover;
+    let CoverSide {
+        solver: subject,
+        root: subject_root,
+        metadata: subject_meta,
+    } = subject;
+    if cover_meta
+        .iter()
+        .chain(subject_meta)
+        .any(|v| v.depth.is_none() || (v.difference && v.handled == 0))
+    {
+        return Ok(false);
+    }
+    let mut candidates = vec![Ty::Never, Ty::Top];
+    let roots = std::iter::once(subject_root).chain(
+        subject
+            .vars
+            .iter()
+            .flat_map(|s| s.lower.iter().chain(&s.upper)),
+    );
+    for ty in roots {
+        let graph = subject.records.graph(ty);
+        for (id, _) in graph.nodes() {
+            let candidate = graph.pool().ty(id);
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
+    // Closed pieces of the covering scheme and Boolean combinations of
+    // subject atoms are valid instantiation expressions even when they do
+    // not occur verbatim in the subject root.
+    let cover_roots = std::iter::once(cover_root).chain(
+        cover
+            .vars
+            .iter()
+            .flat_map(|s| s.lower.iter().chain(&s.upper)),
+    );
+    for ty in cover_roots {
+        let graph = cover.records.graph(ty);
+        for (id, _) in graph.nodes() {
+            let candidate = graph.pool().ty(id);
+            if graph.pool().graph(&candidate).variables().is_empty()
+                && records::label_params(&candidate).is_empty()
+                && !candidates.contains(&candidate)
+            {
+                candidates.push(candidate);
+            }
+        }
+    }
+    let atoms: Vec<_> = candidates
+        .iter()
+        .filter(|ty| match ty {
+            Ty::Var(_) => true,
+            Ty::Con(Head::Named(_), _, args) => args.is_empty(),
+            _ => false,
+        })
+        .cloned()
+        .collect();
+    let combine_scope = demand.new_scope();
+    for i in 0..atoms.len() {
+        for j in i + 1..atoms.len() {
+            demand
+                .charge_state(&[u64::MAX - 2, combine_scope, i as u64, j as u64])
+                .map_err(|_| ())?;
+            for candidate in [
+                subject.records.union(&[atoms[i].clone(), atoms[j].clone()]),
+                subject.records.inter(&[atoms[i].clone(), atoms[j].clone()]),
+            ] {
+                if !candidates.contains(&candidate) {
+                    candidates.push(candidate);
+                }
+            }
+        }
+    }
+    let mut choices = Vec::with_capacity(cover.vars.len());
+    for state in &cover.vars {
+        if let Some(label) = state.label_key {
+            let target = TyVarId(label_map[label.0 as usize] as u32);
+            let options = subject
+                .vars
+                .iter()
+                .enumerate()
+                .filter_map(|(i, s)| (s.label_key == Some(target)).then_some(Ty::Var(V(i as u32))))
+                .collect::<Vec<_>>();
+            if options.is_empty() {
+                return Ok(false);
+            }
+            choices.push(options);
+        } else if state.row != Mode::Value {
+            let options = candidates
+                .iter()
+                .filter(|ty| row_candidate(subject, ty, state.row))
+                .cloned()
+                .collect::<Vec<_>>();
+            if options.is_empty() {
+                return Ok(false);
+            }
+            choices.push(options);
+        } else {
+            choices.push(candidates.clone());
+        }
+    }
+    let count = cover.vars.len();
+    let mut positions = vec![0usize; count];
+    let mut depth = 0usize;
+    let scope = demand.new_scope();
+    loop {
+        let state: Vec<u64> = [u64::MAX - 1, scope]
+            .into_iter()
+            .chain(positions[..depth].iter().map(|v| *v as u64))
+            .collect();
+        demand.charge_state(&state).map_err(|_| ())?;
+        if depth == count {
+            let substitute = |ty: &Ty| {
+                let labels = records::label_params(ty)
+                    .into_iter()
+                    .map(|p| {
+                        let id = records::label_var(&p).expect("interface label binder").0 as usize;
+                        let target = label_map[id];
+                        let value = records::variable_label(
+                            TyVarId(target as u32),
+                            &label_names[target],
+                            p.level,
+                        );
+                        (p, value)
+                    })
+                    .collect();
+                let ty = records::map_labels(ty, &labels);
+                super::alias::map_vars(&ty, &mut |v| {
+                    choices[v.0 as usize][positions[v.0 as usize]].clone()
+                })
+            };
+            let mut valid = true;
+            for (i, state) in cover.vars.iter().enumerate() {
+                let value = &choices[i][positions[i]];
+                for lower in &state.lower {
+                    if !proves(subject, &substitute(lower), value, state.row, demand)? {
+                        valid = false;
+                        break;
+                    }
+                }
+                if !valid {
+                    break;
+                }
+                for upper in &state.upper {
+                    if !proves(subject, value, &substitute(upper), state.row, demand)? {
+                        valid = false;
+                        break;
+                    }
+                }
+                if !valid {
+                    break;
+                }
+                for from in &state.from {
+                    if !proves(
+                        subject,
+                        &choices[from.0 as usize][positions[from.0 as usize]],
+                        value,
+                        state.row,
+                        demand,
+                    )? {
+                        valid = false;
+                        break;
+                    }
+                }
+                if !valid {
+                    break;
+                }
+                for into in &state.into {
+                    if !proves(
+                        subject,
+                        value,
+                        &choices[into.0 as usize][positions[into.0 as usize]],
+                        state.row,
+                        demand,
+                    )? {
+                        valid = false;
+                        break;
+                    }
+                }
+                if !valid {
+                    break;
+                }
+                for handler in &state.handled {
+                    if !handler_entailed(subject, value, &substitute(handler), state.row, demand)? {
+                        valid = false;
+                        break;
+                    }
+                }
+                if !valid {
+                    break;
+                }
+            }
+            if valid {
+                let target = substitute(cover_root);
+                let mut solver = subject.scheme_snapshot();
+                let mut tags = HashMap::new();
+                let mut next = tag_base;
+                let left = tag_scheme_type(&solver.records, &target, &mut tags, &mut next);
+                let right = tag_scheme_type(&solver.records, subject_root, &mut tags, &mut next);
+                for id in tags.values() {
+                    solver.variance.insert(*id, vec![Variance::Co]);
+                    solver.comparison_wrappers.insert(*id);
+                }
+                if proves(&solver, &left, &right, Mode::Value, demand)? {
+                    return Ok(true);
+                }
+            }
+            if depth == 0 {
+                return Ok(false);
+            }
+            depth -= 1;
+            positions[depth] += 1;
+            continue;
+        }
+        if positions[depth] >= choices[depth].len() {
+            positions[depth] = 0;
+            if depth == 0 {
+                return Ok(false);
+            }
+            depth -= 1;
+            positions[depth] += 1;
+        } else {
+            depth += 1;
+            if depth < count {
+                positions[depth] = 0;
+            }
+        }
+    }
+}
+
+fn row_candidate(solver: &Solver, ty: &Ty, mode: Mode) -> bool {
+    let graph = solver.records.graph(ty);
+    graph.nodes().into_iter().all(|(_, node)| match node {
+        Node::Never => true,
+        Node::Var(v) => solver.vars[v.0 as usize].row == mode,
+        Node::Union(..) | Node::Inter(..) => true,
+        _ => false,
+    })
+}
+
+/// Prove a retained same-form handler for a candidate row without installing
+/// it into the subject. Every union branch must retain the obligation.
+fn handler_entailed(
+    subject: &Solver,
+    value: &Ty,
+    handler: &Ty,
+    mode: Mode,
+    demand: &mut records::Demand,
+) -> Result<bool, ()> {
+    let graph = subject.records.graph(value);
+    let mut nodes = graph.nodes();
+    nodes.sort_unstable_by_key(|(id, _)| *id);
+    let mut proven = FxHashMap::default();
+    for (id, node) in nodes {
+        let yes = match node {
+            Node::Never => true,
+            Node::Var(v) => {
+                let state = &subject.vars[v.0 as usize];
+                let mut found = false;
+                for own in &state.handled {
+                    if proves(subject, own, handler, mode, demand)?
+                        && proves(subject, handler, own, mode, demand)?
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                found
+            }
+            Node::Con(head, values, args) => {
+                if Some(head) != handler.value_head() {
+                    true
+                } else {
+                    let ty = subject
+                        .records
+                        .ty(subject.records.intern(Node::Con(head, values, args)));
+                    proves(subject, &ty, handler, mode, demand)?
+                        && proves(subject, handler, &ty, mode, demand)?
+                }
+            }
+            Node::Union(a, b) => proven[&a] && proven[&b],
+            Node::Inter(a, b) => proven[&a] || proven[&b],
+            Node::Diff(base, _) => proven[&base],
+            _ => false,
+        };
+        proven.insert(id, yes);
+    }
+    Ok(proven[&graph.id])
+}
+
+/// A concrete service can distinguish two correlated environment schemes if
+/// every target row binder rejects that form, and the same row is observable
+/// in both input and output positions.
+fn rejected_service_witness(target: &Solver, target_root: &Ty, ground: &Ty) -> bool {
+    use super::solve::Pol;
+    if target.vars.is_empty()
+        || target
+            .vars
+            .iter()
+            .any(|v| v.row != Mode::Env || v.handled.is_empty())
+    {
+        return false;
+    }
+    let graph = target.records.graph(ground);
+    for (id, node) in graph.nodes() {
+        let Node::Con(Head::Named(TypeRef::Custom(ctor)), _, _) = node else {
+            continue;
+        };
+        if target.comparison_wrappers.contains(&ctor) {
+            continue;
+        }
+        let form = target.records.ty(id);
+        let mut all_reject = true;
+        for i in 0..target.vars.len() {
+            let mut trial = target.scheme_snapshot();
+            trial.constrain_env(&form, &Ty::Var(V(i as u32)));
+            if !definite_failure(&trial) {
+                all_reject = false;
+                break;
+            }
+        }
+        if !all_reject {
+            continue;
+        }
+        let mut proof = target.scheme_snapshot();
+        let marker = proof.fresh_at(0);
+        proof.vars[marker.0 as usize].row = Mode::Env;
+        proof.vars[marker.0 as usize].input = true;
+        let target_shape = super::alias::map_vars(target_root, &mut |_| Ty::Var(marker));
+        let form_id = proof.records.import(&form);
+        let source_shape = proof.records.graph(ground).map_nodes(false, &mut |ty, _| {
+            if proof.records.import(&ty) == form_id {
+                Ty::Var(marker)
+            } else {
+                ty
+            }
+        });
+        let sites =
+            proof
+                .records
+                .graph(&target_shape)
+                .variable_sites(&proof, Pol::Pos, false, false);
+        let positive = sites
+            .iter()
+            .any(|(v, p, _)| *v == marker && matches!(p, Pol::Pos | Pol::Both));
+        let negative = sites
+            .iter()
+            .any(|(v, p, _)| *v == marker && matches!(p, Pol::Neg | Pol::Both));
+        if !positive || !negative {
+            continue;
+        }
+        let mut demand = records::Demand::new(records::Demand::LIMIT, true);
+        if matches!(
+            proves(
+                &proof,
+                &target_shape,
+                &source_shape,
+                Mode::Value,
+                &mut demand
+            ),
+            Ok(true)
+        ) && matches!(
+            proves(
+                &proof,
+                &source_shape,
+                &target_shape,
+                Mode::Value,
+                &mut demand
+            ),
+            Ok(true)
+        ) {
+            return true;
+        }
+    }
+    false
 }

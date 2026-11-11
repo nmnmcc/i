@@ -82,7 +82,12 @@ impl Pool {
     }
 
     pub fn intern(&self, node: Node) -> Id {
-        self.0.write().expect("type pool").intern(node)
+        let mut arena = self.0.write().expect("type pool");
+        match node {
+            Node::Union(a, b) => arena.union(a, b),
+            Node::Inter(a, b) => arena.inter(a, b),
+            node => arena.intern(node),
+        }
     }
 
     pub fn record(&self, fields: Vec<(Label, Ty)>) -> Ty {
@@ -212,13 +217,8 @@ impl Pool {
                 continue;
             }
             let node = remap(node, &done);
-            // A child order canonical in one arena need not stay canonical
-            // after its children acquire IDs in another arena.
-            let id2 = match node {
-                Node::Union(a, b) => self.0.write().expect("type pool").union(a, b),
-                Node::Inter(a, b) => self.0.write().expect("type pool").inter(a, b),
-                node => self.intern(node),
-            };
+            // Child IDs change between arenas; intern normalizes their order.
+            let id2 = self.intern(node);
             done.insert(id, id2);
         }
         done[&g.id]
