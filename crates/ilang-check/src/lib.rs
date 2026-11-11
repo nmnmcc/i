@@ -284,6 +284,21 @@ pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
     check_resolved(graph, program, diags)
 }
 
+/// Resolve and infer a project for collection discovery, without selecting
+/// configured program entries or host exports as tool execution roots.
+pub fn check_parsed_for_tools(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (mut program, mut diags) = resolve::resolve(graph, parsed);
+    order::order(&mut program, &mut diags);
+    for module in &mut program.modules {
+        for binding in &mut module.bindings {
+            binding.main = false;
+            binding.test = false;
+        }
+    }
+    program.host_exports.clear();
+    check_resolved(graph, Some(program), diags)
+}
+
 fn check_resolved(
     graph: &PackageGraph,
     program: Option<hir::Program>,
@@ -305,6 +320,21 @@ fn check_resolved(
         types,
         diags,
     }
+}
+
+/// Validate a consumer-selected entry after the project has been checked.
+/// The returned type data includes the selected entry's inferred services.
+pub fn check_selected(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    target: hir::DefId,
+    require_nil: bool,
+) -> (types::Typed, Vec<Diagnostic>) {
+    let (typed, mut diags) =
+        types::check_selected(program, &graph.sources, &[(target, require_nil)]);
+    capabilities::check_selected(program, graph, &[target], &mut diags);
+    map_expansion_diagnostics(program, &graph.sources, &mut diags);
+    (typed, diags)
 }
 
 /// Map diagnostics from the checker's virtual expansion text to written

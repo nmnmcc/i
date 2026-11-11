@@ -682,6 +682,8 @@ dependencies = [
  "ilang-syntax",
  "ilang-wasm",
  "num-bigint",
+ "serde",
+ "serde_json",
  "tempfile",
  "toml_edit",
  "wasmtime",

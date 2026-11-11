@@ -70,6 +70,31 @@ enum Command {
         #[arg(long)]
         entry: Option<String>,
     },
+    /// List checked collection contributions as a JSON manifest.
+    Collections {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long)]
+        offline: bool,
+        /// Include test modules and development dependencies.
+        #[arg(long)]
+        tests: bool,
+    },
+    /// Build and run one opaque collection handle.
+    RunCollection {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long)]
+        offline: bool,
+        #[arg(long)]
+        tests: bool,
+        #[arg(long, default_value_t = 2)]
+        opt: u8,
+        /// Require the selected function to give Nil.
+        #[arg(long)]
+        require_nil: bool,
+        handle: String,
+    },
     /// Build and run the tests of a package.
     Test {
         #[arg(long, default_value = ".")]
@@ -136,6 +161,31 @@ fn main() -> ExitCode {
             opt,
             entry,
         } => cmd_run(&project, opt, offline, entry.as_deref()),
+        Command::Collections {
+            project,
+            offline,
+            tests,
+        } => match ilang_cli::collections(&project, tests, offline) {
+            Ok(manifest) => match serde_json::to_string_pretty(&manifest) {
+                Ok(json) => {
+                    println!("{json}");
+                    Ok(ExitCode::SUCCESS)
+                }
+                Err(error) => Err(error.into()),
+            },
+            Err(error) => {
+                eprintln!("{error}");
+                Ok(ExitCode::FAILURE)
+            }
+        },
+        Command::RunCollection {
+            project,
+            offline,
+            tests,
+            opt,
+            require_nil,
+            handle,
+        } => cmd_run_collection(&project, opt, offline, tests, &handle, require_nil),
         Command::Test {
             project,
             offline,
@@ -278,6 +328,43 @@ fn cmd_run(
         );
     }
     match program.run_entry(b.host_options())? {
+        Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
+        Outcome::Stop(stop) => {
+            eprintln!("{stop}");
+            Ok(ExitCode::FAILURE)
+        }
+        Outcome::Err(error) => {
+            eprintln!("error: {:?}", error.0);
+            Ok(ExitCode::FAILURE)
+        }
+    }
+}
+
+fn cmd_run_collection(
+    project: &Path,
+    opt: u8,
+    offline: bool,
+    tests: bool,
+    handle: &str,
+    require_nil: bool,
+) -> anyhow::Result<ExitCode> {
+    let result = if require_nil {
+        ilang_cli::CollectionResult::Nil
+    } else {
+        ilang_cli::CollectionResult::Any
+    };
+    let selected =
+        match ilang_cli::build_collection(project, options(opt, tests, offline)?, handle, result) {
+            Ok(selected) => selected,
+            Err(error) => {
+                eprintln!("{error}");
+                return Ok(ExitCode::FAILURE);
+            }
+        };
+    for warning in &selected.built.warnings {
+        eprintln!("{warning}");
+    }
+    match selected.run_with(selected.built.host_options())? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
         Outcome::Stop(stop) => {
             eprintln!("{stop}");
