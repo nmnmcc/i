@@ -188,6 +188,10 @@ impl Walk for ExprKind {
                 base.walk(v);
                 fields.walk(v);
             }
+            Self::Record { base, fields } => {
+                base.walk(v);
+                fields.walk(v);
+            }
             Self::Unary { op: _, expr } => expr.walk(v),
             Self::Binary { op: _, lhs, rhs } => {
                 lhs.walk(v);
@@ -253,6 +257,15 @@ impl Walk for TypeKind {
             }
             Self::Hole => {}
             Self::Tuple(ts) | Self::Union(ts) | Self::Inter(ts) | Self::Diff(ts) => ts.walk(v),
+            Self::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                base.walk(v);
+                fields.walk(v);
+                removed.walk(v);
+            }
             Self::Fn {
                 params,
                 ret,
@@ -265,5 +278,11 @@ impl Walk for TypeKind {
                 env.walk(v);
             }
         }
+    }
+}
+
+impl Walk for RecordLabel {
+    fn walk(&mut self, v: &mut impl Visitor) {
+        self.ident.walk(v);
     }
 }

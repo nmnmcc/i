@@ -1167,6 +1167,30 @@ impl<'a> Formatter<'a> {
                     f.expr(&items[i], 0)
                 })
             }
+            ExprKind::Record { base, fields } => {
+                let mut spans = Vec::new();
+                if let Some(b) = base {
+                    spans.push((b.span.start.saturating_sub(2), b.span.end));
+                }
+                spans.extend(
+                    fields
+                        .iter()
+                        .map(|(label, value)| (label.span.start, value.span.end)),
+                );
+                self.seq("(", ")", span.start, span.end - 1, &spans, false, |f, i| {
+                    if let Some(b) = base
+                        && i == 0
+                    {
+                        return cat(vec![text(".."), f.expr(b, 0)]);
+                    }
+                    let (label, value) = &fields[i - usize::from(base.is_some())];
+                    cat(vec![
+                        text(f.slice(label.span)),
+                        text(": "),
+                        f.expr(value, 0),
+                    ])
+                })
+            }
             ExprKind::List { items, rest } => {
                 let mut spans = spans_of(items);
                 if let Some(r) = rest {
@@ -1634,6 +1658,47 @@ impl<'a> Formatter<'a> {
             TypeKind::Lit(v) => return text(v.text()),
             TypeKind::Hole => return text("_"),
             TypeKind::Tuple(items) => return self.types(t.span.start, t.span.end - 1, items),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut spans = Vec::new();
+                if let Some(b) = base {
+                    spans.push((b.span.start.saturating_sub(2), b.span.end));
+                }
+                spans.extend(
+                    fields
+                        .iter()
+                        .map(|(label, ty)| (label.span.start, ty.span.end)),
+                );
+                spans.extend(
+                    removed
+                        .iter()
+                        .map(|label| (label.span.start.saturating_sub(1), label.span.end)),
+                );
+                return self.seq(
+                    "(",
+                    ")",
+                    t.span.start,
+                    t.span.end - 1,
+                    &spans,
+                    false,
+                    |f, i| {
+                        let offset = usize::from(base.is_some());
+                        if let Some(b) = base
+                            && i == 0
+                        {
+                            return cat(vec![text(".."), f.ty(b)]);
+                        }
+                        if let Some((label, ty)) = fields.get(i - offset) {
+                            return cat(vec![text(f.slice(label.span)), text(": "), f.ty(ty)]);
+                        }
+                        let label = &removed[i - offset - fields.len()];
+                        cat(vec![text("-"), text(f.slice(label.span))])
+                    },
+                );
+            }
             TypeKind::Fn {
                 params,
                 ret,

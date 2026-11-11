@@ -50,6 +50,7 @@
 //! | 11 | Boundary | an `$obj` with tag 11; the other fields belong to the code generator |
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
+//! | 14 | Record | field 5: labels and values, interleaved, sorted by the UTF-8 bytes of the labels |
 //! | 15 | Key | identity value; no parts |
 //! | 16 | Keyed | field 5: key, value |
 //! | 17 | Request | identity cell with private mutable completion state |

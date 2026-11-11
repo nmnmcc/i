@@ -32,5 +32,5 @@ direct : String
 45:15: error[E0506]: a call with an argument by label needs a known function type for the function (§6.6, §4.8); write the type of the function, or give the arguments by position
 48:7: error[E0510]: the constructor has no field with the label `n` (§7.1)
 48:10: error[E0510]: the constructor has no field with the label `a` (§7.1)
-84:35: error[E0506]: `.value` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+81:1: error[E0501]: `Node` is not a subtype of `(value: _)`
 103:19: error[E0507]: the function has no parameter with the label `y`

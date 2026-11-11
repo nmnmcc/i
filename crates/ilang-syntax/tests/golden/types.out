@@ -12,7 +12,7 @@ T6 = (A) -> B | C
 
 T7 = (Int, String)
 
-T8 = ()
+T8 = Record
 
 T9 = (Int)
 

@@ -2,7 +2,7 @@ one : 1
 pi : Float
 hello : "hello"
 pair : (1, "a")
-unit : ()
+unit : Record
 ints : List(1 | 2 | 3)
 mixed : List(1 | "a")
 empty : List(Never)
