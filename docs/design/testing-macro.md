@@ -54,5 +54,6 @@ fixtures). In particular, a fixture testing the validity of `@test` itself
 cannot be converted without changing the subject of that fixture.
 
 On a copy of `std`, 1,845 tests passed at `--opt 0` both before and after
-migration. The copied spec corpus contains 239 migrated test functions; one
-fixture retains its invalid `@main`/`@test` combination for manual review.
+migration. The copied spec corpus contains 239 migrated test functions; all 83 cases
+passed at `--opt 0` and `--opt 2`. One fixture retains its invalid
+`@main`/`@test` combination for manual review.
