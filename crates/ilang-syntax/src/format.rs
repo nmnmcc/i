@@ -21,7 +21,7 @@
 
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
-use crate::print::{level, type_prec};
+use crate::print::{is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Diagnostic, parse_module};
@@ -1130,7 +1130,7 @@ impl<'a> Formatter<'a> {
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
             // A match is an operation at level 6 (§6.9).
-            if level(e) < min {
+            if level(e) < min || is_match(e) && min > 6 {
                 let before = f.hard;
                 let body = f.expr_raw(e);
                 if f.hard == before {

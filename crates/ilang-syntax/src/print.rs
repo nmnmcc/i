@@ -70,6 +70,11 @@ fn is_simple(e: &Expr) -> bool {
     }
 }
 
+/// A match `e |> { … }` (§6.12).
+pub(crate) fn is_match(e: &Expr) -> bool {
+    matches!(e.kind, ExprKind::Case { .. })
+}
+
 /// The function that `e` starts with, through operators, calls, `.f`, and
 /// `.k`.
 pub(crate) fn leading_fn(e: &Expr) -> Option<&Function> {
@@ -523,7 +528,7 @@ impl Printer {
     /// more than that is needed.
     fn expr(&mut self, e: &Expr, min: u8) {
         let lvl = level(e);
-        if lvl < min || self.explicit && min > 0 && lvl < 10 {
+        if lvl < min || self.explicit && min > 0 && lvl < 10 || is_match(e) && min > 6 {
             self.w("{ ");
             self.expr_raw(e);
             self.w(" }");
