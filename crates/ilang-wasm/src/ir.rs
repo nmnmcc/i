@@ -500,6 +500,8 @@ pub struct Func {
     /// A name for reading the Wasm text.
     pub name: String,
     pub arity: u32,
+    /// Logical frame units (source parameters and local names), before optimization.
+    pub budget_frame: u32,
     /// The types of the locals; the first `arity` are the parameters.
     pub locals: Vec<LocalType>,
     pub body: Vec<Stmt>,
@@ -745,6 +747,8 @@ pub struct Program {
     pub start: Option<Func>,
     pub exports: Vec<Export>,
     pub sites: Vec<SitePos>,
+    /// Optional template/call-chain notes, parallel to `sites`.
+    pub site_notes: Vec<Option<String>>,
     /// The module paths of the site table, by module index (§11.7).
     pub site_modules: Vec<String>,
     /// The constructor names, from `FIRST_CONSTRUCTOR` on.

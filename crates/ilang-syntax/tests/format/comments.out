@@ -35,7 +35,7 @@ area = (shape) { // after the brace
 		2 // two
 		// after the last part
 	]
-	y = shape |> {
+	y = shape.{
 		// before a clause
 		Circle(r) -> r *. r // area of a circle
 		Square(s) -> s *. s // area of a square
@@ -47,7 +47,7 @@ area = (shape) { // after the brace
 }
 
 empty = (x) {
-	x |> {
+	x.{
 		// nothing here
 	}
 }

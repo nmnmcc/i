@@ -261,6 +261,112 @@ fn pattern_vars(p: &Pattern, out: &mut HashSet<VarId>) {
     out.extend(w.bound);
 }
 
+/// A source-level bound on values simultaneously pending while evaluating
+/// an expression. Unlike Wasm locals this is independent of code generation
+/// and optimization. Earlier call arguments remain pending while later ones
+/// (including a recursive call) are evaluated.
+fn pending_values<'a>(values: impl IntoIterator<Item = &'a Expr>) -> usize {
+    let mut held = 0;
+    let mut peak = 1;
+    for value in values {
+        peak = peak.max(held + expression_values(value));
+        held += 1;
+    }
+    peak.max(held)
+}
+
+fn pattern_values(p: &Pattern) -> usize {
+    match &p.kind {
+        PatternKind::Quote { captures, .. } => {
+            1 + captures
+                .iter()
+                .map(|(_, pattern)| pattern_values(pattern))
+                .sum::<usize>()
+        }
+        PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
+        PatternKind::Constructor { args, .. }
+        | PatternKind::Tuple(args)
+        | PatternKind::Error(args) => 1 + args.iter().map(pattern_values).sum::<usize>(),
+        PatternKind::List { items, .. } => 1 + items.iter().map(pattern_values).sum::<usize>(),
+        PatternKind::BitArray(segments) => {
+            1 + segments
+                .iter()
+                .map(|s| {
+                    pattern_values(&s.value)
+                        + s.format
+                            .as_ref()
+                            .and_then(|f| f.arg.as_deref())
+                            .map_or(0, expression_values)
+                })
+                .sum::<usize>()
+        }
+        PatternKind::Var(_)
+        | PatternKind::Discard
+        | PatternKind::Typed { .. }
+        | PatternKind::Int { .. }
+        | PatternKind::Float { .. }
+        | PatternKind::String(_)
+        | PatternKind::Prefix { .. } => 1,
+    }
+}
+
+fn block_values(block: &hir::Block) -> usize {
+    block
+        .stmts
+        .iter()
+        .map(|stmt| match stmt {
+            hir::Stmt::Bind(binding) => {
+                expression_values(&binding.value).max(pattern_values(&binding.pattern))
+            }
+            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => expression_values(value),
+        })
+        .max()
+        .unwrap_or(1)
+}
+
+fn expression_values(e: &Expr) -> usize {
+    match &e.kind {
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Error
+        | ExprKind::Fn(_) => 1,
+        ExprKind::Tuple(items) => pending_values(items),
+        ExprKind::List { items, rest } => pending_values(items.iter().chain(rest.as_deref())),
+        ExprKind::BitArray(segments) => pending_values(segments.iter().flat_map(|s| {
+            std::iter::once(&s.value).chain(s.format.as_ref().and_then(|f| f.arg.as_deref()))
+        })),
+        ExprKind::Block(block) => block_values(block),
+        ExprKind::Case { subject, clauses } => expression_values(subject).max(
+            1 + clauses
+                .iter()
+                .map(|clause| {
+                    clause
+                        .patterns
+                        .iter()
+                        .map(pattern_values)
+                        .max()
+                        .unwrap_or(1)
+                        .max(clause.guard.as_ref().map_or(1, expression_values))
+                        .max(expression_values(&clause.body))
+                })
+                .max()
+                .unwrap_or(1),
+        ),
+        ExprKind::Call { callee, args } => {
+            pending_values(std::iter::once(callee.as_ref()).chain(args.iter().map(|a| &a.value)))
+        }
+        ExprKind::Field { target, .. }
+        | ExprKind::TupleIndex { target, .. }
+        | ExprKind::Unary { expr: target, .. } => expression_values(target),
+        ExprKind::RecordUpdate { base, fields, .. } => pending_values(
+            std::iter::once(base.as_ref()).chain(fields.iter().map(|(_, value)| value)),
+        ),
+        ExprKind::Binary { lhs, rhs, .. } => pending_values([lhs.as_ref(), rhs.as_ref()]),
+    }
+}
+
 /// Collects the names used and bound in a part of the program.
 #[derive(Default)]
 struct Walk {
@@ -352,6 +458,9 @@ impl Walk {
 
     fn pattern(&mut self, p: &Pattern) {
         match &p.kind {
+            PatternKind::Quote { captures, .. } => {
+                captures.iter().for_each(|(_, p)| self.pattern(p))
+            }
             PatternKind::Var(b) => self.binder(b),
             PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
             PatternKind::Named { binder, pattern } => {
@@ -498,7 +607,9 @@ pub fn lower_with_bindings(
     options: Options,
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     if !typed.coalescing_errors().is_empty() {
-        return Err(typed.coalescing_errors().to_vec());
+        let mut diags = typed.coalescing_errors().to_vec();
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
+        return Err(diags);
     }
     let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
@@ -506,9 +617,14 @@ pub fn lower_with_bindings(
         crate::control::split(&mut l.out);
         Ok((l.out, l.bindings))
     } else {
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
         Err(l.diags)
     }
 }
+
+type Entry = (String, bool);
+type HostExport = (String, ExportAbi, bool);
+type Entries = (Option<Entry>, Vec<Entry>, Vec<HostExport>);
 
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
@@ -526,7 +642,7 @@ struct Lowerer<'a> {
     op_funcs: HashMap<String, FuncId>,
     work: Vec<(FuncId, DefId)>,
     constants: BTreeSet<FuncId>,
-    site_map: HashMap<SitePos, Site>,
+    site_map: HashMap<(SitePos, Option<String>), Site>,
     module_index: HashMap<ModuleId, u32>,
     lines: HashMap<ModuleId, LineIndex<'a>>,
     /// The service id of each service type constructor (§9.2).
@@ -771,7 +887,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.start();
-        self.entries();
+        let (entry, tests, exports) = self.entries();
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
             let tb = self.program.binding(b);
@@ -786,6 +902,13 @@ impl<'a> Lowerer<'a> {
             let func = self.function(b.module, f, &[], name);
             self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         }
+        self.out.abi_json = abi_json(
+            self.options.target,
+            entry,
+            &tests,
+            &exports,
+            &self.out.imports,
+        );
         self.out.constants = self.constants.iter().copied().collect();
     }
 
@@ -793,6 +916,7 @@ impl<'a> Lowerer<'a> {
     fn start(&mut self) {
         let mut fx = Fx::new(ModuleId(0), false);
         let mut out = Vec::new();
+        let mut pending = 1;
         for &b in &self.program.order.init {
             if !self.included(b.module) {
                 continue;
@@ -801,6 +925,9 @@ impl<'a> Lowerer<'a> {
             if tb.defs.len() == 1 && self.known.contains_key(&tb.defs[0]) {
                 continue;
             }
+            pending = pending
+                .max(expression_values(&tb.binding.value))
+                .max(pattern_values(&tb.binding.pattern));
             fx.module = b.module;
             fx.library = self.is_library(b.module);
             let value = self.expr(&mut fx, &mut out, &tb.binding.value);
@@ -823,6 +950,8 @@ impl<'a> Lowerer<'a> {
         self.out.start = Some(Func {
             name: "ilang_start".into(),
             arity: 0,
+            budget_frame: u32::try_from(1 + fx.vars.len() + pending)
+                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -841,7 +970,7 @@ impl<'a> Lowerer<'a> {
 
     /// The program entry, the tests, and the host exports (§10.2, B.5),
     /// and the host services that they need (§9.7).
-    fn entries(&mut self) {
+    fn entries(&mut self) -> Entries {
         let program = self.program;
         let mut entry = None;
         let mut tests = Vec::new();
@@ -915,18 +1044,12 @@ impl<'a> Lowerer<'a> {
                     code::NOT_SUPPORTED,
                     None,
                     Span::default(),
-                    "the WASI target needs a program entry, a `@main` (B.7)",
+                    "the WASI target needs a program entry: `main` in `src/main.i`, or select `[entries]` with `--entry` (B.7)",
                 )),
             }
         }
         self.out.target = self.options.target;
-        self.out.abi_json = abi_json(
-            self.options.target,
-            entry,
-            &tests,
-            &exports,
-            &self.out.imports,
-        );
+        (entry, tests, exports)
     }
 
     /// Whether an entry point is async: it may call a function of an async
@@ -975,6 +1098,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: "async entry".into(),
             arity: 1,
+            budget_frame: 2,
             locals: vec![LocalType::Value; 1 + n as usize],
             body,
             frame: true,
@@ -1287,6 +1411,7 @@ impl<'a> Lowerer<'a> {
         self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
             name: format!("import {} {}", x.module, x.name),
             arity: n,
+            budget_frame: n + 1,
             locals,
             body,
             frame: true,
@@ -1399,9 +1524,19 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.block(&mut fx, &mut out, &f.body, true);
+        let pending = f
+            .params
+            .iter()
+            .filter_map(|p| match p {
+                Param::Pattern { pattern, .. } => Some(pattern_values(pattern)),
+                Param::Env { .. } => None,
+            })
+            .fold(block_values(&f.body), usize::max);
         Func {
             name,
             arity,
+            budget_frame: u32::try_from(1 + arity as usize + fx.vars.len() + pending)
+                .expect("source frame exceeds u32"),
             locals: fx.locals,
             body: out,
             frame: true,
@@ -1418,39 +1553,94 @@ impl<'a> Lowerer<'a> {
         }
         let program = self.program;
         let graph = self.graph;
-        let module = program.module(fx.module);
-        let index = match self.module_index.get(&fx.module) {
+        let mapped = program.origin(fx.module, Span::new(offset, offset));
+        let source = mapped
+            .as_ref()
+            .map_or(program.module(fx.module).source, |o| o.source);
+        let actual = mapped.as_ref().map_or(offset, |o| o.span.start);
+        let module_id = if mapped.is_some() {
+            program
+                .modules
+                .iter()
+                .position(|m| m.source == source)
+                .map(|i| ModuleId(i as u32))
+                .expect("site source has a module")
+        } else {
+            fx.module
+        };
+        let module = program.module(module_id);
+        let base_path = format!(
+            "{}{}",
+            graph.packages[module.package].position_prefix(),
+            module.path
+        );
+        let note = mapped.as_ref().and_then(|o| {
+            o.template.map(|(source, span)| {
+                let template_module = program
+                    .modules
+                    .iter()
+                    .find(|m| m.source == source)
+                    .expect("template source has a module");
+                let (line, column) =
+                    LineIndex::new(&graph.sources.get(source).text).line_col(span.start);
+                let mut note = format!(
+                    "\n  expanded from {}{}:{line}:{column}",
+                    graph.packages[template_module.package].position_prefix(),
+                    template_module.path
+                );
+                for call in o.expansion.call_chain.iter().skip(1).rev() {
+                    let source = ilang_package::SourceId(call.syntax.scope().module);
+                    let m = program
+                        .modules
+                        .iter()
+                        .find(|m| m.source == source)
+                        .expect("macro call source has a module");
+                    let (line, column) = LineIndex::new(&graph.sources.get(source).text)
+                        .line_col(call.syntax.span().start);
+                    note.push_str(&format!(
+                        "\n  in expansion of `{}` at {}{}:{line}:{column}",
+                        call.macro_name,
+                        graph.packages[m.package].position_prefix(),
+                        m.path
+                    ));
+                }
+                note
+            })
+        });
+        let index = match self.module_index.get(&module_id) {
             Some(&i) => i,
             None => {
                 let i = self.out.site_modules.len() as u32;
-                // A package with a location puts `location@major ` first
-                // (§11.7).
-                self.out.site_modules.push(format!(
-                    "{}{}",
-                    graph.packages[module.package].position_prefix(),
-                    module.path
-                ));
-                self.module_index.insert(fx.module, i);
+                self.out.site_modules.push(base_path);
+                self.module_index.insert(module_id, i);
                 i
             }
         };
         let lines = self
             .lines
-            .entry(fx.module)
+            .entry(module_id)
             .or_insert_with(|| LineIndex::new(&graph.sources.get(module.source).text));
-        let (line, column) = lines.line_col(offset);
+        let (line, column) = lines.line_col(actual);
         let pos = SitePos {
             module: index,
             line,
             column,
         };
-        Some(*self.site_map.entry(pos).or_insert_with(|| {
-            self.out.sites.push(pos);
-            self.out.sites.len() as Site - 1
-        }))
+        Some(
+            *self.site_map.entry((pos, note.clone())).or_insert_with(|| {
+                self.out.sites.push(pos);
+                self.out.site_notes.push(note);
+                self.out.sites.len() as Site - 1
+            }),
+        )
     }
 
     // ---- Names ----
+
+    fn runtime_external(&self, d: DefId) -> bool {
+        self.is_library(d.module)
+            && matches!(&self.program.def(d).kind, DefKind::External { module, .. } if module.starts_with("ilang:"))
+    }
 
     /// The operation of an external function of the library.
     fn external_op(&self, d: DefId) -> Result<(Op, u32), String> {
@@ -1507,7 +1697,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => match self.program.def(d).kind {
-                DefKind::External { .. } if !self.is_library(d.module) => {
+                DefKind::External { .. } if !self.runtime_external(d) => {
                     match self.external_func(d) {
                         Some(f) => {
                             self.constants.insert(f);
@@ -1908,7 +2098,7 @@ impl<'a> Lowerer<'a> {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 // §10.1: a call of an external function is done when it is
                 // reached, like all calls.
-                DefKind::External { .. } if !self.is_library(d.module) => {
+                DefKind::External { .. } if !self.runtime_external(*d) => {
                     match self.external_func(*d) {
                         Some(f) => Target::Callee(Callee::Direct(f)),
                         None => Target::Op(Op::Panic),
@@ -2233,6 +2423,34 @@ impl<'a> Lowerer<'a> {
     /// when it does not match (§7.2).
     fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
         match &p.kind {
+            PatternKind::Quote {
+                template,
+                functions,
+                captures,
+                ..
+            } => {
+                let template = self.pattern_call(
+                    fx,
+                    out,
+                    functions[0],
+                    p.span,
+                    vec![Atom::Int((*template).into())],
+                );
+                let result = self.pattern_call(fx, out, functions[1], p.span, vec![template, v]);
+                let success =
+                    self.pattern_call(fx, out, functions[2], p.span, vec![result.clone()]);
+                guard(out, Cond::True(success), fail);
+                for (index, (many, pattern)) in captures.iter().enumerate() {
+                    let value = self.pattern_call(
+                        fx,
+                        out,
+                        functions[if *many { 4 } else { 3 }],
+                        p.span,
+                        vec![result.clone(), Atom::Int(index.into())],
+                    );
+                    self.pattern(fx, out, pattern, value, fail);
+                }
+            }
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {
@@ -2314,6 +2532,32 @@ impl<'a> Lowerer<'a> {
             PatternKind::BitArray(segs) => self.bits_pattern(fx, out, v, segs, fail),
             PatternKind::Error(_) => out.push(Stmt::Unreachable),
         }
+    }
+
+    fn pattern_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        function: DefId,
+        span: Span,
+        args: Vec<Atom>,
+    ) -> Atom {
+        let callee = Expr {
+            kind: ExprKind::Name(ValueRef::Def(function)),
+            span,
+        };
+        let target = self.target(fx, out, &callee);
+        let value = match target {
+            Target::Callee(callee) => Value::Call {
+                callee,
+                args,
+                env: fx.env,
+            },
+            Target::Op(op) if op.needs_env() => Value::OpEnv(op, args, fx.env),
+            Target::Op(op) => Value::Op(op, args),
+            Target::Ctor(_) => unreachable!("quote service is a function"),
+        };
+        let_value(fx, out, value, self.site(fx, span.start))
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).

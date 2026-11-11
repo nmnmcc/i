@@ -31,6 +31,8 @@ pub struct Built {
     pub trusted_package: String,
     /// The warnings, rendered as `path:line:col: warning[CODE]: …`.
     pub warnings: Vec<String>,
+    /// Whether this artifact contains test entries.
+    pub tests: bool,
 }
 
 impl Built {
@@ -40,7 +42,11 @@ impl Built {
         ilang_host::Program::from_bytes(&self.wasm)?.with_binding_plan(self.binding_plan.clone())
     }
     pub fn host_options(&self) -> ilang_host::HostOptions {
-        let mut options = standard_options();
+        let mut options = if self.tests {
+            test_options()
+        } else {
+            standard_options()
+        };
         options
             .imports
             .grant_package(&self.binding_plan, &self.trusted_package);
@@ -130,11 +136,21 @@ pub fn load(project: &Path, tests: bool, offline: bool) -> (PackageGraph, Vec<Di
 
 /// Loads, checks, and compiles the package in `project`.
 pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError> {
-    let (graph, mut diags) = load(project, options.tests, options.offline);
+    build_entry(project, options, None)
+}
+
+/// Build one named manifest entry, or the default source entry.
+pub fn build_entry(
+    project: &Path,
+    options: BuildOptions,
+    entry: Option<&str>,
+) -> Result<Built, BuildError> {
+    let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    graph.entry = entry.map(str::to_owned);
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };
-    let checked = ilang_check::check(&graph);
+    let checked = ilang_macro::project::check(&mut graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
         return Err(program_error(&graph, &diags));
@@ -184,6 +200,7 @@ pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError>
         binding_plan,
         trusted_package,
         warnings: graph.sources.render_all(&warnings),
+        tests: options.tests,
     })
 }
 
@@ -215,9 +232,17 @@ pub fn standard_options() -> ilang_host::HostOptions {
     ilang_host::HostOptions::new(ilang_host::services::stdout())
 }
 
+/// The test host includes the compiler syntax service for ordinary tests of
+/// macro helpers. Program entry hosts do not get this service.
+pub fn test_options() -> ilang_host::HostOptions {
+    let mut options = standard_options();
+    ilang_host::syntax::install(&mut options.imports).expect("syntax service namespace is unique");
+    options
+}
+
 /// Runs one test in a new instance (§10.2), with the standard host services.
 pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestResult {
-    run_test_with(program, name, standard_options())
+    run_test_with(program, name, test_options())
 }
 
 /// Runs one test in a new instance (§10.2) with these host services, on one
