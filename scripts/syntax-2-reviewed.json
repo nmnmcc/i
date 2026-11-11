@@ -565,45 +565,45 @@
       "empty tuple type at byte 54"
     ]
   },
-  "tests/spec/6/t3_record_codec.i:3c499c4378116149": {
+  "tests/spec/6/t3_record_codec.i:8000855e3a68936a": {
     "empty": [
       "empty tuple expression at byte 164"
     ]
   },
-  "tests/spec/6/t3_record_inspect.i:cea50620e94e7aee": {
+  "tests/spec/6/t3_record_inspect.i:e8ddd106969ae532": {
     "empty": [
-      "empty tuple expression at byte 91"
+      "empty tuple expression at byte 92"
     ]
   },
-  "tests/spec/6/t3_record_param_inner_label.i:1e665c57d21b290d": {
-    "empty": [
-      "empty tuple expression at byte 125"
-    ]
-  },
-  "tests/spec/6/t3_record_param_inner_label_unknown.i:0ae975a9100492be": {
-    "empty": [
-      "empty tuple expression at byte 141"
-    ]
-  },
-  "tests/spec/6/t3_record_param_two_keys.i:d347a520d5bf31ea": {
-    "empty": [
-      "empty tuple expression at byte 111"
-    ]
-  },
-  "tests/spec/6/t3_record_param_two_keys_bad.i:47961da0278ebc54": {
+  "tests/spec/6/t3_record_param_inner_label.i:679843b643669702": {
     "empty": [
       "empty tuple expression at byte 126"
     ]
   },
-  "tests/spec/6/t3_record_schema.i:f44c1628d1ccbdff": {
+  "tests/spec/6/t3_record_param_inner_label_unknown.i:ce17207a20f9f80f": {
+    "empty": [
+      "empty tuple expression at byte 141"
+    ]
+  },
+  "tests/spec/6/t3_record_param_two_keys.i:f60d402e54bf3c55": {
+    "empty": [
+      "empty tuple expression at byte 111"
+    ]
+  },
+  "tests/spec/6/t3_record_param_two_keys_bad.i:b486e993e2a9b13a": {
+    "empty": [
+      "empty tuple expression at byte 126"
+    ]
+  },
+  "tests/spec/6/t3_record_schema.i:33b0d96fb4700d09": {
     "empty": [
       "empty tuple expression at byte 118"
     ]
   },
-  "tests/spec/6/t3_record_types.i:1e5824fcf97737d7": {
+  "tests/spec/6/t3_record_types.i:9a2d2b5d585aa828": {
     "empty": [
-      "empty tuple expression at byte 265",
-      "empty tuple expression at byte 272"
+      "empty tuple expression at byte 266",
+      "empty tuple expression at byte 273"
     ]
   }
 }
