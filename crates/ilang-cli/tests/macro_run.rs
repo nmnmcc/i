@@ -747,17 +747,21 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        "name = \"app\"\n[wasm]\nexports = [\"app/main.calc\"]\n",
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ignore outer)\n(@ macro (= ignore (-> ((: x (. syntax Syntax))) (. syntax Syntax) `123)))\n(@ macro (= outer (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nmain = () { m.outer(m.ignore(unknown(1))) }\n",
+        "(m = app/macros)\n(calc)\ncalc = () { m.outer(m.ignore(unknown(1))) }\n",
     )
     .unwrap();
-    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
-    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    let (mut parsed, diagnostics) = ilang_check::parse(&graph);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let registry = Registry::new(&graph, &parsed).unwrap();
     let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
@@ -795,6 +799,37 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     };
     assert_eq!(value.to_string(), "123");
     assert!(engine.scoped.origin(expr.span).is_some());
+    let scoped = engine.scoped.clone();
+    drop(engine);
+    graph.sources.set_text(source, scoped.text().to_owned());
+    let module = parsed.iter_mut().find(|p| p.source == source).unwrap();
+    module.ast = ast;
+    module.scoped = Some(scoped);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        checked.diags
+    );
+    let wasm = ilang_wasm::compile(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        ilang_wasm::Options {
+            tests: false,
+            target: ilang_wasm::Target::Ilang,
+        },
+    )
+    .unwrap();
+    let program = ilang_host::Program::from_bytes(&wasm).unwrap();
+    let mut instance = program
+        .instantiate(ilang_host::HostOptions::default())
+        .unwrap();
+    let result = instance.call("app/main.calc", &[]).unwrap();
+    assert!(
+        matches!(result, ilang_host::Outcome::Ok(ilang_host::Value::Int(ref value)) if value.to_string() == "123"),
+        "{result:?}"
+    );
 }
 
 #[test]

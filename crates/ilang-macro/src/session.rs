@@ -81,7 +81,15 @@ impl Session {
         let resolver_budget = budget.clone();
         let context = Arc::new(DefinitionContext::new(move |query| {
             match resolver(query, &resolver_budget) {
-                DefinitionReply::Answer(answer) => DefinitionReply::Answer(answer.flip_mark(mark)),
+                DefinitionReply::Answer(answer) => {
+                    if ilang_host::syntax::charge_tree(&resolver_budget, &answer, true).is_err() {
+                        return DefinitionReply::CompileError {
+                            message: "macro resource limit exceeded".into(),
+                            at: query.clone(),
+                        };
+                    }
+                    DefinitionReply::Answer(answer.flip_mark(mark))
+                }
                 other => other,
             }
         }));
@@ -109,6 +117,25 @@ impl Session {
             let requests = items
                 .as_ref()
                 .map_or_else(Vec::new, |items| items.take_requests());
+            for request in &requests {
+                match request {
+                    ItemRequest::Add {
+                        collection,
+                        target,
+                        at,
+                        ..
+                    } => {
+                        for tree in [collection, target, at] {
+                            ilang_host::syntax::charge_tree(&budget, tree, true)
+                                .map_err(Failure::Host)?;
+                        }
+                    }
+                    ItemRequest::Expose { name } => {
+                        ilang_host::syntax::charge_tree(&budget, name, true)
+                            .map_err(Failure::Host)?;
+                    }
+                }
+            }
             let (syntax, requests) =
                 ilang_host::syntax::flip_output_and_requests(&syntax, &requests, mark);
             let notes = context.take_notes();
