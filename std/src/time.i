@@ -1,6 +1,6 @@
 //// Exact signed nanoseconds. Duration is a length; Instant is a Unix epoch
 //// position. Both hide their constructors and have one Int representation.
-//// TimeError exports DivisionByZero. These functions are pure.
+//// TimeError exports DivisionByZero. Arithmetic is pure.
 ////
 //// Interface:
 //// nanoseconds/milliseconds/seconds/minutes/hours: (count: Int) -> Duration
@@ -29,9 +29,10 @@
 //// can lose a remainder: scaling its result back need not give the input.
 //// Calendar days, months and years are not duration units. hours(24) is a
 //// fixed 86,400 seconds. Operations use O(1) integer operations; bit costs
-//// depend on integer size. This module does not consult a host clock.
+//// depend on integer size. Observation functions use i/clock.
 
 (
+	i/clock
 	std/int
 	(Order) = std/order
 )
@@ -56,6 +57,9 @@
 	shift
 	between
 	compare_instants
+	now
+	sleep
+	measure
 )
 
 Duration {
@@ -134,4 +138,18 @@ between = (start: Instant, end: Instant) -> Duration {
 
 compare_instants = (first: Instant, second: Instant) -> Order {
 	int.compare(unix_nanoseconds(first), unix_nanoseconds(second))
+}
+
+/// Reads the Unix clock once.
+now = () { Instant(clock.unix_ns()) }
+
+/// Waits for the given signed duration.
+sleep = (duration: Duration) { clock.sleep_ns(to_nanoseconds(duration)) }
+
+/// Measures one call using the monotonic clock.
+measure = (body) {
+	start = clock.monotonic_ns()
+	value = body()
+	end = clock.monotonic_ns()
+	(value, Duration(end - start))
 }

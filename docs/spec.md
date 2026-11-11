@@ -1479,6 +1479,8 @@ The process module separates its capabilities as follows, keeping its existing o
 
 The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
+`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`; UDP is not in v1.
+
 ### 9.8 Keys
 
 `Key(A)` and `Keyed` are built-in types. They are not custom types: their values are made only by `key.new` and `key.wrap`. A key is the same only as itself (§11.4). Two `Keyed` values are equal when their keys are the same and their values are equal. `Key(A)` does not change (§4.5 rule 7). A `Keyed` holds its value (§11.9).
