@@ -613,11 +613,44 @@ pub fn lower_with_bindings(
         ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
         return Err(diags);
     }
-    let mut l = Lowerer::new(graph, program, typed, options);
+    let mut l = Lowerer::new(graph, program, typed, options, None);
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
         Ok((l.out, l.bindings))
+    } else {
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
+        Err(l.diags)
+    }
+}
+
+/// Lower one consumer-selected collection target as the sole tool root.
+/// The target remains separate from program entries, tests and host exports.
+pub fn lower_selected_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    target: DefId,
+    export: &str,
+) -> Result<(ir::Program, Vec<serde_json::Value>, bool), Vec<Diagnostic>> {
+    if !typed.coalescing_errors().is_empty() {
+        let mut diags = typed.coalescing_errors().to_vec();
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
+        return Err(diags);
+    }
+    let mut l = Lowerer::new(
+        graph,
+        program,
+        typed,
+        options,
+        Some((target, export.to_owned())),
+    );
+    l.run();
+    let is_async = l.selected_async;
+    if l.diags.is_empty() {
+        crate::control::split(&mut l.out);
+        Ok((l.out, l.bindings, is_async))
     } else {
         ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
         Err(l.diags)
@@ -633,6 +666,8 @@ struct Lowerer<'a> {
     program: &'a hir::Program,
     typed: &'a Typed,
     options: Options,
+    selected: Option<(DefId, String)>,
+    selected_async: bool,
     packages: HashSet<PackageId>,
     ctors: HashMap<CtorRef, CtorInfo>,
     types: HashMap<TypeId, TypeRepr>,
@@ -667,12 +702,15 @@ impl<'a> Lowerer<'a> {
         program: &'a hir::Program,
         typed: &'a Typed,
         options: Options,
+        selected: Option<(DefId, String)>,
     ) -> Self {
         let mut l = Lowerer {
             graph,
             program,
             typed,
             options,
+            selected,
+            selected_async: false,
             packages: HashSet::new(),
             ctors: HashMap::new(),
             types: HashMap::new(),
@@ -883,19 +921,23 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        // §10.1, B.6: every external function of the compiled packages is
-        // an import.
+        // Tool builds retain only externals reachable from their selected root
+        // or from required initializers; ordinary builds retain §10.1 imports.
+        let reachable = self.selected.as_ref().map(|(d, _)| self.tool_reachable(*d));
         for (mi, m) in self.program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if !self.included(mid) || self.is_library(mid) {
                 continue;
             }
             for (di, d) in m.defs.iter().enumerate() {
-                if matches!(d.kind, DefKind::External { .. }) {
-                    self.external_func(DefId {
-                        module: mid,
-                        index: di as u32,
-                    });
+                let id = DefId {
+                    module: mid,
+                    index: di as u32,
+                };
+                if matches!(d.kind, DefKind::External { .. })
+                    && reachable.as_ref().is_none_or(|set| set.contains(&id))
+                {
+                    self.external_func(id);
                 }
             }
         }
@@ -923,6 +965,38 @@ impl<'a> Lowerer<'a> {
             &self.out.imports,
         );
         self.out.constants = self.constants.iter().copied().collect();
+    }
+
+    /// Dependency closure of a selected root plus the initializers that every
+    /// instance executes. An unused function does not create a host import.
+    fn tool_reachable(&self, target: DefId) -> HashSet<DefId> {
+        let mut seen = HashSet::new();
+        let mut work = vec![target];
+        for &binding in &self.program.order.init {
+            if !self.included(binding.module) {
+                continue;
+            }
+            let b = &self.program.binding(binding).binding;
+            work.extend(
+                ilang_check::order::references(&b.pattern, &b.value)
+                    .into_iter()
+                    .filter_map(|(d, inside)| (!b.direct || !inside).then_some(d)),
+            );
+        }
+        while let Some(id) = work.pop() {
+            if !seen.insert(id) {
+                continue;
+            }
+            if let DefKind::Binding { binding, .. } = self.program.def(id).kind {
+                let b = &self.program.module(id.module).bindings[binding as usize].binding;
+                work.extend(
+                    ilang_check::order::references(&b.pattern, &b.value)
+                        .into_iter()
+                        .map(|(d, _)| d),
+                );
+            }
+        }
+        seen
     }
 
     /// `ilang_start`: the top-level values, in the order of §2.5.
@@ -988,6 +1062,30 @@ impl<'a> Lowerer<'a> {
         let mut entry = None;
         let mut tests = Vec::new();
         let mut needed: BTreeSet<TypeId> = BTreeSet::new();
+        if let Some((target, name)) = self.selected.clone() {
+            let def = program.def(target);
+            let callee = self.entry_callee(target, 0);
+            let fx = Fx::new(target.module, false);
+            let site = self.site(&fx, def.span.start);
+            let is_async = self.entry_async(target, &mut needed);
+            let async_body = is_async.then(|| self.async_body(&callee, 0));
+            self.selected_async = is_async;
+            if self.options.target == ir::Target::Wasi {
+                self.out.entry = Some(name.clone());
+            }
+            self.out.exports.push(Export {
+                name,
+                callee,
+                abi: None,
+                site,
+                async_body,
+            });
+            for service in needed {
+                self.host_service(service);
+            }
+            self.out.target = self.options.target;
+            return (None, tests, Vec::new());
+        }
         for (mi, m) in program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if Some(m.package) != program.root || !self.included(mid) {

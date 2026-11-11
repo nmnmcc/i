@@ -19,6 +19,23 @@ pub struct Expanded {
     pub parsed: Vec<Parsed>,
     pub diagnostics: Vec<Diagnostic>,
     pub transactions: Vec<Transaction>,
+    /// Source-scoped quotation templates for a runtime test instance.
+    pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
+}
+
+impl Expanded {
+    /// Lower source quotations only after expansion has finished. The original
+    /// expanded tree remains available to callers such as `i expand` until
+    /// this method is called.
+    pub fn lower_quotes(&mut self) {
+        for module in &mut self.parsed {
+            ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+                &mut module.ast,
+                module.source.0,
+                &mut self.templates,
+            );
+        }
+    }
 }
 
 /// Parse and expand each module after its dependencies. On failure the
@@ -39,6 +56,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             parsed,
             diagnostics,
             transactions: Vec::new(),
+            templates: Vec::new(),
         });
     }
     let order = match module_order::order(graph, &parsed) {
@@ -174,6 +192,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         parsed,
         diagnostics,
         transactions,
+        templates: Vec::new(),
     })
 }
 fn notes<'a>(transactions: impl IntoIterator<Item = &'a Transaction>) -> Vec<Diagnostic> {
@@ -213,17 +232,45 @@ fn phase(source: SourceId, error: PhaseError) -> Vec<Diagnostic> {
     }
 }
 
+/// A checked project and its complete, ordered collection contributions.
+/// DefIds remain opaque and valid only for this checked program.
+pub struct ProjectChecked {
+    pub program: Option<ilang_check::hir::Program>,
+    pub types: Option<ilang_check::types::Typed>,
+    pub diags: Vec<Diagnostic>,
+    pub collections: Vec<collections::Entry>,
+    /// Source-scoped quote templates for test instances of this project.
+    pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
+}
+
 /// Expand and type-check a project through the same path used by builds.
-pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
+pub fn check(graph: &mut PackageGraph) -> ProjectChecked {
+    check_project(graph, false)
+}
+
+/// Check collection contributions before selecting an execution root.
+pub fn check_for_tools(graph: &mut PackageGraph) -> ProjectChecked {
+    check_project(graph, true)
+}
+
+fn check_project(graph: &mut PackageGraph, tools: bool) -> ProjectChecked {
     match expand(graph) {
         Ok(mut expanded) => {
-            let mut checked = ilang_check::check_parsed(graph, &expanded.parsed);
+            expanded.lower_quotes();
+            let mut checked = if tools {
+                ilang_check::check_parsed_for_tools(graph, &expanded.parsed)
+            } else {
+                ilang_check::check_parsed(graph, &expanded.parsed)
+            };
+            let mut entries = Vec::new();
             if let (Some(program), Some(typed)) = (&checked.program, &checked.types)
                 && !checked.diags.iter().any(Diagnostic::is_error)
-                && let Err(errors) =
-                    collections::resolve(&expanded.parsed, program, typed, &expanded.transactions)
             {
-                checked.diags.extend(errors);
+                match collections::resolve(&expanded.parsed, program, typed, &expanded.transactions)
+                {
+                    Ok(found) => entries = found,
+                    Err(errors) => checked.diags.extend(errors),
+                }
             }
             if let Some(program) = &checked.program {
                 ilang_check::map_expansion_diagnostics(
@@ -233,13 +280,20 @@ pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
                 );
             }
             expanded.diagnostics.append(&mut checked.diags);
-            checked.diags = expanded.diagnostics;
-            checked
+            ProjectChecked {
+                program: checked.program,
+                types: checked.types,
+                diags: expanded.diagnostics,
+                collections: entries,
+                templates: expanded.templates,
+            }
         }
-        Err(diagnostics) => ilang_check::Checked {
+        Err(diagnostics) => ProjectChecked {
             program: None,
             types: None,
             diags: diagnostics,
+            collections: Vec::new(),
+            templates: Vec::new(),
         },
     }
 }

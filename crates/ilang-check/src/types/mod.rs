@@ -590,6 +590,17 @@ pub fn check(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
     infer::Checker::new(program, sources).run()
 }
 
+/// Re-infer with consumer-selected entries, applying the normal entry checks.
+/// The boolean requests the Nil result contract; consumers may instead accept
+/// any result. Each call validates one independently selected provider plan.
+pub fn check_selected(
+    program: &Program,
+    sources: &Sources,
+    selected: &[(DefId, bool)],
+) -> (Typed, Vec<Diagnostic>) {
+    infer::Checker::new(program, sources).run_selected(selected)
+}
+
 /// `check`, keeping the types of the local names in `Typed::locals`.
 pub fn check_keeping_locals(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
     check_keeping_locals_with_errors(program, sources, false)

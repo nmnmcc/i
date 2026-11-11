@@ -297,6 +297,8 @@ pub struct PackageGraph {
     pub root: Option<PackageId>,
     /// An explicit [entries] selection; None uses the source convention.
     pub entry: Option<String>,
+    /// Compile for test execution rather than normal entries and host exports.
+    pub test_run: bool,
 }
 
 /// How packages are loaded.
@@ -375,6 +377,7 @@ pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagn
             library: 0,
             root: None,
             entry: None,
+            test_run: false,
         },
         diags: Vec::new(),
         by_dir: HashMap::new(),

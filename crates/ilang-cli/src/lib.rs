@@ -33,6 +33,8 @@ pub struct Built {
     pub warnings: Vec<String>,
     /// Whether this artifact contains test entries.
     pub tests: bool,
+    /// Source-scoped quote templates installed in each test instance.
+    pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
 }
 
 impl Built {
@@ -43,7 +45,7 @@ impl Built {
     }
     pub fn host_options(&self) -> ilang_host::HostOptions {
         let mut options = if self.tests {
-            test_options()
+            test_options_with_templates(self.templates.clone().into())
         } else {
             standard_options()
         };
@@ -63,6 +65,8 @@ pub enum BuildError {
         codes: Vec<&'static str>,
         errors: usize,
     },
+    /// The requested collection handle is stale or does not exist.
+    Selection(String),
     /// A mistake of the compiler or of Binaryen.
     Internal(String),
 }
@@ -76,6 +80,7 @@ impl std::fmt::Display for BuildError {
                 }
                 write!(f, "{errors} error{}", if *errors == 1 { "" } else { "s" })
             }
+            BuildError::Selection(m) => write!(f, "{m}"),
             BuildError::Internal(m) => write!(f, "internal compiler error: {m}"),
         }
     }
@@ -146,6 +151,7 @@ pub fn build_entry(
     entry: Option<&str>,
 ) -> Result<Built, BuildError> {
     let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    graph.test_run = options.tests;
     graph.entry = entry.map(str::to_owned);
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
@@ -201,6 +207,350 @@ pub fn build_entry(
         trusted_package,
         warnings: graph.sources.render_all(&warnings),
         tests: options.tests,
+        templates: checked.templates,
+    })
+}
+
+/// Persistable description of a checked collection. Handles identify one
+/// contribution in this exact source snapshot; they do not expose compiler IDs.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct CollectionManifest {
+    pub revision: String,
+    pub entries: Vec<CollectionEntry>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct CollectionEntry {
+    pub handle: String,
+    pub collection: String,
+    pub signature: String,
+    pub data: Vec<(String, String)>,
+    pub target: SourcePosition,
+    pub at: SourcePosition,
+    pub calls: Vec<ExpansionCall>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct ExpansionCall {
+    pub macro_name: String,
+    pub position: SourcePosition,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SourcePosition {
+    pub path: String,
+    pub start: u32,
+    pub end: u32,
+    pub line: u32,
+    pub column: u32,
+}
+
+fn position(
+    graph: &PackageGraph,
+    source: ilang_package::SourceId,
+    span: ilang_syntax::span::Span,
+) -> SourcePosition {
+    let file = graph.sources.get(source);
+    let (line, column) = ilang_syntax::span::LineIndex::new(&file.text).line_col(span.start);
+    SourcePosition {
+        path: file.display.clone(),
+        start: span.start,
+        end: span.end,
+        line,
+        column,
+    }
+}
+
+fn snapshot(graph: &PackageGraph) -> String {
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let mut files = Vec::new();
+    for (index, package) in graph.packages.iter().enumerate() {
+        if let Some(source) = package.manifest_source {
+            files.push(PackageFile {
+                path: format!("{index}/i.toml"),
+                kind: FileKind::Regular,
+                bytes: graph.sources.get(source).text.as_bytes().to_vec(),
+            });
+        }
+        for module in &package.modules {
+            files.push(PackageFile {
+                path: format!("{index}/{}", module.path),
+                kind: FileKind::Regular,
+                bytes: graph.sources.get(module.source).text.as_bytes().to_vec(),
+            });
+        }
+    }
+    hash(&files)
+}
+
+fn make_manifest(
+    graph: &PackageGraph,
+    program: &ilang_check::hir::Program,
+    revision: String,
+    entries: &[ilang_macro::collections::Entry],
+) -> CollectionManifest {
+    let entries = entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            let module = program.module(entry.target.module);
+            let target = program.origin(entry.target.module, entry.target_span);
+            let (target_source, target_span) = target
+                .as_ref()
+                .map_or((module.source, entry.target_span), |o| {
+                    o.template.unwrap_or((o.source, o.span))
+                });
+            let calls = target.as_ref().map_or_else(Vec::new, |o| {
+                o.expansion
+                    .call_chain
+                    .iter()
+                    .map(|call| ExpansionCall {
+                        macro_name: call.macro_name.clone(),
+                        position: position(
+                            graph,
+                            ilang_package::SourceId(call.syntax.scope().module),
+                            call.syntax.span(),
+                        ),
+                    })
+                    .collect()
+            });
+            let collection_module = program.module(entry.collection.module);
+            CollectionEntry {
+                handle: format!("{revision}:{index}"),
+                collection: format!(
+                    "{}.{}",
+                    collection_module.path,
+                    program.def(entry.collection).name
+                ),
+                signature: entry.signature.clone(),
+                data: entry.data.clone(),
+                target: position(graph, target_source, target_span),
+                at: position(
+                    graph,
+                    ilang_package::SourceId(entry.at.scope().module),
+                    entry.at.span(),
+                ),
+                calls,
+            }
+        })
+        .collect();
+    CollectionManifest { revision, entries }
+}
+
+/// Check and expand a project, exposing a serializable collection manifest.
+pub fn collections(
+    project: &Path,
+    tests: bool,
+    offline: bool,
+) -> Result<CollectionManifest, BuildError> {
+    let (mut graph, mut diags) = load(project, tests, offline);
+    let revision = snapshot(&graph);
+    let checked = ilang_macro::project::check_for_tools(&mut graph);
+    diags.extend(checked.diags);
+    let (Some(program), Some(_)) = (&checked.program, &checked.types) else {
+        return Err(program_error(&graph, &diags));
+    };
+    if diags.iter().any(Diagnostic::is_error) {
+        return Err(program_error(&graph, &diags));
+    }
+    Ok(make_manifest(
+        &graph,
+        program,
+        revision,
+        &checked.collections,
+    ))
+}
+
+/// A tool decides whether it requires Nil or accepts any return value.
+#[derive(Clone, Copy)]
+pub enum CollectionResult<'a> {
+    /// The consumer accepts any result.
+    Any,
+    /// The consumer requires Nil, checked by the type solver.
+    Nil,
+    /// A consumer-defined contract over the inferred complete type scheme.
+    /// Named type identities are interpreted in the supplied checked program.
+    Checked(
+        &'a dyn Fn(
+            &ilang_check::hir::Program,
+            &ilang_check::types::ShownType,
+        ) -> Result<(), String>,
+    ),
+}
+
+/// Collection metadata bound to a compiled artifact. This is stored in its
+/// `ilang.collections` custom section as well as returned to the consumer.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct CollectionArtifact {
+    pub manifest: CollectionManifest,
+    pub selected: String,
+    pub export: String,
+    pub is_async: bool,
+}
+
+impl CollectionArtifact {
+    /// Read the tool manifest carried by a compiled Wasm artifact.
+    pub fn from_wasm(wasm: &[u8]) -> anyhow::Result<Option<Self>> {
+        let mut found = None;
+        for payload in wasmparser::Parser::new(0).parse_all(wasm) {
+            if let wasmparser::Payload::CustomSection(section) = payload?
+                && section.name() == "ilang.collections"
+            {
+                anyhow::ensure!(found.is_none(), "duplicate ilang.collections sections");
+                found = Some(serde_json::from_slice(section.data())?);
+            }
+        }
+        Ok(found)
+    }
+}
+
+/// A selected collection target and the binary that executes only that root.
+pub struct BuiltCollection {
+    pub built: Built,
+    pub manifest: CollectionManifest,
+    pub selected: CollectionEntry,
+    pub export: String,
+    pub is_async: bool,
+}
+
+impl BuiltCollection {
+    /// Run with one fresh instance and the selected entry's provider plan.
+    pub fn run_with(
+        &self,
+        options: ilang_host::HostOptions,
+    ) -> anyhow::Result<ilang_host::Outcome> {
+        let program = self.built.host_program()?;
+        ilang_host::block_on(async {
+            let mut instance = program.instantiate(options)?;
+            if self.is_async {
+                instance.run_async(&self.export).await
+            } else {
+                instance.run(&self.export)
+            }
+        })
+    }
+}
+
+/// Select by opaque handle from a checked manifest. The snapshot is checked
+/// again, so a stale handle cannot silently select a different contribution.
+pub fn build_collection(
+    project: &Path,
+    options: BuildOptions,
+    handle: &str,
+    result: CollectionResult<'_>,
+) -> Result<BuiltCollection, BuildError> {
+    let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    graph.test_run = options.tests;
+    let revision = snapshot(&graph);
+    let root = graph.root.ok_or_else(|| program_error(&graph, &diags))?;
+    let mut checked = ilang_macro::project::check_for_tools(&mut graph);
+    diags.extend(checked.diags);
+    let (Some(program), Some(_)) = (&mut checked.program, &checked.types) else {
+        return Err(program_error(&graph, &diags));
+    };
+    if diags.iter().any(Diagnostic::is_error) {
+        return Err(program_error(&graph, &diags));
+    }
+    let manifest = make_manifest(&graph, program, revision, &checked.collections);
+    let index = manifest
+        .entries
+        .iter()
+        .position(|e| e.handle == handle)
+        .ok_or_else(|| {
+            BuildError::Selection(
+                "collection handle does not belong to this checked source snapshot".into(),
+            )
+        })?;
+    let selected = manifest.entries[index].clone();
+    let target = checked.collections[index].target;
+    let (typed, more) = ilang_check::check_selected(
+        &graph,
+        program,
+        target,
+        matches!(result, CollectionResult::Nil),
+    );
+    diags.extend(more);
+    if diags.iter().any(Diagnostic::is_error) {
+        return Err(program_error(&graph, &diags));
+    }
+    if let CollectionResult::Checked(contract) = result {
+        let scheme = typed
+            .scheme_types
+            .get(&target)
+            .expect("checked contribution has a type scheme");
+        contract(program, scheme).map_err(|message| {
+            BuildError::Selection(format!(
+                "{}:{}:{}: {message}",
+                selected.at.path, selected.at.line, selected.at.column
+            ))
+        })?;
+    }
+    let export = format!("i.tool.{index}");
+    let (wasm, declarations, is_async) = match ilang_wasm::compile_selected_with_bindings(
+        &graph,
+        program,
+        &typed,
+        ilang_wasm::Options {
+            tests: options.tests,
+            target: options.target,
+        },
+        target,
+        &export,
+    ) {
+        Ok(value) => value,
+        Err(ilang_wasm::Error::Diagnostics(more)) => {
+            diags.extend(more);
+            return Err(program_error(&graph, &diags));
+        }
+        Err(ilang_wasm::Error::Internal(message)) => return Err(BuildError::Internal(message)),
+    };
+    let mut wasm = optimize(&wasm, options.opt)?;
+    let artifact = CollectionArtifact {
+        manifest: manifest.clone(),
+        selected: handle.to_owned(),
+        export: export.clone(),
+        is_async,
+    };
+    let metadata =
+        serde_json::to_vec(&artifact).map_err(|e| BuildError::Internal(e.to_string()))?;
+    ilang_wasm::emit::add_custom_section(&mut wasm, "ilang.collections", &metadata);
+    let declarations = declarations
+        .into_iter()
+        .map(|d| ilang_host::bindings::BindingDeclaration::from_json(&d.to_string()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| BuildError::Internal(e.to_string()))?;
+    let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let files: Vec<_> = graph.packages[graph.library]
+        .modules
+        .iter()
+        .map(|m| PackageFile {
+            path: m.path.clone(),
+            kind: FileKind::Regular,
+            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
+        })
+        .collect();
+    let built = Built {
+        name: graph.packages[root].name.clone(),
+        wasm,
+        binding_plan,
+        trusted_package: hash(&files),
+        warnings: graph.sources.render_all(
+            &diags
+                .iter()
+                .filter(|d| !d.is_error())
+                .cloned()
+                .collect::<Vec<_>>(),
+        ),
+        tests: options.tests,
+        templates: checked.templates,
+    };
+    Ok(BuiltCollection {
+        built,
+        manifest,
+        selected,
+        export,
+        is_async,
     })
 }
 
@@ -235,8 +585,16 @@ pub fn standard_options() -> ilang_host::HostOptions {
 /// The test host includes the compiler syntax service for ordinary tests of
 /// macro helpers. Program entry hosts do not get this service.
 pub fn test_options() -> ilang_host::HostOptions {
+    test_options_with_templates(std::sync::Arc::from([]))
+}
+
+/// The test host for an artifact with source-located quote templates.
+pub fn test_options_with_templates(
+    templates: std::sync::Arc<[ilang_syntax::lisp::syntax::Syntax]>,
+) -> ilang_host::HostOptions {
     let mut options = standard_options();
-    ilang_host::syntax::install(&mut options.imports).expect("syntax service namespace is unique");
+    ilang_host::syntax::install_with_templates(&mut options.imports, templates)
+        .expect("syntax service namespace is unique");
     options
 }
 

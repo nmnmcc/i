@@ -179,7 +179,11 @@ impl<'a> Checker<'a> {
 
     // ---- The program ----
 
-    pub fn run(mut self) -> (Typed, Vec<Diagnostic>) {
+    pub fn run(self) -> (Typed, Vec<Diagnostic>) {
+        self.run_selected(&[])
+    }
+
+    pub fn run_selected(mut self, selected: &[(DefId, bool)]) -> (Typed, Vec<Diagnostic>) {
         let p = self.p;
         self.prepare_aliases();
         // Declarations have their written types (§10.1), generalized.
@@ -229,7 +233,7 @@ impl<'a> Checker<'a> {
             self.complete_ready_reads();
         }
         self.report_coalescing(Span::default());
-        self.entry_points();
+        self.entry_points(selected);
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
         let mut test_shaped = HashSet::new();
@@ -482,7 +486,7 @@ impl<'a> Checker<'a> {
 
     /// §10.2: the entry points of the compiled package: the program entry,
     /// the tests, and the host exports.
-    fn entry_points(&mut self) {
+    fn entry_points(&mut self, selected: &[(DefId, bool)]) {
         let p = self.p;
         let Some(root) = p.root else {
             return;
@@ -490,19 +494,20 @@ impl<'a> Checker<'a> {
         let mut entries = Vec::new();
         for m in p.modules.iter().filter(|m| m.package == root) {
             for b in m.bindings.iter().filter(|b| b.main || b.test) {
-                entries.extend(b.defs.first().map(|d| (*d, b.test, false)));
+                entries.extend(b.defs.first().map(|d| (*d, b.test, false, false)));
             }
         }
-        entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
-        for (d, test, export) in entries {
-            self.entry_point(d, test, export);
+        entries.extend(p.host_exports.iter().map(|d| (*d, false, true, false)));
+        entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false, true)));
+        for (d, test, export, tool) in entries {
+            self.entry_point(d, test, export, tool);
         }
     }
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
     /// take; and the environment has only host services and `Assert`.
-    fn entry_point(&mut self, d: DefId, test: bool, export: bool) {
+    fn entry_point(&mut self, d: DefId, test: bool, export: bool, tool: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
         let (name, span) = (def.name.clone(), def.span);
@@ -568,11 +573,14 @@ impl<'a> Checker<'a> {
         let nil = Ty::named(self.b.nil, Vec::new());
         if test && f.ret != nil && f.ret != Ty::Never {
             let r = show(self, &f.ret);
-            self.error(
-                code::ENTRY_TYPE,
-                span,
-                format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`"),
-            );
+            let message = if tool {
+                format!(
+                    "the selected entry `{name}` must give `Nil` for this consumer, but it gives `{r}`"
+                )
+            } else {
+                format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`")
+            };
+            self.error(code::ENTRY_TYPE, span, message);
         }
         if !export {
             return;

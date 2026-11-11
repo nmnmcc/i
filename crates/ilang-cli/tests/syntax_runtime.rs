@@ -68,6 +68,7 @@ fn build_generated_tests(project: &std::path::Path, opt: ilang_cli::Level) -> il
         trusted_package: hash(&files),
         warnings: vec![],
         tests: true,
+        templates: vec![],
     }
 }
 

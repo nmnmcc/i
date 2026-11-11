@@ -896,3 +896,14 @@ A type is given to a macro as scoped Syntax, using the written-type rows when po
 - A way for a macro to ask what a name is bound to.
 - Mixing the two surfaces in one file, and writing a template in the normal surface inside a `.is` file. The second may be added later with no change to the core tree.
 
+
+A selected contribution is represented in its compiled Wasm by one
+`ilang.collections` custom section, containing JSON with `manifest`, `selected`,
+`export`, and `is_async`. The manifest contains the checked source snapshot
+revision and its ordered entries; each entry records an opaque handle, the
+qualified collection name, inferred signature, metadata and source origins.
+The selected handle must name one manifest entry. The named zero-argument
+Wasm export is an execution root in its own right and is not a main, test, or
+host export in `ilang.abi`. Its asynchronous status uses the ordinary provider
+plan. The Rust and JavaScript hosts execute that exact export through their
+normal entry boundary, including resource cleanup and async scheduling.

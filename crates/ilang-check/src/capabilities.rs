@@ -30,6 +30,11 @@ fn reaches_compiler(program: &Program, initial: impl IntoIterator<Item = DefId>)
 }
 
 pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic>) {
+    // A test instance is supplied with the syntax service (§8); it does not
+    // execute the normal entry or host exports.
+    if graph.test_run {
+        return;
+    }
     let Some(root) = program.root else {
         return;
     };
@@ -80,6 +85,56 @@ pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic
                 .filter_map(|(d, inside)| (!b.binding.direct || !inside).then_some(d));
             if reaches_compiler(program, refs) {
                 diags.push(Diagnostic::error(code::COMPILER_CAPABILITY, Some(m.source), b.binding.span,
+                    "an ordinary entry's initialization cannot reach a compiler-owned operation (§2.1)"));
+            }
+        }
+    }
+}
+
+/// Apply the compiler capability boundary to consumer-selected roots.
+pub fn check_selected(
+    program: &Program,
+    graph: &PackageGraph,
+    roots: &[DefId],
+    diags: &mut Vec<Diagnostic>,
+) {
+    if graph.test_run {
+        return;
+    }
+    for &d in roots {
+        if reaches_compiler(program, [d]) {
+            let module = program.module(d.module);
+            diags.push(Diagnostic::error(
+                code::COMPILER_CAPABILITY,
+                Some(module.source),
+                program.def(d).span,
+                "an ordinary entry cannot reach a compiler-owned operation (§2.1)",
+            ));
+        }
+    }
+    let Some(root) = program.root else { return };
+    let mut packages = HashSet::from([graph.library]);
+    let mut stack = vec![root];
+    while let Some(package) = stack.pop() {
+        if packages.insert(package) {
+            stack.extend(
+                graph.packages[package]
+                    .dependencies
+                    .iter()
+                    .filter_map(|(_, id)| *id),
+            );
+        }
+    }
+    for module in &program.modules {
+        if !packages.contains(&module.package) || module.kind == ModuleKind::Test {
+            continue;
+        }
+        for binding in &module.bindings {
+            let refs = order::references(&binding.binding.pattern, &binding.binding.value)
+                .into_iter()
+                .filter_map(|(id, inside)| (!binding.binding.direct || !inside).then_some(id));
+            if reaches_compiler(program, refs) {
+                diags.push(Diagnostic::error(code::COMPILER_CAPABILITY, Some(module.source), binding.binding.span,
                     "an ordinary entry's initialization cannot reach a compiler-owned operation (§2.1)"));
             }
         }

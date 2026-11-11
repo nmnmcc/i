@@ -240,6 +240,23 @@ function functions(value, location, external) {
   return Object.freeze(result);
 }
 
+/** Read a consumer-selected collection artifact, if present. */
+export function readCollections(module) {
+  const sections = WebAssembly.Module.customSections(module, "ilang.collections");
+  expect(sections.length <= 1, "Duplicate ilang.collections sections");
+  if (!sections.length) return null;
+  let artifact;
+  try { artifact = JSON.parse(decoder.decode(sections[0])); }
+  catch (cause) { throw new AbiError("Malformed ilang.collections metadata", { cause }); }
+  expect(artifact && typeof artifact === "object" &&
+    typeof artifact.selected === "string" && typeof artifact.export === "string" &&
+    typeof artifact.is_async === "boolean" && artifact.manifest &&
+    typeof artifact.manifest.revision === "string" && Array.isArray(artifact.manifest.entries) &&
+    artifact.manifest.entries.some((entry) => entry && entry.handle === artifact.selected),
+    "Malformed ilang.collections metadata");
+  return artifact;
+}
+
 /** Read and check the ilang.abi metadata (B.6), or the metadata `supplied` for a module without it. */
 export function readAbi(module, supplied) {
   if (supplied === undefined && embeddedAbis.has(module)) return embeddedAbis.get(module);
@@ -841,6 +858,7 @@ export async function instantiate(source, options = {}) {
   }
   const module = await compile(source);
   const abi = readAbi(module, options.abi);
+  const collections = readCollections(module);
   checkBindings(module, abi, options);
   const bridge = new Bridge();
   const resourceHost = options.resourceHost ?? defaultResourceHost;
@@ -1092,7 +1110,7 @@ export async function instantiate(source, options = {}) {
   };
 
   const guest = {
-    module, instance, exports: instance.exports, abi,
+    module, instance, exports: instance.exports, abi, collections,
     /** Why the instance cannot be used any more, or null. */
     get unusable() { return bridge.unusable; },
     /**
@@ -1145,6 +1163,12 @@ export async function instantiate(source, options = {}) {
       expect(point, `${name} is not an entry point of the metadata`);
       return runPoint(point);
     },
+    /** Run the selected contribution in this artifact. */
+    runCollection(handle) {
+      expect(collections && collections.selected === handle, "The collection handle is not selected by this artifact");
+      validateFunction(module, instance.exports, collections.export, [], collections.is_async ? [0x7f] : []);
+      return runPoint({ name: collections.export, async: collections.is_async });
+    },
     /** Abandon a live invocation and clean up host resources without i callbacks. */
     takeCleanupErrors() { return resourceHost.takeCleanupErrors(); },
     dispose() {
@@ -1156,7 +1180,7 @@ export async function instantiate(source, options = {}) {
   };
   // All invocation paths share the same ownership boundary. The immutable
   // captured context also survives Promise callbacks after disposal.
-  for (const name of ["call", "callAsync", "run", "runEntryPoint"]) {
+  for (const name of ["call", "callAsync", "run", "runEntryPoint", "runCollection"]) {
     const operation = guest[name];
     const invoke = (...args) => {
       bridge.usable();
@@ -1166,7 +1190,8 @@ export async function instantiate(source, options = {}) {
       try {
         const value = operation(...args);
         const asynchronous = name === "callAsync" || (name === "run" && abi.entry?.async)
-          || (name === "runEntryPoint" && [...(abi.entry ? [abi.entry] : []), ...abi.tests].find((point) => point.name === args[0])?.async);
+          || (name === "runEntryPoint" && [...(abi.entry ? [abi.entry] : []), ...abi.tests].find((point) => point.name === args[0])?.async)
+          || (name === "runCollection" && collections?.is_async);
         if (asynchronous) return value.finally(() => bridge.endResources(resources));
         bridge.endResources(resources);
         return value;
