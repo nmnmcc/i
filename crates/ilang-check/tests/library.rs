@@ -57,11 +57,10 @@ fn library_modules_have_sources() {
     assert_eq!(package.modules.len(), count);
 }
 
-/// The reserved modules parse with no problems, and hold only a module
-/// documentation comment: no imports, no exports and no items.
+/// The remaining unimplemented module holds only a documentation comment.
 #[test]
 fn reserved_modules_are_placeholders() {
-    for path in RESERVED {
+    for path in ["i/process"] {
         let (_, text) = ilang_package::library::MODULES
             .iter()
             .find(|(p, _)| *p == path)
@@ -187,15 +186,58 @@ fn library_names() {
                 "map_concurrently",
             ],
         ),
-        ("i/clock", &[]),
+        ("i/clock", &["monotonic_ns", "unix_ns", "sleep_ns"]),
         (
             "i/random",
             &["from_seed", "word", "int", "float", "split", "at_path"],
         ),
-        ("i/fs", &[]),
+        (
+            "i/fs",
+            &[
+                "open",
+                "read",
+                "write",
+                "flush",
+                "close",
+                "remove",
+                "rename",
+                "mkdir",
+                "list",
+                "metadata",
+                "temp_dir",
+                "read_file",
+                "write_file",
+                "read_lines",
+            ],
+        ),
         ("i/process", &[]),
-        ("i/net", &[]),
-        ("i/stdio", &[]),
+        (
+            "i/net",
+            &[
+                "listen",
+                "local_port",
+                "accept",
+                "connect",
+                "resolve",
+                "read",
+                "write",
+                "shutdown_write",
+                "close_stream",
+                "close_listener",
+            ],
+        ),
+        (
+            "i/stdio",
+            &[
+                "read",
+                "write",
+                "write_error",
+                "flush",
+                "flush_error",
+                "print",
+                "print_error",
+            ],
+        ),
     ];
     for (path, names) in expect {
         let m = program.module(common::module(&program, path));
@@ -316,7 +358,7 @@ const RESERVED: [&str; 5] = ["i/clock", "i/fs", "i/process", "i/net", "i/stdio"]
 
 /// User code imports every reserved module with no problems.
 ///
-/// The paths in RESERVED are explicitly kept as empty modules (§0, §2.1).
+/// These standard paths are registered in the library (§0, §2.1).
 #[test]
 fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
