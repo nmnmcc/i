@@ -46,7 +46,13 @@ fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
     write(root, "src/main.i", "main = () { Nil }\n");
     let built = build(root, false, ilang_cli::Level::O0).unwrap();
     let program = built.host_program().unwrap();
-    assert!(program.abi().externals.keys().all(|namespace| !namespace.starts_with("i:compiler/")));
+    assert!(
+        program
+            .abi()
+            .externals
+            .keys()
+            .all(|namespace| !namespace.starts_with("i:compiler/"))
+    );
     assert!(matches!(
         program.run_entry(built.host_options()).unwrap(),
         ilang_host::Outcome::Ok(_)
