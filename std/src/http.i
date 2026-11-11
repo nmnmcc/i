@@ -1004,9 +1004,8 @@ follow = (req: Request, count: Int) {
 						Error(_)  -> fail.raise(Protocol("invalid redirect"))
 					}
 					Method(method) = req.method
-					change = method != "HEAD" && method != "GET" && {
-						c == 301 || c == 302 || c == 303
-					}
+					drop_body = c == 301 || c == 302 || c == 303
+					change = method != "HEAD" && method != "GET" && drop_body
 					change |> {
 						True -> follow(
 							Request(
@@ -1022,9 +1021,20 @@ follow = (req: Request, count: Int) {
 							Request(
 								req.method
 								url
-								redirect_headers(req.headers, base, next, False)
-								req.body
-								req.trailers
+								redirect_headers(
+									req.headers
+									base
+									next
+									drop_body
+								)
+								{ drop_body } |> {
+									True  -> <<>>
+									False -> req.body
+								}
+								{ drop_body } |> {
+									True  -> Headers([])
+									False -> req.trailers
+								}
 							)
 							count + 1
 						)

@@ -49,10 +49,16 @@ fn http_server() {
     let health = b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
     assert!(request(port, health).ends_with("\r\n\r\nok"));
     let body = r#"{"name":"Ada","age":35}"#;
-    let post = format!("POST /users HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}", body.len());
+    let post = format!(
+        "POST /users HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    );
     assert!(request(port, post.as_bytes()).ends_with(r#"{"id":1,"name":"Ada"}"#));
     let body = r#"{"name":"Ada","age":"bad"}"#;
-    let post = format!("POST /users HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}", body.len());
+    let post = format!(
+        "POST /users HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    );
     let invalid = request(port, post.as_bytes());
     assert!(invalid.starts_with("HTTP/1.1 422"));
     assert!(invalid.contains("age"));
@@ -202,4 +208,88 @@ main = () {{ assert(http.post("http://127.0.0.1:{port}/start", <<"hello":utf8>>)
         ));
         server.join().unwrap();
     }
+}
+
+#[test]
+fn http_redirect_limit() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || {
+        for _ in 0..11 {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                if line == "\r\n" {
+                    break;
+                }
+                assert!(!line.is_empty());
+            }
+            stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: /again\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        }
+    });
+    run_http_program(&format!(
+        r#"
+(i/fail, std/http)
+@main
+main = () {{
+ result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/start") }})
+ result |> {{ Error(http.Protocol("too many redirects")) -> Nil _ -> panic("expected redirect limit") }}
+}}
+"#
+    ));
+    server.join().unwrap();
+}
+
+#[test]
+fn http_redirect_drops_sensitive_headers() {
+    let destination = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let dest_port = destination.local_addr().unwrap().port();
+    let origin = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = origin.local_addr().unwrap().port();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = origin.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        loop {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            if line == "\r\n" {
+                break;
+            }
+            assert!(!line.is_empty());
+        }
+        write!(stream, "HTTP/1.1 302 Found\r\nLocation: http://localhost:{dest_port}/target\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        let (mut stream, _) = destination.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut head = String::new();
+        loop {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            if line == "\r\n" {
+                break;
+            }
+            assert!(!line.is_empty());
+            head.push_str(&line.to_ascii_lowercase());
+        }
+        assert!(head.starts_with("get /target "));
+        assert!(!head.contains("authorization:"));
+        assert!(!head.contains("cookie:"));
+        assert!(!head.contains("proxy-authorization:"));
+        assert!(head.contains("x-test: retained"));
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .unwrap();
+    });
+    run_http_program(&format!(
+        r#"
+(std/http)
+@main
+main = () {{
+ req = http.Request(http.Method("GET"), "http://127.0.0.1:{port}/", http.Headers([("Authorization", "secret"), ("Cookie", "secret"), ("Proxy-Authorization", "secret"), ("X-Test", "retained")]), <<>>, http.Headers([]))
+ assert(http.send(req).status == http.Status(200))
+}}
+"#
+    ));
+    server.join().unwrap();
 }
