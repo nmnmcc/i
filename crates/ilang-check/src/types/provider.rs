@@ -16,7 +16,12 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
                 hir::BuiltinType::Int
             };
             let value = if b == hir::BuiltinType::String {
-                serde_json::from_str::<String>(s).map_err(|e| e.to_string())?
+                let lexed = ilang_syntax::lex(s);
+                assert!(lexed.diagnostics.is_empty(), "checked literal must lex");
+                let ilang_syntax::token::TokenKind::Str(value) = &lexed.tokens[0].kind else {
+                    panic!("checked string literal must be a string token");
+                };
+                value.clone()
             } else {
                 s.clone()
             };

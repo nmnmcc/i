@@ -621,3 +621,13 @@ fn discriminant_constructor_aliases_resolve_before_validation() {
     assert_eq!(names(&p), ["app/main.Part", "app/main.Bundle"]);
     assert!(matches!(p.steps[1].supply, Supply::Constructor(_)));
 }
+
+#[test]
+fn literal_service_arguments_use_i_string_escapes() {
+    let (g, c) = package(
+        "Cell(A) { Cell(A) }\nmake(A) = () -> Cell(A) { panic(\"no\") }\n@main\nmain = (c ! Cell(\"\\u{0}\" | \"x\")) { Nil }",
+        &row("Cell", "make"),
+    );
+    let p = resolve(&g, &c, Target::Native).unwrap();
+    assert_eq!(names(&p), ["app/main.Cell(\"\\u{0000}\" | \"x\")"]);
+}
