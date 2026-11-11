@@ -327,3 +327,21 @@ fn binding_name_is_case_sensitive() {
         Err(ilang_check::providers::PathError::UnknownName)
     );
 }
+
+#[test]
+fn pending_fixture_retains_host_target_factory() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/9.11/providers_pending");
+    let (graph, diagnostics) = ilang_package::load(&root);
+    assert!(!diagnostics.iter().any(|d| d.is_error()), "{diagnostics:?}");
+    let package = &graph.packages[graph.root.unwrap()];
+    let row = package
+        .provider_plan
+        .rows
+        .iter()
+        .find(|row| row.service == "app/main.Bundle")
+        .unwrap();
+    assert!(
+        matches!(row.cells.get(&ilang_package::providers::Target::Host), Some(ilang_package::providers::Cell::Factory { factory, .. }) if factory == "app/main.make")
+    );
+}
