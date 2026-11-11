@@ -964,6 +964,24 @@ impl<'a> Lowerer<'a> {
             self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         }
         self.out.constants = self.constants.iter().copied().collect();
+        // Function lowering can discover imports after entry metadata was built.
+        if self.selected.is_some() {
+            self.out.abi_json = abi_json(self.options.target, None, &[], &[], &self.out.imports);
+        } else {
+            let mut abi: serde_json::Value =
+                serde_json::from_str(&self.out.abi_json).expect("generated ABI must be valid JSON");
+            let imports: serde_json::Value = serde_json::from_str(&abi_json(
+                self.options.target,
+                None,
+                &[],
+                &[],
+                &self.out.imports,
+            ))
+            .expect("generated import ABI must be valid JSON");
+            abi["services"] = imports["services"].clone();
+            abi["externals"] = imports["externals"].clone();
+            self.out.abi_json = abi.to_string();
+        }
     }
 
     /// Dependency closure of a selected root plus the initializers that every
@@ -1983,7 +2001,9 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => match self.program.def(d).kind {
-                DefKind::External { .. } if !self.is_library(d.module) => {
+                DefKind::External { ref module, .. }
+                    if !self.is_library(d.module) || !module.starts_with("ilang:") =>
+                {
                     match self.external_func(d) {
                         Some(f) => {
                             self.constants.insert(f);
@@ -2420,7 +2440,9 @@ impl<'a> Lowerer<'a> {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 // §10.1: a call of an external function is done when it is
                 // reached, like all calls.
-                DefKind::External { .. } if !self.is_library(d.module) => {
+                DefKind::External { ref module, .. }
+                    if !self.is_library(d.module) || !module.starts_with("ilang:") =>
+                {
                     match self.external_func(*d) {
                         Some(f) => Target::Callee(Callee::Direct(f)),
                         None => Target::Op(Op::Panic),
