@@ -27,7 +27,7 @@ compiler's i host, independently of the target of the program being built.
 | Copy a boundary buffer | bytes copied | 4 plus bytes rounded up to words | 0 |
 | Expand Syntax into a scoped AST | 1 plus one per node and child | 1 plus 64 per node and 8 per child | 0 |
 | Render a source-name or text atom for scoped AST | 24 times its UTF-8 bytes plus 16 | 4 plus that bound rounded up to words | 0 |
-| Render an integer atom for scoped AST | square of its 32-bit limb count plus its bit count plus 1 | 4 plus its bit count plus 1, rounded up to words | 0 |
+| Render an integer atom for scoped AST | square of its 32-bit limb count plus its bit count plus 1 | 4 plus its bit count plus 1 bytes, rounded up to words | 0 |
 | Render a float atom for scoped AST | 32 | 8 | 0 |
 | Look up a host identity among `n` live or weak entries | `16 × (1 + bit_length(n + 1))` | 0 | 0 |
 | Install a host identity | the lookup cost again | `64 × (1 + bit_length(n + 1))` | 0 |
