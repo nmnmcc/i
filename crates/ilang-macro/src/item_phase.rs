@@ -8,7 +8,7 @@ use crate::{
     prepare::MacroPosition,
     session::Transaction,
 };
-use ilang_syntax::ast::{Attribute, Item, ItemKind, Pattern, PatternKind};
+use ilang_syntax::ast::{Attribute, Item, ItemKind, Pattern};
 use ilang_syntax::lisp::{
     Datum, DatumKind,
     expansion::MacroArgument,
@@ -36,31 +36,7 @@ fn builtin(attribute: &Attribute) -> bool {
 }
 
 fn names(pattern: &Pattern, output: &mut Vec<String>) {
-    match &pattern.kind {
-        PatternKind::Var(name) => output.push(name.clone()),
-        PatternKind::Typed { binder, .. } if !binder.discard => output.push(binder.name.clone()),
-        PatternKind::Named { name, pattern } => {
-            output.push(name.name.clone());
-            names(pattern, output);
-        }
-        PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-            for arg in args {
-                names(arg, output);
-            }
-        }
-        PatternKind::List { items, rest } => {
-            for item in items {
-                names(item, output);
-            }
-            if let Some(Some(binder)) = rest
-                && !binder.discard
-            {
-                output.push(binder.name.clone());
-            }
-        }
-        PatternKind::Prefix { rest, .. } if !rest.discard => output.push(rest.name.clone()),
-        _ => {}
-    }
+    body_walk::for_each_binder(pattern, |name, _| output.push(name.to_owned()));
 }
 fn item_names(item: &Item) -> Vec<String> {
     match &item.kind {
@@ -867,51 +843,14 @@ impl BodyEngine<'_> {
 }
 
 fn generated_values(engine: &BodyEngine<'_>, slots: &[Slot]) -> Vec<body_walk::Local> {
-    fn binder(pattern: &Pattern, out: &mut Vec<body_walk::Local>, scoped: &ScopedSource) {
-        let mut add = |name: &str, span: Span| {
-            if scoped.is_generated(span) {
-                out.push(body_walk::Local {
-                    name: name.to_owned(),
-                    span,
-                    fn_only: None,
-                });
-            }
-        };
-        match &pattern.kind {
-            PatternKind::Var(name) => add(name, pattern.span),
-            PatternKind::Typed { binder, .. } if !binder.discard => add(&binder.name, binder.span),
-            PatternKind::Named { name, pattern } => {
-                add(&name.name, name.span);
-                binder(pattern, out, scoped);
-            }
-            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-                for arg in args {
-                    binder(arg, out, scoped);
-                }
-            }
-            PatternKind::List { items, rest } => {
-                for item in items {
-                    binder(item, out, scoped);
-                }
-                if let Some(Some(b)) = rest
-                    && !b.discard
-                    && scoped.is_generated(b.span)
-                {
-                    out.push(body_walk::Local {
-                        name: b.name.clone(),
-                        span: b.span,
-                        fn_only: None,
-                    });
-                }
-            }
-            PatternKind::Prefix { rest, .. } if !rest.discard => add(&rest.name, rest.span),
-            _ => {}
-        }
-    }
     let mut out = Vec::new();
     for slot in slots {
         match &slot.item.kind {
-            ItemKind::Binding(binding) => binder(&binding.pattern, &mut out, &engine.scoped),
+            ItemKind::Binding(binding) => body_walk::for_each_binder(&binding.pattern, |name, span| {
+                if engine.scoped.is_generated(span) {
+                    out.push(body_walk::Local { name: name.to_owned(), span, fn_only: None });
+                }
+            }),
             ItemKind::Declaration { name, .. } if engine.scoped.is_generated(name.span) => out
                 .push(body_walk::Local {
                     name: name.name.clone(),
@@ -994,31 +933,13 @@ fn commit_exports(
     Ok(())
 }
 fn unmarked_binder(pattern: &Pattern, wanted: &str, source: u32, scoped: &ScopedSource) -> bool {
-    let matches = |text: &str, span: Span| {
-        text == wanted
-            && scoped.origin(span).is_none_or(|origin| {
-                origin.syntax.scope().module == source && origin.syntax.scope().marks.is_empty()
-            })
-    };
-    match &pattern.kind {
-        PatternKind::Var(name) => matches(name, pattern.span),
-        PatternKind::Typed { binder, .. } => !binder.discard && matches(&binder.name, binder.span),
-        PatternKind::Named { name, pattern } => {
-            matches(&name.name, name.span) || unmarked_binder(pattern, wanted, source, scoped)
+    let mut found = false;
+    body_walk::for_each_binder(pattern, |text, span| {
+        if text == wanted && scoped.origin(span).is_none_or(|origin| {
+            origin.syntax.scope().module == source && origin.syntax.scope().marks.is_empty()
+        }) {
+            found = true;
         }
-        PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => args
-            .iter()
-            .any(|arg| unmarked_binder(arg, wanted, source, scoped)),
-        PatternKind::List { items, rest } => {
-            items
-                .iter()
-                .any(|arg| unmarked_binder(arg, wanted, source, scoped))
-                || rest
-                    .as_ref()
-                    .and_then(|x| x.as_ref())
-                    .is_some_and(|binder| !binder.discard && matches(&binder.name, binder.span))
-        }
-        PatternKind::Prefix { rest, .. } => !rest.discard && matches(&rest.name, rest.span),
-        _ => false,
-    }
+    });
+    found
 }
