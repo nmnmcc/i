@@ -51,3 +51,6 @@ step 2 exception for nesting and stack-limit tests:
 - `ilang-syntax/tests/parser_deep.rs::nested_bitarray_pipelines_do_not_repeat_the_probe` (small host stack / deep nesting)
 - `ilang-syntax/tests/parser_deep.rs::nested_guards_restore_outer_arrow_context` (small host stack / deep nesting)
 - `ilang-syntax/tests/parser_deep.rs::nested_probe_diagnostics_are_shared_and_not_duplicated` (small host stack / deep nesting)
+- `ilang-check/tests/resolve_deep.rs::deep_alternating_pattern_and_format_expression` (10,000 nested nodes on a small stack)
+- `ilang-check/tests/resolve_deep.rs::deep_mixed_expression_preserves_diagnostic_origin` (10,000 nested nodes on a small stack)
+- `ilang-check/tests/resolve_deep.rs::deep_pattern_and_type_preserve_diagnostic_origin` (10,000 nested nodes on a small stack)
