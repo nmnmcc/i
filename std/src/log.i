@@ -3,15 +3,15 @@
 //// Level { Debug Info Warning Failure }
 //// Entry { Entry(level: Level, message: String, fields: List((String,String)),
 ////               at: Option(time.Instant)) }
-//// Sink(E,N) { Sink((Level)->Bool, (Entry)->Nil ? E ! N, (N)->Nil) }
+//// Sink(E,N) { Sink((Level)->Bool, (Entry)->Nil ^ E ! N, (N)->Nil) }
 //// Interface:
-//// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)
+//// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ^ E ! N)->Sink(E,N)
 //// silent(N): ()->Sink(Never,N)
 //// filter(E,N): (sink: Sink(E,N), accept: (Level)->Bool)->Sink(E,N)
 //// minimum(E,N): (sink: Sink(E,N), level: Level)->Sink(E,N)
 //// enabled(E,N): (level: Level)->Bool ! Sink(E,N)
-//// write(E,N): (entry: Entry)->Nil ? E ! N | Sink(E,N)
-//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->Nil ? E | F ! N | Sink(E,N)
+//// write(E,N): (entry: Entry)->Nil ^ E ! N | Sink(E,N)
+//// lazy(E,F,N): (level: Level, message: ()->String ^ F ! N)->Nil ^ E | F ! N | Sink(E,N)
 //// format: (entry: Entry)->String
 ////
 //// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;

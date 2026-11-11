@@ -263,8 +263,8 @@ log_format = () {
 //| original = path.read_text()
 //| positive = {
 //|     'annotated logging body (std-2 section 7)': '''
-//| GateSink(E, N) { GateSink((log.Level) -> Bool, (log.Entry) -> Nil ? E ! N, (N) -> Nil) }
-//| gate_write(E, N) = (event: log.Entry, sink ! GateSink(E, N)) -> Nil ? E ! N | GateSink(E, N) {
+//| GateSink(E, N) { GateSink((log.Level) -> Bool, (log.Entry) -> Nil ^ E ! N, (N) -> Nil) }
+//| gate_write(E, N) = (event: log.Entry, sink ! GateSink(E, N)) -> Nil ^ E ! N | GateSink(E, N) {
 //|   GateSink(accept, send, _) = sink
 //|   accept(event.level) |> { True -> send(event) False -> Nil }
 //| }
@@ -285,7 +285,7 @@ log_format = () {
 //| @test
 //| gate_lazy = () {
 //|   ! log.Sink(String, Never) = log.silent()
-//|   assert(fail.catch(() { log.lazy(log.Info, () -> String ? String { fail.raise("bad") }) }) == Ok(Nil))
+//|   assert(fail.catch(() { log.lazy(log.Info, () -> String ^ String { fail.raise("bad") }) }) == Ok(Nil))
 //|   Nil
 //| }
 //| ''',
