@@ -31,111 +31,108 @@ fn uses(program: &Program, m: ModuleId, b: &Binding) -> Vec<(u32, bool)> {
 
 /// All resolved value references in a binding, including across modules.
 pub fn references(pattern: &Pattern, value: &Expr) -> Vec<(DefId, bool)> {
+    enum Node<'a> {
+        Expr(&'a Expr, bool),
+        Pattern(&'a Pattern, bool),
+        Block(&'a Block, bool),
+    }
     let mut out = Vec::new();
-    let mut w = Walker { out: &mut out };
-    w.pattern(pattern, false);
-    w.expr(value, false);
-    out
-}
-
-struct Walker<'a> {
-    out: &'a mut Vec<(DefId, bool)>,
-}
-
-impl Walker<'_> {
-    fn expr(&mut self, e: &Expr, inside: bool) {
-        match &e.kind {
-            ExprKind::Name(ValueRef::Def(d)) => self.out.push((*d, inside)),
-            ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Name(_)
-            | ExprKind::Error => {}
-            ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x, inside)),
-            ExprKind::List { items, rest } => {
-                items
-                    .iter()
-                    .chain(rest.as_deref())
-                    .for_each(|x| self.expr(x, inside));
-            }
-            ExprKind::BitArray(segs) => {
-                for s in segs {
-                    self.expr(&s.value, inside);
-                    self.format(s.format.as_ref(), inside);
+    let mut work = vec![Node::Expr(value, false), Node::Pattern(pattern, false)];
+    while let Some(node) = work.pop() {
+        match node {
+            Node::Expr(e, inside) => match &e.kind {
+                ExprKind::Name(ValueRef::Def(d)) => out.push((*d, inside)),
+                ExprKind::Int(_)
+                | ExprKind::Float(_)
+                | ExprKind::String(_)
+                | ExprKind::Name(_)
+                | ExprKind::Error => {}
+                ExprKind::Tuple(xs) => work.extend(xs.iter().rev().map(|e| Node::Expr(e, inside))),
+                ExprKind::List { items, rest } => {
+                    if let Some(e) = rest {
+                        work.push(Node::Expr(e, inside));
+                    }
+                    work.extend(items.iter().rev().map(|e| Node::Expr(e, inside)));
                 }
-            }
-            ExprKind::Block(b) => self.block(b, inside),
-            ExprKind::Fn(f) => {
-                for p in &f.params {
-                    if let Param::Pattern { pattern, .. } = p {
-                        self.pattern(pattern, true);
+                ExprKind::BitArray(xs) => {
+                    for x in xs.iter().rev() {
+                        if let Some(arg) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                            work.push(Node::Expr(arg, inside));
+                        }
+                        work.push(Node::Expr(&x.value, inside));
                     }
                 }
-                self.block(&f.body, true);
-            }
-            ExprKind::Case { subject, clauses } => {
-                self.expr(subject, inside);
-                for c in clauses {
-                    c.patterns.iter().for_each(|p| self.pattern(p, inside));
-                    c.guard.iter().for_each(|g| self.expr(g, inside));
-                    self.expr(&c.body, inside);
+                ExprKind::Block(b) => work.push(Node::Block(b, inside)),
+                ExprKind::Fn(f) => {
+                    work.push(Node::Block(&f.body, true));
+                    for p in f.params.iter().rev() {
+                        if let Param::Pattern { pattern, .. } = p {
+                            work.push(Node::Pattern(pattern, true));
+                        }
+                    }
+                }
+                ExprKind::Case { subject, clauses } => {
+                    for c in clauses.iter().rev() {
+                        work.push(Node::Expr(&c.body, inside));
+                        if let Some(g) = &c.guard {
+                            work.push(Node::Expr(g, inside));
+                        }
+                        work.extend(c.patterns.iter().rev().map(|p| Node::Pattern(p, inside)));
+                    }
+                    work.push(Node::Expr(subject, inside));
+                }
+                ExprKind::Call { callee, args } => {
+                    work.extend(args.iter().rev().map(|a| Node::Expr(&a.value, inside)));
+                    work.push(Node::Expr(callee, inside));
+                }
+                ExprKind::Field { target, .. }
+                | ExprKind::TupleIndex { target, .. }
+                | ExprKind::Unary { expr: target, .. } => work.push(Node::Expr(target, inside)),
+                ExprKind::RecordUpdate { base, fields, .. } => {
+                    work.extend(fields.iter().rev().map(|(_, e)| Node::Expr(e, inside)));
+                    work.push(Node::Expr(base, inside));
+                }
+                ExprKind::Binary { lhs, rhs, .. } => {
+                    work.push(Node::Expr(rhs, inside));
+                    work.push(Node::Expr(lhs, inside));
+                }
+            },
+            Node::Pattern(p, inside) => match &p.kind {
+                PatternKind::Named { pattern, .. } => work.push(Node::Pattern(pattern, inside)),
+                PatternKind::Constructor { args, .. }
+                | PatternKind::Tuple(args)
+                | PatternKind::Error(args) => {
+                    work.extend(args.iter().rev().map(|p| Node::Pattern(p, inside)))
+                }
+                PatternKind::List { items, .. } => {
+                    work.extend(items.iter().rev().map(|p| Node::Pattern(p, inside)))
+                }
+                PatternKind::BitArray(xs) => {
+                    for x in xs.iter().rev() {
+                        if let Some(arg) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                            work.push(Node::Expr(arg, inside));
+                        }
+                        work.push(Node::Pattern(&x.value, inside));
+                    }
+                }
+                _ => {}
+            },
+            Node::Block(b, inside) => {
+                for st in b.stmts.iter().rev() {
+                    match st {
+                        Stmt::Bind(b) => {
+                            work.push(Node::Expr(&b.value, inside));
+                            work.push(Node::Pattern(&b.pattern, inside));
+                        }
+                        Stmt::Env { value, .. } | Stmt::Expr(value) => {
+                            work.push(Node::Expr(value, inside))
+                        }
+                    }
                 }
             }
-            ExprKind::Call { callee, args } => {
-                self.expr(callee, inside);
-                args.iter().for_each(|a| self.expr(&a.value, inside));
-            }
-            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
-                self.expr(target, inside)
-            }
-            ExprKind::RecordUpdate { base, fields, .. } => {
-                self.expr(base, inside);
-                fields.iter().for_each(|(_, x)| self.expr(x, inside));
-            }
-            ExprKind::Unary { expr, .. } => self.expr(expr, inside),
-            ExprKind::Binary { lhs, rhs, .. } => {
-                self.expr(lhs, inside);
-                self.expr(rhs, inside);
-            }
         }
     }
-
-    fn block(&mut self, b: &Block, inside: bool) {
-        for s in &b.stmts {
-            match s {
-                Stmt::Bind(b) => {
-                    self.pattern(&b.pattern, inside);
-                    self.expr(&b.value, inside);
-                }
-                Stmt::Env { value, .. } => self.expr(value, inside),
-                Stmt::Expr(e) => self.expr(e, inside),
-            }
-        }
-    }
-
-    fn format(&mut self, f: Option<&Format>, inside: bool) {
-        if let Some(arg) = f.and_then(|f| f.arg.as_ref()) {
-            self.expr(arg, inside);
-        }
-    }
-
-    /// Patterns only use names in bit array lengths.
-    fn pattern(&mut self, p: &Pattern, inside: bool) {
-        match &p.kind {
-            PatternKind::Named { pattern, .. } => self.pattern(pattern, inside),
-            PatternKind::Constructor { args, .. }
-            | PatternKind::Tuple(args)
-            | PatternKind::Error(args) => args.iter().for_each(|a| self.pattern(a, inside)),
-            PatternKind::List { items, .. } => items.iter().for_each(|a| self.pattern(a, inside)),
-            PatternKind::BitArray(segs) => {
-                for s in segs {
-                    self.pattern(&s.value, inside);
-                    self.format(s.format.as_ref(), inside);
-                }
-            }
-            _ => {}
-        }
-    }
+    out
 }
 
 /// The needs and full needs of every top-level binding of a module (§2.5),

@@ -1959,7 +1959,7 @@ impl<'a> Resolver<'a> {
         }
         match self.name(module, name) {
             ExprKind::Name(value @ (ValueRef::Local(_) | ValueRef::Def(_))) => {
-                self.new_of(value, span, self.ty_def.is_some(), None).kind
+                self.new_of(value, span, self.ty_def.is_some(), None).into_kind()
             }
             _ => TypeKind::Error,
         }
