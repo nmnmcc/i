@@ -17,6 +17,10 @@ fn old_and_new_records_have_the_same_tree() {
         assert_eq!(canon(&a), canon(&b));
         let printed = print_module(&a);
         assert_eq!(canon(&parse_module(&printed).0), canon(&a));
+        let formatted = format(old).unwrap();
+        let (roundtrip, errors) = parse_module(&formatted);
+        assert!(errors.is_empty(), "{formatted}: {errors:?}");
+        assert_eq!(canon(&roundtrip), canon(&a));
     }
 }
 

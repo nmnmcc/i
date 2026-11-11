@@ -1536,16 +1536,11 @@ impl<'a> Resolver<'a> {
                 Some(t)
             }
             None => {
-                if name.name == "Record" {
-                    self.error(ilang_syntax::Code::RecordReserved.as_str(), name.span,
-                        "the built-in record type `Record` is kept for T3; it is an ordinary shadowable type name");
-                } else {
-                    self.error(
-                        code::UNKNOWN_TYPE,
-                        name.span,
-                        format!("the type `{}` is not defined", name.name),
-                    );
-                }
+                self.error(
+                    code::UNKNOWN_TYPE,
+                    name.span,
+                    format!("the type `{}` is not defined", name.name),
+                );
                 None
             }
         }

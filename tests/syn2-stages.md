@@ -30,10 +30,9 @@ requires T3 library integration; no keyword or privileged module lookup is added
 
 ## Prior art
 
-Read actual source before stage 1: Rust parser/expr.rs parse_dot_suffix;
-Dart parser_impl.dart parseParenthesizedExpressionFunctionLiteralOrRecordLiteral
+Read actual source before stage 1: Dart parser_impl.dart parseParenthesizedExpressionFunctionLiteralOrRecordLiteral
 and parseParenthesizedExpressionOrRecordLiteral; Gleam parse.rs
-parse_case_clause. Take suffix reuse, matching-close lookahead and separate
+parse_case_clause. Take matching-close lookahead and separate
 head/guard/body parsing. Leave keywords and comma-based disambiguation.
 Gleam format/src/lib.rs pretty and Intermediate::from_extra separate comment
 positions from AST printing; retain i's existing equivalent structure.
