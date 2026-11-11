@@ -134,6 +134,26 @@ pub fn build(project: &Path, options: BuildOptions) -> Result<Built, BuildError>
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };
+    // Until provider elaboration lands, stop at the target-plan boundary.
+    for (id, package) in graph.packages.iter().enumerate() {
+        if id != graph.library
+            && (!package.provider_plan.rows.is_empty()
+                || !package.provider_plan.adapters.is_empty())
+        {
+            diags.push(Diagnostic::error(
+                ilang_package::code::PROVIDERS_PENDING,
+                package.manifest_source,
+                package
+                    .provider_plan
+                    .span
+                    .expect("nonempty plan has a source span"),
+                "target provider plans are not implemented yet (JP; §2.6.1)",
+            ));
+        }
+    }
+    if diags.iter().any(Diagnostic::is_error) {
+        return Err(program_error(&graph, &diags));
+    }
     let checked = ilang_check::check(&graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {

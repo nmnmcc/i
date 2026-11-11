@@ -102,7 +102,11 @@ fn qualified(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>, what: &str) -> Optio
         Some(s)
     }
 }
-fn table<'a>(v: &'a Spanned<DeValue>, d: &mut Vec<Diagnostic>, what: &str) -> Option<&'a DeTable<'a>> {
+fn table<'a>(
+    v: &'a Spanned<DeValue>,
+    d: &mut Vec<Diagnostic>,
+    what: &str,
+) -> Option<&'a DeTable<'a>> {
     if let DeValue::Table(t) = v.get_ref() {
         Some(t)
     } else {
@@ -118,13 +122,61 @@ fn boolean(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>, what: &str) -> Option<
         None
     }
 }
+// Adapter service types may apply closed type constructors to closed types.
+fn closed_type(s: &str) -> bool {
+    let s = s.trim();
+    if let Some(open) = s.find('(') {
+        if !s.ends_with(')') || !(path(&s[..open]) || type_name(&s[..open])) {
+            return false;
+        }
+        let inner = &s[open + 1..s.len() - 1];
+        let mut depth = 0usize;
+        let mut start = 0;
+        for (i, c) in inner.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    if depth == 0 {
+                        return false;
+                    }
+                    depth -= 1;
+                }
+                ',' if depth == 0 => {
+                    if !closed_type(&inner[start..i]) {
+                        return false;
+                    }
+                    start = i + 1;
+                }
+                _ => {}
+            }
+        }
+        depth == 0 && closed_type(&inner[start..])
+    } else {
+        path(s) || matches!(s, "Int" | "String" | "Bool" | "Nil" | "Float" | "Bytes")
+    }
+}
 fn list(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>, what: &str) -> Vec<String> {
     let DeValue::Array(a) = v.get_ref() else {
         error(d, at(v.span()), format!("{what} must be a list"));
         return vec![];
     };
-    a.iter().filter_map(|x| qualified(x, d, what)).collect()
+    a.iter()
+        .filter_map(|item| {
+            let s = string(item, d, what)?;
+            if closed_type(&s) {
+                Some(s)
+            } else {
+                error(
+                    d,
+                    at(item.span()),
+                    format!("{what} must contain closed service types"),
+                );
+                None
+            }
+        })
+        .collect()
 }
+
 fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
     if matches!(v.get_ref(), DeValue::String(_)) {
         return qualified(v, d, "factory").map(|factory| Cell::Factory {
@@ -140,6 +192,7 @@ fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
     let mut required = false;
     let mut has_args = false;
     let mut has_required = false;
+    let mut required_span = at(v.span());
     for (k, v) in t.iter() {
         match k.get_ref().as_ref() {
             "factory" => factory = qualified(v, d, "factory"),
@@ -167,13 +220,14 @@ fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
             }
             "seed_required" => {
                 has_required = true;
+                required_span = at(v.span());
                 required = boolean(v, d, "seed_required").unwrap_or(false);
             }
             _ => error(d, at(k.span()), "unknown provider cell key"),
         }
     }
     if has_required && !args.contains(&Argument::Seed) {
-        error(d, at(v.span()), "seed_required requires a seed argument");
+        error(d, required_span, "seed_required requires a seed argument");
     }
     if host.is_some() && (factory.is_some() || has_args || has_required) {
         error(
@@ -309,5 +363,60 @@ pub(crate) fn adapters(v: &Spanned<DeValue>, plan: &mut ProviderPlan, d: &mut Ve
             }
         }
         plan.adapters.push(a);
+    }
+}
+
+/// A selected cell retains the authority of the manifest that declared it.
+#[derive(Clone, Debug)]
+pub struct SelectedCell<'a> {
+    pub cell: &'a Cell,
+    pub package: crate::PackageId,
+}
+/// A row retains its original metadata and the authority for each target cell.
+#[derive(Clone, Debug)]
+pub struct SelectedRow<'a> {
+    pub row: &'a ProviderRow,
+    pub package: crate::PackageId,
+    pub cells: BTreeMap<Target, SelectedCell<'a>>,
+}
+impl crate::PackageGraph {
+    /// Select explicit root cells over inherited cells. Resolution of names to
+    /// nominal identities and access checking belongs to the provider checker.
+    pub fn selected_provider_rows(&self) -> Vec<SelectedRow<'_>> {
+        let mut rows: Vec<SelectedRow<'_>> = Vec::new();
+        let packages = std::iter::once(self.library)
+            .chain(
+                (0..self.packages.len()).filter(|id| *id != self.library && Some(*id) != self.root),
+            )
+            .chain(self.root);
+        for id in packages {
+            for row in &self.packages[id].provider_plan.rows {
+                if let Some(existing) = rows.iter_mut().find(|r| r.row.service == row.service) {
+                    for (&target, cell) in &row.cells {
+                        if Some(id) == self.root {
+                            existing
+                                .cells
+                                .insert(target, SelectedCell { cell, package: id });
+                        } else {
+                            existing
+                                .cells
+                                .entry(target)
+                                .or_insert(SelectedCell { cell, package: id });
+                        }
+                    }
+                } else {
+                    rows.push(SelectedRow {
+                        row,
+                        package: id,
+                        cells: row
+                            .cells
+                            .iter()
+                            .map(|(&target, cell)| (target, SelectedCell { cell, package: id }))
+                            .collect(),
+                    });
+                }
+            }
+        }
+        rows
     }
 }

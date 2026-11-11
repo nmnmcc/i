@@ -161,3 +161,34 @@ fn standard_library_modules() {
         ]
     );
 }
+
+#[test]
+fn provider_root_cell_overrides_inherited_cell_with_authority() {
+    use ilang_package::providers::{Cell, Target};
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &[
+            (
+                "app/i.toml",
+                "name=\"app\"\n[dependencies]\ndep={path=\"../dep\"}\n[providers.\"dep/main.S\"]\nhost=\"app/main.fake\"\n",
+            ),
+            (
+                "dep/i.toml",
+                "name=\"dep\"\n[providers.\"dep/main.S\"]\njs=\"dep/main.js\"\nhost=\"dep/main.host\"\n",
+            ),
+        ],
+    );
+    let (graph, diags) = load(&dir.path().join("app"));
+    assert!(diags.is_empty(), "{diags:?}");
+    let root = graph.root.unwrap();
+    let dep = graph.packages[root].dependencies[0].1.unwrap();
+    let rows = graph.selected_provider_rows();
+    let row = rows.iter().find(|r| r.row.service == "dep/main.S").unwrap();
+    assert_eq!(row.package, dep);
+    assert_eq!(row.cells[&Target::Js].package, dep);
+    assert_eq!(row.cells[&Target::Host].package, root);
+    assert!(
+        matches!(row.cells[&Target::Host].cell, Cell::Factory { factory, .. } if factory == "app/main.fake")
+    );
+}

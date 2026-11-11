@@ -87,12 +87,29 @@ pub fn compile_wat(
 }
 
 fn pending_providers(graph: &PackageGraph) -> Result<(), Error> {
-    let diagnostics: Vec<_> = graph.packages.iter().enumerate().filter(|(id, _)| *id != graph.library).filter_map(|(_, package)| {
-        let plan = &package.provider_plan;
-        if plan.rows.is_empty() && plan.adapters.is_empty() { return None; }
-        Some(ilang_package::Diagnostic::error(ilang_package::code::PROVIDERS_PENDING, package.manifest_source, plan.span.expect("nonempty plan has a source span"), "target provider plans are not implemented yet (JP; §2.6.1)"))
-    }).collect();
-    if diagnostics.is_empty() { Ok(()) } else { Err(Error::Diagnostics(diagnostics)) }
+    let diagnostics: Vec<_> = graph
+        .packages
+        .iter()
+        .enumerate()
+        .filter(|(id, _)| *id != graph.library)
+        .filter_map(|(_, package)| {
+            let plan = &package.provider_plan;
+            if plan.rows.is_empty() && plan.adapters.is_empty() {
+                return None;
+            }
+            Some(ilang_package::Diagnostic::error(
+                ilang_package::code::PROVIDERS_PENDING,
+                package.manifest_source,
+                plan.span.expect("nonempty plan has a source span"),
+                "target provider plans are not implemented yet (JP; §2.6.1)",
+            ))
+        })
+        .collect();
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::Diagnostics(diagnostics))
+    }
 }
 
 /// The Wasm features of Appendix B.1, and the small ones every engine with

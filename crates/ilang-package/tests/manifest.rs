@@ -278,6 +278,10 @@ fn former_keywords_are_package_and_dependency_names() {
 #[test]
 fn provider_empty_tables_are_valid() {
     for parse in [parse_manifest, parse_dependency_manifest] {
-        assert!(parse("name = \"app\"\n[providers]\n[provider_adapters]\n").1.is_empty());
+        assert!(
+            parse("name = \"app\"\n[providers]\n[provider_adapters]\n")
+                .1
+                .is_empty()
+        );
     }
 }

@@ -139,7 +139,9 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
             }
             "wasm" if compiled => {
                 wasm_exports = wasm(value, "exports", &mut diags);
-                if matches!(value.get_ref(), DeValue::Table(_)) { wasm_synchronous = wasm(value, "synchronous", &mut diags); }
+                if matches!(value.get_ref(), DeValue::Table(_)) {
+                    wasm_synchronous = wasm(value, "synchronous", &mut diags);
+                }
             }
             _ => {}
         }
