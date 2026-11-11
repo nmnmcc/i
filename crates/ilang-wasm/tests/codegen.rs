@@ -358,7 +358,12 @@ main = () { Nil }
         wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
             .validate_all(&bytes)
             .unwrap();
-        run_opaque_target(&bytes);
+        // The driver owns initialization. Wasmtime's command preload creates
+        // a fresh instance for every exported call, losing the ilang_start
+        // performed by the driver. Preload the same code as a reactor while
+        // still validating the original command artifact above.
+        let preload = wat::parse_str(text.replace("(export \"_start\")", "")).unwrap();
+        run_opaque_target(&preload);
     }
 }
 

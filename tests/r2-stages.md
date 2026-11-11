@@ -1265,3 +1265,42 @@ from before the already-landed syntax/default-entry decisions. The ledger's
 2026-11-11 USER confirmations require `^` for displayed error types and make
 `src/main.i`'s main an entry, exempting it from unused-binding warnings. Only
 test expectations changed; the scoped LSP protocol rerun passes all 15 tests.
+
+JP verification commands (cargo commands use the shared heavy wrapper and the
+configured direnv toolchain):
+
+- `cargo check -p ilang-wasm -p ilang-cli --all-targets`: passed after the
+  external-factory fix. `cargo check -p ilang-lsp --all-targets`: passed.
+- `cargo test -p ilang-cli --test providers --test wasi --locked`: passed,
+  15 provider tests and 17 WASI tests.
+- `cargo test -p ilang-lsp --test protocol --locked`: passed, 15 tests.
+- The checker provider suites passed all 39 graph tests and 30 path tests.
+  The CLI spec suite passed all 408 cases at both --opt 0 and --opt 2.
+- Native process (arguments `-- alpha beta`), TLS, and concurrent two-client
+  echo smoke checks passed. The external-factory Node reproduction completed
+  with exactly one callback.
+
+During development, an initial combined checker/package/wasm/host test run
+failed `entry_and_tests_run_by_name_each_test_in_a_new_instance` while temporary
+trap-debug formatting was enabled. The production root-cause formatting was
+restored; the later workspace host run passed all 79 tests. The initial process
+smoke omitted its required arguments and failed at `io_process/main:11:2`;
+passing `-- alpha beta` produced `process ok`. An initial manual Node call
+passed fresh bytes alongside an authorization for the compiled Module and
+correctly failed `Binding authorization does not match the module`; passing
+`bindings.module` made the reproduction pass. These were invocation/debugging
+errors, not relaxed runtime checks or changed expected behavior.
+
+The next workspace pass reached a latent lifetime error in
+`opaque_decoders_keep_the_declared_type_on_both_targets`: the WASI preload
+trapped in control_keep_env with a null root environment. Wasmtime's reference
+Linker::module documentation/implementation explicitly creates a fresh command
+instance for each exported call. Thus the driver's separate ilang_start call
+initialized another instance. The old pure-export path happened not to read
+the root environment. The test now validates the original command artifact,
+then preloads the identical WAT without the `_start` export so that its driver
+can initialize and reuse one instance. The opaque decoding assertions and
+both target checks are unchanged. An initial attempt to omit main instead
+correctly produced `E0701: the WASI target needs a program entry`; that attempt
+was discarded. `cargo check -p ilang-wasm --all-targets` and the complete
+`cargo test -p ilang-wasm --locked` now pass, including all ten codegen tests.
