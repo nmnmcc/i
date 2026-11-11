@@ -678,26 +678,37 @@ impl Coalescer<'_> {
 /// comes there is in, and which is enough for every use there; when the
 /// input side has nothing, the output side (§4.5 rules 6 and 7).
 pub(crate) fn both(t: &Ty) -> Ty {
-    match t {
-        Ty::Both(a, b) => {
-            if is_top(b) {
-                both(a)
-            } else {
-                both(b)
-            }
+    let mut result = t.clone();
+    let mut pending = vec![&mut result];
+    while let Some(part) = pending.pop() {
+        if let Ty::Both(_, b) = &*part {
+            let left = is_top(b);
+            let TyParts::Both(a, b) = std::mem::replace(part, Ty::Never).into_parts() else {
+                unreachable!()
+            };
+            *part = if left { *a } else { *b };
+            pending.push(part);
+            continue;
         }
-        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(both).collect()),
-        Ty::Union(xs) => Ty::Union(xs.iter().map(both).collect()),
-        Ty::Inter(xs) => Ty::Inter(xs.iter().map(both).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), both(p))).collect(),
-            ret: both(&f.ret),
-            err: both(&f.err),
-            env: both(&f.env),
-        })),
-        Ty::Diff(a, h) => Ty::Diff(Box::new(both(a)), h.iter().map(both).collect()),
-        t => t.clone(),
+        match part {
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+                pending.extend(xs.iter_mut().rev())
+            }
+            Ty::Fn(f) => {
+                pending.push(&mut f.env);
+                pending.push(&mut f.err);
+                pending.push(&mut f.ret);
+                pending.extend(f.params.iter_mut().rev().map(|p| &mut p.1));
+            }
+            Ty::Diff(a, hs) => {
+                pending.extend(hs.iter_mut().rev());
+                pending.push(a);
+            }
+            Ty::Var(_) | Ty::Never | Ty::Top => {}
+            Ty::Both(..) => unreachable!(),
+        }
     }
+    result
 }
 
 // ---- Simplification ----
@@ -1406,34 +1417,38 @@ fn prepare(t: &Ty, origin: &mut HashMap<V, V>) -> Ty {
 }
 
 fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
-    let mut go = |x: &Ty| tops(x, next, origin);
-    match t {
-        Ty::Top => {
-            *next -= 1;
-            Ty::Var(V(*next))
+    let mut result = t.clone();
+    let mut pending = vec![&mut result];
+    while let Some(part) = pending.pop() {
+        match part {
+            Ty::Top => {
+                *next -= 1;
+                *part = Ty::Var(V(*next));
+            }
+            Ty::Var(m) if m.0 >= MARK => {
+                let marked = *m;
+                *next -= 1;
+                origin.insert(V(*next), V(marked.0 - MARK));
+                *part = Ty::Var(V(*next));
+            }
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+                pending.extend(xs.iter_mut().rev())
+            }
+            Ty::Fn(f) => {
+                pending.push(&mut f.env);
+                pending.push(&mut f.err);
+                pending.push(&mut f.ret);
+                pending.extend(f.params.iter_mut().rev().map(|p| &mut p.1));
+            }
+            Ty::Diff(a, _) => pending.push(a),
+            Ty::Both(a, b) => {
+                pending.push(b);
+                pending.push(a);
+            }
+            Ty::Var(_) | Ty::Never => {}
         }
-        Ty::Var(m) if m.0 >= MARK => {
-            *next -= 1;
-            origin.insert(V(*next), V(m.0 - MARK));
-            Ty::Var(V(*next))
-        }
-        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
-        Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
-        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
-            ret: go(&f.ret),
-            err: go(&f.err),
-            env: go(&f.env),
-        })),
-        // A part of `H` with no effect is written `_`.
-        Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.clone()),
-        Ty::Both(a, b) => {
-            let a = go(a);
-            Ty::Both(Box::new(a), Box::new(go(b)))
-        }
-        t => t.clone(),
     }
+    result
 }
 
 /// The variables in the order they are written, each with the part of a
@@ -1803,6 +1818,18 @@ mod deep_walk_tests {
                 let replaced = replace(&t, V(0), &Ty::Var(V(2)));
                 assert!(mentions(&replaced, V(2)));
                 assert!(!mentions(&replaced, V(0)));
+                let mut next = u32::MAX;
+                let mut origins = HashMap::default();
+                let with_top = replace(&t, V(0), &Ty::Top);
+                let named = tops(&with_top, &mut next, &mut origins);
+                assert!(mentions(&named, V(u32::MAX - 1)));
+                assert_eq!(next, u32::MAX - 1);
+                assert!(origins.is_empty());
+                let mut sides = Ty::Var(V(4));
+                for _ in 0..10_000 {
+                    sides = Ty::Both(Box::new(sides), Box::new(Ty::Top));
+                }
+                assert_eq!(both(&sides), Ty::Var(V(4)));
             })
             .unwrap()
             .join()
