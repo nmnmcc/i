@@ -2196,8 +2196,25 @@ that module.
 ### D.1. Syntax values and quotes
 
 `i/syntax` exports the opaque `Syntax` type and `Node`, `Position`, and
-`SyntaxError`. A `Syntax` is one datum of Appendix C with its source position
-and scope. `node` gives its node; `make(node, like: s)` makes one with the
+`SyntaxError`. Their public definitions are:
+
+```i
+Syntax {}
+Node {
+  Name(String)  Discard(String)  Up(String)  Symbol(String)
+  Int(Int)  Float(Float)  Text(String)
+  Round(List(Syntax))  Square(List(Syntax))  Curly(List(Syntax))
+  Bits(List(Syntax))  Quote(Syntax)  Unquote(Syntax)  Splice(Syntax)
+}
+Position {
+  ImportItem  ExportItem  Item  Attribute  Constructor  Field  Type
+  FunctionResult  Parameter  Expression  Statement  CallArgument  Clause
+  ClauseHead  Pattern  Segment  Format
+}
+SyntaxError { SyntaxError(message: String, at: Syntax) }
+```
+
+A `Syntax` is one datum of Appendix C with its source position and scope. `node` gives its node; `make(node, like: s)` makes one with the
 position and scope of `s` and fails with `SyntaxError` if an atom cannot be a
 single token of its kind. An integer or float atom is nonnegative and a float
 atom cannot be negative zero. `same_code` compares datums without positions or
