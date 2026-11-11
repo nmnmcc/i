@@ -120,7 +120,7 @@ fn row_kind_survives_an_alias_without_algebra() {
     // F2 requires N to remain a row even when a function alias is copied
     // without normalization. Its value positions must compare Svc's
     // arguments equally before generalization can combine the forms.
-    for mode in ["!", "?"] {
+    for mode in ["!", "^"] {
         let source = "Svc(A) { Svc(() -> A) }
 Row(N) = () -> Nil ! N
 bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
@@ -184,7 +184,7 @@ Alias(N) = T(N)
             format!("T({row})"),
             format!("Alias({row})"),
             format!("() -> Nil ! {row}"),
-            format!("() -> Nil ? {row}"),
+            format!("() -> Nil ^ {row}"),
         ] {
             let source = format!(
                 "{head}use = (x: {written}) {{ x }}

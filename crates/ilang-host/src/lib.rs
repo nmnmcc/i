@@ -133,7 +133,7 @@ impl AbiType {
     }
 }
 
-/// A function at the boundary: `(P1, …, Pn) -> A ? E`.
+/// A function at the boundary: `(P1, …, Pn) -> A ^ E`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Signature {
