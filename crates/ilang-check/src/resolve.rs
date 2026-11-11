@@ -13,7 +13,7 @@
 use crate::Parsed;
 use crate::code;
 use crate::hir::*;
-use crate::types::{Head, HostType, Ty};
+use crate::types::{Head, HostType, Ty, TyParts};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
@@ -2225,10 +2225,10 @@ impl<'a> Resolver<'a> {
                 return None;
             }
             let err = self.boundary_type(err)?;
-            let parts = match err {
-                Ty::Union(ms) => ms,
-                Ty::Never => Vec::new(),
-                t => vec![t],
+            let parts = match err.into_parts() {
+                TyParts::Union(ms) => ms,
+                TyParts::Never => Vec::new(),
+                t => vec![t.into()],
             };
             for m in parts {
                 let h = self.host_member(&m, false)?;

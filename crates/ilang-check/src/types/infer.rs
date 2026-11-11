@@ -6,6 +6,7 @@
 //! `Effects`: a call adds the `E` and `N` of its callee, and a function or
 //! the rest of a block after an environment statement starts a new entry.
 
+use super::TyParts;
 use super::display;
 use super::known;
 use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
@@ -518,7 +519,7 @@ impl<'a> Checker<'a> {
             return;
         };
         let show = |c: &Self, t: &Ty| display::show_known(&c.s, t);
-        let Ty::Fn(f) = display::both(&t) else {
+        let TyParts::Fn(f) = display::both(&t).into_parts() else {
             if export {
                 let t = show(self, &t);
                 self.error(
@@ -1387,8 +1388,8 @@ impl<'a> Checker<'a> {
                 if let Some(r) = rest {
                     let (rt, rk) = self.infer_k(r, &list_exp);
                     self.sub(&rt, &list, r.span);
-                    ks.push(match known::member(&rk, head) {
-                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
+                    ks.push(match known::member(&rk, head).map(Ty::into_parts) {
+                        Some(TyParts::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
                         _ => Ty::Top,
                     });
                 }
@@ -1847,8 +1848,10 @@ impl<'a> Checker<'a> {
             self.note_field_ctors(known_ctor, &kv, span);
         }
         if let Some(c) = known_ctor {
-            let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty)))) {
-                Some(Ty::Con(_, _, xs)) => Some(xs),
+            let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty))))
+                .map(Ty::into_parts)
+            {
+                Some(TyParts::Con(_, _, xs)) => Some(xs),
                 _ => None,
             };
             ctors.push((c, args));
@@ -2139,8 +2142,10 @@ impl<'a> Checker<'a> {
         }
         // §4.8: the known type of the call of `C` with the given fields and
         // the other fields of `v`.
-        let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-            Some(Ty::Con(_, _, xs)) => Some(xs),
+        let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty))))
+            .map(Ty::into_parts)
+        {
+            Some(TyParts::Con(_, _, xs)) => Some(xs),
             _ => None,
         };
         let ks: Vec<Ty> = given

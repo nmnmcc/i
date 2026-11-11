@@ -9,6 +9,7 @@
 //! not removed for being on one side only. Shown names are chosen independently
 //! of written names.
 
+use super::TyParts;
 use super::solve::{Mode, Solver};
 use super::{FnTy, Head, ShownFn, ShownType, Ty, V, Variance};
 // Fast hashing for the small keys of coalescing (docs/performance.md).
@@ -54,7 +55,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     parts.push(t.clone());
     let traced = trace(s, &Ty::tuple(parts), opts)?;
     let (whole, origin) = traced.prepare();
-    let Ty::Con(_, _, parts) = whole else {
+    let Ty::Con(_, _, parts) = &whole else {
         return Err(());
     };
     let t = parts.last().ok_or(())?;
@@ -619,11 +620,15 @@ impl Coalescer<'_> {
                 let mut todo: Vec<_> = parts.into_iter().rev().collect();
                 let mut seen = HashSet::default();
                 while let Some(t) = todo.pop() {
-                    match t {
-                        Ty::Union(ms) if positive => todo.extend(ms.into_iter().rev()),
-                        Ty::Inter(ms) if !positive => todo.extend(ms.into_iter().rev()),
-                        t if seen.insert(t.clone()) => flat.push(t),
-                        _ => {}
+                    match t.into_parts() {
+                        TyParts::Union(ms) if positive => todo.extend(ms.into_iter().rev()),
+                        TyParts::Inter(ms) if !positive => todo.extend(ms.into_iter().rev()),
+                        t => {
+                            let t: Ty = t.into();
+                            if seen.insert(t.clone()) {
+                                flat.push(t);
+                            }
+                        }
                     }
                 }
                 let t = if positive {
@@ -732,13 +737,13 @@ struct Occ<'a> {
 
 impl Norm<'_> {
     fn norm(&self, t: Ty) -> Ty {
-        match t {
-            Ty::Union(ms) => self.union(ms.into_iter().map(|m| self.norm(m)).collect()),
-            Ty::Inter(ms) => self.inter(ms.into_iter().map(|m| self.norm(m)).collect()),
-            Ty::Diff(a, h) => {
+        match t.into_parts() {
+            TyParts::Union(ms) => self.union(ms.into_iter().map(|m| self.norm(m)).collect()),
+            TyParts::Inter(ms) => self.inter(ms.into_iter().map(|m| self.norm(m)).collect()),
+            TyParts::Diff(a, h) => {
                 self.diff(self.norm(*a), h.into_iter().map(|m| self.norm(m)).collect())
             }
-            Ty::Con(h, values, args) => {
+            TyParts::Con(h, values, args) => {
                 let rows = self.s.rows(h, args.len());
                 Ty::Con(
                     h,
@@ -755,7 +760,7 @@ impl Norm<'_> {
                         .collect(),
                 )
             }
-            Ty::Fn(f) => {
+            TyParts::Fn(f) => {
                 let f = *f;
                 Ty::Fn(Box::new(FnTy {
                     params: f
@@ -768,7 +773,7 @@ impl Norm<'_> {
                     env: self.env(f.env),
                 }))
             }
-            Ty::Both(a, b) => {
+            TyParts::Both(a, b) => {
                 let (a, b) = (self.norm(*a), self.norm(*b));
                 if a == b {
                     a
@@ -779,24 +784,26 @@ impl Norm<'_> {
                     Ty::Both(Box::new(a), Box::new(b))
                 }
             }
-            t => t,
+            t => t.into(),
         }
     }
 
     /// An environment: two forms of one type constructor are not put
     /// together, because their arguments must be equal (§9.2).
     fn env(&self, t: Ty) -> Ty {
-        match t {
-            Ty::Both(a, b) => {
+        match t.into_parts() {
+            TyParts::Both(a, b) => {
                 let a = self.env(*a);
                 let b = self.env(*b);
                 self.norm(Ty::Both(Box::new(a), Box::new(b)))
             }
-            Ty::Diff(a, hs) => {
+            TyParts::Diff(a, hs) => {
                 self.diff(self.env(*a), hs.into_iter().map(|h| self.norm(h)).collect())
             }
-            Ty::Union(ms) => self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true),
-            t => self.norm(t),
+            TyParts::Union(ms) => {
+                self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true)
+            }
+            t => self.norm(t.into()),
         }
     }
 
@@ -912,9 +919,9 @@ impl Norm<'_> {
     fn inter(&self, ms: Vec<Ty>) -> Ty {
         let mut flat = Vec::new();
         for m in ms {
-            match m {
-                Ty::Inter(xs) => flat.extend(xs),
-                m => flat.push(m),
+            match m.into_parts() {
+                TyParts::Inter(xs) => flat.extend(xs),
+                m => flat.push(m.into()),
             }
         }
         // `{ A | B } & C` is `A & C | B & C` (§4.4), for unions of types
@@ -1007,37 +1014,39 @@ impl Norm<'_> {
         if hs.is_empty() {
             return a;
         }
-        match a {
-            Ty::Never => Ty::Never,
-            Ty::Union(ms) => self.union(ms.into_iter().map(|m| self.diff(m, hs.clone())).collect()),
-            Ty::Con(..) if a.scalar().is_some() => {
-                let sets: Vec<_> = hs
-                    .iter()
-                    .filter(|m| m.head() == a.head())
-                    .map(|m| m.values().clone())
-                    .collect();
-                if sets.is_empty() {
-                    a
-                } else {
-                    a.with_values(a.values().minus(&super::lits::ValueSet::join_all(&sets)))
-                }
+        if matches!(a, Ty::Con(..)) && a.scalar().is_some() {
+            let sets: Vec<_> = hs
+                .iter()
+                .filter(|m| m.head() == a.head())
+                .map(|m| m.values().clone())
+                .collect();
+            if sets.is_empty() {
+                a
+            } else {
+                a.with_values(a.values().minus(&super::lits::ValueSet::join_all(&sets)))
             }
-            Ty::Con(..) | Ty::Fn(_) => {
-                if hs.iter().any(|m| m.head() == a.head()) {
-                    Ty::Never
-                } else {
-                    a
-                }
+        } else if matches!(a, Ty::Con(..) | Ty::Fn(_)) {
+            if hs.iter().any(|m| m.head() == a.head()) {
+                Ty::Never
+            } else {
+                a
             }
-            Ty::Diff(b, mut h0) => {
-                for m in hs {
-                    if !h0.contains(&m) {
-                        h0.push(m);
+        } else {
+            match a.into_parts() {
+                TyParts::Never => Ty::Never,
+                TyParts::Union(ms) => {
+                    self.union(ms.into_iter().map(|m| self.diff(m, hs.clone())).collect())
+                }
+                TyParts::Diff(b, mut h0) => {
+                    for m in hs {
+                        if !h0.contains(&m) {
+                            h0.push(m);
+                        }
                     }
+                    Ty::Diff(b, h0)
                 }
-                Ty::Diff(b, h0)
+                a => Ty::Diff(Box::new(a.into()), hs),
             }
-            a => Ty::Diff(Box::new(a), hs),
         }
     }
 
@@ -1051,8 +1060,8 @@ impl Norm<'_> {
             }
             (Variance::Inv, _) => x,
         };
-        match (a, b) {
-            (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
+        match (a.into_parts(), b.into_parts()) {
+            (TyParts::Con(h, values, xs), TyParts::Con(_, other, ys)) if xs.len() == ys.len() => {
                 let values = if union {
                     values.union(&other)
                 } else {
@@ -1072,7 +1081,7 @@ impl Norm<'_> {
                         .collect(),
                 )
             }
-            (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+            (TyParts::Fn(f), TyParts::Fn(g)) if f.params.len() == g.params.len() => {
                 let (f, g) = (*f, *g);
                 Ty::Fn(Box::new(FnTy {
                     params: f
@@ -1091,7 +1100,7 @@ impl Norm<'_> {
                     env: pick(f.env, g.env, Variance::Co),
                 }))
             }
-            (a, _) => a,
+            (a, _) => a.into(),
         }
     }
 
