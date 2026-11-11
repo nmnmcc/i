@@ -1,4 +1,4 @@
-//// HTTP/1.1 message values and incremental framing, without I/O.
+//// HTTP/1.1 messages, incremental framing, clients and scoped servers.
 (
 	i/fail
 	i/net
@@ -6,6 +6,7 @@
 	i/clock
 	i/task
 	i/resource
+	i/key
 	std/list
 	std/string
 	std/int
@@ -40,6 +41,7 @@
 	parse_query
 	build_query
 	serve
+	serve_stream
 	get
 	post
 	send
@@ -277,6 +279,12 @@ check_head = (xs: List(Int), limit: Int) -> Nil ? HttpError {
 }
 
 parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
+	(req, after) = parse_request_head(xs)
+	(body, trailers, tail) = read_body(req.headers, after)
+	(Request(..req, body: body, trailers: trailers), tail)
+}
+
+parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
 	(line, rest) = line(xs)
 	parts = string.split(text(line), " ")
 	parts |> {
@@ -292,8 +300,8 @@ parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
 				"invalid target"
 			)
 			(hs, after) = read_headers(rest, [])
-			(body, trailers, tail) = read_body(hs, after)
-			(Request(Method(method), target, hs, body, trailers), tail)
+			validate_framing(hs)
+			(Request(Method(method), target, hs, <<>>, Headers([])), after)
 		}
 		_ -> fail.raise(BadMessage("invalid request line"))
 	}
@@ -502,6 +510,26 @@ chunks = (
 	acc: List(BitArray)
 ) -> (BitArray, Headers, List(Int)) ? HttpError {
 	(size_line, rest) = line(xs)
+	size = chunk_size(size_line)
+	{ size == 0 } |> {
+		True -> {
+			(trailers, tail) = read_headers(rest, [])
+			valid_trailers(trailers)
+			(bit_array.concat(list.reverse(acc)), trailers, tail)
+		}
+		False -> {
+			(part, tail) = take(rest, size, [])
+			tail |> {
+				[13, 10, ..after] -> chunks(after, [bits(part), ..acc])
+				[]                -> fail.raise(NeedMore)
+				[13]              -> fail.raise(NeedMore)
+				_                 -> fail.raise(BadMessage("invalid chunk terminator"))
+			}
+		}
+	}
+}
+
+chunk_size = (size_line: List(Int)) -> Int ? HttpError {
 	(size_raw, extension, has_extension) = cut(size_line, 59)
 	size_bytes = list.reverse(list.drop_while(list.reverse(size_raw), space))
 	require(has_extension || size_bytes == size_raw, "invalid chunk size")
@@ -515,27 +543,16 @@ chunks = (
 	)
 	size = list.fold(size_bytes, 0, (n, x) { n * 16 + hex(x) })
 	require(size >= 0, "invalid chunk size")
-	{ size == 0 } |> {
-		True -> {
-			(trailers, tail) = read_headers(rest, [])
-			require(
-				header_bytes(trailers, "content-length") == None &&
-					header_bytes(trailers, "transfer-encoding") == None &&
-					header_bytes(trailers, "host") == None
-				"invalid trailer field"
-			)
-			(bit_array.concat(list.reverse(acc)), trailers, tail)
-		}
-		False -> {
-			(part, tail) = take(rest, size, [])
-			tail |> {
-				[13, 10, ..after] -> chunks(after, [bits(part), ..acc])
-				[]                -> fail.raise(NeedMore)
-				[13]              -> fail.raise(NeedMore)
-				_                 -> fail.raise(BadMessage("invalid chunk terminator"))
-			}
-		}
-	}
+	size
+}
+
+valid_trailers = (trailers: Headers) -> Nil ? HttpError {
+	require(
+		header_bytes(trailers, "content-length") == None &&
+			header_bytes(trailers, "transfer-encoding") == None &&
+			header_bytes(trailers, "host") == None
+		"invalid trailer field"
+	)
 }
 
 token_prefix = (xs: List(Int), acc: List(Int)) -> (List(Int), List(Int)) {
@@ -869,8 +886,16 @@ lowercase = (s: String) -> String {
 	}
 }
 
-/// Serve each connection in a child task; requests on a connection are ordered.
+/// Buffered request handler, built on the incremental body reader.
 serve = (listener, handler) {
+	serve_stream(listener, (req: Request, reader) {
+		body = collect_body(reader, [])
+		handler(Request(..req, body: body, trailers: reader.trailers()))
+	})
+}
+
+/// Serve a head and a pull reader; the reader is valid until the handler returns.
+serve_stream = (listener, handler) {
 	task.scope((scope) { accept_loop(listener, handler, scope) })
 }
 
@@ -878,69 +903,26 @@ accept_loop = (listener, handler, scope) {
 	stream = net.accept(listener)
 	task.go(scope, () {
 		resource.ensure(() {
-			fail.catch(() { connection_loop(stream, handler, <<>>, False) })
+			fail.catch(() { connection_loop(stream, handler, <<>>) })
 			Nil
 		}, () { net.close_stream(stream) })
 	})
 	accept_loop(listener, handler, scope)
 }
 
-connection_loop = (stream, handler, buffer, continued) {
-	feed_request_limit(<<>>, buffer, 32768) |> {
-		Invalid(_) -> net.write(
-			stream
-			serialize_response(
-				Response(
-					Status(400)
-					reason(400)
-					Headers([("Connection", "close"), ("Content-Length", "0")])
-					<<>>
-					Headers([])
-				)
-			)
-		)
-		Complete(req, rest) -> {
-			res: Response = fail.catch(() { handler(req) }) |> {
-				Ok(value) -> value
-				Error(_)  -> response(Status(500))
-			}
-			hs = header(res.headers, "content-length") |> {
-				Some(_) -> res.headers
-				None -> header(res.headers, "transfer-encoding") |> {
-					Some(_) -> res.headers
-					None -> add_header(
-						res.headers
-						"Content-Length"
-						int.to_string(bit_array.bit_size(res.body) / 8)
-					)
-				}
-			}
-			net.write(
-				stream
-				serialize_response(
-					Response(res.status, res.reason, hs, res.body, res.trailers)
-				)
-			)
-			{
-				has_token(req.headers, "connection", "close") ||
-					has_token(hs, "connection", "close")
-			} |> {
-				True  -> Nil
-				False -> connection_loop(stream, handler, rest, False)
-			}
-		}
+connection_loop = (stream, handler, buffer) {
+	progress: Progress(Request) = fail.catch(() {
+		check_head(octets(buffer), 32768)
+		parse_request_head(octets(buffer))
+	}) |> {
+		Ok((req, rest))        -> Complete(req, bits(rest))
+		Error(NeedMore)        -> More(buffer)
+		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected head error")
+	}
+	progress |> {
+		Invalid(_) -> write_server_reply(stream, response(Status(400)), True)
 		More(_) -> {
-			should_continue = { continued } |> {
-				True  -> False
-				False -> expect_continue(buffer)
-			}
-			{ should_continue } |> {
-				True -> net.write(
-					stream
-					<<"HTTP/1.1 100 Continue\r\n\r\n":utf8>>
-				)
-				False -> Nil
-			}
 			bytes = net.read(stream, 65536)
 			{ bit_array.bit_size(bytes) == 0 } |> {
 				True -> Nil
@@ -948,26 +930,296 @@ connection_loop = (stream, handler, buffer, continued) {
 					stream
 					handler
 					bit_array.concat([buffer, bytes])
-					continued || should_continue
 				)
+			}
+		}
+		Complete(req, rest) -> {
+			result = fail.catch(() {
+				task.scope((_) {
+					cursor = task.cell(
+						BodyCursor(
+							rest
+							request_framing(req.headers)
+							Headers([])
+						)
+					)
+					reader = (
+						read: (max: Int) {
+							read_request_piece(stream, cursor, max)
+						}
+						trailers: () {
+							task.update(cursor, (state) {
+								(state, state.trailers)
+							})
+						}
+					)
+					{ has_token(req.headers, "expect", "100-continue") } |> {
+						True -> net.write(
+							stream
+							<<"HTTP/1.1 100 Continue\r\n\r\n":utf8>>
+						)
+						False -> Nil
+					}
+					res: Response = fail.catch(() { handler(req, reader) }) |> {
+						Ok(res)                -> res
+						Error(BadMessage(why)) -> fail.raise(BadMessage(why))
+						Error(_)               -> response(Status(500))
+					}
+					drain_body(reader)
+					tail = task.update(cursor, (state) {
+						(state, state.buffer)
+					})
+					(res, tail)
+				})
+			})
+			result |> {
+				Error(BadMessage(_)) -> write_server_reply(
+					stream
+					response(Status(400))
+					True
+				)
+				Error(error) -> fail.raise(error)
+				Ok((res, tail)) -> {
+					closing = has_token(req.headers, "connection", "close") ||
+						has_token(res.headers, "connection", "close")
+					write_server_reply(stream, res, closing)
+					{ closing } |> {
+						True  -> Nil
+						False -> connection_loop(stream, handler, tail)
+					}
+				}
 			}
 		}
 	}
 }
 
-expect_continue = (buffer: BitArray) -> Bool {
-	fail.catch(() {
-		(_, after) = line(octets(buffer))
-		(hs, _) = read_headers(after, [])
-		has_token(hs, "expect", "100-continue")
-	}) |> {
-		Ok(value) -> value
-		Error(_)  -> False
+write_server_reply = (stream, res: Response, closing: Bool) {
+	hs = header(res.headers, "content-length") |> {
+		Some(_) -> res.headers
+		None -> header(res.headers, "transfer-encoding") |> {
+			Some(_) -> res.headers
+			None -> add_header(
+				res.headers
+				"Content-Length"
+				int.to_string(bit_array.byte_size(res.body))
+			)
+		}
+	}
+	hs = { closing } |> {
+		True  -> add_header(hs, "Connection", "close")
+		False -> hs
+	}
+	net.write(
+		stream
+		serialize_response(
+			Response(res.status, res.reason, hs, res.body, res.trailers)
+		)
+	)
+}
+
+BodyFraming {
+	Remaining(Int)
+	ChunkSize
+	ChunkData(Int)
+	ChunkEnd
+	ChunkTrailers
+	BodyDone
+}
+
+BodyCursor {
+	BodyCursor(buffer: BitArray, framing: BodyFraming, trailers: Headers)
+}
+
+request_framing = (hs: Headers) -> BodyFraming ? HttpError {
+	validate_framing(hs)
+	transfer_codings(hs) |> {
+		[] -> header(hs, "content-length") |> {
+			None -> Remaining(0)
+			Some(value) -> string.split(value, ",") |> {
+				[first, .._] -> Remaining(
+					parse_length(text_unchecked(trim(octets(<<first:utf8>>))))
+				)
+				_ -> panic("http: empty length split")
+			}
+		}
+		codings -> {
+			require(
+				list.last(codings) == Some("chunked")
+				"invalid transfer-encoding"
+			)
+			ChunkSize
+		}
+	}
+}
+
+read_request_piece = (stream, cursor: task.Cell(BodyCursor), max: Int) {
+	require(max > 0, "body read size must be positive")
+	state = task.update(cursor, (state) { (state, state) })
+	(piece, next) = body_piece(stream, state, max)
+	task.update(cursor, (_) { (next, Nil) })
+	piece
+}
+
+body_more = (stream, state: BodyCursor) {
+	bytes = net.read(stream, 65536)
+	require(bit_array.bit_size(bytes) > 0, "unexpected end of request body")
+	BodyCursor(..state, buffer: bit_array.concat([state.buffer, bytes]))
+}
+
+body_piece = (stream, state: BodyCursor, max: Int) {
+	state.framing |> {
+		BodyDone     -> (<<>>, state)
+		Remaining(0) -> (<<>>, BodyCursor(..state, framing: BodyDone))
+		Remaining(n) | ChunkData(n) -> {
+			{ bit_array.bit_size(state.buffer) == 0 } |> {
+				True -> body_piece(stream, body_more(stream, state), max)
+				False -> {
+					available = bit_array.byte_size(state.buffer)
+					count = int.min(int.min(n, max), available)
+					(part, rest) = split_bytes(state.buffer, count)
+					framing = state.framing |> {
+						Remaining(_) -> Remaining(n - count)
+						ChunkData(_) -> { n == count } |> {
+							True  -> ChunkEnd
+							False -> ChunkData(n - count)
+						}
+						_ -> panic("http: invalid body data state")
+					}
+					(part, BodyCursor(..state, buffer: rest, framing: framing))
+				}
+			}
+		}
+		ChunkSize -> fail.catch(() { line(octets(state.buffer)) }) |> {
+			Error(NeedMore) -> {
+				require(
+					bit_array.byte_size(state.buffer) <= 32768
+					"chunk line too large"
+				)
+				body_piece(stream, body_more(stream, state), max)
+			}
+			Error(error) -> fail.raise(error)
+			Ok((line, rest)) -> {
+				size = chunk_size(line)
+				framing = { size == 0 } |> {
+					True  -> ChunkTrailers
+					False -> ChunkData(size)
+				}
+				body_piece(
+					stream
+					BodyCursor(..state, buffer: bits(rest), framing: framing)
+					max
+				)
+			}
+		}
+		ChunkEnd -> { bit_array.byte_size(state.buffer) < 2 } |> {
+			True -> body_piece(stream, body_more(stream, state), max)
+			False -> state.buffer |> {
+				<<13, 10, rest:bits>> -> body_piece(
+					stream
+					BodyCursor(..state, buffer: rest, framing: ChunkSize)
+					max
+				)
+				_ -> fail.raise(BadMessage("invalid chunk terminator"))
+			}
+		}
+		ChunkTrailers -> fail.catch(() {
+			read_headers(octets(state.buffer), [])
+		}) |> {
+			Error(NeedMore) -> {
+				check_head(octets(state.buffer), 32768)
+				body_piece(stream, body_more(stream, state), max)
+			}
+			Error(error) -> fail.raise(error)
+			Ok((trailers, rest)) -> {
+				valid_trailers(trailers)
+				(<<>>, BodyCursor(bits(rest), BodyDone, trailers))
+			}
+		}
+	}
+}
+
+split_bytes = (buffer: BitArray, count: Int) -> (BitArray, BitArray) {
+	buffer |> {
+		<<part:bytes(count), rest:bits>> -> (part, rest)
+		_                                -> panic("http: invalid body slice")
+	}
+}
+
+collect_body = (reader, acc: List(BitArray)) {
+	piece = reader.read(65536)
+	{ bit_array.bit_size(piece) == 0 } |> {
+		True  -> bit_array.concat(list.reverse(acc))
+		False -> collect_body(reader, [piece, ..acc])
+	}
+}
+
+drain_body = (reader) {
+	{ bit_array.bit_size(reader.read(65536)) == 0 } |> {
+		True  -> Nil
+		False -> drain_body(reader)
 	}
 }
 
 /// A provider is a record containing a send function, so callers can replace it.
-client = () { (send: (req) { send(req) }) }
+client = () {
+	pool = task.cell(Pool([], []))
+	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
+}
+
+Connection {
+	Plain(net.Stream)
+	Secure(tls.Stream)
+}
+
+Idle {
+	Idle(
+		secure:     Bool
+		host:       String
+		port:       Int
+		connection: Connection
+		buffer:     BitArray
+	)
+}
+
+Pool {
+	Pool(idle: List(Idle), released: List(Key(Nil)))
+}
+
+PeerClosed {
+	PeerClosed
+}
+
+close_connection = (connection: Connection) {
+	connection |> {
+		Plain(stream)  -> net.close_stream(stream)
+		Secure(stream) -> tls.close(stream)
+	}
+}
+
+close_client = (pool: task.Cell(Pool)) {
+	idle = task.update(pool, (state) { (Pool([], state.released), state.idle) })
+	list.each(idle, (entry) { close_connection(entry.connection) })
+}
+
+pool_take = (
+	idle: List(Idle)
+	secure: Bool
+	host: String
+	port: Int
+) -> (List(Idle), Option(Idle)) {
+	idle |> {
+		[] -> ([], None)
+		[entry, ..rest] -> {
+			entry.secure == secure && entry.host == host && entry.port == port
+		} |> {
+			True -> (rest, Some(entry))
+			False -> {
+				(next, found) = pool_take(rest, secure, host, port)
+				([entry, ..next], found)
+			}
+		}
+	}
+}
 
 get = (url: String) { send(request(Method("GET"), url)) }
 
@@ -977,13 +1229,16 @@ post = (url: String, body: BitArray) {
 
 body_text = (res: Response) { bit_array.to_string(res.body) }
 
-send = (req: Request) { follow(req, 0) }
+send = (req: Request) {
+	provider = client()
+	resource.ensure(() { provider.send(req) }, provider.close)
+}
 
-follow = (req: Request, count: Int) {
+follow = (pool: task.Cell(Pool), req: Request, count: Int) {
 	{ count > 10 } |> {
 		True -> fail.raise(Protocol("too many redirects"))
 		False -> {
-			res = send_once(req)
+			res = send_once(pool, req)
 			Status(code) = res.status
 			(header(res.headers, "location"), code) |> {
 				(Some(location), c) ? c == 301 ||
@@ -1008,6 +1263,7 @@ follow = (req: Request, count: Int) {
 					change = method != "HEAD" && method != "GET" && drop_body
 					change |> {
 						True -> follow(
+							pool
 							Request(
 								Method("GET")
 								url
@@ -1018,6 +1274,7 @@ follow = (req: Request, count: Int) {
 							count + 1
 						)
 						False -> follow(
+							pool
 							Request(
 								req.method
 								url
@@ -1075,7 +1332,7 @@ redirect_headers = (hs: Headers, base, next, drop_body: Bool) -> Headers {
 	}))
 }
 
-send_once = (req: Request) {
+send_once = (pool: task.Cell(Pool), req: Request) {
 	u = uri.parse(req.target) |> {
 		Ok(value) -> value
 		Error(_)  -> fail.raise(Protocol("invalid URL"))
@@ -1120,10 +1377,56 @@ send_once = (req: Request) {
 		Some(_) -> req.headers
 		None    -> add_header(req.headers, "Host", host_header)
 	}
-	hs = add_header(hs, "Connection", "close")
 	wire = serialize_request(
 		Request(req.method, target, hs, req.body, req.trailers)
 	)
+	cached = task.update(pool, (state) {
+		(rest, found) = pool_take(state.idle, secure, lowercase(hostname), port)
+		(Pool(rest, state.released), found)
+	})
+	result = cached |> {
+		None -> fail.catch(() {
+			exchange(
+				pool
+				Idle(
+					secure
+					lowercase(hostname)
+					port
+					dial(secure, hostname, port)
+					<<>>
+				)
+				req
+				wire
+			)
+		})
+		Some(entry) -> fail.catch(() { exchange(pool, entry, req, wire) }) |> {
+			Error(PeerClosed) | Error(Connect(_)) | Error(Tls(_)) -> fail.catch(
+				() {
+					exchange(
+						pool
+						Idle(
+							secure
+							lowercase(hostname)
+							port
+							dial(secure, hostname, port)
+							<<>>
+						)
+						req
+						wire
+					)
+				}
+			)
+			other -> other
+		}
+	}
+	result |> {
+		Ok(res)           -> res
+		Error(PeerClosed) -> fail.raise(Protocol("unexpected end of response"))
+		Error(error)      -> fail.raise(error)
+	}
+}
+
+dial = (secure: Bool, hostname: String, port: Int) {
 	fail.catch(() { net.resolve(hostname) }) |> {
 		Ok(_)                                          -> Nil
 		Error(net.NetError(operation, endpoint, code)) -> fail.raise(Dns(code))
@@ -1135,29 +1438,62 @@ send_once = (req: Request) {
 		)
 	}
 	secure |> {
-		False -> resource.ensure(() {
-			transport = net_transport(stream)
-			transport.write(wire)
-			read_reply(transport, req.method, <<>>)
-		}, () { net.close_stream(stream) })
-		True -> {
-			secure_stream = fail.catch(() {
-				tls.connect(
-					stream
-					hostname
-					(..tls.options(), alpn: ["http/1.1"])
-				)
-			}) |> {
-				Ok(value)                          -> value
-				Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+		False -> Plain(stream)
+		True -> fail.catch(() {
+			tls.connect(stream, hostname, (..tls.options(), alpn: ["http/1.1"]))
+		}) |> {
+			Ok(value) -> Secure(value)
+			Error(tls.TlsError(stage, reason)) -> {
+				net.close_stream(stream)
+				fail.raise(Tls(reason))
 			}
-			resource.ensure(() {
-				transport = tls_transport(secure_stream)
-				transport.write(wire)
-				read_reply(transport, req.method, <<>>)
-			}, () { tls.close(secure_stream) })
 		}
 	}
+}
+
+exchange = (pool: task.Cell(Pool), entry: Idle, req: Request, wire: BitArray) {
+	lease: Key(Nil) = key.new()
+	resource.ensure(() {
+		transport = entry.connection |> {
+			Plain(stream)  -> net_transport(stream)
+			Secure(stream) -> tls_transport(stream)
+		}
+		transport.write(wire)
+		(res, rest, eof) = read_reply(transport, req.method, entry.buffer)
+		Status(code) = res.status
+		Method(method) = req.method
+		reusable = eof == False &&
+			code >= 200 &&
+			method != "CONNECT" &&
+			has_token(req.headers, "connection", "close") == False &&
+			has_token(res.headers, "connection", "close") == False
+		{ reusable } |> {
+			True -> task.update(pool, (state) {
+				(
+					Pool(
+						[Idle(..entry, buffer: rest), ..state.idle]
+						[lease, ..state.released]
+					)
+					Nil
+				)
+			})
+			False -> Nil
+		}
+		res
+	}, () {
+		released = task.update(pool, (state) {
+			(
+				Pool(state.idle, list.filter(state.released, (key) {
+					key != lease
+				}))
+				list.contains(state.released, lease)
+			)
+		})
+		{ released } |> {
+			True  -> Nil
+			False -> close_connection(entry.connection)
+		}
+	})
 }
 
 read_reply = (transport, method, buffer) {
@@ -1170,12 +1506,15 @@ read_progress = (transport, method, buffer, eof) {
 			Status(code) = res.status
 			{ code >= 100 && code < 200 && code != 101 } |> {
 				True  -> read_progress(transport, method, rest, eof)
-				False -> res
+				False -> (res, rest, eof)
 			}
 		}
 		Invalid(why) -> fail.raise(Protocol(why))
 		More(next) -> eof |> {
-			True -> fail.raise(Protocol("unexpected end of response"))
+			True -> { bit_array.bit_size(next) == 0 } |> {
+				True  -> fail.raise(PeerClosed)
+				False -> fail.raise(Protocol("unexpected end of response"))
+			}
 			False -> {
 				bytes = transport.read(65536)
 				read_progress(

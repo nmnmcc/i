@@ -17,8 +17,13 @@ request against a scheduler-friendly clock sleep.
 
 A provider is an ordinary record with a `send` function. `client()` returns
 the network provider, and `send_with(provider, request)` calls a supplied
-provider. This lets a test use a fake and lets applications select a different
-transport without compiler support. A browser `fetch` provider must observe
+provider. Each client owns an idle connection pool keyed by scheme, host and
+port. Fully framed keep-alive responses return their connection to that pool;
+close-delimited responses, upgrades and explicit closes do not. A request that
+finds its reused connection closed retries once on a fresh connection. Call
+`client.close()` to close its idle connections; the convenience `send`, `get`
+and `post` calls close their temporary client after the request. A fake provider
+lets tests and applications select a different transport without compiler support. A browser `fetch` provider must observe
 browser restrictions: scripts cannot set forbidden request headers, CORS limits
 cross-origin access, and raw trailers are not exposed by fetch.
 
@@ -29,6 +34,16 @@ incrementally, and answers requests on a connection in order. It honors
 500. `route(method, pattern, request)` matches slash-separated paths; a
 segment beginning with `:` captures that segment by name.
 
-The present transport closes connections after each request. Server handlers
-receive a buffered body. `send_timeout` works with a fake provider, but the
-network provider currently fails the effect check when passed to it.
+`serve_stream(listener, handler)` calls `handler(head, body)` as soon as the
+request head is complete. The head is a `Request` with an empty byte body;
+`body.read(max_bytes)` pulls at most that many decoded bytes, returning empty
+bytes at the end. Both Content-Length and chunked uploads are incremental,
+including chunks larger than one read. `body.trailers()` returns decoded
+trailers after the body ends. The reader is valid during the handler call.
+The server drains any unread body before parsing another request, preserving
+pipelined bytes. `serve` uses this reader to provide its buffered Request API.
+
+Pool and body-reader state use ordinary scope-owned `task.cell` values and
+pure atomic `task.update` callbacks. No HTTP state is held in the compiler or
+host. The general service-row checker preserves arbitrary services when a
+network client is passed through `send_timeout`.

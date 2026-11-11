@@ -368,3 +368,226 @@ main = () {{
     ));
     assert_eq!(server.join().unwrap(), 1, "client did not reuse connection");
 }
+
+#[test]
+fn http_reuse_replaces_closed_connection() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || {
+        for body in ["first", "second"] {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(20)))
+                .unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            loop {
+                let mut line = String::new();
+                assert!(reader.read_line(&mut line).unwrap() > 0);
+                if line == "\r\n" {
+                    break;
+                }
+            }
+            // Deliberately close without advertising it: the cached socket is stale.
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        }
+    });
+    run_http_program(&format!(
+        r#"
+(std/http)
+@main
+main = () {{
+ client = http.client()
+ req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
+ assert(http.send_with(client, req).body == <<"first":utf8>>)
+ assert(http.send_with(client, req).body == <<"second":utf8>>)
+ client.close()
+}}
+"#
+    ));
+    server.join().unwrap();
+}
+
+#[test]
+fn http_stream_request_body() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir(project.path().join("src")).unwrap();
+    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    std::fs::write(
+        project.path().join("i.toml"),
+        format!(
+            "name = \"http_stream_test\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
+            std_path.to_str().unwrap()
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        project.path().join("src/main.i"),
+        r#"
+(i/net, i/task, i/stdio, i/core, std/http, std/bit_array, std/list, std/option)
+read_pieces = (body, acc: List(BitArray), count: Int) {
+ piece = body.read(4096)
+ { bit_array.byte_size(piece) == 0 } |> {
+  True -> (bit_array.concat(list.reverse(acc)), count)
+  False -> {
+   { count == 0 } |> { True -> stdio.print("piece") False -> Nil }
+   read_pieces(body, [piece, ..acc], count + 1)
+  }
+ }
+}
+handle = (req: http.Request, body) {
+ { req.target == "/ignore" || req.target == "/next" } |> {
+  True -> http.response(http.Status(204))
+  False -> echo_upload(req, body)
+ }
+}
+echo_upload = (req: http.Request, body) {
+ (bytes, count) = read_pieces(body, [], 0)
+ assert(bit_array.byte_size(bytes) == 1048576)
+ assert(count >= 256)
+ { req.target == "/chunked" } |> {
+  True -> assert(http.header(body.trailers(), "X-End") == option.Some("yes"))
+  False -> assert(body.trailers() == http.Headers([]))
+ }
+ res = http.response(http.Status(200))
+ http.Response(..res, body: bytes)
+}
+@main
+main = () {
+ listener = net.listen("127.0.0.1", 0)
+ stdio.print("listening " <> core.inspect(net.local_port(listener)))
+ http.serve_stream(listener, handle)
+}
+"#,
+    )
+    .unwrap();
+    let child = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--opt", "0", "--project"])
+        .arg(project.path())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut server = Server(child);
+    let mut stdout = BufReader::new(server.0.stdout.take().unwrap());
+    let mut line = String::new();
+    stdout.read_line(&mut line).unwrap();
+    let port: u16 = line
+        .strip_prefix("listening ")
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    let (pieces_tx, pieces_rx) = std::sync::mpsc::channel();
+    let output_reader = thread::spawn(move || {
+        for line in stdout.lines() {
+            pieces_tx.send(line.unwrap()).unwrap();
+        }
+    });
+    let body: Vec<u8> = (0..1048576).map(|n| (n % 251) as u8).collect();
+    for chunked in [true, false] {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(30)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(30)))
+            .unwrap();
+        if chunked {
+            stream.write_all(b"POST /chunked HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1000\r\n").unwrap();
+        } else {
+            stream.write_all(b"POST /length HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: 1048576\r\n\r\n").unwrap();
+        }
+        stream.write_all(&body[..4096]).unwrap();
+        // The handler must consume a piece before the rest of the upload exists.
+        assert_eq!(
+            pieces_rx.recv_timeout(Duration::from_secs(30)).unwrap(),
+            "piece"
+        );
+        if chunked {
+            stream.write_all(b"\r\n").unwrap();
+            for piece in body[4096..].chunks(8192) {
+                write!(stream, "{:x}\r\n", piece.len()).unwrap();
+                stream.write_all(piece).unwrap();
+                stream.write_all(b"\r\n").unwrap();
+            }
+            stream.write_all(b"0\r\nX-End: yes\r\n\r\n").unwrap();
+        } else {
+            stream.write_all(&body[4096..]).unwrap();
+        }
+        let mut reply = Vec::new();
+        stream.read_to_end(&mut reply).unwrap();
+        assert!(
+            reply.starts_with(b"HTTP/1.1 200 OK\r\n"),
+            "{}",
+            String::from_utf8_lossy(&reply[..reply.len().min(256)])
+        );
+        let head_end = reply.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+        assert_eq!(&reply[head_end..], body);
+    }
+    // Leaving a body unread must drain its framing without consuming the next head.
+    for framing in [
+        "Transfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n0\r\nX-End: yes\r\n\r\n",
+        "Content-Length: 3\r\n\r\nabc",
+    ] {
+        let pipeline = format!(
+            "POST /ignore HTTP/1.1\r\nHost: localhost\r\n{framing}GET /next HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+        );
+        assert_eq!(
+            request(port, pipeline.as_bytes())
+                .matches("HTTP/1.1 204")
+                .count(),
+            2
+        );
+    }
+    drop(server);
+    output_reader.join().unwrap();
+}
+
+#[test]
+fn http_reuse_keeps_origins_separate() {
+    let first = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let second = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let first_port = first.local_addr().unwrap().port();
+    let second_port = second.local_addr().unwrap().port();
+    let servers: Vec<_> = [(first, "first", 2), (second, "second", 1)]
+        .into_iter()
+        .map(|(listener, body, count)| thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            for _ in 0..count {
+                loop {
+                    let mut line = String::new();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" { break; }
+                }
+                // Reuse is allowed only after the final chunk and trailers are read.
+                write!(stream, "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n{body}\r\n0\r\nX-End: yes\r\n\r\n", body.len()).unwrap();
+            }
+        }))
+        .collect();
+    run_http_program(&format!(
+        r#"
+(std/http, std/option)
+@main
+main = () {{
+ client = http.client()
+ first = http.request(http.Method("GET"), "http://127.0.0.1:{first_port}/")
+ second = http.request(http.Method("GET"), "http://127.0.0.1:{second_port}/")
+ a = http.send_with(client, first)
+ assert(a.body == <<"first":utf8>>)
+ assert(http.header(a.trailers, "X-End") == option.Some("yes"))
+ assert(http.send_with(client, second).body == <<"second":utf8>>)
+ assert(http.send_with(client, first).body == <<"first":utf8>>)
+ client.close()
+}}
+"#
+    ));
+    for server in servers {
+        server.join().unwrap();
+    }
+}
