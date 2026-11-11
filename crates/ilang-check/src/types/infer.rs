@@ -1885,7 +1885,7 @@ impl<'a> Checker<'a> {
                     self.sub(&ty, &list, state.rest.expect("list rest expression").span);
                     let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
                     state.known.push(match known::member(&known, head) {
-                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
+                        Some(Ty::Con(_, _, ref xs)) if xs.len() == 1 => xs[0].clone(),
                         _ => Ty::Top,
                     });
                     let known = Ty::named(
@@ -3547,6 +3547,41 @@ mod deep_written_type_tests {
                 // deep-tree work; do not make this test depend on their order.
                 std::mem::forget(written);
                 std::mem::forget(result);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deeply_nested_list_expressions_use_an_explicit_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let program = Program::default();
+                let sources = Sources::default();
+                let mut checker = Checker::new(&program, &sources);
+                let mut expr = Expr {
+                    kind: ExprKind::Int(1u8.into()),
+                    span: Span::default(),
+                };
+                for _ in 0..10_000 {
+                    expr = Expr {
+                        kind: ExprKind::List {
+                            items: vec![expr],
+                            rest: None,
+                        },
+                        span: Span::default(),
+                    };
+                }
+                let (ty, known) = checker.infer_k(&expr, &Ty::Top);
+                assert_eq!(
+                    ty.head(),
+                    Some(Head::Named(TypeRef::Builtin(BuiltinType::List)))
+                );
+                assert_eq!(known.head(), ty.head());
+                assert!(checker.diags.is_empty());
+                std::mem::forget(expr);
             })
             .unwrap()
             .join()
