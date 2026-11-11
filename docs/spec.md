@@ -638,7 +638,7 @@ Nil { Nil }
 Result(A, E) { Ok(A) Error(E) }
 ```
 
-The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4.
+The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4. The types `Key` and `Keyed` are in §9.8. Request(A) and Ticket are built-in types, with operations in i/request (§9.11). Request(A) contains request handles whose answer belongs to A. Ticket is an answer-erased handle. Neither has public constructors.
 
 #### Literal types
 
@@ -726,6 +726,8 @@ Pair(Tree, _) = parsed
 8. A member of `Int` or `String` is a subtype of a member with the same type constructor when every value of its value set is in the value set of the other. So `"a" <: "a" | "b" <: String`, and `String - "a" <: String`, but `String` is not a subtype of `"a" | "b"`, and `String - "a"` is not a subtype of `"b"`.
 
 Two types are **equal** when each is a subtype of the other. A value of a subtype may be used in every place where a value of the type is needed.
+
+`Key(A)` (§9.8) does not change. `Request(A)` (§9.11) goes in the same direction as A. The variance of task types follows their ordinary custom definitions (§9.9).
 
 ### 4.6 Function types
 
@@ -1211,7 +1213,13 @@ fixed = () {
 - An environment may not have two forms of one type constructor with different arguments: `State(Int) | State(String)` is a compile error, also for a service type whose parameter goes in one direction (§4.5 rule 4). Two environment parameters of one function may not have the same type constructor. A later environment statement for the same type constructor takes the place of an earlier one.
 - A nominal type is the name of a service. To have two services of the same form, make two types.
 - A service is a normal value. It may be stored and given to functions, and code that has it may call its functions directly.
+- `control.keep_env(f)` (§9.4) gives a function that, wherever it is called, calls `f` with the services that were bound at the place of the `keep_env` call when it ran. It keeps every service bound there, also those that `f` does not need. An environment statement inside `f` gives its service its own value there as usual.
 - Type checking makes certain that every environment parameter gets its service. Getting it never fails at run time.
+
+Await, Root and Owner (§9.11), Scheduler and Runner (§9.9) are normal service values.
+Replacing a host service in i uses an environment statement as for any
+service. Replacing a random seed with task.top keeps the run route of the
+current Runner. Entry defaults do not change call-site service lookup.
 
 A provider can capture a service value. Replacing the service later changes calls that take it from their caller, not the captured value. This is the same rule for shipped and user providers:
 
@@ -1268,15 +1276,24 @@ The module `i/control` has one operation to pause a computation and go on with i
 | `control.suspend` | `(b: Boundary(R, E, N), f: (k: Continuation(A, R, E, N)) -> R ^ E ! N) -> A` |
 | `control.resume` | `(k: Continuation(A, R, E, N), value: A) -> R ^ E ! N` |
 | `control.cancel` | `(k: Continuation(A, R, E, N)) -> Nil ! N` |
+| `control.keep_env` | `(f: (x: S) -> A ? E ! N) -> { (x: S) -> A ? E } ! N` |
 
 `Boundary` and `Continuation` are built-in types. They are not custom types: their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
 
 1. `boundary(body)` makes a boundary `b` and does `body(b)`. The value of `body` is the value of `boundary`. `b` is **active** while the computation between it and the running code is on the stack: from the start of `body` until `body` ends, but not while that part is paused in a continuation. After `resume`, it is active again.
 2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, with the environment of that place, and its value is the value of `boundary`. If `b` is not active, the program stops.
 3. `resume(k, v)` goes on with the paused computation, with `v` as the value of `suspend`. It goes on on top of the place where `resume` is called, and the value that the computation has when it gets to the boundary is the value of `resume`. The paused part keeps the environment statements that were inside it; for the rest, it gets the environment of the place where `resume` is called.
+   The services that a function made by `control.keep_env` keeps count, for the code inside that function, like environment statements inside the paused part: when a paused part that holds such a function's frame is resumed, that code still gets the kept services.
 4. `cancel(k)` unwinds the paused computation (§9.5) and gives `Nil`. While it unwinds, the boundary stays not active, and the final functions get the environment as in rule 3, from the place where `cancel` is called.
+   The same holds for final functions inside a function made by `control.keep_env`: they get the kept services, and the place of `cancel` gives only the services that are not kept.
 5. **One use only**: `resume` and `cancel` together may be used one time for a continuation. A second use stops the program.
 6. If a continuation is never resumed or cancelled, its final functions are not run.
+7. A boundary and a continuation stay on the worker that made them (§11.9). They are not portable.
+
+A structured task cancel resumes its scheduling continuation with a cancel
+answer; i code then cancels an inner continuation (§9.9). It does not change
+control.cancel's rule that the boundary of the cancelled continuation is
+not active during unwinding.
 
 Generators, async code, and schedulers are libraries made from services and this operation. For example, a generator:
 
@@ -1304,6 +1321,12 @@ The module `i/resource` puts final functions in place:
 | `resource.acquire` | `(open: () -> R ^ E ! N, release: (R) -> Nil ! N, use: (R) -> A ^ E ! N) -> A ^ E ! N` | After `open` is done, runs `release` when `use` ends or is unwound |
 
 A final function may not give errors. When the program stops (§11.7), final functions are not run.
+
+A structured scope waits for cancelled children and their final functions
+before it returns (§9.9). Those final functions may suspend and resume and
+use services, but may not raise errors. An unstarted child has no installed
+final functions. A host failure or a destroyed instance cannot run i final
+functions; the host instead releases its own work and resources (Appendix B).
 
 ### 9.6 Assert
 
@@ -1404,6 +1427,371 @@ The process module separates its capabilities as follows, keeping its existing o
 
 The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
+### 9.8 Keys
+
+`Key(A)` and `Keyed` are built-in types. They are not custom types: their values are made only by `key.new` and `key.wrap`. A key is the same only as itself (§11.4). Two `Keyed` values are equal when their keys are the same and their values are equal. `Key(A)` does not change (§4.5 rule 7). A `Keyed` holds its value (§11.9).
+
+| Function | Type | What it does |
+|---|---|---|
+| `new` | `() -> Key(A)` | A new key, the same only as itself |
+| `wrap` | `(k: Key(A), value: A) -> Keyed` | The value, marked with the key |
+| `unwrap` | `(k: Key(A), x: Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
+
+`Lookup(A) { Found(A) Missing }` is a custom type of `i/key`, not a built-in name.
+
+### 9.9 Tasks
+
+
+
+i/task is a library implemented using i/control, i/key and i/request. A run
+owns its tasks and scheduler state. Its implicit root permits local values.
+Scopes constrain the lifetime of spawned work: none outlives its scope.
+Values pass between tasks only through go captures/kept services, channels,
+child results/errors and shares. Portable paths check core.portable even
+with one worker: sends at the call, send events at construction, children
+at completion, scope body errors at failure, shares at creation. Failure
+stops with panic("task: value is not portable"). go never rejects for
+non-portability; on multiple workers it silently classifies the complete task
+record at go and publishes portable records. Other records stay local.
+Local scopes/channels hold the maker's boundary only as a non-portability
+witness. A Task/join event from a local scope holds that scope too. Every
+stateful handle checks run identity; events have fresh keys and sync checks
+only their stateful leaves, including losing alternatives. Channels belong
+to the first scope in their maker's chain, or the run; channels and shares are freed at scope exit.
+Every run has the result of some serial order of task steps. Timing may
+choose a sender, a race/select winner, which failures precede cancellation,
+or whether a handle is used before its owner ends. These order-dependent
+results may change between runs or worker counts. Tests must either avoid
+that dependence or list the allowed outcomes. No task API observes workers.
+
+Export types Scheduler, Runner, Scope(E), Task(A,E), Channel(A), Event(A,E,N),
+Shared(A), and ScheduleError; export only ScheduleError's constructors. The
+other constructors and scheduler protocol are private ordinary custom types,
+not host opaque types. Scope, Task, Channel, and Shared contain invariant keys;
+their parameters are therefore invariant. Event's answer/error/environment
+parameters are covariant: its private representation keeps typed decoding
+functions, rather than Key(A) in an output field. A public Event can hold user
+mapping functions and the local handles of its leaves. Such contents affect
+portability by the normal walk. The library creates no event that captures its
+Scheduler or mutable loop state. A join event keeps its task's scope handle.
+
+Schemes below declare their capital variables on their bindings. N is the body
+service requirement; supplying Scheduler/Runner/Await/Owner/Root discharges those members.
+Assert and user host services remain in N where the body needs them.
+
+| Binding | Type |
+|---|---|
+| `top` | `(seed: random.Generator) -> Runner ! Runner` |
+| `run(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ? E ! N) -> A ? E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ? E ! N) -> A ? E ! N \| Scheduler` |
+| `local_scope(A,E,N)` | Same scheme as scope |
+| `go(A,E,N)` | `(s: Scope(E), body: () -> A ? E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `join(A,E)` | `(t: Task(A,E)) -> A ? E ! Scheduler` |
+| `yield` | `() -> Nil ! Scheduler` |
+| `path` | `() -> List(Int) ! Scheduler` |
+| `random` | `() -> random.Generator ! Scheduler` |
+| `keep(S,A,E,N)` | `(f: (S) -> A ? E ! N) -> { (S) -> A ? E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `channel(A)` | `() -> Channel(A) ! Scheduler` |
+| `local_channel(A)` | `() -> Channel(A) ! Scheduler` |
+| `send(A)` | `(c: Channel(A), value: A) -> Nil ! Scheduler` |
+| `receive(A)` | `(c: Channel(A)) -> A ! Scheduler` |
+| `send_event(A)` | `(c: Channel(A), value: A) -> Event(Nil,Never,Never)` |
+| `receive_event(A)` | `(c: Channel(A)) -> Event(A,Never,Never)` |
+| `join_event(A,E)` | `(t: Task(A,E)) -> Event(A,E,Never)` |
+| `always(A)` | `(value: A) -> Event(A,Never,Never)` |
+| `never` | `() -> Event(Never,Never,Never)` |
+| `choose(A,E,N)` | `(events: List(Event(A,E,N))) -> Event(A,E,N)` |
+| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ? F ! M) -> Event(B,E \| F,N \| M)` |
+| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ? E ! N \| Scheduler` |
+| `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
+| `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
+| `both(A,B,E,N)` | `(left: () -> A ? E ! N, right: () -> B ? E ! N) -> (A,B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `race(A,E,N)` | `(left: () -> A ? E ! N, right: () -> A ? E ! N) -> A ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+
+In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
+for combinators use one common E and N; subtyping admits either child's error
+and needs. No union of invariant Task(Int,E) and Task(String,E) is required:
+`both` keeps two separate handles. No local variants of these three combinators
+are exported in v1. Local callers write a local_scope explicitly.
+
+The differences in the go/keep/combinator environments matter: their wrappers
+supply Scheduler/Runner/Await themselves, so requiring all of N at their call
+sites would overstate their principal needs. Owner is kept, and is not subtracted
+there. Root is kept there too. run/test supply a fresh Root and default Owner,
+so they subtract both. test still needs
+the calling Runner for its nested path/wait route. Attribute expansion for host
+fields happens before ordinary constraint generation; it adds fixed ordinary
+service types, not a type-dependent constraint. Keys are invariant and obey the
+existing value restriction; Request and Event add no qualified types or higher
+rank quantification. Thus the design reduces inference to the existing rules,
+with the new primitive variance rows. The prototype gate checks that argument
+against the implementation rather than assuming it from the notation.
+
+No public spawn detaches a task. `go` never checks its closure's portability.
+It increments the calling task's spawn/run counter, beginning at 1; the child
+path is the parent's path with that index appended. A nested run takes an index
+from that same counter. `path` and `random` are data reads without a suspend.
+A top seed that was already split or drawn keeps that entire derivation state.
+
+A scope waits for all children even when its body returns without joining them.
+Returning a Task handle does not extend the right to join it. Handles check run
+identity before other checks, then chain membership or liveness. `share` checks
+membership as `go` does (same outside-scope stop), including local scopes; values
+shared through either scope kind must be portable. get checks run then share
+liveness. Handle equality means the same object of the same run, never equal
+numeric ids in two runs. Text uses constructors without hidden ids: a private
+identity-bearing key is printed as `//key`, and implementation ids/paths
+are kept under Keyed fields whose text is //keyed, not exposed as plain fields. `path()` alone exposes the semantic task path.
+
+#### Scopes, errors, and cancellation
+
+R1. A task's chain is its active scope bodies, inner first, followed by its
+starting scope's chain. A scope's chain is itself plus its opener's chain at
+opening. `go` and join require the relevant scope in this chain. Run-key mismatch
+stops with `task: handle of another run`; failed membership stops with
+`task: go outside its scope` or `task: join outside its scope`. These messages
+are passed to panic, so the stop prefix is `panic: `.
+
+R2. A scope body executes in the opener task under an inner scope boundary;
+it does not start another scheduler. A child executes from the run loop under
+its own task boundary. On body/child failure, mark the scope cancelling, cancel
+its body and every child, and propagate down their active scope trees. Wait for
+all unwind operations, including scopes created by finals. Choose the least
+path among actual failures; a prefix sorts before its extensions and the scope
+body has the opener's path. A cancellation is not a failure. Types accumulate
+ordinary error unions; stops cannot be caught. A go accepted while cancelling
+creates an unstarted, immediately dropped child and its ordinary Task(A,E)
+handle. A shielded final receives that handle; its body never runs. If that
+scope's cancellation can unwind the caller, the command delivers cancellation
+instead of returning the handle. This priority also applies at a valid join.
+A cancelling scope never starts new user work just to manufacture a join value.
+
+R3. On a normal scope exit, join every live child before returning its body
+value. Before either successful or failing return, free the scope's channels,
+shares, completed-task table entries, and registration records. The owning
+Scope/Task handle can survive but does not retain its result/state after exit.
+Reads needing dead state stop by the defined checks. Channel ownership is the
+first scope in the maker's chain, or the run. A channel wait still present when
+that owner ends stops with `task: channel is gone`, including a waiter in an
+outer scope; it is not silently dropped. share get after exit stops with
+`task: shared value is gone`. Scope ends are scheduling/commit steps.
+
+R4. A paused or runnable started task receives Cancel at the next switch after
+cancellation reaches it. A running task sees it at its next scheduler suspend.
+An unstarted task is dropped without calling its body. The Scheduler command
+which receives Cancel suspends to the innermost cancellation delimiter being
+cancelled; that handler calls control.cancel only on that inner continuation.
+The outer task boundary stays active. Finals use the task's saved services;
+all awaits and sends they perform go to that still-active task boundary. An
+unwind flag excludes that task from a second cancel, including cancellation
+of scopes it creates while unwinding. Such new scopes still obey their own
+internal failure/normal-exit rules. The outer cancel waits for them to end.
+A final that waits forever can keep cancellation waiting forever.
+
+R4a. Keep outcome and cleanup completion separate. A task outcome is pending,
+success, failure or cancelled; drop sets cancelled immediately, and a started
+task sets cancelled when its home scheduler accepts cancellation, before running
+its unwind. A mere cancellation request not yet accepted is not a cancelled
+outcome: that task can still finish first. Normal success/failure is recorded
+after its final functions end. Scope exit still waits for cleanup completion,
+independently of the outcome. Keep dropped/cancelled records until scope exit.
+A cancelled outcome retains its causing scope and cancellation epoch, so a join
+can apply that cause even before its caller receives a cancel message. Do not
+use only a worker-local “cancel delivered” flag to decide whether to stop.
+join's type remains `(Task(A,E)) -> A ? E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
+before observing a target's cancellation outcome. A joiner still cancellable by
+that cancellation is unwound; it never races between this path and a join panic.
+This includes a final executing a fresh scope body that the fresh scope can
+cancel: unwind that inner body, not the already-shielded outer final. A cleanup
+scope and its children are exempt from the older cancellation as R4 requires.
+
+A joiner shielded from the target scope's cancellation cannot obtain A or E
+from a dropped/cancelled child. It stops immediately with
+`panic("task: join of a cancelled task")` when that outcome is known; it does
+not wait for the cancelled target's final functions. If it joined while the
+outcome was still pending, accepting cancellation wakes that join immediately.
+This also avoids cycles between shielded finals joining one another. The stop
+ends the run and, as with any stop, may abandon remaining i finals. In a valid
+structured exit without that stop, scopes still wait for all cleanup to finish.
+An already recorded success or failure gives ordinary A or E. No Cancelled
+error value, aggregate error, or changed join signature is introduced. A join
+can wait for genuinely live work, but never for an already cancelled outcome.
+
+A join_event has the same rule when selected/committed. A known cancelled
+outcome makes that alternative ready, even if cleanup is not complete; it is not a prevalidation fault of a losing
+alternative. A cancellable syncing task processes cancellation first. A shielded
+syncing task stops only if that join alternative wins; losing map functions
+still do not execute. This preserves CML selection and prevents an invalid
+stop from racing cancellation of an ordinary joiner.
+
+R5. A race commits the first successful child completion observed by its
+scope. Commit atomically records the winner and initiates the ordinary scope
+cancel of the loser and body wait. Return only after their finals end. Failure
+before a success commits invokes R2; a failure already observed wins over a
+later success. Once success has committed, cancellation suppresses later
+unobserved errors. Thus race is first completion unless that completion was a
+failure; errors use the same scope rules as other combinators. It is not “first
+successful result despite failures”. Both/map_concurrently give argument/input
+order and R2's errors. All three use portable scopes and check child results
+and errors before recording a completion, including race losers that finish
+before cancellation reaches them.
+
+R6. The runtime entry wrapper and every explicit run own a local root task,
+which they run to completion with structured children. An entry error is
+reported only after the run has unwound; a host export receives its ordinary
+error. A stop immediately traps and runs no finals, as §9.5 requires. Host
+trap/failure/drop also invalidates the instance under ABI H8–H11; it cannot
+promise to resume i cleanup. “Cancellation runs finals” refers to i structured
+cancellation, not destruction of a trapped instance by its host.
+
+#### Events, FIFO behavior, and fairness
+
+Channels are unbuffered rendezvous channels in v1. No close-channel operation is
+needed: owner-scope exit frees their state. An event is a reusable immutable
+description. choose([]) behaves as never(); sync(always(x)) gives x. New event constructions
+have fresh identity keys, independent of A/E/N, so equality means the same
+event handle rather than a comparison of event meanings. map/choose
+perform no Scheduler operation. send_event checks portable payloads immediately;
+receive_event and join_event do not test liveness until sync. A send_event can
+also be built without Scheduler; its handle records whether it is local.
+
+One sync creates one registration identity with ordered alternatives. Validate
+run identities, join chains and channel liveness of all leaves before registering
+any. An invalid losing alternative is still an invalid sync. Register without
+running map callbacks. Among ready alternatives use source order; among partner
+registrations use FIFO arrival order. Distinct leaves from the same registration
+must never rendezvous with one another. A registration may commit once. Commit
+atomically marks both partner registrations, removes all their losing leaves,
+transfers one value, then queues the tasks. Apply only the winning branch's map
+functions, in composition order, in the syncing task after commit. A mapper can
+raise, await, spawn, or stop; it cannot roll back the message. No guard or nack
+operation is exported. Cancelling a sync unregisters all leaves before unwinding.
+
+go appends the child to the FIFO queue and returns to the parent in the same
+turn, after cancellation checks and a host poll only if a task needs host
+progress; it does not yield the parent. yield ends the current turn and queues the caller at the tail. A blocking command removes
+its task until ready; a nonblocking sync/join still makes a scheduling point.
+A completion queues waiters FIFO. Cancellation bookkeeping runs before another
+normal task turn; a task already unwinding is queued normally. Scope ends,
+async awaits, and each loop switch are poll points too. path/random are not.
+
+At every switch, first run cancellation bookkeeping and scan terminal ticket
+waiters. Build the progress-interest set from tasks actually suspended in
+Await.wait on Waiting tickets, including interests forwarded by nested runs.
+Root-level Runner.poll calls request.poll once only when this set is nonempty.
+Otherwise skip it, including before the first task turn. Pure go/yield/join/
+scope operations and merely starting an unawaited raw request do not by
+themselves return status 2. A task/run which never blocks, and makes no explicit
+root wait/poll call, therefore never yields to the host. A pure Scheduler-only
+entry can return async status 0 immediately. A runnable pure task can of course
+share its run with a sibling needing host progress: that sibling's wait causes
+the run's hand-off. This is service of an existing wait, not an implicit yield
+added to the pure task.
+
+While there is progress interest and a task is runnable, poll once before its
+next turn, using status 2. Scan settled tickets, then run a task even if further
+host answers might be ready. This keeps an infinite yielding task from starving
+an IO-waiting sibling, without making pure task switches pay an event-loop yield.
+Unawaited raw work alone does not force progress hand-offs during a runnable
+loop; its caller must eventually wait/poll explicitly or let the run become
+idle. Idle accounting still counts it as specified next.
+
+A nested loop's private Runner.poll passes its current interest tickets to the
+outer Scheduler with its nested-run id, then yields only its calling outer task.
+The outer loop keeps that interest registration while the nested run lives and
+forwards it in turn if nested again. Thus an inner IO waiter alongside an inner
+CPU-yielding task can receive host answers even when the outer caller is runnable.
+Terminal tickets are filtered; each poll replaces that run's prior interests,
+and an error-free final removes the registration on every nested-run exit.
+Cancellation removes a nested registration before completing the calling task's
+unwind; borrowed tickets themselves are not cancelled by unregistering interest.
+No new ABI operation is needed: these are private ordinary Scheduler commands.
+The root Runner's poll takes the aggregated tickets; it never scans all instance
+requests to invent a wait. Explicit low-level request.poll still intentionally
+hands off, and stops request: no active entry from a synchronous entry.
+
+When no task is runnable, scan terminal tickets first. The logical waitable set
+is the union of outstanding requests in every group of the run's stored program
+Root and Waiting tickets its tasks explicitly await, including borrowed tickets
+from another root on the same worker. Group-observer tickets contribute their
+underlying outstanding members, not the observer cell itself (§9.11). Deduplicate
+identities, including an owned request also explicitly awaited. This is a set of work, not a List(Ticket) that
+can be exported across workers: observe owned groups through their counts and
+revision notifications (§9.11); borrowed Ticket values stay local. If this union
+is nonempty, Runner.wait waits for a member to settle and then rescans. An
+unawaited raw request in any custom group prevents deadlock until it settles.
+Its detached Ready answer is retained only by its handle. If the set is empty
+and no task or completion delivery can run, stop with panic("task: deadlock"),
+even if an unrelated root has work. A nested run therefore includes an explicitly
+borrowed outer request, but not unrelated outer work.
+
+A dispatcher may own several ordinary Roots with separate Owners. It chooses
+which root's work it drives; no Root or request has a magic module-based class.
+The scheduler driver keeps a separate control Root/Owner for its wake requests,
+scoped to the run's driver lifetime and closed on every driver exit. It does not
+bind that Owner for user tasks or expose its wake tickets. The stored program
+Root plus explicit borrowed waits above alone justify program progress; the
+control root does not. This same separation serves a batch dispatcher, a timeout
+manager and a plugin notification loop. Both kinds still use the same Root/Owner
+registration, count, cancel and teardown rules. The distinction is which roots
+the ordinary driver selects, not a host import name or a compiler exception.
+
+Quiescence snapshots count runnable/claimed-but-unstarted/running tasks and
+pending completion-to-task or group-notification processing as work. Requests
+stay counted until their answer/cancel transition publishes that work atomically;
+there is no gap where both counts are zero. With no such work, zero members of
+the program waitable set means deadlock, whatever the control count. MC takes
+that snapshot and records the stop under the shared scheduler lock; a wake-only
+control delivery does not count as program work. At the ABI level every actual
+outstanding request, including a wake, still satisfies status 1's requirement.
+Never return status 1 with zero actual outstanding requests or busy-poll with no
+runnable task. A one-worker run needs no wake request. CPU code without suspension
+can monopolize M:1; a go-only loop may postpone children. No bounded wall-time
+guarantee is made for final functions.
+
+#### Runner, nested runs, and testing
+
+The runtime supplies an initial portable Runner: prefix, full seed generator,
+policy, the enclosing request-context Root, and constant functions implementing
+root wait/poll. run uses that Root while opening its fresh run Root, so its
+public environment still needs Runner rather than an extra Root argument. `top(seed)` replaces
+only the seed in the current Runner and preserves its path allocator and wait
+route. This is why its scheme needs Runner: rebinding a seed inside a task must
+not reset its nested-run prefix or make its nested wait bypass the outer loop.
+Entry provisioning uses the private ordinary root-runner constructor, not top.
+The ledger supplies this initial service, so a fixed-seed test can write
+`! task.Runner = task.top(random.from_seed(7))` without a bootstrap problem. In each task its Runner
+routes wait/poll to the outer Scheduler and takes paths from that task's shared
+spawn/run counter. That per-task Runner is non-portable; go's detached substitution
+above prevents accidental retention in children. Explicit run inside the entry's
+default root task is nested. Each run opens a fresh request.Root and its default Owner around its entire
+loop, in a retained frame. Tasks keep Root and their go-site Owner. Custom
+within groups remain registered to that root. The run closes the entire root
+after all tasks/finals end, not just its default group.
+Only the runtime-created entry run
+is eligible for future multicore execution; v1 has one worker throughout.
+
+A nested loop owns fresh run identity and FIFO state on the caller task's stack.
+Nested children do not execute an outer task's channel commands: all handle
+uses check their run key. Its wait hands tickets to the outer task's Scheduler;
+its poll yields that calling task without directly yielding to the host. Only that task is paused; other outer tasks
+continue. When nested work ends it cancels remaining requests/children before
+return. A nested deadlock is detected from that nested run's own tasks and
+waitable requests. It does not return status 1 from a task stack. Chains do not
+cross run identities.
+
+`task.test(seed, choices, body)` supplies a Runner for a fresh nested run. Before
+a turn, take the next script path, if any; it must be runnable, otherwise raise
+`ScheduleError { NotRunnable(path: List(Int)) }` after structured cleanup. When
+the script ends choose FIFO. Do not root-poll or use real clocks. Completed fake
+requests are allowed; reaching a required wait on an unsettled host request stops
+with `panic("task: test needs fake IO")`. Fixed inputs and script give the same
+values, task paths, selected alternatives and trace on every run. Tests for real
+host overlap use ABI completion gates instead. The testing policy changes only
+which legal runnable step is chosen; it cannot commit an unready event.
+
 ### 9.10 Random generators
 
 The module `i/random` gives pure, repeatable random computations. It needs no
@@ -1478,6 +1866,191 @@ result is in [0, 1); at most 53 bits enter the conversion.
 `at_path(g, path)` requires every index to be strictly positive. Otherwise it
 raises `InvalidPath(path)` without a draw or derivation, carrying the whole
 supplied path.
+
+### 9.11 Requests
+
+Request(A) and Ticket are compiler-defined names available in every module,
+like Boundary and Continuation. They have no public constructors. i/request
+exports the following ordinary status/service types, their constructors, and
+functions; it does not redeclare or re-export the primitive types.
+
+```i
+Await { Await(wait: (ticket: Ticket) -> Nil) }
+Root { Root(key: Key(Nil)) }
+Owner { Owner(key: Key(Nil), root: Root) }
+RequestState(A) { Waiting Ready(A) Cancelled Taken }
+```
+
+| Function | Type | Rule |
+|---|---|---|
+| `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
+| `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
+| `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+| `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
+| `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
+| `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
+| `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
+| `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
+| `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
+| `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
+| `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+| `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+| `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+| `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+| `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+| `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+| `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+| `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+| `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+
+`cancel` makes every alias observe Cancelled, even for a previously Ready cell.
+A Taken request stays Taken on cancel. It invokes ABI cancel only for a still-outstanding host id. Cancelling a Ready
+request never invokes that import. `await` or take on Cancelled stops with
+`panic("request: cancelled")`; on Taken it stops with `panic("request: taken")`;
+take on Waiting stops with `panic("request: not ready")`; if Await.wait returns with Waiting it stops with
+`panic("request: wait returned early")`. `wait_any([])` stops with
+`panic("request: empty wait")`. A nonempty list may contain aliases; deduplicate
+by identity. Terminal tickets make it return immediately. It must keep waiting
+through answers of unlisted requests, which are stored for later use. All-listed
+cancelled tickets count as settled. No root continuation is stored on a cell.
+
+Cancellation ownership and run affiliation are separate. Root identifies a
+request run and its enclosing entry context. The runtime creates the initial
+Root only for an entry whose inferred needs require request/task support.
+open_root needs an existing live Root to retain that entry context; it does
+not require the new root to share the old root's request count. A dispatcher
+can thus open an independent root without inventing a second entry. The
+initial bootstrap is part of the narrow entry provision, not a public unscoped
+root allocator. Entry request contexts and each task.run open a fresh Root and
+bind it for their whole lifetime. open_owner uses that Root, not the currently
+bound Owner, to register its group. request.within opens/binds a fresh Owner and
+ensures close_owner on exit; it leaves Root unchanged. Thus custom groups of a
+run have the same root, and a nested task.run has a different root. Both Root
+and Owner are ordinary portable key-bearing service values, not host requests.
+
+Every raw host start records its Owner group and that group's immutable root.
+close_owner cancels only its own group. close_root closes all groups registered
+at that root; no subgroup or old Owner binding escapes it. All group operations
+include every worker, including groups made inside request.within and retained
+by go. Counts and readiness are atomic snapshots; a later start can change them.
+A closed group/root has count zero and is settled. cancel_all cancels the Waiting
+members at its linearization step, not subsequent starts or detached Ready values;
+close additionally refuses future starts. Opening a group under a closed Root
+stops with request: root is gone; a host start under a closed Owner stops with
+request: owner is gone, before making the ABI import. Only live registrations
+and outstanding cells are retained; absence supplies the gone check.
+
+There is no public outstanding/outstanding_root enumeration, including no
+worker-local variant. A Root/Owner operation never returns a Request or Ticket.
+Group cancellation is accepted atomically and forbids later success publication
+for its selected members. Before returning it applies the host cancellation
+actions, including lease revocation. Every state, settled, take, cancel, wait
+and delivery operation observes that terminal state. A host id is retired once.
+
+wait_none/wait_none_root use Await, so a task waits without pausing runnable
+siblings. They return immediately on zero, including for a closed group.
+Otherwise a private local Request(Nil) observation cell subscribes to the group
+and settles on its next zero observation. It has no host id, producer operation
+or Owner membership: a wait is not work that can complete itself. Its Ticket
+never leaves the observer's worker. Check-and-subscribe shares the registration
+lock so completion cannot be lost between checking and sleeping. A concurrent
+start before the zero observation is included; one after it does not undo the
+return. An ordinary ensure unregisters/cancels this local observer on waiter
+exit without cancelling the group's producers. These private cells use the
+same typed state/await machinery as requests; no foreign Ticket is manufactured.
+For progress accounting, an observation cell depends on the actual outstanding
+members of its target group, not on itself; add those members as explicitly
+borrowed work and deduplicate identities (§9.9). In particular it cannot keep
+an otherwise deadlocked empty group alive. Remote members are driven on their
+home workers; group changes reach the local observer through its wake route.
+The private Runner idle operation subscribes to group revisions for any change,
+combined with explicitly borrowed local tickets (§9.9), without enumerating
+foreign tickets. Its observation/check/subscription must be atomic too.
+
+Root is kept at go sites as a normal service. Changing Owner alone cannot move
+a group/request to another run. open_owner under a nested run's Root makes a
+nested group even if user code temporarily rebinds an outer Owner. Explicitly
+using a previously made outer Owner for a raw start still charges that outer
+group/root; this is a capability use, not a transfer of the group. Borrowed
+request tickets may be awaited by another run on the same worker. Opening or
+rebinding an independent Root is the public low-level operation for writing a
+separate request dispatcher, like calling root wait directly; it does not
+silently reaffiliate an existing i/task run's stored root or its old groups.
+The default task scheduler counts the root it owns, not whichever Owner is
+bound at an idle point. An independent request dispatcher must drive its root.
+
+A Ready cell has left its group and belongs to its handle. Closing a group/root
+does not discard such an answer; raw callers must own it just as they own files
+returned by open. Completed cells retain decoded i values only while handles
+are reachable, not through the outstanding table. Low-level cancellation cannot
+roll back a host side effect or run i final functions. Closing a root after its
+structured tasks/finals end cancels any still-outstanding unowned raw work.
+
+Root wait/poll require an active async entry context when they must hand off;
+otherwise they stop with `panic("request: no active entry")`. A later synchronous export must not hand off through a stale boundary from a completed async call. An immediate wait
+on completed fake requests works without that context. They are public primitives
+for writing dispatchers, batch IO, or request races. Direct use inside a task
+pauses that entire run until it returns; normal await uses Await instead. This
+is explicit control use, like suspending to an outer boundary, and does not
+create multiple scheduler histories.
+
+Root and Owner are ordinary services, not primitive types or built-in names.
+They use Key(Nil) and are portable; outstanding request values remain non-portable.
+Root/group registration and observation use internal accounting. Local Ticket
+cancel uses v3 cancel on its home worker; MC group cancellation uses the
+registered host cancellation actions above and retires the home id once. MC
+routes notifications through ordinary request-mode wake services, without new
+runtime imports. Generic
+request groups also serve batch cancellation, request timeouts, and host plugin
+cleanup, independently of tasks. Request operations introduce no new error-row
+or environment polymorphism. Ticket
+cannot recover A; state only reads through the original Request(A). The
+value restriction prevents a fresh request from being generalized at multiple
+unrelated answer types. A cell's state transitions are Waiting -> Ready or
+Cancelled, and Ready -> Taken or Cancelled; there is no write of another A.
+
+In a task, Await.wait submits a WaitRequest(ticket) command to its Scheduler,
+with the task's inner-unwind target registered privately. The loop records the
+waiting task and ticket and queues another task. On each switch it scans settled
+tickets; a ticket may have several waiters. Await consumes the answer once; multiple
+waiters deliberately competing for it may therefore meet request: taken.
+The plain async adapter owns its just-started request through resource.ensure,
+and cancels it on exit, including while unwinding. A raw starter gives ownership
+to the caller, who can use the same pattern. Cancelling one waiter of a manually
+shared raw request does not cancel the producer unless its owner's final function
+does so; cancelling a ticket wakes all waiters, whose await then stops as above.
+
+Because request.cancel also discards Ready answers, an implicit adapter must
+take its A before its final cancels the cell. For resource-creating imports,
+IO wrappers additionally transfer resource ownership as section 8 specifies;
+discarding an unclaimed Ready answer releases its resource. These are two
+separate ownership transfers, not a promise that all raw results are resources.
+
+The ordinary helper for an owned operation that produces no resource is:
+
+```i
+await_owned(A) = (r: Request(A)) -> A ! Await {
+  resource.ensure(
+    () { await(r) }
+    () { cancel(ticket(r)) }
+  )
+}
+```
+
+This definition lives in i/request and uses its local function names. The final
+runs on success, error and task cancellation; after take, cancel is a no-op.
+request.await itself remains a borrowed wait and never takes producer ownership.
+File/Stream/Child wrappers and other non-creating IO wrappers use await_owned,
+including their close operations; resource creators use resource guards (§9.7).
+Cancelling a pending Stream read revokes its read lease before the cancelled
+wrapper finishes unwinding, so a following read cannot see busy from that
+abandoned request. Already consumed bytes or committed effects are not rolled
+back. A cancelled Child wait releases its wait lease without closing the Child;
+a cancelled blocking File operation instead closes that File as §9.7 requires.
 
 ## 10. The host boundary
 
@@ -1633,6 +2206,10 @@ These functions are **entry points**:
 
 An error that comes to the program entry or a test stops the program. An error that comes to a host export is given to the host (Appendix B).
 
+<!-- future-track: JP implements chosen provider graphs, factory/adapter provisioning
+and wasm.synchronous validation. R2 implements the shipped-default inferred-service
+special case; see tests/r2-stages.md and tests/spec/9.11/providers_pending. -->
+
 On targets using the v3 asynchronous entry protocol, an entry is **async** exactly when its complete chosen provider graph (§2.6.1), including both scopes and adapter requirements, contains a request-mode service provider, a scheduler role or a runner role. Normalize an async host declaration to its request-and-await provider first. A service node's declared request/async mode counts even when a factory supplies a completed fake. A pure bundle with no such dependency may be synchronous. Await, Owner and Root alone do not qualify. No source-body reachability or selected-field analysis changes this classification. Metadata and wrapper shape follow the graph before linking and optimization; a requested synchronous export that classifies async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7).
 
 Open the dependency-free primitive entry context before chosen factories, enabling async admission exactly for an async entry. It constructs no replaceable service. Construct all services in §2.6.1's one topological order, enter the sole adapter at its place in that order, and invoke the unchanged source entry with the chosen body services. Finish structured cleanup before delivering the result or error; retire the primitive context on every exit. A stop runs no i finals. Synchronous fake-only contexts cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; pure scheduler switches alone do not yield to the host.
@@ -1650,13 +2227,13 @@ mode: () -> "on" | "off"           // compile error: the host gives the value
 log: (level: "info" | "warn") -> Nil   // correct: i code gives the value
 ```
 
-The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above.
+The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. Requests, tickets, tasks, scopes, channels and events cannot cross the ABI. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above. No library-specific exception is added.
 
 ## 11. Run-time behavior
 
 ### 11.1 Values
 
-No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, values of custom types, functions, boundaries, continuations, and host references.
+No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, values of custom types, functions, boundaries, continuations, keys, keyed values, requests, tickets, and host references.
 
 ### 11.2 Int
 
@@ -1680,6 +2257,10 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 - Strings are the same when their scalar values are equal. Codepoints are the same when their numbers are equal. Bit arrays are the same when their bits are equal.
 - Tuples, lists, and values of custom types are the same when they have the same constructor and their parts are the same, in order. Values with different type constructors, and tuples of different sizes, are never the same.
 - A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression or a clause block, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, a library function, and each `@external` declaration are each one value; two declarations of one import are two values. So two function expressions that are written the same way give values that are not the same.
+
+- Each call of `control.keep_env` (§9.4) makes a new function, the same only as itself. A key (§9.8) is the same only as itself. Two keyed values are equal when their keys are the same and their values are equal.
+- A request or ticket compares by its underlying request identity, which does not change on answer, take or cancel. Ticket identity is not a fresh value on each call of ticket. Request and Ticket are different type constructors and are not equal to one another.
+- A value stays the same value when the program copies it from one worker to another (§11.9).
 
 ### 11.5 Comparing
 
@@ -1732,6 +2313,8 @@ The **text form** of a value is given by `core.inspect` (§13):
 | UtfCodepoint | `//utfcodepoint(`, the character, `)` |
 | Function | `//fn(`, one name for each parameter of its type with `, ` between them, `) { ... }`. Environment parameters are not counted. Parameter i (counting from 0) is named by the letter `a` + (i mod 26), with the decimal number i div 26 after it when i is 26 or more: `//fn(a, b) { ... }` |
 | Boundary, continuation | `//boundary`, `//continuation` |
+| Key, keyed value | `//key`, `//keyed` |
+| Request, ticket | `//request`, `//ticket` |
 | Host reference | `//wasm(opaque)` |
 
 A **Float** is written in this way. Let d1 … dn be the shortest list of decimal digits, with dn not 0, such that 0.d1…dn × 10^k gives back the same float when read. When more than one list of that length does this, take the one nearest to the exact value of the float; when two are equally near, take the one whose last digit is even. `-` comes first for a negative float, including -0.0. Zero is `0.0`. Let p = k − n.
@@ -1739,6 +2322,18 @@ A **Float** is written in this way. Let d1 … dn be the shortest list of decima
 - The **long form** is used when p is at least L and at most U, and not when p ≥ 0 and the size of the float is 2^53 or more. L is −4 when n = 1, and −2 − n when not. U is 2 when n = 1 or k ≥ 11, and 1 when not.
 - In the long form, the digits are written as a decimal number, with `.` and at least one digit after it: `123.0`, `12.67`, `0.0123`.
 - In the short form, d1 is written, then `.`, then d2 … dn, or `0` when n = 1, then `e`, then k − 1 as a decimal number with `-` when it is negative: `3.0e26`, `1.0e-7`, `1.0e3`.
+
+The text form of a function, a key or a keyed value never depends on which worker made it or holds it. Task handles keep bookkeeping ids under keyed fields, whose text is `//keyed`; only task.path exposes the semantic task path. Requests and tickets show no ids, state or answers.
+
+### 11.9 Workers
+
+A program may run on one or more **workers** at the same time. Which worker does which part of the work cannot be seen. Tasks that run at the same time take their steps (sends and receives, joins, host calls, failures and stops) one after another, in an order that the program does not fix; this order may differ from run to run and with the number of workers. Every run gives a result that some order of the steps gives, and each step does what it would do if the steps were taken one at a time in that order. The number of workers only changes which order happens. So anything that depends on the order of steps may change, for example which sender a receive pairs with, which event of a `choose` commits, whether a step comes before or after the end of a scope, which tasks fail before a cancel reaches them, which of two stops is first, and the order of output. A program whose results do not depend on the order of its steps gives one result. Running out of memory or stack (§11.7) is not covered by this rule. The host chooses the number of workers.
+
+The **captures** of a function made by a function expression are the local names that its body uses and that are bound outside it, after macro expansion; a name counts when it is written in the body, also in a part that never runs. Top-level names are not captures. A function made by `control.keep_env` (§9.4) has the captures of its argument and the services it keeps. Other functions have no captures.
+
+The values that a value **holds** are: the parts of a tuple, a list, a value of a custom type or a record (§11.4); the values of the captures of a function; and the value in a `Keyed` (§9.8). `==` does not look at what a function holds (§11.4). A value is **portable** when it is not a boundary, a continuation, a host reference, a request, a ticket or a `Syntax` value (`meta.md` §8), and every value it holds is portable. A value may hold itself, through a local function that calls itself; only the other values it holds then count.
+
+A value that is not portable never goes to another worker. Values may be copied between workers; a copy is the same value (§11.4).
 
 ## 12. Built-in names
 
@@ -1750,10 +2345,12 @@ These names may be used in every module. Other names may cover them.
 | `Bool` `Nil` `Result`, and `True` `False` `Nil` `Ok` `Error` | Custom types and their constructors | §4.2 |
 | `Assert` `AssertionFailure` | Custom types and their constructors | §9.6 |
 | `Boundary` `Continuation` | Built-in types made by `i/control` | §9.4 |
+| `Key` `Keyed` | Built-in types made by `i/key` | §9.8 |
+| `Request` `Ticket` | Built-in types operated on by `i/request` | §9.11 |
 | `panic` | `(message: String) -> Never` | §11.7 |
 | `assert` | `(c: Bool) -> Nil ! Assert` | §9.6 |
 
-These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), and `i/core` (§13) have the other functions and types.
+These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/key` (§9.8), `i/task` (§9.9), `i/random` (§9.10), `i/request` (§9.11), and `i/core` (§13) give the other names. The IO module list is extended with its service definitions.
 
 ## 13. The module `i/core`
 
@@ -1761,6 +2358,7 @@ These are normal functions: they are called, given, and compared like any other 
 
 | Function | Type | What it gives |
 |---|---|---|
+| `portable` | `(value: A) -> Bool` | `True` when the value is portable (§11.9) |
 | `not` | `(Bool) -> Bool` | `True` for `False`, and `False` for `True` |
 | `to_float` | `(Int) -> Float` | The nearest Float, with ties to even. If it is not finite, the program stops. |
 | `truncate` | `(Float) -> Int` | The Float without its fraction, rounded toward zero |
@@ -1807,6 +2405,8 @@ A compiled program is one Wasm module. It needs the Wasm features garbage collec
 Checked Wasi buffers are separate table-owned allocations (§B.3, §B.7.1); they do not change these host allocation exports.
 
 The module has no Wasm start function, so that imports called while top-level values are worked out may call `ilang_alloc`. The module has one custom section named `ilang.abi` with the metadata of §B.6.
+
+This version runs one instance for each run of the program. Workers (§11.9) come with a later version of this interface.
 
 ### B.2 Values
 
@@ -1866,7 +2466,7 @@ So for an export, the host makes the parameter buffers with `ilang_alloc`, frees
 - The host answers a request by calling the export `ilang_resume:namespace:label` of the function that started it. The first parameter is the request id, and the others are the results of the function as in §B.2. The result is a status again. The host may answer outstanding requests in any order, but one at a time. It makes the result buffers with `ilang_alloc` just before the call that gives them. A module that starts a request of a function and has no such export for it, or one of the wrong type, has a fault, and the host does not use the instance again.
 - A call of `ilang_resume:…` with an id that is not outstanding, or that another function started, traps.
 - When the status is 1 and no request is outstanding, the program can never go on. This is a fault of the module, and the host does not use the instance again.
-- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; a module made by this compiler has no outstanding request at that point.
+- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; structured entry cleanup normally leaves no outstanding request; a deliberately unowned raw request is dropped by the host at status 0.
 - When the work of an async function fails in the host (not an error of its `^ E`, which is an answer), the host drops every outstanding request and does not use the instance again.
 - While an async entry point is waiting or runnable, the host may only call `ilang_resume:…`, `ilang_continue`, `ilang_alloc`, and `ilang_free`. So an instance runs one async entry point at a time. The module does not check every export for this; a host that calls another export breaks the instance.
 - When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again. Every outstanding request is dropped, and an answer that comes later is ignored. The host makes a new instance and calls `ilang_start` on it.

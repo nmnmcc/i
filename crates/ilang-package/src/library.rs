@@ -9,6 +9,8 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/control", include_str!("../../../lib/i/control.i")),
     ("i/resource", include_str!("../../../lib/i/resource.i")),
     ("i/assertion", include_str!("../../../lib/i/assertion.i")),
+    ("i/request", include_str!("../../../lib/i/request.i")),
+    ("i/key", include_str!("../../../lib/i/key.i")),
     ("i/core", include_str!("../../../lib/i/core.i")),
     ("i/io", include_str!("../../../lib/i/io.i")),
     // Reserved modules. They are empty for now. docs/spec.md does not name

@@ -73,6 +73,8 @@ fn graph_with_path_dependencies() {
             "i/control",
             "i/resource",
             "i/assertion",
+            "i/request",
+            "i/key",
             "i/core",
             "i/io",
             "i/task",

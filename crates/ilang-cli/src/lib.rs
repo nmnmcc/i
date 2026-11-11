@@ -438,9 +438,9 @@ pub fn build_collection(
     let (mut graph, mut diags) = load(project, options.tests, options.offline);
     let revision = snapshot(&graph);
     let root = graph.root.ok_or_else(|| program_error(&graph, &diags))?;
-    let checked = ilang_macro::project::check_for_tools(&mut graph);
+    let mut checked = ilang_macro::project::check_for_tools(&mut graph);
     diags.extend(checked.diags);
-    let (Some(program), Some(_)) = (&checked.program, &checked.types) else {
+    let (Some(program), Some(_)) = (&mut checked.program, &checked.types) else {
         return Err(program_error(&graph, &diags));
     };
     if diags.iter().any(Diagnostic::is_error) {

@@ -116,6 +116,22 @@ const WAT: &str = r#"
 
 (func $shadow_restore (param $depth i32) (global.set $sp (local.get $depth)))
 
+;; Save the full trace, including pending lazy frames, without changing the
+;; running computation's shadow stack. Used by delayed host-value validation.
+(func $shadow_snapshot (result (ref $frames))
+  (local $old (ref $frames)) (local $sp i32) (local $copy (ref $frames))
+  (local.set $old (global.get $shadow))
+  (local.set $sp (global.get $sp))
+  (if (i32.eqz (ref.is_null (global.get $stop_unpend)))
+    (then (call_ref $unpend (ref.as_non_null (global.get $stop_unpend)))))
+  (local.set $copy (array.new_default $frames (global.get $sp)))
+  (array.copy $frames $frames (local.get $copy) (i32.const 0)
+    (global.get $shadow) (i32.const 0) (global.get $sp))
+  (global.set $shadow (local.get $old))
+  (global.set $sp (local.get $sp))
+  (local.get $copy))
+
+
 ;; `module path:line:column`, or null when the site is not in the table.
 (func $site_text (param $site i32) (result eqref)
   (local $table (ref null $sites)) (local $modules (ref null $values))
