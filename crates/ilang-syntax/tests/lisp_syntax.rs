@@ -531,7 +531,7 @@ fn definition_preserves_record_label_parameter_identity() {
     let Node::Round(head) = item[1].node() else {
         panic!("head");
     };
-    let Node::Curly(fields) = item[2].node() else {
+    let Node::Round(fields) = item[2].node() else {
         panic!("record");
     };
     let Node::Round(field) = fields[0].node() else {
@@ -1003,9 +1003,9 @@ fn deeply_nested_definition_answer_uses_bounded_host_stack() {
 
 #[test]
 fn definition_answer_preserves_a_single_field_record_type() {
-    let definition = root("(= (Box A) { (: x A) })");
+    let definition = root("(= (Box A) ((: x A)))");
     let answer = ilang_syntax::lisp::definitions::expanded_definition(&definition, 91).unwrap();
-    assert_eq!(answer.show(), "(= (Box A) {(: x A)})");
+    assert_eq!(answer.show(), "(= (Box A) ((: x A)))");
 }
 
 #[test]
@@ -1410,12 +1410,12 @@ fn records_parse_from_lisp_with_fields_spread_and_removal() {
     let empty = ilang_syntax::lisp::parse("()").unwrap();
     let empty = ilang_syntax::lisp::parse_expression(&empty[0]).unwrap();
     assert!(matches!(&empty.kind, ExprKind::Record { base: None, fields } if fields.is_empty()));
-    let values = ilang_syntax::lisp::parse("{ .. r (: x 1) (: \"a b\" 2) }").unwrap();
+    let values = ilang_syntax::lisp::parse("(.. r (: x 1) (: \"a b\" 2))").unwrap();
     let value = ilang_syntax::lisp::parse_expression(&values[0]).unwrap();
     assert!(
         matches!(&value.kind, ExprKind::Record { base: Some(_), fields } if fields.len() == 2 && fields[1].0.name == "a b")
     );
-    let types = ilang_syntax::lisp::parse("{ .. R (- old) (: K { Int }) }").unwrap();
+    let types = ilang_syntax::lisp::parse("(.. R (- old) (: K { Int }))").unwrap();
     let ty = ilang_syntax::lisp::parse_type(&types[0]).unwrap();
     assert!(
         matches!(&ty.kind, TypeKind::Record { base: Some(_), fields, removed } if fields[0].0.parameter && removed[0].ident.name == "old")
