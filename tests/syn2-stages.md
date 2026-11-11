@@ -147,3 +147,11 @@ Stress capture reproduction: `target/debug/i build --offline --opt 0 --wat
 the 120-second retry while other shared-slot jobs were running. Its archived
 baseline built in the longer retry; no migrated WAT was produced in those two
 attempts. This is a capture timeout, not evidence of a semantic difference.
+
+The longer baseline retry also timed out at 120 seconds for
+`tests/review/cases/review-k4d/perf/mutual100`, `mutual150`, `mutual200`, and
+`mutual300`; each had already exceeded the initial 12-second limit. The same
+`i build --offline --opt 0 --wat --project <path> --out <file>` command is the
+reproduction. `wide_generic_512`, `stress_wide_open_512`, `chain4000`,
+`mutual50`, and `runchain4000` have passed the longer paired comparison with
+byte-identical WAT.
