@@ -304,6 +304,7 @@ pub struct CollectionManifest {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct CollectionEntry {
+    pub module: String,
     pub handle: String,
     pub collection: String,
     pub signature: String,
@@ -399,6 +400,7 @@ fn make_manifest(
             });
             let collection_module = program.module(entry.collection.module);
             CollectionEntry {
+                module: module.path.clone(),
                 handle: format!("{revision}:{index}"),
                 collection: format!(
                     "{}.{}",

@@ -412,9 +412,10 @@ fn cmd_test(
     let mut seen = std::collections::HashMap::new();
     for entry in &entries {
         if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
-            if let Some(previous) = seen.insert(name, &entry.at) {
+            let qualified = format!("{}.{name}", entry.module);
+            if let Some(previous) = seen.insert(qualified.clone(), &entry.at) {
                 eprintln!(
-                    "duplicate test name {name:?}: {}:{}:{} and {}:{}:{}",
+                    "duplicate test name {qualified:?}: {}:{}:{} and {}:{}:{}",
                     previous.path,
                     previous.line,
                     previous.column,
@@ -483,7 +484,7 @@ fn cmd_test(
                     .find(|(k, _)| k == key)
                     .map(|(_, v)| v.as_str())
             };
-            let name = get("name").unwrap_or(&entry.target.path);
+            let name = format!("{}.{}", entry.module, get("name").unwrap_or(&entry.target.path));
             let mode = get("mode").unwrap_or("test");
             if filter.is_some_and(|f| !name.contains(f)) {
                 continue;
