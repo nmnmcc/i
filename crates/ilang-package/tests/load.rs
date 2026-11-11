@@ -142,6 +142,7 @@ fn standard_library_modules() {
             "std/http",
             "std/int",
             "std/json",
+            "std/schema",
             "std/list",
             "std/log",
             "std/option",
