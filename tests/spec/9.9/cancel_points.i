@@ -10,6 +10,7 @@
 // finals may yield. R4a processes scope cancellation before cancelled joins.
 (
 	i/task
+	i/request
 	i/resource
 	i/fail
 )
@@ -21,7 +22,7 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-probe = (label: String, wait: () -> Nil ! task.Scheduler) {
+probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
