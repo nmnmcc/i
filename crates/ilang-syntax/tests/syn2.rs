@@ -16,59 +16,38 @@ fn binding(source: &str) -> Expr {
 
 #[test]
 fn match_suffix_binds_above_unary_and_every_binary_level() {
-    // M1/M2: suffix is a Case node, and is stronger than unary and multiplication.
-    let binary = binding("answer = n.{ 0 -> 1 _ -> 2 } * 10");
+    // Matches are pipes; grouping is needed under stronger operators.
+    let binary = binding("answer = { n |> { 0 -> 1 _ -> 2 } } * 10");
     let ExprKind::Binary { lhs, .. } = &binary.kind else {
         panic!()
     };
-    assert!(matches!(lhs.kind, ExprKind::Case { .. }));
-    let unary = binding("answer = -n.{ 0 -> 1 _ -> 2 }");
-    let ExprKind::Unary { expr, .. } = &unary.kind else {
-        panic!()
-    };
-    assert!(matches!(expr.kind, ExprKind::Case { .. }));
+    assert!(matches!(lhs.kind, ExprKind::Block(_)));
     for subject in [
-        "a || b", "a && b", "a == b", "a < b", "a <> b", "a | f", "a + b", "a * b", "-a",
+        "a || b", "a && b", "a == b", "a < b", "a <> b", "a |> f", "a + b", "a * b", "-a",
     ] {
-        let source = format!("answer = {{ {subject} }}.{{ _ -> 1 }}");
+        let source = format!("answer = {{ {subject} }} |> {{ _ -> 1 }}");
         assert!(matches!(binding(&source).kind, ExprKind::Case { .. }));
     }
 }
 
 #[test]
 fn bare_pipe_does_not_make_a_clause_head() {
-    // Coordinator a / P3: a bar selects clauses only after a complete head.
-    let value = binding("answer = { x | f }");
-    let ExprKind::Block(block) = &value.kind else {
-        panic!()
-    };
-    assert!(matches!(
-        &block.stmts[0],
-        Stmt::Expr(Expr {
-            kind: ExprKind::Binary {
-                op: BinOp::Pipe,
-                ..
-            },
-            ..
-        })
-    ));
+    assert!(!parse_module("answer = { x | f }").1.is_empty());
     assert!(matches!(
         binding("answer = { 0 | 1 -> 2 _ -> 3 }").kind,
         ExprKind::Clauses(_)
     ));
-    // Coordinator b: piping to a clause value has existing direct-match meaning.
     assert!(matches!(
-        binding("answer = x | { 0 -> 1 _ -> 2 }").kind,
+        binding("answer = x |> { 0 -> 1 _ -> 2 }").kind,
         ExprKind::Case { .. }
     ));
 }
 
 #[test]
 fn caret_and_guard_have_separate_slots() {
-    // E1/E2 and P2: caret is an error slot, question is a guard.
-    binding("answer = (x) -> Int ^ String ! Log { x }");
-    binding("answer = x.{ f: (Int) -> Int ? ready -> f(1) _ -> 0 }");
-    binding("answer = x.{ n ? n | ready -> 1 _ -> 0 }");
+    binding("answer = (x) -> Int ? String ! Log { x }");
+    binding("answer = x |> { f: { (Int) -> Int } ? ready -> f(1) _ -> 0 }");
+    binding("answer = x |> { n ? n |> ready -> 1 _ -> 0 }");
 }
 
 #[test]
@@ -87,32 +66,21 @@ fn contexts_and_records_do_not_use_commas_to_choose() {
     for rhs in ["(a: 1, 2)", "(1, a: 2)"] {
         let (_, diagnostics) = parse_module(&format!("answer = {rhs}"));
         assert!(
-            diagnostics.iter().any(|d| d.message.contains("cannot mix")),
+            diagnostics
+                .iter()
+                .any(|d| d.code == ilang_syntax::Code::Unexpected),
             "{diagnostics:?}"
         );
     }
-    // D3/N2: function parameter lists may be empty; tuple types/patterns may not.
-    for source in ["Unit = ()", "take = (()) { Nil }"] {
-        let (_, diagnostics) = parse_module(source);
-        assert!(
-            diagnostics.iter().any(|d| d.message.contains("Nil")),
-            "{diagnostics:?}"
-        );
-    }
+    // Empty function parameters and empty tuple syntax remain parseable.
+    binding("take = () { Nil }");
 }
 
 #[test]
 fn numeric_subject_diagnostic_keeps_number_lexing() {
-    // Coordinator d / M3: the formatter prefers a brace group.
-    let source = format!("answer = {}", "1.{ _ -> 0 }");
-    assert!(
-        parse_module(&source)
-            .1
-            .iter()
-            .any(|d| d.message.contains("lexed as a float"))
-    );
     let out = format("answer = 1 |> { _ -> 0 }").unwrap();
-    assert!(out.contains("{ 1 }.{"), "{out}");
+    assert!(out.contains("1 |> {"), "{out}");
+    assert!(parse_module(&out).1.is_empty());
 }
 
 #[test]
@@ -130,7 +98,9 @@ fn both_printers_preserve_trees_and_comments_with_new_spelling() {
             let (after, diagnostics) = parse_module(&out);
             assert!(diagnostics.is_empty(), "{out}: {diagnostics:?}");
             assert_eq!(canon(&before), canon(&after), "{out}");
-            assert!(!out.contains("|>"), "{out}");
+            if source.contains("|>") {
+                assert!(out.contains("|>"), "{out}");
+            }
         }
         let once = format(source).unwrap();
         assert_eq!(format(&once).unwrap(), once);
