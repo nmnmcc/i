@@ -744,7 +744,7 @@
   "crates/ilang-cli/tests/check.rs:453fcde653a95c85": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-cli/tests/check.rs:b2331ec9454567b3": {
@@ -763,7 +763,7 @@
   "crates/ilang-cli/tests/package_commands.rs:015b3139e860bcaf": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-lsp/src/change.rs:4cdfb1ce888445e2": {
@@ -864,10 +864,10 @@
   "crates/ilang-syntax/tests/golden/err_guard_word.i:d9ca0efb02727105": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `v`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `v`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_header_empty.i:bc7cf48d1732417b": {
@@ -906,8 +906,8 @@
   "crates/ilang-syntax/tests/golden/err_pipe_group.i:b21ad312873fd189": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`",
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`",
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_pipe_target.i:f211c96492c6d0ca": {
@@ -977,10 +977,10 @@
       "E0006: `2` is not a digit of base 2",
       "E0007: this float literal is not a finite binary64 number",
       "E0003: unknown escape",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
+      "E0004: `\\u{\u2026}` needs 1 to 6 hex digits that make a Unicode scalar value",
       "E0006: `12px` is not a number",
       "E0008: `fooBar` is not a name, a discard, or an UpName",
       "E0008: `Foo_bar` is not a name, a discard, or an UpName",
@@ -1050,19 +1050,19 @@
   "crates/ilang-syntax/tests/parse.rs:04e24b46baf5040e": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:3ce334bfd693e428": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:b6a4ae21a4ba6902": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ad4393882ff472b2": {
@@ -1111,26 +1111,26 @@
   },
   "crates/ilang-syntax/tests/parse.rs:79d44e974dbc8474": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-syntax/tests/parse.rs:96422ef1f554e5e2": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `{`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `{`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-syntax/tests/parse.rs:180492297ecd3956": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `case`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `case`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `n`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-syntax/tests/parse.rs:c1f607c4a9dd9c9d": {
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ],
     "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
@@ -1302,20 +1302,20 @@
   "tests/review/cases/review-a1/_loose/capture/original/.invalid/src/main.i:ce52e71b11ac93a4": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/capture/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/03_mixed_headers/original/.invalid/src/main.i:a9d9b44168dfeedb": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/04_header_order/original/.invalid/src/main.i:bc7528f08f9c0a6a": {
@@ -1351,19 +1351,19 @@
   "tests/review/cases/review-a1/_loose/cases/20_old_alias_returns_fn/original/.invalid/src/main.i:aa26a225a69b2113": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/21_old_alias_typed_fn/original/.invalid/src/main.i:bd4205ecf70c889e": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i:964f0e757bb34246": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i:6fae0c21e165c75b": {
@@ -1381,7 +1381,7 @@
   "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -1393,8 +1393,8 @@
   "tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original/.invalid/src/main.i:9160f49b02878079": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/61_old_type_alias_join/original/.invalid/src/main.i:c78910db9cef477f": {
@@ -1406,43 +1406,43 @@
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/capture/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i:bc7528f08f9c0a6a": {
@@ -1472,7 +1472,7 @@
   "tests/review/cases/review-a1/cases/21_old_alias_typed_fn/.invalid/src/main.i:bd4205ecf70c889e": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/cases/29_param_shadow/.invalid/src/main.i:6fae0c21e165c75b": {
@@ -1490,7 +1490,7 @@
   "tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { \u2026 } } * 10`"
     ]
   },
   "tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -1502,25 +1502,25 @@
   "tests/review/cases/review-a1/confirmed/capture-from-old/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-keep-layout/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-plain/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-k4c/cases/plain_1/.invalid/src/main.i:bd5b9fa7651d1619": {
@@ -1557,7 +1557,7 @@
   "tests/review/cases/review-native3/injection_control/.invalid/src/resource.i:681a205b48798d32": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i:21150877805e373b": {
@@ -1627,19 +1627,19 @@
   "tests/review/cases/review-runtime/echo-types/.invalid/src/main.i:033c3a6c2411563f": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-std1/stream/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ef830fe8a6451ed0": {
@@ -1950,66 +1950,66 @@
   "editors/vscode/test/sample.i:e58bed8a30762048": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0003: unknown escape; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:6100ddd868490a15": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:3be21bd923ed7025": {
@@ -2027,26 +2027,26 @@
   "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:eb2f2775666edf45": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:b40bf9426d491496": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:25e81878720e617c": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:ea9bf08abd8374b6": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:1de15bf30cc2d4ba": {
@@ -2064,7 +2064,7 @@
   "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:677bf7e20bf770ff": {
@@ -2136,55 +2136,55 @@
   "tests/review/cases/review-native3/alias/.invalid/src/main.i:f71902283bf0e419": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/direct/.invalid/src/main.i:54a84c4e326b9f0a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/external/.invalid/src/main.i:cf77c54bb0020029": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/field/.invalid/src/main.i:9cca1d56794833b3": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:abb9cd95ff009b02": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:8cc5e6ebb1e74381": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/positive/.invalid/src/main.i:05223b2c9df25096": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:58efcc7552f5fa83": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-native3/update/.invalid/src/main.i:ce5ff1a67fbb1ae9": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (\u2026)` and `export (\u2026)` with header groups `(\u2026)`, and `case e { \u2026 }` with `e |> { \u2026 }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/spec/1.7/a1_same_line_negative.i:13c31898de80a63a": {
@@ -2238,5 +2238,64 @@
   "crates/ilang-wasm/tests/control_lazy.rs:7111383378a50a4c": {
     "not_source": true,
     "reason": "Delimiter used to split a generated program, not an i module."
+  },
+  "crates/ilang-cli/tests/http.rs:3597d8fd08de24af": {
+    "not_source": true,
+    "reason": "Rust format string generates a TOML manifest."
+  },
+  "crates/ilang-cli/tests/http.rs:8e812e356e161441": {
+    "not_source": true,
+    "reason": "Rust format string generates a TOML manifest."
+  },
+  "crates/ilang-cli/tests/http.rs:81cdcb5c5b4e27d6": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render Rust format string with a representative port."
+  },
+  "crates/ilang-cli/tests/http.rs:53c514ae54f0dcfe": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render Rust format string with a representative port."
+  },
+  "crates/ilang-cli/tests/http.rs:86571961a0f21442": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render Rust format string with a representative port."
   }
 }

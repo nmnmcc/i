@@ -208,3 +208,10 @@ candidates are in Rust/editor/JavaScript test strings or deliberate invalid
 fixtures; the separate old-syntax inventory verifies their registered context
 and expected diagnostics. Minimal reproduction:
 `scripts/syntax-2-migrate --repo --check --use-built-tool`.
+
+After the comparison, `redesign` advanced to `4ed95a05` and was merged into
+this lane. The counts above describe the original `7e240a4e` baseline, not
+WAT comparisons for the newly merged HTTP and editor work. The new Rust HTTP
+fixtures were migrated, and the editor retains both error-type spellings for
+legacy parser coverage. The post-merge syntax inventory passes for 4,117
+snippets; all seven VS Code editor tests pass.

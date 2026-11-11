@@ -288,7 +288,7 @@
         },
         {
           "name": "keyword.operator.guard.i",
-          "match": "\\?"
+          "match": "\\?(?=[^\\n]*->)"
         },
         {
           "name": "keyword.operator.comparison.float.i",
@@ -328,7 +328,7 @@
         },
         {
           "name": "keyword.operator.error.i",
-          "match": "\\^"
+          "match": "\\^|\\?"
         },
         {
           "name": "keyword.operator.environment.i",

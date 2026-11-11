@@ -127,7 +127,6 @@ fn http_timeout() {
  i/task
  std/http
 )
-@main
 main = () {{
  task.run(() {{
   result = fail.catch(() {{ http.send_timeout(http.client(), http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
@@ -147,7 +146,7 @@ fn http_dns() {
  i/fail
  std/http
 )
-@main
+
 main = () {
  result = fail.catch(() { http.get("http://name.invalid/") })
  result |> { Error(http.Dns(_)) -> Nil _ -> panic("expected DNS error") }
@@ -164,7 +163,6 @@ fn http_dns_distinct_from_connection_refused() {
     run_http_program(&format!(
         r#"
 (i/fail, std/http)
-@main
 main = () {{
  result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/") }})
  result |> {{ Error(http.Connect(_)) -> Nil _ -> panic("expected connection error") }}
@@ -219,7 +217,7 @@ fn http_redirect_methods() {
         run_http_program(&format!(
             r#"
 (std/http)
-@main
+
 main = () {{ assert(http.post("http://127.0.0.1:{port}/start", <<"hello":utf8>>).status == http.Status(200)) }}
 "#
         ));
@@ -249,7 +247,6 @@ fn http_redirect_limit() {
     run_http_program(&format!(
         r#"
 (i/fail, std/http)
-@main
 main = () {{
  result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/start") }})
  result |> {{ Error(http.Protocol("too many redirects")) -> Nil _ -> panic("expected redirect limit") }}
@@ -301,7 +298,7 @@ fn http_redirect_drops_sensitive_headers() {
     run_http_program(&format!(
         r#"
 (std/http)
-@main
+
 main = () {{
  req = http.Request(http.Method("GET"), "http://127.0.0.1:{port}/", http.Headers([("Authorization", "secret"), ("Cookie", "secret"), ("Proxy-Authorization", "secret"), ("X-Test", "retained")]), <<>>, http.Headers([]))
  assert(http.send(req).status == http.Status(200))
@@ -357,7 +354,7 @@ fn http_reuse() {
     run_http_program(&format!(
         r#"
 (std/http)
-@main
+
 main = () {{
  client = http.client()
  req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
@@ -399,7 +396,7 @@ fn http_reuse_replaces_closed_connection() {
     run_http_program(&format!(
         r#"
 (std/http)
-@main
+
 main = () {{
  client = http.client()
  req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
@@ -456,7 +453,7 @@ echo_upload = (req: http.Request, body) {
  res = http.response(http.Status(200))
  http.Response(..res, body: bytes)
 }
-@main
+
 main = () {
  listener = net.listen("127.0.0.1", 0)
  stdio.print("listening " <> core.inspect(net.local_port(listener)))
@@ -573,7 +570,7 @@ fn http_reuse_keeps_origins_separate() {
     run_http_program(&format!(
         r#"
 (std/http, std/option)
-@main
+
 main = () {{
  client = http.client()
  first = http.request(http.Method("GET"), "http://127.0.0.1:{first_port}/")
