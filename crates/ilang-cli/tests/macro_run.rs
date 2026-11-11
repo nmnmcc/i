@@ -846,3 +846,59 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     );
     assert!(engine.scoped.origin(ty.span).is_some());
 }
+
+#[test]
+fn body_engine_expands_pipe_left_operand_as_first_argument() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, first)\n(@ macro (= first (-> ((: x (. syntax Syntax)) (: ignored (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { 42 | m.first(unknown) }\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let source = module.source;
+    let mut ast = module.ast.clone();
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected definition".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &ast.items[0].kind else {
+        panic!("binding expected")
+    };
+    let ilang_syntax::ast::ExprKind::Fn(fun) = &binding.value.kind else {
+        panic!("function expected")
+    };
+    let ilang_syntax::ast::Stmt::Expr(expr) = &fun.body.stmts[0] else {
+        panic!("expression expected")
+    };
+    let ilang_syntax::ast::ExprKind::Int(value) = &expr.kind else {
+        panic!("integer expected")
+    };
+    assert_eq!(value.to_string(), "42");
+}

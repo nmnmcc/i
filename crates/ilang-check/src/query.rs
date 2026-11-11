@@ -24,9 +24,18 @@ use std::collections::{HashMap, HashSet};
 /// problems found after the first errors are not reported. The types of
 /// the local names are kept (`Typed::locals`).
 pub fn check_for_queries(graph: &PackageGraph) -> Checked {
-    let (parsed, mut diags) = parse(graph);
+    let (parsed, diags) = parse(graph);
+    check_parsed_for_queries(graph, &parsed, diags)
+}
+
+/// Resolve and infer query information from the syntax-expanded modules.
+pub fn check_parsed_for_queries(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+    mut diags: Vec<Diagnostic>,
+) -> Checked {
     let syntax_errors = diags.iter().any(Diagnostic::is_error);
-    let (mut program, more) = resolve::resolve(graph, &parsed);
+    let (mut program, more) = resolve::resolve(graph, parsed);
     let mut ordered = Vec::new();
     order::order(&mut program, &mut ordered);
     if !syntax_errors {
