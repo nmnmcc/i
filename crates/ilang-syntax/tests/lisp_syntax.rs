@@ -1409,4 +1409,11 @@ fn show_as_attribute_item_uses_only_required_line_breaks() {
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(module.items.len(), 1);
     assert_eq!(module.items[0].attributes.len(), 1);
+
+    let tuple = root("(@ test (= (, x y) (, 1 2)))");
+    let text = tuple.show_as(Position::Item).unwrap();
+    assert_eq!(text, "@test\n(x, y) = (1, 2)");
+    let (module, errors) = ilang_syntax::parse_module(&format!("{text}\n"));
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(module.items[0].attributes.len(), 1);
 }
