@@ -22,6 +22,8 @@ fn match_suffix_binds_above_unary_and_every_binary_level() {
         panic!()
     };
     assert!(matches!(lhs.kind, ExprKind::Block(_)));
+    let unary = binding("answer = -{ n |> { 0 -> 1 _ -> 2 } }");
+    assert!(matches!(unary.kind, ExprKind::Unary { .. }));
     for subject in [
         "a || b", "a && b", "a == b", "a < b", "a <> b", "a |> f", "a + b", "a * b", "-a",
     ] {
@@ -72,8 +74,15 @@ fn contexts_and_records_do_not_use_commas_to_choose() {
             "{diagnostics:?}"
         );
     }
-    // Empty function parameters and empty tuple syntax remain parseable.
+    // Empty function parameters are valid; empty tuple types and patterns are not.
     binding("take = () { Nil }");
+    for (source, hint) in [("Unit = ()", "Record"), ("take = (()) { Nil }", "Nil")] {
+        let (_, diagnostics) = parse_module(source);
+        assert!(
+            diagnostics.iter().any(|d| d.message.contains(hint)),
+            "{diagnostics:?}"
+        );
+    }
 }
 
 #[test]
