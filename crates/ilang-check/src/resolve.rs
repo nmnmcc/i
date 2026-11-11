@@ -900,6 +900,10 @@ impl<'a> Resolver<'a> {
                         continue;
                     }
                     if name == "test" && !is_test_module {
+                        if out.main {
+                            self.error(code::EXPORT_NAME_TWICE, a.span,
+                                "this function is the program entry and also a test, so their export names would be the same (B.5)");
+                        }
                         self.error(
                             code::TEST_OUTSIDE_TEST,
                             a.span,

@@ -31,6 +31,13 @@ pub fn write(dir: &Path, stem: &str, source: &str) {
             if name == "main" {
                 continue;
             }
+            if item
+                .attributes
+                .iter()
+                .any(|attr| attr.module.is_none() && attr.name.name == "main")
+            {
+                continue;
+            }
             for attr in &item.attributes {
                 if attr.module.is_none()
                     && attr.name.name == "test"
@@ -82,7 +89,7 @@ pub fn write(dir: &Path, stem: &str, source: &str) {
         while tests.contains(&alias) {
             alias.push('_');
         }
-        let mut wrappers = format!("({alias} = spec/main)\n");
+        let mut wrappers = format!("({alias} = spec/{stem})\n");
         for name in tests {
             wrappers.push_str(&format!("@test\n{name} = () {{ {alias}.{name}() }}\n"));
         }
@@ -90,5 +97,5 @@ pub fn write(dir: &Path, stem: &str, source: &str) {
         std::fs::write(dir.join("test").join(format!("{stem}.i")), wrappers).unwrap();
     }
     std::fs::create_dir_all(dir.join("src")).unwrap();
-    std::fs::write(dir.join("src/main.i"), text).unwrap();
+    std::fs::write(dir.join("src").join(format!("{stem}.i")), text).unwrap();
 }
