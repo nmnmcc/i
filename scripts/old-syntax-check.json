@@ -2539,5 +2539,9 @@
   },
   "crates/ilang-wasm/src/budget.rs:d46aee08cc49f6d1": {
     "not_source": "WebAssembly text instruction name"
+  },
+  "crates/ilang-cli/tests/entries.rs:5f416e6f7e039dd4": {
+    "not_source": true,
+    "reason": "i.toml manifest text in a test, not an i module."
   }
 }
