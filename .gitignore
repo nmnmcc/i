@@ -13,3 +13,9 @@
 
 __pycache__/
 *.pyc
+
+# Workspace configuration is source, including when a global ignore hides it.
+!/.vscode/
+!/.vscode/*.json
+!/.zed/
+!/.zed/*.json

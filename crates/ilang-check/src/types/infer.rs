@@ -297,7 +297,11 @@ impl<'a> Checker<'a> {
 
     // ---- The program ----
 
-    pub fn run(mut self) -> (Typed, Vec<Diagnostic>) {
+    pub fn run(self) -> (Typed, Vec<Diagnostic>) {
+        self.run_selected(&[])
+    }
+
+    pub fn run_selected(mut self, selected: &[(DefId, bool)]) -> (Typed, Vec<Diagnostic>) {
         let p = self.p;
         self.prepare_aliases();
         // Declarations have their written types (§10.1), generalized.
@@ -368,7 +372,7 @@ impl<'a> Checker<'a> {
             self.complete_ready_reads();
         }
         self.report_coalescing(Span::default());
-        self.entry_points();
+        self.entry_points(selected);
         // The shown type schemes (§4.7).
         let mut typed = std::mem::take(&mut self.out);
         let artifact_schemes = p
@@ -433,6 +437,11 @@ impl<'a> Checker<'a> {
                     typed.provider_scheme_artifacts.insert(id, artifact.clone());
                     if d.exported || opts.written {
                         typed.scheme_artifacts.insert(id, artifact);
+                    }
+                    if d.exported
+                        || opts.written
+                        || selected.iter().any(|(target, _)| *target == id)
+                    {
                         typed.scheme_types.insert(id, shown);
                     }
                 } else {
@@ -729,7 +738,7 @@ impl<'a> Checker<'a> {
 
     /// §10.2: the entry points of the compiled package: the program entry,
     /// the tests, and the host exports.
-    fn entry_points(&mut self) {
+    fn entry_points(&mut self, selected: &[(DefId, bool)]) {
         let p = self.p;
         let Some(root) = p.root else {
             return;
@@ -737,19 +746,20 @@ impl<'a> Checker<'a> {
         let mut entries = Vec::new();
         for m in p.modules.iter().filter(|m| m.package == root) {
             for b in m.bindings.iter().filter(|b| b.main || b.test) {
-                entries.extend(b.defs.first().map(|d| (*d, b.test, false)));
+                entries.extend(b.defs.first().map(|d| (*d, b.test, false, false)));
             }
         }
-        entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
-        for (d, test, export) in entries {
-            self.entry_point(d, test, export);
+        entries.extend(p.host_exports.iter().map(|d| (*d, false, true, false)));
+        entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false, true)));
+        for (d, test, export, tool) in entries {
+            self.entry_point(d, test, export, tool);
         }
     }
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
     /// take. Target provider planning validates its inferred environment later.
-    fn entry_point(&mut self, d: DefId, test: bool, export: bool) {
+    fn entry_point(&mut self, d: DefId, test: bool, export: bool, tool: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
         let (name, span) = (def.name.clone(), def.span);
@@ -808,7 +818,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::ENTRY_TYPE,
                 span,
-                format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`"),
+                if tool { format!("the selected entry `{name}` must give `Nil` for this consumer, but it gives `{r}`") } else { format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`") },
             );
         }
         if !export {
@@ -974,21 +984,19 @@ impl<'a> Checker<'a> {
         };
         let mut found = Vec::new();
         uses_types(&shown, &mut found);
-        let mut names: Vec<String> = Vec::new();
+        let mut names: Vec<(String, bool)> = Vec::new();
         for id in found {
             let def = self.p.ty(id);
-            if def.module == self.module && !def.exported && !names.contains(&def.name) {
-                names.push(def.name.clone());
+            if !def.exported && !names.iter().any(|(name, _)| name == &def.name) {
+                names.push((def.name.clone(), def.module == self.module));
             }
         }
-        for name in names {
+        for (name, local) in names {
+            let location = if local { " of this module" } else { "" };
             self.error(
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
-                format!(
-                    "`{}` is exported, but its inferred type uses the type `{name}` of this module, which is not exported (§2.4)",
-                    d.name
-                ),
+                format!("`{}` is exported, but its inferred type uses the type `{name}`{location}, which is not exported (§2.4)", d.name),
             );
         }
     }

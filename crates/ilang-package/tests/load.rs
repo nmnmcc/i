@@ -81,6 +81,7 @@ fn graph_with_path_dependencies() {
             "i/task",
             "i/clock",
             "i/random",
+            "i/syntax",
             "i/fs",
             "i/process",
             "i/net",
@@ -156,6 +157,7 @@ fn standard_library_modules() {
             "std/set",
             "std/stream",
             "std/string",
+            "std/test",
             "std/time",
             "std/uri",
         ]

@@ -87,6 +87,8 @@
 	to_instant
 	parse
 	format
+	now
+	format_now
 )
 
 Date {
@@ -301,14 +303,14 @@ to_instant = (civil: Civil, offset: Offset) -> time.Instant {
 
 // Every input check in the text profile maps to BadText, including constructor
 // failures. These helpers raise only within parse's enclosing pure catch.
-require_text = (valid: Bool) -> Nil ? CalendarError {
+require_text = (valid: Bool) -> Nil ^ CalendarError {
 	valid |> {
 		True  -> Nil
 		False -> fail.raise(BadText)
 	}
 }
 
-expect = (chars: List(Int), wanted: Int) -> List(Int) ? CalendarError {
+expect = (chars: List(Int), wanted: Int) -> List(Int) ^ CalendarError {
 	chars |> {
 		[c, ..tail] -> { c == wanted } |> {
 			True  -> tail
@@ -322,7 +324,7 @@ digits = (
 	chars: List(Int)
 	count: Int
 	value: Int
-) -> (Int, List(Int)) ? CalendarError {
+) -> (Int, List(Int)) ^ CalendarError {
 	{ count == 0 } |> {
 		True -> (value, chars)
 		False -> chars |> {
@@ -349,7 +351,7 @@ scan_digits = (
 	}
 }
 
-read_year = (chars: List(Int)) -> (Int, List(Int)) ? CalendarError {
+read_year = (chars: List(Int)) -> (Int, List(Int)) ^ CalendarError {
 	(sign, rest) = chars |> {
 		[43, ..tail] -> (1, tail)
 		[45, ..tail] -> (-1, tail)
@@ -381,7 +383,7 @@ power_of_ten = (exponent: Int) -> Int {
 	}
 }
 
-read_fraction = (chars: List(Int)) -> (Int, List(Int)) ? CalendarError {
+read_fraction = (chars: List(Int)) -> (Int, List(Int)) ^ CalendarError {
 	chars |> {
 		[46, ..tail] -> {
 			(n, count, rest) = scan_digits(tail, 0, 0)
@@ -392,7 +394,7 @@ read_fraction = (chars: List(Int)) -> (Int, List(Int)) ? CalendarError {
 	}
 }
 
-read_offset = (chars: List(Int)) -> Offset ? CalendarError {
+read_offset = (chars: List(Int)) -> Offset ^ CalendarError {
 	chars |> {
 		[90] -> utc()
 		[sign, ..tail] -> {
@@ -496,3 +498,9 @@ format = (civil: Civil, offset: Offset) -> String {
 		offset_text(offset)
 	])
 }
+
+/// Reads the current civil time in UTC.
+now = () { at(time.now(), utc()) }
+
+/// Formats the current UTC time.
+format_now = () { format(now(), utc()) }

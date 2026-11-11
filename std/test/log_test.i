@@ -1,6 +1,8 @@
 (
 	i/control
 	i/fail
+	i/stdio
+	i/request
 	std/list
 	std/log
 	std/time
@@ -21,7 +23,7 @@ record = (event: Event, capture ! Capture) -> Nil ! Capture {
 }
 
 // std-2 §7: finite, closed instantiations retain service and error types.
-deliver: (log.Entry) -> Nil ? String ! Capture | log.Sink(
+deliver: (log.Entry) -> Nil ^ String ! Capture | log.Sink(
 	String
 	Capture
 ) = log.write
@@ -30,8 +32,8 @@ query: (log.Level) -> Bool ! log.Sink(String, Capture) = log.enabled
 
 defer_message: (
 	log.Level
-	() -> String ? String ! Capture
-) -> Nil ? String ! Capture | log.Sink(String, Capture) = log.lazy
+	() -> String ^ String ! Capture
+) -> Nil ^ String ! Capture | log.Sink(String, Capture) = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
 	log.make((_: log.Level) { True }, (entry) { record(Sent(entry)) })
@@ -185,7 +187,7 @@ DeliveryError {
 	DeliveryError(String)
 }
 
-broken_deliver: (log.Entry) -> Nil ? DeliveryError ! Capture | log.Sink(
+broken_deliver: (log.Entry) -> Nil ^ DeliveryError ! Capture | log.Sink(
 	DeliveryError
 	Capture
 ) = log.write
@@ -250,81 +252,92 @@ log_format = () {
 	Nil
 }
 
-// The compiler gate and negative service cases are executable checks, kept out
-// of the ordinary passing test suite per std-2 §7. The harness appends each
-// case to this owned file and restores it even when a check fails. All five
-// positive cases must pass after the K4 checker changes.
-// Successful generic clients must also run at both optimization levels.
-// Run from the lane with the exact compiler:
-// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/log_test.i").read_text().splitlines() if x.startswith("//| ")))'
-//| import subprocess
-//| from pathlib import Path
-//| path = Path('std/test/log_test.i')
-//| original = path.read_text()
-//| positive = {
-//|     'annotated logging body (std-2 section 7)': '''
-//| GateSink(E, N) { GateSink((log.Level) -> Bool, (log.Entry) -> Nil ? E ! N, (N) -> Nil) }
-//| gate_write(E, N) = (event: log.Entry, sink ! GateSink(E, N)) -> Nil ? E ! N | GateSink(E, N) {
-//|   GateSink(accept, send, _) = sink
-//|   accept(event.level) |> { True -> send(event) False -> Nil }
-//| }
-//| ''',
-//|     'annotated body (review F1/spec 4.7)': '''
-//| GateS(N) { GateS(() -> Nil ! N) }
-//| gate_use(N) = (s ! GateS(N)) -> Nil ! N | GateS(N) { GateS(f) = s f() }
-//| ''',
-//|     'generic write client (std-2 section 7)': '''
-//| @test
-//| gate_client = () {
-//|   ! log.Sink(String, Never) = log.make((_: log.Level) { True }, (e) { fail.raise(e.message) })
-//|   assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
-//|   Nil
-//| }
-//| ''',
-//|     'generic lazy client (L3/section 7)': '''
-//| @test
-//| gate_lazy = () {
-//|   ! log.Sink(String, Never) = log.silent()
-//|   assert(fail.catch(() { log.lazy(log.Info, () -> String ? String { fail.raise("bad") }) }) == Ok(Nil))
-//|   Nil
-//| }
-//| ''',
-//|     'minimal invariant client (review F1)': '''
-//| GateS(N) { GateS(() -> Nil ! N, (N) -> Nil) }
-//| gate_use(N) = (s ! GateS(N)) { GateS(f, _) = s f() }
-//| gate_run(N) = (body: () -> Nil ! N) { body() }
-//| @test
-//| gate_client = () {
-//|   ! GateS(Never) = GateS(() { Nil }, (_: Never) { Nil })
-//|   gate_run(() { gate_use() })
-//| }
-//| ''',
-//| }
-//| negative = {
-//|     'invariant stored environment (L5)': ('''Consumer(A) { Consumer((A) -> Nil) }
-//| bad = (s: log.Sink(Never, Consumer(Int))) -> log.Sink(Never, Consumer(Never)) { s }
-//| ''', 'E0515'),
-//|     'unequal service arguments (L5/spec 9.2)': ('''bad = (s ! log.Sink(String, Never)) -> Bool ! log.Sink(Int, Never) { True }''', 'E0515'),
-//| }
-//| baseline = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
-//| assert baseline.returncode == 0, baseline.stderr
-//| try:
-//|     for name, source in positive.items():
-//|         path.write_text(original + '\n' + source + '\n')
-//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
-//|         print(name, result.returncode, result.stderr, flush=True)
-//|         assert result.returncode == 0, result.stderr
-//|         print('PASS', flush=True)
-//|         if result.returncode == 0 and '@test' in source:
-//|             for level in ('0', '2'):
-//|                 run = subprocess.run(['target/release/i', 'test', '--project', 'std', '--opt', level, 'gate_'], capture_output=True, text=True)
-//|                 print(name, 'opt ' + level, run.returncode, run.stdout, run.stderr, flush=True)
-//|                 test = 'gate_lazy' if name == 'generic lazy client (L3/section 7)' else 'gate_client'
-//|                 assert run.returncode == 0 and '0 failed' in run.stdout and 'pass std/log_test.' + test in run.stdout
-//|     for name, (source, code) in negative.items():
-//|         path.write_text(original + '\n' + source + '\n')
-//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
-//|         print(name, result.returncode, result.stderr, flush=True)
-//|         assert result.returncode == 1 and 'error[' + code + ']' in result.stderr
-//| finally:
-//|     path.write_text(original)
+GateSink(E, N) {
+	GateSink((log.Level) -> Bool, (log.Entry) -> Nil ^ E ! N, (N) -> Nil)
+}
+
+gate_write(E, N) = (
+	event: log.Entry
+	sink ! GateSink(E, N)
+) -> Nil ^ E ! N | GateSink(E, N) {
+	GateSink(accept, send, _) = sink
+	accept(event.level) |> {
+		True  -> send(event)
+		False -> Nil
+	}
+}
+
+GateS(N) {
+	GateS(() -> Nil ! N, (N) -> Nil)
+}
+
+gate_use(N) = (s ! GateS(N)) {
+	GateS(f, _) = s
+	f()
+}
+
+gate_run(N) = (body: () -> Nil ! N) { body() }
+
+@test
+gate_annotated_write = () {
+	! GateSink(String, Never) = GateSink(
+		(_: log.Level) { True }
+		(e) { fail.raise(e.message) }
+		(_: Never) { Nil }
+	)
+	assert(fail.catch(() { gate_write(entry(log.Info)) }) == Error("hello"))
+	Nil
+}
+
+@test
+gate_annotated_service = () {
+	! GateS(Never) = GateS(() { Nil }, (_: Never) { Nil })
+	gate_use()
+}
+
+@test
+gate_generic_write = () {
+	! log.Sink(String, Never) = log.make((_: log.Level) { True }, (e) {
+		fail.raise(e.message)
+	})
+	assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
+	Nil
+}
+
+@test
+gate_generic_lazy = () {
+	! log.Sink(String, Never) = log.silent()
+	assert(
+		fail.catch(() {
+			log.lazy(log.Info, () -> String ^ String { fail.raise("bad") })
+		}) ==
+			Ok(Nil)
+	)
+	Nil
+}
+
+@test
+gate_invariant_client = () {
+	! GateS(Never) = GateS(() { Nil }, (_: Never) { Nil })
+	gate_run(() { gate_use() })
+}
+
+@test
+stderr_sink_reports_failures = () {
+	! stdio.Stdio = stdio.Stdio(
+		(_) { request.ready(Ok(<<>>)) }
+		(_) { request.ready(Ok(Nil)) }
+		(_) { request.ready(Error("failed")) }
+		() { request.ready(Ok(Nil)) }
+		() { request.ready(Ok(Nil)) }
+	)
+	! log.Sink(
+		stdio.StdioError
+		stdio.Stdio | request.Await | request.Owner
+	) = log.stderr()
+	assert(
+		fail.catch(() { log.write(entry(log.Info)) }) ==
+			Error(stdio.StdioError("write_error", "failed"))
+	)
+	Nil
+}

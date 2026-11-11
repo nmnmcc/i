@@ -1,11 +1,19 @@
-//// HTTP/1.1 message values and incremental framing, without I/O.
+//// HTTP/1.1 messages, incremental framing, clients and scoped servers.
 (
 	i/fail
+	i/net
+	i/tls
+	i/clock
+	i/task
+	i/resource
+	i/key
 	std/list
 	std/string
 	std/int
 	std/bit_array
 	std/uri
+	std/json
+	std/schema
 	(Option, Some, None) = std/option
 )
 
@@ -32,6 +40,19 @@
 	reason
 	parse_query
 	build_query
+	serve
+	serve_stream
+	get
+	post
+	send
+	client
+	body_text
+	body_json
+	body_decode
+	BodyError(..)
+	send_with
+	send_timeout
+	route
 	content_length
 	content_type
 	transfer_encoding
@@ -85,6 +106,12 @@ Response {
 HttpError {
 	NeedMore
 	BadMessage(String)
+	Dns(String)
+	Connect(String)
+	Tls(String)
+	Protocol(String)
+	Timeout
+	StatusError(Int)
 }
 
 Progress(A) {
@@ -183,6 +210,7 @@ feed_request = (buffer: BitArray, bytes: BitArray) -> Progress(Request) {
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -192,6 +220,7 @@ feed_response = (buffer: BitArray, bytes: BitArray) -> Progress(Response) {
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -211,6 +240,7 @@ feed_response_for = (
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
@@ -227,11 +257,12 @@ feed_request_limit = (
 		Ok((message, rest))    -> Complete(message, bits(rest))
 		Error(NeedMore)        -> More(input)
 		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected parser error")
 	}
 }
 
-check_head = (xs: List(Int), limit: Int) -> Nil ? HttpError {
-	go = (rest: List(Int), count: Int) -> Nil ? HttpError {
+check_head = (xs: List(Int), limit: Int) -> Nil ^ HttpError {
+	go = (rest: List(Int), count: Int) -> Nil ^ HttpError {
 		{ count > limit } |> {
 			True -> fail.raise(BadMessage("head too large"))
 			False -> rest |> {
@@ -247,7 +278,13 @@ check_head = (xs: List(Int), limit: Int) -> Nil ? HttpError {
 	go(xs, 0)
 }
 
-parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
+parse_request = (xs: List(Int)) -> (Request, List(Int)) ^ HttpError {
+	(req, after) = parse_request_head(xs)
+	(body, trailers, tail) = read_body(req.headers, after)
+	(Request(..req, body: body, trailers: trailers), tail)
+}
+
+parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ^ HttpError {
 	(line, rest) = line(xs)
 	parts = string.split(text(line), " ")
 	parts |> {
@@ -263,14 +300,14 @@ parse_request = (xs: List(Int)) -> (Request, List(Int)) ? HttpError {
 				"invalid target"
 			)
 			(hs, after) = read_headers(rest, [])
-			(body, trailers, tail) = read_body(hs, after)
-			(Request(Method(method), target, hs, body, trailers), tail)
+			validate_framing(hs)
+			(Request(Method(method), target, hs, <<>>, Headers([])), after)
 		}
 		_ -> fail.raise(BadMessage("invalid request line"))
 	}
 }
 
-parse_response = (xs: List(Int)) -> (Response, List(Int)) ? HttpError {
+parse_response = (xs: List(Int)) -> (Response, List(Int)) ^ HttpError {
 	parse_response_for(xs, Method("GET"), True)
 }
 
@@ -278,7 +315,7 @@ parse_response_for = (
 	xs: List(Int)
 	method: Method
 	eof: Bool
-) -> (Response, List(Int)) ? HttpError {
+) -> (Response, List(Int)) ^ HttpError {
 	(first, rest) = line(xs)
 	raw = first |> {
 		[72, 84, 84, 80, 47, 49, 46, 49, 32, a, b, c, 32, ..phrase] ? digit(
@@ -319,7 +356,7 @@ parse_response_for = (
 read_headers = (
 	xs: List(Int)
 	acc: List((String, BitArray))
-) -> (Headers, List(Int)) ? HttpError {
+) -> (Headers, List(Int)) ^ HttpError {
 	(head, rest) = line(xs)
 	head |> {
 		[] -> (make_headers(list.reverse(acc)), rest)
@@ -356,7 +393,7 @@ text_unchecked = (xs: List(Int)) -> String {
 	}
 }
 
-validate_framing = (hs: Headers) -> Nil ? HttpError {
+validate_framing = (hs: Headers) -> Nil ^ HttpError {
 	length = header_bytes(hs, "content-length")
 	transfer = header_bytes(hs, "transfer-encoding")
 	require(
@@ -403,7 +440,7 @@ validate_framing = (hs: Headers) -> Nil ? HttpError {
 read_body = (
 	hs: Headers
 	xs: List(Int)
-) -> (BitArray, Headers, List(Int)) ? HttpError {
+) -> (BitArray, Headers, List(Int)) ^ HttpError {
 	validate_framing(hs)
 	lengths = list.concat(list.map(headers(hs, "content-length"), (value) {
 		list.map(string.split(value, ","), (part) {
@@ -437,7 +474,7 @@ read_body = (
 	}
 }
 
-transfer_codings = (hs: Headers) -> List(String) ? HttpError {
+transfer_codings = (hs: Headers) -> List(String) ^ HttpError {
 	codings = list.concat(list.map(headers(hs, "transfer-encoding"), (value) {
 		list.map(string.split(value, ","), (part) {
 			lowercase(text_unchecked(trim(octets(<<part:utf8>>))))
@@ -459,7 +496,7 @@ transfer_codings = (hs: Headers) -> List(String) ? HttpError {
 	codings
 }
 
-parse_length = (value: String) -> Int ? HttpError {
+parse_length = (value: String) -> Int ^ HttpError {
 	raw = octets(<<value:utf8>>)
 	require(raw != [] && list.all(raw, digit), "invalid content-length")
 	int.parse(value) |> {
@@ -471,30 +508,13 @@ parse_length = (value: String) -> Int ? HttpError {
 chunks = (
 	xs: List(Int)
 	acc: List(BitArray)
-) -> (BitArray, Headers, List(Int)) ? HttpError {
+) -> (BitArray, Headers, List(Int)) ^ HttpError {
 	(size_line, rest) = line(xs)
-	(size_raw, extension, has_extension) = cut(size_line, 59)
-	size_bytes = list.reverse(list.drop_while(list.reverse(size_raw), space))
-	require(has_extension || size_bytes == size_raw, "invalid chunk size")
-	{ has_extension } |> {
-		True  -> validate_extensions(extension)
-		False -> Nil
-	}
-	require(
-		size_bytes != [] && list.all(size_bytes, (x) { hex(x) >= 0 })
-		"invalid chunk size"
-	)
-	size = list.fold(size_bytes, 0, (n, x) { n * 16 + hex(x) })
-	require(size >= 0, "invalid chunk size")
+	size = chunk_size(size_line)
 	{ size == 0 } |> {
 		True -> {
 			(trailers, tail) = read_headers(rest, [])
-			require(
-				header_bytes(trailers, "content-length") == None &&
-					header_bytes(trailers, "transfer-encoding") == None &&
-					header_bytes(trailers, "host") == None
-				"invalid trailer field"
-			)
+			valid_trailers(trailers)
 			(bit_array.concat(list.reverse(acc)), trailers, tail)
 		}
 		False -> {
@@ -509,6 +529,32 @@ chunks = (
 	}
 }
 
+chunk_size = (size_line: List(Int)) -> Int ^ HttpError {
+	(size_raw, extension, has_extension) = cut(size_line, 59)
+	size_bytes = list.reverse(list.drop_while(list.reverse(size_raw), space))
+	require(has_extension || size_bytes == size_raw, "invalid chunk size")
+	{ has_extension } |> {
+		True  -> validate_extensions(extension)
+		False -> Nil
+	}
+	require(
+		size_bytes != [] && list.all(size_bytes, (x) { hex(x) >= 0 })
+		"invalid chunk size"
+	)
+	size = list.fold(size_bytes, 0, (n, x) { n * 16 + hex(x) })
+	require(size >= 0, "invalid chunk size")
+	size
+}
+
+valid_trailers = (trailers: Headers) -> Nil ^ HttpError {
+	require(
+		header_bytes(trailers, "content-length") == None &&
+			header_bytes(trailers, "transfer-encoding") == None &&
+			header_bytes(trailers, "host") == None
+		"invalid trailer field"
+	)
+}
+
 token_prefix = (xs: List(Int), acc: List(Int)) -> (List(Int), List(Int)) {
 	xs |> {
 		[x, ..tail] ? token(x) -> token_prefix(tail, [x, ..acc])
@@ -516,7 +562,7 @@ token_prefix = (xs: List(Int), acc: List(Int)) -> (List(Int), List(Int)) {
 	}
 }
 
-validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
+validate_extensions = (xs: List(Int)) -> Nil ^ HttpError {
 	(name, after_name) = token_prefix(list.drop_while(xs, space), [])
 	rest = list.drop_while(after_name, space)
 	require(name != [], "invalid chunk extension")
@@ -543,7 +589,7 @@ validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
 	}
 }
 
-extension_quoted = (xs: List(Int)) -> List(Int) ? HttpError {
+extension_quoted = (xs: List(Int)) -> List(Int) ^ HttpError {
 	xs |> {
 		[34, ..tail]                            -> tail
 		[92, x, ..tail] ? field_value(x)        -> extension_quoted(tail)
@@ -552,11 +598,11 @@ extension_quoted = (xs: List(Int)) -> List(Int) ? HttpError {
 	}
 }
 
-line = (xs: List(Int)) -> (List(Int), List(Int)) ? HttpError {
+line = (xs: List(Int)) -> (List(Int), List(Int)) ^ HttpError {
 	go = (
 		rest: List(Int)
 		acc: List(Int)
-	) -> (List(Int), List(Int)) ? HttpError {
+	) -> (List(Int), List(Int)) ^ HttpError {
 		rest |> {
 			[]               -> fail.raise(NeedMore)
 			[13]             -> fail.raise(NeedMore)
@@ -573,7 +619,7 @@ take = (
 	xs: List(Int)
 	n: Int
 	acc: List(Int)
-) -> (List(Int), List(Int)) ? HttpError {
+) -> (List(Int), List(Int)) ^ HttpError {
 	{ n == 0 } |> {
 		True -> (list.reverse(acc), xs)
 		False -> xs |> {
@@ -625,7 +671,7 @@ token = (x: Int) -> Bool {
 		)
 }
 
-require = (ok: Bool, why: String) -> Nil ? HttpError {
+require = (ok: Bool, why: String) -> Nil ^ HttpError {
 	ok |> {
 		True  -> Nil
 		False -> fail.raise(BadMessage(why))
@@ -646,7 +692,7 @@ bits = (xs: List(Int)) -> BitArray {
 	bit_array.concat(list.map(xs, (x) { <<x>> }))
 }
 
-text = (xs: List(Int)) -> String ? HttpError {
+text = (xs: List(Int)) -> String ^ HttpError {
 	bit_array.to_string(bits(xs)) |> {
 		Ok(s)    -> s
 		Error(_) -> fail.raise(BadMessage("invalid UTF-8"))
@@ -838,4 +884,764 @@ lowercase = (s: String) -> String {
 		Ok(value) -> value
 		Error(_)  -> panic("http: invalid internal text")
 	}
+}
+
+/// Buffered request handler, built on the incremental body reader.
+serve = (listener, handler) {
+	serve_stream(listener, (req: Request, reader) {
+		body = collect_body(reader, [])
+		handler(Request(..req, body: body, trailers: reader.trailers()))
+	})
+}
+
+/// Serve a head and a pull reader; the reader is valid until the handler returns.
+serve_stream = (listener, handler) {
+	task.scope((scope) { accept_loop(listener, handler, scope) })
+}
+
+accept_loop = (listener, handler, scope) {
+	stream = net.accept(listener)
+	task.go(scope, () {
+		resource.ensure(() {
+			fail.catch(() { connection_loop(stream, handler, <<>>) })
+			Nil
+		}, () { net.close_stream(stream) })
+	})
+	accept_loop(listener, handler, scope)
+}
+
+connection_loop = (stream, handler, buffer) {
+	progress: Progress(Request) = fail.catch(() {
+		check_head(octets(buffer), 32768)
+		parse_request_head(octets(buffer))
+	}) |> {
+		Ok((req, rest))        -> Complete(req, bits(rest))
+		Error(NeedMore)        -> More(buffer)
+		Error(BadMessage(why)) -> Invalid(why)
+		Error(_)               -> panic("http: unexpected head error")
+	}
+	progress |> {
+		Invalid(_) -> write_server_reply(stream, response(Status(400)), True)
+		More(_) -> {
+			bytes = net.read(stream, 65536)
+			{ bit_array.bit_size(bytes) == 0 } |> {
+				True -> Nil
+				False -> connection_loop(
+					stream
+					handler
+					bit_array.concat([buffer, bytes])
+				)
+			}
+		}
+		Complete(req, rest) -> {
+			result = fail.catch(() {
+				task.scope((_) {
+					cursor = task.ref(
+						BodyCursor(
+							rest
+							request_framing(req.headers)
+							Headers([])
+						)
+					)
+					reader = (
+						read: (max: Int) {
+							read_request_piece(stream, cursor, max)
+						}
+						trailers: () {
+							task.update(cursor, (state) {
+								(state, state.trailers)
+							})
+						}
+					)
+					{ has_token(req.headers, "expect", "100-continue") } |> {
+						True -> net.write(
+							stream
+							<<"HTTP/1.1 100 Continue\r\n\r\n":utf8>>
+						)
+						False -> Nil
+					}
+					res: Response = fail.catch(() { handler(req, reader) }) |> {
+						Ok(res)                -> res
+						Error(BadMessage(why)) -> fail.raise(BadMessage(why))
+						Error(_)               -> response(Status(500))
+					}
+					drain_body(reader)
+					tail = task.update(cursor, (state) {
+						(state, state.buffer)
+					})
+					(res, tail)
+				})
+			})
+			result |> {
+				Error(BadMessage(_)) -> write_server_reply(
+					stream
+					response(Status(400))
+					True
+				)
+				Error(error) -> fail.raise(error)
+				Ok((res, tail)) -> {
+					closing = has_token(req.headers, "connection", "close") ||
+						has_token(res.headers, "connection", "close")
+					write_server_reply(stream, res, closing)
+					{ closing } |> {
+						True  -> Nil
+						False -> connection_loop(stream, handler, tail)
+					}
+				}
+			}
+		}
+	}
+}
+
+write_server_reply = (stream, res: Response, closing: Bool) {
+	hs = header(res.headers, "content-length") |> {
+		Some(_) -> res.headers
+		None -> header(res.headers, "transfer-encoding") |> {
+			Some(_) -> res.headers
+			None -> add_header(
+				res.headers
+				"Content-Length"
+				int.to_string(bit_array.byte_size(res.body))
+			)
+		}
+	}
+	hs = { closing } |> {
+		True  -> add_header(hs, "Connection", "close")
+		False -> hs
+	}
+	net.write(
+		stream
+		serialize_response(
+			Response(res.status, res.reason, hs, res.body, res.trailers)
+		)
+	)
+}
+
+BodyFraming {
+	Remaining(Int)
+	ChunkSize
+	ChunkData(Int)
+	ChunkEnd
+	ChunkTrailers
+	BodyDone
+}
+
+BodyCursor {
+	BodyCursor(buffer: BitArray, framing: BodyFraming, trailers: Headers)
+}
+
+request_framing = (hs: Headers) -> BodyFraming ^ HttpError {
+	validate_framing(hs)
+	transfer_codings(hs) |> {
+		[] -> header(hs, "content-length") |> {
+			None -> Remaining(0)
+			Some(value) -> string.split(value, ",") |> {
+				[first, .._] -> Remaining(
+					parse_length(text_unchecked(trim(octets(<<first:utf8>>))))
+				)
+				_ -> panic("http: empty length split")
+			}
+		}
+		codings -> {
+			require(
+				list.last(codings) == Some("chunked")
+				"invalid transfer-encoding"
+			)
+			ChunkSize
+		}
+	}
+}
+
+read_request_piece = (stream, cursor: task.Ref(BodyCursor), max: Int) {
+	require(max > 0, "body read size must be positive")
+	state = task.update(cursor, (state) { (state, state) })
+	(piece, next) = body_piece(stream, state, max)
+	task.update(cursor, (_) { (next, Nil) })
+	piece
+}
+
+body_more = (stream, state: BodyCursor) {
+	bytes = net.read(stream, 65536)
+	require(bit_array.bit_size(bytes) > 0, "unexpected end of request body")
+	BodyCursor(..state, buffer: bit_array.concat([state.buffer, bytes]))
+}
+
+body_piece = (stream, state: BodyCursor, max: Int) {
+	state.framing |> {
+		BodyDone     -> (<<>>, state)
+		Remaining(0) -> (<<>>, BodyCursor(..state, framing: BodyDone))
+		Remaining(n) | ChunkData(n) -> {
+			{ bit_array.bit_size(state.buffer) == 0 } |> {
+				True -> body_piece(stream, body_more(stream, state), max)
+				False -> {
+					available = bit_array.byte_size(state.buffer)
+					count = int.min(int.min(n, max), available)
+					(part, rest) = split_bytes(state.buffer, count)
+					framing = state.framing |> {
+						Remaining(_) -> Remaining(n - count)
+						ChunkData(_) -> { n == count } |> {
+							True  -> ChunkEnd
+							False -> ChunkData(n - count)
+						}
+						_ -> panic("http: invalid body data state")
+					}
+					(part, BodyCursor(..state, buffer: rest, framing: framing))
+				}
+			}
+		}
+		ChunkSize -> fail.catch(() { line(octets(state.buffer)) }) |> {
+			Error(NeedMore) -> {
+				require(
+					bit_array.byte_size(state.buffer) <= 32768
+					"chunk line too large"
+				)
+				body_piece(stream, body_more(stream, state), max)
+			}
+			Error(error) -> fail.raise(error)
+			Ok((line, rest)) -> {
+				size = chunk_size(line)
+				framing = { size == 0 } |> {
+					True  -> ChunkTrailers
+					False -> ChunkData(size)
+				}
+				body_piece(
+					stream
+					BodyCursor(..state, buffer: bits(rest), framing: framing)
+					max
+				)
+			}
+		}
+		ChunkEnd -> { bit_array.byte_size(state.buffer) < 2 } |> {
+			True -> body_piece(stream, body_more(stream, state), max)
+			False -> state.buffer |> {
+				<<13, 10, rest:bits>> -> body_piece(
+					stream
+					BodyCursor(..state, buffer: rest, framing: ChunkSize)
+					max
+				)
+				_ -> fail.raise(BadMessage("invalid chunk terminator"))
+			}
+		}
+		ChunkTrailers -> fail.catch(() {
+			read_headers(octets(state.buffer), [])
+		}) |> {
+			Error(NeedMore) -> {
+				check_head(octets(state.buffer), 32768)
+				body_piece(stream, body_more(stream, state), max)
+			}
+			Error(error) -> fail.raise(error)
+			Ok((trailers, rest)) -> {
+				valid_trailers(trailers)
+				(<<>>, BodyCursor(bits(rest), BodyDone, trailers))
+			}
+		}
+	}
+}
+
+split_bytes = (buffer: BitArray, count: Int) -> (BitArray, BitArray) {
+	buffer |> {
+		<<part:bytes(count), rest:bits>> -> (part, rest)
+		_                                -> panic("http: invalid body slice")
+	}
+}
+
+collect_body = (reader, acc: List(BitArray)) {
+	piece = reader.read(65536)
+	{ bit_array.bit_size(piece) == 0 } |> {
+		True  -> bit_array.concat(list.reverse(acc))
+		False -> collect_body(reader, [piece, ..acc])
+	}
+}
+
+drain_body = (reader) {
+	{ bit_array.bit_size(reader.read(65536)) == 0 } |> {
+		True  -> Nil
+		False -> drain_body(reader)
+	}
+}
+
+/// A provider is a record containing a send function, so callers can replace it.
+client = () {
+	pool = task.ref(Pool([], []))
+	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
+}
+
+Connection {
+	Plain(net.Stream)
+	Secure(tls.Stream)
+}
+
+Idle {
+	Idle(
+		secure:     Bool
+		host:       String
+		port:       Int
+		connection: Connection
+		buffer:     BitArray
+	)
+}
+
+Pool {
+	Pool(idle: List(Idle), released: List(Key(Nil)))
+}
+
+PeerClosed {
+	PeerClosed
+}
+
+close_connection = (connection: Connection) {
+	connection |> {
+		Plain(stream)  -> net.close_stream(stream)
+		Secure(stream) -> tls.close(stream)
+	}
+}
+
+close_client = (pool: task.Ref(Pool)) {
+	idle = task.update(pool, (state) { (Pool([], state.released), state.idle) })
+	list.each(idle, (entry) { close_connection(entry.connection) })
+}
+
+pool_take = (
+	idle: List(Idle)
+	secure: Bool
+	host: String
+	port: Int
+) -> (List(Idle), Option(Idle)) {
+	idle |> {
+		[] -> ([], None)
+		[entry, ..rest] -> {
+			entry.secure == secure && entry.host == host && entry.port == port
+		} |> {
+			True -> (rest, Some(entry))
+			False -> {
+				(next, found) = pool_take(rest, secure, host, port)
+				([entry, ..next], found)
+			}
+		}
+	}
+}
+
+get = (url: String) { send(request(Method("GET"), url)) }
+
+post = (url: String, body: BitArray) {
+	send(Request(Method("POST"), url, Headers([]), body, Headers([])))
+}
+
+body_text = (res: Response) { bit_array.to_string(res.body) }
+
+send = (req: Request) {
+	provider = client()
+	resource.ensure(() { provider.send(req) }, provider.close)
+}
+
+follow = (pool: task.Ref(Pool), req: Request, count: Int) {
+	{ count > 10 } |> {
+		True -> fail.raise(Protocol("too many redirects"))
+		False -> {
+			res = send_once(pool, req)
+			Status(code) = res.status
+			(header(res.headers, "location"), code) |> {
+				(Some(location), c) ? c == 301 ||
+					c == 302 ||
+					c == 303 ||
+					c == 307 ||
+					c == 308 -> {
+					base = uri.parse(req.target) |> {
+						Ok(value) -> value
+						Error(_)  -> fail.raise(Protocol("invalid URL"))
+					}
+					next = uri.parse(location) |> {
+						Ok(value) -> value
+						Error(_)  -> fail.raise(Protocol("invalid redirect"))
+					}
+					url = uri.resolve(base, next) |> {
+						Ok(value) -> uri.to_string(value)
+						Error(_)  -> fail.raise(Protocol("invalid redirect"))
+					}
+					Method(method) = req.method
+					drop_body = c == 301 || c == 302 || c == 303
+					change = method != "HEAD" && method != "GET" && drop_body
+					change |> {
+						True -> follow(
+							pool
+							Request(
+								Method("GET")
+								url
+								redirect_headers(req.headers, base, next, True)
+								<<>>
+								Headers([])
+							)
+							count + 1
+						)
+						False -> follow(
+							pool
+							Request(
+								req.method
+								url
+								redirect_headers(
+									req.headers
+									base
+									next
+									drop_body
+								)
+								{ drop_body } |> {
+									True  -> <<>>
+									False -> req.body
+								}
+								{ drop_body } |> {
+									True  -> Headers([])
+									False -> req.trailers
+								}
+							)
+							count + 1
+						)
+					}
+				}
+				_ -> res
+			}
+		}
+	}
+}
+
+redirect_headers = (hs: Headers, base, next, drop_body: Bool) -> Headers {
+	resolved = uri.resolve(base, next) |> {
+		Ok(value) -> value
+		Error(_)  -> panic("http: invalid resolved redirect")
+	}
+	changed = uri.parts(base).authority != uri.parts(resolved).authority
+	RawHeaders(list.filter(raw_pairs(hs), (pair) {
+		(name, _) = pair
+		name = lowercase(name)
+		{
+			changed && {
+				name == "authorization" ||
+					name == "cookie" ||
+					name == "proxy-authorization" ||
+					name == "host"
+			}
+		} ==
+			False &&
+			{
+				drop_body && {
+					name == "content-length" ||
+						name == "content-type" ||
+						name == "transfer-encoding"
+				}
+			} ==
+				False
+	}))
+}
+
+send_once = (pool: task.Ref(Pool), req: Request) {
+	u = uri.parse(req.target) |> {
+		Ok(value) -> value
+		Error(_)  -> fail.raise(Protocol("invalid URL"))
+	}
+	parts = uri.parts(u)
+	secure = parts.scheme |> {
+		Some("http")  -> False
+		Some("https") -> True
+		_             -> fail.raise(Protocol("invalid URL scheme"))
+	}
+	authority = parts.authority |> {
+		Some(value) -> value
+		None        -> fail.raise(Protocol("missing host"))
+	}
+	hostname = authority.host |> {
+		uri.RegName(value)   -> value
+		uri.IpLiteral(value) -> value
+	}
+	port = authority.port |> {
+		Some(value) -> int.parse(value) |> {
+			Ok(number) ? number > 0 && number < 65536 -> number
+			_                                         -> fail.raise(Protocol("invalid port"))
+		}
+		None -> secure |> {
+			True  -> 443
+			False -> 80
+		}
+	}
+	path = { parts.path == "" } |> {
+		True  -> "/"
+		False -> parts.path
+	}
+	target = parts.query |> {
+		Some(q) -> path <> "?" <> q
+		None    -> path
+	}
+	host_header = authority.port |> {
+		Some(p) -> hostname <> ":" <> p
+		None    -> hostname
+	}
+	hs = header(req.headers, "host") |> {
+		Some(_) -> req.headers
+		None    -> add_header(req.headers, "Host", host_header)
+	}
+	wire = serialize_request(
+		Request(req.method, target, hs, req.body, req.trailers)
+	)
+	cached = task.update(pool, (state) {
+		(rest, found) = pool_take(state.idle, secure, lowercase(hostname), port)
+		(Pool(rest, state.released), found)
+	})
+	result = cached |> {
+		None -> fail.catch(() {
+			exchange(
+				pool
+				Idle(
+					secure
+					lowercase(hostname)
+					port
+					dial(secure, hostname, port)
+					<<>>
+				)
+				req
+				wire
+			)
+		})
+		Some(entry) -> fail.catch(() { exchange(pool, entry, req, wire) }) |> {
+			Error(PeerClosed) | Error(Connect(_)) | Error(Tls(_)) -> fail.catch(
+				() {
+					exchange(
+						pool
+						Idle(
+							secure
+							lowercase(hostname)
+							port
+							dial(secure, hostname, port)
+							<<>>
+						)
+						req
+						wire
+					)
+				}
+			)
+			other -> other
+		}
+	}
+	result |> {
+		Ok(res)           -> res
+		Error(PeerClosed) -> fail.raise(Protocol("unexpected end of response"))
+		Error(error)      -> fail.raise(error)
+	}
+}
+
+dial = (secure: Bool, hostname: String, port: Int) {
+	fail.catch(() { net.resolve(hostname) }) |> {
+		Ok(_)                                          -> Nil
+		Error(net.NetError(operation, endpoint, code)) -> fail.raise(Dns(code))
+	}
+	stream = fail.catch(() { net.connect(hostname, port) }) |> {
+		Ok(value) -> value
+		Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+			Connect(code)
+		)
+	}
+	secure |> {
+		False -> Plain(stream)
+		True -> fail.catch(() {
+			tls.connect(stream, hostname, (..tls.options(), alpn: ["http/1.1"]))
+		}) |> {
+			Ok(value) -> Secure(value)
+			Error(tls.TlsError(stage, reason)) -> {
+				net.close_stream(stream)
+				fail.raise(Tls(reason))
+			}
+		}
+	}
+}
+
+exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
+	lease: Key(Nil) = key.new()
+	resource.ensure(() {
+		transport = entry.connection |> {
+			Plain(stream)  -> net_transport(stream)
+			Secure(stream) -> tls_transport(stream)
+		}
+		transport.write(wire)
+		(res, rest, eof) = read_reply(transport, req.method, entry.buffer)
+		Status(code) = res.status
+		Method(method) = req.method
+		reusable = eof == False &&
+			code >= 200 &&
+			method != "CONNECT" &&
+			has_token(req.headers, "connection", "close") == False &&
+			has_token(res.headers, "connection", "close") == False
+		{ reusable } |> {
+			True -> task.update(pool, (state) {
+				(
+					Pool(
+						[Idle(..entry, buffer: rest), ..state.idle]
+						[lease, ..state.released]
+					)
+					Nil
+				)
+			})
+			False -> Nil
+		}
+		res
+	}, () {
+		released = task.update(pool, (state) {
+			(
+				Pool(state.idle, list.filter(state.released, (key) {
+					key != lease
+				}))
+				list.contains(state.released, lease)
+			)
+		})
+		{ released } |> {
+			True  -> Nil
+			False -> close_connection(entry.connection)
+		}
+	})
+}
+
+read_reply = (transport, method, buffer) {
+	read_progress(transport, method, buffer, False)
+}
+
+read_progress = (transport, method, buffer, eof) {
+	feed_response_for(<<>>, buffer, method, eof, 32768) |> {
+		Complete(res, rest) -> {
+			Status(code) = res.status
+			{ code >= 100 && code < 200 && code != 101 } |> {
+				True  -> read_progress(transport, method, rest, eof)
+				False -> (res, rest, eof)
+			}
+		}
+		Invalid(why) -> fail.raise(Protocol(why))
+		More(next) -> eof |> {
+			True -> { bit_array.bit_size(next) == 0 } |> {
+				True  -> fail.raise(PeerClosed)
+				False -> fail.raise(Protocol("unexpected end of response"))
+			}
+			False -> {
+				bytes = transport.read(65536)
+				read_progress(
+					transport
+					method
+					bit_array.concat([next, bytes])
+					bit_array.bit_size(bytes) == 0
+				)
+			}
+		}
+	}
+}
+
+BodyError {
+	InvalidText
+	InvalidJson(json.JsonError)
+	InvalidSchema(schema.SchemaError)
+}
+
+body_json = (res: Response) -> Result(json.Json, BodyError) {
+	body_text(res) |> {
+		Error(_) -> Error(InvalidText)
+		Ok(text) -> json.parse(text) |> {
+			Ok(value)    -> Ok(value)
+			Error(error) -> Error(InvalidJson(error))
+		}
+	}
+}
+
+body_decode(A) = (
+	res: Response
+	codec: schema.Schema(A, schema.SchemaError)
+) -> Result(A, BodyError) {
+	body_json(res) |> {
+		Error(error) -> Error(error)
+		Ok(value) -> schema.decode(codec, value) |> {
+			Ok(decoded)  -> Ok(decoded)
+			Error(error) -> Error(InvalidSchema(error))
+		}
+	}
+}
+
+send_with = (provider, req) { provider.send(req) }
+
+send_timeout = (provider, req, duration_ns) {
+	task.race(() { provider.send(req) }, () {
+		clock.sleep_ns(duration_ns)
+		fail.raise(Timeout)
+	})
+}
+
+/// Match a method and slash-separated path; segments prefixed with ':' bind parameters.
+route = (
+	method: Method
+	pattern: String
+	req: Request
+) -> Option(List((String, String))) {
+	{ method == req.method } |> {
+		False -> None
+		True -> {
+			path = string.split(req.target, "?") |> {
+				[first, .._] -> first
+				[]           -> panic("http: split returned no segments")
+			}
+			match_segments(string.split(pattern, "/"), string.split(path, "/"))
+		}
+	}
+}
+
+match_segments = (
+	pattern: List(String)
+	path: List(String)
+) -> Option(List((String, String))) {
+	(pattern, path) |> {
+		([], []) -> Some([])
+		([p, ..ps], [v, ..vs]) -> {
+			string.starts_with(p, ":") |> {
+				True -> match_segments(ps, vs) |> {
+					Some(rest) -> Some([(string.drop_start(p, 1), v), ..rest])
+					None       -> None
+				}
+				False -> { p == v } |> {
+					True  -> match_segments(ps, vs)
+					False -> None
+				}
+			}
+		}
+		_ -> None
+	}
+}
+
+net_transport = (stream) {
+	(read: (max) {
+		fail.catch(() { net.read(stream, max) }) |> {
+			Ok(value) -> value
+			Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+				Connect(code)
+			)
+		}
+	}, write: (bytes) {
+		fail.catch(() { net.write(stream, bytes) }) |> {
+			Ok(value) -> value
+			Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+				Connect(code)
+			)
+		}
+	})
+}
+
+tls_transport = (stream) {
+	(read: (max) {
+		fail.catch(() { tls.read(stream, max) }) |> {
+			Ok(value)                          -> value
+			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+		}
+	}, write: (bytes) {
+		fail.catch(() { tls.write(stream, bytes) }) |> {
+			Ok(value)                          -> value
+			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+		}
+	})
+}
+
+has_token = (hs: Headers, name: String, value: String) -> Bool {
+	list.any(headers(hs, name), (line) {
+		list.any(string.split(line, ","), (part) {
+			lowercase(text_unchecked(trim(octets(<<part:utf8>>)))) == value
+		})
+	})
 }

@@ -18,6 +18,17 @@ export interface Abi {
   services?: Record<string, Record<string, Signature>>;
   externals?: Record<string, Record<string, Signature>>;
 }
+export interface SourcePosition { path: string; start: number; end: number; line: number; column: number }
+export interface CollectionEntry {
+  handle: string; collection: string; signature: string; data: [string, string][];
+  target: SourcePosition; at: SourcePosition;
+  calls: { macro_name: string; position: SourcePosition }[];
+}
+export interface CollectionArtifact {
+  manifest: { revision: string; entries: CollectionEntry[] };
+  selected: string; export: string; is_async: boolean;
+}
+export function readCollections(module: WebAssembly.Module): CollectionArtifact | null;
 export interface BitArray { bytes: Uint8Array; bitLength: number }
 /** nil: undefined or null; bool: boolean; int: bigint; float: number; string; bit_array: BitArray; externref: any. */
 export type Value = undefined | null | boolean | bigint | number | string | BitArray | unknown;
@@ -54,6 +65,7 @@ export interface Guest {
   readonly instance: WebAssembly.Instance;
   readonly exports: WebAssembly.Exports;
   readonly abi: Readonly<Required<Abi>>;
+  readonly collections: CollectionArtifact | null;
   /** Why the instance cannot be used any more, or null. */
   readonly unusable: string | null;
   /** Stop admission and cancel work/resources independently of language finals. */
@@ -66,6 +78,7 @@ export interface Guest {
   /** Run the program entry; a Promise when it is async. */
   run(): void | Promise<void>;
   runEntryPoint(name: string): void | Promise<void>;
+  runCollection(handle: string): void | Promise<void>;
 }
 /** The program stopped. `stopMessage` is the stop message, or null for a trap without one. */
 export class Stop extends Error {

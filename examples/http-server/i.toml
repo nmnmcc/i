@@ -1,0 +1,4 @@
+name = "http_server"
+
+[dependencies]
+std = { path = "../../std" }

@@ -41,7 +41,7 @@ case_lines = x |> {
   _ -> 4
 }
 
-typed = (x) -> Int ^ String { x }
+typed = (x) -> Int ? String { x }
 
 negative = n |> {
   0 -> 1

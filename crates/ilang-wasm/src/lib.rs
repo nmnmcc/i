@@ -12,6 +12,7 @@
 //!
 //! The code is simple and not optimized: `ilang-binaryen` optimizes it.
 
+pub mod budget;
 pub mod control;
 pub mod emit;
 pub mod ir;
@@ -69,6 +70,12 @@ pub fn compile_with_bindings(
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);
+    add_provider_section(&mut wasm, &bindings);
+    validate(&wasm).map_err(Error::Internal)?;
+    Ok((wasm, bindings))
+}
+
+fn add_provider_section(wasm: &mut Vec<u8>, bindings: &[serde_json::Value]) {
     let registrations: Vec<_> = bindings.iter().filter(|d| d["kind"] == "service").map(|d| {
         let declaration = d["declaration"].as_str().expect("service declaration");
         serde_json::json!({
@@ -77,12 +84,31 @@ pub fn compile_with_bindings(
         })
     }).collect();
     emit::add_json_section(
-        &mut wasm,
+        wasm,
         "ilang.providers",
         &serde_json::to_string(&registrations).expect("host registration metadata"),
     );
+}
+
+/// Compile one selected collection target without adding it to the ordinary
+/// entry, test, or host-export tables. The export handle is owned by the tool.
+pub fn compile_selected_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    target: hir::DefId,
+    export: &str,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>, bool), Error> {
+    let (ir, bindings, is_async) =
+        lower::lower_selected_with_bindings(graph, program, typed, options, target, export)
+            .map_err(Error::Diagnostics)?;
+    let text = emit::wat(&ir);
+    let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
+    emit::add_abi_section(&mut wasm, &ir.abi_json);
+    add_provider_section(&mut wasm, &bindings);
     validate(&wasm).map_err(Error::Internal)?;
-    Ok((wasm, bindings))
+    Ok((wasm, bindings, is_async))
 }
 
 /// The WAT text of a checked program, for reading.
@@ -94,6 +120,31 @@ pub fn compile_wat(
 ) -> Result<String, Error> {
     let ir = lower::lower(graph, program, typed, options).map_err(Error::Diagnostics)?;
     Ok(emit::wat(&ir))
+}
+
+/// Compile a macro program with deterministic logical resource accounting.
+/// Its trusted host must install the `ilang:macro/budget/v1` hooks.
+pub fn compile_macro(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    mut options: Options,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    // Macro evaluation is always on the compiler host, independently of the
+    // target of the program being compiled (meta §8).
+    options.target = Target::Host;
+    let (ir, bindings) =
+        lower::lower_with_bindings(graph, program, typed, options).map_err(Error::Diagnostics)?;
+    let (text, cost) = emit::wat_metered(&ir);
+    let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
+    emit::add_abi_section(&mut wasm, &ir.abi_json);
+    add_provider_section(&mut wasm, &bindings);
+    let mut static_cost = [0u8; 16];
+    static_cost[..8].copy_from_slice(&cost.work.to_le_bytes());
+    static_cost[8..].copy_from_slice(&cost.allocation.to_le_bytes());
+    emit::add_custom_section(&mut wasm, "ilang.macro.budget", &static_cost);
+    validate(&wasm).map_err(Error::Internal)?;
+    Ok((wasm, bindings))
 }
 
 /// The Wasm features of Appendix B.1, and the small ones every engine with

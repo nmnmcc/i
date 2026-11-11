@@ -803,13 +803,17 @@ dependencies = [
  "ilang-check",
  "ilang-host",
  "ilang-lsp",
+ "ilang-macro",
  "ilang-package",
  "ilang-syntax",
  "ilang-wasm",
  "num-bigint 0.5.1",
  "rcgen",
+ "serde",
+ "serde_json",
  "tempfile",
  "toml_edit",
+ "wasmparser 0.262.0",
  "wasmtime",
 ]
 
@@ -820,6 +824,7 @@ dependencies = [
  "anyhow",
  "futures-util",
  "getrandom 0.3.4",
+ "ilang-syntax",
  "num-bigint 0.5.1",
  "rustls-native-certs",
  "rustls-pemfile",
@@ -840,6 +845,7 @@ dependencies = [
  "anyhow",
  "crossbeam-channel",
  "ilang-check",
+ "ilang-macro",
  "ilang-package",
  "ilang-syntax",
  "lsp-server",
@@ -847,6 +853,18 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "ilang-macro"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ilang-check",
+ "ilang-host",
+ "ilang-package",
+ "ilang-syntax",
+ "ilang-wasm",
 ]
 
 [[package]]

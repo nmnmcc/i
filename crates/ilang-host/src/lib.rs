@@ -73,10 +73,12 @@
 //! collector or size, to measure them.
 
 pub mod bindings;
+pub mod macro_budget;
 mod requests;
 pub mod resources;
 mod run;
 pub mod services;
+pub mod syntax;
 #[cfg(test)]
 mod tests;
 
@@ -544,6 +546,7 @@ enum HostFunction {
 pub struct HostImports {
     functions: BTreeMap<(String, String), HostFunction>,
     resource_host: ResourceHost,
+    macro_budget: Option<macro_budget::MacroBudget>,
     unrestricted: std::collections::BTreeSet<(String, String)>,
     grants: bindings::Grants,
 }
@@ -553,6 +556,7 @@ impl Default for HostImports {
         Self {
             functions: BTreeMap::new(),
             resource_host: HOST.get_or_init(ResourceHost::default).clone(),
+            macro_budget: None,
             unrestricted: Default::default(),
             grants: Default::default(),
         }
@@ -560,6 +564,11 @@ impl Default for HostImports {
 }
 
 impl HostImports {
+    /// Give an instrumented macro instance the same budget as its compiler services.
+    pub fn set_macro_budget(&mut self, budget: macro_budget::MacroBudget) {
+        assert!(self.macro_budget.is_none(), "macro budget set twice");
+        self.macro_budget = Some(budget);
+    }
     /// Choose an explicit host identity domain. Reuse it across programs/tests.
     pub fn with_resource_host(mut self, host: ResourceHost) -> Self {
         self.resource_host = host;
@@ -693,6 +702,16 @@ impl HostImports {
     /// Adds every function of `other`. A function that is in both is an
     /// error.
     pub fn merge(&mut self, other: HostImports) -> Result<()> {
+        if let Some(incoming) = &other.macro_budget {
+            if let Some(current) = &self.macro_budget {
+                ensure!(
+                    current.same_instance(incoming),
+                    "cannot merge distinct macro budgets"
+                );
+            } else {
+                self.macro_budget = Some(incoming.clone());
+            }
+        }
         for ((module, name), function) in other.functions {
             self.insert(module, name, function)?;
         }
@@ -744,7 +763,8 @@ impl HostOptions {
 
 struct State {
     resources: ResourceContext,
-    references: HashMap<usize, (Weak<dyn Any + Send + Sync>, i64)>,
+    macro_budget: Option<macro_budget::MacroBudget>,
+    references: BTreeMap<usize, (Weak<dyn Any + Send + Sync>, i64)>,
     next_reference: i64,
     /// The message of the `panic` import, or of a host value that is not correct.
     stop_message: Option<String>,
@@ -774,11 +794,29 @@ pub struct Program {
     artifact_digest: String,
     binding_plan: Option<bindings::BindingPlan>,
     provider_registrations: Vec<ProviderRegistration>,
+    macro_static_cost: Option<(u64, u64)>,
 }
 
 impl Program {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let embedded = Abi::from_wasm(bytes)?;
+        let mut macro_static_cost = None;
+        for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+            if let wasmparser::Payload::CustomSection(section) = payload?
+                && section.name() == "ilang.macro.budget"
+            {
+                ensure!(
+                    macro_static_cost.is_none(),
+                    "duplicate macro budget section"
+                );
+                let data = section.data();
+                ensure!(data.len() == 16, "invalid macro budget section");
+                macro_static_cost = Some((
+                    u64::from_le_bytes(data[..8].try_into().unwrap()),
+                    u64::from_le_bytes(data[8..].try_into().unwrap()),
+                ));
+            }
+        }
         let embedded_abi = embedded.is_some();
         let abi = embedded.unwrap_or_default();
         let mut registrations = None;
@@ -833,6 +871,13 @@ impl Program {
         let module = Module::new(&engine, bytes)
             .map_err(anyhow::Error::from)
             .context("compiling the i WebAssembly module")?;
+        let has_macro_hooks = module
+            .imports()
+            .any(|import| import.module() == "ilang:macro/budget/v1");
+        ensure!(
+            has_macro_hooks == macro_static_cost.is_some(),
+            "macro accounting hooks and static budget section must occur together"
+        );
         Ok(Self {
             engine,
             module,
@@ -841,6 +886,7 @@ impl Program {
             artifact_digest: bindings::artifact_digest(bytes),
             binding_plan: None,
             provider_registrations,
+            macro_static_cost,
         })
     }
 
@@ -874,6 +920,14 @@ impl Program {
     /// Make an instance and call `ilang_start` (B.1). When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
+        if let Some((work, allocation)) = self.macro_static_cost {
+            let budget = options
+                .imports
+                .macro_budget
+                .as_ref()
+                .context("macro program needs a compiler budget")?;
+            budget.charge(work, allocation)?;
+        }
         for table in [&self.abi.services, &self.abi.externals] {
             for (namespace, fields) in table {
                 for name in fields.keys() {
@@ -964,7 +1018,8 @@ impl Program {
             &self.engine,
             State {
                 resources: initialization.clone(),
-                references: HashMap::new(),
+                macro_budget: options.imports.macro_budget.clone(),
+                references: BTreeMap::new(),
                 next_reference: 1,
                 stop_message: None,
                 failure: None,
@@ -1802,6 +1857,85 @@ fn host_failure(caller: &mut Caller<'_, State>, error: anyhow::Error) -> wasmtim
 }
 
 fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
+    // These imports are emitted only for compiler macro programs. The
+    // compiler services hold a clone of this same invocation budget.
+    linker.func_wrap(
+        "ilang:macro/budget/v1",
+        "charge",
+        |mut caller: Caller<'_, State>, work: i64, words: i64| -> wasmtime::Result<()> {
+            if work < 0 || words < 0 {
+                return Err(host_failure(&mut caller, anyhow!("negative macro charge")));
+            }
+            let Some(budget) = caller.data().macro_budget.clone() else {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("macro budget import without a budget"),
+                ));
+            };
+            budget
+                .charge(work as u64, words as u64)
+                .map_err(|e| host_failure(&mut caller, e.into()))
+        },
+    )?;
+    linker.func_wrap(
+        "ilang:macro/budget/v1",
+        "enter",
+        |mut caller: Caller<'_, State>, units: i32| -> wasmtime::Result<()> {
+            if units <= 0 {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("invalid macro frame units"),
+                ));
+            }
+            let Some(budget) = caller.data().macro_budget.clone() else {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("macro budget import without a budget"),
+                ));
+            };
+            budget
+                .enter_frame(units as u64)
+                .map_err(|e| host_failure(&mut caller, e.into()))
+        },
+    )?;
+    linker.func_wrap(
+        "ilang:macro/budget/v1",
+        "leave",
+        |mut caller: Caller<'_, State>| -> wasmtime::Result<()> {
+            let Some(budget) = caller.data().macro_budget.clone() else {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("macro budget import without a budget"),
+                ));
+            };
+            if !budget.try_leave_frame() {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("macro frame stack underflow"),
+                ));
+            }
+            Ok(())
+        },
+    )?;
+    linker.func_wrap(
+        "ilang:macro/budget/v1",
+        "restore",
+        |mut caller: Caller<'_, State>, depth: i32| -> wasmtime::Result<()> {
+            let Some(budget) = caller.data().macro_budget.clone() else {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("macro budget import without a budget"),
+                ));
+            };
+            if depth < 0 || !budget.try_restore_frames(depth as u64) {
+                return Err(host_failure(
+                    &mut caller,
+                    anyhow!("invalid macro frame restore"),
+                ));
+            }
+            Ok(())
+        },
+    )?;
     // Drops an outstanding request (B.4).
     linker.func_wrap(
         HOST_MODULE,
@@ -1858,17 +1992,31 @@ fn reference_id(
             .clone();
         let address = Arc::as_ptr(&value.0) as *const () as usize;
         let state = caller.data_mut();
+        let count = u64::try_from(state.references.len()).expect("reference count exceeds u64");
+        let levels = u64::from(64 - (count + 1).leading_zeros());
+        if let Some(budget) = &state.macro_budget {
+            // A balanced map has bounded lookup and split costs. Charge a
+            // deterministic upper bound before either the lookup or a node
+            // allocation, independent of addresses and allocator choices.
+            budget.charge(16 * (levels + 1), 0)?;
+        }
         if let Some((weak, id)) = state.references.get(&address)
             && let Some(existing) = weak.upgrade()
             && Arc::ptr_eq(&existing, &value.0)
         {
             return Ok(*id);
         }
+        if let Some(budget) = &state.macro_budget {
+            budget.charge(16 * (levels + 1), 64 * (levels + 1))?;
+        }
         let id = state.next_reference;
         state.next_reference = id
             .checked_add(1)
             .context("host reference identity space exhausted")?;
         if id % 256 == 0 {
+            if let Some(budget) = &state.macro_budget {
+                budget.charge(count, 0)?;
+            }
             state
                 .references
                 .retain(|_, (weak, _)| weak.strong_count() != 0);
@@ -1878,7 +2026,7 @@ fn reference_id(
             .insert(address, (Arc::downgrade(&value.0), id));
         Ok(id)
     })()
-    .map_err(wasmtime::Error::from_anyhow)
+    .map_err(|error| host_failure(caller, error))
 }
 
 fn define_import(
@@ -2110,7 +2258,11 @@ impl Bridge {
         }
         let memory = self.memory.context("the module does not export memory")?;
         let bytes = memory.data(context.as_context());
-        Ok(bytes[checked_range(ptr, len, bytes.len())?].to_vec())
+        let range = checked_range(ptr, len, bytes.len())?;
+        if let Some(budget) = &context.as_context().data().macro_budget {
+            budget.charge(u64::from(len), 4 + u64::from(len).div_ceil(8))?;
+        }
+        Ok(bytes[range].to_vec())
     }
 
     /// Copy into a new buffer from `ilang_alloc`; empty buffers have address 0.
@@ -2124,6 +2276,9 @@ impl Bridge {
             u32::try_from(bytes.len()).context("host buffer exceeds the wasm32 address space")?;
         if len == 0 {
             return Ok(0);
+        }
+        if let Some(budget) = &context.as_context().data().macro_budget {
+            budget.charge(u64::from(len), 4 + u64::from(len).div_ceil(8))?;
         }
         let memory = self.memory.context("the module does not export memory")?;
         let alloc = self

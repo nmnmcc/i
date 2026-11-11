@@ -125,7 +125,7 @@ bounded = (
 
 /// A value in [0, below), with rejection to avoid modulo bias.
 /// InvalidBound carries a nonpositive bound, without drawing a word.
-int = (g: Generator, below: Int) -> (Int, Generator) ? RandomError {
+int = (g: Generator, below: Int) -> (Int, Generator) ^ RandomError {
 	{ below > 0 } |> {
 		True -> {
 			space = space_for(below, word_size())
@@ -216,7 +216,7 @@ derive_path = (g: Generator, path: List(Int)) -> Generator {
 
 /// Derives positive path indices. Empty paths preserve the complete generator.
 /// InvalidPath carries the whole supplied path, without deriving or drawing.
-at_path = (g: Generator, path: List(Int)) -> Generator ? RandomError {
+at_path = (g: Generator, path: List(Int)) -> Generator ^ RandomError {
 	valid_path(path) |> {
 		True  -> derive_path(g, path)
 		False -> fail.raise(InvalidPath(path))

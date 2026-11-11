@@ -18,6 +18,7 @@
 	Channel
 	Event
 	Shared
+	Ref
 	ScheduleError(..)
 	top
 	run
@@ -44,6 +45,8 @@
 	sync
 	share
 	get
+	ref
+	update
 	both
 	race
 	map_concurrently
@@ -84,6 +87,10 @@ Channel(A) {
 
 Shared(A) {
 	Shared(run: Key(Nil), owner: Keyed, id: Keyed, values: Key(A))
+}
+
+Ref(A) {
+	Ref(run: Key(Nil), id: Keyed, values: Key(A))
 }
 
 ScheduleError {
@@ -281,7 +288,7 @@ ChannelState {
 }
 
 ShareState {
-	ShareState(id: Address, owner: Address, value: Keyed)
+	ShareState(id: Address, owner: Maybe(Address), value: Keyed)
 }
 
 Leaf {
@@ -292,7 +299,7 @@ Leaf {
 }
 
 Branch(A, E, N) {
-	Branch(leaf: Leaf, decode: (Keyed) -> A ? E ! N)
+	Branch(leaf: Leaf, decode: (Keyed) -> A ^ E ! N)
 }
 
 Event(A, E, N) {
@@ -399,6 +406,8 @@ Command {
 	Select(List(Leaf))
 	NewShare(ScopeInfo, Keyed)
 	GetShare(Key(Nil), Keyed, Keyed)
+	NewRef(Keyed)
+	UpdateRef(Key(Nil), Keyed, (Keyed) -> (Keyed, Keyed))
 	Drain
 }
 
@@ -1086,7 +1095,7 @@ guarded = (
 }
 
 make_start(A, E, N) = (
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	result: Key(Result(A, E))
 	errors: Key(E)
 	check: Bool
@@ -2276,7 +2285,7 @@ prevalidate = (s: State, t: TaskState, command: Command) {
 		)
 		Select(leaves)   -> check_leaves(s, t, leaves)
 		SendNow(info, _) -> check_channel(s, info)
-		GetShare(run, _, id) -> {
+		GetShare(run, _, id) | UpdateRef(run, id, _) -> {
 			check_run(s.run, run)
 			find_share(s.shares, read(address_key, id))
 			Nil
@@ -2596,9 +2605,9 @@ do_command = (
 		NewShare(info, value) -> {
 			portable(value)
 			id = new_address(t)
-			row = ShareState(id, read(address_key, info.id), value)
+			row = ShareState(id, Present(read(address_key, info.id)), value)
 			next = set_task(s, TaskState(..t, handles: t.handles + 1))
-			scope = find_scope(next.scopes, row.owner)
+			scope = find_scope(next.scopes, read(address_key, info.id))
 			next = set_scope(
 				State(
 					..next
@@ -2607,6 +2616,48 @@ do_command = (
 				ScopeState(..scope, owned_shares: [id, ..scope.owned_shares])
 			)
 			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
+		}
+		NewRef(value) -> {
+			portable(value)
+			id = new_address(t)
+			owner = head_scope(t.chain)
+			row = ShareState(id, owner, value)
+			next = set_task(
+				State(..s, shares: store_add(s.shares, address_index(id), row))
+				TaskState(..t, handles: t.handles + 1)
+			)
+			next = owner |> {
+				Absent -> next
+				Present(owner) -> {
+					scope = find_scope(next.scopes, owner)
+					set_scope(
+						next
+						ScopeState(
+							..scope
+							owned_shares: [id, ..scope.owned_shares]
+						)
+					)
+				}
+			}
+			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
+		}
+		UpdateRef(_, id, change) -> {
+			address = read(address_key, id)
+			row = store_find(s.shares, address_index(address)) |> {
+				Present(row) -> row
+				Absent       -> panic("task: shared value is gone")
+			}
+			(value, answer) = change(row.value)
+			portable(value)
+			next = State(
+				..s
+				shares: store_update(
+					s.shares
+					address_index(address)
+					ShareState(..row, value: value)
+				)
+			)
+			reply(next, t.serial, k, Proceed(answer), False)
 		}
 		GetShare(_, _, id) -> reply(
 			s
@@ -3029,11 +3080,11 @@ loop = (state: State) -> RunReply {
 }
 
 scope_call_body(A, E, N) = (
-	body: (Scope(E)) -> A ? E ! N
+	body: (Scope(E)) -> A ^ E ! N
 	witness: Witness
 	mode: Mode
 	own: Scheduler
-) -> ScopeResult(A) ? E ! N {
+) -> ScopeResult(A) ^ E ! N {
 	info = read(scope_key, ask(own, NewScope(witness, mode)))
 	errors: Key(E) = key.new()
 	results: Key(Result(A, E)) = key.new()
@@ -3076,9 +3127,9 @@ scope_call_body(A, E, N) = (
 }
 
 scope(A, E, N) = (
-	body: (s: Scope(E)) -> A ? E ! N
+	body: (s: Scope(E)) -> A ^ E ! N
 	own ! Scheduler
-) -> A ? E ! N | Scheduler {
+) -> A ^ E ! N | Scheduler {
 	scope_call(body, Portable, Ordinary, own) |> {
 		BodyValue(value) -> value
 		WinnerValue(_)   -> panic("task: invalid scope winner")
@@ -3086,9 +3137,9 @@ scope(A, E, N) = (
 }
 
 local_scope(A, E, N) = (
-	body: (s: Scope(E)) -> A ? E ! N
+	body: (s: Scope(E)) -> A ^ E ! N
 	own ! Scheduler
-) -> A ? E ! N | Scheduler {
+) -> A ^ E ! N | Scheduler {
 	own |> {
 		DetachedScheduler -> panic("task: no scheduler")
 		Scheduler(..) -> scope_call(body, own.witness, Ordinary, own) |> {
@@ -3100,7 +3151,7 @@ local_scope(A, E, N) = (
 
 go_key(A, E, N) = (
 	s: Scope(E)
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	result: Key(Result(A, E))
 	own ! Scheduler
 ) -> Task(A, E) ! Scheduler | N - Scheduler - Runner - request.Await {
@@ -3111,7 +3162,7 @@ go_key(A, E, N) = (
 
 go(A, E, N) = (
 	s: Scope(E)
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 ) -> Task(A, E) ! Scheduler | N - Scheduler - Runner - request.Await {
 	result: Key(Result(A, E)) = key.new()
 	go_key(s, body, result)
@@ -3130,7 +3181,7 @@ branch_at(A, E, N) = (
 	}
 }
 
-sync_body(A, E, N) = (e: Event(A, E, N), own: Scheduler) -> A ? E ! N {
+sync_body(A, E, N) = (e: Event(A, E, N), own: Scheduler) -> A ^ E ! N {
 	leaves = list_map(e.branches, (branch: Branch(A, E, N)) { branch.leaf })
 	read(selection_key, ask(own, Select(leaves))) |> {
 		Selected(index, value) -> {
@@ -3163,7 +3214,7 @@ choose(A, E, N) = (events: List(Event(A, E, N))) -> Event(A, E, N) {
 
 map(A, B, E, F, N, M) = (
 	e: Event(A, E, N)
-	f: (A) -> B ? F ! M
+	f: (A) -> B ^ F ! M
 ) -> Event(B, E | F, N | M) {
 	Event(key.new(), list_map(e.branches, (branch: Branch(A, E, N)) {
 		Branch(branch.leaf, (value: Keyed) { f(branch.decode(value)) })
@@ -3176,7 +3227,7 @@ join_event(A, E) = (t: Task(A, E)) -> Event(A, E, Never) {
 	})])
 }
 
-join(A, E) = (t: Task(A, E)) -> A ? E ! Scheduler { sync(join_event(t)) }
+join(A, E) = (t: Task(A, E)) -> A ^ E ! Scheduler { sync(join_event(t)) }
 
 channel(A) = (own ! Scheduler) -> Channel(A) ! Scheduler {
 	Channel(read(channel_key, ask(own, NewChannel(Portable))), key.new())
@@ -3233,9 +3284,9 @@ get(A) = (s: Shared(A), own ! Scheduler) -> A ! Scheduler {
 }
 
 keep(S, A, E, N) = (
-	f: (S) -> A ? E ! N
+	f: (S) -> A ^ E ! N
 	_own ! Scheduler
-) -> { (S) -> A ? E ! Scheduler } ! Scheduler | N - Scheduler - Runner - request.Await {
+) -> { (S) -> A ^ E ! Scheduler } ! Scheduler | N - Scheduler - Runner - request.Await {
 	! Scheduler = DetachedScheduler
 	! Runner = DetachedRunner
 	! request.Await = request.Await((_) { panic("task: no scheduler") })
@@ -3254,10 +3305,33 @@ keep(S, A, E, N) = (
 	(value: S, own ! Scheduler) { kept((value, own)) }
 }
 
+/// A state ref owned by the current scope, or by the run at its root.
+/// Values are portable; update callbacks are pure and execute atomically.
+ref(A) = (value: A, own ! Scheduler) -> Ref(A) ! Scheduler {
+	values: Key(A) = key.new()
+	id = ask(own, NewRef(key.wrap(values, value)))
+	own |> {
+		DetachedScheduler -> panic("task: no scheduler")
+		Scheduler(..)     -> Ref(own.run, id, values)
+	}
+}
+
+update(A, B) = (
+	ref: Ref(A)
+	change: (A) -> (A, B)
+	own ! Scheduler
+) -> B ! Scheduler {
+	answers: Key(B) = key.new()
+	read(answers, ask(own, UpdateRef(ref.run, ref.id, (value: Keyed) {
+		(next, answer) = change(read(ref.values, value))
+		(key.wrap(ref.values, next), key.wrap(answers, answer))
+	})))
+}
+
 both(A, B, E, N) = (
-	left: () -> A ? E ! N
-	right: () -> B ? E ! N
-) -> (A, B) ? E ! Scheduler | N - Scheduler - Runner - request.Await {
+	left: () -> A ^ E ! N
+	right: () -> B ^ E ! N
+) -> (A, B) ^ E ! Scheduler | N - Scheduler - Runner - request.Await {
 	scope((s) {
 		a = go(s, left)
 		b = go(s, right)
@@ -3266,10 +3340,10 @@ both(A, B, E, N) = (
 }
 
 race(A, E, N) = (
-	left: () -> A ? E ! N
-	right: () -> A ? E ! N
+	left: () -> A ^ E ! N
+	right: () -> A ^ E ! N
 	own ! Scheduler
-) -> A ? E ! Scheduler | N - Scheduler - Runner - request.Await {
+) -> A ^ E ! Scheduler | N - Scheduler - Runner - request.Await {
 	results: Key(Result(A, E)) = key.new()
 	scope_call((s) {
 		go_key(s, left, results)
@@ -3285,7 +3359,7 @@ race(A, E, N) = (
 spawn_values(A, B, E, N) = (
 	s: Scope(E)
 	xs: List(A)
-	f: (A) -> B ? E ! N
+	f: (A) -> B ^ E ! N
 ) -> List(Task(B, E)) ! Scheduler | N - Scheduler - Runner - request.Await {
 	xs |> {
 		[] -> []
@@ -3296,7 +3370,7 @@ spawn_values(A, B, E, N) = (
 	}
 }
 
-join_values(A, E) = (tasks: List(Task(A, E))) -> List(A) ? E ! Scheduler {
+join_values(A, E) = (tasks: List(Task(A, E))) -> List(A) ^ E ! Scheduler {
 	tasks |> {
 		[] -> []
 		[t, ..rest] -> {
@@ -3308,13 +3382,13 @@ join_values(A, E) = (tasks: List(Task(A, E))) -> List(A) ? E ! Scheduler {
 
 map_concurrently(A, B, E, N) = (
 	xs: List(A)
-	f: (A) -> B ? E ! N
-) -> List(B) ? E ! Scheduler | N - Scheduler - Runner - request.Await {
+	f: (A) -> B ^ E ! N
+) -> List(B) ^ E ! Scheduler | N - Scheduler - Runner - request.Await {
 	scope((s) { join_values(spawn_values(s, xs, f)) })
 }
 
 execute_body(A, E, N) = (
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	runner: Runner
 	seed: rng.Generator
 	policy: Policy
@@ -3425,9 +3499,9 @@ execute_body(A, E, N) = (
 }
 
 run(A, E, N) = (
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	runner ! Runner
-) -> A ? E ! Runner | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
+) -> A ^ E ! Runner | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
 	runner |> {
 		DetachedRunner -> panic("task: no scheduler")
 		Runner(..) -> execute(body, runner, runner.seed, runner.policy) |> {
@@ -3440,9 +3514,9 @@ run(A, E, N) = (
 test(A, E, N) = (
 	seed: rng.Generator
 	choices: List(List(Int))
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	runner ! Runner
-) -> A ? E | ScheduleError ! Runner | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
+) -> A ^ E | ScheduleError ! Runner | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
 	execute(body, runner, seed, Script(choices)) |> {
 		Ok(result)   -> fail.from_result(result)
 		Error(error) -> fail.raise(error)
@@ -3450,19 +3524,19 @@ test(A, E, N) = (
 }
 
 _entry(A, E, N) = (
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	root ! request.Root
-) -> A ? E ! request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
+) -> A ^ E ! request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
 	! Runner = initial(root)
 	retain(run(body))
 }
 
 scope_call(A, E, N) = (
-	body: (Scope(E)) -> A ? E ! N
+	body: (Scope(E)) -> A ^ E ! N
 	witness: Witness
 	mode: Mode
 	own: Scheduler
-) -> ScopeResult(A) ? E ! N {
+) -> ScopeResult(A) ^ E ! N {
 	kept = control.keep_env((_: Nil) {
 		request.within(() { scope_call_body(body, witness, mode, own) })
 	})
@@ -3470,7 +3544,7 @@ scope_call(A, E, N) = (
 }
 
 execute(A, E, N) = (
-	body: () -> A ? E ! N
+	body: () -> A ^ E ! N
 	runner: Runner
 	seed: rng.Generator
 	policy: Policy
@@ -3481,7 +3555,7 @@ execute(A, E, N) = (
 	retain(kept(Nil))
 }
 
-sync(A, E, N) = (e: Event(A, E, N), own ! Scheduler) -> A ? E ! N | Scheduler {
+sync(A, E, N) = (e: Event(A, E, N), own ! Scheduler) -> A ^ E ! N | Scheduler {
 	kept = control.keep_env((_: Nil) { sync_body(e, own) })
 	retain(kept(Nil))
 }

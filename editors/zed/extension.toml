@@ -1,0 +1,18 @@
+id = "ilang"
+name = "i"
+description = "The i programming language: syntax highlighting and i lsp."
+version = "0.1.0"
+schema_version = 1
+authors = ["i contributors"]
+repository = "https://github.com/nmnmcc/i"
+
+[language_servers.ilang]
+name = "i Language Server"
+languages = ["i"]
+
+[grammars.i]
+# Canonical checkout. scripts/dev-editors zed prepares a portable dev copy
+# with the current worktree's absolute file URL and exact committed revision.
+repository = "file:///home/agent/Programming/i"
+commit = "HEAD"
+path = "editors/tree-sitter-i"

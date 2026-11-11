@@ -68,14 +68,39 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
-        /// Select a function declared in [entries].
-        #[arg(long)]
-        entry: Option<String>,
         #[arg(long, value_enum, default_value_t = TargetArg::Native)]
         target: TargetArg,
         /// Arguments passed to the program after --.
         #[arg(last = true)]
         args: Vec<String>,
+        /// Select a function declared in [entries].
+        #[arg(long)]
+        entry: Option<String>,
+    },
+    /// List checked collection contributions as a JSON manifest.
+    Collections {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long)]
+        offline: bool,
+        /// Include test modules and development dependencies.
+        #[arg(long)]
+        tests: bool,
+    },
+    /// Build and run one opaque collection handle.
+    RunCollection {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long)]
+        offline: bool,
+        #[arg(long)]
+        tests: bool,
+        #[arg(long, default_value_t = 2)]
+        opt: u8,
+        /// Require the selected function to give Nil.
+        #[arg(long)]
+        require_nil: bool,
+        handle: String,
     },
     /// Build and run the tests of a package.
     Test {
@@ -106,6 +131,9 @@ enum Command {
         /// Write nothing; list the files that would change, and fail if any.
         #[arg(long)]
         check: bool,
+        /// Convert the source to the specified surface.
+        #[arg(long, value_parser = ["i", "is"])]
+        to: Option<String>,
         /// Files or directories to format instead.
         paths: Vec<PathBuf>,
     },
@@ -152,6 +180,31 @@ fn main() -> ExitCode {
             args,
             target.into(),
         ),
+        Command::Collections {
+            project,
+            offline,
+            tests,
+        } => match ilang_cli::collections(&project, tests, offline) {
+            Ok(manifest) => match serde_json::to_string_pretty(&manifest) {
+                Ok(json) => {
+                    println!("{json}");
+                    Ok(ExitCode::SUCCESS)
+                }
+                Err(error) => Err(error.into()),
+            },
+            Err(error) => {
+                eprintln!("{error}");
+                Ok(ExitCode::FAILURE)
+            }
+        },
+        Command::RunCollection {
+            project,
+            offline,
+            tests,
+            opt,
+            require_nil,
+            handle,
+        } => cmd_run_collection(&project, opt, offline, tests, &handle, require_nil),
         Command::Test {
             project,
             offline,
@@ -172,8 +225,9 @@ fn main() -> ExitCode {
         Command::Fmt {
             project,
             check,
+            to,
             paths,
-        } => commands::fmt::run(&project, check, &paths),
+        } => commands::fmt::run(&project, check, to.as_deref(), &paths),
     };
     match result {
         Ok(code) => code,
@@ -273,7 +327,7 @@ fn cmd_build(
     if wat {
         let (mut graph, _) = ilang_cli::load(project, false, offline);
         graph.entry = entry.map(str::to_owned);
-        let checked = ilang_check::check(&graph);
+        let checked = ilang_macro::project::check(&mut graph);
         if let (Some(p), Some(t)) = (&checked.program, &checked.types)
             && let Ok(text) = ilang_wasm::compile_wat(
                 &graph,
@@ -344,6 +398,43 @@ fn cmd_run(
     }
 }
 
+fn cmd_run_collection(
+    project: &Path,
+    opt: u8,
+    offline: bool,
+    tests: bool,
+    handle: &str,
+    require_nil: bool,
+) -> anyhow::Result<ExitCode> {
+    let result = if require_nil {
+        ilang_cli::CollectionResult::Nil
+    } else {
+        ilang_cli::CollectionResult::Any
+    };
+    let selected =
+        match ilang_cli::build_collection(project, options(opt, tests, offline)?, handle, result) {
+            Ok(selected) => selected,
+            Err(error) => {
+                eprintln!("{error}");
+                return Ok(ExitCode::FAILURE);
+            }
+        };
+    for warning in &selected.built.warnings {
+        eprintln!("{warning}");
+    }
+    match selected.run_with(selected.built.host_options())? {
+        Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
+        Outcome::Stop(stop) => {
+            eprintln!("{stop}");
+            Ok(ExitCode::FAILURE)
+        }
+        Outcome::Err(error) => {
+            eprintln!("error: {:?}", error.0);
+            Ok(ExitCode::FAILURE)
+        }
+    }
+}
+
 fn cmd_test(
     project: &Path,
     opt: u8,
@@ -354,6 +445,47 @@ fn cmd_test(
 ) -> anyhow::Result<ExitCode> {
     if target == Target::Wasi {
         anyhow::bail!("the WASI target runs a command entry and does not compile tests (§B.7)");
+    }
+    let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
+    let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
+    let entries = if let Some(collection) = manifest
+        .get("test")
+        .and_then(|t| t.get("collection"))
+        .and_then(|v| v.as_str())
+    {
+        match ilang_cli::collections(project, true, offline) {
+            Ok(manifest) => manifest
+                .entries
+                .into_iter()
+                .filter(|e| e.collection == collection)
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                eprintln!("{error}");
+                return Ok(ExitCode::FAILURE);
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    let focused = entries
+        .iter()
+        .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
+    let mut seen = std::collections::HashMap::new();
+    for entry in &entries {
+        if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
+            if let Some(previous) = seen.insert(name, &entry.at) {
+                eprintln!(
+                    "duplicate test name {name:?}: {}:{}:{} and {}:{}:{}",
+                    previous.path,
+                    previous.line,
+                    previous.column,
+                    entry.at.path,
+                    entry.at.line,
+                    entry.at.column
+                );
+                return Ok(ExitCode::FAILURE);
+            }
+        }
     }
     let options = BuildOptions {
         target,
@@ -371,7 +503,14 @@ fn cmd_test(
         .filter(|n| filter.is_none_or(|f| n.contains(f)))
         .collect();
     let mut failed = 0;
+    let mut passed = 0;
+    let mut skipped = 0;
     for name in &tests {
+        if focused {
+            skipped += 1;
+            println!("skip {name}");
+            continue;
+        }
         let start = (std::time::Instant::now(), cpu_seconds());
         let result = ilang_cli::run_test_with(&program, name, b.host_options());
         let took = if time {
@@ -384,7 +523,10 @@ fn cmd_test(
             String::new()
         };
         match result {
-            TestResult::Passed => println!("pass {name}{took}"),
+            TestResult::Passed => {
+                passed += 1;
+                println!("pass {name}{took}");
+            }
             TestResult::Stopped(stop) => {
                 failed += 1;
                 println!("FAIL {name}{took}");
@@ -399,7 +541,59 @@ fn cmd_test(
             }
         }
     }
-    println!("{} passed, {failed} failed", tests.len() - failed);
+    {
+        for entry in entries {
+            let get = |key: &str| {
+                entry
+                    .data
+                    .iter()
+                    .find(|(k, _)| k == key)
+                    .map(|(_, v)| v.as_str())
+            };
+            let name = get("name").unwrap_or(&entry.target.path);
+            let mode = get("mode").unwrap_or("test");
+            if filter.is_some_and(|f| !name.contains(f)) {
+                continue;
+            }
+            if mode == "skip" || (focused && mode != "only") {
+                skipped += 1;
+                println!("skip {name}");
+                continue;
+            }
+            let selected = match ilang_cli::build_collection(
+                project,
+                options,
+                &entry.handle,
+                ilang_cli::CollectionResult::Nil,
+            ) {
+                Ok(selected) => selected,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return Ok(ExitCode::FAILURE);
+                }
+            };
+            let outcome = selected.run_with(selected.built.host_options());
+            let success = matches!(outcome, Ok(Outcome::Ok(_)));
+            if outcome.is_ok() && success != (mode == "fails") {
+                passed += 1;
+                println!("pass {name}");
+            } else {
+                failed += 1;
+                println!("FAIL {name}");
+                match outcome {
+                    Ok(Outcome::Stop(stop)) => println!("  {stop}"),
+                    Ok(Outcome::Err(error)) => println!("  error: {:?}", error.0),
+                    Err(error) => println!("  {error:#}"),
+                    Ok(Outcome::Ok(_)) => println!("  expected failure"),
+                }
+            }
+        }
+    }
+    if skipped == 0 {
+        println!("{passed} passed, {failed} failed");
+    } else {
+        println!("{passed} passed, {failed} failed, {skipped} skipped");
+    }
     Ok(if failed == 0 {
         ExitCode::SUCCESS
     } else {
@@ -426,15 +620,20 @@ fn cpu_seconds() -> Option<f64> {
 /// top-level name of the package's modules, in source order. The tests are
 /// checked too.
 fn check(project: &Path, offline: bool, types: bool, target: Option<Target>) -> ExitCode {
-    let (graph, mut diags) = ilang_cli::load(project, true, offline);
+    let (mut graph, mut diags) = ilang_cli::load(project, true, offline);
     if graph.root.is_some() {
-        let checked = ilang_check::check(&graph);
+        let checked = ilang_macro::project::check(&mut graph);
         if let Some(target) = target
             && !checked.diags.iter().any(Diagnostic::is_error)
+            && let (Some(program), Some(typed)) = (&checked.program, &checked.types)
         {
-            for plan in
-                ilang_check::providers::resolve_plans(&checked, &graph, target.provider_target())
-                    .into_values()
+            for plan in ilang_check::providers::resolve_program_plans(
+                program,
+                typed,
+                &graph,
+                target.provider_target(),
+            )
+            .into_values()
             {
                 if let Err(more) = plan {
                     diags.extend(more);

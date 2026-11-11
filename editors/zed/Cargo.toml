@@ -1,0 +1,16 @@
+[package]
+name = "zed_i"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Match the reference zed-gleam extension's supported API.
+zed_extension_api = "=0.1.0"
+
+# This extension builds independently of the compiler workspace.
+[workspace]

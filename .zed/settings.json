@@ -1,0 +1,12 @@
+{
+  "languages": {
+    "i": {
+      "language_servers": ["ilang"],
+      "formatter": { "language_server": { "name": "ilang" } },
+      "format_on_save": "on"
+    }
+  },
+  "lsp": {
+    "ilang": { "binary": { "path": "target/release/i" } }
+  }
+}
