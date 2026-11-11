@@ -159,193 +159,193 @@ json_generated_strings = () {
 }
 
 @test
-json_valid_0 = () {
+json_valid_0_null = () {
 	Ok(v) = json.parse(" null ")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_1 = () {
+json_valid_1_true = () {
 	Ok(v) = json.parse("true")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_2 = () {
+json_valid_2_false = () {
 	Ok(v) = json.parse("false")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_3 = () {
+json_valid_3_0 = () {
 	Ok(v) = json.parse("-0")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_4 = () {
+json_valid_4_10 = () {
 	Ok(v) = json.parse("10")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_5 = () {
+json_valid_5_12 = () {
 	Ok(v) = json.parse("-12")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_6 = () {
+json_valid_6_0_0 = () {
 	Ok(v) = json.parse("0.0")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_7 = () {
+json_valid_7_0_1 = () {
 	Ok(v) = json.parse("-0.1")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_8 = () {
+json_valid_8_12_34 = () {
 	Ok(v) = json.parse("12.34")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_9 = () {
+json_valid_9_1e_2 = () {
 	Ok(v) = json.parse("1E+2")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_10 = () {
+json_valid_10_1e_2 = () {
 	Ok(v) = json.parse("1e-2")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_11 = () {
+json_valid_11_empty = () {
 	Ok(v) = json.parse("[ ]")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_12 = () {
+json_valid_12_empty = () {
 	Ok(v) = json.parse("{ }")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_13 = () {
+json_valid_13_1_2_3 = () {
 	Ok(v) = json.parse("[1,2,3]")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_14 = () {
+json_valid_14_empty = () {
 	Ok(v) = json.parse("[[],{}]")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_15 = () {
+json_valid_15_x_true = () {
 	Ok(v) = json.parse("{\"x\":true}")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_16 = () {
+json_valid_16_x_1_x_2 = () {
 	Ok(v) = json.parse("{\"x\":1,\"x\":2}")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_17 = () {
+json_valid_17_empty = () {
 	Ok(v) = json.parse("\"\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_18 = () {
+json_valid_18_empty = () {
 	Ok(v) = json.parse("\"/\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_19 = () {
+json_valid_19_empty = () {
 	Ok(v) = json.parse("\"\\/\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_20 = () {
+json_valid_20_empty = () {
 	Ok(v) = json.parse("\"\\\\\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_21 = () {
+json_valid_21_empty = () {
 	Ok(v) = json.parse("\"\\\"\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_22 = () {
+json_valid_22_b_f_n_r_t = () {
 	Ok(v) = json.parse("\"\\b\\f\\n\\r\\t\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_23 = () {
+json_valid_23_u0000 = () {
 	Ok(v) = json.parse("\"\\u0000\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_24 = () {
+json_valid_24_u00e9 = () {
 	Ok(v) = json.parse("\"\\u00e9\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_25 = () {
+json_valid_25_ud834_udd1e = () {
 	Ok(v) = json.parse("\"\\uD834\\uDD1E\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_26 = () {
+json_valid_26_empty = () {
 	Ok(v) = json.parse("\"你好\"")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_27 = () {
+json_valid_27_true_false_null = () {
 	Ok(v) = json.parse("[true,false,null]")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_28 = () {
+json_valid_28_a_1 = () {
 	Ok(v) = json.parse(" { \"a\" : [1] } ")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_29 = () {
+json_valid_29_a_b = () {
 	Ok(v) = json.parse("[\"a\",\"b\"]")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_valid_30 = () {
+json_valid_30_a_b = () {
 	Ok(v) = json.parse("{\"a\":{},\"b\":[]}")
 	assert(json.parse(json.print(v)) == Ok(v))
 }
 
 @test
-json_invalid_0 = () {
+json_invalid_0_empty = () {
 	assert(json.parse("") |> {
 		Error(_) -> True
 		_        -> False
@@ -353,7 +353,7 @@ json_invalid_0 = () {
 }
 
 @test
-json_invalid_1 = () {
+json_invalid_1_empty = () {
 	assert(json.parse(" ") |> {
 		Error(_) -> True
 		_        -> False
@@ -361,7 +361,7 @@ json_invalid_1 = () {
 }
 
 @test
-json_invalid_2 = () {
+json_invalid_2_null = () {
 	assert(json.parse("Null") |> {
 		Error(_) -> True
 		_        -> False
@@ -369,7 +369,7 @@ json_invalid_2 = () {
 }
 
 @test
-json_invalid_3 = () {
+json_invalid_3_true = () {
 	assert(json.parse("TRUE") |> {
 		Error(_) -> True
 		_        -> False
@@ -377,7 +377,7 @@ json_invalid_3 = () {
 }
 
 @test
-json_invalid_4 = () {
+json_invalid_4_undefined = () {
 	assert(json.parse("undefined") |> {
 		Error(_) -> True
 		_        -> False
@@ -385,7 +385,7 @@ json_invalid_4 = () {
 }
 
 @test
-json_invalid_5 = () {
+json_invalid_5_nan = () {
 	assert(json.parse("nan") |> {
 		Error(_) -> True
 		_        -> False
@@ -393,7 +393,7 @@ json_invalid_5 = () {
 }
 
 @test
-json_invalid_6 = () {
+json_invalid_6_empty = () {
 	assert(json.parse("-") |> {
 		Error(_) -> True
 		_        -> False
@@ -401,7 +401,7 @@ json_invalid_6 = () {
 }
 
 @test
-json_invalid_7 = () {
+json_invalid_7_1 = () {
 	assert(json.parse("+1") |> {
 		Error(_) -> True
 		_        -> False
@@ -409,7 +409,7 @@ json_invalid_7 = () {
 }
 
 @test
-json_invalid_8 = () {
+json_invalid_8_00 = () {
 	assert(json.parse("00") |> {
 		Error(_) -> True
 		_        -> False
@@ -417,7 +417,7 @@ json_invalid_8 = () {
 }
 
 @test
-json_invalid_9 = () {
+json_invalid_9_01 = () {
 	assert(json.parse("01") |> {
 		Error(_) -> True
 		_        -> False
@@ -425,7 +425,7 @@ json_invalid_9 = () {
 }
 
 @test
-json_invalid_10 = () {
+json_invalid_10_01 = () {
 	assert(json.parse("-01") |> {
 		Error(_) -> True
 		_        -> False
@@ -433,7 +433,7 @@ json_invalid_10 = () {
 }
 
 @test
-json_invalid_11 = () {
+json_invalid_11_1 = () {
 	assert(json.parse(".1") |> {
 		Error(_) -> True
 		_        -> False
@@ -441,7 +441,7 @@ json_invalid_11 = () {
 }
 
 @test
-json_invalid_12 = () {
+json_invalid_12_1 = () {
 	assert(json.parse("1.") |> {
 		Error(_) -> True
 		_        -> False
@@ -449,7 +449,7 @@ json_invalid_12 = () {
 }
 
 @test
-json_invalid_13 = () {
+json_invalid_13_1e = () {
 	assert(json.parse("1e") |> {
 		Error(_) -> True
 		_        -> False
@@ -457,7 +457,7 @@ json_invalid_13 = () {
 }
 
 @test
-json_invalid_14 = () {
+json_invalid_14_1e = () {
 	assert(json.parse("1e+") |> {
 		Error(_) -> True
 		_        -> False
@@ -465,7 +465,7 @@ json_invalid_14 = () {
 }
 
 @test
-json_invalid_15 = () {
+json_invalid_15_1e = () {
 	assert(json.parse("1e-") |> {
 		Error(_) -> True
 		_        -> False
@@ -473,7 +473,7 @@ json_invalid_15 = () {
 }
 
 @test
-json_invalid_16 = () {
+json_invalid_16_empty = () {
 	assert(json.parse("[") |> {
 		Error(_) -> True
 		_        -> False
@@ -481,7 +481,7 @@ json_invalid_16 = () {
 }
 
 @test
-json_invalid_17 = () {
+json_invalid_17_empty = () {
 	assert(json.parse("]") |> {
 		Error(_) -> True
 		_        -> False
@@ -489,7 +489,7 @@ json_invalid_17 = () {
 }
 
 @test
-json_invalid_18 = () {
+json_invalid_18_1 = () {
 	assert(json.parse("[1") |> {
 		Error(_) -> True
 		_        -> False
@@ -497,7 +497,7 @@ json_invalid_18 = () {
 }
 
 @test
-json_invalid_19 = () {
+json_invalid_19_1 = () {
 	assert(json.parse("[1,]") |> {
 		Error(_) -> True
 		_        -> False
@@ -505,7 +505,7 @@ json_invalid_19 = () {
 }
 
 @test
-json_invalid_20 = () {
+json_invalid_20_1 = () {
 	assert(json.parse("[,1]") |> {
 		Error(_) -> True
 		_        -> False
@@ -513,7 +513,7 @@ json_invalid_20 = () {
 }
 
 @test
-json_invalid_21 = () {
+json_invalid_21_1_2 = () {
 	assert(json.parse("[1 2]") |> {
 		Error(_) -> True
 		_        -> False
@@ -521,7 +521,7 @@ json_invalid_21 = () {
 }
 
 @test
-json_invalid_22 = () {
+json_invalid_22_empty = () {
 	assert(json.parse("{") |> {
 		Error(_) -> True
 		_        -> False
@@ -529,7 +529,7 @@ json_invalid_22 = () {
 }
 
 @test
-json_invalid_23 = () {
+json_invalid_23_empty = () {
 	assert(json.parse("}") |> {
 		Error(_) -> True
 		_        -> False
@@ -537,7 +537,7 @@ json_invalid_23 = () {
 }
 
 @test
-json_invalid_24 = () {
+json_invalid_24_empty = () {
 	assert(json.parse("{,}") |> {
 		Error(_) -> True
 		_        -> False
@@ -545,7 +545,7 @@ json_invalid_24 = () {
 }
 
 @test
-json_invalid_25 = () {
+json_invalid_25_a = () {
 	assert(json.parse("{\"a\"}") |> {
 		Error(_) -> True
 		_        -> False
@@ -553,7 +553,7 @@ json_invalid_25 = () {
 }
 
 @test
-json_invalid_26 = () {
+json_invalid_26_a = () {
 	assert(json.parse("{\"a\":}") |> {
 		Error(_) -> True
 		_        -> False
@@ -561,7 +561,7 @@ json_invalid_26 = () {
 }
 
 @test
-json_invalid_27 = () {
+json_invalid_27_a_1 = () {
 	assert(json.parse("{\"a\":1,}") |> {
 		Error(_) -> True
 		_        -> False
@@ -569,7 +569,7 @@ json_invalid_27 = () {
 }
 
 @test
-json_invalid_28 = () {
+json_invalid_28_a_1 = () {
 	assert(json.parse("{a:1}") |> {
 		Error(_) -> True
 		_        -> False
@@ -577,7 +577,7 @@ json_invalid_28 = () {
 }
 
 @test
-json_invalid_29 = () {
+json_invalid_29_a_1 = () {
 	assert(json.parse("{\"a\" 1}") |> {
 		Error(_) -> True
 		_        -> False
@@ -585,7 +585,7 @@ json_invalid_29 = () {
 }
 
 @test
-json_invalid_30 = () {
+json_invalid_30_empty = () {
 	assert(json.parse("\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -593,7 +593,7 @@ json_invalid_30 = () {
 }
 
 @test
-json_invalid_31 = () {
+json_invalid_31_empty = () {
 	assert(json.parse("\"\\\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -601,7 +601,7 @@ json_invalid_31 = () {
 }
 
 @test
-json_invalid_32 = () {
+json_invalid_32_x = () {
 	assert(json.parse("\"\\x\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -609,7 +609,7 @@ json_invalid_32 = () {
 }
 
 @test
-json_invalid_33 = () {
+json_invalid_33_u12 = () {
 	assert(json.parse("\"\\u12\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -617,7 +617,7 @@ json_invalid_33 = () {
 }
 
 @test
-json_invalid_34 = () {
+json_invalid_34_uzzzz = () {
 	assert(json.parse("\"\\uZZZZ\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -625,7 +625,7 @@ json_invalid_34 = () {
 }
 
 @test
-json_invalid_35 = () {
+json_invalid_35_ud800 = () {
 	assert(json.parse("\"\\uD800\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -633,7 +633,7 @@ json_invalid_35 = () {
 }
 
 @test
-json_invalid_36 = () {
+json_invalid_36_udc00 = () {
 	assert(json.parse("\"\\uDC00\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -641,7 +641,7 @@ json_invalid_36 = () {
 }
 
 @test
-json_invalid_37 = () {
+json_invalid_37_ud800_u0041 = () {
 	assert(json.parse("\"\\uD800\\u0041\"") |> {
 		Error(_) -> True
 		_        -> False
@@ -649,7 +649,7 @@ json_invalid_37 = () {
 }
 
 @test
-json_invalid_38 = () {
+json_invalid_38_true_false = () {
 	assert(json.parse("true false") |> {
 		Error(_) -> True
 		_        -> False
@@ -657,7 +657,7 @@ json_invalid_38 = () {
 }
 
 @test
-json_invalid_39 = () {
+json_invalid_39_nullx = () {
 	assert(json.parse("nullx") |> {
 		Error(_) -> True
 		_        -> False
@@ -665,7 +665,7 @@ json_invalid_39 = () {
 }
 
 @test
-json_invalid_40 = () {
+json_invalid_40_empty = () {
 	assert(json.parse("{}[]") |> {
 		Error(_) -> True
 		_        -> False
@@ -673,7 +673,7 @@ json_invalid_40 = () {
 }
 
 @test
-json_invalid_41 = () {
+json_invalid_41_a_n = () {
 	assert(json.parse("\"a\n\"") |> {
 		Error(_) -> True
 		_        -> False

@@ -160,7 +160,7 @@ http_incremental_chunked_response = () {
 }
 
 @test
-http_requests_0 = () {
+http_requests_0_get_http_1_1_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"GET / HTTP/1.1\r\n\r\n":utf8>>
@@ -172,7 +172,7 @@ http_requests_0 = () {
 }
 
 @test
-http_requests_1 = () {
+http_requests_1_head_x_http_1_1_r_nhost_h_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"HEAD /x HTTP/1.1\r\nHost: h\r\n\r\n":utf8>>
@@ -184,7 +184,7 @@ http_requests_1 = () {
 }
 
 @test
-http_requests_2 = () {
+http_requests_2_post_x_q_a_http_1_1_r_ncontent_lengt = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"POST /x?q=a HTTP/1.1\r\nContent-Length: 0\r\n\r\n":utf8>>
@@ -196,7 +196,7 @@ http_requests_2 = () {
 }
 
 @test
-http_requests_3 = () {
+http_requests_3_put_a_http_1_1_r_ncontent_length_1_r = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"PUT /a HTTP/1.1\r\nContent-Length: 1\r\n\r\na":utf8>>
@@ -208,7 +208,7 @@ http_requests_3 = () {
 }
 
 @test
-http_requests_4 = () {
+http_requests_4_delete_http_1_1_r_nx_y_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"DELETE / HTTP/1.1\r\nX: y\r\n\r\n":utf8>>
@@ -220,7 +220,7 @@ http_requests_4 = () {
 }
 
 @test
-http_requests_5 = () {
+http_requests_5_options_http_1_1_r_nhost_h_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"OPTIONS * HTTP/1.1\r\nHost: h\r\n\r\n":utf8>>
@@ -232,7 +232,7 @@ http_requests_5 = () {
 }
 
 @test
-http_requests_6 = () {
+http_requests_6_patch_p_http_1_1_r_nx_a_r_nx_b_r_n_r = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"PATCH /p HTTP/1.1\r\nX: a\r\nX: b\r\n\r\n":utf8>>
@@ -244,7 +244,7 @@ http_requests_6 = () {
 }
 
 @test
-http_requests_7 = () {
+http_requests_7_connect_h_80_http_1_1_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"CONNECT h:80 HTTP/1.1\r\n\r\n":utf8>>
@@ -256,7 +256,7 @@ http_requests_7 = () {
 }
 
 @test
-http_requests_8 = () {
+http_requests_8_trace_http_1_1_r_nx_t_a_t_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"TRACE / HTTP/1.1\r\nX: \t a \t\r\n\r\n":utf8>>
@@ -268,7 +268,7 @@ http_requests_8 = () {
 }
 
 @test
-http_requests_9 = () {
+http_requests_9_custom_http_1_1_r_nx_1_value_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"custom / HTTP/1.1\r\nX-1: value\r\n\r\n":utf8>>
@@ -280,7 +280,7 @@ http_requests_9 = () {
 }
 
 @test
-http_requests_10 = () {
+http_requests_10_get_http_1_1_r_nempty_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"GET / HTTP/1.1\r\nEmpty:\r\n\r\n":utf8>>
@@ -292,7 +292,7 @@ http_requests_10 = () {
 }
 
 @test
-http_requests_11 = () {
+http_requests_11_get_http_1_1_r_nx_a_b_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"GET / HTTP/1.1\r\nX: a:b\r\n\r\n":utf8>>
@@ -304,7 +304,7 @@ http_requests_11 = () {
 }
 
 @test
-http_requests_12 = () {
+http_requests_12_get_http_1_1_r_ncontent_length_3_r_n = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"GET / HTTP/1.1\r\nContent-Length: 3\r\n\r\nabc":utf8>>
@@ -316,7 +316,7 @@ http_requests_12 = () {
 }
 
 @test
-http_requests_13 = () {
+http_requests_13_get_http_1_1_r_ntransfer_encoding_ch = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<"GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n":utf8>>
@@ -328,7 +328,7 @@ http_requests_13 = () {
 }
 
 @test
-http_requests_14 = () {
+http_requests_14_post_http_1_1_r_ntransfer_encoding_c = () {
 	http.Complete(value, <<>>) = http.feed_request(
 		<<>>
 		<<
@@ -342,7 +342,7 @@ http_requests_14 = () {
 }
 
 @test
-http_responses_0 = () {
+http_responses_0_http_1_1_200_ok_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 200 OK\r\n\r\n":utf8>>
@@ -354,7 +354,7 @@ http_responses_0 = () {
 }
 
 @test
-http_responses_1 = () {
+http_responses_1_http_1_1_201_created_r_nx_a_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 201 Created\r\nX: a\r\n\r\n":utf8>>
@@ -366,7 +366,7 @@ http_responses_1 = () {
 }
 
 @test
-http_responses_2 = () {
+http_responses_2_http_1_1_204_no_content_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 204 No Content\r\n\r\n":utf8>>
@@ -378,7 +378,7 @@ http_responses_2 = () {
 }
 
 @test
-http_responses_3 = () {
+http_responses_3_http_1_1_301_moved_permanently_r_nlo = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 301 Moved Permanently\r\nLocation: /\r\n\r\n":utf8>>
@@ -390,7 +390,7 @@ http_responses_3 = () {
 }
 
 @test
-http_responses_4 = () {
+http_responses_4_http_1_1_302_found_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 302 Found\r\n\r\n":utf8>>
@@ -402,7 +402,7 @@ http_responses_4 = () {
 }
 
 @test
-http_responses_5 = () {
+http_responses_5_http_1_1_304_not_modified_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 304 Not Modified\r\n\r\n":utf8>>
@@ -414,7 +414,7 @@ http_responses_5 = () {
 }
 
 @test
-http_responses_6 = () {
+http_responses_6_http_1_1_400_bad_request_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 400 Bad Request\r\n\r\n":utf8>>
@@ -426,7 +426,7 @@ http_responses_6 = () {
 }
 
 @test
-http_responses_7 = () {
+http_responses_7_http_1_1_401_unauthorized_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 401 Unauthorized\r\n\r\n":utf8>>
@@ -438,7 +438,7 @@ http_responses_7 = () {
 }
 
 @test
-http_responses_8 = () {
+http_responses_8_http_1_1_403_forbidden_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 403 Forbidden\r\n\r\n":utf8>>
@@ -450,7 +450,7 @@ http_responses_8 = () {
 }
 
 @test
-http_responses_9 = () {
+http_responses_9_http_1_1_404_not_found_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 404 Not Found\r\n\r\n":utf8>>
@@ -462,7 +462,7 @@ http_responses_9 = () {
 }
 
 @test
-http_responses_10 = () {
+http_responses_10_http_1_1_405_method_not_allowed_r_n_ = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 405 Method Not Allowed\r\n\r\n":utf8>>
@@ -474,7 +474,7 @@ http_responses_10 = () {
 }
 
 @test
-http_responses_11 = () {
+http_responses_11_http_1_1_500_internal_server_error_r = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 500 Internal Server Error\r\n\r\n":utf8>>
@@ -486,7 +486,7 @@ http_responses_11 = () {
 }
 
 @test
-http_responses_12 = () {
+http_responses_12_http_1_1_502_bad_gateway_r_n_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 502 Bad Gateway\r\n\r\n":utf8>>
@@ -498,7 +498,7 @@ http_responses_12 = () {
 }
 
 @test
-http_responses_13 = () {
+http_responses_13_http_1_1_503_service_unavailable_r_n = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 503 Service Unavailable\r\n\r\n":utf8>>
@@ -510,7 +510,7 @@ http_responses_13 = () {
 }
 
 @test
-http_responses_14 = () {
+http_responses_14_http_1_1_200_ok_r_ncontent_length_2_ = () {
 	http.Complete(value, <<>>) = http.feed_response(
 		<<>>
 		<<"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi":utf8>>
@@ -522,7 +522,7 @@ http_responses_14 = () {
 }
 
 @test
-http_bad_0 = () {
+http_bad_0_get_http_1_0_r_n_r_n = () {
 	assert(http.feed_request(<<>>, <<"GET / HTTP/1.0\r\n\r\n":utf8>>) |> {
 		http.Invalid(_) -> True
 		_               -> False
@@ -530,7 +530,7 @@ http_bad_0 = () {
 }
 
 @test
-http_bad_1 = () {
+http_bad_1_get_http_1_1_r_n_r_n = () {
 	assert(http.feed_request(<<>>, <<"GET  / HTTP/1.1\r\n\r\n":utf8>>) |> {
 		http.Invalid(_) -> True
 		_               -> False
@@ -538,7 +538,7 @@ http_bad_1 = () {
 }
 
 @test
-http_bad_2 = () {
+http_bad_2_g_t_http_1_1_r_n_r_n = () {
 	assert(http.feed_request(<<>>, <<"G@T / HTTP/1.1\r\n\r\n":utf8>>) |> {
 		http.Invalid(_) -> True
 		_               -> False
@@ -546,7 +546,7 @@ http_bad_2 = () {
 }
 
 @test
-http_bad_3 = () {
+http_bad_3_get_http_1_1_n_n = () {
 	assert(http.feed_request(<<>>, <<"GET / HTTP/1.1\n\n":utf8>>) |> {
 		http.Invalid(_) -> True
 		_               -> False
@@ -554,7 +554,7 @@ http_bad_3 = () {
 }
 
 @test
-http_bad_4 = () {
+http_bad_4_get_http_1_1_r_n_fold_x_r_n_r_n = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -567,7 +567,7 @@ http_bad_4 = () {
 }
 
 @test
-http_bad_5 = () {
+http_bad_5_get_http_1_1_r_nbad_header_x_r_n_r_n = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -580,7 +580,7 @@ http_bad_5 = () {
 }
 
 @test
-http_bad_6 = () {
+http_bad_6_get_http_1_1_r_nnocolon_r_n_r_n = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -593,7 +593,7 @@ http_bad_6 = () {
 }
 
 @test
-http_bad_7 = () {
+http_bad_7_get_http_1_1_r_ncontent_length_1_r_n = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -606,7 +606,7 @@ http_bad_7 = () {
 }
 
 @test
-http_bad_8 = () {
+http_bad_8_get_http_1_1_r_ncontent_length_x_r_n = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -619,7 +619,7 @@ http_bad_8 = () {
 }
 
 @test
-http_bad_9 = () {
+http_bad_9_get_http_1_1_r_ncontent_length_0_r_n = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -634,7 +634,7 @@ http_bad_9 = () {
 }
 
 @test
-http_bad_10 = () {
+http_bad_10_get_http_1_1_r_ntransfer_encoding_gz = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -647,7 +647,7 @@ http_bad_10 = () {
 }
 
 @test
-http_bad_11 = () {
+http_bad_11_get_http_1_1_r_ntransfer_encoding_ch = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -660,7 +660,7 @@ http_bad_11 = () {
 }
 
 @test
-http_bad_12 = () {
+http_bad_12_get_http_1_1_r_ntransfer_encoding_ch = () {
 	assert(
 		http.feed_request(
 			<<>>
@@ -799,4 +799,37 @@ http_content_length_list = () {
 	input = <<"POST / HTTP/1.1\r\nContent-Length: 01, 1\r\n\r\na":utf8>>
 	http.Complete(req, <<>>) = http.feed_request(<<>>, input)
 	assert(req.body == <<"a":utf8>>)
+}
+
+@test
+http_transfer_coding_chain = () {
+	input = <<
+		"POST / HTTP/1.1\r\nTransfer-Encoding: gzip, chunked\r\n\r\n1\r\na\r\n0\r\n\r\n":utf8
+	>>
+	http.Complete(req, <<>>) = http.feed_request(<<>>, input)
+	assert(req.body == <<"a":utf8>>)
+	assert(
+		http.feed_request(<<>>, http.serialize_request(req)) ==
+			http.Complete(req, <<>>)
+	)
+}
+
+@test
+http_response_transfer_close = () {
+	input = <<"HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip\r\n\r\nabc":utf8>>
+	http.More(buffer) = http.feed_response_for(
+		<<>>
+		input
+		http.Method("GET")
+		False
+		100
+	)
+	http.Complete(res, <<>>) = http.feed_response_for(
+		buffer
+		<<>>
+		http.Method("GET")
+		True
+		100
+	)
+	assert(res.body == <<"abc":utf8>>)
 }

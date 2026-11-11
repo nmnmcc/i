@@ -304,7 +304,7 @@ parse_response_for = (
 		True -> (<<>>, Headers([]), after)
 		False -> {
 			headers(hs, "content-length") == [] &&
-				headers(hs, "transfer-encoding") == []
+				list.last(transfer_codings(hs)) != Some("chunked")
 		} |> {
 			True -> eof |> {
 				True  -> (bits(after), Headers([]), [])
@@ -371,6 +371,33 @@ validate_framing = (hs: Headers) -> Nil ? HttpError {
 		transfer == None || header(hs, "transfer-encoding") != None
 		"invalid transfer-encoding"
 	)
+	list.each(raw_pairs(hs), (pair) {
+		(name, value) = pair
+		{
+			lowercase(name) == "content-length" ||
+				lowercase(name) == "transfer-encoding"
+		} |> {
+			True -> require(bit_array.to_string(value) |> {
+				Ok(_)    -> True
+				Error(_) -> False
+			}, "invalid framing field")
+			False -> Nil
+		}
+	})
+	lengths = list.concat(list.map(headers(hs, "content-length"), (value) {
+		list.map(string.split(value, ","), (part) {
+			parse_length(text_unchecked(trim(octets(<<part:utf8>>))))
+		})
+	}))
+	lengths |> {
+		[] -> Nil
+		[first, ..others] -> require(
+			list.all(others, (x) { x == first })
+			"differing content-length"
+		)
+	}
+	transfer_codings(hs)
+	Nil
 }
 
 read_body = (
@@ -399,15 +426,37 @@ read_body = (
 				(bits(part), Headers([]), rest)
 			}
 		}
-		[encoding] -> {
+		_ -> {
+			codings = transfer_codings(hs)
 			require(
-				lowercase(encoding) == "chunked"
+				list.last(codings) == Some("chunked")
 				"invalid transfer-encoding"
 			)
 			chunks(xs, [])
 		}
-		_ -> fail.raise(BadMessage("invalid transfer-encoding"))
 	}
+}
+
+transfer_codings = (hs: Headers) -> List(String) ? HttpError {
+	codings = list.concat(list.map(headers(hs, "transfer-encoding"), (value) {
+		list.map(string.split(value, ","), (part) {
+			lowercase(text_unchecked(trim(octets(<<part:utf8>>))))
+		})
+	}))
+	list.each(codings, (coding) {
+		raw = octets(<<coding:utf8>>)
+		require(raw != [] && list.all(raw, token), "invalid transfer-encoding")
+	})
+	require(
+		list.count(codings, (coding) { coding == "chunked" }) <= 1
+		"repeated chunked encoding"
+	)
+	require(
+		list.contains(codings, "chunked") == False ||
+			list.last(codings) == Some("chunked")
+		"chunked encoding is not final"
+	)
+	codings
 }
 
 parse_length = (value: String) -> Int ? HttpError {
@@ -637,8 +686,11 @@ serialize = (
 ) -> BitArray {
 	xs = raw_pairs(hs)
 	chunked = header(hs, "transfer-encoding") |> {
-		Some(v) -> lowercase(v) == "chunked"
-		None    -> False
+		Some(v) -> list.last(list.map(string.split(v, ","), (part) {
+			lowercase(text_unchecked(trim(octets(<<part:utf8>>))))
+		})) ==
+			Some("chunked")
+		None -> False
 	}
 	with_length = {
 		chunked == False &&
