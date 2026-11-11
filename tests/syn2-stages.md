@@ -117,10 +117,10 @@ the default entry, and the test is outside `test/` (§10.2).
 The `i/record.All` capture-free source form described above is not installed:
 `lib/i/record.i` does not export that alias, and the migrator currently writes
 `Record` for legacy `{..}`. A module that shadows `Record` therefore needs a
-manual migration before this rewrite can be relied on. The formatter preserves legacy `@main` attributes; removing or relocating an
-entry currently requires `scripts/syntax-2-migrate` rather than `i fmt`.
+manual migration before this rewrite can be relied on. The formatter removes legacy `@main` attributes and preserves their comments.
+Relocating a non-default entry requires `scripts/syntax-2-migrate`.
 The migrator flags `x = ()` as an empty tuple because the two surfaces share
 its spelling; checker-based disambiguation remains unfinished. Per-file legacy syntax mode and its markers have been removed; the frozen
 legacy reader remains available to migration tools.
 The migrator writes by default and reports individual source locations.
-The old-syntax inventory and formatter entry migration remain unfinished.
+The old-syntax inventory remains unfinished.
