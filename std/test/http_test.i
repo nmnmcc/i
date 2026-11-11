@@ -842,3 +842,12 @@ http_reject_chunk_size_leading_space = () {
 	http.Invalid(_) = http.feed_request(<<>>, input)
 	Nil
 }
+
+@test
+http_reject_chunk_extension_trailing_space = () {
+	input = <<
+		"POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n1;x \r\na\r\n0\r\n\r\n":utf8
+	>>
+	http.Invalid(_) = http.feed_request(<<>>, input)
+	Nil
+}

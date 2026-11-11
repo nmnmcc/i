@@ -521,7 +521,7 @@ validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
 	rest = list.drop_while(after_name, space)
 	require(name != [], "invalid chunk extension")
 	rest |> {
-		[]           -> Nil
+		[]           -> require(rest == after_name, "invalid chunk extension")
 		[59, ..tail] -> validate_extensions(tail)
 		[61, ..raw] -> {
 			tail = list.drop_while(raw, space)
@@ -534,7 +534,7 @@ validate_extensions = (xs: List(Int)) -> Nil ? HttpError {
 				}
 			}
 			list.drop_while(after_value, space) |> {
-				[]           -> Nil
+				[]           -> require(after_value == [], "invalid chunk extension")
 				[59, ..next] -> validate_extensions(next)
 				_            -> fail.raise(BadMessage("invalid chunk extension"))
 			}
