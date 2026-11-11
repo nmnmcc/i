@@ -729,7 +729,7 @@ Run tests (wasmtime CLI, D17). Each program is compiled with `Target::Wasi` (B.7
 
 The test prints S and the native stack it used.
 
-6. `resume_cost_is_flat` (D9): the bench program as `@main`, with `rounds` and the expected sum filled in. For depth 10 and depth 1000, and rounds R1 = 1000 and R2 = 4000:
+6. `resume_cost_is_flat` (D9): the bench program as the entry, with `rounds` and the expected sum filled in. For depth 10 and depth 1000, and rounds R1 = 1000 and R2 = 4000:
    - bisect the smallest fuel (`-W fuel=N`) that finishes, until the bracket is under 0.1%;
    - the marginal fuel is (F(R2) − F(R1)) / (R2 − R1);
    - assert marginal(1000) / marginal(10) ≤ 1.05.
@@ -775,7 +775,6 @@ The test prints S and the native stack it used.
       x + 1
     }
 
-    @main
     main = () {
       // The paused computation needs `Out` where it starts and where k2 is
       // resumed (§10.2). This one is never called: the cancel runs under the
@@ -834,7 +833,7 @@ The test prints S and the native stack it used.
     ```
 
     The resume of `k3` re-enters only `h`; `o1` stays pending in T(k3). `h` calls `inner`, which resumes `k2`. The `$cancel k` leaves T(k2) after it inserts g's slot at d2, goes through the frames of `inner` and `h` (which have no handler, so their slots stay), and T(k3) catches it with `top = $sp > d3` and `from` at o1's record. At the end of its list, T(k3) inserts the slots of its pending code records (o1's, and the one of the body of `b3` if that call is not a tail call) at d3, under the slots of `h`, `inner` and g. Eager prints g, inner, h, o1, then main's sites, in that order. An implementation that puts the slots at `$sp` instead of at `d` prints o1 before g and fails this test, and test 12 alone would not see it (there `$sp == d`).
-14. `env_tail_call_as_eager` (D16, section 7a): the program of section 7a as `@main`, resumed where `Name` is "resumer", which panics with the name `g` sees. It compares the stop text with eager's, which names "resumer". A second part does the same on `cancel`, with a `resource.ensure` in `g` whose final function panics with the name. These values break §9.4 rules 3 and 4, so they are not spec cases; the test only checks that B changes nothing. When the gap of section 7a is fixed, the expected texts change to "in", and the two parts become spec cases.
+14. `env_tail_call_as_eager` (D16, section 7a): the program of section 7a as the entry, resumed where `Name` is "resumer", which panics with the name `g` sees. It compares the stop text with eager's, which names "resumer". A second part does the same on `cancel`, with a `resource.ensure` in `g` whose final function panics with the name. These values break §9.4 rules 3 and 4, so they are not spec cases; the test only checks that B changes nothing. When the gap of section 7a is fixed, the expected texts change to "in", and the two parts become spec cases.
 15. `cancel_out_restores_before_mode2` (D13, P3): the restore of `d` just before a call in mode 2. Test 13 with `o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }`: the ensure record of `k3` is pending outside `h`. The `$cancel k` that leaves T(k2) reaches T(k3) with `$sp` above `d3` (the slots of `h`, `inner` and g). T(k3) skips any code record before the ensure record (the call of `h` in the ensure's body is a tail call, so there may be none), restores `d3` and calls the ensure record in mode 2, and the final function stops. Eager's `$ensure_run` restored its depth, so its trace has no line of `h`, `inner` or `g`. An implementation that leaves out `$shadow_restore(d)` before the call prints those three stale lines. The stop text is compared with eager's.
 16. `cancel_suspends_to_inner_boundary` (D15): moved here from the spec case `control_lazy_cancel_inner_boundary`. During `cancel(k)`, a final function suspends to `inner`, a boundary that was paused inside `k`. It must succeed, so `inner` is active during the unwind (eager re-entered it). Its `f(k')` gives a value as the value of the `control.boundary` call of `inner`, and the code after it in the body of `outer` runs on inside the cancel; `$cancel_core` then drops the value it ends with and `cancel(k)` gives Nil. That is what eager does at `dcb19df`, but §9.4 rule 4 does not say that a cancel may go back to ordinary code, or what happens to its value, so it is checked here with eager's output, not in `tests/spec` (open question 5). The program records what runs in a text that it prints, and the test compares it with eager's.
 

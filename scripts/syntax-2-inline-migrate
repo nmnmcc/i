@@ -5,6 +5,25 @@ import json,re,subprocess
 import os
 os.chdir(Path(__file__).resolve().parent.parent)
 paths=[Path('README.md'),*Path('docs').rglob('*.md')]
+quoted=[]
+changes={}
+for p in paths:
+ text=p.read_text()
+ for m in re.finditer(r'(?m)^> ?```i[^\n]*\n((?:^>[^\n]*\n)*?)^> ?```[ \t]*$',text):
+  src=''.join(re.sub(r'^> ?', '', line) for line in m[1].splitlines(keepends=True))
+  quoted.append((p,m.start(1),m.end(1),src))
+if quoted:
+ r=subprocess.run(['target/debug/examples/migrate-syntax2'],input=''.join(json.dumps(x[3],ensure_ascii=False)+'\n' for x in quoted),text=True,capture_output=True,check=True)
+ for (p,a,b,src),line in zip(quoted,r.stdout.splitlines()):
+  result=json.loads(line)
+  if result['diagnostics'] or result['empty'] or any(name != 'main' for name in result['mains']): continue
+  out=result['source']
+  if out!=src:
+   changes.setdefault(p,[]).append((a,b,''.join('> '+line if line.strip() else '>\n' for line in out.splitlines(keepends=True))))
+ for p,edits in changes.items():
+  text=p.read_text()
+  for a,b,out in reversed(edits): text=text[:a]+out+text[b:]
+  p.write_text(text)
 items=[]; forms=[]
 for p in paths:
  text=p.read_text()
@@ -35,4 +54,5 @@ for p,changes in edits.items():
  text=p.read_text()
  for a,b,out,src in reversed(changes): text=text[:a]+out+text[b:]
  p.write_text(text)
-print('changed',sum(map(len,edits.values())),'files',len(edits))
+print('changed',sum(map(len,edits.values())) + sum(map(len,changes.values())),
+      'files',len(set(edits) | set(changes)))

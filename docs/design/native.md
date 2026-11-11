@@ -1694,7 +1694,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >   )
 > }
 >
-> @main
+>
 > main = () {
 >   resource.acquire(
 >     () { net.listen("127.0.0.1", 8080) }
@@ -1762,7 +1762,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >   )
 > }
 >
-> @main
+>
 > main = () {
 >   resource.acquire(
 >     () { net.listen("127.0.0.1", 8080) }
@@ -3729,7 +3729,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > spin = () { spin() }
 >
-> @main
+>
 > main = () {
 >   task.scope((s) {
 >     task.go(s, spin)
@@ -3770,7 +3770,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > @host("i:net/v1", "request")
 > Pretend { Pretend(read: (stream: Int, max_bytes: Int) -> Request(Result(BitArray, String))) }
 >
-> @main
+>
 > main = (raw ! Pretend) {
 >   request.await(raw.read(1, 1))
 > }
@@ -5272,7 +5272,7 @@ New sentence(s)/block:
 > (i/task, i/request)
 > @host("review:gate/v1", "request")
 > Gate { Gate(wait: () -> Request(Nil)) }
-> @main
+>
 > main = (gate ! Gate, root ! request.Root) {
 >   pending = gate.wait()
 >   task.scope((s) {
@@ -5347,7 +5347,7 @@ New sentence(s)/block:
 > ```i
 > (i/task, i/control, i/core)
 > event = task.always(1)
-> @main
+>
 > main = () {
 >   task.run(() { assert(task.sync(event) == 1) })
 >   task.run(() { assert(task.sync(event) == 1) })
@@ -5372,7 +5372,7 @@ New sentence(s)/block:
 > (i/task, i/request)
 > @host("review:gate/v1", "request")
 > Gate { Gate(wait: () -> Request(Nil)) }
-> @main
+>
 > main = (gate ! Gate) {
 >   pending = gate.wait()
 >   task.run(() { request.await(pending) })
@@ -5390,7 +5390,7 @@ New sentence(s)/block:
 >
 > ```i
 > (i/task)
-> @main
+>
 > main = () {
 >   task.scope((s) {
 >     a = task.go(s, task.path)

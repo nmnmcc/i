@@ -1777,9 +1777,9 @@ Exclude the discussion of compiler frame/table layout.
 
 **§10.2 full replacement.**
 
-> The program entry is the @main function of the compiled package. It has no
-> ordinary parameters and its value is ignored. More than one is a compile
-> error; dependencies' @main attributes do not add entries. Tests are @test
+> The program entry is `main` in `src/main.i`, or a target selected from the
+> compiled package's `[entries]`. It has no ordinary parameters and its value
+> is ignored. Dependency entries do not affect the program. Tests are @test
 > functions in test/ of the compiled package; each has no ordinary parameters
 > and returns Nil. A test passes by returning Nil and fails on a stop. Each
 > runs in its own freshly started instance. Host exports are the functions

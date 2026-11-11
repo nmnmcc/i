@@ -112,7 +112,7 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 |---|---|---|
 | Imports | `(a/b/c, x = a/b, (C, y) = a/b, x = (C, y) = a/b)` | `(, (/ a b c) (= x (/ a b)) (= (, C y) (/ a b)) (= x (, C y) (/ a b)))` |
 | Exports | `(x, U, U(..))` | `(, x U (U ..))` |
-| Built-in attribute | `@main Item`, `@host("ns", "async") Item` | `(@ main Item)`, `(@ (host "ns" "async") Item)` |
+| Built-in attribute | `@test Item`, `@host("ns", "async") Item` | `(@ test Item)`, `(@ (host "ns" "async") Item)` |
 | Macro before an item | `@m Item`, `@m(e…) Item`, `@a.m(e…) Item` | `(@ m Item)`, `(@ (m e…) Item)`, `(@ ((. a m) e…) Item)` |
 | Custom type | `U { C1(T, x: T) C2 }` | `(U { (C1 T (: x T)) C2 })` |
 | Custom type with parameters | `U(A, B) { … }` | `((U A B) { … })` |
@@ -125,7 +125,7 @@ In the tables, `e` is an expression, `p` a pattern, `T` a type, `x` and `a` a na
 - At the top level of a file, a `(, …)` is the imports when it has a `(/ …)` in it, and the exports when not. It may not be empty.
 - A module path `(/ …)` has two or more names. An import item `(= …)` has two parts, or three when it has both a name and a list of names. Every other `(= …)` has exactly two parts.
 - An item that is a `Round` whose head is an `UpName`, or a `Round` whose head is an `UpName`, is a custom type. An `(= …)` whose first part is one of these is a type alias. An item that is a `Round` whose head is a name or a `(. a m)` is a macro call.
-- Each `(@ …)` has one attribute. More attributes are put one inside the other, the first on the outside: `@main @deprecated("x") f = e` is `(@ main (@ (deprecated "x") (= f e)))`.
+- Each `(@ …)` has one attribute. More attributes are put one inside the other, the first on the outside: `@test @deprecated("x") f = e` is `(@ test (@ (deprecated "x") (= f e)))`.
 - `@m Item` gives the macro only the item. `@m()` is not written; `(@ (m) Item)` is a compile error.
 
 **Types**
