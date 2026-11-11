@@ -851,3 +851,29 @@ http_reject_chunk_extension_trailing_space = () {
 	http.Invalid(_) = http.feed_request(<<>>, input)
 	Nil
 }
+
+@test
+provider_and_route = () {
+	provider = (send: (req: http.Request) { http.response(http.Status(201)) })
+	res = http.send_with(
+		provider
+		http.request(http.Method("GET"), "http://example.com")
+	)
+	assert(res.status == http.Status(201))
+	assert(
+		http.route(
+			http.Method("GET")
+			"/users/:id"
+			http.request(http.Method("GET"), "/users/42")
+		) ==
+			Some([("id", "42")])
+	)
+	assert(
+		http.route(
+			http.Method("POST")
+			"/users/:id"
+			http.request(http.Method("GET"), "/users/42")
+		) ==
+			None
+	)
+}

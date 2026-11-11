@@ -20,7 +20,7 @@ The compiler follows the spec and is kept small:
 - `crates/ilang-host` and `bindings/javascript`: the Wasmtime host and the JavaScript SDK for browsers;
 - `crates/ilang-lsp` and `editors/vscode`: the language server and the VS Code extension;
 - `crates/ilang-cli`: the `i` command;
-- `lib/i` and `std`: the library modules and the standard library. The `std` modules are `bit_array`, `bool`, `calendar`, `cli`, `dict`, `float`, `http`, `int`, `json`, `list`, `log`, `option`, `order`, `pair`, `path`, `property`, `result`, `sequence`, `set`, `stream`, `string`, `time`, and `uri`.
+- `lib/i` and `std`: the library modules and the standard library. The `std` modules are `bit_array`, `bool`, `calendar`, `cli`, `dict`, `float`, `http`, `int`, `json`, `list`, `log`, `option`, `order`, `pair`, `path`, `property`, `result`, `schema`, `sequence`, `set`, `stream`, `string`, `time`, and `uri`.
 
 The spec suite in `tests/spec` runs every case unoptimized and optimized, and requires the same result.
 

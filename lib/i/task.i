@@ -18,6 +18,7 @@
 	Channel
 	Event
 	Shared
+	Ref
 	ScheduleError(..)
 	top
 	run
@@ -44,6 +45,8 @@
 	sync
 	share
 	get
+	ref
+	update
 	both
 	race
 	map_concurrently
@@ -84,6 +87,10 @@ Channel(A) {
 
 Shared(A) {
 	Shared(run: Key(Nil), owner: Keyed, id: Keyed, values: Key(A))
+}
+
+Ref(A) {
+	Ref(run: Key(Nil), id: Keyed, values: Key(A))
 }
 
 ScheduleError {
@@ -281,7 +288,7 @@ ChannelState {
 }
 
 ShareState {
-	ShareState(id: Address, owner: Address, value: Keyed)
+	ShareState(id: Address, owner: Maybe(Address), value: Keyed)
 }
 
 Leaf {
@@ -399,6 +406,8 @@ Command {
 	Select(List(Leaf))
 	NewShare(ScopeInfo, Keyed)
 	GetShare(Key(Nil), Keyed, Keyed)
+	NewRef(Keyed)
+	UpdateRef(Key(Nil), Keyed, (Keyed) -> (Keyed, Keyed))
 	Drain
 }
 
@@ -2276,7 +2285,7 @@ prevalidate = (s: State, t: TaskState, command: Command) {
 		)
 		Select(leaves)   -> check_leaves(s, t, leaves)
 		SendNow(info, _) -> check_channel(s, info)
-		GetShare(run, _, id) -> {
+		GetShare(run, _, id) | UpdateRef(run, id, _) -> {
 			check_run(s.run, run)
 			find_share(s.shares, read(address_key, id))
 			Nil
@@ -2596,9 +2605,9 @@ do_command = (
 		NewShare(info, value) -> {
 			portable(value)
 			id = new_address(t)
-			row = ShareState(id, read(address_key, info.id), value)
+			row = ShareState(id, Present(read(address_key, info.id)), value)
 			next = set_task(s, TaskState(..t, handles: t.handles + 1))
-			scope = find_scope(next.scopes, row.owner)
+			scope = find_scope(next.scopes, read(address_key, info.id))
 			next = set_scope(
 				State(
 					..next
@@ -2607,6 +2616,48 @@ do_command = (
 				ScopeState(..scope, owned_shares: [id, ..scope.owned_shares])
 			)
 			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
+		}
+		NewRef(value) -> {
+			portable(value)
+			id = new_address(t)
+			owner = head_scope(t.chain)
+			row = ShareState(id, owner, value)
+			next = set_task(
+				State(..s, shares: store_add(s.shares, address_index(id), row))
+				TaskState(..t, handles: t.handles + 1)
+			)
+			next = owner |> {
+				Absent -> next
+				Present(owner) -> {
+					scope = find_scope(next.scopes, owner)
+					set_scope(
+						next
+						ScopeState(
+							..scope
+							owned_shares: [id, ..scope.owned_shares]
+						)
+					)
+				}
+			}
+			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
+		}
+		UpdateRef(_, id, change) -> {
+			address = read(address_key, id)
+			row = store_find(s.shares, address_index(address)) |> {
+				Present(row) -> row
+				Absent       -> panic("task: shared value is gone")
+			}
+			(value, answer) = change(row.value)
+			portable(value)
+			next = State(
+				..s
+				shares: store_update(
+					s.shares
+					address_index(address)
+					ShareState(..row, value: value)
+				)
+			)
+			reply(next, t.serial, k, Proceed(answer), False)
 		}
 		GetShare(_, _, id) -> reply(
 			s
@@ -3252,6 +3303,29 @@ keep(S, A, E, N) = (
 		}
 	})
 	(value: S, own ! Scheduler) { kept((value, own)) }
+}
+
+/// A state ref owned by the current scope, or by the run at its root.
+/// Values are portable; update callbacks are pure and execute atomically.
+ref(A) = (value: A, own ! Scheduler) -> Ref(A) ! Scheduler {
+	values: Key(A) = key.new()
+	id = ask(own, NewRef(key.wrap(values, value)))
+	own |> {
+		DetachedScheduler -> panic("task: no scheduler")
+		Scheduler(..)     -> Ref(own.run, id, values)
+	}
+}
+
+update(A, B) = (
+	ref: Ref(A)
+	change: (A) -> (A, B)
+	own ! Scheduler
+) -> B ! Scheduler {
+	answers: Key(B) = key.new()
+	read(answers, ask(own, UpdateRef(ref.run, ref.id, (value: Keyed) {
+		(next, answer) = change(read(ref.values, value))
+		(key.wrap(ref.values, next), key.wrap(answers, answer))
+	})))
 }
 
 both(A, B, E, N) = (

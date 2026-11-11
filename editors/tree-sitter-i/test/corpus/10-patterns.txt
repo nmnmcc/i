@@ -1,0 +1,71 @@
+==================
+Constructor alias prefix bit and guarded patterns
+==================
+main = (input) {
+  input |> {
+    0.0 -> 0
+    -.1.0 -> 1
+    Some(value) -> value
+    "prefix" <> rest -> rest
+    [head, ..] -> head
+    <<size, rest: bytes(size)>> -> rest
+    all = (left, right) -> all
+    _ -> Nil
+  }
+}
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (identifier))
+      (block
+        (binary_expression
+          (identifier)
+          (clause_block
+            (clause
+              (float)
+              (integer))
+            (clause
+              (negative_pattern
+                (float))
+              (integer))
+            (clause
+              (constructor_pattern
+                (type_identifier)
+                (identifier))
+              (identifier))
+            (clause
+              (prefix_pattern
+                (string
+                  (string_content))
+                (identifier))
+              (identifier))
+            (clause
+              (list_pattern
+                (identifier)
+                (rest_pattern))
+              (identifier))
+            (clause
+              (bit_pattern
+                (pattern_segment
+                  (identifier))
+                (pattern_segment
+                  (identifier)
+                  (bit_format
+                    (identifier)
+                    (identifier))))
+              (identifier))
+            (clause
+              (alias_pattern
+                (identifier)
+                (tuple_pattern
+                  (identifier)
+                  (identifier)))
+              (identifier))
+            (clause
+              (discard)
+              (type_identifier))))))))

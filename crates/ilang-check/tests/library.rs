@@ -169,6 +169,8 @@ fn library_names() {
                 "sync",
                 "share",
                 "get",
+                "ref",
+                "update",
                 "both",
                 "race",
                 "map_concurrently",

@@ -521,8 +521,8 @@ outstanding slot contains import index, ABI id, a fresh GC generation token,
 Owner group key, immutable Root key, and a reference to its request cell.
 Root/group indexes must remove a request on answer or cancel; completed cells
 are not retained by either index. Root accounting spans every live group,
-while closing a group touches only its own slots. Keep count/revision and local
-cell indexing separate from the start; MC adds shared metadata and home-worker
+while closing a group touches only its own slots. Keep count/revision and
+local cell indexing separate from the start; MC adds shared metadata and home-worker
 notifications without exposing an enumeration API. Normal entry-context exit
 retires every root/group registered in that context, including an independent
 root its caller forgot to close. Clearing requests at status 0 must clear those
@@ -616,9 +616,9 @@ a cancelled blocking File operation instead closes that File as §8.1 requires.
 ### 6.1 Public task types and functions
 
 Export types Scheduler, Runner, Scope(E), Task(A,E), Channel(A), Event(A,E,N),
-Shared(A), and ScheduleError; export only ScheduleError's constructors. The
+Shared(A), Ref(A), and ScheduleError; export only ScheduleError's constructors. The
 other constructors and scheduler protocol are private ordinary custom types,
-not host opaque types. Scope, Task, Channel, and Shared contain invariant keys;
+not host opaque types. Scope, Task, Channel, Shared, and Ref contain invariant keys;
 their parameters are therefore invariant. Event's answer/error/environment
 parameters are covariant: its private representation keeps typed decoding
 functions, rather than Key(A) in an output field. A public Event can hold user
@@ -657,6 +657,8 @@ Assert and user host services remain in N where the body needs them.
 | `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
 | `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
 | `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
+| `ref(A)` | `(value: A) -> Ref(A) ! Scheduler` |
+| `update(A,B)` | `(ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler` |
 | `both(A,B,E,N)` | `(left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
@@ -695,6 +697,13 @@ liveness. Handle equality means the same object of the same run, never equal
 numeric ids in two runs. Text uses constructors without hidden ids: a private
 identity-bearing key is printed as `//key` per S7, and implementation ids/paths
 are kept under Keyed fields whose text is //keyed, not exposed as plain fields. `path()` alone exposes the semantic task path.
+
+`ref(value)` creates portable state owned by the current scope, or the run
+at its root. `update(ref, change)` runs the pure `(A) -> (A, B)` callback
+atomically, stores its first result and returns its second result. Run identity
+and liveness checks precede the callback; owner exit deletes the state, and a
+later update stops with `task: shared value is gone`. The handle stays immutable.
+The state uses the scheduler's ordinary persistent share table and scope cleanup.
 
 ### 6.2 Scopes, errors, and cancellation
 

@@ -145,7 +145,7 @@ i/task.set_task : (s: State, t: TaskState) -> State
 i/task.add_task : (s: State, t: TaskState) -> State
 i/task.set_scope : (s: State, scope: ScopeState) -> State
 i/task.guarded : (own: Scheduler, owner: Maybe(Address), body: () -> Completion) -> Completion
-i/task.make_start : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
+i/task.make_start : (body: () -> A ^ E ! N, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
 i/task.path : () -> List(Int) ! Scheduler
 i/task.random : () -> rng.Generator ! Scheduler
 i/task.yield : () -> Nil ! Scheduler
@@ -238,8 +238,8 @@ i/task.loop : (state: State) -> RunReply
 i/task.scope_call_body : (body: (Scope(A)) -> B ^ A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ^ A ! N
 i/task.scope : (body: (s: Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler | request.Root
 i/task.local_scope : (body: (s: Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler | request.Root
-i/task.go_key : (s: Scope(A), body: () -> B ^ A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, result: Key(Result(B, A))) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
-i/task.go : (s: Scope(A), body: () -> B ^ A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.go_key : (s: Scope(A), body: () -> B ^ A ! N, result: Key(Result(B, A))) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.go : (s: Scope(A), body: () -> B ^ A ! N) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
 i/task.branch_at : (branches: List(Branch(A, B, C)), index: Int) -> Branch(A, B, C)
 i/task.sync_body : (e: Event(A, B, C), own: Scheduler) -> A ^ B ! C
 i/task.always : (value: A) -> Event(A, Never, Never)
@@ -257,18 +257,20 @@ i/task.send : (c: Channel(A), value: A) -> Nil ! Scheduler
 i/task.receive : (c: Channel(A)) -> A ! Scheduler
 i/task.share : (s: Scope(A), value: B) -> Shared(B) ! Scheduler
 i/task.get : (s: Shared(A)) -> A ! Scheduler
-i/task.keep : (f: (A) -> B ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }) -> { (A) -> B ^ E ! Scheduler } ! N - Scheduler - Runner - request.Await | Scheduler
-i/task.both : (left: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> B ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> (A, B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
-i/task.race : (left: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> A ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> A ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
-i/task.spawn_values : (s: Scope(A), xs: List(B), f: (B) -> C ^ A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(Task(C, A)) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.keep : (f: (A) -> B ^ E ! N) -> { (A) -> B ^ E ! Scheduler } ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.ref : (value: A) -> Ref(A) ! Scheduler
+i/task.update : (ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler
+i/task.both : (left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A, B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
+i/task.race : (left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
+i/task.spawn_values : (s: Scope(A), xs: List(B), f: (B) -> C ^ A ! N) -> List(Task(C, A)) ! N - Scheduler - Runner - request.Await | Scheduler
 i/task.join_values : (tasks: List(Task(A, B))) -> List(A) ^ B ! Scheduler
-i/task.map_concurrently : (xs: List(A), f: (A) -> B ^ E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
-i/task.execute_body : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
-i/task.run : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ^ E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
-i/task.test : (seed: rng.Generator, choices: List(List(Int)), body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ^ E | ScheduleError ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
-i/task._entry : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ^ E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | request.Root
+i/task.map_concurrently : (xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! N - Scheduler - Runner - request.Await | Scheduler | request.Root
+i/task.execute_body : (body: () -> A ^ E ! N, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
+i/task.run : (body: () -> A ^ E ! N) -> A ^ E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
+i/task.test : (seed: rng.Generator, choices: List(List(Int)), body: () -> A ^ E ! N) -> A ^ E | ScheduleError ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
+i/task._entry : (body: () -> A ^ E ! N) -> A ^ E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | request.Root
 i/task.scope_call : (body: (Scope(A)) -> B ^ A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ^ A ! N | request.Root
-i/task.execute : (body: () -> A ^ E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
+i/task.execute : (body: () -> A ^ E ! N, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
 i/task.sync : (e: Event(A, B, C)) -> A ^ B ! C | Scheduler
 i/task.root_active : (_run: Key(Nil), _active: Active) -> RunControl
 i/task.cause_allowed : (s: State, t: TaskState, cause: Cause) -> Bool

@@ -333,8 +333,8 @@ This is the full version-1 schema; string cells are its nullary shorthand. A ser
 The package plan is data, not executable macro code. The root package selects target cells over the shipped plan; dependency packages cannot override its selections. There is no wildcard or implicit service discovery. The shipped capability registry is plan data: a registered row without a cell for this target is unsupplied, including user-registered capabilities. An absent root cell inherits the shipped cell when one exists. A plan is resolved with
 its declaring package's authority: it may name that package's private bindings;
 references into dependencies must be exported. Inherited cells keep their
-original declaring authority. Copying a dependency's private path into a root
-cell is an access error. This gives every package the same plan-only access,
+original declaring authority. Copying a dependency's private path into a
+root cell is an access error. This gives every package the same plan-only access,
 without making a private factory callable from ordinary outside source. It
 preserves private root-runner construction. The rule does not change source visibility (§2.4).
 Unknown keys, duplicate resolved rows/cells, unknown
@@ -1501,9 +1501,9 @@ results may change between runs or worker counts. Tests must either avoid
 that dependence or list the allowed outcomes. No task API observes workers.
 
 Export types Scheduler, Runner, Scope(E), Task(A,E), Channel(A), Event(A,E,N),
-Shared(A), and ScheduleError; export only ScheduleError's constructors. The
+Shared(A), Ref(A), and ScheduleError; export only ScheduleError's constructors. The
 other constructors and scheduler protocol are private ordinary custom types,
-not host opaque types. Scope, Task, Channel, and Shared contain invariant keys;
+not host opaque types. Scope, Task, Channel, Shared, and Ref contain invariant keys;
 their parameters are therefore invariant. Event's answer/error/environment
 parameters are covariant: its private representation keeps typed decoding
 functions, rather than Key(A) in an output field. A public Event can hold user
@@ -1542,9 +1542,12 @@ Assert and user host services remain in N where the body needs them.
 | `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
 | `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
 | `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
+| `ref(A)` | `(value: A) -> Ref(A) ! Scheduler` |
+| `update(A,B)` | `(ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler` |
 | `both(A,B,E,N)` | `(left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+
 
 In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
 for combinators use one common E and N; subtyping admits either child's error
@@ -1681,6 +1684,17 @@ error. A stop immediately traps and runs no finals, as §9.5 requires. Host
 trap/failure/drop also invalidates the instance under ABI H8–H11; it cannot
 promise to resume i cleanup. “Cancellation runs finals” refers to i structured
 cancellation, not destruction of a trapped instance by its host.
+
+i values and bindings are immutable; `task.ref` is the only state construct, owned by its scope, changed only by `task.update` with a pure function.
+
+A `Ref(A)` is an immutable handle to scheduler-owned state. `ref(value)`
+creates one in the first scope of the maker's chain, or in the run at its root.
+`update(ref, change)` atomically replaces its value with the first part of
+`change(old)` and returns the second part. The callback is pure, with no typed
+errors or services. Stored values must be portable. Check the run identity and
+ref liveness before calling the callback. Owner exit frees its state; later
+updates stop with `task: shared value is gone`. Refs use the same scheduler
+arbitration as channels, and do not introduce host state or mutable i values.
 
 #### Events, FIFO behavior, and fairness
 

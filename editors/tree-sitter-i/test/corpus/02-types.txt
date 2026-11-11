@@ -1,0 +1,57 @@
+==================
+Nominal types aliases and type operators
+==================
+Value(A) { Some(value: A) None }
+Choice = Int | String & { Int - 0 }
+id(A): (A) -> A = (value: A) { value }
+
+---
+
+(source_file
+  (type_definition
+    (type_identifier)
+    (type_arguments
+      (named_type
+        (type_identifier)))
+    (constructor
+      (type_identifier)
+      (type_parameters_list
+        (type_parameter
+          (identifier)
+          (named_type
+            (type_identifier)))))
+    (constructor
+      (type_identifier)))
+  (type_definition
+    (type_identifier)
+    (binary_type
+      (named_type
+        (type_identifier))
+      (binary_type
+        (named_type
+          (type_identifier))
+        (type_group
+          (binary_type
+            (named_type
+              (type_identifier))
+            (integer))))))
+  (binding
+    (identifier)
+    (type_parameters
+      (type_identifier))
+    (function_type
+      (type_parameters_list
+        (type_parameter
+          (named_type
+            (type_identifier))))
+      (return_type
+        (named_type
+          (type_identifier))))
+    (function
+      (parameters
+        (typed_pattern
+          (identifier)
+          (named_type
+            (type_identifier))))
+      (block
+        (identifier)))))

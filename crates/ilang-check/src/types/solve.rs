@@ -923,6 +923,20 @@ impl Solver {
         if matches!(l, Ty::Var(_)) && matches!(r, Ty::Union(ms) if ms.contains(l)) {
             return;
         }
+        // A row is also contained in H | (row - H). Recording this
+        // tautology as an upper bound makes generalization split its two
+        // occurrences into unrelated variables, closing an open callback row.
+        // The difference already retains H's same-form obligations.
+        if let (Ty::Var(_), Ty::Union(ms)) = (l, r) {
+            let mut flat = Vec::new();
+            flatten_union(ms, &mut flat);
+            if flat.iter().any(|m| {
+                matches!(m, Ty::Diff(base, heads) if base.as_ref() == l
+                    && heads.iter().all(|h| flat.iter().any(|m| self.same_form(m, h))))
+            }) {
+                return;
+            }
+        }
         if (matches!(l, Ty::Var(_)) || matches!(r, Ty::Var(_)))
             && !self.cache.insert((l.clone(), r.clone(), env))
         {
