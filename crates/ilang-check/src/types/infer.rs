@@ -437,8 +437,8 @@ impl<'a> Checker<'a> {
                                 scheme: scheme.clone(),
                             },
                         );
-                        typed.scheme_types.insert(id, shown);
                     }
+                    typed.scheme_types.insert(id, shown);
                 } else {
                     self.report_coalescing(d.span);
                 }
@@ -1000,7 +1000,7 @@ impl<'a> Checker<'a> {
         let mut names: Vec<String> = Vec::new();
         for id in found {
             let def = self.p.ty(id);
-            if def.module == self.module && !def.exported && !names.contains(&def.name) {
+            if !def.exported && !names.contains(&def.name) {
                 names.push(def.name.clone());
             }
         }
@@ -1009,7 +1009,7 @@ impl<'a> Checker<'a> {
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
                 format!(
-                    "`{}` is exported, but its inferred type uses the type `{name}` of this module, which is not exported (§2.4)",
+                    "`{}` is exported, but its inferred type uses the private type `{name}`, which is not exported (§2.4)",
                     d.name
                 ),
             );
