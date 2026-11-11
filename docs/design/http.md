@@ -28,3 +28,8 @@ incrementally, and answers requests on a connection in order. It honors
 32768 bytes, returns 400 for malformed requests, and converts handler errors to
 500. `route(method, pattern, request)` matches slash-separated paths; a
 segment beginning with `:` captures that segment by name.
+
+The present transport closes connections after each request. Server handlers
+receive a buffered body. `send_timeout` works with a fake provider, but the
+network provider currently fails the effect check when passed to it. DNS
+failures from `net.connect` are currently reported as connect errors.
