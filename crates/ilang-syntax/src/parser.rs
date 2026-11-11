@@ -890,8 +890,8 @@ impl Parser<'_> {
         let Some(mut pattern) = pats.pop() else {
             return Ok(None);
         };
-        while let Some(outer) = pats.pop() {
-            let PatternKind::Var(name) = outer.kind else {
+        while let Some(mut outer) = pats.pop() {
+            let PatternKind::Var(name) = std::mem::replace(&mut outer.kind, PatternKind::Discard(String::new())) else {
                 unreachable!("only names are chained")
             };
             pattern = Pattern {
@@ -995,11 +995,11 @@ impl Parser<'_> {
                 break;
             }
             self.bump();
-            let rhs = self.binary(op.level())?;
+            let mut rhs = self.binary(op.level())?;
             if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
-                let ExprKind::Clauses(clauses) = rhs.kind else {
+                let ExprKind::Clauses(clauses) = std::mem::replace(&mut rhs.kind, ExprKind::Tuple(Vec::new())) else {
                     unreachable!()
                 };
                 lhs = Expr {
