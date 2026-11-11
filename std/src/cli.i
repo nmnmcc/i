@@ -1,6 +1,6 @@
 //// Pure command argument descriptions with typed results. Parser hides fixed
 //// metadata and a decoder; Names, DefinitionError and CliError expose their
-//// constructors. No process, printing, exit, reserved flag or implicit default.
+//// constructors. The pure parser has no reserved flag or implicit default.
 ////
 //// pure stores a value; flag returns Bool; option/argument return a converted
 //// value; optional returns Option; many/rest return List. map and map2 preserve

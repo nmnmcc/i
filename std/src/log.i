@@ -46,7 +46,7 @@
 //// entries arrive in sequential call order; filter(s,always_true) preserves
 //// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback
 //// termination guarantee is added. Generic client use awaits the §7 compiler
-//// gate; closed service clients are supported. IO adapters are explicit.
+//// IO adapters are explicit and use the same sink service.
 
 (
 	i/core
