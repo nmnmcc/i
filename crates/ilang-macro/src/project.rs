@@ -232,28 +232,45 @@ fn phase(source: SourceId, error: PhaseError) -> Vec<Diagnostic> {
     }
 }
 
-/// Expand and type-check a project through the same path used by builds.
-pub fn check(graph: &mut PackageGraph) -> ilang_check::Checked {
-    check_with_templates(graph).0
+/// A checked project and its complete, ordered collection contributions.
+/// DefIds remain opaque and valid only for this checked program.
+pub struct ProjectChecked {
+    pub program: Option<ilang_check::hir::Program>,
+    pub types: Option<ilang_check::types::Typed>,
+    pub diags: Vec<Diagnostic>,
+    pub collections: Vec<collections::Entry>,
+    /// Source-scoped quote templates for test instances of this project.
+    pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
 }
 
-/// Check the expanded project and return the quote table for test instances.
-pub fn check_with_templates(
-    graph: &mut PackageGraph,
-) -> (
-    ilang_check::Checked,
-    Vec<ilang_syntax::lisp::syntax::Syntax>,
-) {
+/// Expand and type-check a project through the same path used by builds.
+pub fn check(graph: &mut PackageGraph) -> ProjectChecked {
+    check_project(graph, false)
+}
+
+/// Check collection contributions before selecting an execution root.
+pub fn check_for_tools(graph: &mut PackageGraph) -> ProjectChecked {
+    check_project(graph, true)
+}
+
+fn check_project(graph: &mut PackageGraph, tools: bool) -> ProjectChecked {
     match expand(graph) {
         Ok(mut expanded) => {
             expanded.lower_quotes();
-            let mut checked = ilang_check::check_parsed(graph, &expanded.parsed);
+            let mut checked = if tools {
+                ilang_check::check_parsed_for_tools(graph, &expanded.parsed)
+            } else {
+                ilang_check::check_parsed(graph, &expanded.parsed)
+            };
+            let mut entries = Vec::new();
             if let (Some(program), Some(typed)) = (&checked.program, &checked.types)
                 && !checked.diags.iter().any(Diagnostic::is_error)
-                && let Err(errors) =
-                    collections::resolve(&expanded.parsed, program, typed, &expanded.transactions)
             {
-                checked.diags.extend(errors);
+                match collections::resolve(&expanded.parsed, program, typed, &expanded.transactions)
+                {
+                    Ok(found) => entries = found,
+                    Err(errors) => checked.diags.extend(errors),
+                }
             }
             if let Some(program) = &checked.program {
                 ilang_check::map_expansion_diagnostics(
@@ -263,17 +280,21 @@ pub fn check_with_templates(
                 );
             }
             expanded.diagnostics.append(&mut checked.diags);
-            checked.diags = expanded.diagnostics;
-            (checked, expanded.templates)
+            ProjectChecked {
+                program: checked.program,
+                types: checked.types,
+                diags: expanded.diagnostics,
+                collections: entries,
+                templates: expanded.templates,
+            }
         }
-        Err(diagnostics) => (
-            ilang_check::Checked {
-                program: None,
-                types: None,
-                diags: diagnostics,
-            },
-            Vec::new(),
-        ),
+        Err(diagnostics) => ProjectChecked {
+            program: None,
+            types: None,
+            diags: diagnostics,
+            collections: Vec::new(),
+            templates: Vec::new(),
+        },
     }
 }
 

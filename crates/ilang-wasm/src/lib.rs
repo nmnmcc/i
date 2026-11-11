@@ -74,6 +74,26 @@ pub fn compile_with_bindings(
     Ok((wasm, bindings))
 }
 
+/// Compile one selected collection target without adding it to the ordinary
+/// entry, test, or host-export tables. The export handle is owned by the tool.
+pub fn compile_selected_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    target: hir::DefId,
+    export: &str,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>, bool), Error> {
+    let (ir, bindings, is_async) =
+        lower::lower_selected_with_bindings(graph, program, typed, options, target, export)
+            .map_err(Error::Diagnostics)?;
+    let text = emit::wat(&ir);
+    let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
+    emit::add_abi_section(&mut wasm, &ir.abi_json);
+    validate(&wasm).map_err(Error::Internal)?;
+    Ok((wasm, bindings, is_async))
+}
+
 /// The WAT text of a checked program, for reading.
 pub fn compile_wat(
     graph: &PackageGraph,

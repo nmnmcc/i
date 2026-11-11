@@ -15,6 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wasmparser.workspace = true
 clap.workspace = true
 ilang-package.workspace = true
 ilang-check.workspace = true
