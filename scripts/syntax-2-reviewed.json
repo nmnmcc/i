@@ -348,7 +348,7 @@
   },
   "tests/spec/6/syn2_empty_tuple_type.i:4dfd264ad80b24c8": {
     "empty": [
-      "empty tuple type at byte 54"
+      "empty tuple type at byte 81"
     ]
   },
   "tests/spec/6/t3_record_codec.i:8000855e3a68936a": {
