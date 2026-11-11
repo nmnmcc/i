@@ -814,7 +814,7 @@ struct Builder<'a> {
     entry: DefId,
     target: Target,
     nodes: Vec<Node>,
-    indices: HashMap<(Scope, String), usize>,
+    indices: HashMap<(Scope, TypeId, Vec<ShownType>), usize>,
     adapter: Option<DefId>,
     adapter_requires: Vec<usize>,
     adapter_origin: Option<String>,
@@ -835,7 +835,10 @@ impl Builder<'_> {
         {
             return Err(format!("recursive dependency: {}", trail(chain)));
         }
-        if let Some(&id) = self.indices.get(&(scope, s.name.clone())) {
+        if let Some(&id) = self
+            .indices
+            .get(&(scope, s.constructor, s.arguments.clone()))
+        {
             return Ok(id);
         }
         let row = self.schema.rows.get(&s.constructor);
@@ -930,7 +933,8 @@ impl Builder<'_> {
             }
         };
         let id = self.nodes.len();
-        self.indices.insert((scope, s.name.clone()), id);
+        self.indices
+            .insert((scope, s.constructor, s.arguments.clone()), id);
         self.nodes.push(Node {
             step: ConstructionStep {
                 service: s.clone(),
@@ -1015,11 +1019,12 @@ impl Builder<'_> {
                 self.schema.adapters[&a]
                     .supplies
                     .iter()
-                    .map(|s| s.name.clone()),
+                    .map(|s| (s.constructor, s.arguments.clone())),
             );
         }
         for n in &mut self.nodes {
-            let supplied = n.step.scope == Scope::Body && seeded.contains(&n.step.service.name);
+            let supplied = n.step.scope == Scope::Body
+                && seeded.contains(&(n.step.service.constructor, n.step.service.arguments.clone()));
             if n.seed {
                 let required = self
                     .schema
