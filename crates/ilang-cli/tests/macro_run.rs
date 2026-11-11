@@ -902,3 +902,54 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
     };
     assert_eq!(value.to_string(), "42");
 }
+
+#[test]
+fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{
+        body_engine::{BodyEngine, Error},
+        body_walk,
+        registry::Registry,
+    };
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> (x (! d (. syntax Diagnostics))) _ { ((. d note) \"discard me\") `(= x 1) })))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nmain = () { m.bad(1) }\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let source = module.source;
+    let mut ast = module.ast.clone();
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected definition".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    assert!(matches!(
+        body_walk::expressions(&mut ast, &mut engine),
+        Err(Error::Conversion(_))
+    ));
+    assert!(engine.transactions.is_empty());
+}
