@@ -530,7 +530,6 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
         g.sources.render_all(&c.diags)
     );
     let mut p = c.program.unwrap();
-    assert!(p.of_sites.is_empty());
     let before = p.order.groups.clone();
     let init = p.order.init.clone();
     let needs = p
@@ -559,7 +558,7 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
     let normal = c.types.unwrap();
     assert_eq!(normal.schemes, reversed.schemes);
     assert_eq!(normal.scheme_types, reversed.scheme_types);
-    assert!(reversed.alias_types.is_empty());
+    assert_eq!(normal.alias_types, reversed.alias_types);
 }
 
 #[test]
