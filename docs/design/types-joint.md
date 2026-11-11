@@ -50,7 +50,7 @@ The one `resolve::ty` dispatch is:
 | `m.T(...)` | Named type, normal module/export/arity lookup; T2 does not capture it |
 | Lowercase `x` / `m.x`, without joined `(` | T2: pending/own-binding checks, ordinary value lookup, `Of`; `m` must be a module in the qualified form |
 | Lowercase `m(...)` / `a.m(...)` | Reserved macro form, regardless of imports |
-| `{ ..T, ... }` / `{ label: T, ... }` | T3: record type, decoded duplicate check, label binding checks; recurse into base and fields |
+| `( ..T, ... )` / `( label: T, ... )` | T3: record type, decoded duplicate check, label binding checks; recurse into base and fields |
 | `{ T }` | Group; no distinct inferred type |
 | Remaining structural forms | Recurse through the same visitor; propagate context and Of provenance |
 
