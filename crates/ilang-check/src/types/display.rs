@@ -235,27 +235,42 @@ fn is_top(t: &Ty) -> bool {
 
 /// `a` and `b` are equal when each mark is `Top`.
 fn same_unmarked(a: &Ty, b: &Ty) -> bool {
-    let all = |xs: &[Ty], ys: &[Ty]| {
-        xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| same_unmarked(x, y))
-    };
-    match (a, b) {
-        _ if is_top(a) && is_top(b) => true,
-        (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) => h == g && a == b && all(xs, ys),
-        (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
-        (Ty::Fn(f), Ty::Fn(g)) => {
-            f.params.len() == g.params.len()
-                && f.params
-                    .iter()
-                    .zip(&g.params)
-                    .all(|(p, q)| p.0 == q.0 && same_unmarked(&p.1, &q.1))
-                && same_unmarked(&f.ret, &g.ret)
-                && same_unmarked(&f.err, &g.err)
-                && same_unmarked(&f.env, &g.env)
+    let mut pending = vec![(a, b)];
+    while let Some((a, b)) = pending.pop() {
+        if is_top(a) && is_top(b) {
+            continue;
         }
-        (Ty::Diff(x, h), Ty::Diff(y, g)) => same_unmarked(x, y) && all(h, g),
-        (Ty::Both(x, y), Ty::Both(z, w)) => same_unmarked(x, z) && same_unmarked(y, w),
-        _ => a == b,
+        match (a, b) {
+            (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) if h == g && a == b && xs.len() == ys.len() => {
+                pending.extend(xs.iter().zip(ys))
+            }
+            (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys))
+                if xs.len() == ys.len() =>
+            {
+                pending.extend(xs.iter().zip(ys))
+            }
+            (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+                for (p, q) in f.params.iter().zip(&g.params) {
+                    if p.0 != q.0 {
+                        return false;
+                    }
+                    pending.push((&p.1, &q.1));
+                }
+                pending.extend([(&f.ret, &g.ret), (&f.err, &g.err), (&f.env, &g.env)]);
+            }
+            (Ty::Diff(x, h), Ty::Diff(y, g)) if h.len() == g.len() => {
+                pending.push((x, y));
+                pending.extend(h.iter().zip(g));
+            }
+            (Ty::Both(x, y), Ty::Both(z, w)) => {
+                pending.push((x, z));
+                pending.push((y, w));
+            }
+            _ if a == b => {}
+            _ => return false,
+        }
     }
+    true
 }
 
 /// A simplified type, with what its variables and its `Top`s stand for.
@@ -732,74 +747,123 @@ struct Occ<'a> {
 
 impl Norm<'_> {
     fn norm(&self, t: Ty) -> Ty {
-        match t.into_parts() {
-            TyParts::Union(ms) => self.union(ms.into_iter().map(|m| self.norm(m)).collect()),
-            TyParts::Inter(ms) => self.inter(ms.into_iter().map(|m| self.norm(m)).collect()),
-            TyParts::Diff(a, h) => {
-                self.diff(self.norm(*a), h.into_iter().map(|m| self.norm(m)).collect())
-            }
-            TyParts::Con(h, values, args) => {
-                let rows = self.s.rows(h, args.len());
-                Ty::Con(
-                    h,
-                    values,
-                    args.into_iter()
-                        .zip(rows)
-                        .map(|(a, row)| {
-                            if row != Mode::Value {
-                                self.env(a)
-                            } else {
-                                self.norm(a)
-                            }
-                        })
-                        .collect(),
-                )
-            }
-            TyParts::Fn(f) => {
-                let f = *f;
-                Ty::Fn(Box::new(FnTy {
-                    params: f
-                        .params
-                        .into_iter()
-                        .map(|(l, p)| (l, self.norm(p)))
-                        .collect(),
-                    ret: self.norm(f.ret),
-                    err: self.env(f.err),
-                    env: self.env(f.env),
-                }))
-            }
-            TyParts::Both(a, b) => {
-                let (a, b) = (self.norm(*a), self.norm(*b));
-                if a == b {
-                    a
-                } else if same_unmarked(&a, &b) {
-                    // Equal but for marks: the side with the marks.
-                    if b == Ty::Top { a } else { b }
-                } else {
-                    Ty::Both(Box::new(a), Box::new(b))
-                }
-            }
-            t => t.into(),
-        }
+        self.norm_in(t, false)
     }
 
-    /// An environment: two forms of one type constructor are not put
-    /// together, because their arguments must be equal (§9.2).
-    fn env(&self, t: Ty) -> Ty {
-        match t.into_parts() {
-            TyParts::Both(a, b) => {
-                let a = self.env(*a);
-                let b = self.env(*b);
-                self.norm(Ty::Both(Box::new(a), Box::new(b)))
-            }
-            TyParts::Diff(a, hs) => {
-                self.diff(self.env(*a), hs.into_iter().map(|h| self.norm(h)).collect())
-            }
-            TyParts::Union(ms) => {
-                self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true)
-            }
-            t => self.norm(t.into()),
+    fn norm_in(&self, t: Ty, environment: bool) -> Ty {
+        enum Task {
+            Visit(Ty, bool),
+            Con(Head, super::lits::ValueSet, usize),
+            Fn(Vec<Option<String>>),
+            Union(usize, bool),
+            Inter(usize),
+            Diff(usize),
+            Both(bool),
         }
+        let mut tasks = vec![Task::Visit(t, environment)];
+        let mut results = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t, env) => match t.into_parts() {
+                    TyParts::Both(a, b) => {
+                        tasks.push(Task::Both(env));
+                        tasks.push(Task::Visit(*b, env));
+                        tasks.push(Task::Visit(*a, env));
+                    }
+                    TyParts::Diff(a, hs) => {
+                        tasks.push(Task::Diff(hs.len()));
+                        tasks.extend(hs.into_iter().rev().map(|h| Task::Visit(h, false)));
+                        tasks.push(Task::Visit(*a, env));
+                    }
+                    TyParts::Union(ms) => {
+                        tasks.push(Task::Union(ms.len(), env));
+                        tasks.extend(ms.into_iter().rev().map(|m| Task::Visit(m, false)));
+                    }
+                    part if env => tasks.push(Task::Visit(part.into(), false)),
+                    TyParts::Inter(ms) => {
+                        tasks.push(Task::Inter(ms.len()));
+                        tasks.extend(ms.into_iter().rev().map(|m| Task::Visit(m, false)));
+                    }
+                    TyParts::Con(h, values, args) => {
+                        let modes = self.s.rows(h, args.len());
+                        let n = args.len();
+                        let children: Vec<_> = args.into_iter().zip(modes).collect();
+                        tasks.push(Task::Con(h, values, n));
+                        tasks.extend(
+                            children
+                                .into_iter()
+                                .rev()
+                                .map(|(a, m)| Task::Visit(a, m != Mode::Value)),
+                        );
+                    }
+                    TyParts::Fn(f) => {
+                        let FnTy {
+                            params,
+                            ret,
+                            err,
+                            env,
+                        } = *f;
+                        let mut names = Vec::with_capacity(params.len());
+                        let mut children = Vec::with_capacity(params.len() + 3);
+                        for (n, t) in params {
+                            names.push(n);
+                            children.push((t, false));
+                        }
+                        children.extend([(ret, false), (err, true), (env, true)]);
+                        tasks.push(Task::Fn(names));
+                        tasks.extend(children.into_iter().rev().map(|(t, e)| Task::Visit(t, e)));
+                    }
+                    part => results.push(part.into()),
+                },
+                Task::Con(h, values, n) => {
+                    let args = results.split_off(results.len() - n);
+                    results.push(Ty::Con(h, values, args));
+                }
+                Task::Fn(names) => {
+                    let mut parts = results
+                        .split_off(results.len() - names.len() - 3)
+                        .into_iter();
+                    let params = names
+                        .into_iter()
+                        .map(|n| (n, parts.next().expect("normalized parameter")))
+                        .collect();
+                    results.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: parts.next().expect("normalized return"),
+                        err: parts.next().expect("normalized error"),
+                        env: parts.next().expect("normalized environment"),
+                    })));
+                }
+                Task::Union(n, env) => {
+                    let ms = results.split_off(results.len() - n);
+                    results.push(self.union_in(ms, env));
+                }
+                Task::Inter(n) => {
+                    let ms = results.split_off(results.len() - n);
+                    results.push(self.inter(ms));
+                }
+                Task::Diff(n) => {
+                    let mut parts = results.split_off(results.len() - n - 1).into_iter();
+                    let a = parts.next().expect("normalized difference subject");
+                    results.push(self.diff(a, parts.collect()));
+                }
+                Task::Both(env) => {
+                    let b = results.pop().expect("normalized right side");
+                    let a = results.pop().expect("normalized left side");
+                    if env {
+                        tasks.push(Task::Visit(Ty::Both(Box::new(a), Box::new(b)), false));
+                    } else if a == b {
+                        results.push(a);
+                    } else if same_unmarked(&a, &b) {
+                        results.push(if b == Ty::Top { a } else { b });
+                    } else {
+                        results.push(Ty::Both(Box::new(a), Box::new(b)));
+                    }
+                }
+            }
+        }
+        assert_eq!(results.len(), 1, "display normalization result stack");
+        results.pop().unwrap()
     }
 
     fn union(&self, ms: Vec<Ty>) -> Ty {
@@ -1594,32 +1658,110 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
 }
 
 fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
-    let go = |x: &Ty| hide(x, outside, in_h);
-    match t {
-        Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(v)) => Ty::Top,
-        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
-        Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
-        Ty::Inter(xs) => {
-            let mut xs: Vec<_> = xs.iter().map(go).filter(|t| *t != Ty::Top).collect();
-            match xs.len() {
-                0 => Ty::Top,
-                1 => xs.pop().unwrap(),
-                _ => Ty::Inter(xs),
+    enum Task {
+        Visit(Ty, bool),
+        Con(Head, super::lits::ValueSet, usize),
+        Union(usize),
+        Inter(usize),
+        Fn(Vec<Option<String>>),
+        Diff(usize),
+        Both,
+    }
+    let mut tasks = vec![Task::Visit(t.clone(), in_h)];
+    let mut results = Vec::new();
+    while let Some(task) = tasks.pop() {
+        match task {
+            Task::Visit(t, in_h) => match t.into_parts() {
+                TyParts::Var(v) if in_h && (v.0 >= MARK || !outside.contains(&v)) => {
+                    results.push(Ty::Top)
+                }
+                TyParts::Con(h, values, xs) => {
+                    tasks.push(Task::Con(h, values, xs.len()));
+                    tasks.extend(xs.into_iter().rev().map(|x| Task::Visit(x, in_h)));
+                }
+                TyParts::Union(xs) => {
+                    tasks.push(Task::Union(xs.len()));
+                    tasks.extend(xs.into_iter().rev().map(|x| Task::Visit(x, in_h)));
+                }
+                TyParts::Inter(xs) => {
+                    tasks.push(Task::Inter(xs.len()));
+                    tasks.extend(xs.into_iter().rev().map(|x| Task::Visit(x, in_h)));
+                }
+                TyParts::Fn(f) => {
+                    let FnTy {
+                        params,
+                        ret,
+                        err,
+                        env,
+                    } = *f;
+                    let mut names = Vec::with_capacity(params.len());
+                    let mut children = Vec::with_capacity(params.len() + 3);
+                    for (name, t) in params {
+                        names.push(name);
+                        children.push(t);
+                    }
+                    children.extend([ret, err, env]);
+                    tasks.push(Task::Fn(names));
+                    tasks.extend(children.into_iter().rev().map(|x| Task::Visit(x, in_h)));
+                }
+                TyParts::Diff(a, hs) => {
+                    tasks.push(Task::Diff(hs.len()));
+                    tasks.extend(hs.into_iter().rev().map(|x| Task::Visit(x, true)));
+                    tasks.push(Task::Visit(*a, in_h));
+                }
+                TyParts::Both(a, b) => {
+                    tasks.push(Task::Both);
+                    tasks.push(Task::Visit(*b, in_h));
+                    tasks.push(Task::Visit(*a, in_h));
+                }
+                part => results.push(part.into()),
+            },
+            Task::Con(h, values, n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(Ty::Con(h, values, xs));
+            }
+            Task::Union(n) => {
+                let xs = results.split_off(results.len() - n);
+                results.push(Ty::Union(xs));
+            }
+            Task::Inter(n) => {
+                let mut xs = results.split_off(results.len() - n);
+                xs.retain(|t| *t != Ty::Top);
+                results.push(match xs.len() {
+                    0 => Ty::Top,
+                    1 => xs.pop().unwrap(),
+                    _ => Ty::Inter(xs),
+                });
+            }
+            Task::Fn(names) => {
+                let mut parts = results
+                    .split_off(results.len() - names.len() - 3)
+                    .into_iter();
+                let params = names
+                    .into_iter()
+                    .map(|name| (name, parts.next().expect("hidden parameter")))
+                    .collect();
+                results.push(Ty::Fn(Box::new(FnTy {
+                    params,
+                    ret: parts.next().expect("hidden return"),
+                    err: parts.next().expect("hidden error"),
+                    env: parts.next().expect("hidden environment"),
+                })));
+            }
+            Task::Diff(n) => {
+                let mut parts = results.split_off(results.len() - n - 1).into_iter();
+                let a = parts.next().expect("hidden difference subject");
+                results.push(Ty::Diff(Box::new(a), parts.collect()));
+            }
+            Task::Both => {
+                let b = results.pop().expect("hidden right side");
+                let a = results.pop().expect("hidden left side");
+                results.push(Ty::Both(Box::new(a), Box::new(b)));
             }
         }
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
-            ret: go(&f.ret),
-            err: go(&f.err),
-            env: go(&f.env),
-        })),
-        Ty::Diff(a, h) => Ty::Diff(
-            Box::new(go(a)),
-            h.iter().map(|x| hide(x, outside, true)).collect(),
-        ),
-        Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
-        t => t.clone(),
     }
+    assert_eq!(results.len(), 1, "hidden type result stack");
+    results.pop().unwrap()
 }
 
 // ---- Known types (§4.8) ----
@@ -1825,11 +1967,29 @@ mod deep_walk_tests {
                 assert!(mentions(&named, V(u32::MAX - 1)));
                 assert_eq!(next, u32::MAX - 1);
                 assert!(origins.is_empty());
+                let marked = replace(&t, V(0), &Ty::Var(mark(V(0))));
+                assert!(same_unmarked(&marked, &with_top));
+                let hidden = holes(&t);
+                let mut visible = Vec::new();
+                ty_vars(&hidden, &mut visible);
+                assert_eq!(visible, vec![V(0)]);
                 let mut sides = Ty::Var(V(4));
                 for _ in 0..10_000 {
                     sides = Ty::Both(Box::new(sides), Box::new(Ty::Top));
                 }
                 assert_eq!(both(&sides), Ty::Var(V(4)));
+                let s = Solver::new(Default::default(), Vec::new());
+                let norm = Norm {
+                    s: &s,
+                    keep: None,
+                    written: false,
+                };
+                let mut nested = Ty::Var(V(0));
+                for _ in 0..10_000 {
+                    nested = Ty::tuple(vec![nested]);
+                }
+                let expected = nested.clone();
+                assert_eq!(norm.norm(nested), expected);
             })
             .unwrap()
             .join()
