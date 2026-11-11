@@ -339,23 +339,34 @@ pub(crate) fn types_for_host_references(references: bool) -> std::borrow::Cow<'s
 }
 
 pub(crate) fn wat_for_host_references(references: bool) -> &'static str {
-    static WITH_REFERENCES: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    static WITHOUT_REFERENCES: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    let runtime = if references {
-        &WITH_REFERENCES
-    } else {
-        &WITHOUT_REFERENCES
-    };
-    runtime.get_or_init(|| runtime_wat(references))
+    wat_for_expansion_sites(references, false)
 }
 
-fn runtime_wat(references: bool) -> String {
+pub(crate) fn wat_for_expansion_sites(references: bool, expansion_sites: bool) -> &'static str {
+    static WITH_REFERENCES: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    static WITHOUT_REFERENCES: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    static WITH_REFERENCES_EXPANDED: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    static WITHOUT_REFERENCES_EXPANDED: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let runtime = match (references, expansion_sites) {
+        (true, false) => &WITH_REFERENCES,
+        (false, false) => &WITHOUT_REFERENCES,
+        (true, true) => &WITH_REFERENCES_EXPANDED,
+        (false, true) => &WITHOUT_REFERENCES_EXPANDED,
+    };
+    runtime.get_or_init(|| runtime_wat(references, expansion_sites))
+}
+
+fn runtime_wat(references: bool, expansion_sites: bool) -> String {
     [
         MEMORY.to_owned(),
         bigint::wat(),
         bitarrays::wat(),
         values::wat(references),
-        stops::wat(),
+        if expansion_sites {
+            stops::wat_with_expansion_sites()
+        } else {
+            stops::wat()
+        },
         core::wat(),
         casing::wat(),
         search::wat(),

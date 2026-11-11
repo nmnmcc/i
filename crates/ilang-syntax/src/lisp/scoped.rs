@@ -15,6 +15,14 @@ pub struct Origin {
     pub call_site: Syntax,
     /// Original definition head that contains this occurrence, if any.
     pub definition_head: Option<u64>,
+    /// Outer-to-inner calls that produced this occurrence.
+    pub call_chain: Vec<Invocation>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Invocation {
+    pub syntax: Syntax,
+    pub macro_name: String,
 }
 
 #[derive(Clone, Debug)]
@@ -35,7 +43,7 @@ pub enum MeteredError {
 pub type ChargeResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 /// Source text with a virtual, append-only suffix for expanded occurrences.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ScopedSource {
     text: String,
     original_len: u32,
@@ -64,9 +72,42 @@ impl ScopedSource {
         self.spans
             .get(&span)
             .or_else(|| self.starts.get(&span.start))
+            .or_else(|| {
+                self.spans
+                    .iter()
+                    .filter(|(s, _)| s.start <= span.start && span.end <= s.end)
+                    .min_by_key(|(s, _)| s.end - s.start)
+                    .map(|(_, origin)| origin)
+            })
     }
     pub fn is_generated(&self, span: Span) -> bool {
         span.start > self.original_len
+    }
+
+    /// Attach this invocation and any enclosing invocations to every node in
+    /// the newly appended result. Called after each successful conversion.
+    pub fn inherit_call_chain(&mut self, root: Span, invocation: Span, macro_name: &str) {
+        let parent = self.origin(invocation).cloned();
+        let current = self
+            .origin(root)
+            .expect("expanded root has an origin")
+            .call_site
+            .clone();
+        let mut chain = parent.map_or_else(Vec::new, |o| o.call_chain);
+        chain.push(Invocation {
+            syntax: current,
+            macro_name: macro_name.to_owned(),
+        });
+        for (span, origin) in &mut self.spans {
+            if root.start <= span.start && span.end <= root.end {
+                origin.call_chain = chain.clone();
+            }
+        }
+        for (start, origin) in &mut self.starts {
+            if root.start <= *start && *start < root.end {
+                origin.call_chain = chain.clone();
+            }
+        }
     }
 
     fn position(&self) -> u32 {
@@ -240,6 +281,7 @@ impl ScopedSource {
             syntax: syntax.clone(),
             call_site: call_site.clone(),
             definition_head,
+            call_chain: Vec::new(),
         };
         assert!(
             self.spans.insert(span, origin.clone()).is_none(),
@@ -328,6 +370,42 @@ mod tests {
     use super::*;
     use crate::lisp::syntax::{Node, Scope};
     use std::collections::BTreeSet;
+
+    fn name(text: &str, module: u32, span: Span, mark: Option<u64>) -> Syntax {
+        let datum = Datum {
+            kind: DatumKind::Name(text.into()),
+            span,
+            docs: Vec::new(),
+        };
+        Syntax::from_datum(
+            &datum,
+            &Scope {
+                module,
+                marks: mark.into_iter().collect(),
+            },
+        )
+    }
+
+    #[test]
+    fn nested_expansions_keep_every_call_and_the_real_template() {
+        let mut source = ScopedSource::new("outer(x)".into());
+        let call = name("outer", 0, Span::new(0, 8), None);
+        let first_template = name("inner", 1, Span::new(4, 9), Some(11));
+        let first = source.expression(&first_template, &call).unwrap();
+        source.inherit_call_chain(first.span, call.span(), "outer");
+        let nested_call = source.origin(first.span).unwrap().syntax.clone();
+        let second_template = name("value", 2, Span::new(7, 12), Some(12));
+        let second = source.expression(&second_template, &nested_call).unwrap();
+        source.inherit_call_chain(second.span, first.span, "inner");
+        let origin = source.origin(second.span).unwrap();
+        assert_eq!(origin.syntax.scope().module, 2);
+        assert_eq!(origin.syntax.span(), Span::new(7, 12));
+        assert_eq!(origin.call_chain.len(), 2);
+        assert_eq!(origin.call_chain[0].macro_name, "outer");
+        assert_eq!(origin.call_chain[0].syntax.span(), Span::new(0, 8));
+        assert_eq!(origin.call_chain[1].macro_name, "inner");
+        assert_eq!(origin.call_chain[1].syntax.scope().module, 1);
+    }
 
     #[test]
     fn deep_virtual_source_builds_and_releases_without_recursive_stack() {
