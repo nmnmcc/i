@@ -395,7 +395,9 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
             Node::Square(xs) => s.with_node(Node::Square(
                 xs.iter().map(|x| ty(x, binders, answer)).collect(),
             )),
-            Node::Curly(xs) if xs.len() == 1 => ty(&xs[0], binders, answer),
+            Node::Curly(xs) if xs.len() == 1 && !super::source_syntax::record_parts(xs) => {
+                ty(&xs[0], binders, answer)
+            }
             Node::Curly(xs) => s.with_node(Node::Curly(
                 xs.iter().map(|x| ty(x, binders, answer)).collect(),
             )),
