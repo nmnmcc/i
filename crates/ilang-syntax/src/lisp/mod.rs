@@ -22,7 +22,7 @@ pub mod source_syntax;
 pub mod syntax;
 mod to_ast;
 mod to_source;
-mod trampoline;
+pub(crate) mod trampoline;
 pub use encode::{expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
@@ -30,7 +30,7 @@ pub use to_ast::{
 };
 pub use to_source::{normal_source, normal_with_comments};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Datum {
     pub kind: DatumKind,
     pub span: Span,
@@ -54,6 +54,43 @@ pub enum DatumKind {
     Quote(Box<Datum>),
     Unquote(Box<Datum>),
     Splice(Box<Datum>),
+}
+
+// Compare arbitrary-depth syntax without recursing through Rust stack frames.
+impl PartialEq for Datum {
+    fn eq(&self, other: &Self) -> bool {
+        let mut work = vec![(self, other)];
+        while let Some((a, b)) = work.pop() {
+            if a.span != b.span || a.docs != b.docs {
+                return false;
+            }
+            use DatumKind as K;
+            match (&a.kind, &b.kind) {
+                (K::Name(x), K::Name(y))
+                | (K::Discard(x), K::Discard(y))
+                | (K::UpName(x), K::UpName(y))
+                | (K::String(x), K::String(y))
+                | (K::Symbol(x), K::Symbol(y))
+                    if x == y => {}
+                (K::Int(x), K::Int(y)) if x == y => {}
+                (K::Float(x), K::Float(y)) if x == y => {}
+                (K::Round(x), K::Round(y))
+                | (K::Square(x), K::Square(y))
+                | (K::Curly(x), K::Curly(y))
+                | (K::Bits(x), K::Bits(y)) => {
+                    if x.len() != y.len() {
+                        return false;
+                    }
+                    work.extend(x.iter().zip(y));
+                }
+                (K::Quote(x), K::Quote(y))
+                | (K::Unquote(x), K::Unquote(y))
+                | (K::Splice(x), K::Splice(y)) => work.push((x, y)),
+                _ => return false,
+            }
+        }
+        true
+    }
 }
 
 // Datum trees may be supplied by macros and can be much deeper than the host
@@ -339,26 +376,100 @@ impl Parser<'_> {
 
 /// Print a datum on one line. Whitespace separates tokens that might join.
 pub fn show(datum: &Datum) -> String {
-    use DatumKind::*;
-    match &datum.kind {
-        Name(s) | Discard(s) | UpName(s) | Symbol(s) => s.clone(),
-        Int(n) => n.to_string(),
-        Float(n) => float(*n),
-        String(s) => crate::print::string_literal(s),
-        Round(xs) => bracket("(", ")", xs),
-        Square(xs) => bracket("[", "]", xs),
-        Curly(xs) => bracket("{", "}", xs),
-        Bits(xs) => {
-            if xs.is_empty() {
-                "<<>>".into()
-            } else {
-                bracket("<< ", " >>", xs)
+    show_tree(datum)
+}
+
+enum View<'a, T> {
+    Atom(&'a str),
+    Int(&'a BigUint),
+    Float(f64),
+    String(&'a str),
+    Bracket(&'static str, &'static str, &'a [T]),
+    Prefix(&'static str, &'a T),
+}
+
+trait Printable: Sized {
+    fn view(&self) -> View<'_, Self>;
+}
+
+impl Printable for Datum {
+    fn view(&self) -> View<'_, Self> {
+        use DatumKind::*;
+        match &self.kind {
+            Name(s) | Discard(s) | UpName(s) | Symbol(s) => View::Atom(s),
+            Int(n) => View::Int(n),
+            Float(n) => View::Float(*n),
+            String(s) => View::String(s),
+            Round(xs) => View::Bracket("(", ")", xs),
+            Square(xs) => View::Bracket("[", "]", xs),
+            Curly(xs) => View::Bracket("{", "}", xs),
+            Bits(xs) if xs.is_empty() => View::Bracket("<<", ">>", xs),
+            Bits(xs) => View::Bracket("<< ", " >>", xs),
+            Quote(x) => View::Prefix("`", x),
+            Unquote(x) => View::Prefix("~", x),
+            Splice(x) => View::Prefix("~..", x),
+        }
+    }
+}
+
+impl Printable for syntax::Syntax {
+    fn view(&self) -> View<'_, Self> {
+        use syntax::Node::*;
+        match self.node() {
+            Name(s) | Discard(s) | Up(s) | Symbol(s) => View::Atom(s),
+            Int(n) => View::Int(n),
+            Float(n) => View::Float(*n),
+            Text(s) => View::String(s),
+            Round(xs) => View::Bracket("(", ")", xs),
+            Square(xs) => View::Bracket("[", "]", xs),
+            Curly(xs) => View::Bracket("{", "}", xs),
+            Bits(xs) if xs.is_empty() => View::Bracket("<<", ">>", xs),
+            Bits(xs) => View::Bracket("<< ", " >>", xs),
+            Quote(x) => View::Prefix("`", x),
+            Unquote(x) => View::Prefix("~", x),
+            Splice(x) => View::Prefix("~..", x),
+        }
+    }
+}
+
+fn show_tree<T: Printable>(tree: &T) -> String {
+    use std::fmt::Write;
+    enum Task<'a, T> {
+        Node(&'a T),
+        Text(&'static str),
+    }
+    let mut pending = vec![Task::Node(tree)];
+    let mut out = String::new();
+    while let Some(task) = pending.pop() {
+        let node = match task {
+            Task::Text(s) => {
+                out.push_str(s);
+                continue;
+            }
+            Task::Node(n) => n,
+        };
+        match node.view() {
+            View::Atom(s) => out.push_str(s),
+            View::Int(n) => write!(&mut out, "{n}").expect("writing to a String"),
+            View::Float(n) => out.push_str(&float(n)),
+            View::String(s) => out.push_str(&crate::print::string_literal(s)),
+            View::Prefix(prefix, child) => {
+                out.push_str(prefix);
+                pending.push(Task::Node(child));
+            }
+            View::Bracket(open, close, children) => {
+                out.push_str(open);
+                pending.push(Task::Text(close));
+                for i in (0..children.len()).rev() {
+                    pending.push(Task::Node(&children[i]));
+                    if i != 0 {
+                        pending.push(Task::Text(" "));
+                    }
+                }
             }
         }
-        Quote(x) => format!("`{}", show(x)),
-        Unquote(x) => format!("~{}", show(x)),
-        Splice(x) => format!("~..{}", show(x)),
     }
+    out
 }
 
 fn float(n: f64) -> String {
@@ -367,11 +478,4 @@ fn float(n: f64) -> String {
         Some((mantissa, exponent)) if !mantissa.contains('.') => format!("{mantissa}.0e{exponent}"),
         _ => s,
     }
-}
-
-fn bracket(open: &str, close: &str, xs: &[Datum]) -> String {
-    format!(
-        "{open}{}{close}",
-        xs.iter().map(show).collect::<Vec<_>>().join(" ")
-    )
 }

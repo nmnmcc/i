@@ -7,14 +7,14 @@ use std::task::{Context, Poll, Waker};
 
 type Task<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
 
-pub(super) struct Scheduler<'a>(Rc<RefCell<Vec<Task<'a>>>>);
+pub(crate) struct Scheduler<'a>(Rc<RefCell<Vec<Task<'a>>>>);
 impl Clone for Scheduler<'_> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 impl<'a> Scheduler<'a> {
-    pub(super) async fn call<T: 'a, F, Fut>(&self, f: F) -> T
+    pub(crate) async fn call<T: 'a, F, Fut>(&self, f: F) -> T
     where
         F: FnOnce(Self) -> Fut + 'a,
         Fut: Future<Output = T> + 'a,
@@ -32,7 +32,7 @@ impl<'a> Scheduler<'a> {
         .await
     }
 }
-pub(super) fn run<'a, T: 'a, F, Fut>(f: F) -> T
+pub(crate) fn run<'a, T: 'a, F, Fut>(f: F) -> T
 where
     F: FnOnce(Scheduler<'a>) -> Fut + 'a,
     Fut: Future<Output = T> + 'a,
