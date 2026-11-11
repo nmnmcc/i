@@ -2233,3 +2233,14 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
         .join()
         .unwrap();
 }
+
+#[test]
+fn unused_compile_time_helper_does_not_break_a_normal_program() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/helpers.is"), "(= quoted (-> () _ `hello))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "main = () { 1 }\n").unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i")).args(["run", "--offline", "--project"]).arg(dir.path()).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+}

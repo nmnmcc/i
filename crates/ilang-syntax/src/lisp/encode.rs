@@ -203,7 +203,7 @@ impl Encoder<'_> {
                 Work::Pattern(p, false) => {
                     work.push(Work::Pattern(p, true));
                     match &p.kind {
-                        PatternKind::Quote(_)
+                        PatternKind::Quote { .. }
                         | PatternKind::Var(_)
                         | PatternKind::Discard(_)
                         | PatternKind::Int { .. }
