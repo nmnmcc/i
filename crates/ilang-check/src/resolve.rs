@@ -2542,7 +2542,7 @@ impl<'a> Resolver<'a> {
                     if let TypeKind::Named {
                         ty: TypeRef::Builtin(BuiltinType::Request),
                         args,
-                    } = expanded.kind
+                    } = &expanded.kind
                         && args.len() == 1
                     {
                         let answer = self.expand(&args[0]);
