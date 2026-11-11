@@ -595,3 +595,29 @@ fn unchosen_target_cells_still_check_their_factory_type() {
         &["app/main.A", "must return its service"],
     );
 }
+
+#[test]
+fn adapter_service_list_order_does_not_change_its_type() {
+    let (mut g, c) = package("(i/task)\n@main\nmain = () { task.yield() }", "");
+    g.packages[g.library].provider_plan.adapters[0]
+        .supplies
+        .reverse();
+    let p = resolve(&g, &c, Target::Native).unwrap();
+    assert_eq!(
+        names(&p),
+        ["i/request.Root", "i/task.Runner", "i/task.Scheduler"]
+    );
+}
+
+#[test]
+fn discriminant_constructor_aliases_resolve_before_validation() {
+    let source = "Bundle { On(Part)\nOff }\nPart { Part }\npart = () { Part }\nselected = On\nalias = selected\n@main\nmain = (b ! Bundle) { Nil }";
+    let plan = format!(
+        "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.alias\",native=\"app/main.alias\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
+        row("Part", "part")
+    );
+    let (g, c) = package(source, &plan);
+    let p = resolve(&g, &c, Target::Native).unwrap();
+    assert_eq!(names(&p), ["app/main.Part", "app/main.Bundle"]);
+    assert!(matches!(p.steps[1].supply, Supply::Constructor(_)));
+}

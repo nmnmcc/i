@@ -135,6 +135,7 @@ impl Typed {
     /// any particular entry result, error or environment.
     pub(crate) fn provider_adapter(
         &self,
+        p: &Program,
         id: DefId,
         supplies: &[ShownType],
         requires: &[ShownType],
@@ -192,6 +193,29 @@ impl Typed {
                 externals: OnceLock::new(),
             }),
         };
+        // Difference removes a set of service constructors. Normalize both
+        // schemes before comparison so manifest list order cannot affect the
+        // generalized proof (the source scheme retains its written order).
+        fn ordered_differences(p: &Program, ty: &Ty) -> Ty {
+            records::Pool::default()
+                .graph(ty)
+                .map_nodes(false, &mut |ty, _| match ty {
+                    Ty::Diff(base, mut removed) => {
+                        removed.sort_by_cached_key(|ty| match ty.head() {
+                            Some(Head::Named(TypeRef::Custom(id))) => {
+                                format!("{}.{}", p.module(p.ty(id).module).path, p.ty(id).name)
+                            }
+                            head => format!("{head:?}"),
+                        });
+                        Ty::Diff(base, removed)
+                    }
+                    ty => ty,
+                })
+        }
+        let mut actual = actual.clone();
+        actual.scheme.ty = ordered_differences(p, &actual.scheme.ty);
+        let mut expected = expected;
+        expected.scheme.ty = ordered_differences(p, &expected.scheme.ty);
         let name = |r: TypeRef| format!("{r:?}");
         match actual.compare(&expected, &mut |r| name(r), &mut |r| name(r))? {
             SchemeComparison::Equivalent(_) => Ok(()),

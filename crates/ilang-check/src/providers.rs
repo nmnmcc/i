@@ -548,6 +548,46 @@ fn direct_binding(p: &Program, mut id: DefId) -> Result<DefId, String> {
     Err("recursive adapter alias".into())
 }
 
+fn resolve_constructor(
+    g: &PackageGraph,
+    p: &Program,
+    authority: PackageId,
+    path: &str,
+) -> Result<hir::CtorRef, String> {
+    let (m, name) = module(g, p, authority, path).map_err(|e| format!("{path}: {e:?}"))?;
+    for &ty in &p.module(m).types {
+        if let hir::TypeBody::Custom(ctors) = &p.ty(ty).body
+            && let Some(index) = ctors.iter().position(|c| c.name == name)
+        {
+            if p.module(m).package != authority && !p.ty(ty).constructors_exported {
+                return Err(format!("constructor {path}: Private"));
+            }
+            return Ok(hir::CtorRef {
+                ty,
+                index: index as u32,
+            });
+        }
+    }
+    let mut binding =
+        resolve_binding(g, p, authority, path).map_err(|e| format!("constructor {path}: {e:?}"))?;
+    let mut seen = HashSet::new();
+    while seen.insert(binding) {
+        let hir::DefKind::Binding { binding: at, .. } = p.def(binding).kind else {
+            return Err(format!("{path} is not a constructor alias"));
+        };
+        match p.module(binding.module).bindings[at as usize]
+            .binding
+            .value
+            .kind
+        {
+            hir::ExprKind::Name(hir::ValueRef::Ctor(ctor)) => return Ok(ctor),
+            hir::ExprKind::Name(hir::ValueRef::Def(next)) => binding = next,
+            _ => return Err(format!("{path} is not a direct constructor alias")),
+        }
+    }
+    Err(format!("recursive constructor alias {path}"))
+}
+
 impl Schema {
     fn resolve(p: &Program, t: &Typed, g: &PackageGraph, target: Target) -> Self {
         let mut out = Self {
@@ -585,6 +625,7 @@ impl Schema {
                     let supplies = parse(&a.supplies)?;
                     let requires = parse(&a.requires)?;
                     t.provider_adapter(
+                        p,
                         binding,
                         &supplies.iter().map(as_type).collect::<Vec<_>>(),
                         &requires.iter().map(as_type).collect::<Vec<_>>(),
@@ -725,9 +766,8 @@ impl Schema {
         for (&id, row) in &mut out.rows {
             for (&column, path) in &row.declaration.discriminant {
                 let result = (|| {
-                    let (m, name) =
-                        module(g, p, row.authority, path).map_err(|e| format!("{path}: {e:?}"))?;
-                    if m != p.ty(id).module {
+                    let resolved = resolve_constructor(g, p, row.authority, path)?;
+                    if resolved.ty != id {
                         return Err(format!(
                             "constructor {path} does not belong to {}",
                             row.declaration.service
@@ -736,26 +776,13 @@ impl Schema {
                     let hir::TypeBody::Custom(ctors) = &p.ty(id).body else {
                         unreachable!("resolved nominal row")
                     };
-                    let (index, ctor) = ctors
-                        .iter()
-                        .enumerate()
-                        .find(|(_, c)| c.name == name)
-                        .ok_or_else(|| format!("unknown constructor {path}"))?;
-                    if p.module(m).package != row.authority && !p.ty(id).constructors_exported {
-                        return Err(format!("constructor {path}: Private"));
-                    }
+                    let ctor = &ctors[resolved.index as usize];
                     let mut fields = vec![];
                     for f in &ctor.fields {
                         fields.push(as_type(&service(p, hir_type(p, t, &f.ty)?)?));
                     }
                     if column == target && row.cell.is_none() {
-                        row.generated = Some((
-                            hir::CtorRef {
-                                ty: id,
-                                index: index as u32,
-                            },
-                            fields,
-                        ));
+                        row.generated = Some((resolved, fields));
                     }
                     Ok(())
                 })();
