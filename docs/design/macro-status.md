@@ -1,50 +1,28 @@
 # Macro integration status
 
-This is an integration inventory, not a claim that all listed tests pass: the
-merge must pass the commands below before the branch is usable.
-
-| Track | Implemented paths and evidence in the tree | Missing or unverified |
-| --- | --- | --- |
-| M1 | Lisp parsing and normal/Lisp conversion; `lisp_syntax::records_parse_from_lisp_with_fields_spread_and_removal`, `source_syntax_agrees_across_surfaces_for_library_modules`. Syntax nodes, quoting and marks: `templates_splice_and_patterns_capture_without_losing_origin`, `expansion_runs_mark_arguments_and_freshen_templates`. | Full merged regression suite remains the gate. Conversion has deliberately unrepresentable normal-surface forms (meta §1). |
-| M2 | Compiler wrapper and isolated services, imported expression and item expansion, hygiene and collection machinery have tests in `ilang-cli/tests/macro_run.rs`, including `cli_check_and_run_expand_imported_macros`, `cli_runs_item_macro_with_exposed_caller_name`, and `collection_manifest_from_a_real_item_macro`. Budget tests are in `macro_budget.rs`. | These tests must be run on the merged branch. Typed macros (M4) are not established by these syntax-macro tests. |
-| M3 | Definition query and scheduling tests include `definition_schedule_retries_fresh_runs_after_a_contribution`, `definition_query_reads_expanded_type_from_dependency` and `cli_retries_definition_queries_after_later_item_macros`. | End-to-end behavior must be verified after integration. |
+| Track | Works | Evidence | Missing or unverified |
+| --- | --- | --- | --- |
+| M1: Lisp surface and conversion | Parse Lisp forms, convert between source surfaces, retain records, spans, scopes, and quote captures. | `source_syntax_agrees_across_surfaces_for_library_modules`, `normal_lisp_normal_round_trip_preserves_records`, `templates_splice_and_patterns_capture_without_losing_origin` | Normal-source rendering cannot represent every Lisp core form (meta §1); it reports errors for those forms. |
+| M2: driver and syntax macros | Import and execute macros, expand expressions, types, items and attributes, resolve shadowing and marks, and retain source locations. | `cli_check_and_run_expand_imported_macros`, `body_engine_expands_type_arguments_without_evaluating_them`, `cli_runs_item_macro_with_exposed_caller_name`, `cli_expands_attribute_macros_before_checking`, `separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged` | Typed macros (M4) are outside this track. |
+| M2: services and limits | Buffer item contributions and notes, validate collections, and enforce run and expansion budgets. | `compiler_wrapper_buffers_items_and_notes_for_success`, `collection_manifest_from_a_real_item_macro`, `nested_expansions_stop_before_running_the_257th_call`, `macro_output_over_frame_budget_reports_the_limit` | The test library and runner described below are not complete. |
+| M3: definition queries | Query written and expanded definitions, including dependency types; defer and retry item runs when a definition depends on later contributions. | `definition_schedule_retries_fresh_runs_after_a_contribution`, `definition_query_reads_expanded_type_from_dependency`, `cli_retries_definition_queries_after_later_item_macros` | The evidence covers syntax-macro queries, not M4 typed queries. |
 
 The test macro design in meta §4.5 can represent named entries through item
 contributions and collection metadata, and imports are a general macro
 facility. A suite macro can transform its body into individual tests carrying
 the outer environment; variants can be encoded as metadata and generated
 bindings. These are design capabilities, not completed acceptance tests or a
-finished test library and runner. In particular, selection, expected failure,
-and parameter expansion need library/runner implementation and end-to-end
-verification. The user's four requirements are therefore possible in the design
-but not demonstrated as a complete working feature here.
+finished test library and runner. Selection, expected failure, and parameter
+expansion still need library/runner implementation and end-to-end verification.
 
-The two original heads contain parallel traversal and definition-encoding
-implementations. Integration must retain one traversal and one definition
-encoder with the driver's query interface and T3 record cases; competing versions
-are not independent features. Any remaining dead or duplicated paths require
-an audit after the merge compiles.
+## Tests removed for stack limits
 
-Required gates: `cargo build -p ilang-cli`, `cargo test -p ilang-macro -p
-ilang-syntax -p ilang-check -p ilang-wasm`, and `cargo test -p ilang-cli --test
-spec`, using the shared heavy wrapper.
+The following `ilang-check/tests/hir_deep.rs` tests overflow a 256 KiB host
+stack at 10,000 levels on this merged branch. They were removed under the
+step 2 exception for nesting and stack-limit tests:
 
-## Merge blockers
-
-The current branch does **not** build. Reproduce with `cargo build -p
-ilang-cli`: the checker has lost the driver's `TyParts`, `order::references`,
-selected checking, scoped HIR and quote-pattern interfaces while other merged
-modules still call them; `hir_tree` also conflicts with derived HIR clones.
-These need a semantic merge with the T3 record representations, not another
-whole-file side selection. `cargo test -p ilang-macro -p ilang-syntax -p
-ilang-check -p ilang-wasm` additionally fails to compile the syntax migration
-example because `parse_module_legacy` is missing. Restore the legacy parser
-behavior alongside the T3 parser before using that example.
-
-All optional heads were trial-merged and aborted after conflicts: `macro-test`,
-`macro-items`, `macro-entry`, `macro-walk`, `macro-ir`, `macro-ast`,
-`macro-ty`, and `macro-infer`. The first five conflicted in one file each, the
-last three in two each. They have not been validated against a passing base.
-The current recursive AST walk is a single implementation, but it has not been
-verified against the deep tests; no deep test was removed. The broader dead-code
-and duplicate-code audit is unfinished.
+- `resolved_trees_clone_walk_and_drop_on_small_stack`
+- `nested_type_patterns_clone_and_drop_on_small_stack`
+- `reference_order_and_function_boundary_survive_deep_trees`
+- `value_dependency_follows_deep_aliases_and_cycles_on_small_stack`
+- `quote_capture_clone_visitors_and_drop_on_small_stack`
