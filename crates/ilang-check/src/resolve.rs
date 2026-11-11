@@ -30,6 +30,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         generated_values: Vec::new(),
         generated_types: Vec::new(),
         defs_by_name: Vec::new(),
+        macros_by_name: Vec::new(),
         types_by_name: Vec::new(),
         ctors_by_name: Vec::new(),
         slots: Vec::new(),
@@ -77,6 +78,10 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Entry {
     Def(DefId),
+    /// A compile-time macro occupies the value namespace but is not a value.
+    Macro {
+        exported: bool,
+    },
     Ctor(CtorRef),
     Module(ModuleId),
     /// A name from an import that failed; the problem has been reported,
@@ -152,6 +157,7 @@ struct Resolver<'a> {
     generated_values: Vec<HashMap<NameKey, Entry>>,
     generated_types: Vec<HashMap<NameKey, TypeId>>,
     defs_by_name: Vec<HashMap<String, u32>>,
+    macros_by_name: Vec<HashMap<String, bool>>,
     types_by_name: Vec<HashMap<String, TypeId>>,
     ctors_by_name: Vec<HashMap<String, CtorRef>>,
     slots: Vec<Vec<Slot>>,
@@ -325,6 +331,7 @@ impl<'a> Resolver<'a> {
             self.generated_values.push(HashMap::new());
             self.generated_types.push(HashMap::new());
             self.defs_by_name.push(HashMap::new());
+            self.macros_by_name.push(HashMap::new());
             self.types_by_name.push(HashMap::new());
             self.ctors_by_name.push(HashMap::new());
             self.slots.push(Vec::new());
@@ -389,7 +396,9 @@ impl<'a> Resolver<'a> {
         let key = self.name_key(name, span);
         self.check_binder(name, span, true, false);
         let occupied = if key.scope.marks.is_empty() {
-            self.defs_by_name[mi].contains_key(name) || self.ctors_by_name[mi].contains_key(name)
+            self.defs_by_name[mi].contains_key(name)
+                || self.macros_by_name[mi].contains_key(name)
+                || self.ctors_by_name[mi].contains_key(name)
         } else {
             self.generated_values[mi].contains_key(&key)
         };
@@ -429,8 +438,56 @@ impl<'a> Resolver<'a> {
         self.cur = m;
         let parsed = self.parsed;
         let ast = &parsed[m.0 as usize].ast;
+        let lisp = self
+            .graph
+            .sources
+            .get(parsed[m.0 as usize].source)
+            .display
+            .ends_with(".is");
+        if let Err(errors) = ilang_syntax::lisp::expansion::definitions(ast, lisp) {
+            for error in errors {
+                self.error(code::ATTRIBUTE_PLACE, error.span, error.message);
+            }
+        }
         let placeholder_var = VarId(u32::MAX);
         for item in &ast.items {
+            if item
+                .attributes
+                .iter()
+                .any(|a| a.module.is_none() && a.name.name == "macro")
+            {
+                let mut remaining = item.clone();
+                remaining.attributes.retain(|attribute| {
+                    !(attribute.module.is_none() && attribute.name.name == "macro")
+                });
+                for attribute in &remaining.attributes {
+                    if attribute.module.is_none()
+                        && matches!(attribute.name.name.as_str(), "main" | "test")
+                    {
+                        self.error(
+                            code::ATTRIBUTE_PLACE,
+                            attribute.span,
+                            format!("`@{}` cannot be put on a macro", attribute.name.name),
+                        );
+                    }
+                }
+                remaining.attributes.retain(|attribute| {
+                    attribute.module.is_some()
+                        || !matches!(attribute.name.name.as_str(), "main" | "test")
+                });
+                self.attributes(&remaining);
+                if let ast::ItemKind::Binding(binding) = &item.kind {
+                    let mut names = Vec::new();
+                    ast_binders(&binding.pattern, &mut names);
+                    for (name, span) in names {
+                        if self.value_free(m, &name, span) {
+                            self.macros_by_name[m.0 as usize].insert(name, false);
+                        }
+                    }
+                }
+                self.slots[m.0 as usize].push(Slot::None);
+                continue;
+            }
             let mut attrs = self.attributes(item);
             let here = self.p.module(m);
             let root = self.graph.root == Some(here.package);
@@ -939,6 +996,10 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             if !is_upper(name) {
+                if let Some(exported) = self.macros_by_name[mi].get_mut(name) {
+                    *exported = true;
+                    continue;
+                }
                 match self.defs_by_name[mi].get(name) {
                     Some(&d) => self.p.modules[mi].defs[d as usize].exported = true,
                     None => {
@@ -1027,6 +1088,11 @@ impl<'a> Resolver<'a> {
                 index: d,
             });
             scope.values.insert(name.clone(), (entry, false));
+        }
+        for (name, &exported) in &self.macros_by_name[mi] {
+            scope
+                .values
+                .insert(name.clone(), (Entry::Macro { exported }, false));
         }
         for (name, &c) in &self.ctors_by_name[mi] {
             scope.values.insert(name.clone(), (Entry::Ctor(c), false));
@@ -1176,6 +1242,18 @@ impl<'a> Resolver<'a> {
         let ti = target.0 as usize;
         let module = self.module_name(target).to_string();
         if !is_upper(&n.name) {
+            if let Some(&exported) = self.macros_by_name[ti].get(&n.name) {
+                if exported {
+                    self.put_value(scope, &n.name, n.span, Entry::Macro { exported });
+                } else {
+                    self.error(
+                        code::NOT_EXPORTED,
+                        n.span,
+                        format!("`{}` is not exported from `{module}`", n.name),
+                    );
+                }
+                return;
+            }
             match self.defs_by_name[ti].get(&n.name) {
                 Some(&d) if self.p.modules[ti].defs[d as usize].exported => {
                     let id = DefId {
@@ -2740,6 +2818,7 @@ impl<'a> Resolver<'a> {
                 && (!key.scope.marks.is_empty() || module != self.cur.0 as usize);
             let exported = match e {
                 Entry::Def(d) => self.p.def(*d).exported,
+                Entry::Macro { exported } => *exported,
                 Entry::Ctor(c) => self.p.ty(c.ty).constructors_exported,
                 Entry::Module(_) => *imported,
                 Entry::Broken => true,
@@ -2762,6 +2841,25 @@ impl<'a> Resolver<'a> {
     fn member(&mut self, target: ModuleId, name: &ast::Ident, trusted: bool) -> ExprKind {
         let ti = target.0 as usize;
         let path = self.module_name(target).to_string();
+        if let Some(&exported) = self.macros_by_name[ti].get(&name.name) {
+            if !exported && !trusted {
+                self.error(
+                    code::NOT_EXPORTED,
+                    name.span,
+                    format!("`{}` is not exported from `{path}`", name.name),
+                );
+            } else {
+                self.error(
+                    code::MACRO_RESERVED,
+                    name.span,
+                    format!(
+                        "macro `{}` can only be used as a macro call (§4.1)",
+                        name.name
+                    ),
+                );
+            }
+            return ExprKind::Error;
+        }
         let (found, exported) = if is_upper(&name.name) {
             match self.ctors_by_name[ti].get(&name.name) {
                 Some(&c) => (
@@ -2856,6 +2954,17 @@ impl<'a> Resolver<'a> {
             Some(Found::Entry(Entry::Def(d))) => {
                 self.used_def(d, name.span);
                 ExprKind::Name(ValueRef::Def(d))
+            }
+            Some(Found::Entry(Entry::Macro { .. })) => {
+                self.error(
+                    code::MACRO_RESERVED,
+                    name.span,
+                    format!(
+                        "macro `{}` can only be used as a macro call (§4.1)",
+                        name.name
+                    ),
+                );
+                ExprKind::Error
             }
             Some(Found::Entry(Entry::Ctor(c))) => {
                 self.used_ctor(c, name.span);
