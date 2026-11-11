@@ -55,6 +55,7 @@
 //! | 16 | Keyed | field 5: key, value |
 //! | 17 | Request | identity cell with private mutable completion state |
 //! | 18 | Ticket | field 5: the underlying request cell |
+//! | 19 | Provider continuation guard | internal non-portable `$obj` subtype; fields 8/9 track adapter lifetime and invocation state |
 //!
 //! Code outside `values.rs` goes through lists only with `$list_is_empty`,
 //! `$list_head` and `$list_tail`. A list cell is a lean `$cons`, one small

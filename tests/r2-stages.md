@@ -1241,3 +1241,13 @@ The first complete spec run passed 407/408 cases. The remaining failure was
 `9.9/cancel_points.i: error[E0212]: request is put in by more than one import`:
 the fixture contained two identical `i/request` imports. Removing the duplicate
 preserves its cancellation assertions and expected output.
+
+The first workspace acceptance pass also exposed two real trace regressions:
+`lazy_cancel_out_trace` and `lazy_cancel_out_two_trampolines` stopped with
+`control: boundary is not active` but omitted their source frames. Generated
+entry cleanup had used resource.ensure, whose cancellation unwinding restores
+the shadow depth. Administrative provider completion now catches typed errors
+only and rethrows them unchanged after cleanup. An unhandled cancellation
+retires the primitive registry directly at the entry stop boundary, preserving
+its source frames and avoiding an extra i finalizer. The targeted rerun passed
+all 17 WASI tests and all 14 provider execution tests.

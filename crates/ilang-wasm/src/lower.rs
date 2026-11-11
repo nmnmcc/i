@@ -28,7 +28,7 @@
 //!   outside the library, and each field of a host service that an entry
 //!   point needs, is an import with a function that calls it
 //!   ([`Value::HostCall`]). The host services are records of these functions
-//!   in the root environment. A function of an async host service starts
+//!   in the entry's chosen environment. A function of an async host service starts
 //!   its import and suspends to the root boundary of its async entry point
 //!   ([`Value::HostStart`]); when the host answers, it reads the answer
 //!   ([`Value::HostReply`]). Entry wrappers construct the checked provider
@@ -1134,19 +1134,19 @@ impl<'a> Lowerer<'a> {
                                 captured[..n as usize].to_vec(),
                             );
                         });
-                    let complete =
-                        this.provider_guard_final(fx, out, guard, "provider_guard_complete");
-                    let value = let_value(
+                    let value = this.provider_finish(
                         fx,
                         out,
-                        Value::OpEnv(Op::Ensure, vec![call, complete], Env::Param),
-                        None,
+                        call,
+                        Env::Param,
+                        "provider_guard_complete",
+                        vec![guard],
                     );
                     out.push(Stmt::Return(value));
                 });
             let adapter_env =
                 self.provider_environment(&plan, &adapter.requires, &values, &mut fx, &mut body);
-            // Bind adapter prerequisites in a separate thunk so ensure preserves
+            // Bind adapter prerequisites in a separate thunk so the delimiter preserves
             // that environment while the continuation reads adapter seeds.
             let adapter_callee = self.def_callee(adapter.binding);
             let call = self.provider_closure(
@@ -1163,17 +1163,13 @@ impl<'a> Lowerer<'a> {
                     });
                 },
             );
-            let leave = self.provider_guard_final(
+            let result = self.provider_finish(
                 &mut fx,
                 &mut body,
-                guard.clone(),
+                call,
+                adapter_env,
                 "provider_guard_leave",
-            );
-            let result = let_value(
-                &mut fx,
-                &mut body,
-                Value::OpEnv(Op::Ensure, vec![call, leave], adapter_env),
-                None,
+                vec![guard.clone()],
             );
             let_value(
                 &mut fx,
@@ -1217,26 +1213,13 @@ impl<'a> Lowerer<'a> {
                 site: None,
             });
         });
-        let cleanup = self.provider_closure(&mut fx, &mut body, vec![], |_, fx, out, _| {
-            let value = let_value(
-                fx,
-                out,
-                Value::Op(
-                    Op::Runtime {
-                        name: "request_entry_end",
-                        arity: 0,
-                    },
-                    vec![],
-                ),
-                None,
-            );
-            out.push(Stmt::Return(value));
-        });
-        let result = let_value(
+        let result = self.provider_finish(
             &mut fx,
             &mut body,
-            Value::OpEnv(Op::Ensure, vec![call, cleanup], Env::Root),
-            None,
+            call,
+            Env::Root,
+            "request_entry_end",
+            vec![],
         );
         body.push(Stmt::Return(result));
         let wrapper = self.new_func();
@@ -1327,22 +1310,43 @@ impl<'a> Lowerer<'a> {
         )
     }
 
-    fn provider_guard_final(
+    /// Administrative completion must not catch `$cancel`: an unwinding
+    /// escaping the entry is a stop, whose original shadow frames are required.
+    /// Normal returns and typed errors complete the scope; suspension does not.
+    fn provider_finish(
         &mut self,
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
-        guard: Atom,
-        name: &'static str,
+        body: Atom,
+        env: Env,
+        operation: &'static str,
+        args: Vec<Atom>,
     ) -> Atom {
-        self.provider_closure(fx, out, vec![guard], |_, fx, out, args| {
-            let value = let_value(
-                fx,
-                out,
-                Value::Op(Op::Runtime { name, arity: 1 }, args),
-                None,
-            );
-            out.push(Stmt::Return(value));
-        })
+        let result = let_value(fx, out, Value::OpEnv(Op::Catch, vec![body], env), None);
+        let arity = args.len() as u32;
+        let_value(
+            fx,
+            out,
+            Value::Op(
+                Op::Runtime {
+                    name: operation,
+                    arity,
+                },
+                args,
+            ),
+            None,
+        );
+        let callee = self.library_callee("i/fail", "from_result");
+        let_value(
+            fx,
+            out,
+            Value::Call {
+                callee,
+                args: vec![result],
+                env: Env::Root,
+            },
+            None,
+        )
     }
 
     fn provider_environment(
@@ -1509,7 +1513,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// A host service in the environment of an entry point (§9.7): one
-    /// import for each field, and its value in the root environment.
+    /// import for each field, and a descriptor for the entry's provider leaf.
     fn host_service(&mut self, t: TypeId) {
         if self
             .out

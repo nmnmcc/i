@@ -98,7 +98,7 @@ pub(super) const EFFECTS: &str = r#"
       (global.set $async_live (i32.const 0))
       (global.set $host_last_status (i32.const 0))
       (return (i32.const 0)))
-    (drop) (call $stop_boundary_inactive) (unreachable)))
+    (drop) (drop (call $request_entry_end)) (call $stop_boundary_inactive) (unreachable)))
   ;; An error stops the program entry and tests; a host export gives it to
   ;; the host (§10.2).
   (if (i32.eqz (global.get $async_export))

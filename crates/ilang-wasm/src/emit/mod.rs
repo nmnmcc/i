@@ -961,7 +961,7 @@ impl<'p> Emitter<'p> {
                          (block $cancel (result eqref)\n\
                          (drop (try_table (result eqref) (catch $error $error) (catch $cancel $cancel) {call}))\n\
                          (return))\n\
-                         (drop) (call $stop_boundary_inactive) (unreachable)))\n\
+                         (drop) (drop (call $request_entry_end)) (call $stop_boundary_inactive) (unreachable)))\n\
                          (call $stop_error (local.get $e) (i32.const {site})) (unreachable))"
                     );
                 }
@@ -1008,7 +1008,7 @@ impl<'p> Emitter<'p> {
              (block $cancel (result eqref)\n\
              (local.set $v (try_table (result eqref) (catch $error $error) (catch $cancel $cancel) {call}))\n\
              (return (i32.const 0){}))\n\
-             (drop) (call $stop_boundary_inactive) (unreachable)))\n\
+             (drop) (drop (call $request_entry_end)) (call $stop_boundary_inactive) (unreachable)))\n\
              (call $shadow_restore (local.get $depth))\n",
             with(0, "(local.get $v)")
         );
