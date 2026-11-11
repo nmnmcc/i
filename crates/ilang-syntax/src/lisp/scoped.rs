@@ -345,19 +345,7 @@ mod tests {
                 }
                 let mut source = ScopedSource::new("source".into());
                 let datum = source.append(&syntax, &syntax);
-                let mut pending = vec![datum];
-                while let Some(datum) = pending.pop() {
-                    match datum.kind {
-                        DatumKind::Round(xs)
-                        | DatumKind::Square(xs)
-                        | DatumKind::Curly(xs)
-                        | DatumKind::Bits(xs) => pending.extend(xs),
-                        DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
-                            pending.push(*x)
-                        }
-                        _ => {}
-                    }
-                }
+                drop(datum);
                 drop(source);
                 drop(syntax);
             })
