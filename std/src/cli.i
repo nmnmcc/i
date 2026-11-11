@@ -49,7 +49,7 @@
 ////   InvalidArgument(index:Int,name:String,text:String,reason:String)
 ////   ExtraArgument(index:Int,token:String) }
 //// Parser(A) is opaque.
-//// Public signatures (all pure):
+//// Pure signatures:
 //// pure(A): (value: A) -> Parser(A)
 //// flag: (names: Names, help: String) -> Parser(Bool)
 //// option(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)
@@ -63,8 +63,12 @@
 //// help(A): (parser: Parser(A), program: String) -> Result(String, DefinitionError)
 //// text: (text: String) -> Result(String, String)
 //// integer: (text: String) -> Result(Int, String)
+//// read obtains process arguments; run reports errors and runs a body.
 
 (
+	i/process
+	i/stdio
+	i/core
 	std/list
 	std/string
 	std/int
@@ -86,6 +90,8 @@
 	map
 	map2
 	parse
+	read
+	run
 	help
 	text
 	integer
@@ -671,5 +677,23 @@ help(A) = (
 				})
 			])
 		)
+	}
+}
+
+/// Parses the arguments supplied by the process service.
+read = (parser) { parse(parser, process.args()) }
+
+/// Runs a command after parsing its arguments, reporting failures on stderr.
+run = (parser, program, body) {
+	read(parser) |> {
+		Ok(value) -> body(value)
+		Error(error) -> {
+			stdio.print_error(core.inspect(error))
+			help(parser, program) |> {
+				Ok(usage)         -> stdio.print_error(usage)
+				Error(definition) -> stdio.print_error(core.inspect(definition))
+			}
+			panic("invalid command arguments")
+		}
 	}
 }

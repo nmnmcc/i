@@ -87,6 +87,8 @@
 	to_instant
 	parse
 	format
+	now
+	format_now
 )
 
 Date {
@@ -496,3 +498,9 @@ format = (civil: Civil, offset: Offset) -> String {
 		offset_text(offset)
 	])
 }
+
+/// Reads the current civil time in UTC.
+now = () { at(time.now(), utc()) }
+
+/// Formats the current UTC time.
+format_now = () { format(now(), utc()) }
