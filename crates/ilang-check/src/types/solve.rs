@@ -567,6 +567,49 @@ impl Solver {
     }
 
     fn same_form_in(&self, a: &Ty, b: &Ty, expanding: &mut HashSet<V>) -> bool {
+        let mut pending = vec![(a, b)];
+        while let Some((a, b)) = pending.pop() {
+            if a == b {
+                continue;
+            }
+            match (a, b) {
+                (Ty::Con(h, values, xs), Ty::Con(k, other, ys))
+                    if h == k && values == other && xs.len() == ys.len() =>
+                {
+                    pending.extend(xs.iter().zip(ys).rev());
+                }
+                (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+                    pending.push((&f.env, &g.env));
+                    pending.push((&f.err, &g.err));
+                    pending.push((&f.ret, &g.ret));
+                    pending.extend(
+                        f.params
+                            .iter()
+                            .zip(&g.params)
+                            .rev()
+                            .map(|(p, q)| (&p.1, &q.1)),
+                    );
+                }
+                (Ty::Both(a, b), Ty::Both(c, d)) => {
+                    pending.push((b, d));
+                    pending.push((a, c));
+                }
+                (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys))
+                    if xs.len() == 1 && ys.len() == 1 =>
+                {
+                    pending.push((&xs[0], &ys[0]));
+                }
+                (Ty::Diff(a, xs), Ty::Diff(b, ys)) if xs.is_empty() && ys.is_empty() => {
+                    pending.push((a, b));
+                }
+                _ if !self.same_form_recursive(a, b, expanding) => return false,
+                _ => {}
+            }
+        }
+        true
+    }
+
+    fn same_form_recursive(&self, a: &Ty, b: &Ty, expanding: &mut HashSet<V>) -> bool {
         if a == b {
             return true;
         }
@@ -615,33 +658,11 @@ impl Solver {
                 expanding.remove(v);
                 equal
             }
-            (Ty::Con(h, values, xs), Ty::Con(k, other, ys)) => {
-                h == k
-                    && values == other
-                    && xs.len() == ys.len()
-                    && xs
-                        .iter()
-                        .zip(ys)
-                        .all(|(x, y)| self.same_form_in(x, y, expanding))
-            }
             (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => {
                 sets(xs, ys, expanding)
             }
             (Ty::Diff(a, hs), Ty::Diff(b, ks)) => {
                 self.same_form_in(a, b, expanding) && sets(hs, ks, expanding)
-            }
-            (Ty::Both(a, b), Ty::Both(c, d)) => {
-                self.same_form_in(a, c, expanding) && self.same_form_in(b, d, expanding)
-            }
-            (Ty::Fn(f), Ty::Fn(g)) => {
-                f.params.len() == g.params.len()
-                    && f.params
-                        .iter()
-                        .zip(&g.params)
-                        .all(|(p, q)| self.same_form_in(&p.1, &q.1, expanding))
-                    && self.same_form_in(&f.ret, &g.ret, expanding)
-                    && self.same_form_in(&f.err, &g.err, expanding)
-                    && self.same_form_in(&f.env, &g.env, expanding)
             }
             _ => false,
         }
@@ -655,40 +676,12 @@ impl Solver {
         if !self.has_handlers {
             return Vec::new();
         }
-        fn parts(t: &Ty, out: &mut Vec<Ty>) {
-            out.push(t.clone());
-            match t {
-                Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
-                    for x in xs {
-                        parts(x, out);
-                    }
-                }
-                Ty::Fn(f) => {
-                    for p in &f.params {
-                        parts(&p.1, out);
-                    }
-                    for x in [&f.ret, &f.err, &f.env] {
-                        parts(x, out);
-                    }
-                }
-                Ty::Diff(a, hs) => {
-                    parts(a, out);
-                    for h in hs {
-                        parts(h, out);
-                    }
-                }
-                Ty::Both(a, b) => {
-                    parts(a, out);
-                    parts(b, out);
-                }
-                _ => {}
-            }
-        }
         let mut all = Vec::new();
-        parts(t, &mut all);
+        super::tree::visit(t, |part| all.push(part));
         let mut hidden = Vec::new();
         for v in all
             .iter()
+            .copied()
             .filter_map(|t| if let Ty::Var(v) = t { Some(*v) } else { None })
         {
             if self.var(v).level <= level || self.var(v).row == Mode::Value {
@@ -711,7 +704,7 @@ impl Solver {
                     {
                         continue;
                     }
-                    let witnessed = all.iter().any(|part| match part {
+                    let witnessed = all.iter().copied().any(|part| match part {
                         Ty::Diff(a, hs) => is_var(a) && hs.iter().any(|m| self.same_form(m, h)),
                         Ty::Union(ms) => {
                             ms.iter().any(&is_var) && ms.iter().any(|m| self.same_form(m, h))
@@ -1687,6 +1680,7 @@ impl Solver {
 
     /// `t` with each type directly inside it changed by `f`, which is given
     /// the polarity of the place.
+    #[cfg(test)]
     pub fn map_children(
         &mut self,
         t: &Ty,
@@ -3562,6 +3556,24 @@ mod deep_tree_tests {
                     end = &args[0];
                 }
                 assert!(matches!(end, Ty::Var(_)));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn same_form_handles_deep_mismatch_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let s = Solver::new(StdHashMap::new(), Vec::new());
+                let mut a = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let mut b = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                for _ in 0..10_000 {
+                    a = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![a]);
+                    b = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![b]);
+                }
+                assert!(!s.same_form(&a, &b));
             })
             .unwrap()
             .join()

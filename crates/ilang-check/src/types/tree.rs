@@ -87,7 +87,7 @@ impl std::fmt::Debug for Ty {
 }
 
 /// Visit the owned type tree in source order without following solver edges.
-pub(super) fn visit(t: &Ty, mut f: impl FnMut(&Ty)) {
+pub(super) fn visit<'a>(t: &'a Ty, mut f: impl FnMut(&'a Ty)) {
     let mut pending = vec![t];
     while let Some(t) = pending.pop() {
         f(t);
