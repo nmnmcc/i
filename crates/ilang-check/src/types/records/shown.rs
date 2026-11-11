@@ -160,6 +160,20 @@ impl ShownGraph {
         }
     }
 
+    /// Expose one ordinary algebra node while retaining shared record graphs.
+    pub(crate) fn ordinary_view(&self) -> Option<ShownType> {
+        self.graph.view().map(|ty| {
+            crate::types::display::tree_with(&ty, &mut |var| {
+                self.names
+                    .iter()
+                    .find(|(id, _)| *id == var)
+                    .expect("shown graph variable has a name")
+                    .1
+                    .clone()
+            })
+        })
+    }
+
     pub(crate) fn graph_is_closed(&self) -> bool {
         self.graph.variables().is_empty()
     }

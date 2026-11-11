@@ -250,3 +250,17 @@ fn external_function_factory_uses_its_checked_calling_convention() {
     ));
     assert_eq!(calls.load(Ordering::Relaxed), 1);
 }
+
+#[test]
+fn http_client_graph_environment_provisions_net_and_tls() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/http-get");
+    let built = build(&path, options(Target::Native)).unwrap_or_else(|error| panic!("{error}"));
+    let program = built.host_program().unwrap();
+    assert!(program.abi().entry.as_ref().unwrap().is_async);
+    for namespace in ["i:net/v1", "i:tls/v1"] {
+        assert!(
+            program.abi().services.contains_key(namespace),
+            "missing {namespace}"
+        );
+    }
+}

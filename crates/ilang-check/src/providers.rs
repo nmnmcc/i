@@ -336,6 +336,10 @@ fn canonical(p: &Program, t: &ShownType) -> String {
 fn normalize(p: &Program, t: ShownType) -> ShownType {
     let union = matches!(t, ShownType::Union(_));
     match t {
+        ShownType::Graph(graph) => match graph.ordinary_view() {
+            Some(view) => normalize(p, view),
+            None => ShownType::Graph(graph),
+        },
         ShownType::Union(xs) | ShownType::Inter(xs) => {
             let mut out = vec![];
             for x in xs {
@@ -425,10 +429,10 @@ fn as_type(s: &Service) -> ShownType {
     ShownType::Named(TypeRef::Custom(s.constructor), s.arguments.clone())
 }
 fn members(p: &Program, ty: &ShownType) -> Result<Vec<Service>, String> {
-    let xs = match ty {
+    let xs = match normalize(p, ty.clone()) {
         ShownType::Never => return Ok(vec![]),
-        ShownType::Union(xs) => xs.clone(),
-        x => vec![x.clone()],
+        ShownType::Union(xs) => xs,
+        x => vec![x],
     };
     let mut out = vec![];
     for x in xs {
