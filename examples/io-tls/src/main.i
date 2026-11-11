@@ -3,6 +3,7 @@
 	i/core
 	i/stdio
 )
+
 main = () {
 	opts = (..tls.options(), alpn: ["http/1.1"])
 	stream = tls.dial("example.com", 443, opts)

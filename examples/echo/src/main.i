@@ -25,7 +25,6 @@ serve = (listener, scope) {
 	serve(listener, scope)
 }
 
-@main
 main = () {
 	listener = net.listen("127.0.0.1", 0)
 	stdio.print("listening " <> core.inspect(net.local_port(listener)))
