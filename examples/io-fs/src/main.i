@@ -6,7 +6,7 @@
 	i/core
 )
 
-@main
+
 main = () {
 	dir = fs.temp_dir() <>
 		"/i-io-fs-example-" <>

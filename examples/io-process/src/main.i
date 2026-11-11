@@ -6,7 +6,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	assert(process.args() == ["alpha", "beta"])
 	process.env("PATH")
