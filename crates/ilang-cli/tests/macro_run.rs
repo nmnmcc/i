@@ -2001,3 +2001,28 @@ fn project_check_rejects_a_private_collection_binding() {
         checked.diags
     );
 }
+
+#[test]
+fn definition_query_reads_expanded_type_from_dependency() {
+    use ilang_host::{macro_budget::MacroBudget, syntax::DefinitionReply};
+    use ilang_macro::{definition_world::DefinitionWorld, item_phase::{Definitions, Snapshot}};
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make)\n(@ macro (= typ (-> () _ `Int)))\n(@ macro (= make (-> (x) _ `(= ~x (typ)))))\n").unwrap();
+    std::fs::write(dir.path().join("src/types.i"), "(m = app/macros)\n(T)\nm.make(T)\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "((T) = app/types)\nvalue = 1\n").unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let expanded = ilang_macro::project::expand(&mut graph).unwrap_or_else(|d| panic!("{d:?}"));
+    let module = expanded.parsed.iter().find(|p| p.path == "app/main").unwrap();
+    let snapshot = Snapshot { module: module.ast.clone(), ready: vec![true; module.ast.items.len()], scoped: module.scoped.clone().unwrap(), source: module.source.0, other_runs: false, active: None, epoch: 0, item_overrides: Default::default() };
+    let world = DefinitionWorld::new(&graph, &expanded.parsed);
+    world.prepare(&snapshot);
+    let query = Syntax::from_datum(&parse("T").unwrap()[0], &Scope { module: module.source.0, marks: BTreeSet::new() });
+    let answer = world.resolve(&snapshot, &query, &query, Mode::Normal, 999, &MacroBudget::default());
+    let DefinitionReply::Answer(answer) = answer.reply else { panic!("expected a definition answer") };
+    let shown = ilang_syntax::lisp::show(&answer.to_datum());
+    assert!(shown.contains("Int") && !shown.contains("typ"), "{shown}");
+}
