@@ -29,12 +29,14 @@ pub enum Error {
         failure: Failure,
         macro_name: String,
         call: Syntax,
+        invocation_span: Span,
     },
     Conversion(ScopedError),
     Resource {
         error: Box<dyn std::error::Error + Send + Sync>,
         macro_name: String,
         call: Syntax,
+        invocation_span: Span,
     },
     SameModule(Span),
     Depth(Span),
@@ -146,6 +148,7 @@ impl<'a> BodyEngine<'a> {
         mac: &Macro,
         args: Vec<MacroArgument>,
         call: &Syntax,
+        invocation_span: Span,
         position: MacroPosition,
     ) -> Result<
         (
@@ -156,7 +159,7 @@ impl<'a> BodyEngine<'a> {
         Error,
     > {
         if mac.source == self.source {
-            return Err(Error::SameModule(call.span()));
+            return Err(Error::SameModule(invocation_span));
         }
         let phase = match position {
             MacroPosition::Item => 0,
@@ -240,6 +243,7 @@ impl<'a> BodyEngine<'a> {
                 failure,
                 macro_name: mac.definition.name.clone(),
                 call: call.clone(),
+                invocation_span,
             })?;
         Ok((
             result.syntax,
@@ -273,14 +277,19 @@ impl Hook for BodyEngine<'_> {
             syntax: self.expr_syntax(&arg.value),
         }));
         let call = self.expr_syntax(expression);
-        let (result, budget, transactions) =
-            self.execute(&mac, args, &call, MacroPosition::Expression)?;
+        let (result, budget, transactions) = self.execute(
+            &mac,
+            args,
+            &call,
+            expression.span,
+            MacroPosition::Expression,
+        )?;
         let expression = self
             .scoped
             .expression_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
-            .map_err(|error| metered_error(error, &mac.definition.name, &call))?;
+            .map_err(|error| metered_error(error, &mac.definition.name, &call, expression.span))?;
         self.transactions.extend(transactions);
         Ok(expression)
     }
@@ -315,13 +324,13 @@ impl Hook for BodyEngine<'_> {
             .collect();
         let call = self.ty_syntax(ty);
         let (result, budget, transactions) =
-            self.execute(&mac, args, &call, MacroPosition::Type)?;
+            self.execute(&mac, args, &call, ty.span, MacroPosition::Type)?;
         let ty = self
             .scoped
             .ty_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
-            .map_err(|error| metered_error(error, &mac.definition.name, &call))?;
+            .map_err(|error| metered_error(error, &mac.definition.name, &call, ty.span))?;
         self.transactions.extend(transactions);
         Ok(ty)
     }
@@ -389,13 +398,19 @@ impl Hook for BodyEngine<'_> {
     }
 }
 
-fn metered_error(error: MeteredError, macro_name: &str, call: &Syntax) -> Error {
+fn metered_error(
+    error: MeteredError,
+    macro_name: &str,
+    call: &Syntax,
+    invocation_span: Span,
+) -> Error {
     match error {
         MeteredError::Syntax(error) => Error::Conversion(error),
         MeteredError::Resource(error) => Error::Resource {
             error,
             macro_name: macro_name.to_owned(),
             call: call.clone(),
+            invocation_span,
         },
     }
 }

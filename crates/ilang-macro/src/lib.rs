@@ -7,3 +7,4 @@ pub mod session;
 pub mod body_engine;
 pub mod call;
 pub mod registry;
+pub mod validate;

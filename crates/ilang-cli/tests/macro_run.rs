@@ -1057,3 +1057,32 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
         }
     }
 }
+
+#[test]
+fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    let path = dir.path().join("src/macros.is");
+    let check = |source: &str| {
+        std::fs::write(&path, source).unwrap();
+        let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let (parsed, diagnostics) = ilang_check::parse(&graph);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let source = parsed
+            .iter()
+            .find(|m| m.path == "app/macros")
+            .unwrap()
+            .source;
+        ilang_macro::validate::module(&graph, &parsed, source)
+    };
+    assert!(check("(, (= syntax (/ i syntax)))\n(@ macro (= ok (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").is_ok());
+    let wrong = check("(@ macro (= wrong (-> (x) _ 1)))\n").unwrap_err();
+    assert!(
+        wrong.iter().any(|d| d.message.contains("macro `wrong`")),
+        "{wrong:?}"
+    );
+    let outside = check("(, (= syntax (/ i syntax)))\n(@ (external \"other\" \"effect\") (: effect (-> () Nil)))\n(@ macro (= unsafe (-> ((: x (. syntax Syntax))) (. syntax Syntax) { (effect) x })))\n").unwrap_err();
+    assert!(outside.iter().any(|d| d.is_error()), "{outside:?}");
+}
