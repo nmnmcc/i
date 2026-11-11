@@ -438,7 +438,12 @@ impl<'a> Checker<'a> {
                             },
                         );
                     }
-                    typed.scheme_types.insert(id, shown);
+                    if d.exported
+                        || opts.written
+                        || selected.iter().any(|(target, _)| *target == id)
+                    {
+                        typed.scheme_types.insert(id, shown);
+                    }
                 } else {
                     self.report_coalescing(d.span);
                 }
