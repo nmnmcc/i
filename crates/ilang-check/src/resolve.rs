@@ -310,6 +310,7 @@ impl<'a> Resolver<'a> {
                 package: parsed.package,
                 source: parsed.source,
                 kind: parsed.kind,
+                scoped: parsed.scoped.clone(),
                 imports: Vec::new(),
                 import_names: Vec::new(),
                 imported_types: Vec::new(),

@@ -616,6 +616,22 @@ impl<'c> Server<'c> {
                 code: Some(lsp::NumberOrString::String(d.code.to_string())),
                 source: Some("i".to_string()),
                 message: d.message.clone(),
+                related_information: (!d.related.is_empty()).then(|| {
+                    d.related
+                        .iter()
+                        .filter_map(|note| {
+                            let path = a.paths.get(&note.source)?;
+                            let uri = self.uri_of(path)?;
+                            Some(lsp::DiagnosticRelatedInformation {
+                                location: lsp::Location {
+                                    uri,
+                                    range: LineIndex::new(a.text(note.source)).range(note.span),
+                                },
+                                message: note.message.clone(),
+                            })
+                        })
+                        .collect()
+                }),
                 ..Default::default()
             });
         }

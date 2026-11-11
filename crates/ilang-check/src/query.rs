@@ -48,6 +48,7 @@ pub fn check_parsed_for_queries(
             types::check_keeping_locals_with_errors(&program, &graph.sources, true).0
         }))
         .ok();
+        crate::map_expansion_diagnostics(&program, &graph.sources, &mut diags);
         return Checked {
             program: Some(program),
             types,
@@ -56,6 +57,7 @@ pub fn check_parsed_for_queries(
     }
     let (typed, more) = types::check_keeping_locals(&program, &graph.sources);
     diags.extend(more);
+    crate::map_expansion_diagnostics(&program, &graph.sources, &mut diags);
     Checked {
         program: Some(program),
         types: Some(typed),
@@ -176,11 +178,18 @@ impl<'a> Query<'a> {
     }
 
     fn ast(&self, m: ModuleId) -> ast::Module {
-        let source = self.graph.sources.get(self.program.module(m).source);
+        let module = self.program.module(m);
+        let source = self.graph.sources.get(module.source);
+        let text = module
+            .scoped
+            .as_ref()
+            .map_or(source.text.as_str(), |scoped| {
+                &source.text[..scoped.original_len() as usize]
+            });
         if source.display.ends_with(".is") {
-            ilang_syntax::lisp::parse_source(&source.text).0
+            ilang_syntax::lisp::parse_source(text).0
         } else {
-            ilang_syntax::parse_module(self.text(m)).0
+            ilang_syntax::parse_module(text).0
         }
     }
 
@@ -191,8 +200,8 @@ impl<'a> Query<'a> {
     /// constructor its type as a function, for a field its written type,
     /// and for a type its definition.
     pub fn type_at(&self, m: ModuleId, offset: u32) -> Option<Hover> {
-        let (span, target) = self.target_at(m, offset)?;
-        let (code, doc_at) = self.describe(m, span.start, &target)?;
+        let (owner, span, at, target) = self.target_at(m, offset)?;
+        let (code, doc_at) = self.describe(owner, at, &target)?;
         Some(Hover {
             span,
             code,
@@ -535,6 +544,15 @@ impl<'a> Query<'a> {
 
     /// The `///` comment of the item whose span holds `span`.
     fn doc(&self, m: ModuleId, span: Span) -> Option<String> {
+        let (m, span) = if let Some(origin) = self.program.origin(m, span) {
+            let syntax = &origin.expansion.syntax;
+            (
+                self.module_of_source(SourceId(syntax.scope().module))?,
+                syntax.span(),
+            )
+        } else {
+            (m, span)
+        };
         let ast = self.ast(m);
         let item = ast
             .items
@@ -557,16 +575,33 @@ impl<'a> Query<'a> {
     /// a top-level name, a constructor, a field, or a type at its name, and
     /// a module at the start of its file.
     pub fn definition_at(&self, m: ModuleId, offset: u32) -> Option<Location> {
-        let (_, target) = self.target_at(m, offset)?;
-        self.definition(m, &target)
+        let (owner, _, _, target) = self.target_at(m, offset)?;
+        self.definition(owner, &target)
     }
 
     fn definition(&self, m: ModuleId, target: &Target) -> Option<Location> {
         let p = self.program;
-        let at = |module: ModuleId, span: Span| Location {
-            module,
-            source: p.module(module).source,
-            span,
+        let at = |module: ModuleId, span: Span| {
+            if let Some(origin) = p.origin(module, span) {
+                // A definition produced by a template is navigated to the
+                // actual template name, not to the call-site diagnostic.
+                let syntax = &origin.expansion.syntax;
+                let source = SourceId(syntax.scope().module);
+                let module = self
+                    .module_of_source(source)
+                    .expect("syntax source has a module");
+                Location {
+                    module,
+                    source,
+                    span: syntax.span(),
+                }
+            } else {
+                Location {
+                    module,
+                    source: p.module(module).source,
+                    span,
+                }
+            }
         };
         match target {
             Target::Local(v) => {
@@ -596,7 +631,7 @@ impl<'a> Query<'a> {
     }
 
     /// The smallest name or literal at `offset`, with its span.
-    fn target_at(&self, m: ModuleId, offset: u32) -> Option<(Span, Target)> {
+    fn target_at(&self, m: ModuleId, offset: u32) -> Option<(ModuleId, Span, u32, Target)> {
         let text = self.text(m);
         let word = word_at(text, offset);
         let w = self.walk(m);
@@ -613,10 +648,41 @@ impl<'a> Query<'a> {
         {
             let name = &text[word.start as usize..word.end as usize];
             if let Some(t) = self.import_module(m, name) {
-                return Some((word, Target::Module(t)));
+                return Some((m, word, word.start, Target::Module(t)));
             }
         }
-        found
+        if let Some((span, target)) = found {
+            return Some((m, span, span.start, target));
+        }
+        // Written macro arguments and template nodes can occur in expanded
+        // HIR owned by another module. Resolve them by their original source
+        // span while retaining the HIR offset for local type queries.
+        let source = self.source_of(m);
+        let mut candidates = Vec::new();
+        for (index, module) in self.program.modules.iter().enumerate() {
+            if module.scoped.is_none() {
+                continue;
+            }
+            let owner = ModuleId(index as u32);
+            for (span, target) in self.walk(owner).occ {
+                let Some(origin) = self.program.origin(owner, span) else {
+                    continue;
+                };
+                let syntax = &origin.expansion.syntax;
+                let real = syntax.span();
+                if syntax.scope().module == source.0
+                    && real.start < real.end
+                    && real.start <= offset
+                    && offset <= real.end
+                {
+                    candidates.push((real.end - real.start, owner, real, span.start, target));
+                }
+            }
+        }
+        candidates
+            .into_iter()
+            .min_by_key(|x| x.0)
+            .map(|(_, owner, span, at, target)| (owner, span, at, target))
     }
 
     fn import_module(&self, m: ModuleId, name: &str) -> Option<ModuleId> {
