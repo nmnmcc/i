@@ -1,1 +1,4 @@
 name = "probe"
+
+[entries]
+legacy = "main.example"

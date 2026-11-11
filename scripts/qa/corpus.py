@@ -257,8 +257,10 @@ def observe_in(binary, case, bound, runtime):
         for opt in [0, 2]:
             result['run' + str(opt)], _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
     if check['exit'] == 0:
-        text = '\n'.join((project / f).read_text() for f in case['files'])
-        has_main = bool(re.search(r'(?m)^\s*@main\b', text))
+        source = project / 'src/main.i'
+        has_main = source.is_file() and bool(re.search(r'(?m)^\s*main(?:\([^\n]*\))?(?:\s*:[^=\n]+)?\s*=', source.read_text()))
+        entries = tomllib.loads((project / 'i.toml').read_text()).get('entries', {})
+        named_entry = next(iter(entries), None) if not has_main else None
         # This guarantees startup is exercised, including for checker-only libraries.
         # The original check above still reports only the original top-level types.
         if project != runtime:
@@ -272,8 +274,11 @@ def observe_in(binary, case, bound, runtime):
         for opt in [0, 2]:
             test, _ = invoke(binary, project, ['test', '--opt', str(opt)], bound)
             result['test' + str(opt)] = test
-            if has_main:
-                run, _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
+            if has_main or named_entry:
+                command = ['run', '--opt', str(opt)]
+                if named_entry:
+                    command += ['--entry', named_entry]
+                run, _ = invoke(binary, project, command, bound)
                 result['run' + str(opt)] = run
     return result, elapsed
 
