@@ -100,9 +100,8 @@ The new error marker is `^`; the default entry is `src/main.i`'s `main`,
 with other entries declared in `[entries]`. Record nodes come from T3.
 
 Integration note: old braced and new parenthesised record forms construct the
-T3 record nodes. The parser uses `// syntax: syn2` or a `^` in a file to
-choose guard interpretation where the old error marker is ambiguous with a
-function-type guard; the migration rewrites error markers before that choice.
+T3 record nodes. At a clause head, `?` begins a guard; a legacy error type
+in that position must be grouped. This is decided by grammar.
 The Go `cmd/gofmt/rewrite.go` comment-map approach motivates retaining source
 between span edits, and Cargo `src/workspace/parser/targets.rs` and Gleam
 `compiler-cli/src/run.rs` distinguish conventional and explicitly selected
@@ -112,19 +111,16 @@ entry modules.
 
 The full spec suite's second run passed 400/402 cases. The old record
 reservation case now accepts a record and its expectation has been updated.
-The remaining `tests/spec/10.2/main_and_test.i` reproduces an entry/test
-collision with `@main\n@test\nboth = () { Nil }`: the single-file runner
-constructs `src/main.i`, and reports E0305 (test placement) instead of the
-expected E0321 (entry/test collision). Two attempts to reconcile this fixture
-with the new single-file runner have not restored its expected diagnostic.
+The `tests/spec/10.2/main_and_test.i` fixture expects E0305: `both` is not
+the default entry, and the test is outside `test/` (§10.2).
 
 The `i/record.All` capture-free source form described above is not installed:
 `lib/i/record.i` does not export that alias, and the migrator currently writes
 `Record` for legacy `{..}`. A module that shadows `Record` therefore needs a
-manual migration before this rewrite can be relied on. The per-file syntax
-marker is also still needed for a function-type guard in a file with no `^`.
-The formatter preserves legacy `@main` attributes; removing or relocating an
+manual migration before this rewrite can be relied on. The formatter preserves legacy `@main` attributes; removing or relocating an
 entry currently requires `scripts/syntax-2-migrate` rather than `i fmt`.
-The migrator flags an unmarked `x = ()` as an empty tuple because the two
-surfaces share its spelling. Marking the file `// syntax: syn2` distinguishes
-an already-migrated empty record.
+The migrator flags `x = ()` as an empty tuple because the two surfaces share
+its spelling; checker-based disambiguation remains unfinished. The legacy
+`syntax: syn1` mode still exists and its fixtures still need migration.
+The migrator writes by default and reports individual source locations.
+The old-syntax inventory and formatter entry migration remain unfinished.
