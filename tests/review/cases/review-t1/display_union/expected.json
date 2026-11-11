@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "probe/main.f : (x: -20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | -10 | -9 | -8 | -7 | -6 | -5 | -4 | -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20) -> Bool\n",
-      "stderr": "src/main.i:2:17: warning[W0503]: the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `f` is not used\nsrc/main.i:2:17: warning[W0503]: the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:2:17: warning[W0503]: the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `f` is not used\nsrc/main.i:2:17: warning[W0503]: the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:2:17: warning[W0503]: the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `f` is not used\nsrc/main.i:2:17: warning[W0503]: the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)\n"
     }
   },
   "transitions": [

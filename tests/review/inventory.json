@@ -20587,7 +20587,7 @@
       "origin": "/tmp/review-num/async/src/main.i",
       "sha256": "c642ff6de81335dba70580cfc2f3e50a113aed4d57079151dfb94b43cf4ec12b",
       "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "case": "review-num/async"
+      "historical_snapshot": "tests/review/tools/review-num/async-original.i.source"
     },
     {
       "origin": "/tmp/review-num/probes/test/numeric.i",
@@ -20605,19 +20605,19 @@
       "origin": "/tmp/review-rec/growth.i",
       "sha256": "21150877805e373b2d8a03f93fbbbd828ecf30e9171ce9a3242ce33666b2e7d3",
       "source": "docs/design/records.md; T3 is held in the ledger",
-      "case": "review-rec/_loose/growth"
+      "historical_snapshot": "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i"
     },
     {
       "origin": "/tmp/review-rec/probes.i",
       "sha256": "aeecbdae1c142356e90557fda4a9d9811b8b8802a0f4467e17a3af49186aa867",
       "source": "docs/design/records.md; T3 is held in the ledger",
-      "case": "review-rec/_loose/probes"
+      "historical_snapshot": "tests/review/cases/review-rec/_loose/probes/.invalid/src/main.i"
     },
     {
       "origin": "/tmp/review-rec/schema-union.i",
       "sha256": "5988d6050671f785ff945f7c1bdf67eb6ff27fe58bbdd5ef7b62eaa49e355c3c",
       "source": "docs/design/records.md; T3 is held in the ledger",
-      "case": "review-rec/_loose/schema-union"
+      "historical_snapshot": "tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i"
     },
     {
       "origin": "/tmp/review-runtime/echo-types/src/main.i",
@@ -23731,6 +23731,234 @@
       "existing": [
         "crates/ilang-check/tests/value_type_review/whole_ref_normalize/src/main.i"
       ]
+    },
+    {
+      "origin": "/tmp/review-r2/borrow_owned/src/main.i",
+      "sha256": "450668899273341733c96f4f8de258fb035d329e9d3adacdd8e683e9aaedf9f9",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/borrow_owned"
+    },
+    {
+      "origin": "/tmp/review-r2/cancel_choose/src/main.i",
+      "sha256": "c39c42bc5b5489157a99c489f73a80b0f0a0c2341e184f7b2a7bb6b1da07bafb",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/cancel_choose"
+    },
+    {
+      "origin": "/tmp/review-r2/cancel_error_final/src/main.i",
+      "sha256": "e6ca70ba74d367da343292a12ef3ad462b672b0bc9dcf303aaf5af5fd1d42e30",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/cancel_error_final"
+    },
+    {
+      "origin": "/tmp/review-r2/cancel_normal_final/src/main.i",
+      "sha256": "e71b00ba1827c54851bde30d9b9c0ba893e324fdde738b3fb1e844479672747d",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/cancel_normal_final"
+    },
+    {
+      "origin": "/tmp/review-r2/cancel_send/src/main.i",
+      "sha256": "3b909579b3f222dc9e733fa10e38f300f9c0682477cdc356c10ebd5e8e93b838",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/cancel_send"
+    },
+    {
+      "origin": "/tmp/review-r2/choice_commit/src/main.i",
+      "sha256": "75fd9947324001f3fb47cc097a128934eeb4707f7f8da9af81212cb5264d28d5",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/choice_commit"
+    },
+    {
+      "origin": "/tmp/review-r2/dag_16/src/main.i",
+      "sha256": "448f62bec857a3fdc96b3fede693547cf294498cceeac585c0cb555d9637ea02",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/dag_16"
+    },
+    {
+      "origin": "/tmp/review-r2/dag_20/src/main.i",
+      "sha256": "a0fa9ecc818fe1229e18a937eb1077aa0db1bd43e9979ddb534d72c05e6196b4",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/dag_20"
+    },
+    {
+      "origin": "/tmp/review-r2/dag_24/src/main.i",
+      "sha256": "76ba32dd79753d1b28d6f47382a5aa7c98214473dddf801b5bbd271d049ac4da",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/dag_24"
+    },
+    {
+      "origin": "/tmp/review-r2/dag_28/src/main.i",
+      "sha256": "67704217730b37d093b7eda159baf18cd311ff1e6623db2dc35f5652cbc2efe4",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/dag_28"
+    },
+    {
+      "origin": "/tmp/review-r2/dag_28_local/src/main.i",
+      "sha256": "c3a9d9a010629df12a568c04844791df1428777485917ee9b18723e8213de682",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/dag_28_local"
+    },
+    {
+      "origin": "/tmp/review-r2/deadlock/src/main.i",
+      "sha256": "2ab4bbf73aba788bb9a71cc49f1b1a69ac7ad12e39a44721793958aef1b24814",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/deadlock"
+    },
+    {
+      "origin": "/tmp/review-r2/deep_1000/src/main.i",
+      "sha256": "e08ca9e8c0307cb1ab815317da57fe2fb79b2bdee7aa5c3a1e2bd0d96b365d91",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/deep_1000"
+    },
+    {
+      "origin": "/tmp/review-r2/deep_200/src/main.i",
+      "sha256": "3575e4229b480255ca47c6190526ebc6ba6dbd00ac801c469b5fd763026f9f62",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/deep_200"
+    },
+    {
+      "origin": "/tmp/review-r2/deep_50/src/main.i",
+      "sha256": "ade74bd7e7182c4147813a12f99c5bc2488d125cfeb74dc6eb2bdf2ab723c65e",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/deep_50"
+    },
+    {
+      "origin": "/tmp/review-r2/determinism/src/main.i",
+      "sha256": "0d18694e831e6d1dbdd6d067abb4b58b5f3b1c94de5bb457ef82cfb5f3f18a73",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/determinism"
+    },
+    {
+      "origin": "/tmp/review-r2/escaped_task/src/main.i",
+      "sha256": "ac1d96fa5a1c3a9a8b9fcebc8bfe1f680c3270a5028def7e6d50c6b3b89966e4",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/escaped_task"
+    },
+    {
+      "origin": "/tmp/review-r2/join_failure/src/main.i",
+      "sha256": "eb3a99a265c4756c872640299e55410232bf39699a7896a1ebb7a59d40ae92b8",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/join_failure"
+    },
+    {
+      "origin": "/tmp/review-r2/lifetime/src/main.i",
+      "sha256": "ad94c27ce405219a9f8040ee984aa323b802159058c142efec926cb4dda2e279",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/lifetime"
+    },
+    {
+      "origin": "/tmp/review-r2/local_capture/src/main.i",
+      "sha256": "7e3ed5ef756e56cda66582a898949573a3467c3016e4818721fc6d15a49e6973",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/local_capture"
+    },
+    {
+      "origin": "/tmp/review-r2/missing_service/src/main.i",
+      "sha256": "549279e0033fc8d2e3855d627dc8a02a69ed112fd7ffccf2fe85c2da0dc0767a",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/missing_service"
+    },
+    {
+      "origin": "/tmp/review-r2/never_yields/src/main.i",
+      "sha256": "5c5c15e47afdb546ca243c11c6ca196cd9c12901fb0e6ef686180ebbba88f652",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/never_yields"
+    },
+    {
+      "origin": "/tmp/review-r2/nonportable_result/src/main.i",
+      "sha256": "23953b7db2defcbfbf3f07f8cefe19ab804bcf13baf0f998bb957acceff54848",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/nonportable_result"
+    },
+    {
+      "origin": "/tmp/review-r2/pure_fake/src/main.i",
+      "sha256": "9e0c52d5673c39fcad63a49c28394b22ac2845dea5c6128c596a718ea7084c07",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/pure_fake"
+    },
+    {
+      "origin": "/tmp/review-r2/race_tie/src/main.i",
+      "sha256": "446412ac58448e957090cd33611fd35f28ab730c202694003e5f33141edc6334",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/race_tie"
+    },
+    {
+      "origin": "/tmp/review-r2/request_groups/src/main.i",
+      "sha256": "e7b16a9f74d20fb67ebd260d1daf228f9fd7de8cac7be7c3caed82e09532296e",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/request_groups"
+    },
+    {
+      "origin": "/tmp/review-r2/request_reuse/src/main.i",
+      "sha256": "4530dd910006a670fb002b15aae5539ca2463c3edad37faae85afe743874991f",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/request_reuse"
+    },
+    {
+      "origin": "/tmp/review-r2/request_stop/src/main.i",
+      "sha256": "385c235ae6fd0a5d548a79e86a77af2662f767f848adcd6f6ed89a4bba34dfe1",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/request_stop"
+    },
+    {
+      "origin": "/tmp/review-r2/senders_1000/src/main.i",
+      "sha256": "f87a2db79fb036f663faaf6b2eec65916fc009905ecb7c557af9eb7e92255614",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/senders_1000"
+    },
+    {
+      "origin": "/tmp/review-r2/senders_128/src/main.i",
+      "sha256": "ce58d920278205d9aa6d50bd25fc11838f9a6df450970d491176343a5d1dbab7",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/senders_128"
+    },
+    {
+      "origin": "/tmp/review-r2/senders_16/src/main.i",
+      "sha256": "69325e184c9475dd8e33adfe280cf68ee321ed087431d24e6e3aacbc42c9a967",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/senders_16"
+    },
+    {
+      "origin": "/tmp/review-r2/senders_256/src/main.i",
+      "sha256": "6bc25862527c1e383a53abfc20108772d4b774994f666647244b71513b3329a5",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/senders_256"
+    },
+    {
+      "origin": "/tmp/review-r2/senders_32/src/main.i",
+      "sha256": "d0e86da3a6199d5dbb6fd21c829c8cbd339b6de3d596c5cd312eff924c83784c",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/senders_32"
+    },
+    {
+      "origin": "/tmp/review-r2/senders_64/src/main.i",
+      "sha256": "f8627a60c468490f74d7ab7a06d939c07ff2b4f1aab1f1508d8f79c369754df3",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/senders_64"
+    },
+    {
+      "origin": "/tmp/review-r2/shield_nested/src/main.i",
+      "sha256": "24ce3c506649500fa066e56930423af4c920e2814777ac1fc00aa0271c5722b8",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/shield_nested"
+    },
+    {
+      "origin": "/tmp/review-r2/tasks_1000/src/main.i",
+      "sha256": "e40db1fe81fc83d8d6f70320c54eff000454957a484e960088eeaf3e5857e29a",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/tasks_1000"
+    },
+    {
+      "origin": "/tmp/review-r2/tasks_5000/src/main.i",
+      "sha256": "f012bf84b93c5a6697062bd86992252dc1a1e91435d3405a7378aa5fe34664e0",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/tasks_5000"
+    },
+    {
+      "origin": "/tmp/review-r2/wait_any_unlisted/src/main.i",
+      "sha256": "af954cdff91583f15316327600526f9f779c39061c27605631b3216278dff510",
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "case": "review-r2/wait_any_unlisted"
     }
   ],
   "tools": [
@@ -44444,6 +44672,36 @@
       "path": "tests/review/tools/review-k4s/before-check/src/types/solve.rs.source",
       "sha256": "69af75145afb81c5176a33ec3981ca45ff36592c55be43ccceaf8605cce9c59f",
       "kind": "historical snapshot driver or changed source; not an active compiler file"
+    },
+    {
+      "origin": "/tmp/review-r2/probes.test.mjs",
+      "path": "tests/review/tools/review-r2/probes.test.mjs.source",
+      "sha256": "2c6314a5d17411273baba00a3a5b2c36334ab9234edccf793a929e45a4f0430f"
+    },
+    {
+      "origin": "/tmp/review-r2/criteria.md",
+      "path": "tests/review/tools/review-r2/criteria.md.source",
+      "sha256": "632f180b4b2420e2a00e69cd18bfdfef78447ff5e55fa02a88ea8cf010cfcfc3"
+    },
+    {
+      "origin": "/tmp/review-r2/report.md",
+      "path": "tests/review/tools/review-r2/report.md.source",
+      "sha256": "bc2bcd8d6ff5e81b9232ac85ba1e7fb8651333b3930df189eb837d924ab78482"
+    },
+    {
+      "origin": "/tmp/review-r2/performance/task-source.i",
+      "path": "tests/review/tools/review-r2/performance/task-source.i.source",
+      "sha256": "c142edb88915822443776411a22f3e5f5effdb5f5fcc54bd1d7ae459e24a6246"
+    },
+    {
+      "origin": "/tmp/review-r2/performance/summary.json",
+      "path": "tests/review/tools/review-r2/performance/summary.json.source",
+      "sha256": "cc49f78f13d9145a6d1ea91ad97cf4a0a76bc7f75fda66fdfafee901ab592596"
+    },
+    {
+      "origin": "/tmp/review-r2/performance/outer/allocation-attribution.json",
+      "path": "tests/review/tools/review-r2/performance/outer/allocation-attribution.json.source",
+      "sha256": "36162c9d623fa06d54644b8630c5e412ecd0b923eacb8be67f47d5b32c31a138"
     }
   ],
   "excluded": []

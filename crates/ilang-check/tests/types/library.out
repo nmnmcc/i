@@ -8,9 +8,52 @@ i/control.boundary : (body: (b: Boundary(A, B, C)) -> A ? B ! C) -> A ? B ! C
 i/control.suspend : (b: Boundary(A, B, C), f: (k: Continuation(D, A, B, C)) -> A ? B ! C) -> D
 i/control.resume : (k: Continuation(A, B, C, D), value: A) -> B ? C ! D
 i/control.cancel : (k: Continuation(A, B, C, D)) -> Nil ! D
+i/control.keep_env : (f: (x: A) -> B ? E ! N) -> { (x: A) -> B ? E } ! N
 i/resource.ensure : (body: () -> A ? E ! N, with: () -> Nil ! N) -> A ? E ! N
 i/resource.acquire : (open: () -> A ? E ! N, release: (A) -> Nil ! N, use: (A) -> B ? E ! N) -> B ? E ! N
 i/assertion.catch : (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
+i/request.new_root : (parent: Key(Nil)) -> Key(Nil)
+i/request.end_root : (root: Key(Nil)) -> Nil
+i/request.new_owner : (root: Key(Nil)) -> Key(Nil)
+i/request.end_owner : (owner: Key(Nil)) -> Nil
+i/request.group_count : (owner: Key(Nil)) -> Int
+i/request.root_count : (root: Key(Nil)) -> Int
+i/request.cancel_group : (owner: Key(Nil)) -> Nil
+i/request.cancel_root : (root: Key(Nil)) -> Nil
+i/request.observe_owner : (owner: Key(Nil)) -> Request(Nil)
+i/request.observe_root : (root: Key(Nil)) -> Request(Nil)
+i/request.open_root : () -> Root ! Root
+i/request.close_root : (root: Root) -> Nil
+i/request.open_owner : () -> Owner ! Root
+i/request.close_owner : (owner: Owner) -> Nil
+i/request.count : (owner: Owner) -> Int
+i/request.count_root : (root: Root) -> Int
+i/request.settled_owner : (owner: Owner) -> Bool
+i/request.settled_root : (root: Root) -> Bool
+i/request.cancel_all : (owner: Owner) -> Nil
+i/request.cancel_all_root : (root: Root) -> Nil
+i/request.retain : (value: A) -> A
+i/request.within : (body: () -> A ? E ! N) -> A ? E ! N - Owner | Root
+i/request.wait_none : (owner: Owner) -> Nil ! Await
+i/request.wait_none_root : (root: Root) -> Nil ! Await
+i/request.ready : (value: A) -> Request(A)
+i/request.ticket : (r: Request(A)) -> Ticket
+i/request.read_state : (r: Request(A)) -> Result(A, Int)
+i/request.take : (r: Request(A)) -> A
+i/request.settled : (r: Ticket) -> Bool
+i/request.cancel : (r: Ticket) -> Nil
+i/request.state : (r: Request(A)) -> RequestState(A)
+i/request.await : (r: Request(A)) -> A ! Await
+i/request.await_owned : (r: Request(A)) -> A ! Await
+i/request.wait_any : (rs: List(Ticket)) -> Nil
+i/request.poll : () -> Nil
+i/request.entry_root : () -> Key(Nil)
+i/request.entry_end : () -> Nil
+i/request._entry : (body: () -> A ? E ! N) -> A ? E ! N - Await - Owner - Root
+i/key.new : () -> Key(A)
+i/key.wrap : (k: Key(A), value: A) -> Keyed
+i/key.read : (k: Key(A), value: Keyed) -> Result(A, Nil)
+i/key.unwrap : (k: Key(A), x: Keyed) -> Lookup(A)
 i/core.not : (Bool) -> Bool
 i/core.to_float : (Int) -> Float
 i/core.truncate : (Float) -> Int
@@ -40,6 +83,230 @@ i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
+i/core.portable : (value: A) -> Bool
+i/record.get : (r: (K: A), key: K) -> A
+i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
+i/record.remove : (r: Record & A, key: K) -> (..A, -K)
+i/record.has : (r: Record, key: String) -> Bool
+i/record.keys : (r: Record) -> List(String)
+i/record.size : (r: Record) -> Int
+i/record.texts : (r: Record) -> List((String, String))
+i/task.finalizing : (k: Continuation(A, B, C, D), b: Boundary(F, G, H)) -> Bool
+i/task.no_waiters : WaitQueue
+i/task.address_key : Key(Address)
+i/task.path_key : Key(List(Int))
+i/task.task_key : Key(Int)
+i/task.scope_key : Key(ScopeInfo)
+i/task.channel_key : Key(ChannelInfo)
+i/task.unit_key : Key(Nil)
+i/task.scope_reply_key : Key(ScopeReply)
+i/task.selection_key : Key(Selection)
+i/task.read : (k: Key(A), value: Keyed) -> A
+i/task.retain : (value: A) -> A
+i/task.unit_value : Keyed
+i/task.unit : () -> Keyed
+i/task.answer : (reply: StepAnswer) -> Keyed
+i/task.ask : (own: Scheduler, command: Command) -> Keyed
+i/task.check_run : (actual: Key(Nil), wanted: Key(Nil)) -> Nil
+i/task.portable : (value: A) -> Nil
+i/task.contains : (xs: List(A), value: B) -> Bool
+i/task.append : (xs: List(A), ys: List(A)) -> List(A)
+i/task.reverse : (xs: List(A), acc: List(A)) -> List(A)
+i/task.without : (xs: List(A), value: A) -> List(A)
+i/task.tree_height : (tree: TaskTree(A)) -> Int
+i/task.tree_node : (id: Int, task: A, left: TaskTree(A), right: TaskTree(A)) -> TaskTree(A)
+i/task.tree_balance : (id: Int, task: A, left: TaskTree(A), right: TaskTree(A)) -> TaskTree(A)
+i/task.tree_find : (tree: TaskTree(A), wanted: Int) -> Maybe(A)
+i/task.empty_page : () -> TaskPage(Never)
+i/task.empty_store : () -> TaskStore(Never)
+i/task.page_get : (page: TaskPage(A), slot: Int) -> Maybe(A)
+i/task.page_put : (page: TaskPage(A), slot: Int, value: Maybe(A)) -> TaskPage(A)
+i/task.page_find : (store: TaskStore(A), id: Int) -> TaskPage(A)
+i/task.flush_page : (rows: TaskTree(TaskPage(A)), cache: Maybe(PageCache(A))) -> TaskTree(TaskPage(A))
+i/task.write_slot : (store: TaskStore(A), id: Int, value: Maybe(A)) -> TaskStore(A)
+i/task.store_find : (store: TaskStore(A), id: Int) -> Maybe(A)
+i/task.find_task : (store: TaskStore(TaskState), id: Int) -> TaskState
+i/task.flush_record : (store: TaskStore(A)) -> TaskStore(A)
+i/task.store_update : (store: TaskStore(A), id: Int, value: A) -> TaskStore(A)
+i/task.focus_task : (store: TaskStore(A), id: Int) -> TaskStore(A)
+i/task.put_task : (tree: TaskTree(A), id: Int, task: A) -> TaskTree(A)
+i/task.update_task : (tree: TaskTree(A), wanted: Int, value: A) -> TaskTree(A)
+i/task.tree_first : (tree: TaskTree(A)) -> (Int, A)
+i/task.drop_task : (tree: TaskTree(A), wanted: Int) -> TaskTree(A)
+i/task.tree_rows : (tree: TaskTree(A), rest: List(A)) -> List(A)
+i/task.store_add : (store: TaskStore(A), id: Int, value: A) -> TaskStore(A)
+i/task.drop_children : (store: TaskStore(A), ids: List(Int)) -> TaskStore(A)
+i/task.address_index : (id: Address) -> Int
+i/task.find_scope : (scopes: TaskStore(ScopeState), id: Address) -> ScopeState
+i/task.put_scope : (scopes: TaskStore(ScopeState), scope: ScopeState) -> TaskStore(ScopeState)
+i/task.active_live : (task: ActiveTask) -> Bool
+i/task.record_task : (s: State, t: TaskState, tasks: TaskStore(TaskState), new: Bool) -> State
+i/task.set_task : (s: State, t: TaskState) -> State
+i/task.add_task : (s: State, t: TaskState) -> State
+i/task.set_scope : (s: State, scope: ScopeState) -> State
+i/task.guarded : (own: Scheduler, owner: Maybe(Address), body: () -> Completion) -> Completion
+i/task.make_start : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
+i/task.path : () -> List(Int) ! Scheduler
+i/task.random : () -> rng.Generator ! Scheduler
+i/task.yield : () -> Nil ! Scheduler
+i/task.top : (seed: rng.Generator) -> Runner ! Runner
+i/task.observe_change : (root: Key(Nil)) -> Request(Nil)
+i/task.has_work : (ticket: Ticket) -> Bool
+i/task.wait_root : (_run: Key(Nil), root: request.Root, tickets: List(Ticket)) -> RunControl
+i/task.root_poll : (_run: Key(Nil), tickets: List(Ticket), runnable: Bool) -> RunControl
+i/task.root_forget : (_run: Key(Nil)) -> Nil
+i/task.root_allocate : () -> List(Int)
+i/task.initial : (root: request.Root) -> Runner
+i/task.run_control : (reply: StepAnswer) -> RunControl
+i/task.make_scheduler : (b: Boundary(Turn, Never, Never), task_path: List(Int), id: Int, run: Key(Nil), upstream: Runner) -> Scheduler
+i/task.list_map : (xs: List(A), f: (A) -> B) -> List(B)
+i/task.any : (xs: List(A), f: (A) -> Bool) -> Bool
+i/task.filter : (xs: List(A), f: (A) -> Bool) -> List(A)
+i/task.first_path : (a: List(Int), b: List(Int)) -> Bool
+i/task.active_epochs : (frames: List(Frame)) -> List(Cause)
+i/task.exemptions : (s: State, t: TaskState) -> List(Cause)
+i/task.frame_plan : (frames: List(Frame), cause: Cause) -> Maybe(CancelPlan)
+i/task.cause_for_chain : (s: State, t: TaskState, chain: List(Address)) -> Maybe(Cause)
+i/task.withdraw : (s: State, flag: Request(Registration)) -> State
+i/task.remove_registration : (s: State, task_path: Int) -> State
+i/task.waiter_live : (w: Waiter) -> Bool
+i/task.compact_queue : (q: WaitQueue) -> WaitQueue
+i/task.waiter_queue : (q: WaitQueue, waiter: Waiter) -> WaitQueue
+i/task.queue_head : (q: WaitQueue, excluded: Maybe(Request(Registration)), skipped: List(Waiter)) -> QueueHead
+i/task.queue_live : (q: WaitQueue) -> Bool
+i/task.adjust_waiters : (s: State, leaves: List(Leaf)) -> State
+i/task.compact_sources : (s: State, leaves: List(Leaf)) -> State
+i/task.set_channel : (s: State, channel: ChannelState) -> State
+i/task.queue : (s: State, task_path: Int) -> State
+i/task.has_ready : (s: State) -> Bool
+i/task.reply : (s: State, task_path: Int, k: Continuation(StepAnswer, Turn, Never, Never), value: StepAnswer, switch: Bool) -> State
+i/task.accept_cancel : (s: State, t: TaskState, c: Cause) -> State
+i/task.propagate_tasks : (s: State, rows: List(ActiveTask)) -> State
+i/task.propagate : (s: State) -> State
+i/task.cancel_scope : (s: State, id: Address) -> State
+i/task.cancel_run : (s: State) -> State
+i/task.portable_witness : (w: Witness) -> Bool
+i/task.check_scope : (s: State, t: TaskState, scope: ScopeInfo, message: String) -> Nil
+i/task.find_channel : (channels: TaskStore(ChannelState), id: Address) -> ChannelState
+i/task.check_channel : (s: State, info: ChannelInfo) -> Nil
+i/task.check_leaf_run : (s: State, leaf: Leaf) -> Nil
+i/task.check_leaf : (s: State, t: TaskState, leaf: Leaf) -> Nil
+i/task.check_leaves : (s: State, t: TaskState, leaves: List(Leaf)) -> Nil
+i/task.leaf_at : (leaves: List(Leaf), index: Int) -> Leaf
+i/task.partner : (s: State, leaf: Leaf, excluded: Maybe(Request(Registration))) -> Partner
+i/task.commit_partner : (s: State, waiter: Waiter, payload: Keyed) -> State
+i/task.probe_leaf : (s: State, leaf: Leaf, index: Int, excluded: Maybe(Request(Registration))) -> Commit
+i/task.probe : (s: State, leaves: List(Leaf), index: Int, excluded: Maybe(Request(Registration))) -> Commit
+i/task.register_leaves : (s: State, flag: Request(Registration), leaves: List(Leaf), index: Int) -> State
+i/task.select : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), leaves: List(Leaf)) -> State
+i/task.wake_source_waiters : (s: State, rows: List(Waiter)) -> State
+i/task.wake_source_rows : (s: State, rows: List(Int)) -> State
+i/task.wake_sources : (s: State) -> State
+i/task.wake_tickets : (s: State, paths: List(Int)) -> State
+i/task.lowest_error : (errors: List((List(Int), Keyed)), best: (List(Int), Keyed)) -> Keyed
+i/task.scope_reply : (scope: ScopeState) -> ScopeReply
+i/task.refresh_rows : (s: State, rows: List(Int)) -> State
+i/task.refresh_clean : (s: State) -> State
+i/task.owned_channel_bad : (s: State, ids: List(Address)) -> Bool
+i/task.owned_indices : (ids: List(Address)) -> List(Int)
+i/task.retire_scope : (s: State, scope: ScopeState) -> State
+i/task.retire_scopes : (s: State) -> State
+i/task.maintain : (s: State) -> State
+i/task.new_address : (t: TaskState) -> Address
+i/task.head_scope : (chain: List(Address)) -> Maybe(Address)
+i/task.find_share : (shares: TaskStore(ShareState), id: Address) -> Keyed
+i/task.prevalidate : (s: State, t: TaskState, command: Command) -> Nil
+i/task.add_forward : (rows: List(Forward), id: Key(Nil), tickets: List(Ticket)) -> List(Forward)
+i/task.end_frame : (frames: List(Frame), id: Address) -> List(Frame)
+i/task.do_command : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), command: Command) -> State
+i/task.cancellation_reply : (t: TaskState) -> Bool
+i/task.finals_changed : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
+i/task.update_finals : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> List(Frame)
+i/task.on_command : (s: State, task_path: Int, command: Command, k: Continuation(StepAnswer, Turn, Never, Never)) -> State
+i/task.observe_completion : (s: State, t: TaskState, completion: Completion) -> State
+i/task.turn : (s: State, t: TaskState) -> Turn
+i/task.interests_tasks : (s: State, paths: List(Int)) -> List(Ticket)
+i/task.interests_forward : (rows: List(Forward)) -> List(Ticket)
+i/task.interests : (s: State) -> List(Ticket)
+i/task.apply_run_control : (s: State, result: RunControl) -> State
+i/task.finished_run : (s: State) -> Bool
+i/task.run_reply : (s: State) -> RunReply
+i/task.script_rows : (s: State, ids: List(ActiveTask), wanted: List(Int)) -> Maybe(TaskState)
+i/task.script_task : (s: State, wanted: List(Int)) -> Maybe(TaskState)
+i/task.choose_turn : (state: State) -> State
+i/task.loop : (state: State) -> RunReply
+i/task.scope_call_body : (body: (Scope(A)) -> B ? A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ? A ! N
+i/task.scope : (body: (s: Scope(A)) -> B ? A ! N) -> B ? A ! N | Scheduler
+i/task.local_scope : (body: (s: Scope(A)) -> B ? A ! N) -> B ? A ! N | Scheduler
+i/task.go_key : (s: Scope(A), body: () -> B ? A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, result: Key(Result(B, A))) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.go : (s: Scope(A), body: () -> B ? A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.branch_at : (branches: List(Branch(A, B, C)), index: Int) -> Branch(A, B, C)
+i/task.sync_body : (e: Event(A, B, C), own: Scheduler) -> A ? B ! C
+i/task.always : (value: A) -> Event(A, Never, Never)
+i/task.never : () -> Event(Never, Never, Never)
+i/task.branches_of : (events: List(Event(A, B, C))) -> List(Branch(A, B, C))
+i/task.choose : (events: List(Event(A, B, C))) -> Event(A, B, C)
+i/task.map : (e: Event(A, B, C), f: (A) -> D ? E ! N) -> Event(D, B | E, C | N)
+i/task.join_event : (t: Task(A, B)) -> Event(A, B, Never)
+i/task.join : (t: Task(A, B)) -> A ? B ! Scheduler
+i/task.channel : () -> Channel(A) ! Scheduler
+i/task.local_channel : () -> Channel(A) ! Scheduler
+i/task.send_event : (c: Channel(A), value: A) -> Event(Nil, Never, Never)
+i/task.receive_event : (c: Channel(A)) -> Event(A, Never, Never)
+i/task.send : (c: Channel(A), value: A) -> Nil ! Scheduler
+i/task.receive : (c: Channel(A)) -> A ! Scheduler
+i/task.share : (s: Scope(A), value: B) -> Shared(B) ! Scheduler
+i/task.get : (s: Shared(A)) -> A ! Scheduler
+i/task.keep : (f: (A) -> B ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await }) -> { (A) -> B ? E ! Scheduler } ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.both : (left: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> B ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> (A, B) ? E ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.race : (left: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }, right: () -> A ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> A ? E ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.spawn_values : (s: Scope(A), xs: List(B), f: (B) -> C ? A ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(Task(C, A)) ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.join_values : (tasks: List(Task(A, B))) -> List(A) ? B ! Scheduler
+i/task.map_concurrently : (xs: List(A), f: (A) -> B ? E ! N & { request.Await | Runner | Scheduler | N - Scheduler - Runner - request.Await } & { Scheduler | Runner | request.Await | N - Scheduler - Runner - request.Await }) -> List(B) ? E ! N - Scheduler - Runner - request.Await | Scheduler
+i/task.execute_body : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
+i/task.run : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ? E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
+i/task.test : (seed: rng.Generator, choices: List(List(Int)), body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ? E | ScheduleError ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | Runner
+i/task._entry : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }) -> A ? E ! N - Scheduler - Runner - request.Await - request.Owner - request.Root | request.Root
+i/task.scope_call : (body: (Scope(A)) -> B ? A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ? A ! N
+i/task.execute : (body: () -> A ? E ! N & { request.Await | Runner | Scheduler | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root } & { Scheduler | Runner | request.Await | request.Owner | request.Root | N - Scheduler - Runner - request.Await - request.Owner - request.Root }, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
+i/task.sync : (e: Event(A, B, C)) -> A ? B ! C | Scheduler
+i/task.root_active : (_run: Key(Nil), _active: Active) -> RunControl
+i/task.cause_allowed : (s: State, t: TaskState, cause: Cause) -> Bool
+i/task.frame_abort : (frames: List(Frame)) -> Maybe(() -> Never)
+i/task.effective_active : (s: State, t: TaskState) -> Active
+i/task.put_nest : (rows: List(Nest), id: Key(Nil), anchor: Maybe(Address), active: Active) -> List(Nest)
+i/task.register_driver : (s: State, task_path: Int, command: Command) -> State
+i/task.pending_frame : (frames: List(Frame)) -> Maybe(Frame)
+i/task.older_shield : (rows: List(Nest), id: Key(Nil)) -> Bool
+i/task.cancel_response : (s: State, t: TaskState, abort: () -> Never) -> State
+i/task.notify_nested : (s: State, t: TaskState, id: Key(Nil)) -> State
+i/task.deliver_deferred : (s: State, path: Int, command: Command) -> State
+i/task.frame_owner : (frames: List(Frame)) -> Maybe(Address)
+i/task.anchor_within : (frames: List(Frame), anchor: Maybe(Address), target: Maybe(Address)) -> Bool
+i/task.affected_nests : (t: TaskState, frames: List(Frame)) -> List(Nest)
+i/task.nested_abort : (rows: List(Nest)) -> Maybe(() -> Never)
+i/task.empty_relay : (_notice: ForeignNotice, _value: Keyed, _discard: Bool) -> Keyed
+i/task.empty_active : Active
+i/task.foreign_active : (t: TaskState) -> Bool
+i/task.frame_epoch : (frames: List(Frame)) -> Maybe(Cause)
+i/task.scope_token : (s: State, owner: Maybe(Address)) -> Key(Nil)
+i/task.notice_with : (notice: ForeignNotice, hops: List(Hop)) -> ForeignNotice
+i/task.current_relay : (t: TaskState) -> (ForeignNotice, Keyed, Bool) -> Keyed
+i/task.forward_response : (s: State, t: TaskState, notice: ForeignNotice) -> State
+i/task.scope_end_reply : (s: State, t: TaskState, scope: ScopeState) -> StepAnswer
+i/task.queue_scope_end : (s: State, t: TaskState, scope: ScopeState) -> State
+i/task.finish_scope : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), info: ScopeInfo) -> State
+i/task.anchor_epoch : (frames: List(Frame), anchor: Maybe(Address)) -> Maybe(Maybe(Cause))
+i/task.unwinding_above : (frames: List(Frame), anchor: Maybe(Address)) -> Bool
+i/task.notice_ready : (t: TaskState, hop: Hop) -> Bool
+i/task.notice_live : (t: TaskState, hop: Hop) -> Bool
+i/task.post_notice : (s: State, notice: ForeignNotice) -> State
+i/task.apply_notice : (s: State, t: TaskState, notice: ForeignNotice) -> State
+i/task.pump_task_messages : (s: State, path: Int) -> State
+i/task.pump_rows : (s: State, rows: List(ActiveTask)) -> State
+i/task.pump_messages : (s: State) -> State
+i/task.relay_notice : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, Never, Never), notice: ForeignNotice, value: Keyed, discard: Bool) -> State
+i/task.notice_hops : (notice: ForeignNotice) -> List(Hop)
 i/random.word_size : () -> Int
 i/random.mask : (x: Int) -> Int
 i/random.xor_shift : (x: Int, n: Int) -> Int

@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "efb6266cde3be7cf34c9771fc42fc2214c8570d0",
+  "binary_sha256": "d46121b363ffda062935e29391dcb8122612b597ad6ed942712ea78a8cc31f46",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "",
-      "stderr": "src/main.i:2:32: error[E0101]: expected `}`, found `:`\nsrc/main.i:3:38: error[E0101]: expected `}`, found `:`\nsrc/main.i:6:20: error[E0101]: expected `}`, found `:`\nsrc/main.i:7:30: error[E0101]: expected `}`, found `:`\nsrc/main.i:14:31: error[E0101]: expected a type, found `..`\nsrc/main.i:17:39: error[E0101]: expected a type, found `..`\n6 errors\n"
+      "stdout": "app/main.wrap : (x: Int | String) -> (a: Int | String)\napp/main.wrap_union : (x: Int | String) -> (a: Int) | (a: String)\napp/main.pair : () -> (data: (Int, Int)) | (error: String)\napp/main.pair_annotated : () -> (data: (Int, Int)) | (error: String)\napp/main.choose : (c: Bool, r: Record & A) -> (b: 2) | { (a: 1) & (..A, -a) }\napp/main.choose_written : (c: Bool, r: Record & A) -> (b: 2) | { (a: 1) & (..A, -a) }\n",
+      "stderr": "src/main.i:18:3: error[E0501]: cannot prove the result fits this union from the established bounds; annotate the updated value or omit the result annotation (the type at 17:49 needs it)\n1 error\n"
     }
   }
 }

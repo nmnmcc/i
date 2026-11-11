@@ -20,7 +20,10 @@ fn library_resolves_cleanly() {
             "i/control",
             "i/resource",
             "i/assertion",
+            "i/request",
+            "i/key",
             "i/core",
+            "i/record",
             "i/io",
             "i/task",
             "i/clock",
@@ -79,7 +82,39 @@ fn library_names() {
     let program = program.unwrap();
     let expect: &[(&str, &[&str])] = &[
         ("i/fail", &["raise", "catch", "from_result", "map_error"]),
-        ("i/control", &["boundary", "suspend", "resume", "cancel"]),
+        (
+            "i/control",
+            &["boundary", "suspend", "resume", "cancel", "keep_env"],
+        ),
+        ("i/key", &["new", "wrap", "unwrap"]),
+        (
+            "i/request",
+            &[
+                "open_root",
+                "close_root",
+                "open_owner",
+                "close_owner",
+                "count",
+                "count_root",
+                "settled_owner",
+                "settled_root",
+                "cancel_all",
+                "cancel_all_root",
+                "wait_none",
+                "wait_none_root",
+                "within",
+                "ready",
+                "ticket",
+                "state",
+                "take",
+                "settled",
+                "cancel",
+                "await",
+                "await_owned",
+                "wait_any",
+                "poll",
+            ],
+        ),
         ("i/resource", &["ensure", "acquire"]),
         ("i/assertion", &["catch"]),
         (
@@ -114,11 +149,44 @@ fn library_names() {
                 "bit_array_concat",
                 "inspect",
                 "hash",
+                "portable",
             ],
         ),
         ("i/prelude", &["panic", "assert"]),
         ("i/io", &[]),
-        ("i/task", &[]),
+        (
+            "i/task",
+            &[
+                "top",
+                "run",
+                "test",
+                "scope",
+                "local_scope",
+                "go",
+                "join",
+                "yield",
+                "path",
+                "random",
+                "keep",
+                "channel",
+                "local_channel",
+                "send",
+                "receive",
+                "send_event",
+                "receive_event",
+                "join_event",
+                "always",
+                "never",
+                "choose",
+                "map",
+                "sync",
+                "share",
+                "get",
+                "both",
+                "race",
+                "map_concurrently",
+            ],
+        ),
         ("i/clock", &[]),
         (
             "i/random",
@@ -244,7 +312,7 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 6] = ["i/task", "i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
+const RESERVED: [&str; 5] = ["i/clock", "i/fs", "i/process", "i/net", "i/stdio"];
 
 /// User code imports every reserved module with no problems.
 ///
@@ -254,9 +322,8 @@ fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
     let main = format!("(\n{imports})\n\nx = 1\n");
     assert!(ilang_syntax::parse_module(&main).1.is_empty());
-    let (graph, program, diags) = common::check_files(&[("src/main.i", &main)]);
-    let rendered = graph.sources.render_all(&diags);
-    assert!(rendered.is_empty(), "{rendered:#?}");
+    let (_, program, diags) = common::check_files(&[("src/main.i", &main)]);
+    common::expect_unused(&diags, &["x"]);
     assert!(program.is_some());
 }
 

@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "67525bee4f4b15e4490d1d5ec6fd968db9d264fd",
+  "binary_sha256": "cd4b0e2d992b0ffea0d86a3de8797e447c12e6197e8b0e68b1b4634286e4e35d",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:3:10: error[E0210]: there is no module `i/request`\nsrc/main.i:4:1: error[E0302]: this attribute is written `@host(\"namespace\")` or `@host(\"namespace\", \"async\")`\nsrc/main.i:5:25: error[E0202]: the type `Request` is not defined\nsrc/main.i:9:8: error[E0203]: `i/task` has no `scope`\nsrc/main.i:10:18: error[E0203]: `i/task` has no `go`\nsrc/main.i:16:18: error[E0203]: `i/task` has no `join`\n6 errors\n"
+      "stderr": "src/main.i:11:15: error[E0203]: `i/request` has no `outstanding_root`\n1 error\n"
     }
   }
 }

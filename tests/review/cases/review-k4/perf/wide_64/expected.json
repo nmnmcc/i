@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.f_0 : () -> Nil ! S0\napp/main.f_1 : () -> Nil ! S1\napp/main.f_2 : () -> Nil ! S2\napp/main.f_3 : () -> Nil ! S3\napp/main.f_4 : () -> Nil ! S4\napp/main.f_5 : () -> Nil ! S5\napp/main.f_6 : () -> Nil ! S6\napp/main.f_7 : () -> Nil ! S7\napp/main.f_8 : () -> Nil ! S8\napp/main.f_9 : () -> Nil ! S9\napp/main.f_10 : () -> Nil ! S10\napp/main.f_11 : () -> Nil ! S11\napp/main.f_12 : () -> Nil ! S12\napp/main.f_13 : () -> Nil ! S13\napp/main.f_14 : () -> Nil ! S14\napp/main.f_15 : () -> Nil ! S15\napp/main.f_16 : () -> Nil ! S16\napp/main.f_17 : () -> Nil ! S17\napp/main.f_18 : () -> Nil ! S18\napp/main.f_19 : () -> Nil ! S19\napp/main.f_20 : () -> Nil ! S20\napp/main.f_21 : () -> Nil ! S21\napp/main.f_22 : () -> Nil ! S22\napp/main.f_23 : () -> Nil ! S23\napp/main.f_24 : () -> Nil ! S24\napp/main.f_25 : () -> Nil ! S25\napp/main.f_26 : () -> Nil ! S26\napp/main.f_27 : () -> Nil ! S27\napp/main.f_28 : () -> Nil ! S28\napp/main.f_29 : () -> Nil ! S29\napp/main.f_30 : () -> Nil ! S30\napp/main.f_31 : () -> Nil ! S31\napp/main.f_32 : () -> Nil ! S32\napp/main.f_33 : () -> Nil ! S33\napp/main.f_34 : () -> Nil ! S34\napp/main.f_35 : () -> Nil ! S35\napp/main.f_36 : () -> Nil ! S36\napp/main.f_37 : () -> Nil ! S37\napp/main.f_38 : () -> Nil ! S38\napp/main.f_39 : () -> Nil ! S39\napp/main.f_40 : () -> Nil ! S40\napp/main.f_41 : () -> Nil ! S41\napp/main.f_42 : () -> Nil ! S42\napp/main.f_43 : () -> Nil ! S43\napp/main.f_44 : () -> Nil ! S44\napp/main.f_45 : () -> Nil ! S45\napp/main.f_46 : () -> Nil ! S46\napp/main.f_47 : () -> Nil ! S47\napp/main.f_48 : () -> Nil ! S48\napp/main.f_49 : () -> Nil ! S49\napp/main.f_50 : () -> Nil ! S50\napp/main.f_51 : () -> Nil ! S51\napp/main.f_52 : () -> Nil ! S52\napp/main.f_53 : () -> Nil ! S53\napp/main.f_54 : () -> Nil ! S54\napp/main.f_55 : () -> Nil ! S55\napp/main.f_56 : () -> Nil ! S56\napp/main.f_57 : () -> Nil ! S57\napp/main.f_58 : () -> Nil ! S58\napp/main.f_59 : () -> Nil ! S59\napp/main.f_60 : () -> Nil ! S60\napp/main.f_61 : () -> Nil ! S61\napp/main.f_62 : () -> Nil ! S62\napp/main.f_63 : () -> Nil ! S63\napp/main.wide : () -> Nil ! S0 | S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8 | S9 | S10 | S11 | S12 | S13 | S14 | S15 | S16 | S17 | S18 | S19 | S20 | S21 | S22 | S23 | S24 | S25 | S26 | S27 | S28 | S29 | S30 | S31 | S32 | S33 | S34 | S35 | S36 | S37 | S38 | S39 | S40 | S41 | S42 | S43 | S44 | S45 | S46 | S47 | S48 | S49 | S50 | S51 | S52 | S53 | S54 | S55 | S56 | S57 | S58 | S59 | S60 | S61 | S62 | S63\n",
-      "stderr": ""
+      "stdout": "app/main.f_0 : () -> Nil ! S0\napp/main.f_1 : () -> Nil ! S1\napp/main.f_2 : () -> Nil ! S2\napp/main.f_3 : () -> Nil ! S3\napp/main.f_4 : () -> Nil ! S4\napp/main.f_5 : () -> Nil ! S5\napp/main.f_6 : () -> Nil ! S6\napp/main.f_7 : () -> Nil ! S7\napp/main.f_8 : () -> Nil ! S8\napp/main.f_9 : () -> Nil ! S9\napp/main.f_10 : () -> Nil ! S10\napp/main.f_11 : () -> Nil ! S11\napp/main.f_12 : () -> Nil ! S12\napp/main.f_13 : () -> Nil ! S13\napp/main.f_14 : () -> Nil ! S14\napp/main.f_15 : () -> Nil ! S15\napp/main.f_16 : () -> Nil ! S16\napp/main.f_17 : () -> Nil ! S17\napp/main.f_18 : () -> Nil ! S18\napp/main.f_19 : () -> Nil ! S19\napp/main.f_20 : () -> Nil ! S20\napp/main.f_21 : () -> Nil ! S21\napp/main.f_22 : () -> Nil ! S22\napp/main.f_23 : () -> Nil ! S23\napp/main.f_24 : () -> Nil ! S24\napp/main.f_25 : () -> Nil ! S25\napp/main.f_26 : () -> Nil ! S26\napp/main.f_27 : () -> Nil ! S27\napp/main.f_28 : () -> Nil ! S28\napp/main.f_29 : () -> Nil ! S29\napp/main.f_30 : () -> Nil ! S30\napp/main.f_31 : () -> Nil ! S31\napp/main.f_32 : () -> Nil ! S32\napp/main.f_33 : () -> Nil ! S33\napp/main.f_34 : () -> Nil ! S34\napp/main.f_35 : () -> Nil ! S35\napp/main.f_36 : () -> Nil ! S36\napp/main.f_37 : () -> Nil ! S37\napp/main.f_38 : () -> Nil ! S38\napp/main.f_39 : () -> Nil ! S39\napp/main.f_40 : () -> Nil ! S40\napp/main.f_41 : () -> Nil ! S41\napp/main.f_42 : () -> Nil ! S42\napp/main.f_43 : () -> Nil ! S43\napp/main.f_44 : () -> Nil ! S44\napp/main.f_45 : () -> Nil ! S45\napp/main.f_46 : () -> Nil ! S46\napp/main.f_47 : () -> Nil ! S47\napp/main.f_48 : () -> Nil ! S48\napp/main.f_49 : () -> Nil ! S49\napp/main.f_50 : () -> Nil ! S50\napp/main.f_51 : () -> Nil ! S51\napp/main.f_52 : () -> Nil ! S52\napp/main.f_53 : () -> Nil ! S53\napp/main.f_54 : () -> Nil ! S54\napp/main.f_55 : () -> Nil ! S55\napp/main.f_56 : () -> Nil ! S56\napp/main.f_57 : () -> Nil ! S57\napp/main.f_58 : () -> Nil ! S58\napp/main.f_59 : () -> Nil ! S59\napp/main.f_60 : () -> Nil ! S60\napp/main.f_61 : () -> Nil ! S61\napp/main.f_62 : () -> Nil ! S62\napp/main.f_63 : () -> Nil ! S63\napp/main.wide : () -> Nil ! S0 | S1 | S10 | S11 | S12 | S13 | S14 | S15 | S16 | S17 | S18 | S19 | S2 | S20 | S21 | S22 | S23 | S24 | S25 | S26 | S27 | S28 | S29 | S3 | S30 | S31 | S32 | S33 | S34 | S35 | S36 | S37 | S38 | S39 | S4 | S40 | S41 | S42 | S43 | S44 | S45 | S46 | S47 | S48 | S49 | S5 | S50 | S51 | S52 | S53 | S54 | S55 | S56 | S57 | S58 | S59 | S6 | S60 | S61 | S62 | S63 | S7 | S8 | S9\n",
+      "stderr": "src/main.i:129:1: warning[W0504]: top-level binding `wide` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:129:1: warning[W0504]: top-level binding `wide` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:129:1: warning[W0504]: top-level binding `wide` is not used\n"
     }
   }
 }

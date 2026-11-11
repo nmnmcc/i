@@ -16001,42 +16001,33 @@
       "project": "tests/review/cases/review-rec/_loose/growth",
       "origin": "/tmp/review-rec/growth.i",
       "context": null,
-      "source": "docs/design/records.md; T3 is held in the ledger",
+      "source": "docs/spec.md §4.9 and docs/design/records.md §20.3; original source retained in .invalid",
       "finding": "growth",
       "files": [
         "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
+      ]
     },
     {
       "id": "review-rec/_loose/probes",
       "project": "tests/review/cases/review-rec/_loose/probes",
       "origin": "/tmp/review-rec/probes.i",
       "context": null,
-      "source": "docs/design/records.md; T3 is held in the ledger",
+      "source": "docs/spec.md §4.9 and docs/design/records.md §20.3; original source retained in .invalid",
       "finding": "probes",
       "files": [
         "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
+      ]
     },
     {
       "id": "review-rec/_loose/schema-union",
       "project": "tests/review/cases/review-rec/_loose/schema-union",
       "origin": "/tmp/review-rec/schema-union.i",
       "context": null,
-      "source": "docs/design/records.md; T3 is held in the ledger",
+      "source": "docs/spec.md §4.9 and docs/design/records.md §20.3; original source retained in .invalid",
       "finding": "schema-union",
       "files": [
         "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
+      ]
     },
     {
       "id": "review-runtime/echo-types",
@@ -20707,6 +20698,1224 @@
       "context": null,
       "source": "docs/spec.md §§2.5, 4.3, 4.7: completed value types",
       "finding": "valuechain4096",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/row_alias",
+      "project": "tests/review/cases/review-k4-lane/row_alias",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#row_alias",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant row_alias",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/direct_row",
+      "project": "tests/review/cases/review-k4-lane/direct_row",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#direct_row",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant direct_row",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/effect_row_alias",
+      "project": "tests/review/cases/review-k4-lane/effect_row_alias",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#effect_row_alias",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant effect_row_alias",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/latent_row",
+      "project": "tests/review/cases/review-k4-lane/latent_row",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#latent_row",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant latent_row",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/alias_kind_env",
+      "project": "tests/review/cases/review-k4-lane/alias_kind_env",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#alias_kind_env",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant alias_kind_env",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/alias_kind_error",
+      "project": "tests/review/cases/review-k4-lane/alias_kind_error",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#alias_kind_error",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant alias_kind_error",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q21",
+      "project": "tests/review/cases/review-k4-lane/q21",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q21",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q21",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q22",
+      "project": "tests/review/cases/review-k4-lane/q22",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q22",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q22",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q23",
+      "project": "tests/review/cases/review-k4-lane/q23",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q23",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q23",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q24",
+      "project": "tests/review/cases/review-k4-lane/q24",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q24",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q24",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q25",
+      "project": "tests/review/cases/review-k4-lane/q25",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q25",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q25",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q26",
+      "project": "tests/review/cases/review-k4-lane/q26",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q26",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q26",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q27",
+      "project": "tests/review/cases/review-k4-lane/q27",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q27",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q27",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q28",
+      "project": "tests/review/cases/review-k4-lane/q28",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q28",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q28",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q29",
+      "project": "tests/review/cases/review-k4-lane/q29",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q29",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q29",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q30",
+      "project": "tests/review/cases/review-k4-lane/q30",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q30",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q30",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q31",
+      "project": "tests/review/cases/review-k4-lane/q31",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q31",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q31",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q32",
+      "project": "tests/review/cases/review-k4-lane/q32",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q32",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q32",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q33",
+      "project": "tests/review/cases/review-k4-lane/q33",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q33",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q33",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q34",
+      "project": "tests/review/cases/review-k4-lane/q34",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q34",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q34",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q35",
+      "project": "tests/review/cases/review-k4-lane/q35",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q35",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q35",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q36",
+      "project": "tests/review/cases/review-k4-lane/q36",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q36",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q36",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q37",
+      "project": "tests/review/cases/review-k4-lane/q37",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q37",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q37",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q38",
+      "project": "tests/review/cases/review-k4-lane/q38",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q38",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q38",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q39",
+      "project": "tests/review/cases/review-k4-lane/q39",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q39",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q39",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/q40",
+      "project": "tests/review/cases/review-k4-lane/q40",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#q40",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant q40",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/closed_handler_hole",
+      "project": "tests/review/cases/review-k4-lane/closed_handler_hole",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#closed_handler_hole",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant closed_handler_hole",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/latent_row_same",
+      "project": "tests/review/cases/review-k4-lane/latent_row_same",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#latent_row_same",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant latent_row_same",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/error_row_values",
+      "project": "tests/review/cases/review-k4-lane/error_row_values",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#error_row_values",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant error_row_values",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w1-Never",
+      "project": "tests/review/cases/review-k4-lane/w1-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w1-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w1-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w1-Dep",
+      "project": "tests/review/cases/review-k4-lane/w1-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w1-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w1-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w2-Never",
+      "project": "tests/review/cases/review-k4-lane/w2-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w2-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w2-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w2-Dep",
+      "project": "tests/review/cases/review-k4-lane/w2-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w2-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w2-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w3-Never",
+      "project": "tests/review/cases/review-k4-lane/w3-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w3-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w3-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w3-Dep",
+      "project": "tests/review/cases/review-k4-lane/w3-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w3-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w3-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w4-Never",
+      "project": "tests/review/cases/review-k4-lane/w4-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w4-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w4-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w4-Dep",
+      "project": "tests/review/cases/review-k4-lane/w4-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w4-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w4-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w5-Never",
+      "project": "tests/review/cases/review-k4-lane/w5-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w5-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w5-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w5-Dep",
+      "project": "tests/review/cases/review-k4-lane/w5-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w5-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w5-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w6-Never",
+      "project": "tests/review/cases/review-k4-lane/w6-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w6-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w6-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w6-Dep",
+      "project": "tests/review/cases/review-k4-lane/w6-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w6-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w6-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w7-Never",
+      "project": "tests/review/cases/review-k4-lane/w7-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w7-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w7-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w7-Dep",
+      "project": "tests/review/cases/review-k4-lane/w7-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w7-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w7-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w8-Never",
+      "project": "tests/review/cases/review-k4-lane/w8-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w8-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w8-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w8-Dep",
+      "project": "tests/review/cases/review-k4-lane/w8-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w8-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w8-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w9-Never",
+      "project": "tests/review/cases/review-k4-lane/w9-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w9-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w9-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w9-Dep",
+      "project": "tests/review/cases/review-k4-lane/w9-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w9-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w9-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w10-Never",
+      "project": "tests/review/cases/review-k4-lane/w10-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w10-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w10-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w10-Dep",
+      "project": "tests/review/cases/review-k4-lane/w10-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w10-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w10-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w11-Never",
+      "project": "tests/review/cases/review-k4-lane/w11-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w11-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w11-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w11-Dep",
+      "project": "tests/review/cases/review-k4-lane/w11-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w11-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w11-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w12-Never",
+      "project": "tests/review/cases/review-k4-lane/w12-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w12-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w12-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w12-Dep",
+      "project": "tests/review/cases/review-k4-lane/w12-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w12-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w12-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w13-Never",
+      "project": "tests/review/cases/review-k4-lane/w13-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w13-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w13-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w13-Dep",
+      "project": "tests/review/cases/review-k4-lane/w13-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w13-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w13-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w14-Never",
+      "project": "tests/review/cases/review-k4-lane/w14-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w14-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w14-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w14-Dep",
+      "project": "tests/review/cases/review-k4-lane/w14-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w14-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w14-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w15-Never",
+      "project": "tests/review/cases/review-k4-lane/w15-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w15-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w15-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w15-Dep",
+      "project": "tests/review/cases/review-k4-lane/w15-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w15-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w15-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w16-Never",
+      "project": "tests/review/cases/review-k4-lane/w16-Never",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w16-Never",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w16-Never",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/w16-Dep",
+      "project": "tests/review/cases/review-k4-lane/w16-Dep",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#w16-Dep",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant w16-Dep",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/unused-False",
+      "project": "tests/review/cases/review-k4-lane/unused-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#unused-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant unused-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/unused-True",
+      "project": "tests/review/cases/review-k4-lane/unused-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#unused-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant unused-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-0-False",
+      "project": "tests/review/cases/review-k4-lane/previous-0-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-0-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-0-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-0-True",
+      "project": "tests/review/cases/review-k4-lane/previous-0-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-0-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-0-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-1-False",
+      "project": "tests/review/cases/review-k4-lane/previous-1-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-1-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-1-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-2-False",
+      "project": "tests/review/cases/review-k4-lane/previous-2-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-2-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-2-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-2-True",
+      "project": "tests/review/cases/review-k4-lane/previous-2-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-2-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-2-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-3-False",
+      "project": "tests/review/cases/review-k4-lane/previous-3-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-3-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-3-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-3-True",
+      "project": "tests/review/cases/review-k4-lane/previous-3-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-3-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-3-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-4-False",
+      "project": "tests/review/cases/review-k4-lane/previous-4-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-4-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-4-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-4-True",
+      "project": "tests/review/cases/review-k4-lane/previous-4-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-4-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-4-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-5-False",
+      "project": "tests/review/cases/review-k4-lane/previous-5-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-5-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-5-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-5-True",
+      "project": "tests/review/cases/review-k4-lane/previous-5-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-5-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-5-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-6-False",
+      "project": "tests/review/cases/review-k4-lane/previous-6-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-6-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-6-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-6-True",
+      "project": "tests/review/cases/review-k4-lane/previous-6-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-6-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-6-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/previous-chain-64",
+      "project": "tests/review/cases/review-k4-lane/previous-chain-64",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#previous-chain-64",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant previous-chain-64",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/handler-hole-False-False",
+      "project": "tests/review/cases/review-k4-lane/handler-hole-False-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#handler-hole-False-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant handler-hole-False-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/handler-hole-True-False",
+      "project": "tests/review/cases/review-k4-lane/handler-hole-True-False",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#handler-hole-True-False",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant handler-hole-True-False",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-k4-lane/handler-hole-True-True",
+      "project": "tests/review/cases/review-k4-lane/handler-hole-True-True",
+      "origin": "git:9695b32a2a4f180511202c0dbe5812bf1b778586:crates/ilang-cli/tests/k4.rs#handler-hole-True-True",
+      "source": "docs/spec.md §§4.5, 4.7, 4.8, 9.2–9.3; K4 F1–F3 and first-review entry obligations",
+      "finding": "K4 runtime variant handler-hole-True-True",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/borrow_owned",
+      "project": "tests/review/cases/review-r2/borrow_owned",
+      "origin": "/tmp/review-r2/borrow_owned",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "borrow_owned",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_choose",
+      "project": "tests/review/cases/review-r2/cancel_choose",
+      "origin": "/tmp/review-r2/cancel_choose",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_choose",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_error_final",
+      "project": "tests/review/cases/review-r2/cancel_error_final",
+      "origin": "/tmp/review-r2/cancel_error_final",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_error_final",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_normal_final",
+      "project": "tests/review/cases/review-r2/cancel_normal_final",
+      "origin": "/tmp/review-r2/cancel_normal_final",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_normal_final",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/cancel_send",
+      "project": "tests/review/cases/review-r2/cancel_send",
+      "origin": "/tmp/review-r2/cancel_send",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "cancel_send",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/choice_commit",
+      "project": "tests/review/cases/review-r2/choice_commit",
+      "origin": "/tmp/review-r2/choice_commit",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "choice_commit",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_16",
+      "project": "tests/review/cases/review-r2/dag_16",
+      "origin": "/tmp/review-r2/dag_16",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_16",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_20",
+      "project": "tests/review/cases/review-r2/dag_20",
+      "origin": "/tmp/review-r2/dag_20",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_20",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_24",
+      "project": "tests/review/cases/review-r2/dag_24",
+      "origin": "/tmp/review-r2/dag_24",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_24",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_28",
+      "project": "tests/review/cases/review-r2/dag_28",
+      "origin": "/tmp/review-r2/dag_28",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_28",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/dag_28_local",
+      "project": "tests/review/cases/review-r2/dag_28_local",
+      "origin": "/tmp/review-r2/dag_28_local",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "dag_28_local",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deadlock",
+      "project": "tests/review/cases/review-r2/deadlock",
+      "origin": "/tmp/review-r2/deadlock",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deadlock",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deep_1000",
+      "project": "tests/review/cases/review-r2/deep_1000",
+      "origin": "/tmp/review-r2/deep_1000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deep_1000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deep_200",
+      "project": "tests/review/cases/review-r2/deep_200",
+      "origin": "/tmp/review-r2/deep_200",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deep_200",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/deep_50",
+      "project": "tests/review/cases/review-r2/deep_50",
+      "origin": "/tmp/review-r2/deep_50",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "deep_50",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/determinism",
+      "project": "tests/review/cases/review-r2/determinism",
+      "origin": "/tmp/review-r2/determinism",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "determinism",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/escaped_task",
+      "project": "tests/review/cases/review-r2/escaped_task",
+      "origin": "/tmp/review-r2/escaped_task",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "escaped_task",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/join_failure",
+      "project": "tests/review/cases/review-r2/join_failure",
+      "origin": "/tmp/review-r2/join_failure",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "join_failure",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/lifetime",
+      "project": "tests/review/cases/review-r2/lifetime",
+      "origin": "/tmp/review-r2/lifetime",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "lifetime",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/local_capture",
+      "project": "tests/review/cases/review-r2/local_capture",
+      "origin": "/tmp/review-r2/local_capture",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "local_capture",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/missing_service",
+      "project": "tests/review/cases/review-r2/missing_service",
+      "origin": "/tmp/review-r2/missing_service",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "missing_service",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/never_yields",
+      "project": "tests/review/cases/review-r2/never_yields",
+      "origin": "/tmp/review-r2/never_yields",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "never_yields",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/nonportable_result",
+      "project": "tests/review/cases/review-r2/nonportable_result",
+      "origin": "/tmp/review-r2/nonportable_result",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "nonportable_result",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/pure_fake",
+      "project": "tests/review/cases/review-r2/pure_fake",
+      "origin": "/tmp/review-r2/pure_fake",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "pure_fake",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/race_tie",
+      "project": "tests/review/cases/review-r2/race_tie",
+      "origin": "/tmp/review-r2/race_tie",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "race_tie",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/request_groups",
+      "project": "tests/review/cases/review-r2/request_groups",
+      "origin": "/tmp/review-r2/request_groups",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "request_groups",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/request_reuse",
+      "project": "tests/review/cases/review-r2/request_reuse",
+      "origin": "/tmp/review-r2/request_reuse",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "request_reuse",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/request_stop",
+      "project": "tests/review/cases/review-r2/request_stop",
+      "origin": "/tmp/review-r2/request_stop",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "request_stop",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_1000",
+      "project": "tests/review/cases/review-r2/senders_1000",
+      "origin": "/tmp/review-r2/senders_1000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_1000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_128",
+      "project": "tests/review/cases/review-r2/senders_128",
+      "origin": "/tmp/review-r2/senders_128",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_128",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_16",
+      "project": "tests/review/cases/review-r2/senders_16",
+      "origin": "/tmp/review-r2/senders_16",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_16",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_256",
+      "project": "tests/review/cases/review-r2/senders_256",
+      "origin": "/tmp/review-r2/senders_256",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_256",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_32",
+      "project": "tests/review/cases/review-r2/senders_32",
+      "origin": "/tmp/review-r2/senders_32",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_32",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/senders_64",
+      "project": "tests/review/cases/review-r2/senders_64",
+      "origin": "/tmp/review-r2/senders_64",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "senders_64",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/shield_nested",
+      "project": "tests/review/cases/review-r2/shield_nested",
+      "origin": "/tmp/review-r2/shield_nested",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "shield_nested",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/tasks_1000",
+      "project": "tests/review/cases/review-r2/tasks_1000",
+      "origin": "/tmp/review-r2/tasks_1000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "tasks_1000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/tasks_5000",
+      "project": "tests/review/cases/review-r2/tasks_5000",
+      "origin": "/tmp/review-r2/tasks_5000",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "tasks_5000",
+      "files": [
+        "src/main.i"
+      ]
+    },
+    {
+      "id": "review-r2/wait_any_unlisted",
+      "project": "tests/review/cases/review-r2/wait_any_unlisted",
+      "origin": "/tmp/review-r2/wait_any_unlisted",
+      "context": null,
+      "source": "docs/spec.md §§9.5, 9.9, 9.11; runtime.md §§5–6; independent review-r2/criteria.md",
+      "finding": "wait_any_unlisted",
       "files": [
         "src/main.i"
       ]

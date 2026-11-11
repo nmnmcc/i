@@ -253,6 +253,9 @@ def observe_in(binary, case, bound, runtime):
         project = materialize(case, runtime)
     check, elapsed = invoke(binary, project, ['check', '--types'], bound)
     result = {'check': check}
+    if check['exit'] == 1 and case.get('run_rejected'):
+        for opt in [0, 2]:
+            result['run' + str(opt)], _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
     if check['exit'] == 0:
         text = '\n'.join((project / f).read_text() for f in case['files'])
         has_main = bool(re.search(r'(?m)^\s*@main\b', text))
@@ -277,6 +280,14 @@ def observe_in(binary, case, bound, runtime):
 
 def select(args):
     cases = json.loads((CORPUS / 'manifest.json').read_text())['cases']
+    if getattr(args, 'case_list', None):
+        names = json.loads(args.case_list.read_text())
+        if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
+            raise SystemExit('case-list must be a nonempty JSON list of case IDs')
+        missing = set(names) - {c['id'] for c in cases}
+        if missing:
+            raise SystemExit('unknown cases: ' + ', '.join(sorted(missing)))
+        cases = [c for c in cases if c['id'] in names]
     cases = [c for c in cases if args.filter in c['id']]
     if not cases:
         raise SystemExit('no cases selected')
@@ -313,17 +324,20 @@ def run_corpus(args):
                 return False
         return True
     def observe_case(case):
+        if any(r.get('phase') == 'entry' and re.search(r['pattern'], case['id'])
+               for r in requirements['requirements']):
+            case = dict(case, run_rejected=True)
         bound = args.timeout
         saved = ROOT / case['project'] / 'expected.json'
-        if not update and saved.exists():
+        if (not update or args.keep_bounds) and saved.exists():
             bound = json.loads(saved.read_text()).get('bound_seconds', 3)
-        return case, observe(args.binary, case, bound)[0]
+        return case, observe(args.binary, case, bound)[0], bound
     pool = ThreadPoolExecutor(max_workers=args.jobs)
-    for n, (case, result) in enumerate(pool.map(observe_case, cases)):
+    for n, (case, result, bound) in enumerate(pool.map(observe_case, cases)):
         applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
         expected_path = ROOT / case['project'] / 'expected.json'
         if update:
-            dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': args.timeout, 'outcome': result})
+            dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': bound, 'outcome': result})
         elif not expected_path.exists():
             failures.append(case['id'] + ': missing expected.json')
         else:
@@ -351,12 +365,19 @@ def run_corpus(args):
             if wanted == 'reject':
                 met = check['exit'] == 1 and 'error[' in check['stderr'] and 'panicked at' not in check['stderr']
                 if requirement.get('phase') == 'entry':
-                    entry_checks = [check] if check['exit'] != 0 else [result['run0'], result['run2']] if 'run0' in result else [result['test0'], result['test2']]
+                    entry_checks = [check, *[result[k] for k in ['run0', 'run2'] if k in result]] if check['exit'] != 0 else [result['run0'], result['run2']] if 'run0' in result else [result['test0'], result['test2']]
                     met = all(v['exit'] == 1 and ('error[' in v['stderr'] or 'provider:' in v['stderr'])
                               and 'E0505' not in v['stderr'] and 'trap:' not in v['stderr']
                               for v in entry_checks)
             elif wanted == 'accept':
                 met = check['exit'] == 0 and all(value['exit'] == 0 for value in result.values())
+            elif wanted == 'diverge':
+                met = check['exit'] == 0 and all(
+                    result[phase]['exit'] == 0 for phase in ('test0', 'test2')
+                ) and all(
+                    result[phase]['exit'] == 'timeout' and not result[phase]['stdout']
+                    for phase in ('run0', 'run2')
+                )
             else:
                 met = False
             if requirement.get('diagnostic_codes'):
@@ -365,6 +386,9 @@ def run_corpus(args):
                 met = met and bool(actual_codes.intersection(requirement['diagnostic_codes'])) and 'E0505' not in actual_codes
             for fragment in requirement.get('types_contain', []):
                 met = met and fragment in check['stdout']
+            if 'run_stdout' in requirement:
+                met = met and all(phase in result and result[phase]['stdout'] == requirement['run_stdout']
+                                  for phase in ['run0', 'run2'])
             if requirement.get('known_failure'):
                 summary['completed-resource-case' if met and requirement.get('censored') else 'XPASS' if met else 'XFAIL'] += 1
                 if met and not update and not requirement.get('censored'):
@@ -645,10 +669,15 @@ def main():
     run = sub.add_parser('run')
     run.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
     run.add_argument('--filter', default='')
+    run.add_argument('--case-list', type=Path)
     run.add_argument('--timeout', type=float, default=10)
     run.add_argument('--missing-only', action='store_true')
+    run.add_argument('--keep-bounds', action='store_true', help='retain each saved observation budget during UPDATE=1')
     run.add_argument('--jobs', type=int, default=1)
     sub.add_parser('parse-register')
+    migration = sub.add_parser('migrate-k4')
+    migration.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
+    sub.add_parser('audit-k4')
     reporting = sub.add_parser('report')
     reporting.add_argument('--verification-log', type=Path)
     snap = sub.add_parser('snapshot')
@@ -661,7 +690,13 @@ def main():
     salvage = sub.add_parser('snapshot-tools')
     salvage.add_argument('--source', default='/tmp')
     args = parser.parse_args()
-    if args.mode == 'import':
+    if args.mode == 'audit-k4':
+        from k4_audit import audit
+        audit()
+    elif args.mode == 'migrate-k4':
+        from k4_migrate import migrate
+        migrate(args.binary)
+    elif args.mode == 'import':
         import_reviews(args)
         snapshot_tools(args)
     elif args.mode == 'run':

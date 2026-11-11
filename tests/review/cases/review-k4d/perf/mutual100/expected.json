@@ -1,17 +1,37 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": "timeout",
-      "stdout": "",
-      "stderr": ""
+      "exit": 0,
+      "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.m0 : (k: Int) -> Int ! N | S(N)\napp/main.m1 : (k: Int) -> Int ! N | S(N)\napp/main.m2 : (k: Int) -> Int ! N | S(N)\napp/main.m3 : (k: Int) -> Int ! N | S(N)\napp/main.m4 : (k: Int) -> Int ! N | S(N)\napp/main.m5 : (k: Int) -> Int ! N | S(N)\napp/main.m6 : (k: Int) -> Int ! N | S(N)\napp/main.m7 : (k: Int) -> Int ! N | S(N)\napp/main.m8 : (k: Int) -> Int ! N | S(N)\napp/main.m9 : (k: Int) -> Int ! N | S(N)\napp/main.m10 : (k: Int) -> Int ! N | S(N)\napp/main.m11 : (k: Int) -> Int ! N | S(N)\napp/main.m12 : (k: Int) -> Int ! N | S(N)\napp/main.m13 : (k: Int) -> Int ! N | S(N)\napp/main.m14 : (k: Int) -> Int ! N | S(N)\napp/main.m15 : (k: Int) -> Int ! N | S(N)\napp/main.m16 : (k: Int) -> Int ! N | S(N)\napp/main.m17 : (k: Int) -> Int ! N | S(N)\napp/main.m18 : (k: Int) -> Int ! N | S(N)\napp/main.m19 : (k: Int) -> Int ! N | S(N)\napp/main.m20 : (k: Int) -> Int ! N | S(N)\napp/main.m21 : (k: Int) -> Int ! N | S(N)\napp/main.m22 : (k: Int) -> Int ! N | S(N)\napp/main.m23 : (k: Int) -> Int ! N | S(N)\napp/main.m24 : (k: Int) -> Int ! N | S(N)\napp/main.m25 : (k: Int) -> Int ! N | S(N)\napp/main.m26 : (k: Int) -> Int ! N | S(N)\napp/main.m27 : (k: Int) -> Int ! N | S(N)\napp/main.m28 : (k: Int) -> Int ! N | S(N)\napp/main.m29 : (k: Int) -> Int ! N | S(N)\napp/main.m30 : (k: Int) -> Int ! N | S(N)\napp/main.m31 : (k: Int) -> Int ! N | S(N)\napp/main.m32 : (k: Int) -> Int ! N | S(N)\napp/main.m33 : (k: Int) -> Int ! N | S(N)\napp/main.m34 : (k: Int) -> Int ! N | S(N)\napp/main.m35 : (k: Int) -> Int ! N | S(N)\napp/main.m36 : (k: Int) -> Int ! N | S(N)\napp/main.m37 : (k: Int) -> Int ! N | S(N)\napp/main.m38 : (k: Int) -> Int ! N | S(N)\napp/main.m39 : (k: Int) -> Int ! N | S(N)\napp/main.m40 : (k: Int) -> Int ! N | S(N)\napp/main.m41 : (k: Int) -> Int ! N | S(N)\napp/main.m42 : (k: Int) -> Int ! N | S(N)\napp/main.m43 : (k: Int) -> Int ! N | S(N)\napp/main.m44 : (k: Int) -> Int ! N | S(N)\napp/main.m45 : (k: Int) -> Int ! N | S(N)\napp/main.m46 : (k: Int) -> Int ! N | S(N)\napp/main.m47 : (k: Int) -> Int ! N | S(N)\napp/main.m48 : (k: Int) -> Int ! N | S(N)\napp/main.m49 : (k: Int) -> Int ! N | S(N)\napp/main.m50 : (k: Int) -> Int ! N | S(N)\napp/main.m51 : (k: Int) -> Int ! N | S(N)\napp/main.m52 : (k: Int) -> Int ! N | S(N)\napp/main.m53 : (k: Int) -> Int ! N | S(N)\napp/main.m54 : (k: Int) -> Int ! N | S(N)\napp/main.m55 : (k: Int) -> Int ! N | S(N)\napp/main.m56 : (k: Int) -> Int ! N | S(N)\napp/main.m57 : (k: Int) -> Int ! N | S(N)\napp/main.m58 : (k: Int) -> Int ! N | S(N)\napp/main.m59 : (k: Int) -> Int ! N | S(N)\napp/main.m60 : (k: Int) -> Int ! N | S(N)\napp/main.m61 : (k: Int) -> Int ! N | S(N)\napp/main.m62 : (k: Int) -> Int ! N | S(N)\napp/main.m63 : (k: Int) -> Int ! N | S(N)\napp/main.m64 : (k: Int) -> Int ! N | S(N)\napp/main.m65 : (k: Int) -> Int ! N | S(N)\napp/main.m66 : (k: Int) -> Int ! N | S(N)\napp/main.m67 : (k: Int) -> Int ! N | S(N)\napp/main.m68 : (k: Int) -> Int ! N | S(N)\napp/main.m69 : (k: Int) -> Int ! N | S(N)\napp/main.m70 : (k: Int) -> Int ! N | S(N)\napp/main.m71 : (k: Int) -> Int ! N | S(N)\napp/main.m72 : (k: Int) -> Int ! N | S(N)\napp/main.m73 : (k: Int) -> Int ! N | S(N)\napp/main.m74 : (k: Int) -> Int ! N | S(N)\napp/main.m75 : (k: Int) -> Int ! N | S(N)\napp/main.m76 : (k: Int) -> Int ! N | S(N)\napp/main.m77 : (k: Int) -> Int ! N | S(N)\napp/main.m78 : (k: Int) -> Int ! N | S(N)\napp/main.m79 : (k: Int) -> Int ! N | S(N)\napp/main.m80 : (k: Int) -> Int ! N | S(N)\napp/main.m81 : (k: Int) -> Int ! N | S(N)\napp/main.m82 : (k: Int) -> Int ! N | S(N)\napp/main.m83 : (k: Int) -> Int ! N | S(N)\napp/main.m84 : (k: Int) -> Int ! N | S(N)\napp/main.m85 : (k: Int) -> Int ! N | S(N)\napp/main.m86 : (k: Int) -> Int ! N | S(N)\napp/main.m87 : (k: Int) -> Int ! N | S(N)\napp/main.m88 : (k: Int) -> Int ! N | S(N)\napp/main.m89 : (k: Int) -> Int ! N | S(N)\napp/main.m90 : (k: Int) -> Int ! N | S(N)\napp/main.m91 : (k: Int) -> Int ! N | S(N)\napp/main.m92 : (k: Int) -> Int ! N | S(N)\napp/main.m93 : (k: Int) -> Int ! N | S(N)\napp/main.m94 : (k: Int) -> Int ! N | S(N)\napp/main.m95 : (k: Int) -> Int ! N | S(N)\napp/main.m96 : (k: Int) -> Int ! N | S(N)\napp/main.m97 : (k: Int) -> Int ! N | S(N)\napp/main.m98 : (k: Int) -> Int ! N | S(N)\napp/main.m99 : (k: Int) -> Int ! N | S(N)\n",
+      "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     }
   }
 }

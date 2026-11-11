@@ -1,17 +1,37 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "app/main.marker : Nil\napp/cases.get : () -> Int ! Dep\napp/cases.use : (x: A) -> A ? E ! N | S(A, E, N)\napp/cases.run : (body: () -> A ? E ! N) -> A ? E ! N\n",
-      "stderr": "test/cases.i:7:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:8:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:15:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:21:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:26:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:31:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:36:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:44:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:45:2: error[E0505]: this type has itself inside it, through a type variable (§4.7)\ntest/cases.i:46:2: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n10 errors\n"
+      "exit": 0,
+      "stdout": "app/main.marker : Nil\napp/cases.get : () -> Int ! Dep\napp/cases.use : (x: A) -> A ? E ! N | S(A, E, N)\napp/cases.run : (body: () -> A ? E ! N) -> A ? E ! N\napp/cases.forward : (x: A & B) -> B ? E ! N | S(A & B, E, N)\napp/cases.left : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.right : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.integer : () -> Nil\napp/cases.string : () -> Nil\napp/cases.error : () -> Nil\napp/cases.mutual : () -> Nil\napp/cases.make : (x: Int) -> () -> Int\napp/cases.installed_in_closure : () -> Nil\n",
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/cases.integer\npass app/cases.string\npass app/cases.error\npass app/cases.mutual\npass app/cases.installed_in_closure\npass app/qa_corpus_runtime_test.qa_startup\n6 passed, 0 failed\n",
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/cases.integer\npass app/cases.string\npass app/cases.error\npass app/cases.mutual\npass app/cases.installed_in_closure\npass app/qa_corpus_runtime_test.qa_startup\n6 passed, 0 failed\n",
+      "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     }
   }
 }

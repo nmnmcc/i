@@ -97,6 +97,8 @@ pub struct HostFn {
     pub result: crate::types::HostType,
     /// The members of the errors, in the canonical order of B.2.
     pub errors: Vec<crate::types::HostType>,
+    /// Preserve Result(A, Never) as distinct from a plain answer.
+    pub request_result: bool,
 }
 
 impl Program {
@@ -194,6 +196,7 @@ pub struct TypeDef {
 pub struct Host {
     pub namespace: String,
     pub is_async: bool,
+    pub is_request: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -226,12 +229,17 @@ pub enum BuiltinType {
     BitArray,
     UtfCodepoint,
     Never,
+    Record,
     Boundary,
     Continuation,
+    Key,
+    Keyed,
+    Request,
+    Ticket,
 }
 
 impl BuiltinType {
-    pub const ALL: [BuiltinType; 9] = [
+    pub const ALL: [BuiltinType; 14] = [
         BuiltinType::Int,
         BuiltinType::Float,
         BuiltinType::String,
@@ -239,8 +247,13 @@ impl BuiltinType {
         BuiltinType::BitArray,
         BuiltinType::UtfCodepoint,
         BuiltinType::Never,
+        BuiltinType::Record,
         BuiltinType::Boundary,
         BuiltinType::Continuation,
+        BuiltinType::Key,
+        BuiltinType::Keyed,
+        BuiltinType::Request,
+        BuiltinType::Ticket,
     ];
 
     pub fn name(self) -> &'static str {
@@ -252,15 +265,20 @@ impl BuiltinType {
             BuiltinType::BitArray => "BitArray",
             BuiltinType::UtfCodepoint => "UtfCodepoint",
             BuiltinType::Never => "Never",
+            BuiltinType::Record => "Record",
             BuiltinType::Boundary => "Boundary",
             BuiltinType::Continuation => "Continuation",
+            BuiltinType::Key => "Key",
+            BuiltinType::Keyed => "Keyed",
+            BuiltinType::Request => "Request",
+            BuiltinType::Ticket => "Ticket",
         }
     }
 
     /// The number of type parameters (§4.2, §4.5 rule 7).
     pub fn arity(self) -> usize {
         match self {
-            BuiltinType::List => 1,
+            BuiltinType::List | BuiltinType::Key | BuiltinType::Request => 1,
             BuiltinType::Boundary => 3,
             BuiltinType::Continuation => 4,
             _ => 0,
@@ -281,6 +299,19 @@ pub struct Type {
 }
 
 #[derive(Clone, Debug)]
+pub struct RecordLabel {
+    pub ident: Ident,
+    pub parameter: Option<TyVarId>,
+}
+
+impl std::ops::Deref for RecordLabel {
+    type Target = Ident;
+    fn deref(&self) -> &Ident {
+        &self.ident
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum TypeKind {
     Lit(crate::types::LitValue),
     Of {
@@ -298,6 +329,11 @@ pub enum TypeKind {
     /// `_`.
     Hole,
     Tuple(Vec<Type>),
+    Record {
+        base: Option<Box<Type>>,
+        fields: Vec<(RecordLabel, Type)>,
+        removed: Vec<RecordLabel>,
+    },
     Fn {
         params: Vec<FnParamType>,
         ret: Box<Type>,
@@ -381,6 +417,10 @@ pub enum ExprKind {
     String(String),
     Name(ValueRef),
     Tuple(Vec<Expr>),
+    Record {
+        base: Option<Box<Expr>>,
+        fields: Vec<(Ident, Expr)>,
+    },
     List {
         items: Vec<Expr>,
         rest: Option<Box<Expr>>,
@@ -600,6 +640,14 @@ pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
                 walk_type(t, f);
             }
         }
+        TypeKind::Record { base, fields, .. } => {
+            if let Some(base) = base {
+                walk_type(base, f);
+            }
+            for (_, field) in fields {
+                walk_type(field, f);
+            }
+        }
         TypeKind::Fn {
             params,
             ret,
@@ -808,6 +856,14 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
             ExprKind::Tuple(ts) => {
                 for e in ts {
                     expr(e, f);
+                }
+            }
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    expr(base, f);
+                }
+                for (_, value) in fields {
+                    expr(value, f);
                 }
             }
             ExprKind::List { items, rest } => {

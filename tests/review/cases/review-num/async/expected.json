@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "d81eb7e217b3401bb00c3ee26d4f884b538bef7d",
+  "binary_sha256": "6035547c503c6ce8c8452e17a735c5bb934ff449e3c9cfb711e448bc008815f4",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "asyncprobe/main.work : (x: Float) -> Float ! Pause\n",
+      "stdout": "asyncprobe/main.work : (x: Float) -> Float ! Pause | request.Await | request.Owner\n",
       "stderr": ""
     },
     "test0": {

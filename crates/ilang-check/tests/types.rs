@@ -233,7 +233,12 @@ fn scheme_types_know_each_type_by_what_it_is() {
     let (graph, diags) = ilang_package::load(&tmp.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");
     let checked = ilang_check::check(&graph);
-    assert!(checked.diags.is_empty(), "{:?}", checked.diags);
+    assert_eq!(checked.diags.len(), 1, "{:?}", checked.diags);
+    assert_eq!(checked.diags[0].code, ilang_check::code::UNUSED_BINDING);
+    assert_eq!(
+        checked.diags[0].message,
+        "top-level binding `hidden` is not used"
+    );
     let (program, types) = (checked.program.unwrap(), checked.types.unwrap());
     let main = program
         .modules

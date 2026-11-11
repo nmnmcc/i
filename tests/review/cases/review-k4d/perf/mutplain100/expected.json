@@ -1,8 +1,8 @@
 {
-  "compiler": "e1e32d6635c773c0a914f69e91afa4c909e19565",
-  "binary_sha256": "7b99465c4826e92daf01617e9493e8c495518dac239f4df903fa3e4562de02d3",
+  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
+  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 3.0,
+  "bound_seconds": 10.0,
   "outcome": {
     "check": {
       "command": [
@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.m0 : (k: Int) -> 1\napp/main.m1 : (k: Int) -> 1\napp/main.m2 : (k: Int) -> 1\napp/main.m3 : (k: Int) -> 1\napp/main.m4 : (k: Int) -> 1\napp/main.m5 : (k: Int) -> 1\napp/main.m6 : (k: Int) -> 1\napp/main.m7 : (k: Int) -> 1\napp/main.m8 : (k: Int) -> 1\napp/main.m9 : (k: Int) -> 1\napp/main.m10 : (k: Int) -> 1\napp/main.m11 : (k: Int) -> 1\napp/main.m12 : (k: Int) -> 1\napp/main.m13 : (k: Int) -> 1\napp/main.m14 : (k: Int) -> 1\napp/main.m15 : (k: Int) -> 1\napp/main.m16 : (k: Int) -> 1\napp/main.m17 : (k: Int) -> 1\napp/main.m18 : (k: Int) -> 1\napp/main.m19 : (k: Int) -> 1\napp/main.m20 : (k: Int) -> 1\napp/main.m21 : (k: Int) -> 1\napp/main.m22 : (k: Int) -> 1\napp/main.m23 : (k: Int) -> 1\napp/main.m24 : (k: Int) -> 1\napp/main.m25 : (k: Int) -> 1\napp/main.m26 : (k: Int) -> 1\napp/main.m27 : (k: Int) -> 1\napp/main.m28 : (k: Int) -> 1\napp/main.m29 : (k: Int) -> 1\napp/main.m30 : (k: Int) -> 1\napp/main.m31 : (k: Int) -> 1\napp/main.m32 : (k: Int) -> 1\napp/main.m33 : (k: Int) -> 1\napp/main.m34 : (k: Int) -> 1\napp/main.m35 : (k: Int) -> 1\napp/main.m36 : (k: Int) -> 1\napp/main.m37 : (k: Int) -> 1\napp/main.m38 : (k: Int) -> 1\napp/main.m39 : (k: Int) -> 1\napp/main.m40 : (k: Int) -> 1\napp/main.m41 : (k: Int) -> 1\napp/main.m42 : (k: Int) -> 1\napp/main.m43 : (k: Int) -> 1\napp/main.m44 : (k: Int) -> 1\napp/main.m45 : (k: Int) -> 1\napp/main.m46 : (k: Int) -> 1\napp/main.m47 : (k: Int) -> 1\napp/main.m48 : (k: Int) -> 1\napp/main.m49 : (k: Int) -> 1\napp/main.m50 : (k: Int) -> 1\napp/main.m51 : (k: Int) -> 1\napp/main.m52 : (k: Int) -> 1\napp/main.m53 : (k: Int) -> 1\napp/main.m54 : (k: Int) -> 1\napp/main.m55 : (k: Int) -> 1\napp/main.m56 : (k: Int) -> 1\napp/main.m57 : (k: Int) -> 1\napp/main.m58 : (k: Int) -> 1\napp/main.m59 : (k: Int) -> 1\napp/main.m60 : (k: Int) -> 1\napp/main.m61 : (k: Int) -> 1\napp/main.m62 : (k: Int) -> 1\napp/main.m63 : (k: Int) -> 1\napp/main.m64 : (k: Int) -> 1\napp/main.m65 : (k: Int) -> 1\napp/main.m66 : (k: Int) -> 1\napp/main.m67 : (k: Int) -> 1\napp/main.m68 : (k: Int) -> 1\napp/main.m69 : (k: Int) -> 1\napp/main.m70 : (k: Int) -> 1\napp/main.m71 : (k: Int) -> 1\napp/main.m72 : (k: Int) -> 1\napp/main.m73 : (k: Int) -> 1\napp/main.m74 : (k: Int) -> 1\napp/main.m75 : (k: Int) -> 1\napp/main.m76 : (k: Int) -> 1\napp/main.m77 : (k: Int) -> 1\napp/main.m78 : (k: Int) -> 1\napp/main.m79 : (k: Int) -> 1\napp/main.m80 : (k: Int) -> 1\napp/main.m81 : (k: Int) -> 1\napp/main.m82 : (k: Int) -> 1\napp/main.m83 : (k: Int) -> 1\napp/main.m84 : (k: Int) -> 1\napp/main.m85 : (k: Int) -> 1\napp/main.m86 : (k: Int) -> 1\napp/main.m87 : (k: Int) -> 1\napp/main.m88 : (k: Int) -> 1\napp/main.m89 : (k: Int) -> 1\napp/main.m90 : (k: Int) -> 1\napp/main.m91 : (k: Int) -> 1\napp/main.m92 : (k: Int) -> 1\napp/main.m93 : (k: Int) -> 1\napp/main.m94 : (k: Int) -> 1\napp/main.m95 : (k: Int) -> 1\napp/main.m96 : (k: Int) -> 1\napp/main.m97 : (k: Int) -> 1\napp/main.m98 : (k: Int) -> 1\napp/main.m99 : (k: Int) -> 1\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": ""
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     }
   }
 }

@@ -19,3 +19,17 @@ holes : (x: A) -> Bool
 30:9: warning[W0503]: the two sides have the known types `(1, 2)` and `(1, 2, 3)`, which can never be equal, so `==` is always `False` (§6.9)
 35:32: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 38:15: warning[W0503]: the two sides have the known types `(_, 1)` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
+6:1: warning[W0504]: top-level binding `literals` is not used
+8:1: warning[W0504]: top-level binding `typed` is not used
+11:1: warning[W0504]: top-level binding `with_nil` is not used
+13:1: warning[W0504]: top-level binding `lists` is not used
+15:1: warning[W0504]: top-level binding `type_var` is not used
+17:1: warning[W0504]: top-level binding `type_var_literal` is not used
+19:1: warning[W0504]: top-level binding `untyped` is not used
+22:1: warning[W0504]: top-level binding `not_equal` is not used
+25:1: warning[W0504]: top-level binding `shared` is not used
+27:1: warning[W0504]: top-level binding `apart` is not used
+30:1: warning[W0504]: top-level binding `sizes` is not used
+32:1: warning[W0504]: top-level binding `same_size` is not used
+35:1: warning[W0504]: top-level binding `function` is not used
+38:1: warning[W0504]: top-level binding `holes` is not used

@@ -7,7 +7,7 @@ use crate::code;
 use crate::hir::*;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) struct Template {
     pub ty: Ty,
     pub params: usize,
@@ -17,6 +17,7 @@ pub(super) struct Template {
 
 fn has_algebra(t: &Ty) -> bool {
     match t {
+        Ty::Graph(_) => true,
         Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
         Ty::Fn(f) => {
@@ -24,6 +25,25 @@ fn has_algebra(t: &Ty) -> bool {
                 || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra)
         }
         Ty::Both(a, b) => has_algebra(a) || has_algebra(b),
+        Ty::Var(_) | Ty::Never | Ty::Top => false,
+    }
+}
+
+fn has_record(t: &Ty) -> bool {
+    match t {
+        Ty::Graph(g) => g.nodes().into_iter().any(|(_, node)| {
+            matches!(
+                node,
+                super::records::Node::Rec(_) | super::records::Node::Without(..)
+            )
+        }),
+        Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
+        Ty::Fn(f) => {
+            f.params.iter().any(|(_, t)| has_record(t))
+                || [&f.ret, &f.err, &f.env].into_iter().any(has_record)
+        }
+        Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),
+        Ty::Both(a, b) => has_record(a) || has_record(b),
         Ty::Var(_) | Ty::Never | Ty::Top => false,
     }
 }
@@ -38,6 +58,7 @@ impl Template {
 
 pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
     match t {
+        Ty::Graph(g) => g.map_vars(f),
         Ty::Var(v) => f(*v),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -122,6 +143,12 @@ impl Checker<'_> {
                 slots,
             });
             if let Some(template) = template {
+                if def.exported && has_record(&template.ty) {
+                    self.out.alias_artifacts.insert(
+                        id,
+                        super::scheme_wire::AliasArtifact::new(template.clone(), &self.s, id),
+                    );
+                }
                 if self
                     .p
                     .value_aliases
@@ -196,6 +223,34 @@ impl Checker<'_> {
                 }
             }
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(&mut go).collect::<Option<_>>()?),
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let pool = super::records::Pool::default();
+                let mut labels = Vec::new();
+                let mut resolved = Vec::new();
+                for (name, ty) in fields {
+                    let label = super::records::written_label(name, self.s.level);
+                    labels.push(label.clone());
+                    resolved.push((label, go(ty)?));
+                }
+                labels.extend(
+                    removed
+                        .iter()
+                        .map(|name| super::records::written_label(name, self.s.level)),
+                );
+                let record = pool.record(resolved);
+                match base {
+                    Some(base) => {
+                        let base = go(base)?;
+                        let rest = pool.without(&base, labels);
+                        pool.inter(&[rest, record])
+                    }
+                    None => record,
+                }
+            }
             TypeKind::Union(ts) => Ty::Union(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Inter(ts) => Ty::Inter(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Diff(ts) => {
@@ -220,7 +275,18 @@ impl Checker<'_> {
         })
     }
 
-    pub(super) fn instantiate_alias(&mut self, id: TypeId, args: Vec<Ty>) -> Ty {
+    pub(super) fn instantiate_alias(
+        &mut self,
+        id: TypeId,
+        args: Vec<Ty>,
+        mode: super::solve::Mode,
+    ) -> Ty {
+        for (arg, mode) in args.iter().zip(
+            self.s
+                .rows(super::Head::Named(TypeRef::Custom(id)), args.len()),
+        ) {
+            self.s.mark_mode(arg, mode);
+        }
         let Some(template) = self.reads.templates.get(&id) else {
             if !self.recovery && !self.reads.aliases.contains_key(&id) {
                 panic!("pending alias {id:?}");
@@ -232,8 +298,9 @@ impl Checker<'_> {
         // With no operators in either the template or its arguments,
         // normalization would only copy constructors and variables unchanged.
         if has_algebra {
-            normalize(&mut self.s, ty)
+            self.s.normalize_mode(ty, mode)
         } else {
+            self.s.mark_mode(&ty, mode);
             ty
         }
     }
@@ -251,6 +318,7 @@ impl Checker<'_> {
     fn normalize_known_alias(&self, t: Ty) -> Ty {
         let go = |t| self.normalize_known_alias(t);
         match t {
+            Ty::Graph(_) => t,
             Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
@@ -277,29 +345,5 @@ impl Checker<'_> {
 }
 
 pub(super) fn normalize(s: &mut super::solve::Solver, t: Ty) -> Ty {
-    let mut go = |t| normalize(s, t);
-    match t {
-        Ty::Union(ts) => {
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.union(ts)
-        }
-        Ty::Inter(ts) => {
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.inter(ts)
-        }
-        Ty::Diff(t, ts) => {
-            let t = go(*t);
-            let ts = ts.into_iter().map(&mut go).collect();
-            s.diff(t, ts)
-        }
-        Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(&mut go).collect()),
-        Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
-            params: g.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
-            ret: go(g.ret),
-            err: go(g.err),
-            env: go(g.env),
-        })),
-        Ty::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
-        Ty::Var(_) | Ty::Top | Ty::Never => t,
-    }
+    s.normalize_mode(t, super::solve::Mode::Value)
 }

@@ -13,3 +13,14 @@ literal : (v: Int | String) -> String | Int - 1
 partial : (v: Result(Int, String) | Nil) -> Nil | Result(Int, String)
 by_patterns : (p: (Bool, Int | String)) -> String | Int
 open : (v: A) -> 0 | A - Int
+41:1: warning[W0504]: top-level binding `safe` is not used
+52:1: warning[W0504]: top-level binding `rest` is not used
+61:1: warning[W0504]: top-level binding `whole` is not used
+70:1: warning[W0504]: top-level binding `nested` is not used
+79:1: warning[W0504]: top-level binding `pairs` is not used
+90:1: warning[W0504]: top-level binding `deep` is not used
+101:1: warning[W0504]: top-level binding `guarded` is not used
+108:1: warning[W0504]: top-level binding `literal` is not used
+115:1: warning[W0504]: top-level binding `partial` is not used
+126:1: warning[W0504]: top-level binding `by_patterns` is not used
+135:1: warning[W0504]: top-level binding `open` is not used

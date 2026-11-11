@@ -79,6 +79,135 @@ fn front_end_project(source: &str) -> tempfile::TempDir {
 }
 
 #[test]
+fn a_local_annotation_cannot_hide_an_entry_service() {
+    // §4.8 retains the service through the local binding; §10.2 requires
+    // a provider before entry. Both annotations have the same finite type.
+    let annotated = "S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) { S(f) = s f() }
+@main
+main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+    for source in [
+        annotated.to_string(),
+        annotated.replace("local: () -> Nil ! N | S(N)", "local"),
+    ] {
+        let dir = front_end_project(&source);
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["check", "--types", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&out.stderr).contains("error[E0522]"));
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains("app/main.main : () -> Nil ! N | S(N)")
+        );
+        for opt in ["0", "2"] {
+            let out = Command::new(env!("CARGO_BIN_EXE_i"))
+                .args(["run", "--opt", opt, "--project"])
+                .arg(dir.path())
+                .output()
+                .unwrap();
+            let err = String::from_utf8_lossy(&out.stderr);
+            assert_eq!(out.status.code(), Some(1), "{err}");
+            assert!(
+                err.contains("error[E0522]") && !err.contains("trap"),
+                "{err}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_captured_service_row_keeps_callback_dependencies() {
+    // §4.5 rule 4 keeps S's argument equal across levels; §4.8 rule 9
+    // removes the supplied S(Dependency), leaving Dependency itself.
+    let source = "S(N) { S(() -> Nil ! N) }
+Dependency { Dependency }
+read = (d ! Dependency) { Nil }
+use(N) = (s ! S(N)) { S(f) = s f() }
+apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+@main
+main = () { ! S(Dependency) = S(() { read() }) apply() }";
+    for supplied in [false, true] {
+        let source = if supplied {
+            source.replace(
+                "! S(Dependency)",
+                "! Dependency = Dependency\n! S(Dependency)",
+            )
+        } else {
+            source.to_string()
+        };
+        let dir = front_end_project(&source);
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["check", "--types", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        let main = if supplied {
+            "app/main.main : () -> Nil\n"
+        } else {
+            "app/main.main : () -> Nil ! Dependency\n"
+        };
+        assert_eq!(
+            out.status.success(),
+            supplied,
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains(main),
+            "{}",
+            String::from_utf8_lossy(&out.stdout)
+        );
+        for opt in ["0", "2"] {
+            let out = Command::new(env!("CARGO_BIN_EXE_i"))
+                .args(["run", "--opt", opt, "--project"])
+                .arg(dir.path())
+                .output()
+                .unwrap();
+            let err = String::from_utf8_lossy(&out.stderr);
+            assert_eq!(out.status.success(), supplied, "{err}");
+            if !supplied {
+                assert!(
+                    err.contains("error[E0522]") && !err.contains("trap"),
+                    "{err}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn lowering_rejects_an_uncoalesced_partial_result() {
+    // §4.7 prohibits recursive types even when a caller of the compiler
+    // API accidentally ignores the checker diagnostics.
+    let dir = front_end_project("bad = (x) { x(x) }\n@main\nmain = () { Nil }");
+    let (graph, _) = ilang_cli::load(dir.path(), false, true);
+    let checked = ilang_check::check(&graph);
+    assert!(checked.diags.iter().any(|d| d.code == "E0505"));
+    assert!(
+        !checked
+            .types
+            .as_ref()
+            .unwrap()
+            .coalescing_errors()
+            .is_empty()
+    );
+    let result = ilang_wasm::compile_wat(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        ilang_wasm::Options {
+            tests: false,
+            target: ilang_wasm::Target::Ilang,
+        },
+    );
+    assert!(
+        matches!(result, Err(ilang_wasm::Error::Diagnostics(ds)) if ds.iter().any(|d| d.code == "E0505"))
+    );
+}
+
+#[test]
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
     // A1 §3.9 / spec §6.12: a top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.

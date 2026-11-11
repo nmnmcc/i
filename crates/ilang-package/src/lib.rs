@@ -27,6 +27,8 @@ pub mod code {
     pub const MANIFEST_SYNTAX: &str = "E0601";
     pub const MANIFEST_NAME: &str = "E0602";
     pub const MANIFEST_SHAPE: &str = "E0603";
+    /// R2 rejects provider plans until the JP implementation lands.
+    pub const PROVIDERS_PENDING: &str = "E0522";
     pub const DEPENDENCY_NAME: &str = "E0604";
     pub const DEPENDENCY_TWICE: &str = "E0605";
     pub const DEPENDENCY_VALUE: &str = "E0606";
