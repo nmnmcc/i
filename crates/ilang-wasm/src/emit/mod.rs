@@ -65,8 +65,20 @@ const DECLARED: &[&str] = &[
 
 /// The WAT text of the whole module.
 pub fn wat(p: &Program) -> String {
+    wat_inner(p, false)
+}
+
+/// WAT for an isolated compiler macro run, including logical accounting.
+pub fn wat_metered(p: &Program) -> (String, crate::budget::StaticCharge) {
+    let raw = wat_inner(p, true);
+    let cost = crate::budget::static_charge(&raw);
+    (crate::budget::instrument(&raw), cost)
+}
+
+fn wat_inner(p: &Program, metered: bool) -> String {
     let mut e = Emitter {
         p,
+        metered,
         arities: BTreeSet::new(),
         ctors: BTreeSet::new(),
         strings: HashMap::new(),
@@ -180,7 +192,10 @@ pub fn wat(p: &Program) -> String {
             );
         }
     }
-    m.push_str(runtime::wat_for_host_references(references));
+    m.push_str(runtime::wat_for_expansion_sites(
+        references,
+        p.site_notes.iter().any(Option::is_some),
+    ));
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
     m.push_str(host::EFFECTS);
@@ -239,6 +254,7 @@ fn closure(arity: u32, f: FuncId, captures: &str) -> String {
 
 struct Emitter<'p> {
     p: &'p Program,
+    metered: bool,
     arities: BTreeSet<u32>,
     /// The constructors without fields that are used, as (constructor id,
     /// type id).
@@ -259,6 +275,9 @@ impl<'p> Emitter<'p> {
             FuncKind::Ctor { ctor, ty, arity } => {
                 let locals = vec![LocalType::Value; *arity as usize + 1];
                 self.header(&name, *arity, &locals);
+                if self.metered {
+                    let _ = writeln!(self.out, "(call $macro_enter (i32.const {}))", arity + 1);
+                }
                 let fields: String = (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
                 let _ = writeln!(
                     self.out,
@@ -270,6 +289,9 @@ impl<'p> Emitter<'p> {
             FuncKind::Runtime { op, arity } => {
                 let locals = vec![LocalType::Value; *arity as usize + 1];
                 self.header(&name, *arity, &locals);
+                if self.metered {
+                    let _ = writeln!(self.out, "(call $macro_enter (i32.const {}))", arity + 1);
+                }
                 let args: Vec<String> = (0..*arity).map(|i| format!("(local.get $l{i})")).collect();
                 let body = self.op(*op, &args, "(local.get $env)");
                 let _ = writeln!(
@@ -303,8 +325,15 @@ impl<'p> Emitter<'p> {
         if f.frame {
             // `$slot` keeps the slot of the frame for the frame records of
             // its points.
-            self.out
-                .push_str(" (local $slot i32)\n(call $shadow_enter_call)\n");
+            self.out.push_str(" (local $slot i32)\n");
+            if self.metered {
+                let _ = writeln!(
+                    self.out,
+                    "(call $macro_enter (i32.const {}))",
+                    f.budget_frame
+                );
+            }
+            self.out.push_str("(call $shadow_enter_call)\n");
         }
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
@@ -319,6 +348,9 @@ impl<'p> Emitter<'p> {
     }
 
     fn stmt(&mut self, out: &mut String, s: &Stmt, frame: bool) {
+        if self.metered {
+            out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
+        }
         match s {
             Stmt::Let { dst, value, site } => {
                 if let Some(site) = site {
@@ -807,6 +839,21 @@ impl<'p> Emitter<'p> {
             names.len(),
             names.join(" ")
         );
+        if self.p.site_notes.iter().any(Option::is_some) {
+            assert_eq!(self.p.site_notes.len(), self.p.sites.len());
+            let notes: Vec<String> = self
+                .p
+                .site_notes
+                .iter()
+                .map(|note| self.string(note.as_deref().unwrap_or("")))
+                .collect();
+            let _ = writeln!(
+                self.out,
+                "(call $site_notes_install (array.new_fixed $values {} {}))",
+                notes.len(),
+                notes.join(" ")
+            );
+        }
         // The root environment: the `Assert` of the runtime (§9.6), and
         // no other service yet.
         let _ = writeln!(
@@ -1117,11 +1164,15 @@ fn int(n: &BigInt) -> String {
 
 /// Appends the `ilang.abi` custom section (B.6).
 pub fn add_abi_section(wasm: &mut Vec<u8>, json: &str) {
-    let name = b"ilang.abi";
+    add_custom_section(wasm, "ilang.abi", json.as_bytes());
+}
+
+pub fn add_custom_section(wasm: &mut Vec<u8>, name: &str, bytes: &[u8]) {
+    let name = name.as_bytes();
     let mut payload = Vec::new();
     leb(&mut payload, name.len() as u64);
     payload.extend_from_slice(name);
-    payload.extend_from_slice(json.as_bytes());
+    payload.extend_from_slice(bytes);
     wasm.push(0);
     leb(wasm, payload.len() as u64);
     wasm.extend_from_slice(&payload);

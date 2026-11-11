@@ -20,13 +20,13 @@ T10 = m.T(_, A)
 
 T11 = List(List(Int))
 
-T12 = (A) -> (B) -> C ? E ! N
+T12 = (A) -> (B) -> C ^ E ! N
 
-T13 = (A) -> { (B) -> C ? E } ! N
+T13 = (A) -> { (B) -> C ^ E } ! N
 
 T14 = { A - B } - C
 
-T15 = (body: () -> A ? E ! N) -> Result(A, E) ! N
+T15 = (body: () -> A ^ E ! N) -> Result(A, E) ! N
 
 T16 = { A | B } | C
 
@@ -51,6 +51,6 @@ Gen(A) {
 }
 
 @external("m", "f")
-f(B): (a: Int, B) -> Int | String ? E ! N
+f(B): (a: Int, B) -> Int | String ^ E ! N
 --- explicit ---
 T1 = A | { B & { C - D - E } }

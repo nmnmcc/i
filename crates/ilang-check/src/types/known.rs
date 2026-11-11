@@ -525,6 +525,7 @@ impl Checker<'_> {
     pub fn member_for(&self, q: &Pattern, b: &Ty) -> Ty {
         let prim = |t| Head::Named(TypeRef::Builtin(t));
         let head = match &q.kind {
+            PatternKind::Quote { syntax, .. } => Head::Named(TypeRef::Custom(*syntax)),
             PatternKind::Var(_) | PatternKind::Discard => return b.clone(),
             PatternKind::Typed { ty, .. } => return self.kconv(ty, &HashMap::new()),
             PatternKind::Named { pattern, .. } => return self.member_for(pattern, b),
@@ -552,6 +553,19 @@ impl Checker<'_> {
     pub fn fit_known(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
         match &q.kind {
+            PatternKind::Quote {
+                syntax, captures, ..
+            } => {
+                let one = Ty::named(TypeRef::Custom(*syntax), Vec::new());
+                for (many, pattern) in captures {
+                    let ty = if *many {
+                        Ty::named(TypeRef::Builtin(BuiltinType::List), vec![one.clone()])
+                    } else {
+                        one.clone()
+                    };
+                    self.fit_known(pattern, &ty, in_case);
+                }
+            }
             PatternKind::Var(x) => self.kbind(x.var, b.clone(), in_case),
             PatternKind::Typed {
                 binder: Some(x),

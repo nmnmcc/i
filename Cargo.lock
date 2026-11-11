@@ -677,6 +677,7 @@ dependencies = [
  "ilang-check",
  "ilang-host",
  "ilang-lsp",
+ "ilang-macro",
  "ilang-package",
  "ilang-syntax",
  "ilang-wasm",
@@ -692,6 +693,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures-util",
+ "ilang-syntax",
  "num-bigint",
  "serde",
  "serde_json",
@@ -709,6 +711,7 @@ dependencies = [
  "anyhow",
  "crossbeam-channel",
  "ilang-check",
+ "ilang-macro",
  "ilang-package",
  "ilang-syntax",
  "lsp-server",
@@ -716,6 +719,18 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "ilang-macro"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ilang-check",
+ "ilang-host",
+ "ilang-package",
+ "ilang-syntax",
+ "ilang-wasm",
 ]
 
 [[package]]
@@ -733,6 +748,7 @@ name = "ilang-syntax"
 version = "0.1.0"
 dependencies = [
  "num-bigint",
+ "serde_json",
  "thiserror",
 ]
 

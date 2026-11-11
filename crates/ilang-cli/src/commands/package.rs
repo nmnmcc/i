@@ -1022,7 +1022,7 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
         );
     }
     let dir = tmp.path().join(prefix);
-    let (graph, mut diags) = ilang_package::load_with(
+    let (mut graph, mut diags) = ilang_package::load_with(
         &dir,
         &LoadOptions {
             tests: false,
@@ -1030,7 +1030,7 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
             ..LoadOptions::from_env()
         },
     );
-    diags.extend(ilang_check::check(&graph).diags);
+    diags.extend(ilang_macro::project::check(&mut graph).diags);
     let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
     if !errors.is_empty()
         && errors.iter().all(|d| {
@@ -1083,7 +1083,7 @@ type Interface = BTreeMap<String, Entry>;
 /// outer error is a problem of the tool; the inner one says that the
 /// package does not check.
 fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
-    let (graph, mut diags) = ilang_package::load_with(
+    let (mut graph, mut diags) = ilang_package::load_with(
         dir,
         &LoadOptions {
             tests: false,
@@ -1094,7 +1094,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
     let Some(root) = graph.root else {
         return Ok(Err(problems(&graph, &diags)));
     };
-    let checked = ilang_check::check(&graph);
+    let checked = ilang_macro::project::check(&mut graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
         return Ok(Err(problems(&graph, &diags)));

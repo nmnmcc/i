@@ -115,6 +115,42 @@ impl Program {
     pub fn binding(&self, b: BindingRef) -> &TopBinding {
         &self.module(b.module).bindings[b.index as usize]
     }
+
+    /// The source location of expanded syntax. Template occurrences retain
+    /// their definition location as well as the outermost written call.
+    pub fn origin(&self, module: ModuleId, span: Span) -> Option<SourceOrigin<'_>> {
+        let m = self.module(module);
+        let scoped = m.scoped.as_ref()?;
+        if !scoped.is_generated(span) {
+            return None;
+        }
+        let origin = scoped
+            .origin(span)
+            .expect("expanded span must have an origin");
+        let syntax = &origin.syntax;
+        let template = syntax.scope().module != m.source.0 || !syntax.scope().marks.is_empty();
+        let primary = if template {
+            origin
+                .call_chain
+                .first()
+                .map_or(&origin.call_site, |call| &call.syntax)
+        } else {
+            syntax
+        };
+        Some(SourceOrigin {
+            source: SourceId(primary.scope().module),
+            span: primary.span(),
+            template: template.then_some((SourceId(syntax.scope().module), syntax.span())),
+            expansion: origin,
+        })
+    }
+}
+
+pub struct SourceOrigin<'a> {
+    pub source: SourceId,
+    pub span: Span,
+    pub template: Option<(SourceId, Span)>,
+    pub expansion: &'a ilang_syntax::lisp::scoped::Origin,
 }
 
 #[derive(Clone, Debug)]
@@ -123,6 +159,8 @@ pub struct Module {
     pub package: PackageId,
     pub source: SourceId,
     pub kind: ModuleKind,
+    /// Mapping from expanded virtual spans to their original syntax and calls.
+    pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// The modules that this module imports.
     pub imports: Vec<ModuleId>,
     /// The name that each import gives to its module (§2.3).
@@ -499,6 +537,15 @@ pub struct Binder {
 
 #[derive(Clone, Debug)]
 pub enum PatternKind {
+    /// A compiler-generated view over a syntax value. The five ordinary
+    /// service functions build the template, match it, test success and
+    /// project one or many captured values, respectively.
+    Quote {
+        template: u32,
+        syntax: TypeId,
+        functions: [DefId; 5],
+        captures: Vec<(bool, Pattern)>,
+    },
     Var(Binder),
     Discard,
     /// `x: T` or `_: T`.
@@ -736,6 +783,7 @@ pub fn summarize_aliases(p: &mut Program) {
 pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
     fn pattern(p: &Pattern, f: &mut impl FnMut(&Type)) {
         match &p.kind {
+            PatternKind::Quote { captures, .. } => captures.iter().for_each(|(_, p)| pattern(p, f)),
             PatternKind::Typed { ty, .. } => f(ty),
             PatternKind::Named { pattern: p, .. } => pattern(p, f),
             PatternKind::Constructor { args, .. }

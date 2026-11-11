@@ -15,31 +15,37 @@ use std::collections::BTreeSet;
 
 /// What a binding uses: `(binding, inside a function body)`.
 fn uses(program: &Program, m: ModuleId, b: &Binding) -> Vec<(u32, bool)> {
+    references(&b.pattern, &b.value)
+        .into_iter()
+        .filter_map(|(d, inside)| {
+            if d.module != m {
+                return None;
+            }
+            match program.def(d).kind {
+                DefKind::Binding { binding, .. } => Some((binding, inside)),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+/// All resolved value references in a binding, including across modules.
+pub fn references(pattern: &Pattern, value: &Expr) -> Vec<(DefId, bool)> {
     let mut out = Vec::new();
-    let mut w = Walker {
-        program,
-        module: m,
-        out: &mut out,
-    };
-    w.pattern(&b.pattern, false);
-    w.expr(&b.value, false);
+    let mut w = Walker { out: &mut out };
+    w.pattern(pattern, false);
+    w.expr(value, false);
     out
 }
 
 struct Walker<'a> {
-    program: &'a Program,
-    module: ModuleId,
-    out: &'a mut Vec<(u32, bool)>,
+    out: &'a mut Vec<(DefId, bool)>,
 }
 
 impl Walker<'_> {
     fn expr(&mut self, e: &Expr, inside: bool) {
         match &e.kind {
-            ExprKind::Name(ValueRef::Def(d)) if d.module == self.module => {
-                if let DefKind::Binding { binding, .. } = self.program.def(*d).kind {
-                    self.out.push((binding, inside));
-                }
-            }
+            ExprKind::Name(ValueRef::Def(d)) => self.out.push((*d, inside)),
             ExprKind::Int(_)
             | ExprKind::Float(_)
             | ExprKind::String(_)
@@ -116,6 +122,14 @@ impl Walker<'_> {
     /// Patterns only use names in bit array lengths.
     fn pattern(&mut self, p: &Pattern, inside: bool) {
         match &p.kind {
+            PatternKind::Quote {
+                functions,
+                captures,
+                ..
+            } => {
+                self.out.extend(functions.iter().map(|f| (*f, inside)));
+                captures.iter().for_each(|(_, p)| self.pattern(p, inside));
+            }
             PatternKind::Named { pattern, .. } => self.pattern(pattern, inside),
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
