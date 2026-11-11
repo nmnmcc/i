@@ -48,7 +48,7 @@ fn checked_expression(d: &Datum) -> Result<String> {
         return Err(bad(d, "a normal-surface expression"));
     };
     binding.value = expected;
-    if crate::shape::canon(&wanted) != crate::shape::canon(&parsed) {
+    if !crate::shape::equivalent(&wanted, &parsed) {
         return Err(bad(d, "a normal-surface expression"));
     }
     Ok(text)

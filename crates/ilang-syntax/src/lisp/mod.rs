@@ -22,7 +22,7 @@ pub mod source_syntax;
 pub mod syntax;
 mod to_ast;
 mod to_source;
-mod trampoline;
+pub(crate) mod trampoline;
 pub use encode::{SourceEncoder, expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
@@ -30,7 +30,7 @@ pub use to_ast::{
 };
 pub use to_source::{normal_source, normal_with_comments};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Datum {
     pub kind: DatumKind,
     pub span: Span,
@@ -54,6 +54,43 @@ pub enum DatumKind {
     Quote(Box<Datum>),
     Unquote(Box<Datum>),
     Splice(Box<Datum>),
+}
+
+// Compare arbitrary-depth syntax without recursing through Rust stack frames.
+impl PartialEq for Datum {
+    fn eq(&self, other: &Self) -> bool {
+        let mut work = vec![(self, other)];
+        while let Some((a, b)) = work.pop() {
+            if a.span != b.span || a.docs != b.docs {
+                return false;
+            }
+            use DatumKind as K;
+            match (&a.kind, &b.kind) {
+                (K::Name(x), K::Name(y))
+                | (K::Discard(x), K::Discard(y))
+                | (K::UpName(x), K::UpName(y))
+                | (K::String(x), K::String(y))
+                | (K::Symbol(x), K::Symbol(y))
+                    if x == y => {}
+                (K::Int(x), K::Int(y)) if x == y => {}
+                (K::Float(x), K::Float(y)) if x == y => {}
+                (K::Round(x), K::Round(y))
+                | (K::Square(x), K::Square(y))
+                | (K::Curly(x), K::Curly(y))
+                | (K::Bits(x), K::Bits(y)) => {
+                    if x.len() != y.len() {
+                        return false;
+                    }
+                    work.extend(x.iter().zip(y));
+                }
+                (K::Quote(x), K::Quote(y))
+                | (K::Unquote(x), K::Unquote(y))
+                | (K::Splice(x), K::Splice(y)) => work.push((x, y)),
+                _ => return false,
+            }
+        }
+        true
+    }
 }
 
 // Datum trees may be supplied by macros and can be much deeper than the host
