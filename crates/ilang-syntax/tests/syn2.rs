@@ -17,11 +17,13 @@ fn binding(source: &str) -> Expr {
 #[test]
 fn match_suffix_binds_above_unary_and_every_binary_level() {
     // M1/M2: suffix is a Case node, and is stronger than unary and multiplication.
-    let ExprKind::Binary { lhs, .. } = binding("answer = n.{ 0 -> 1 _ -> 2 } * 10").kind else {
+    let binary = binding("answer = n.{ 0 -> 1 _ -> 2 } * 10");
+    let ExprKind::Binary { lhs, .. } = &binary.kind else {
         panic!()
     };
     assert!(matches!(lhs.kind, ExprKind::Case { .. }));
-    let ExprKind::Unary { expr, .. } = binding("answer = -n.{ 0 -> 1 _ -> 2 }").kind else {
+    let unary = binding("answer = -n.{ 0 -> 1 _ -> 2 }");
+    let ExprKind::Unary { expr, .. } = &unary.kind else {
         panic!()
     };
     assert!(matches!(expr.kind, ExprKind::Case { .. }));
@@ -37,7 +39,7 @@ fn match_suffix_binds_above_unary_and_every_binary_level() {
 fn bare_pipe_does_not_make_a_clause_head() {
     // Coordinator a / P3: a bar selects clauses only after a complete head.
     let value = binding("answer = { x | f }");
-    let ExprKind::Block(block) = value.kind else {
+    let ExprKind::Block(block) = &value.kind else {
         panic!()
     };
     assert!(matches!(
