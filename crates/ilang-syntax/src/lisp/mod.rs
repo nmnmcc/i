@@ -22,6 +22,7 @@ pub mod source_syntax;
 pub mod syntax;
 mod to_ast;
 mod to_source;
+mod trampoline;
 pub use encode::{expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
@@ -29,7 +30,7 @@ pub use to_ast::{
 };
 pub use to_source::{normal_source, normal_with_comments};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Datum {
     pub kind: DatumKind,
     pub span: Span,
@@ -53,6 +54,111 @@ pub enum DatumKind {
     Quote(Box<Datum>),
     Unquote(Box<Datum>),
     Splice(Box<Datum>),
+}
+
+// Datum trees may be supplied by macros and can be much deeper than the host
+// call stack. Both copying quotes and disposing failed conversions must walk
+// the tree explicitly; a depth limit here would change the language contract.
+impl Clone for Datum {
+    fn clone(&self) -> Self {
+        enum Work<'a> {
+            Visit(&'a Datum),
+            Build(&'a Datum, usize),
+        }
+        let mut work = vec![Work::Visit(self)];
+        let mut values: Vec<Datum> = Vec::new();
+        while let Some(task) = work.pop() {
+            match task {
+                Work::Visit(d) => {
+                    let children: &[Datum] = match &d.kind {
+                        DatumKind::Round(xs)
+                        | DatumKind::Square(xs)
+                        | DatumKind::Curly(xs)
+                        | DatumKind::Bits(xs) => xs,
+                        DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
+                            std::slice::from_ref(x)
+                        }
+                        _ => &[],
+                    };
+                    work.push(Work::Build(d, children.len()));
+                    work.extend(children.iter().rev().map(Work::Visit));
+                }
+                Work::Build(d, n) => {
+                    let children = values.split_off(values.len() - n);
+                    let kind = match &d.kind {
+                        DatumKind::Name(x) => DatumKind::Name(x.clone()),
+                        DatumKind::Discard(x) => DatumKind::Discard(x.clone()),
+                        DatumKind::UpName(x) => DatumKind::UpName(x.clone()),
+                        DatumKind::Int(x) => DatumKind::Int(x.clone()),
+                        DatumKind::Float(x) => DatumKind::Float(*x),
+                        DatumKind::String(x) => DatumKind::String(x.clone()),
+                        DatumKind::Symbol(x) => DatumKind::Symbol(x.clone()),
+                        DatumKind::Round(_) => DatumKind::Round(children),
+                        DatumKind::Square(_) => DatumKind::Square(children),
+                        DatumKind::Curly(_) => DatumKind::Curly(children),
+                        DatumKind::Bits(_) => DatumKind::Bits(children),
+                        DatumKind::Quote(_) => {
+                            DatumKind::Quote(Box::new(children.into_iter().next().unwrap()))
+                        }
+                        DatumKind::Unquote(_) => {
+                            DatumKind::Unquote(Box::new(children.into_iter().next().unwrap()))
+                        }
+                        DatumKind::Splice(_) => {
+                            DatumKind::Splice(Box::new(children.into_iter().next().unwrap()))
+                        }
+                    };
+                    values.push(Datum {
+                        kind,
+                        span: d.span,
+                        docs: d.docs.clone(),
+                    });
+                }
+            }
+        }
+        values.pop().expect("datum clone has a root")
+    }
+}
+impl Drop for Datum {
+    fn drop(&mut self) {
+        if matches!(
+            &self.kind,
+            DatumKind::Name(_)
+                | DatumKind::Discard(_)
+                | DatumKind::UpName(_)
+                | DatumKind::Int(_)
+                | DatumKind::Float(_)
+                | DatumKind::String(_)
+                | DatumKind::Symbol(_)
+        ) {
+            return;
+        }
+        let mut work = vec![std::mem::replace(
+            &mut self.kind,
+            DatumKind::Symbol(String::new()),
+        )];
+        while let Some(kind) = work.pop() {
+            match kind {
+                DatumKind::Round(mut xs)
+                | DatumKind::Square(mut xs)
+                | DatumKind::Curly(mut xs)
+                | DatumKind::Bits(mut xs) => {
+                    for child in &mut xs {
+                        work.push(std::mem::replace(
+                            &mut child.kind,
+                            DatumKind::Symbol(String::new()),
+                        ));
+                    }
+                }
+                DatumKind::Quote(mut x) | DatumKind::Unquote(mut x) | DatumKind::Splice(mut x) => {
+                    work.push(std::mem::replace(
+                        &mut x.kind,
+                        DatumKind::Symbol(String::new()),
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// A file's datums and documentation after its final datum.
@@ -233,26 +339,100 @@ impl Parser<'_> {
 
 /// Print a datum on one line. Whitespace separates tokens that might join.
 pub fn show(datum: &Datum) -> String {
-    use DatumKind::*;
-    match &datum.kind {
-        Name(s) | Discard(s) | UpName(s) | Symbol(s) => s.clone(),
-        Int(n) => n.to_string(),
-        Float(n) => float(*n),
-        String(s) => crate::print::string_literal(s),
-        Round(xs) => bracket("(", ")", xs),
-        Square(xs) => bracket("[", "]", xs),
-        Curly(xs) => bracket("{", "}", xs),
-        Bits(xs) => {
-            if xs.is_empty() {
-                "<<>>".into()
-            } else {
-                bracket("<< ", " >>", xs)
+    show_tree(datum)
+}
+
+enum View<'a, T> {
+    Atom(&'a str),
+    Int(&'a BigUint),
+    Float(f64),
+    String(&'a str),
+    Bracket(&'static str, &'static str, &'a [T]),
+    Prefix(&'static str, &'a T),
+}
+
+trait Printable: Sized {
+    fn view(&self) -> View<'_, Self>;
+}
+
+impl Printable for Datum {
+    fn view(&self) -> View<'_, Self> {
+        use DatumKind::*;
+        match &self.kind {
+            Name(s) | Discard(s) | UpName(s) | Symbol(s) => View::Atom(s),
+            Int(n) => View::Int(n),
+            Float(n) => View::Float(*n),
+            String(s) => View::String(s),
+            Round(xs) => View::Bracket("(", ")", xs),
+            Square(xs) => View::Bracket("[", "]", xs),
+            Curly(xs) => View::Bracket("{", "}", xs),
+            Bits(xs) if xs.is_empty() => View::Bracket("<<", ">>", xs),
+            Bits(xs) => View::Bracket("<< ", " >>", xs),
+            Quote(x) => View::Prefix("`", x),
+            Unquote(x) => View::Prefix("~", x),
+            Splice(x) => View::Prefix("~..", x),
+        }
+    }
+}
+
+impl Printable for syntax::Syntax {
+    fn view(&self) -> View<'_, Self> {
+        use syntax::Node::*;
+        match self.node() {
+            Name(s) | Discard(s) | Up(s) | Symbol(s) => View::Atom(s),
+            Int(n) => View::Int(n),
+            Float(n) => View::Float(*n),
+            Text(s) => View::String(s),
+            Round(xs) => View::Bracket("(", ")", xs),
+            Square(xs) => View::Bracket("[", "]", xs),
+            Curly(xs) => View::Bracket("{", "}", xs),
+            Bits(xs) if xs.is_empty() => View::Bracket("<<", ">>", xs),
+            Bits(xs) => View::Bracket("<< ", " >>", xs),
+            Quote(x) => View::Prefix("`", x),
+            Unquote(x) => View::Prefix("~", x),
+            Splice(x) => View::Prefix("~..", x),
+        }
+    }
+}
+
+fn show_tree<T: Printable>(tree: &T) -> String {
+    use std::fmt::Write;
+    enum Task<'a, T> {
+        Node(&'a T),
+        Text(&'static str),
+    }
+    let mut pending = vec![Task::Node(tree)];
+    let mut out = String::new();
+    while let Some(task) = pending.pop() {
+        let node = match task {
+            Task::Text(s) => {
+                out.push_str(s);
+                continue;
+            }
+            Task::Node(n) => n,
+        };
+        match node.view() {
+            View::Atom(s) => out.push_str(s),
+            View::Int(n) => write!(&mut out, "{n}").expect("writing to a String"),
+            View::Float(n) => out.push_str(&float(n)),
+            View::String(s) => out.push_str(&crate::print::string_literal(s)),
+            View::Prefix(prefix, child) => {
+                out.push_str(prefix);
+                pending.push(Task::Node(child));
+            }
+            View::Bracket(open, close, children) => {
+                out.push_str(open);
+                pending.push(Task::Text(close));
+                for i in (0..children.len()).rev() {
+                    pending.push(Task::Node(&children[i]));
+                    if i != 0 {
+                        pending.push(Task::Text(" "));
+                    }
+                }
             }
         }
-        Quote(x) => format!("`{}", show(x)),
-        Unquote(x) => format!("~{}", show(x)),
-        Splice(x) => format!("~..{}", show(x)),
     }
+    out
 }
 
 fn float(n: f64) -> String {
@@ -261,11 +441,4 @@ fn float(n: f64) -> String {
         Some((mantissa, exponent)) if !mantissa.contains('.') => format!("{mantissa}.0e{exponent}"),
         _ => s,
     }
-}
-
-fn bracket(open: &str, close: &str, xs: &[Datum]) -> String {
-    format!(
-        "{open}{}{close}",
-        xs.iter().map(show).collect::<Vec<_>>().join(" ")
-    )
 }

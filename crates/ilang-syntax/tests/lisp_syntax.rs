@@ -938,6 +938,7 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
     let Node::Round(head) = core[0].node() else {
         panic!("head")
     };
+    assert_eq!(core[0].definition_head(), Some(90));
     assert!(matches!(
         head[1].scope_identity(),
         Some(ScopeIdentity::DefinitionParameter { answer: 90, .. })
@@ -960,7 +961,7 @@ fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
     let call = root("call");
     let mut source = ScopedSource::new("original source".into());
     let expr = source.expression(&result, &call).unwrap();
-    let ExprKind::Binary { lhs, rhs, .. } = expr.kind else {
+    let ExprKind::Binary { lhs, rhs, .. } = &expr.kind else {
         panic!("binary")
     };
     assert_ne!(lhs.span, rhs.span);
@@ -1033,7 +1034,7 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
     let syntax = root("(f \"你好\")");
     let mut source = ScopedSource::new("// 原文件".into());
     let expr = source.expression(&syntax, &call).unwrap();
-    let ExprKind::Call { args, .. } = expr.kind else {
+    let ExprKind::Call { args, .. } = &expr.kind else {
         panic!("call")
     };
     let span = args[0].value.span;
@@ -1192,4 +1193,147 @@ fn host_identity_is_weak_and_does_not_keep_a_prior_run_alive() {
             .unwrap()
             .identical(&syntax)
     );
+}
+
+#[test]
+fn deeply_nested_syntax_marks_and_drops_without_host_stack_growth() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_syntax::lisp::syntax::{Node, Syntax};
+            let mut syntax = root("x");
+            for _ in 0..20_000 {
+                syntax = Syntax::make(Node::Round(vec![syntax.clone()]), &syntax).unwrap();
+            }
+            let datum = syntax.to_datum();
+            let rebuilt = Syntax::from_datum(&datum, syntax.scope());
+            assert!(syntax.same_code(&rebuilt));
+            drop(datum);
+            let quote = Syntax::make(Node::Quote(syntax.clone()), &syntax).unwrap();
+            assert!(quote.match_quote(&rebuilt).unwrap().is_some());
+            drop(quote);
+            drop(rebuilt);
+            let marked = syntax.flip_mark(7);
+            assert!(marked.scope().marks.contains(&7));
+            ilang_syntax::lisp::syntax::validate_expansion(&marked, &[]).unwrap();
+            let fresh = ilang_syntax::lisp::definitions::freshen_parameters(&marked, 1, 2);
+            drop(fresh);
+            let answer = marked.as_answer();
+            drop(answer);
+            drop(marked);
+            drop(syntax);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn rewriting_a_definition_head_cannot_forge_parameter_binding_authority() {
+    use ilang_syntax::lisp::definitions::builtin_definition;
+    use ilang_syntax::lisp::syntax::{Node, Syntax};
+    let like = root("x");
+    let answer = builtin_definition("Result", like.scope(), like.span(), 30).unwrap();
+    let Node::Round(item) = answer.node() else {
+        panic!("item")
+    };
+    let Node::Round(head) = item[0].node() else {
+        panic!("head")
+    };
+    assert_eq!(item[0].definition_head(), Some(30));
+    let unchanged = item[0].replace_children(head.clone());
+    assert_eq!(unchanged.definition_head(), Some(30));
+    let replacement = Syntax::make(Node::Up("A".into()), &head[1]).unwrap();
+    let changed = item[0].replace_children(vec![head[0].clone(), replacement, head[2].clone()]);
+    assert_eq!(changed.definition_head(), None);
+}
+
+#[test]
+fn duplicate_definition_heads_are_freshened_with_all_uses() {
+    use ilang_syntax::lisp::definitions::{builtin_definition, freshen_duplicate_heads};
+    use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax};
+    let like = root("x");
+    let definition = builtin_definition("Result", like.scope(), like.span(), 50).unwrap();
+    let items = Syntax::make(
+        Node::Curly(vec![definition.clone(), definition.clone()]),
+        &like,
+    )
+    .unwrap();
+    let mut next = 51;
+    let output = freshen_duplicate_heads(&items, || {
+        let id = next;
+        next += 1;
+        id
+    });
+    let Node::Curly(items) = output.node() else {
+        panic!("items")
+    };
+    for (item, id) in items.iter().zip([50, 51]) {
+        let Node::Round(parts) = item.node() else {
+            panic!("item")
+        };
+        let Node::Round(head) = parts[0].node() else {
+            panic!("head")
+        };
+        let Node::Curly(body) = parts[1].node() else {
+            panic!("body")
+        };
+        let Node::Round(ctor) = body[0].node() else {
+            panic!("ctor")
+        };
+        assert_eq!(parts[0].definition_head(), Some(id));
+        assert!(
+            matches!(head[1].scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer, parameter: 0, .. }) if *answer == id)
+        );
+        assert_eq!(head[1].scope_identity(), ctor[1].scope_identity());
+    }
+}
+
+#[test]
+fn definition_table_charges_before_freshening_written_and_expanded_answers() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{
+        Definition, DefinitionCost, DefinitionTable, Lookup,
+    };
+    let of = root("Box");
+    let source = "Box(A) { Box(A) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty());
+    let mut table = DefinitionTable::default();
+    table.insert(
+        1,
+        Definition::Written {
+            item: Box::new(module.items[0].clone()),
+            source: source.into(),
+            scope: of.scope().clone(),
+            ready: true,
+        },
+    );
+    let expanded =
+        ilang_syntax::lisp::definitions::builtin_definition("Result", of.scope(), of.span(), 9)
+            .unwrap();
+    table.insert(
+        2,
+        Definition::Expanded {
+            syntax: expanded,
+            parameter_answer: Some(9),
+            ready: true,
+        },
+    );
+    for key in [1, 2] {
+        let mut charged = false;
+        let result = table.query_metered(
+            &of,
+            Mode::Normal,
+            10,
+            |_, _| Lookup::Found(key),
+            |cost| {
+                assert!(matches!(cost, DefinitionCost::Syntax(_)));
+                charged = true;
+                Err(Box::new(std::io::Error::other("allocation limit")))
+            },
+        );
+        assert!(charged);
+        assert!(matches!(result, Err(error) if error.to_string() == "allocation limit"));
+    }
 }

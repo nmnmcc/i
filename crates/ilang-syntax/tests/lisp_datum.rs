@@ -18,6 +18,67 @@ fn datums_round_trip_and_keep_spans() {
 }
 
 #[test]
+fn deep_syntax_show_and_datum_conversion_use_an_explicit_stack() {
+    use ilang_syntax::lisp::{
+        Datum,
+        syntax::{Node, Scope, Syntax},
+    };
+    use ilang_syntax::span::Span;
+    use std::collections::BTreeSet;
+
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let leaf = Datum {
+                kind: DatumKind::Name("x".into()),
+                span: Span::new(0, 1),
+                docs: Vec::new(),
+            };
+            let like = Syntax::from_datum(
+                &leaf,
+                &Scope {
+                    module: 0,
+                    marks: BTreeSet::new(),
+                },
+            );
+            let mut value = like.clone();
+            let mut keepers = vec![value.clone()];
+            for _ in 0..20_000 {
+                value = Syntax::make(Node::Round(vec![value]), &like).unwrap();
+                keepers.push(value.clone());
+            }
+            let printed = value.show();
+            assert_eq!(printed.len(), 40_001);
+            assert_eq!(printed.as_bytes()[20_000], b'x');
+            let datum = value.to_datum();
+            assert_eq!(show(&datum), printed);
+            drop(datum);
+            let mut quoted = Datum {
+                kind: DatumKind::Name("x".into()),
+                span: Span::new(0, 1),
+                docs: Vec::new(),
+            };
+            for _ in 0..20_000 {
+                quoted = Datum {
+                    kind: DatumKind::Quote(Box::new(quoted)),
+                    span: Span::new(0, 1),
+                    docs: Vec::new(),
+                };
+            }
+            assert_eq!(show(&quoted).len(), 20_001);
+            drop(quoted);
+            // Keep Syntax children alive until their parents have been released.
+            drop(value);
+            while let Some(value) = keepers.pop() {
+                drop(value);
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
 fn quote_rules_are_checked() {
     assert!(parse("~x").is_err());
     assert!(parse("`(f `(g x))").is_err());
@@ -117,14 +178,46 @@ fn compiler_preparation_registers_nested_quote_pattern_templates() {
 fn quote_capture_collection_handles_deep_templates() {
     use ilang_syntax::lisp::{Datum, DatumKind, quote_lower::pattern_captures};
     use ilang_syntax::span::Span;
-    let datum = |kind| Datum { kind, span: Span::new(0, 0), docs: Vec::new() };
-    let mut body = datum(DatumKind::Unquote(Box::new(datum(DatumKind::Name("x".into())))));
+    let datum = |kind| Datum {
+        kind,
+        span: Span::new(0, 0),
+        docs: Vec::new(),
+    };
+    let mut body = datum(DatumKind::Unquote(Box::new(datum(DatumKind::Name(
+        "x".into(),
+    )))));
     for _ in 0..10_000 {
         body = datum(DatumKind::Round(vec![body]));
     }
     let quote = datum(DatumKind::Quote(Box::new(body)));
     assert_eq!(pattern_captures(&quote).len(), 1);
-    std::mem::forget(quote);
+}
+
+#[test]
+fn nested_quote_captures_use_the_parser_work_stack() {
+    use ilang_syntax::ast::PatternKind;
+    use ilang_syntax::lisp::{Datum, DatumKind, parse_pattern};
+    use ilang_syntax::span::Span;
+    let datum = |kind| Datum {
+        kind,
+        span: Span::new(0, 0),
+        docs: Vec::new(),
+    };
+    let mut nested = datum(DatumKind::Name("x".into()));
+    for _ in 0..256 {
+        nested = datum(DatumKind::Quote(Box::new(datum(DatumKind::Round(vec![
+            datum(DatumKind::Unquote(Box::new(nested))),
+        ])))));
+    }
+    let pattern = parse_pattern(&nested).unwrap();
+    let mut at = &pattern;
+    for _ in 0..256 {
+        let PatternKind::Quote { captures, .. } = &at.kind else {
+            panic!("nested quote");
+        };
+        at = &captures[0].1;
+    }
+    assert!(matches!(&at.kind, PatternKind::Var(name) if name == "x"));
 }
 
 #[test]
