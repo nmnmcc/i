@@ -112,7 +112,7 @@ fn dependency_conventions_and_entry_tables_have_no_effect() {
 #[test]
 fn a_bare_bar_is_not_a_pipe() {
     // A bare `|` is not a pipe; the pipe remains `|>`.
-    let source = "main = () { False | True }";
+    let source = /* old-syntax-check: E0101 */ "main = () { False | True }";
     let dir = project("name = \"app\"\n", &[("src/main.i", source)]);
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
