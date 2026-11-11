@@ -13,6 +13,8 @@ use crate::run::{MacroProgram, RunOutcome};
 /// One successful run's effects. They are visible only after expansion and
 /// output validation both succeed; the driver commits them with item phase.
 pub struct Transaction {
+    /// Written macro arguments and its validated result, for i expand --trace.
+    pub trace: String,
     pub notes: Vec<String>,
     pub requests: Vec<ItemRequest>,
     /// Filled by the item driver after the entire result validates.
@@ -153,10 +155,21 @@ impl Session {
             let (syntax, requests) =
                 ilang_host::syntax::flip_output_and_requests(&syntax, &requests, mark);
             let notes = context.take_notes();
+            let trace = format!(
+                "{}({}) => {}",
+                definition.name,
+                arguments
+                    .iter()
+                    .map(Syntax::show)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                syntax.show()
+            );
             let mut expanded = expand_result(self, syntax, &budget)?;
             expanded.transactions.insert(
                 0,
                 Transaction {
+                    trace,
                     notes,
                     requests,
                     item_origin: None,

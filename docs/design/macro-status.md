@@ -58,8 +58,11 @@ step 2 exception for nesting and stack-limit tests:
 ## How to try it
 
 From the repository root, create a small project with a macro in a separate
-library module. `i check` expands macros as part of checking; there is no
-separate `i expand` command yet.
+library module. `i check` expands macros as part of checking.
+`i expand --project PATH src/main.i --to is --trace` prints the expanded
+module and the macro arguments/results; `--to i` is available for modules
+without quotations or other Lisp-only forms. Expansion uses the isolated
+compiler sandbox and its ordinary empty provider plan.
 
 ```sh
 mkdir -p /tmp/i-macro-demo/src

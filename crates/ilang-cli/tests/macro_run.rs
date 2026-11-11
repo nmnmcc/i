@@ -1860,6 +1860,7 @@ fn checked_collection_validates_targets_and_duplicates() {
         at: atom("good"),
     };
     let transaction = |requests| Transaction {
+        trace: "synthetic collection".into(),
         notes: vec![],
         requests,
         item_origin: Some(ItemOrigin {

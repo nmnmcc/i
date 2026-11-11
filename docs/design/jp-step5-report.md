@@ -9,6 +9,10 @@ entries use graph-derived async classification, factory construction and host
 registration metadata on both Rust and JavaScript. Test execution preserves the
 chosen target column for each selected contribution.
 
+The merged macro driver had no CLI expansion command. Added
+`i expand --project PATH src/main.i --to is --trace`, using that same compiler
+sandbox, with both output surfaces and explicit errors for Lisp-only forms.
+
 Interpretations and sources:
 
 - Compiler macro programs use an empty sandbox plan through the ordinary planner.

@@ -245,3 +245,41 @@ fn selected_collection_uses_its_target_plan_and_transitive_requests() {
         "{error}"
     );
 }
+
+#[test]
+fn expand_command_prints_both_surfaces_and_macro_trace() {
+    let dir = tempfile::tempdir().unwrap();
+    project(dir.path());
+    for surface in ["is", "i"] {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["expand", "--project"])
+            .arg(dir.path())
+            .args(["src/main.i", "--to", surface, "--trace", "--offline"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert!(!text.contains("m.emit("), "{text}");
+        let errors = if surface == "is" {
+            ilang_syntax::lisp::parse_source(&text).1
+        } else {
+            ilang_syntax::parse_module(&text).1
+        };
+        assert!(errors.is_empty(), "{errors:?}\n{text}");
+        let trace = String::from_utf8(output.stderr).unwrap();
+        assert!(trace.contains("emit(") && trace.contains("=>"), "{trace}");
+    }
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["expand", "--project"])
+        .arg(dir.path())
+        .args(["src/macros.is", "--to", "i", "--offline"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--to is"));
+}

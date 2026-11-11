@@ -19,6 +19,21 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Print source after macro expansion, without running the program.
+    Expand {
+        #[arg(long, default_value = ".")]
+        project: PathBuf,
+        #[arg(long)]
+        offline: bool,
+        /// Output surface; quotations require is.
+        #[arg(long, default_value = "is", value_parser = ["i", "is"])]
+        to: String,
+        /// Print each macro's arguments and result on standard error.
+        #[arg(long)]
+        trace: bool,
+        /// A source file or qualified module; by default all package modules.
+        module: Option<String>,
+    },
     /// Check a package for errors.
     Check {
         /// The package directory, with its `i.toml`.
@@ -142,6 +157,13 @@ enum Command {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
+        Command::Expand {
+            project,
+            offline,
+            to,
+            trace,
+            module,
+        } => commands::expand::run(&project, offline, &to, trace, module.as_deref()),
         Command::Check {
             project,
             offline,
