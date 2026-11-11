@@ -1344,3 +1344,21 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         assert!(matches!(result, Err(error) if error.to_string() == "allocation limit"));
     }
 }
+
+#[test]
+fn records_parse_from_lisp_with_fields_spread_and_removal() {
+    use ilang_syntax::ast::{ExprKind, TypeKind};
+    let empty = ilang_syntax::lisp::parse("()").unwrap();
+    let empty = ilang_syntax::lisp::parse_expression(&empty[0]).unwrap();
+    assert!(matches!(&empty.kind, ExprKind::Record { base: None, fields } if fields.is_empty()));
+    let values = ilang_syntax::lisp::parse("{ .. r (: x 1) (: \"a b\" 2) }").unwrap();
+    let value = ilang_syntax::lisp::parse_expression(&values[0]).unwrap();
+    assert!(
+        matches!(&value.kind, ExprKind::Record { base: Some(_), fields } if fields.len() == 2 && fields[1].0.name == "a b")
+    );
+    let types = ilang_syntax::lisp::parse("{ .. R (- old) (: K { Int }) }").unwrap();
+    let ty = ilang_syntax::lisp::parse_type(&types[0]).unwrap();
+    assert!(
+        matches!(&ty.kind, TypeKind::Record { base: Some(_), fields, removed } if fields[0].0.parameter && removed[0].ident.name == "old")
+    );
+}

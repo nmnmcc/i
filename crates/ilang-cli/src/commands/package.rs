@@ -2212,8 +2212,10 @@ mod value_type_interfaces {
     #[test]
     fn exported_record_schemes_compare_labels_and_value_types() {
         let a = interface("(f)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }");
-        let same = interface("(f)\nf(LabelName) = (r: (LabelName: Int), key: LabelName) -> Int { 1 }");
-        let changed = interface("(f)\nf(LabelName) = (r: (LabelName: String), key: LabelName) -> Int { 1 }");
+        let same =
+            interface("(f)\nf(LabelName) = (r: (LabelName: Int), key: LabelName) -> Int { 1 }");
+        let changed =
+            interface("(f)\nf(LabelName) = (r: (LabelName: String), key: LabelName) -> Int { 1 }");
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
     }

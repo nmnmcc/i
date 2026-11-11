@@ -7,32 +7,36 @@ use crate::span::Span;
 /// taken out of it cannot bind in another head; copies of the whole head carry
 /// this identity and freshening changes it together with all its parameters.
 fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
-    let Node::Round(parts) = definition.node() else {
-        return definition;
-    };
-    if let [marker, attribute, inner] = parts.as_slice()
-        && matches!(marker.node(), Node::Symbol(s) if s == "@")
-    {
-        return definition.replace_children(vec![
-            marker.clone(),
-            attribute.clone(),
-            mark_definition_head(inner.clone(), answer),
-        ]);
+    let mut wrappers = Vec::new();
+    let mut core = definition.clone();
+    while let Node::Round(parts) = core.node() {
+        if let [marker, attribute, inner] = parts.as_slice()
+            && matches!(marker.node(), Node::Symbol(s) if s == "@")
+        {
+            wrappers.push((core.clone(), marker.clone(), attribute.clone()));
+            core = inner.clone();
+        } else {
+            break;
+        }
     }
-    let head = match parts.as_slice() {
-        [eq, _, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => 1,
-        [_, body] if matches!(body.node(), Node::Curly(_)) => 0,
-        _ => return definition,
-    };
-    let Node::Round(head_parts) = parts[head].node() else {
-        return definition;
-    };
-    if !head_parts.iter().skip(1).any(|part| matches!(part.scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer: owner, .. }) if *owner == answer)) {
-        return definition;
+    if let Node::Round(parts) = core.node() {
+        let head = match parts.as_slice() {
+            [eq, _, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => Some(1),
+            [_, body] if matches!(body.node(), Node::Curly(_)) => Some(0),
+            _ => None,
+        };
+        if let Some(head) = head && let Node::Round(head_parts) = parts[head].node()
+            && head_parts.iter().skip(1).any(|part| matches!(part.scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer: owner, .. }) if *owner == answer))
+        {
+            let mut parts = parts.clone();
+            parts[head] = parts[head].with_definition_head(answer);
+            core = core.replace_children(parts);
+        }
     }
-    let mut parts = parts.clone();
-    parts[head] = parts[head].with_definition_head(answer);
-    definition.replace_children(parts)
+    for (wrapper, marker, attribute) in wrappers.into_iter().rev() {
+        core = wrapper.replace_children(vec![marker, attribute, core]);
+    }
+    core
 }
 
 /// The written definition of a queryable built-in type. `answer` is fresh for
@@ -123,45 +127,56 @@ pub fn source_definition(
         parameters: &HashMap<&str, u32>,
         sites: &mut HashMap<(Span, String), u32>,
     ) {
-        match &ty.kind {
-            TypeKind::Named { module, name, args } => {
-                if module.is_none()
-                    && let Some(&id) = parameters.get(name.name.as_str())
-                {
-                    sites.insert((name.span, name.name.clone()), id);
+        let mut pending = vec![ty];
+        while let Some(ty) = pending.pop() {
+            match &ty.kind {
+                TypeKind::Named { module, name, args } => {
+                    if module.is_none()
+                        && let Some(&id) = parameters.get(name.name.as_str())
+                    {
+                        sites.insert((name.span, name.name.clone()), id);
+                    }
+                    pending.extend(args);
                 }
-                for arg in args {
-                    type_sites(arg, parameters, sites);
+                TypeKind::Call { args, .. }
+                | TypeKind::Tuple(args)
+                | TypeKind::Union(args)
+                | TypeKind::Inter(args)
+                | TypeKind::Diff(args) => pending.extend(args),
+                TypeKind::Record {
+                    base,
+                    fields,
+                    removed,
+                } => {
+                    pending.extend(base.iter().map(Box::as_ref));
+                    for (label, ty) in fields {
+                        if label.parameter
+                            && let Some(&id) = parameters.get(label.name.as_str())
+                        {
+                            sites.insert((label.span, label.name.clone()), id);
+                        }
+                        pending.push(ty);
+                    }
+                    for label in removed {
+                        if label.parameter
+                            && let Some(&id) = parameters.get(label.name.as_str())
+                        {
+                            sites.insert((label.span, label.name.clone()), id);
+                        }
+                    }
                 }
+                TypeKind::Fn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                } => {
+                    pending.extend(params.iter().map(|param| &param.ty));
+                    pending.push(ret);
+                    pending.extend(err.iter().chain(env.iter()).map(Box::as_ref));
+                }
+                TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
             }
-            TypeKind::Call { args, .. } => {
-                for arg in args {
-                    type_sites(arg, parameters, sites);
-                }
-            }
-            TypeKind::Tuple(types)
-            | TypeKind::Union(types)
-            | TypeKind::Inter(types)
-            | TypeKind::Diff(types) => {
-                for ty in types {
-                    type_sites(ty, parameters, sites);
-                }
-            }
-            TypeKind::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => {
-                for param in params {
-                    type_sites(&param.ty, parameters, sites);
-                }
-                type_sites(ret, parameters, sites);
-                for ty in err.iter().chain(env.iter()) {
-                    type_sites(ty, parameters, sites);
-                }
-            }
-            TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
         }
     }
     for ty in &def.head {
@@ -315,7 +330,19 @@ pub fn type_query(of: &Syntax) -> Result<TypeQuery, super::syntax::SyntaxError> 
 /// syntactically valid; malformed items are reported at their source span.
 pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxError> {
     use crate::ast::ItemKind;
-    let parsed = super::parse_item(&item.to_datum()).map_err(|error| SyntaxError {
+    let mut wrappers = Vec::new();
+    let mut core = item;
+    while let Node::Round(parts) = core.node() {
+        if let [marker, attr, body] = parts.as_slice()
+            && matches!(marker.node(), Node::Symbol(s) if s == "@")
+        {
+            wrappers.push((core, marker.clone(), attr.clone()));
+            core = body;
+        } else {
+            break;
+        }
+    }
+    let parsed = super::parse_item(&core.to_datum()).map_err(|error| SyntaxError {
         message: error.message,
         span: error.span,
     })?;
@@ -325,17 +352,9 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
             span: item.span(),
         });
     };
-    let Node::Round(parts) = item.node() else {
+    let Node::Round(parts) = core.node() else {
         unreachable!("type definition item is round")
     };
-    if let [marker, attr, body] = parts.as_slice()
-        && matches!(marker.node(), Node::Symbol(s) if s == "@")
-    {
-        let body = expanded_definition(body, answer)?;
-        return Ok(item
-            .with_node(Node::Round(vec![marker.clone(), attr.clone(), body]))
-            .as_answer());
-    }
     let (head_index, body_index, custom) = match parts.as_slice() {
         [head, body] if matches!(body.node(), Node::Curly(_)) => {
             let _ = head;
@@ -384,28 +403,61 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
         binders: &[(String, Scope, Option<ScopeIdentity>, u32)],
         answer: u64,
     ) -> Syntax {
-        match s.node() {
-            Node::Up(_) => named(s, binders, answer),
-            Node::Round(xs) if matches!(xs.as_slice(), [dot, _, _] if matches!(dot.node(), Node::Symbol(x) if x == ".")) => {
-                s.clone()
-            }
-            Node::Round(xs) => s.with_node(Node::Round(
-                xs.iter().map(|x| ty(x, binders, answer)).collect(),
-            )),
-            Node::Square(xs) => s.with_node(Node::Square(
-                xs.iter().map(|x| ty(x, binders, answer)).collect(),
-            )),
-            Node::Curly(xs) if xs.len() == 1 && !super::source_syntax::record_parts(xs) => {
-                ty(&xs[0], binders, answer)
-            }
-            Node::Curly(xs) => s.with_node(Node::Curly(
-                xs.iter().map(|x| ty(x, binders, answer)).collect(),
-            )),
-            Node::Bits(xs) => s.with_node(Node::Bits(
-                xs.iter().map(|x| ty(x, binders, answer)).collect(),
-            )),
-            _ => s.clone(),
+        enum Task {
+            Enter(Syntax),
+            Finish(Syntax, usize, bool),
         }
+        let mut tasks = vec![Task::Enter(s.clone())];
+        let mut built = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Enter(node) => {
+                    if matches!(node.node(), Node::Up(_)) {
+                        built.push(named(&node, binders, answer));
+                        continue;
+                    }
+                    if matches!(node.node(), Node::Round(xs) if matches!(xs.as_slice(), [dot, _, _] if matches!(dot.node(), Node::Symbol(x) if x == ".")))
+                    {
+                        built.push(node);
+                        continue;
+                    }
+                    let (children, group) = match node.node() {
+                        Node::Round(xs) | Node::Square(xs) | Node::Bits(xs) => (xs.clone(), false),
+                        Node::Curly(xs) => (
+                            xs.clone(),
+                            xs.len() == 1 && !super::source_syntax::record_parts(xs),
+                        ),
+                        _ => {
+                            built.push(node);
+                            continue;
+                        }
+                    };
+                    tasks.push(Task::Finish(node, children.len(), group));
+                    tasks.extend(children.into_iter().rev().map(Task::Enter));
+                }
+                Task::Finish(node, count, group) => {
+                    let children = built.split_off(built.len() - count);
+                    built.push(if group {
+                        children
+                            .into_iter()
+                            .next()
+                            .expect("type group has one child")
+                    } else {
+                        let replacement = match node.node() {
+                            Node::Round(_) => Node::Round(children),
+                            Node::Square(_) => Node::Square(children),
+                            Node::Curly(_) => Node::Curly(children),
+                            Node::Bits(_) => Node::Bits(children),
+                            _ => unreachable!("compound type node"),
+                        };
+                        node.with_node(replacement)
+                    });
+                }
+            }
+        }
+        built
+            .pop()
+            .expect("definition type conversion produced one root")
     }
     let mut result = parts.clone();
     if !binders.is_empty() {
@@ -442,29 +494,34 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
     } else {
         result[body_index] = ty(&parts[body_index], &binders, answer);
     }
-    Ok(mark_definition_head(
-        item.with_node(Node::Round(result)).as_answer(),
-        answer,
-    ))
+    let mut result = core.with_node(Node::Round(result));
+    for (wrapper, marker, attr) in wrappers.into_iter().rev() {
+        result = wrapper.with_node(Node::Round(vec![marker, attr, result]));
+    }
+    Ok(mark_definition_head(result.as_answer(), answer))
 }
 
 /// Freshen repeated copies of a query-provided definition head within one
 /// item result. The caller supplies globally fresh answer identities.
 pub fn freshen_duplicate_heads(result: &Syntax, mut fresh: impl FnMut() -> u64) -> Syntax {
     use std::collections::HashSet;
-    fn owner(item: &Syntax) -> Option<u64> {
-        let Node::Round(parts) = item.node() else {
-            return None;
-        };
-        match parts.as_slice() {
-            [marker, _, inner] if matches!(marker.node(), Node::Symbol(s) if s == "@") => {
-                owner(inner)
+    fn owner(mut item: &Syntax) -> Option<u64> {
+        loop {
+            let Node::Round(parts) = item.node() else {
+                return None;
+            };
+            match parts.as_slice() {
+                [marker, _, inner] if matches!(marker.node(), Node::Symbol(s) if s == "@") => {
+                    item = inner
+                }
+                [head, body] if matches!(body.node(), Node::Curly(_)) => {
+                    return head.definition_head();
+                }
+                [marker, head, _] if matches!(marker.node(), Node::Symbol(s) if s == "=") => {
+                    return head.definition_head();
+                }
+                _ => return None,
             }
-            [head, body] if matches!(body.node(), Node::Curly(_)) => head.definition_head(),
-            [marker, head, _] if matches!(marker.node(), Node::Symbol(s) if s == "=") => {
-                head.definition_head()
-            }
-            _ => None,
         }
     }
     let items: Vec<_> = match result.node() {

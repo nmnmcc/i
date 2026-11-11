@@ -1350,7 +1350,10 @@ impl Parser<'_> {
             ExprKind::Fn(Box::new(self.function()?))
         } else if self.eat(&T::RParen) {
             if self.old_empty {
-                return Ok(Expr { kind: ExprKind::Tuple(Vec::new()), span: self.span_from(start) });
+                return Ok(Expr {
+                    kind: ExprKind::Tuple(Vec::new()),
+                    span: self.span_from(start),
+                });
             }
             ExprKind::Record {
                 base: None,
