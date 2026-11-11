@@ -56,7 +56,7 @@ fn blind_expected_subject_is_checked_before_audit_codegen() {
             .iter()
             .any(ilang_package::Diagnostic::is_error)
     );
-    for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
+    for target in [ilang_wasm::Target::Native, ilang_wasm::Target::Wasi] {
         ilang_wasm::compile_wat(
             &graph,
             checked.program.as_ref().unwrap(),
@@ -96,8 +96,11 @@ main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
             .arg(dir.path())
             .output()
             .unwrap();
-        assert_eq!(out.status.code(), Some(1));
-        assert!(String::from_utf8_lossy(&out.stderr).contains("error[E0522]"));
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         assert!(
             String::from_utf8_lossy(&out.stdout).contains("app/main.main : () -> Nil ! N | S(N)")
         );
@@ -110,7 +113,7 @@ main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
             let err = String::from_utf8_lossy(&out.stderr);
             assert_eq!(out.status.code(), Some(1), "{err}");
             assert!(
-                err.contains("error[E0522]") && !err.contains("trap"),
+                err.contains("error[E0523]") && !err.contains("trap"),
                 "{err}"
             );
         }
@@ -150,7 +153,7 @@ main = () { ! S(Dependency) = S(() { read() }) apply() }";
         };
         assert_eq!(
             out.status.success(),
-            supplied,
+            true,
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
@@ -169,7 +172,7 @@ main = () { ! S(Dependency) = S(() { read() }) apply() }";
             assert_eq!(out.status.success(), supplied, "{err}");
             if !supplied {
                 assert!(
-                    err.contains("error[E0522]") && !err.contains("trap"),
+                    err.contains("error[E0523]") && !err.contains("trap"),
                     "{err}"
                 );
             }
@@ -199,7 +202,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
         checked.types.as_ref().unwrap(),
         ilang_wasm::Options {
             tests: false,
-            target: ilang_wasm::Target::Ilang,
+            target: ilang_wasm::Target::Native,
         },
     );
     assert!(

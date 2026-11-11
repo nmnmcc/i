@@ -329,9 +329,9 @@ fn binding_name_is_case_sensitive() {
 }
 
 #[test]
-fn pending_fixture_retains_host_target_factory() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/spec/9.11/providers_pending");
+fn provider_fixture_retains_host_target_factory() {
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec/9.11/providers");
     let (graph, diagnostics) = ilang_package::load(&root);
     assert!(!diagnostics.iter().any(|d| d.is_error()), "{diagnostics:?}");
     let package = &graph.packages[graph.root.unwrap()];

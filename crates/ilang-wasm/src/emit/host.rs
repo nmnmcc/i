@@ -215,9 +215,12 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
   (global.set $req_roots (call $list_cons
     (struct.new $request_root (local.get $key) (i32.const 0)) (global.get $req_roots)))
   (local.get $key))
-(func $request_entry_root (result eqref)
+(func $request_entry_begin (result eqref)
   (if (global.get $req_entry_live) (then unreachable))
   (global.set $req_entry_live (i32.const 1))
+  (ref.null eq))
+(func $request_entry_root (result eqref)
+  (if (i32.eqz (global.get $req_entry_live)) (then unreachable))
   (call $request_add_root))
 (func $request_open_root (param $parent eqref) (result eqref)
   (if (ref.is_null (call $request_find_root (local.get $parent)))
@@ -568,8 +571,41 @@ pub(super) fn effects() -> String {
             ("owner_gone", "request: owner is gone"),
         ],
     ));
+    out.push_str(&runtime::with_literals(
+        PROVIDERS.to_string(),
+        &[
+            ("provider_called", "provider: body already called"),
+            ("provider_inactive", "provider: body is not active"),
+            ("provider_incomplete", "provider: body was not completed"),
+        ],
+    ));
     out
 }
+
+const PROVIDERS: &str = r#"
+(type $provider_guard (struct (field (mut i32)) (field (mut i32))))
+(func $provider_guard_new (result eqref)
+  (struct.new $provider_guard (i32.const 1) (i32.const 0)))
+(func $provider_guard_enter (param $value eqref) (result eqref)
+  (local $g (ref $provider_guard))
+  (local.set $g (ref.cast (ref $provider_guard) (local.get $value)))
+  (if (i32.eqz (struct.get $provider_guard 0 (local.get $g)))
+    (then (call $panic {{provider_inactive}}) unreachable))
+  (if (struct.get $provider_guard 1 (local.get $g))
+    (then (call $panic {{provider_called}}) unreachable))
+  (struct.set $provider_guard 1 (local.get $g) (i32.const 1))
+  (ref.null eq))
+(func $provider_guard_complete (param $value eqref) (result eqref)
+  (struct.set $provider_guard 1 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 2))
+  (ref.null eq))
+(func $provider_guard_leave (param $value eqref) (result eqref)
+  (struct.set $provider_guard 0 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 0))
+  (ref.null eq))
+(func $provider_guard_check (param $value eqref) (result eqref)
+  (if (i32.ne (struct.get $provider_guard 1 (ref.cast (ref $provider_guard) (local.get $value))) (i32.const 2))
+    (then (call $panic {{provider_incomplete}}) unreachable))
+  (ref.null eq))
+"#;
 
 impl<'p> Emitter<'p> {
     /// Starts an import of an async host service (B.4) with a new request

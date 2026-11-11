@@ -1,0 +1,5 @@
+# spec: 2.6.1
+# expect: pass
+name = "app"
+[providers."i/clock.Clock"]
+native = "app/main.fake"

@@ -127,6 +127,8 @@ pub enum LocalType {
 pub enum Env {
     /// The environment of the running function.
     Param,
+    /// The entry environment containing only the default Assert.
+    Root,
     /// A local of type `Env`, made by an environment statement.
     Local(Local),
 }
@@ -608,7 +610,7 @@ impl Point {
         let mut env = self.env;
         loop {
             match env {
-                Env::Param => break,
+                Env::Param | Env::Root => break,
                 Env::Local(l) => {
                     let link = self.envs.iter().find(|e| e.dst == l)?;
                     if links.len() == self.envs.len() {
@@ -713,19 +715,31 @@ pub enum ImportKind {
 /// The host a module is made for.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Target {
-    /// A host of the i binary interface (Appendix B), such as `i run`, the
-    /// Rust host, and the JavaScript SDK.
+    Js,
+    Nodejs,
     #[default]
-    Ilang,
+    Native,
+    Host,
     /// A WASI preview 1 command, which runs in a stock Wasmtime (B.7).
     Wasi,
 }
 
 impl Target {
+    pub fn provider_target(self) -> ilang_package::providers::Target {
+        use ilang_package::providers::Target as P;
+        match self {
+            Self::Host => P::Host,
+            Self::Js => P::Js,
+            Self::Nodejs => P::Nodejs,
+            Self::Native => P::Native,
+            Self::Wasi => P::Wasi,
+        }
+    }
+
     /// The name in the metadata (B.6).
     pub fn name(self) -> &'static str {
         match self {
-            Target::Ilang => "ilang",
+            Target::Js | Target::Nodejs | Target::Native | Target::Host => "ilang",
             Target::Wasi => "wasi",
         }
     }
@@ -743,8 +757,8 @@ pub struct Import {
     pub awaited: bool,
 }
 
-/// A host service that the host gives (§9.7): its value is put in the root
-/// environment, a record of closures of `fields`, which call the imports.
+/// A chosen host registration (§9.7): each entry constructs its record of
+/// import closures as a leaf of its provider graph.
 #[derive(Clone, Debug)]
 pub struct HostService {
     pub service: u32,

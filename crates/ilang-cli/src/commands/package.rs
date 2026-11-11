@@ -85,6 +85,8 @@ pub enum PackageCommand {
     Deps {
         #[arg(long, default_value = ".")]
         project: PathBuf,
+        #[arg(long, value_enum, default_value_t = crate::TargetArg::Native)]
+        target: crate::TargetArg,
     },
 }
 
@@ -106,7 +108,9 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
             dry_run,
             project,
         } => publish(&project, &version, dry_run),
-        PackageCommand::Deps { project } => deps(&project),
+        PackageCommand::Deps { project, target } => {
+            deps(&project, ilang_wasm::Target::from(target))
+        }
     }
 }
 
@@ -715,7 +719,7 @@ fn library_hosts<'a>(
         .filter(|&t| program.ty(t).host.is_some())
 }
 
-fn deps(project: &Path) -> Result<ExitCode> {
+fn deps(project: &Path, target: ilang_wasm::Target) -> Result<ExitCode> {
     let (graph, diags) = load(project, true);
     if diags.iter().any(Diagnostic::is_error) || graph.root.is_none() {
         return Err(problems(&graph, &diags));
@@ -729,6 +733,64 @@ fn deps(project: &Path) -> Result<ExitCode> {
         for (what, at) in &p.permissions {
             let at: Vec<&str> = at.iter().map(String::as_str).collect();
             println!("  {what} ({})", at.join(", "));
+        }
+    }
+    let checked = ilang_check::check(&graph);
+    if checked.diags.iter().any(Diagnostic::is_error) {
+        return Err(problems(&graph, &checked.diags));
+    }
+    let p = checked.program.as_ref().expect("checked program");
+    let t = checked.types.as_ref().expect("checked types");
+    if t.entry_provider_needs.is_empty() {
+        let ds =
+            ilang_check::providers::validate_plan_schema(p, t, &graph, target.provider_target());
+        if !ds.is_empty() {
+            return Err(problems(&graph, &ds));
+        }
+    }
+    for (entry, plan) in
+        ilang_check::providers::resolve_plans(&checked, &graph, target.provider_target())
+    {
+        let plan = plan.map_err(|ds| problems(&graph, &ds))?;
+        println!(
+            "entry {}.{} ({:?}, {})",
+            p.module(entry.module).path,
+            p.def(entry).name,
+            plan.target,
+            if plan.is_async { "async" } else { "sync" }
+        );
+        for (i, step) in plan.steps.iter().enumerate() {
+            if let Some(adapter) = &plan.adapter
+                && adapter.enter_at == i
+            {
+                println!(
+                    "  enter {}.{}",
+                    p.module(adapter.binding.module).path,
+                    p.def(adapter.binding).name
+                );
+            }
+            let supply = match step.supply {
+                ilang_check::providers::Supply::Host => "host registration".to_string(),
+                ilang_check::providers::Supply::Factory(d) => {
+                    format!("{}.{}", p.module(d.module).path, p.def(d).name)
+                }
+                ilang_check::providers::Supply::Constructor(c) => {
+                    format!("constructor {}", p.ty(c.ty).name)
+                }
+            };
+            println!(
+                "  {i}: {:?} {} <- {supply} {:?}",
+                step.scope, step.service.name, step.arguments
+            );
+        }
+        if let Some(adapter) = &plan.adapter
+            && adapter.enter_at == plan.steps.len()
+        {
+            println!(
+                "  enter {}.{}",
+                p.module(adapter.binding.module).path,
+                p.def(adapter.binding).name
+            );
         }
     }
     Ok(ExitCode::SUCCESS)

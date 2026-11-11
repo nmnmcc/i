@@ -31,14 +31,15 @@
 //!   in the root environment. A function of an async host service starts
 //!   its import and suspends to the root boundary of its async entry point
 //!   ([`Value::HostStart`]); when the host answers, it reads the answer
-//!   ([`Value::HostReply`]). An entry point is async when an async host
-//!   service is in its environment.
+//!   ([`Value::HostReply`]). Entry wrappers construct the checked provider
+//!   graph; its host modes and roles determine asynchronous admission.
 //!
 //! The calls that may suspend are found and split afterwards (`control.rs`).
 
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
+use ilang_check::providers::{self, ResolvedArgument, ResolvedPlan, Scope, Supply};
 use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
@@ -510,7 +511,41 @@ pub fn lower_with_bindings(
     if !typed.coalescing_errors().is_empty() {
         return Err(typed.coalescing_errors().to_vec());
     }
+    let mut plans = std::collections::BTreeMap::new();
+    let mut errors = if typed.entry_provider_needs.is_empty() {
+        providers::validate_plan_schema(program, typed, graph, options.target.provider_target())
+    } else {
+        Vec::new()
+    };
+    for (entry, plan) in
+        providers::resolve_program_plans(program, typed, graph, options.target.provider_target())
+    {
+        if program.module(entry.module).kind == ModuleKind::Test && !options.tests {
+            continue;
+        }
+        match plan {
+            Ok(plan) => {
+                plans.insert(entry, plan);
+            }
+            Err(more) => errors.extend(more),
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
     let mut l = Lowerer::new(graph, program, typed, options);
+    l.plans = plans;
+    // Generated constructors and seeds can introduce services absent from source bindings.
+    for plan in l.plans.values() {
+        for step in &plan.steps {
+            let next = l.services.len() as u32;
+            l.services
+                .entry(TypeRef::Custom(step.service.constructor))
+                .or_insert(next);
+        }
+    }
+    l.out.services = l.services.len() as u32;
+
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
@@ -522,6 +557,7 @@ pub fn lower_with_bindings(
 
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
+    plans: std::collections::BTreeMap<DefId, ResolvedPlan>,
     program: &'a hir::Program,
     typed: &'a Typed,
     options: Options,
@@ -562,6 +598,7 @@ impl<'a> Lowerer<'a> {
     ) -> Self {
         let mut l = Lowerer {
             graph,
+            plans: Default::default(),
             program,
             typed,
             options,
@@ -869,7 +906,6 @@ impl<'a> Lowerer<'a> {
         let program = self.program;
         let mut entry = None;
         let mut tests = Vec::new();
-        let mut needed: BTreeSet<TypeId> = BTreeSet::new();
         for (mi, m) in program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
             if Some(m.package) != program.root || !self.included(mid) {
@@ -884,7 +920,7 @@ impl<'a> Lowerer<'a> {
                 let callee = self.entry_callee(d, 0);
                 let fx = Fx::new(mid, false);
                 let site = self.site(&fx, b.binding.span.start);
-                let is_async = self.entry_async(d, &mut needed);
+                let is_async = self.plans[&d].is_async;
                 let async_body = is_async.then(|| self.async_body(&callee, 0));
                 self.out.exports.push(Export {
                     name: name.clone(),
@@ -918,7 +954,7 @@ impl<'a> Lowerer<'a> {
                 errors: sig.errors.iter().map(|t| abi_type(*t)).collect(),
             };
             let callee = self.entry_callee(d, abi.params.len() as u32);
-            let is_async = self.entry_async(d, &mut needed);
+            let is_async = self.plans[&d].is_async;
             let async_body = is_async.then(|| self.async_body(&callee, abi.params.len() as u32));
             exports.push((name.clone(), abi.clone(), is_async));
             self.out.exports.push(Export {
@@ -928,9 +964,6 @@ impl<'a> Lowerer<'a> {
                 site: None,
                 async_body,
             });
-        }
-        for t in needed {
-            self.host_service(t);
         }
         if self.options.target == ir::Target::Wasi {
             match &entry {
@@ -953,109 +986,479 @@ impl<'a> Lowerer<'a> {
         );
     }
 
+    /// Apply the checked topological graph, keeping each factory's lexical
+    /// environment separate even for different instances of one constructor.
     fn entry_callee(&mut self, d: DefId, n: u32) -> Callee {
-        let mut callee = self.def_callee(d);
-        let services = self
-            .typed
-            .entry_services
-            .get(&d)
-            .cloned()
-            .unwrap_or_default();
-        let tasks = services.iter().any(|id| {
-            let t = self.program.ty(*id);
-            self.program.module(t.module).path == "i/task"
-                && matches!(t.name.as_str(), "Scheduler" | "Runner")
+        let plan = self.plans[&d].clone();
+        let mut fx = Fx::new(d.module, false);
+        let args: Vec<_> = (0..n)
+            .map(|_| Atom::Local(fx.local(LocalType::Value)))
+            .collect();
+        let mut body = Vec::new();
+        let_value(
+            &mut fx,
+            &mut body,
+            Value::Op(
+                Op::Runtime {
+                    name: "request_entry_begin",
+                    arity: 0,
+                },
+                vec![],
+            ),
+            None,
+        );
+        let key = plan.needs_entry_root_key.then(|| {
+            let_value(
+                &mut fx,
+                &mut body,
+                Value::Op(
+                    Op::Runtime {
+                        name: "request_entry_root",
+                        arity: 0,
+                    },
+                    vec![],
+                ),
+                None,
+            )
         });
-        let requests = tasks
-            || services.iter().any(|id| {
-                let t = self.program.ty(*id);
-                t.host.as_ref().is_some_and(|h| h.is_async || h.is_request)
-                    || self.program.module(t.module).path == "i/request"
-            });
-        if tasks {
-            callee = self.wrap_entry(callee, n, "i/task");
-        }
-        if requests {
-            callee = self.wrap_entry(callee, n, "i/request");
-        }
-        callee
-    }
-
-    fn wrap_entry(&mut self, callee: Callee, n: u32, module: &str) -> Callee {
-        let thunk = self.new_func();
-        let mut thunk_body = Vec::new();
-        for i in 0..n {
-            thunk_body.push(Stmt::Let {
-                dst: i,
-                value: Value::Capture(i),
-                site: None,
-            });
-        }
-        thunk_body.push(Stmt::TailCall {
-            callee,
-            args: (0..n).map(Atom::Local).collect(),
-            env: Env::Param,
-            site: None,
-        });
-        self.out.funcs[thunk.0 as usize] = FuncKind::Code(Func {
-            name: format!("{module} entry body"),
-            arity: 0,
-            locals: vec![LocalType::Value; n as usize],
-            body: thunk_body,
+        let mut values = vec![None; plan.steps.len()];
+        let enter_at = plan
+            .adapter
+            .as_ref()
+            .map_or(plan.steps.len(), |a| a.enter_at);
+        self.provider_steps(
+            &plan,
+            0..enter_at,
+            &mut fx,
+            &mut body,
+            &mut values,
+            key.clone(),
+            &HashMap::new(),
+        );
+        let result = if let Some(adapter) = &plan.adapter {
+            let guard = let_value(
+                &mut fx,
+                &mut body,
+                Value::Op(
+                    Op::Runtime {
+                        name: "provider_guard_new",
+                        arity: 0,
+                    },
+                    vec![],
+                ),
+                None,
+            );
+            let mut captures = args.clone();
+            captures.push(key.clone().unwrap_or(Atom::Nil));
+            captures.push(guard.clone());
+            let positions: Vec<_> = values
+                .iter()
+                .enumerate()
+                .filter_map(|(i, v)| v.as_ref().map(|v| (i, v.clone())))
+                .collect();
+            captures.extend(positions.iter().map(|(_, v)| v.clone()));
+            let continuation =
+                self.provider_closure(&mut fx, &mut body, captures, |this, fx, out, captured| {
+                    let guard = captured[n as usize + 1].clone();
+                    let_value(
+                        fx,
+                        out,
+                        Value::Op(
+                            Op::Runtime {
+                                name: "provider_guard_enter",
+                                arity: 1,
+                            },
+                            vec![guard.clone()],
+                        ),
+                        None,
+                    );
+                    // Snapshot all adapter seeds at continuation entry, before any
+                    // factory can suspend or replace its own lexical environment.
+                    let mut captured = captured;
+                    let supplied = &plan.adapter.as_ref().expect("selected adapter").supplies;
+                    for service in supplied {
+                        let slot = this.services[&TypeRef::Custom(service.constructor)];
+                        captured.push(let_value(fx, out, Value::Service(Env::Param, slot), None));
+                    }
+                    let call =
+                        this.provider_closure(fx, out, captured, |this, fx, out, captured| {
+                            let mut values = vec![None; plan.steps.len()];
+                            for ((position, _), value) in positions
+                                .iter()
+                                .zip(&captured[n as usize + 2..n as usize + 2 + positions.len()])
+                            {
+                                values[*position] = Some(value.clone());
+                            }
+                            let key = plan
+                                .needs_entry_root_key
+                                .then(|| captured[n as usize].clone());
+                            let seeds: HashMap<_, _> = supplied
+                                .iter()
+                                .zip(&captured[n as usize + 2 + positions.len()..])
+                                .map(|(service, value)| (service.constructor, value.clone()))
+                                .collect();
+                            this.provider_steps(
+                                &plan,
+                                enter_at..plan.steps.len(),
+                                fx,
+                                out,
+                                &mut values,
+                                key,
+                                &seeds,
+                            );
+                            this.provider_entry_call(
+                                &plan,
+                                fx,
+                                out,
+                                &values,
+                                captured[..n as usize].to_vec(),
+                            );
+                        });
+                    let complete =
+                        this.provider_guard_final(fx, out, guard, "provider_guard_complete");
+                    let value = let_value(
+                        fx,
+                        out,
+                        Value::OpEnv(Op::Ensure, vec![call, complete], Env::Param),
+                        None,
+                    );
+                    out.push(Stmt::Return(value));
+                });
+            let adapter_env =
+                self.provider_environment(&plan, &adapter.requires, &values, &mut fx, &mut body);
+            // Bind adapter prerequisites in a separate thunk so ensure preserves
+            // that environment while the continuation reads adapter seeds.
+            let adapter_callee = self.def_callee(adapter.binding);
+            let call = self.provider_closure(
+                &mut fx,
+                &mut body,
+                vec![continuation],
+                |_, _, out, captured| {
+                    // This thunk is called under adapter_env below.
+                    out.push(Stmt::TailCall {
+                        callee: adapter_callee,
+                        args: captured,
+                        env: Env::Param,
+                        site: None,
+                    });
+                },
+            );
+            let leave = self.provider_guard_final(
+                &mut fx,
+                &mut body,
+                guard.clone(),
+                "provider_guard_leave",
+            );
+            let result = let_value(
+                &mut fx,
+                &mut body,
+                Value::OpEnv(Op::Ensure, vec![call, leave], adapter_env),
+                None,
+            );
+            let_value(
+                &mut fx,
+                &mut body,
+                Value::Op(
+                    Op::Runtime {
+                        name: "provider_guard_check",
+                        arity: 1,
+                    },
+                    vec![guard],
+                ),
+                None,
+            );
+            result
+        } else {
+            let env = self.provider_body_environment(&plan, &values, &mut fx, &mut body);
+            let callee = self.def_callee(d);
+            self.provider_call(&mut fx, &mut body, callee, args, env)
+        };
+        body.push(Stmt::Return(result));
+        let inner = self.new_func();
+        self.out.funcs[inner.0 as usize] = FuncKind::Code(Func {
+            name: "provider entry".into(),
+            arity: n,
+            locals: fx.locals,
+            body,
             frame: true,
         });
-        let wrapper = self.new_func();
-        let entry = self.library_callee(module, "_entry");
-        self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
-            name: format!("{module} entry"),
-            arity: n,
-            locals: vec![LocalType::Value; n as usize + 1],
-            body: vec![
-                Stmt::Let {
-                    dst: n,
-                    value: Value::Closure {
-                        func: thunk,
-                        captures: (0..n).map(Atom::Local).collect(),
-                        patched: false,
+        // Primitive cleanup is outside the entire plan, including construction
+        // failures and adapter errors. Traps retire through host teardown.
+        let mut fx = Fx::new(d.module, false);
+        let args: Vec<_> = (0..n)
+            .map(|_| Atom::Local(fx.local(LocalType::Value)))
+            .collect();
+        let mut body = Vec::new();
+        let call = self.provider_closure(&mut fx, &mut body, args, |_, _, out, args| {
+            out.push(Stmt::TailCall {
+                callee: Callee::Direct(inner),
+                args,
+                env: Env::Root,
+                site: None,
+            });
+        });
+        let cleanup = self.provider_closure(&mut fx, &mut body, vec![], |_, fx, out, _| {
+            let value = let_value(
+                fx,
+                out,
+                Value::Op(
+                    Op::Runtime {
+                        name: "request_entry_end",
+                        arity: 0,
                     },
-                    site: None,
-                },
-                Stmt::TailCall {
-                    callee: entry,
-                    args: vec![Atom::Local(n)],
-                    env: Env::Param,
-                    site: None,
-                },
-            ],
+                    vec![],
+                ),
+                None,
+            );
+            out.push(Stmt::Return(value));
+        });
+        let result = let_value(
+            &mut fx,
+            &mut body,
+            Value::OpEnv(Op::Ensure, vec![call, cleanup], Env::Root),
+            None,
+        );
+        body.push(Stmt::Return(result));
+        let wrapper = self.new_func();
+        self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
+            name: "provider context".into(),
+            arity: n,
+            locals: fx.locals,
+            body,
             frame: true,
         });
         Callee::Direct(wrapper)
     }
 
-    /// R2 supplies the inferred needs. JP will supply the complete chosen
-    /// provider closure without changing this classification rule.
-    fn services_require_async(&self, services: &[TypeId]) -> bool {
-        self.options.target == ir::Target::Ilang
-            && services.iter().any(|id| {
-                let ty = self.program.ty(*id);
-                ty.host.as_ref().is_some_and(|h| h.is_async || h.is_request)
-                    || (self.program.module(ty.module).path == "i/task"
-                        && matches!(ty.name.as_str(), "Scheduler" | "Runner"))
-            })
+    fn provider_closure(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        captures: Vec<Atom>,
+        build: impl FnOnce(&mut Self, &mut Fx, &mut Vec<Stmt>, Vec<Atom>),
+    ) -> Atom {
+        self.provider_closure_arity(fx, out, captures, 0, build)
     }
 
-    fn entry_async(&self, d: DefId, needed: &mut BTreeSet<TypeId>) -> bool {
-        let Some(services) = self.typed.entry_services.get(&d) else {
-            return false;
-        };
-        needed.extend(services.iter().copied());
-        self.services_require_async(services)
+    fn provider_closure_arity(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        captures: Vec<Atom>,
+        arity: u32,
+        build: impl FnOnce(&mut Self, &mut Fx, &mut Vec<Stmt>, Vec<Atom>),
+    ) -> Atom {
+        let mut inner = Fx::new(fx.module, false);
+        for _ in 0..arity {
+            inner.local(LocalType::Value);
+        }
+        let mut body = Vec::new();
+        let args = (0..captures.len())
+            .map(|i| let_value(&mut inner, &mut body, Value::Capture(i as u32), None))
+            .collect();
+        build(self, &mut inner, &mut body, args);
+        let func = self.new_func();
+        self.out.funcs[func.0 as usize] = FuncKind::Code(Func {
+            name: "provider continuation".into(),
+            arity,
+            locals: inner.locals,
+            body,
+            frame: true,
+        });
+        let_value(
+            fx,
+            out,
+            Value::Closure {
+                func,
+                captures,
+                patched: false,
+            },
+            None,
+        )
+    }
+
+    /// Pin only this invocation's chosen services across adapter/host resumes.
+    fn provider_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        callee: Callee,
+        args: Vec<Atom>,
+        env: Env,
+    ) -> Atom {
+        let body = self.provider_closure_arity(fx, out, args, 1, |_, _, out, args| {
+            out.push(Stmt::TailCall {
+                callee,
+                args,
+                env: Env::Param,
+                site: None,
+            });
+        });
+        let kept = let_value(fx, out, Value::OpEnv(Op::KeepEnv, vec![body], env), None);
+        let_value(
+            fx,
+            out,
+            Value::Call {
+                callee: Callee::Value(kept),
+                args: vec![Atom::Nil],
+                env,
+            },
+            None,
+        )
+    }
+
+    fn provider_guard_final(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        guard: Atom,
+        name: &'static str,
+    ) -> Atom {
+        self.provider_closure(fx, out, vec![guard], |_, fx, out, args| {
+            let value = let_value(
+                fx,
+                out,
+                Value::Op(Op::Runtime { name, arity: 1 }, args),
+                None,
+            );
+            out.push(Stmt::Return(value));
+        })
+    }
+
+    fn provider_environment(
+        &self,
+        plan: &ResolvedPlan,
+        positions: &[usize],
+        values: &[Option<Atom>],
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+    ) -> Env {
+        let mut env = Env::Root;
+        for &position in positions {
+            let service = self.services[&TypeRef::Custom(plan.steps[position].service.constructor)];
+            let dst = fx.local(LocalType::Env);
+            out.push(Stmt::LetEnv {
+                dst,
+                env,
+                service,
+                value: values[position]
+                    .clone()
+                    .expect("dependency precedes provider"),
+            });
+            env = Env::Local(dst);
+        }
+        env
+    }
+
+    fn provider_body_environment(
+        &self,
+        plan: &ResolvedPlan,
+        values: &[Option<Atom>],
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+    ) -> Env {
+        // Only actual entry needs belong together; sibling parameter instances
+        // used by separate factories must never be unioned into one environment.
+        let needs = &self.typed.entry_services[&plan.entry];
+        let positions: Vec<_> = plan
+            .steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, step)| {
+                (step.scope == Scope::Body && needs.contains(&step.service.constructor))
+                    .then_some(i)
+            })
+            .collect();
+        self.provider_environment(plan, &positions, values, fx, out)
+    }
+
+    fn provider_entry_call(
+        &mut self,
+        plan: &ResolvedPlan,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        values: &[Option<Atom>],
+        args: Vec<Atom>,
+    ) {
+        let env = self.provider_body_environment(plan, values, fx, out);
+        let callee = self.def_callee(plan.entry);
+        let value = self.provider_call(fx, out, callee, args, env);
+        out.push(Stmt::Return(value));
+    }
+
+    fn provider_steps(
+        &mut self,
+        plan: &ResolvedPlan,
+        range: std::ops::Range<usize>,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        values: &mut [Option<Atom>],
+        key: Option<Atom>,
+        seeds: &HashMap<TypeId, Atom>,
+    ) {
+        for position in range {
+            let step = &plan.steps[position];
+            let mut args = Vec::new();
+            let mut dependencies = Vec::new();
+            for argument in &step.arguments {
+                match argument {
+                    ResolvedArgument::Seed(seed) => {
+                        let seed = if seed.is_some() {
+                            let value = seeds[&step.service.constructor].clone();
+                            let_value(fx, out, Value::Cons(value, Atom::EmptyList), None)
+                        } else {
+                            Atom::EmptyList
+                        };
+                        args.push(seed);
+                    }
+                    ResolvedArgument::EntryRootKey => {
+                        args.push(key.clone().expect("plan registers initial root"))
+                    }
+                    ResolvedArgument::Service(i) => dependencies.push(*i),
+                }
+            }
+            let env = self.provider_environment(plan, &dependencies, values, fx, out);
+            let value = match step.supply {
+                Supply::Host => {
+                    self.host_service(step.service.constructor);
+                    let host = self
+                        .out
+                        .host_services
+                        .iter()
+                        .find(|h| {
+                            h.service == self.services[&TypeRef::Custom(step.service.constructor)]
+                        })
+                        .expect("checked host service");
+                    Value::Record {
+                        ctor: host.ctor,
+                        ty: host.ty,
+                        fields: host.fields.iter().copied().map(Atom::Func).collect(),
+                    }
+                }
+                Supply::Factory(d) => {
+                    let callee = self.def_callee(d);
+                    Value::Atom(self.provider_call(fx, out, callee, args, env))
+                }
+                Supply::Constructor(c) => {
+                    let fields = dependencies
+                        .iter()
+                        .map(|&i| values[i].clone().expect("constructor dependency"))
+                        .collect();
+                    match self.ctors[&c].repr {
+                        CtorRepr::Record { ctor, ty } => Value::Record { ctor, ty, fields },
+                        CtorRepr::Bool(b) => Value::Atom(Atom::Bool(b)),
+                        CtorRepr::Nil => Value::Atom(Atom::Nil),
+                    }
+                }
+            };
+            values[position] = Some(let_value(fx, out, value, None));
+        }
     }
 
     /// Whether a host service is async in the module: on the WASI target
     /// every host function is a blocking call (B.7).
     fn host_is_async(&self, host: &hir::Host) -> bool {
-        host.is_async && self.options.target == ir::Target::Ilang
+        host.is_async && self.options.target != ir::Target::Wasi
     }
 
     /// The body of an async entry point inside its root boundary (B.5): a
@@ -1089,6 +1492,14 @@ impl<'a> Lowerer<'a> {
     /// A host service in the environment of an entry point (§9.7): one
     /// import for each field, and its value in the root environment.
     fn host_service(&mut self, t: TypeId) {
+        if self
+            .out
+            .host_services
+            .iter()
+            .any(|h| Some(&h.service) == self.services.get(&TypeRef::Custom(t)))
+        {
+            return;
+        }
         let program = self.program;
         let def = program.ty(t);
         let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {

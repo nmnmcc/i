@@ -95,7 +95,7 @@ pub fn resolve_binding(
 }
 
 use crate::{
-    Checked, code,
+    Checked,
     hir::{self, BuiltinType, TypeRef},
     types::{ShownType, Typed},
 };
@@ -169,9 +169,7 @@ pub struct ResolvedPlan {
 }
 
 /// Build each entry's complete chosen provider graph. This is a target-build
-/// phase, separate from source checking and lowering. The temporary E0522
-/// lowering gate remains in the build/compile callers until plan application.
-/// Source E0522s are superseded here by resolved supplies or plan diagnostics.
+/// phase, separate from source checking and lowering.
 pub fn resolve_plans(
     checked: &Checked,
     graph: &PackageGraph,
@@ -180,15 +178,27 @@ pub fn resolve_plans(
     let (Some(p), Some(t)) = (&checked.program, &checked.types) else {
         return BTreeMap::new();
     };
+    if checked.diags.iter().any(Diagnostic::is_error) {
+        return t
+            .entry_provider_needs
+            .keys()
+            .map(|&d| (d, Err(checked.diags.clone())))
+            .collect();
+    }
+    resolve_program_plans(p, t, graph, target)
+}
+
+/// Resolve plans from already checked source, including compiler API callers.
+pub fn resolve_program_plans(
+    p: &Program,
+    t: &Typed,
+    graph: &PackageGraph,
+    target: Target,
+) -> BTreeMap<DefId, Result<ResolvedPlan, Vec<Diagnostic>>> {
     let mut out = BTreeMap::new();
     let schema = Schema::resolve(p, t, graph, target);
     for (&entry, needs) in &t.entry_provider_needs {
-        let mut errors: Vec<_> = checked
-            .diags
-            .iter()
-            .filter(|d| d.is_error() && d.code != code::ENTRY_ENV)
-            .cloned()
-            .collect();
+        let mut errors = Vec::new();
         errors.extend(schema.errors.iter().map(|(authority, span, msg)| {
             let mut d = diagnostic(p, entry, target, *span, msg);
             d.source = graph.packages[*authority].manifest_source;
@@ -213,9 +223,74 @@ pub fn resolve_plans(
         let result = builder
             .build(needs)
             .map_err(|msg| vec![diagnostic(p, entry, target, p.def(entry).span, &msg)]);
+        let result = result.and_then(|plan| {
+            let synchronous = graph.root.is_some_and(|root| {
+                graph.packages[root].wasm_synchronous.iter().any(|e| {
+                    e.module == p.module(entry.module).path && e.function == p.def(entry).name
+                })
+            });
+            if synchronous && plan.is_async {
+                fn qualifying_path(plan: &ResolvedPlan, position: usize) -> Option<Vec<String>> {
+                    let step = &plan.steps[position];
+                    if step.request_mode || step.role != Role::None {
+                        return Some(vec![step.service.name.clone()]);
+                    }
+                    for argument in &step.arguments {
+                        if let ResolvedArgument::Service(dependency) = argument
+                            && let Some(mut path) = qualifying_path(plan, *dependency)
+                        {
+                            path.insert(0, step.service.name.clone());
+                            return Some(path);
+                        }
+                    }
+                    None
+                }
+                let path = plan
+                    .steps
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, step)| {
+                        step.scope == Scope::Body
+                            && t.entry_services[&entry].contains(&step.service.constructor)
+                    })
+                    .find_map(|(i, _)| qualifying_path(&plan, i))
+                    .expect("an async plan has a qualifying dependency")
+                    .join(" -> ");
+                Err(vec![diagnostic(
+                    p,
+                    entry,
+                    target,
+                    p.def(entry).span,
+                    &format!("synchronous export has an async provider dependency: {path}"),
+                )])
+            } else {
+                Ok(plan)
+            }
+        });
         out.insert(entry, result);
     }
     out
+}
+
+/// A target still validates declarations when a package has no entry to build.
+pub fn validate_plan_schema(
+    p: &Program,
+    t: &Typed,
+    graph: &PackageGraph,
+    target: Target,
+) -> Vec<Diagnostic> {
+    Schema::resolve(p, t, graph, target)
+        .errors
+        .into_iter()
+        .map(|(authority, span, message)| {
+            Diagnostic::error(
+                PLAN_ERROR,
+                graph.packages[authority].manifest_source,
+                span,
+                format!("provider target {}: {message}", target_name(target)),
+            )
+        })
+        .collect()
 }
 
 fn diagnostic(p: &Program, entry: DefId, target: Target, span: Span, msg: &str) -> Diagnostic {

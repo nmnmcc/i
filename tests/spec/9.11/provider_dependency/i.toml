@@ -1,0 +1,7 @@
+# spec: 2.6.1
+# expect: pass
+name = "app"
+[providers."app/main.Config"]
+native = "app/main.config"
+[providers."app/main.Service"]
+native = "app/main.service"

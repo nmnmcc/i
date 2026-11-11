@@ -1,8 +1,9 @@
 # spec: 2.6
-# expect: compile-error E0522
-# future-track: JP -- replace this rejection with provider-plan conformance.
+# expect: pass
+# output: provider built
 name = "app"
 [wasm]
 exports = ["app/main.probe"]
 [providers."app/main.Bundle"]
 host = "app/main.make"
+native = "app/main.make"

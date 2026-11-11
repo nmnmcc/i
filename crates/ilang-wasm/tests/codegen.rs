@@ -314,7 +314,7 @@ main = () { Nil }
             "app/main.echo",
         ],
     );
-    for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
+    for target in [ilang_wasm::Target::Native, ilang_wasm::Target::Wasi] {
         let text = compile_wat(
             &graph,
             checked.program.as_ref().unwrap(),

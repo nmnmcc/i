@@ -41,7 +41,7 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
     let (graph, checked) = check(&missing);
     let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
     assert!(
-        !errors.is_empty() && errors.iter().all(|d| d.code == "E0522"),
+        errors.is_empty(),
         "{name}: {:?}",
         graph.sources.render_all(&checked.diags)
     );

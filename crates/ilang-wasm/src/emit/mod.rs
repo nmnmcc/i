@@ -929,24 +929,6 @@ impl<'p> Emitter<'p> {
              (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
             self.p.services.max(1)
         );
-        // §9.7: the host services that the entry points need, made of
-        // closures that call the imports.
-        for s in &self.p.host_services {
-            let fields: String = s
-                .fields
-                .iter()
-                .map(|f| format!(" (global.get $c{})", f.0))
-                .collect();
-            let _ = writeln!(
-                self.out,
-                "(array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {})\n\
-                 (call $record (i32.const {}) (i64.const {}) (array.new_fixed $values {}{fields})))",
-                s.service,
-                s.ctor,
-                s.ty,
-                s.fields.len()
-            );
-        }
         if self.p.start.is_some() {
             self.out
                 .push_str("(drop (call $start (ref.null $obj) (global.get $root_env)))\n");
@@ -1195,6 +1177,7 @@ fn local_type(t: LocalType) -> &'static str {
 fn env_text(e: Env) -> String {
     match e {
         Env::Param => "(local.get $env)".into(),
+        Env::Root => "(global.get $root_env)".into(),
         Env::Local(l) => format!("(local.get $l{l})"),
     }
 }

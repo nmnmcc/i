@@ -147,7 +147,7 @@ fn no_imports(_: &mut Linker<State>) {}
 
 /// The stop message that the ilang host gets for the same program.
 fn ilang_stop(project: &Path) -> String {
-    let b = build(project, options(Level::O0, Target::Ilang)).unwrap_or_else(|e| panic!("{e}"));
+    let b = build(project, options(Level::O0, Target::Native)).unwrap_or_else(|e| panic!("{e}"));
     let program = Program::from_bytes(&b.wasm).unwrap();
     match program.run_entry(Default::default()) {
         Ok(Outcome::Stop(stop)) => stop.message.unwrap(),
@@ -395,7 +395,7 @@ fn the_standard_service_is_the_one_of_i_io() {
 #[test]
 fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
     let source = " ((Io) = i/io)\n@external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n@main\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
-    for target in [Target::Wasi, Target::Ilang] {
+    for target in [Target::Wasi, Target::Native] {
         let dir = package(source);
         let e = match build(dir.path(), options(Level::O0, target)) {
             Err(e @ BuildError::Program { .. }) => e.to_string(),
@@ -438,13 +438,13 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
         "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (code: Int) -> Nil\n\
          @main\nmain = () {{ exit(0) }}\n"
     ));
-    assert!(build(dir.path(), options(Level::O0, Target::Ilang)).is_ok());
+    assert!(build(dir.path(), options(Level::O0, Target::Native)).is_ok());
 }
 
 #[test]
 fn only_wasi_modules_name_their_target() {
     let dir = package("@main\nmain = () { Nil }\n");
-    let ilang = build(dir.path(), options(Level::O0, Target::Ilang))
+    let ilang = build(dir.path(), options(Level::O0, Target::Native))
         .unwrap()
         .wasm;
     assert_eq!(Abi::from_wasm(&ilang).unwrap().unwrap().target, None);

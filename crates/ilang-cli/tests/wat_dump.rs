@@ -14,7 +14,7 @@ mod single_file;
 
 fn dump(project: &Path, name: &str, out: &Path) {
     for (target, tag) in [
-        (ilang_wasm::Target::Ilang, "ilang"),
+        (ilang_wasm::Target::Native, "ilang"),
         (ilang_wasm::Target::Wasi, "wasi"),
     ] {
         for tests in [true, false] {

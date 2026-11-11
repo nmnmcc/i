@@ -23,7 +23,7 @@ fn completed_aliases_and_projections_do_not_change_wat() {
         .unwrap()
     };
     for tests in [false, true] {
-        for target in [ilang_wasm::Target::Ilang, ilang_wasm::Target::Wasi] {
+        for target in [ilang_wasm::Target::Native, ilang_wasm::Target::Wasi] {
             assert_eq!(compile(base, tests, target), compile(typed, tests, target));
         }
     }

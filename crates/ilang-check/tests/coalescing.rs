@@ -6,7 +6,7 @@ fn entry(source: &str) {
     let checked = ilang_check::query::check_for_queries(&graph);
     let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
     assert!(
-        !errors.is_empty() && errors.iter().all(|d| d.code == "E0522"),
+        errors.is_empty(),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );
@@ -187,7 +187,7 @@ helper(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
     let checked = ilang_check::check(&graph);
     let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
     assert!(
-        !errors.is_empty() && errors.iter().all(|d| d.code == "E0522"),
+        errors.is_empty(),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );

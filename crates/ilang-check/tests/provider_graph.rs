@@ -348,15 +348,19 @@ fn standard_io_entry_gets_shipped_plan() {
     );
 }
 #[test]
-fn providers_pending_fixture_plan() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/spec/9.11/providers_pending");
+fn providers_fixture_plan() {
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec/9.11/providers");
     let (g, ds) = ilang_package::load(&root);
     assert!(!ds.iter().any(Diagnostic::is_error), "{ds:?}");
     let c = ilang_check::check(&g);
-    let p = resolve(&g, &c, Target::Host).unwrap();
+    let p = providers::resolve_plans(&c, &g, Target::Host)
+        .into_values()
+        .next()
+        .unwrap()
+        .unwrap();
     assert_eq!(names(&p), ["app/main.Work", "app/main.Bundle"]);
-    assert!(p.is_async);
+    assert!(!p.is_async);
 }
 
 fn dependency_fixture(source: &str, plan: &str, dependency_plan: &str) -> (PackageGraph, Checked) {

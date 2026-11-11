@@ -17,7 +17,7 @@ fn options() -> BuildOptions {
         tests: false,
         opt: Level::O0,
         offline: true,
-        target: Target::Ilang,
+        target: Target::Native,
     }
 }
 fn entry(path: &Path, name: Option<&str>) -> Option<String> {

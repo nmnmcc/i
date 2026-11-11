@@ -748,7 +748,7 @@ impl<'a> Checker<'a> {
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
-    /// take; and the environment has only host services and `Assert`.
+    /// take. Target provider planning validates its inferred environment later.
     fn entry_point(&mut self, d: DefId, test: bool, export: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
@@ -795,35 +795,8 @@ impl<'a> Checker<'a> {
         }
         let mut services = Vec::new();
         for m in known::members(&f.env) {
-            let ok = match &m {
-                Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
-                    if self.p.ty(*id).host.is_some() {
-                        services.push(*id);
-                    }
-                    let service = self.p.ty(*id);
-                    let request = self.p.module(service.module).path == "i/request"
-                        && matches!(service.name.as_str(), "Root" | "Owner" | "Await");
-                    let task = self.p.module(service.module).path == "i/task"
-                        && matches!(service.name.as_str(), "Scheduler" | "Runner");
-                    if request || task {
-                        services.push(*id);
-                    }
-                    service.host.is_some()
-                        || TypeRef::Custom(*id) == self.b.assert
-                        || request
-                        || task
-                }
-                _ => false,
-            };
-            if !ok {
-                let m = show(self, &m);
-                self.error(
-                    code::ENTRY_ENV,
-                    span,
-                    format!(
-                        "`{name}` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `{m}`, which must be given before it gets to the entry point"
-                    ),
-                );
+            if let Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) = m {
+                services.push(id);
             }
         }
         services.sort();

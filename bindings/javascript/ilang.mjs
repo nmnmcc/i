@@ -907,7 +907,9 @@ export async function instantiate(source, options = {}) {
         const legacy = options.imports?.[moduleName]?.[name];
         const contextFn = options.contextImports?.[moduleName]?.[name] ?? (!legacy ? standard[moduleName]?.[name] : undefined);
         expect(!(legacy && contextFn), `Host function ${moduleName} ${name} is registered twice`);
-        expect(typeof (contextFn ?? legacy) === "function", `Missing host function ${moduleName} ${name}`);
+        const declaration = options.bindings && bindingAuthorizations.get(options.bindings).plan.declarations.find((d) => d.kind === "service" && d.namespace === moduleName && d.name === name);
+        const service = declaration ? ` for service ${declaration.module}.${declaration.declaration.split(".")[0]}` : "";
+        expect(typeof (contextFn ?? legacy) === "function", `Missing host function ${moduleName} ${name}${service}`);
         expect(!Object.hasOwn(imports[moduleName], name), `Host function ${moduleName} ${name} is registered twice`);
         // Nothing is thrown into the module (B.1): an exception of the
         // host function, or an answer that stops the program, is kept, and

@@ -5,6 +5,7 @@ mod commands;
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, level};
 use ilang_host::{Outcome, TestResult};
+use ilang_package::Diagnostic;
 use ilang_wasm::Target;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -30,6 +31,9 @@ enum Command {
         /// `module/path.name : type`.
         #[arg(long)]
         types: bool,
+        /// Validate entry provider plans for this target.
+        #[arg(long, value_enum)]
+        target: Option<TargetArg>,
     },
     /// Build a package into a Wasm module.
     Build {
@@ -47,10 +51,8 @@ enum Command {
         /// The output file; by default `build/<name>.wasm` in the package.
         #[arg(long)]
         out: Option<PathBuf>,
-        /// The host to build for: `ilang` (`i run`, the Rust host, the
-        /// JavaScript SDK) or `wasi` (a WASI command that a stock Wasmtime
-        /// runs with `wasmtime run`).
-        #[arg(long, value_enum, default_value_t = TargetArg::Ilang)]
+        /// Provider column; ilang is an alias of host.
+        #[arg(long, value_enum, default_value_t = TargetArg::Native)]
         target: TargetArg,
         /// Also print the unoptimized WAT text next to the output.
         #[arg(long, hide = true)]
@@ -69,6 +71,8 @@ enum Command {
         /// Select a function declared in [entries].
         #[arg(long)]
         entry: Option<String>,
+        #[arg(long, value_enum, default_value_t = TargetArg::Native)]
+        target: TargetArg,
         /// Arguments passed to the program after --.
         #[arg(last = true)]
         args: Vec<String>,
@@ -83,6 +87,8 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 0)]
         opt: u8,
+        #[arg(long, value_enum, default_value_t = TargetArg::Native)]
+        target: TargetArg,
         /// Only run the tests whose name has this text.
         filter: Option<String>,
         /// Print how long each test takes to run, without the build.
@@ -112,7 +118,8 @@ fn main() -> ExitCode {
             project,
             offline,
             types,
-        } => return check(&project, offline, types),
+            target,
+        } => return check(&project, offline, types, target.map(Into::into)),
         Command::Build {
             project,
             offline,
@@ -136,14 +143,30 @@ fn main() -> ExitCode {
             opt,
             entry,
             args,
-        } => cmd_run(&project, opt, offline, entry.as_deref(), args),
+            target,
+        } => cmd_run(
+            &project,
+            opt,
+            offline,
+            entry.as_deref(),
+            args,
+            target.into(),
+        ),
         Command::Test {
             project,
             offline,
             opt,
             filter,
             time,
-        } => cmd_test(&project, opt, offline, filter.as_deref(), time),
+            target,
+        } => cmd_test(
+            &project,
+            opt,
+            offline,
+            filter.as_deref(),
+            time,
+            target.into(),
+        ),
         Command::Package(c) => commands::package::run(c),
         Command::Lsp => commands::lsp::run(),
         Command::Fmt {
@@ -163,16 +186,23 @@ fn main() -> ExitCode {
 
 /// The values of `--target`.
 #[derive(Clone, Copy, clap::ValueEnum)]
-enum TargetArg {
-    Ilang,
+pub(crate) enum TargetArg {
+    Js,
+    Nodejs,
+    Native,
     Wasi,
+    #[value(alias = "ilang")]
+    Host,
 }
 
 impl From<TargetArg> for Target {
     fn from(t: TargetArg) -> Target {
         match t {
-            TargetArg::Ilang => Target::Ilang,
+            TargetArg::Js => Target::Js,
+            TargetArg::Nodejs => Target::Nodejs,
+            TargetArg::Native => Target::Native,
             TargetArg::Wasi => Target::Wasi,
+            TargetArg::Host => Target::Host,
         }
     }
 }
@@ -183,7 +213,7 @@ fn options(opt: u8, tests: bool, offline: bool) -> anyhow::Result<BuildOptions> 
         tests,
         opt,
         offline,
-        target: Target::Ilang,
+        target: Target::Native,
     })
 }
 
@@ -234,7 +264,7 @@ fn cmd_build(
         std::fs::create_dir_all(dir)?;
     }
     std::fs::write(&out, &b.wasm)?;
-    if target == ilang_wasm::Target::Ilang {
+    if target != ilang_wasm::Target::Wasi {
         std::fs::write(
             out.with_extension("bindings.json"),
             b.binding_plan.to_json()?,
@@ -268,8 +298,13 @@ fn cmd_run(
     offline: bool,
     entry: Option<&str>,
     args: Vec<String>,
+    target: Target,
 ) -> anyhow::Result<ExitCode> {
-    let Some(b) = built_entry(project, options(opt, false, offline)?, entry)? else {
+    let options = BuildOptions {
+        target,
+        ..options(opt, false, offline)?
+    };
+    let Some(b) = built_entry(project, options, entry)? else {
         return Ok(ExitCode::FAILURE);
     };
     let program = b.host_program()?;
@@ -301,8 +336,13 @@ fn cmd_test(
     offline: bool,
     filter: Option<&str>,
     time: bool,
+    target: Target,
 ) -> anyhow::Result<ExitCode> {
-    let Some(b) = built(project, options(opt, true, offline)?)? else {
+    let options = BuildOptions {
+        target,
+        ..options(opt, true, offline)?
+    };
+    let Some(b) = built(project, options)? else {
         return Ok(ExitCode::FAILURE);
     };
     let program = b.host_program()?;
@@ -368,10 +408,22 @@ fn cpu_seconds() -> Option<f64> {
 /// `path:line:col: error[CODE]: …`. With `types`, prints the type of each
 /// top-level name of the package's modules, in source order. The tests are
 /// checked too.
-fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
+fn check(project: &Path, offline: bool, types: bool, target: Option<Target>) -> ExitCode {
     let (graph, mut diags) = ilang_cli::load(project, true, offline);
     if graph.root.is_some() {
         let checked = ilang_check::check(&graph);
+        if let Some(target) = target
+            && !checked.diags.iter().any(Diagnostic::is_error)
+        {
+            for plan in
+                ilang_check::providers::resolve_plans(&checked, &graph, target.provider_target())
+                    .into_values()
+            {
+                if let Err(more) = plan {
+                    diags.extend(more);
+                }
+            }
+        }
         diags.extend(checked.diags);
         if types && let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
             for (i, m) in program.modules.iter().enumerate() {

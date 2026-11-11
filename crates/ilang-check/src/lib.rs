@@ -115,7 +115,6 @@ pub mod code {
     pub const BIT_PATTERN: &str = "E0519";
     // E0520 became warning W0503: disjoint equality is well defined (§6.9).
     pub const ENTRY_TYPE: &str = "E0521";
-    pub const ENTRY_ENV: &str = "E0522";
     pub const NEVER_USED: &str = "W0501";
     pub const VALUE_NOT_USED: &str = "W0502";
     pub const EQ_DISJOINT: &str = "W0503";
@@ -183,7 +182,7 @@ pub struct Checked {
 /// only inferred when resolution found no errors, so that one mistake is
 /// not reported many times.
 pub fn check(graph: &PackageGraph) -> Checked {
-    let (mut program, mut diags) = resolve_program(graph);
+    let (program, mut diags) = resolve_program(graph);
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
@@ -192,41 +191,6 @@ pub fn check(graph: &PackageGraph) -> Checked {
         }
         _ => None,
     };
-    if let (Some(p), Some(t)) = (&mut program, &types)
-        && !diags.iter().any(Diagnostic::is_error)
-    {
-        let mut changed = false;
-        for (entry, services) in &t.entry_services {
-            let tasks = services.iter().any(|id| {
-                let service = p.ty(*id);
-                p.module(service.module).path == "i/task"
-                    && matches!(service.name.as_str(), "Scheduler" | "Runner")
-            });
-            let requests = tasks
-                || services.iter().any(|id| {
-                    let service = p.ty(*id);
-                    service
-                        .host
-                        .as_ref()
-                        .is_some_and(|h| h.is_async || h.is_request)
-                        || p.module(service.module).path == "i/request"
-                });
-            for (path, needed) in [("i/request", requests), ("i/task", tasks)] {
-                if needed && let Some(index) = p.modules.iter().position(|m| m.path == path) {
-                    let dep = hir::ModuleId(index as u32);
-                    if dep != entry.module
-                        && !p.modules[entry.module.0 as usize].imports.contains(&dep)
-                    {
-                        p.modules[entry.module.0 as usize].imports.push(dep);
-                        changed = true;
-                    }
-                }
-            }
-        }
-        if changed {
-            order::order(p, &mut diags);
-        }
-    }
     Checked {
         program,
         types,

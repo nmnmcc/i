@@ -1181,3 +1181,35 @@ the review inventory as a historical snapshot. All nine updated observations
 passed again, and the inventory fingerprint audit reported zero failures. The
 migrated numeric export also ran against an asynchronous JS host at O0, O2 and
 O3; each call made one host handoff and returned negative zero with its sign.
+
+
+## JP: applied provider plans
+
+The historical R2 entry specialization above is superseded by spec §2.6.1.
+Source checking retains ordinary named service requirements without checking
+supplies. Target builds resolve one graph per entry, materialize host leaves
+and chosen factories in its stable topological order, and invoke the ordinary
+adapter at the graph's adapter-enter position. Every selected factory executes,
+including seeded factories. Outer and body instances are separate values;
+each factory receives only its checked dependencies. Generated calls use the
+existing control.keep_env delimiter to retain those lexical dependencies
+across suspension and scheduler resumes. The primitive context opens before
+construction and retires after normal returns and typed errors; stops use host
+teardown. Guarded adapter bodies enforce one invocation during adapter lifetime.
+
+Async classification uses the complete graph's declared roles and host modes.
+Await/Owner/Root alone stay synchronous. wasm.synchronous rejects async graphs.
+The five CLI targets select their provider columns, with ilang aliasing host;
+run/test default to native, and source-only check performs no supply validation.
+i deps prints the selected per-entry construction order and adapter position.
+
+The old provider-table rejection is removed. tests/spec/9.11/providers now
+executes its user factory and host dependency. provider_dependency,
+provider_clock_fake and provider_missing cover dependency construction, a
+standard-service replacement on a test entry, and a missing supply. Execution
+and host-registration regressions are in crates/ilang-cli/tests/providers.rs.
+The prior-art construction model is Effect Layer.buildWithMemoMap /
+provideLayer (effect/packages/effect/src/Layer.ts and internal/layer.ts) and
+ZIO ZLayer.build / MemoMap (zio/core/shared/src/main/scala/zio/ZLayer.scala):
+construct dependencies before dependents, once per graph instance and scope,
+then supply the completed environment to the consumer.

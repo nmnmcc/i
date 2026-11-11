@@ -843,7 +843,24 @@ impl Program {
                             .imports
                             .functions
                             .contains_key(&(namespace.clone(), name.clone())),
-                        "missing host function {namespace} {name}"
+                        "missing host function {namespace} {name}{}",
+                        self.binding_plan
+                            .as_ref()
+                            .and_then(|plan| plan
+                                .declarations
+                                .iter()
+                                .find(|d| d.namespace == *namespace
+                                    && d.name == *name
+                                    && d.kind == "service"))
+                            .map(|d| format!(
+                                " for service {}.{}",
+                                d.module,
+                                d.declaration
+                                    .split('.')
+                                    .next()
+                                    .expect("service declaration")
+                            ))
+                            .unwrap_or_default()
                     );
                 }
             }

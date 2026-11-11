@@ -201,10 +201,52 @@ impl Typed {
         // Difference removes a set of service constructors. Normalize both
         // schemes before comparison so manifest list order cannot affect the
         // generalized proof (the source scheme retains its written order).
+        // For nullary services, N is a subset of (N - S) | S. Source
+        // inference may retain that admission intersection or simplify it away.
+        // Normalize the identity on both sides before comparing the complete
+        // generalized schemes; parameterized services keep their constraints.
+        fn view(t: &Ty) -> Ty {
+            match t {
+                Ty::Graph(g) => g.view().expect("ordinary environment node"),
+                _ => t.clone(),
+            }
+        }
+        fn parts(t: &Ty, intersection: bool) -> Vec<Ty> {
+            let mut pending = vec![t.clone()];
+            let mut result = Vec::new();
+            while let Some(t) = pending.pop() {
+                match view(&t) {
+                    Ty::Inter(xs) if intersection => pending.extend(xs),
+                    Ty::Union(xs) if !intersection => pending.extend(xs),
+                    t => result.push(t),
+                }
+            }
+            result
+        }
+        fn admission(t: Ty) -> Ty {
+            let Ty::Inter(_) = t else {
+                return t;
+            };
+            let xs = parts(&t, true);
+            let keep: Vec<_> = xs.iter().filter(|candidate| {
+                let union = parts(candidate, false);
+                !xs.iter().any(|base| union.iter().any(|member| {
+                    let Ty::Diff(from, removed) = member else { return false; };
+                    view(from) == *base && removed.iter().all(|head| {
+                        matches!(view(head), Ty::Con(Head::Named(TypeRef::Custom(_)), _, ref args) if args.is_empty())
+                            && union.iter().any(|m| *m == view(head))
+                    })
+                }))
+            }).cloned().collect();
+            match keep.as_slice() {
+                [one] => one.clone(),
+                _ => Ty::Inter(keep),
+            }
+        }
         fn ordered_differences(p: &Program, ty: &Ty) -> Ty {
             records::Pool::default()
                 .graph(ty)
-                .map_nodes(false, &mut |ty, _| match ty {
+                .map_nodes(false, &mut |ty, env| match ty {
                     Ty::Diff(base, mut removed) => {
                         removed.sort_by_cached_key(|ty| match ty.head() {
                             Some(Head::Named(TypeRef::Custom(id))) => {
@@ -214,6 +256,7 @@ impl Typed {
                         });
                         Ty::Diff(base, removed)
                     }
+                    ty if env => admission(ty),
                     ty => ty,
                 })
         }
