@@ -3936,6 +3936,46 @@ mod deep_source_tests {
     use super::*;
 
     #[test]
+    fn quote_capture_scans_handle_deep_patterns() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let span = Span::default();
+                let mut p = Pattern {
+                    kind: PatternKind::Var(Binder {
+                        var: VarId(9),
+                        name: "capture".into(),
+                        span,
+                    }),
+                    span,
+                };
+                let function = DefId {
+                    module: ModuleId(0),
+                    index: 0,
+                };
+                for _ in 0..10_000 {
+                    p = Pattern {
+                        kind: PatternKind::Quote {
+                            template: 0,
+                            syntax: TypeId(0),
+                            functions: [function; 5],
+                            captures: vec![(false, p)],
+                        },
+                        span,
+                    };
+                }
+                assert_eq!(pattern_values(&p), 10_001);
+                let mut walk = Walk::default();
+                walk.pattern(&p);
+                assert_eq!(walk.bound, HashSet::from([VarId(9)]));
+                drop(p);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
     fn source_measure_and_capture_walk_handle_deep_trees() {
         std::thread::Builder::new()
             .stack_size(256 * 1024)
