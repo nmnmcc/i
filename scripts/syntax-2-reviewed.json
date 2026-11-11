@@ -595,5 +595,15 @@
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
+  },
+  "docs/design/records.md:91de788edf6eac62": {
+    "empty": [
+      "empty tuple expression at byte 103"
+    ]
+  },
+  "docs/design/records.md:2ab64e6b6cf10981": {
+    "empty": [
+      "empty tuple expression at byte 131"
+    ]
   }
 }

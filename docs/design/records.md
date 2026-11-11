@@ -355,8 +355,8 @@ Without L2, the body could supply the value. In `g(K) = (r: ( K: Int ), k: K) ->
 With that type, and `put` replacing the field at run time:
 
 ```i
-bump(R) = (r: R) -> R & { age: String } { record.put(r, "age", "old") }
-x = bump({ age: 36 })   // { age: 36 & String }, which has no values
+bump(R) = (r: R) -> R & (age: String) { record.put(r, "age", "old") }
+x = bump((age: 36))     // (age: 36 & String), which has no values
 x.age + 1               // checks, and at run time adds 1 to "old"
 ```
 
@@ -365,9 +365,9 @@ With `( ..R, age: String )`, `x` has the type `( age: String )`, and the last li
 ### 5.7 The rigid key and forgetting
 
 ```i
-twist(K) = (r: { a: Int }, k: K) -> { ..{ a: Int }, K: "s" } { record.put(r, k, "s") }
-twist({ a: 1 }, "a").a + 1    // E0501: the type is { a: "s" }
-twist({ a: 1 }, "b").a + 1    // correct: the type is { a: Int, b: "s" }
+twist(K) = (r: (a: Int), k: K) -> (..(a: Int), K: "s") { record.put(r, k, "s") }
+twist((a: 1), "a").a + 1    // E0501: the type is (a: "s")
+twist((a: 1), "b").a + 1    // correct: the type is (a: Int, b: "s")
 ```
 
 The `->` part is needed: it is what makes `K` a label parameter (L1). Without it, `K` is an ordinary type variable, and the call of `put` in the body is E0541 with the hint of part 11.
@@ -386,18 +386,18 @@ The constraint is `Without(R2, {K}) & { K: "s" } <: { a: A }`, both members of t
 ### 5.8 A schema library in plain i
 
 ```i
-Schema(A) { Schema(decode: (Json) -> A ? DecodeError) }
+Schema(A) { Schema(decode: (Json) -> A ^ DecodeError) }
 
-object: Schema({..}) = Schema(decode: (j) { {..} })
+object: Schema(Record) = Schema(decode: (j) { () })
 
-field(R, K, V) = (s: Schema(R), key: K, value: Schema(V)) -> Schema({ ..R, K: V }) {
+field(R, K, V) = (s: Schema(R), key: K, value: Schema(V)) -> Schema(( ..R, K: V )) {
   Schema(decode: (j) {
     s.decode(j) |> record.put(key, value.decode(json.at(j, key)))
   })
 }
 
 user = object |> field("name", string) |> field("age", int)
-// user : Schema({ age: Int, name: String })
+// user : Schema((age: Int, name: String))
 ```
 
 This checks as written, with no extra annotation:
@@ -419,11 +419,11 @@ The json-schema track needs a codec that decodes and encodes. With one type para
 A codec with two type parameters works, with `&` and no forgetting on the encode side. `D` is the type the decoder makes, and `E` is the type the encoder reads from. The decoded type comes first, so that the plan's alias pattern `Codec(User, _) = user` reads the record type from the first argument:
 
 ```i
-Codec(D, E) { Codec(decode: (Json) -> D ? DecodeError, encode: (E) -> Json) }
+Codec(D, E) { Codec(decode: (Json) -> D ^ DecodeError, encode: (E) -> Json) }
 
-object: Codec({..}, {..}) = Codec(decode: (j) { {..} }, encode: (x) { json.object([]) })
+object: Codec(Record, Record) = Codec(decode: (j) { () }, encode: (x) { json.object([]) })
 
-field(R, E, K, V) = (s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec({ ..R, K: V }, E & { K: V }) {
+field(R, E, K, V) = (s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec(( ..R, K: V ), E & ( K: V )) {
   Codec(
     decode: (j) { s.decode(j) |> record.put(key, value.decode(json.at(j, key))) },
     encode: (x) { json.set(s.encode(x), key, value.encode(record.get(x, key))) },
@@ -431,7 +431,7 @@ field(R, E, K, V) = (s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec({ ..R,
 }
 
 user = object |> field("name", string) |> field("age", int)
-Codec(User, _) = user          // User is { age: Int, name: String }
+Codec(User, _) = user          // User is (age: Int, name: String)
 ```
 
 - `Codec` is covariant in `D` and contravariant in `E` (`infer.rs:2472`).
@@ -1372,8 +1372,8 @@ not graph identity or one spelling's distribution, defines closed acceptance.
 These two previously rejected closed annotations now pass:
 
 ```i
-wrap_union = (x: Int | String) -> { a: Int } | { a: String } { a: x }
-pair = () -> { data: (Int, Int) } | { error: String } { data: (1, 2) }
+wrap_union = (x: Int | String) -> (a: Int) | (a: String) { (a: x) }
+pair = () -> (data: (Int, Int)) | (error: String) { (data: (1, 2)) }
 ```
 
 `wrap` with result `( a: Int | String )` has the same verdict as
@@ -1422,8 +1422,8 @@ uncovered field case. Resource exhaustion has U6's separate diagnostic.
 Schema(A) { Schema(decode: () -> A) }
 make = (c: Bool) {
   c |> {
-    True -> Schema(decode: () { a: 1 })
-    False -> Schema(decode: () { a: "x" })
+    True -> Schema(decode: () { (a: 1) })
+    False -> Schema(decode: () { (a: "x") })
   }
 }
 schema = make(True)
@@ -1650,7 +1650,7 @@ algebraic reasoning, not compiler runs):
 i code:
 
 ```i
-map_pair = (r, fa, fb) { a: fa(r.a), b: fb(r.b) }
+map_pair = (r, fa, fb) { (a: fa(r.a), b: fb(r.b)) }
 ```
 
 It has a record requirement for a and b and a record of the two result types.
