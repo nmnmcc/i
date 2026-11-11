@@ -26,7 +26,9 @@ mod known;
 mod lits;
 mod pattern;
 mod shown;
+mod shown_tree;
 mod solve;
+mod tree;
 mod value_types;
 
 pub use lits::{LitValue, TestValues};
@@ -59,7 +61,6 @@ pub struct TestMember {
 
 /// A type in inference. `Top` is only made when a type is shown: it is a
 /// type variable that has no effect, in an input place.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
     Var(V),
     /// A named type or a tuple, with its arguments or parts.
@@ -76,6 +77,36 @@ pub(crate) enum Ty {
     Both(Box<Ty>, Box<Ty>),
 }
 
+/// An owned type's fields, separated so callers can consume them without
+/// bypassing `Ty`'s iterative destructor.
+pub(crate) enum TyParts {
+    Var(V),
+    Con(Head, lits::ValueSet, Vec<Ty>),
+    Fn(Box<FnTy>),
+    Union(Vec<Ty>),
+    Inter(Vec<Ty>),
+    Diff(Box<Ty>, Vec<Ty>),
+    Never,
+    Top,
+    Both(Box<Ty>, Box<Ty>),
+}
+
+impl From<TyParts> for Ty {
+    fn from(t: TyParts) -> Ty {
+        match t {
+            TyParts::Var(v) => Ty::Var(v),
+            TyParts::Con(h, v, xs) => Ty::Con(h, v, xs),
+            TyParts::Fn(f) => Ty::Fn(f),
+            TyParts::Union(xs) => Ty::Union(xs),
+            TyParts::Inter(xs) => Ty::Inter(xs),
+            TyParts::Diff(a, xs) => Ty::Diff(a, xs),
+            TyParts::Never => Ty::Never,
+            TyParts::Top => Ty::Top,
+            TyParts::Both(a, b) => Ty::Both(a, b),
+        }
+    }
+}
+
 // The baseline Ty is 40 bytes on 64-bit targets. The set adds at most 8.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Ty>() <= 48);
@@ -90,6 +121,37 @@ pub(crate) struct FnTy {
 }
 
 impl Ty {
+    pub(crate) fn into_parts(mut self) -> TyParts {
+        match &mut self {
+            Ty::Var(v) => TyParts::Var(*v),
+            Ty::Con(h, values, args) => TyParts::Con(
+                *h,
+                std::mem::replace(values, lits::ValueSet::ALL),
+                std::mem::take(args),
+            ),
+            Ty::Fn(f) => TyParts::Fn(std::mem::replace(
+                f,
+                Box::new(FnTy {
+                    params: Vec::new(),
+                    ret: Ty::Never,
+                    err: Ty::Never,
+                    env: Ty::Never,
+                }),
+            )),
+            Ty::Union(xs) => TyParts::Union(std::mem::take(xs)),
+            Ty::Inter(xs) => TyParts::Inter(std::mem::take(xs)),
+            Ty::Diff(a, xs) => TyParts::Diff(
+                std::mem::replace(a, Box::new(Ty::Never)),
+                std::mem::take(xs),
+            ),
+            Ty::Never => TyParts::Never,
+            Ty::Top => TyParts::Top,
+            Ty::Both(a, b) => TyParts::Both(
+                std::mem::replace(a, Box::new(Ty::Never)),
+                std::mem::replace(b, Box::new(Ty::Never)),
+            ),
+        }
+    }
     pub fn literal(v: &LitValue) -> Ty {
         let (b, text) = match v {
             LitValue::Int(n) => (crate::hir::BuiltinType::Int, n.to_string()),
@@ -153,10 +215,13 @@ impl Ty {
     /// A type variable, or a difference of one: a member that a value of
     /// any type constructor may go to.
     pub fn is_varlike(&self) -> bool {
-        match self {
-            Ty::Var(_) => true,
-            Ty::Diff(a, _) => a.is_varlike(),
-            _ => false,
+        let mut t = self;
+        loop {
+            match t {
+                Ty::Var(_) => return true,
+                Ty::Diff(a, _) => t = a,
+                _ => return false,
+            }
         }
     }
 }

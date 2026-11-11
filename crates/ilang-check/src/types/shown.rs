@@ -6,7 +6,6 @@ use crate::hir::TypeRef;
 
 /// A type as it is shown (§4.7): simplified, with its type variables named.
 /// [`ShownType::text`] writes it in the syntax of §3.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ShownType {
     /// The canonical source text of an Int or String literal.
     Lit(String),
@@ -111,23 +110,27 @@ impl ShownType {
     /// intersection, 3 no difference and no function type. A part that
     /// binds less is put in `{ }`.
     fn write(&self, prec: u8, out: &mut String, n: &mut Names) {
-        let open = |out: &mut String, own: u8| {
-            if prec > own {
-                out.push_str("{ ");
-            }
-        };
-        let close = |out: &mut String, own: u8| {
-            if prec > own {
-                out.push_str(" }");
-            }
-        };
-        let list = |xs: &[ShownType], sep: &str, p: u8, out: &mut String, n: &mut Names| {
+        enum Task<'a> {
+            Node(&'a ShownType, u8),
+            Part(&'a ShownType, bool),
+            Text(&'a str),
+            Owned(String),
+            Type(TypeRef),
+            Var(&'a str),
+        }
+        fn list<'a>(
+            xs: &'a [ShownType],
+            sep: &'a str,
+            prec: u8,
+            limit: Option<usize>,
+        ) -> Vec<Task<'a>> {
             let mut seen = [0usize; 2];
             let counts = [false, true].map(|string| {
                 xs.iter()
                     .filter(|x| matches!(x, ShownType::Lit(s) if s.starts_with('"') == string))
                     .count()
             });
+            let mut items = Vec::new();
             let mut written = 0;
             for x in xs {
                 let kind = match x {
@@ -136,97 +139,117 @@ impl ShownType {
                 };
                 if let Some(k) = kind {
                     seen[k] += 1;
-                    if n.limit.is_some_and(|limit| counts[k] > limit) && seen[k] > 10 {
+                    if limit.is_some_and(|limit| counts[k] > limit) && seen[k] > 10 {
                         if seen[k] == 11 {
                             if written > 0 {
-                                out.push_str(sep);
+                                items.push(Task::Text(sep));
                             }
-                            out.push_str(&format!("… ({} more)", counts[k] - 10));
+                            items.push(Task::Owned(format!("… ({} more)", counts[k] - 10)));
                             written += 1;
                         }
                         continue;
                     }
                 }
                 if written > 0 {
-                    out.push_str(sep);
+                    items.push(Task::Text(sep));
                 }
-                x.write(p, out, n);
+                items.push(Task::Node(x, prec));
                 written += 1;
             }
-        };
-        match self {
-            ShownType::Lit(s) => out.push_str(s),
-            ShownType::Var(v) => out.push_str(&(n.var)(v)),
-            ShownType::Never => out.push_str("Never"),
-            ShownType::Hole => out.push('_'),
-            ShownType::Named(r, args) => {
-                out.push_str(&(n.ty)(*r));
-                if !args.is_empty() {
-                    out.push('(');
-                    list(args, ", ", 0, out, n);
-                    out.push(')');
-                }
-            }
-            ShownType::Tuple(parts) => {
-                out.push('(');
-                list(parts, ", ", 0, out, n);
-                out.push(')');
-            }
-            ShownType::Fn(f) => {
-                open(out, 0);
-                out.push('(');
-                for (i, (l, p)) in f.params.iter().enumerate() {
-                    if i > 0 {
-                        out.push_str(", ");
-                    }
-                    if let Some(l) = l {
-                        out.push_str(l);
-                        out.push_str(": ");
-                    }
-                    p.write(0, out, n);
-                }
-                out.push_str(") -> ");
-                // A function type followed by `?` or `!` is put in `{ }`.
-                let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
+            items
+        }
+        let mut tasks = vec![Task::Node(self, prec)];
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Text(s) => out.push_str(s),
+                Task::Owned(s) => out.push_str(&s),
+                Task::Type(r) => out.push_str(&(n.ty)(r)),
+                Task::Var(v) => out.push_str(&(n.var)(v)),
+                Task::Part(x, followed) => {
                     let braces = followed && matches!(x, ShownType::Fn(_));
                     if braces {
-                        out.push_str("{ ");
+                        tasks.push(Task::Text(" }"));
                     }
-                    x.write(0, out, n);
+                    tasks.push(Task::Node(x, 0));
                     if braces {
-                        out.push_str(" }");
+                        tasks.push(Task::Text("{ "));
                     }
-                };
-                part(&f.ret, f.err.is_some() || f.env.is_some(), out, n);
-                if let Some(e) = &f.err {
-                    out.push_str(" ? ");
-                    part(e, f.env.is_some(), out, n);
                 }
-                if let Some(e) = &f.env {
-                    out.push_str(" ! ");
-                    part(e, false, out, n);
-                }
-                close(out, 0);
-            }
-            ShownType::Union(ms) => {
-                open(out, 0);
-                list(ms, " | ", 1, out, n);
-                close(out, 0);
-            }
-            ShownType::Inter(ms) => {
-                open(out, 1);
-                list(ms, " & ", 2, out, n);
-                close(out, 1);
-            }
-            ShownType::Diff(a, h) => {
-                // Only the type constructors of `H` matter (§4.4).
-                open(out, 2);
-                a.write(2, out, n);
-                if !h.is_empty() {
-                    out.push_str(" - ");
-                    list(h, " - ", 3, out, n);
-                }
-                close(out, 2);
+                Task::Node(t, prec) => match t {
+                    ShownType::Lit(s) => tasks.push(Task::Text(s)),
+                    ShownType::Var(v) => tasks.push(Task::Var(v)),
+                    ShownType::Never => tasks.push(Task::Text("Never")),
+                    ShownType::Hole => tasks.push(Task::Text("_")),
+                    ShownType::Named(r, xs) => {
+                        if !xs.is_empty() {
+                            tasks.push(Task::Text(")"));
+                            tasks.extend(list(xs, ", ", 0, n.limit).into_iter().rev());
+                            tasks.push(Task::Text("("));
+                        }
+                        tasks.push(Task::Type(*r));
+                    }
+                    ShownType::Tuple(xs) => {
+                        tasks.push(Task::Text(")"));
+                        tasks.extend(list(xs, ", ", 0, n.limit).into_iter().rev());
+                        tasks.push(Task::Text("("));
+                    }
+                    ShownType::Fn(f) => {
+                        if prec > 0 {
+                            tasks.push(Task::Text(" }"));
+                        }
+                        if let Some(e) = &f.env {
+                            tasks.push(Task::Part(e, false));
+                            tasks.push(Task::Text(" ! "));
+                        }
+                        if let Some(e) = &f.err {
+                            tasks.push(Task::Part(e, f.env.is_some()));
+                            tasks.push(Task::Text(" ? "));
+                        }
+                        tasks.push(Task::Part(&f.ret, f.err.is_some() || f.env.is_some()));
+                        tasks.push(Task::Text(") -> "));
+                        for (i, (label, p)) in f.params.iter().enumerate().rev() {
+                            tasks.push(Task::Node(p, 0));
+                            if let Some(label) = label {
+                                tasks.push(Task::Text(": "));
+                                tasks.push(Task::Text(label));
+                            }
+                            if i > 0 {
+                                tasks.push(Task::Text(", "));
+                            }
+                        }
+                        tasks.push(Task::Text("("));
+                        if prec > 0 {
+                            tasks.push(Task::Text("{ "));
+                        }
+                    }
+                    ShownType::Union(xs) | ShownType::Inter(xs) => {
+                        let (own, sep, child) = if matches!(t, ShownType::Union(_)) {
+                            (0, " | ", 1)
+                        } else {
+                            (1, " & ", 2)
+                        };
+                        if prec > own {
+                            tasks.push(Task::Text(" }"));
+                        }
+                        tasks.extend(list(xs, sep, child, n.limit).into_iter().rev());
+                        if prec > own {
+                            tasks.push(Task::Text("{ "));
+                        }
+                    }
+                    ShownType::Diff(a, xs) => {
+                        if prec > 2 {
+                            tasks.push(Task::Text(" }"));
+                        }
+                        if !xs.is_empty() {
+                            tasks.extend(list(xs, " - ", 3, n.limit).into_iter().rev());
+                            tasks.push(Task::Text(" - "));
+                        }
+                        tasks.push(Task::Node(a, 2));
+                        if prec > 2 {
+                            tasks.push(Task::Text("{ "));
+                        }
+                    }
+                },
             }
         }
     }
@@ -242,34 +265,32 @@ struct Names<'a> {
 impl ShownType {
     /// Nominal identities in the complete tree, including function inputs.
     pub fn type_refs(&self, out: &mut Vec<TypeRef>) {
-        match self {
-            ShownType::Named(ty, ts) => {
-                out.push(*ty);
-                for t in ts {
-                    t.type_refs(out);
+        let mut pending = vec![self];
+        while let Some(t) = pending.pop() {
+            match t {
+                ShownType::Named(r, xs) => {
+                    out.push(*r);
+                    pending.extend(xs.iter().rev());
                 }
+                ShownType::Tuple(xs) | ShownType::Union(xs) | ShownType::Inter(xs) => {
+                    pending.extend(xs.iter().rev())
+                }
+                ShownType::Fn(f) => {
+                    if let Some(t) = &f.env {
+                        pending.push(t);
+                    }
+                    if let Some(t) = &f.err {
+                        pending.push(t);
+                    }
+                    pending.push(&f.ret);
+                    pending.extend(f.params.iter().rev().map(|(_, t)| t));
+                }
+                ShownType::Diff(a, xs) => {
+                    pending.extend(xs.iter().rev());
+                    pending.push(a);
+                }
+                ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => {}
             }
-            ShownType::Tuple(ts) | ShownType::Union(ts) | ShownType::Inter(ts) => {
-                for t in ts {
-                    t.type_refs(out);
-                }
-            }
-            ShownType::Fn(f) => {
-                for (_, t) in &f.params {
-                    t.type_refs(out);
-                }
-                f.ret.type_refs(out);
-                for t in f.err.iter().chain(&f.env) {
-                    t.type_refs(out);
-                }
-            }
-            ShownType::Diff(t, ts) => {
-                t.type_refs(out);
-                for t in ts {
-                    t.type_refs(out);
-                }
-            }
-            ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => {}
         }
     }
 }

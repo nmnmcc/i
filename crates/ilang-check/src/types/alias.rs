@@ -1,5 +1,6 @@
 //! Dependency-driven alias templates. Template variables are private slots,
 //! never solver variables; instantiation allocates each written hole once.
+use super::TyParts;
 use super::infer::Checker;
 use super::value_types::Read;
 use super::{FnTy, ShownType, Ty, V};
@@ -262,21 +263,23 @@ impl Checker<'_> {
     }
     fn normalize_known_alias(&self, t: Ty) -> Ty {
         let go = |t| self.normalize_known_alias(t);
-        match t {
-            Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+        match t.into_parts() {
+            TyParts::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
+            TyParts::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
                 ret: go(f.ret),
                 err: go(f.err),
                 env: go(f.env),
             })),
-            Ty::Union(ts) => self.kunion(ts.into_iter().map(go).collect()),
-            Ty::Inter(ts) => super::display::known_inter(&self.s, ts.into_iter().map(go).collect()),
-            Ty::Diff(t, ts) => {
+            TyParts::Union(ts) => self.kunion(ts.into_iter().map(go).collect()),
+            TyParts::Inter(ts) => {
+                super::display::known_inter(&self.s, ts.into_iter().map(go).collect())
+            }
+            TyParts::Diff(t, ts) => {
                 super::display::known_diff(&self.s, go(*t), ts.into_iter().map(go).collect())
             }
-            Ty::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
-            Ty::Var(_) | Ty::Never | Ty::Top => t,
+            TyParts::Both(a, b) => Ty::Both(Box::new(go(*a)), Box::new(go(*b))),
+            t => t.into(),
         }
     }
 
