@@ -40,6 +40,7 @@ mod fs;
 mod net;
 mod process;
 mod stdio;
+mod tls;
 
 use crate::{BigInt, HostImports, Value};
 use anyhow::bail;
@@ -75,6 +76,7 @@ pub fn standard_with_args(
     net::register(&mut imports);
     process::register(&mut imports, args);
     stdio::register(&mut imports);
+    tls::register(&mut imports);
     imports
 }
 
