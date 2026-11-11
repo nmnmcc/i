@@ -682,10 +682,10 @@ help(A) = (
 }
 
 /// Parses the arguments supplied by the process service.
-read = (parser) { parse(parser, process.args()) }
+read(A) = (parser: Parser(A)) { parse(parser, process.args()) }
 
 /// Runs a command after parsing its arguments, reporting failures on stderr.
-run = (parser, program, body) {
+run(A, E, N) = (parser: Parser(A), program: String, body: (A) -> Nil ^ E ! N) {
 	read(parser) |> {
 		Ok(value) -> body(value)
 		Error(error) -> {
