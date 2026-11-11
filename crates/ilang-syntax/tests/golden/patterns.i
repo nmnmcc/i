@@ -1,3 +1,4 @@
+// syntax: syn1
 f = (v) {
    v |> {
     x -> 1
