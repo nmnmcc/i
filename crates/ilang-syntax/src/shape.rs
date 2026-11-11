@@ -20,33 +20,42 @@ pub fn shape(module: &Module) -> String {
     format!("{module:?}")
 }
 
+struct Canon;
+impl Visitor for Canon {
+    fn expr(&mut self, e: &mut Expr, enter: bool) {
+        if !enter
+            && let ExprKind::Block(b) = &mut e.kind
+            && let [Stmt::Expr(inner)] = &mut b.stmts[..]
+        {
+            // Children are already normalized. Move the child out rather
+            // than cloning it at every level of a nested group chain.
+            let child = std::mem::replace(
+                inner,
+                Expr {
+                    kind: ExprKind::Tuple(Vec::new()),
+                    span: Span::default(),
+                },
+            );
+            *e = child;
+        }
+    }
+}
+
 /// Remove transparent expression groups and normalize spans. All other
 /// data, including every string payload, participates in AST equality.
 pub(crate) fn canonical(module: &Module) -> Module {
-    struct Canon;
-    impl Visitor for Canon {
-        fn expr(&mut self, e: &mut Expr, enter: bool) {
-            if !enter
-                && let ExprKind::Block(b) = &mut e.kind
-                && let [Stmt::Expr(inner)] = &mut b.stmts[..]
-            {
-                // Children are already normalized. Move the child out rather
-                // than cloning it at every level of a nested group chain.
-                let child = std::mem::replace(
-                    inner,
-                    Expr {
-                        kind: ExprKind::Tuple(Vec::new()),
-                        span: Span::default(),
-                    },
-                );
-                *e = child;
-            }
-        }
-    }
     let mut module = module.clone();
     module.walk(&mut Canon);
     module.walk(&mut Unspan);
     module
+}
+
+struct Floats(Vec<String>);
+impl Visitor for Floats {
+    fn float(&mut self, value: &mut f64) {
+        self.0.push(format!("{value:?}"));
+        *value = 0.0;
+    }
 }
 
 /// Compare syntax after removing transparent groups and source spans.
@@ -55,15 +64,23 @@ pub fn equivalent(a: &Module, b: &Module) -> bool {
     // `canon` historically compares Debug text, which distinguishes signed
     // zero and prints all NaNs alike. Normalize floating fields separately to
     // retain exactly that contract while using stack-safe structural equality.
-    struct Floats(Vec<String>);
-    impl Visitor for Floats {
-        fn float(&mut self, value: &mut f64) {
-            self.0.push(format!("{value:?}"));
-            *value = 0.0;
-        }
-    }
     let mut a = canonical(a);
     let mut b = canonical(b);
+    let mut af = Floats(Vec::new());
+    let mut bf = Floats(Vec::new());
+    a.walk(&mut af);
+    b.walk(&mut bf);
+    af.0 == bf.0 && a == b
+}
+
+/// Compare expression structure with the same normalization as `equivalent`.
+pub fn equivalent_expression(a: &Expr, b: &Expr) -> bool {
+    let mut a = a.clone();
+    let mut b = b.clone();
+    a.walk(&mut Canon);
+    b.walk(&mut Canon);
+    a.walk(&mut Unspan);
+    b.walk(&mut Unspan);
     let mut af = Floats(Vec::new());
     let mut bf = Floats(Vec::new());
     a.walk(&mut af);
@@ -150,6 +167,13 @@ mod deep_tests {
                 }
                 binding.value = e;
                 assert!(equivalent(&plain, &nested));
+                let ItemKind::Binding(a) = &plain.items[0].kind else {
+                    unreachable!()
+                };
+                let ItemKind::Binding(b) = &nested.items[0].kind else {
+                    unreachable!()
+                };
+                assert!(equivalent_expression(&a.value, &b.value));
             })
             .unwrap()
             .join()
