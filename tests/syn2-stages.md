@@ -161,3 +161,9 @@ invalid test module. It cannot be run when that module is loaded, and the
 old default build did not load it, so the migrated fixture leaves its `main`
 as an ordinary test-module binding. This follows §2.6's root entry selection
 and preserves the fixture's default build and negative test behavior.
+
+The paired retry of `review-k4c/cases/stress_wide_open_1024` captured the
+baseline but the migrated build timed out at both 12 and 120 seconds. The
+baseline `review-k4/perf/wide_generic_2048` also timed out at both limits.
+Both use the same `i build --offline --opt 0 --wat --project <path> --out
+<file>` reproduction described above.
