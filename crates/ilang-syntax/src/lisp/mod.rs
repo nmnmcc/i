@@ -14,6 +14,7 @@ pub mod definition_schedule;
 pub mod definition_table;
 pub mod definitions;
 mod encode;
+mod encode_charge;
 pub mod expansion;
 mod from_ast;
 pub mod quote_lower;
@@ -25,6 +26,7 @@ mod to_ast;
 mod to_source;
 pub(crate) mod trampoline;
 pub use encode::{SourceEncoder, expression_syntax, item_syntax, pattern_syntax, type_syntax};
+pub use encode_charge::SyntaxCharge;
 pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
     parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type,
