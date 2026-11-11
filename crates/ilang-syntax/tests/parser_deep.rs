@@ -435,7 +435,7 @@ fn deep_record_type_fields_and_spreads_parse_and_drop() {
             let PatternKind::Typed { ty, .. } = &pattern.kind else {
                 panic!("typed parameter")
             };
-            let mut node = ty.as_ref();
+            let mut node = ty;
             for _ in 0..n {
                 node = match &node.kind {
                     TypeKind::Record {
