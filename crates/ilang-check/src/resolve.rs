@@ -3957,6 +3957,11 @@ impl<'a> Resolver<'a> {
         if let Some(root) = self.graph.root {
             let pkg = &self.graph.packages[root];
             let mut bad = Vec::new();
+            if let Some(m) = self.by_path.get(&(root, format!("{}/main", pkg.name)))
+                && let Some(&index) = self.defs_by_name[m.0 as usize].get("main")
+            {
+                self.p.declared_entries.push(DefId { module: *m, index });
+            }
             for (name, e) in &pkg.entries {
                 let valid = self
                     .by_path
@@ -3971,7 +3976,11 @@ impl<'a> Resolver<'a> {
                                 )
                             })
                     });
-                if !valid {
+                if valid {
+                    let m = self.by_path[&(root, e.module.clone())];
+                    let index = self.defs_by_name[m.0 as usize][&e.function];
+                    self.p.declared_entries.push(DefId { module: m, index });
+                } else {
                     bad.push((
                         e.span,
                         format!("entry `{name}` must name a top-level function of this package"),

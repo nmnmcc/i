@@ -41,6 +41,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
         }
     }
     references.pending.extend(&p.host_exports);
+    references.pending.extend(&p.declared_entries);
     // Exempt definitions still use values through written types (§4.3).
     for t in &p.types {
         match &t.body {

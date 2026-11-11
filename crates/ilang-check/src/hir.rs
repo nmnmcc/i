@@ -75,6 +75,8 @@ pub struct Program {
     /// The host exports (§10.2): the names in `[wasm].exports` of the
     /// compiled package that are exported functions of a module.
     pub host_exports: Vec<DefId>,
+    /// Default and declared program entries, including unselected entries.
+    pub declared_entries: Vec<DefId>,
     /// The number of `VarId`s and `TyVarId`s given out.
     pub var_count: u32,
     pub ty_var_count: u32,
