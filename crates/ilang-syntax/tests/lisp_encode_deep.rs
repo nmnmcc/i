@@ -268,10 +268,10 @@ fn reusable_encoder_preserves_source_spans_and_scope_across_items() {
 }
 
 #[test]
-fn reusable_encoder_agrees_with_independent_lisp_printer_on_spec_corpus() {
+fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
     use ilang_syntax::lisp::SourceEncoder;
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
-    let mut dirs = vec![root];
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut dirs = vec![root.join("lib"), root.join("std"), root.join("tests/spec")];
     let scope = scope();
     let mut checked = 0;
     while let Some(dir) = dirs.pop() {
@@ -298,8 +298,11 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_spec_corpus() {
                     items: vec![clean],
                     ..Default::default()
                 };
+                let plan = planned(&encoder, item);
+                let encoded = encoder.item(item);
+                assert_eq!(plan, direct_charge_events(&encoded), "{}", path.display());
                 assert_eq!(
-                    encoder.item(item).show(),
+                    encoded.show(),
                     ilang_syntax::lisp::print_module(&expected).trim_end(),
                     "{}",
                     path.display()
@@ -310,7 +313,7 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_spec_corpus() {
     }
     assert!(
         checked > 100,
-        "expected substantive valid spec corpus, saw {checked} items"
+        "expected substantive valid corpus, saw {checked} items"
     );
 }
 
@@ -361,4 +364,196 @@ fn written_macro_argument_preserves_identity_scope_and_locations_through_quote()
         &source[call_parts[1].span().start as usize..call_parts[1].span().end as usize],
         "1"
     );
+}
+
+fn planned(
+    encoder: &ilang_syntax::lisp::SourceEncoder,
+    item: &ilang_syntax::ast::Item,
+) -> Vec<ilang_syntax::lisp::SyntaxCharge> {
+    let mut events = Vec::new();
+    encoder
+        .visit_item_charge(item, |event| {
+            events.push(event);
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+    events
+}
+
+// Independent oracle for the host's output=true Syntax traversal: each
+// event is checked individually, including zero-cost integer operations.
+fn direct_charge_events(
+    root: &ilang_syntax::lisp::syntax::Syntax,
+) -> Vec<ilang_syntax::lisp::SyntaxCharge> {
+    use ilang_syntax::lisp::SyntaxCharge as C;
+    enum Task<'a> {
+        Node(&'a ilang_syntax::lisp::syntax::Syntax),
+        Leave,
+    }
+    let mut pending = vec![Task::Node(root)];
+    let mut events = Vec::new();
+    while let Some(task) = pending.pop() {
+        let s = match task {
+            Task::Leave => {
+                events.push(C::LeaveFrame);
+                continue;
+            }
+            Task::Node(s) => s,
+        };
+        events.push(C::EnterFrame(1));
+        events.push(C::Charge { work: 1, words: 80 });
+        pending.push(Task::Leave);
+        let bytes = match s.node() {
+            Node::Name(text)
+            | Node::Discard(text)
+            | Node::Up(text)
+            | Node::Symbol(text)
+            | Node::Text(text) => text.len() as u64,
+            Node::Int(value) => {
+                let bytes = value.bits().div_ceil(8);
+                let limbs = bytes.div_ceil(4);
+                events.push(C::Charge {
+                    work: limbs.saturating_mul(limbs),
+                    words: 0,
+                });
+                bytes
+            }
+            Node::Float(_) => 8,
+            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                let n = xs.len() as u64;
+                events.push(C::Charge {
+                    work: n,
+                    words: 4 + n.saturating_mul(8),
+                });
+                pending.extend(xs.iter().rev().map(Task::Node));
+                0
+            }
+            Node::Quote(child) | Node::Unquote(child) | Node::Splice(child) => {
+                events.push(C::Charge { work: 1, words: 8 });
+                pending.push(Task::Node(child));
+                0
+            }
+        };
+        let work = bytes.saturating_mul(12);
+        events.push(C::Charge {
+            work,
+            words: 4 + work.div_ceil(8),
+        });
+    }
+    events
+}
+
+#[test]
+fn charge_plan_matches_each_event_without_building_the_answer() {
+    use ilang_syntax::lisp::SourceEncoder;
+    let source = "Thing(A) { Item(label: A, number: 123456789012345678901234567890) }\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let scope = scope();
+    let encoder = SourceEncoder::new(&scope, source);
+    let plan = planned(&encoder, &module.items[0]);
+    let encoded = encoder.item(&module.items[0]);
+    assert_eq!(plan, direct_charge_events(&encoded));
+    let mut prefix = Vec::new();
+    let stopped = encoder.visit_item_charge(&module.items[0], |event| {
+        prefix.push(event);
+        if prefix.len() == 7 {
+            Err("limit")
+        } else {
+            Ok(())
+        }
+    });
+    assert_eq!(stopped, Err("limit"));
+    assert_eq!(prefix, plan[..7]);
+    fn send_sync<T: Send + Sync>() {}
+    send_sync::<SourceEncoder>();
+    // Neither lexical context nor an unrelated item may affect the selected
+    // definition's plan, including its event order.
+    let extended = format!("{source}unrelated = \"{}\"\n", "x".repeat(50_000));
+    let extended_encoder = SourceEncoder::new(&scope, &extended);
+    assert_eq!(plan, planned(&extended_encoder, &module.items[0]));
+}
+
+#[test]
+fn deep_item_charge_plan_is_stack_safe_and_has_exact_order() {
+    use ilang_syntax::ast::{Binding, Item, ItemKind};
+    use ilang_syntax::lisp::SourceEncoder;
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let depth = 10_000;
+            let prefix = "main = ";
+            let source = format!("{prefix}{}x{}", "f(".repeat(depth), ")".repeat(depth));
+            let end = source.len();
+            let pos = prefix.len() + depth * 2;
+            let mut expr = Expr {
+                span: Span::new(pos as u32, (pos + 1) as u32),
+                kind: ExprKind::Name {
+                    module: None,
+                    name: ident("x", pos),
+                },
+            };
+            for i in (0..depth).rev() {
+                let start = prefix.len() + i * 2;
+                let f = ident("f", start);
+                expr = Expr {
+                    span: Span::new(start as u32, (end - i) as u32),
+                    kind: ExprKind::Call {
+                        callee: Box::new(Expr {
+                            span: f.span,
+                            kind: ExprKind::Name {
+                                module: None,
+                                name: f,
+                            },
+                        }),
+                        args: vec![Arg {
+                            label: None,
+                            value: expr,
+                        }],
+                    },
+                };
+            }
+            let pattern = Pattern {
+                span: Span::new(0, 4),
+                kind: PatternKind::Var("main".into()),
+            };
+            let item = Item {
+                doc: vec![],
+                attributes: vec![],
+                span: Span::new(0, end as u32),
+                kind: ItemKind::Binding(Binding {
+                    pattern,
+                    value: expr,
+                    span: Span::new(0, end as u32),
+                    type_params: vec![],
+                }),
+            };
+            let scope = scope();
+            let encoder = SourceEncoder::new(&scope, &source);
+            let plan = planned(&encoder, &item);
+            let result = encoder.item(&item);
+            assert_eq!(plan, direct_charge_events(&result));
+            drop(result);
+            drop(item);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn charge_events_count_unicode_zero_and_large_integer_exactly() {
+    use ilang_syntax::lisp::SourceEncoder;
+    let source = "value = () { [\"é\\n\", 0, 1234567890123456789012345678901234567890] }\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let scope = scope();
+    let encoder = SourceEncoder::new(&scope, source);
+    let item = &module.items[0];
+    let plan = planned(&encoder, item);
+    assert_eq!(plan, direct_charge_events(&encoder.item(item)));
+    assert!(plan.iter().any(|event| matches!(
+        event,
+        ilang_syntax::lisp::SyntaxCharge::Charge { work: 0, words: 0 }
+    )));
 }

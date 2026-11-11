@@ -23,46 +23,69 @@ pub fn type_syntax(t: &TypeExpr, scope: &Scope, source: &str) -> Syntax {
 ///
 /// The input nodes must belong to the source passed to `new`. Results carry
 /// the scope and the original spans of those nodes.
-pub struct SourceEncoder<'a> {
-    encoder: Encoder<'a>,
+pub struct SourceEncoder {
+    scope: Scope,
+    tokens: Vec<Token>,
+    close: Vec<Option<u32>>,
+    positions: Vec<usize>,
 }
-impl<'a> SourceEncoder<'a> {
-    pub fn new(scope: &'a Scope, source: &str) -> Self {
+impl SourceEncoder {
+    pub fn new(scope: &Scope, source: &str) -> Self {
+        let lexed = crate::lex(source);
+        // The first token beginning at or after each byte boundary. The
+        // source is indexed once, so separate items do not re-lex it.
+        let mut positions = vec![lexed.tokens.len(); source.len() + 1];
+        let mut next = lexed.tokens.len();
+        for offset in (0..=source.len()).rev() {
+            while next > 0 && lexed.tokens[next - 1].span.start as usize >= offset {
+                next -= 1;
+            }
+            positions[offset] = next;
+        }
         Self {
-            encoder: Encoder::new(scope, source),
+            scope: scope.clone(),
+            tokens: lexed.tokens,
+            close: lexed.close,
+            positions,
         }
     }
     pub fn expression(&self, expression: &Expr) -> Syntax {
-        self.encoder.prepare(vec![Work::Expr(expression, false)]);
-        let value = self.encoder.expr(expression);
-        self.encoder.clear();
-        value
+        let encoder = Encoder::new(self);
+        encoder.prepare(vec![Work::Expr(expression, false)]);
+        encoder.expr(expression)
     }
     pub fn item(&self, item: &Item) -> Syntax {
-        self.encoder.prepare(vec![Work::Item(item)]);
-        let value = self.encoder.item(item);
-        self.encoder.clear();
-        value
+        let encoder = Encoder::new(self);
+        encoder.prepare(vec![Work::Item(item)]);
+        encoder.item(item)
+    }
+    /// Visit exactly the charges of copying this written item's encoded
+    /// Syntax, in the same order as the host's output-tree traversal. No
+    /// Syntax or atom copies are constructed; an error stops immediately.
+    pub fn visit_item_charge<E>(
+        &self,
+        item: &Item,
+        visit: impl FnMut(super::SyntaxCharge) -> Result<(), E>,
+    ) -> Result<(), E> {
+        super::encode_charge::item(item, visit)
     }
     pub fn pattern(&self, pattern: &Pattern) -> Syntax {
-        self.encoder.prepare(vec![Work::Pattern(pattern, false)]);
-        let value = self.encoder.pattern(pattern);
-        self.encoder.clear();
-        value
+        let encoder = Encoder::new(self);
+        encoder.prepare(vec![Work::Pattern(pattern, false)]);
+        encoder.pattern(pattern)
     }
     pub fn ty(&self, ty: &TypeExpr) -> Syntax {
-        self.encoder.prepare(vec![Work::Type(ty, false)]);
-        let value = self.encoder.ty(ty);
-        self.encoder.clear();
-        value
+        let encoder = Encoder::new(self);
+        encoder.prepare(vec![Work::Type(ty, false)]);
+        encoder.ty(ty)
     }
 }
 
 struct Encoder<'a> {
     scope: &'a Scope,
-    tokens: Vec<Token>,
-    close: Vec<Option<u32>>,
-    positions: Vec<usize>,
+    tokens: &'a [Token],
+    close: &'a [Option<u32>],
+    positions: &'a [usize],
     expressions: RefCell<HashMap<*const Expr, Syntax>>,
     patterns: RefCell<HashMap<*const Pattern, Syntax>>,
     types: RefCell<HashMap<*const TypeExpr, Syntax>>,
@@ -82,32 +105,16 @@ enum Work<'a> {
     Arg(&'a Arg),
 }
 impl Encoder<'_> {
-    fn new<'a>(scope: &'a Scope, source: &str) -> Encoder<'a> {
-        let lexed = crate::lex(source);
-        // Map each byte boundary to the first token beginning there or later.
-        // This makes each token lookup O(1) before its bounded local scan.
-        let mut positions = vec![lexed.tokens.len(); source.len() + 1];
-        let mut next = lexed.tokens.len();
-        for offset in (0..=source.len()).rev() {
-            while next > 0 && lexed.tokens[next - 1].span.start as usize >= offset {
-                next -= 1;
-            }
-            positions[offset] = next;
-        }
+    fn new(source: &SourceEncoder) -> Encoder<'_> {
         Encoder {
-            scope,
-            tokens: lexed.tokens,
-            close: lexed.close,
-            positions,
+            scope: &source.scope,
+            tokens: &source.tokens,
+            close: &source.close,
+            positions: &source.positions,
             expressions: RefCell::new(HashMap::new()),
             patterns: RefCell::new(HashMap::new()),
             types: RefCell::new(HashMap::new()),
         }
-    }
-    fn clear(&self) {
-        self.expressions.borrow_mut().clear();
-        self.patterns.borrow_mut().clear();
-        self.types.borrow_mut().clear();
     }
     fn prepare<'a>(&self, mut work: Vec<Work<'a>>) {
         while let Some(task) = work.pop() {
