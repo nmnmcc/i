@@ -1,6 +1,10 @@
 //! Report syntax spans for the test migration; edits remain source-preserving.
-use ilang_syntax::{ast::{ExprKind, ItemKind, PatternKind}, lexer::lex, token::TokenKind};
-use serde_json::{json, Value};
+use ilang_syntax::{
+    ast::{ExprKind, ItemKind, PatternKind},
+    lexer::lex,
+    token::TokenKind,
+};
+use serde_json::{Value, json};
 use std::io::{self, BufRead};
 
 fn inspect(source: &str) -> Value {
@@ -12,17 +16,34 @@ fn inspect(source: &str) -> Value {
     let mut tests = Vec::new();
     for item in &module.items {
         for attr in &item.attributes {
-            if attr.module.is_some() || attr.name.name != "test" { continue; }
-            let ItemKind::Binding(binding) = &item.kind else { return json!({"error":"@test is not a binding"}); };
-            let PatternKind::Var(name) = &binding.pattern.kind else { return json!({"error":"@test has a non-name pattern"}); };
-            if !matches!(binding.value.kind, ExprKind::Fn(_)) || item.attributes.len() != 1 || !attr.args.is_empty() || attr.call.is_some() {
+            if attr.module.is_some() || attr.name.name != "test" {
+                continue;
+            }
+            let ItemKind::Binding(binding) = &item.kind else {
+                return json!({"error":"@test is not a binding"});
+            };
+            let PatternKind::Var(name) = &binding.pattern.kind else {
+                return json!({"error":"@test has a non-name pattern"});
+            };
+            if !matches!(binding.value.kind, ExprKind::Fn(_))
+                || item.attributes.len() != 1
+                || !attr.args.is_empty()
+                || attr.call.is_some()
+            {
                 return json!({"error":format!("@test {name} has an unsupported declaration")});
             }
-            let references = tokens.iter().filter(|t| matches!(&t.kind, TokenKind::Name(n) if n == name)).count() > 1 || module.exports.iter().any(|e| e.name.name == *name);
-            tests.push(json!({"name":name, "attr_start":attr.span.start, "attr_end":attr.span.end,
+            let references = tokens
+                .iter()
+                .filter(|t| matches!(&t.kind, TokenKind::Name(n) if n == name))
+                .count()
+                > 1
+                || module.exports.iter().any(|e| e.name.name == *name);
+            tests.push(
+                json!({"name":name, "attr_start":attr.span.start, "attr_end":attr.span.end,
                 "binding_start":binding.span.start, "binding_end":binding.span.end,
                 "value_start":binding.value.span.start, "value_end":binding.value.span.end,
-                "referenced":references}));
+                "referenced":references}),
+            );
         }
     }
     json!({"tests": tests, "imports":module.imports_span.map(|s| json!([s.start,s.end])),

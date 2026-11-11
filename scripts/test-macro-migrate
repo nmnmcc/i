@@ -24,15 +24,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('paths', nargs='+', type=Path)
     args = parser.parse_args()
-    if not BINARY.exists():
-        subprocess.run([str(ROOT.parent / 'cache/heavy'), 'direnv', 'exec', str(ROOT.parent.parent),
+    if not BINARY.exists() or BINARY.stat().st_mtime < (ROOT / 'crates/ilang-syntax/examples/migrate-tests.rs').stat().st_mtime:
+        heavy, shell = ROOT.parent / 'cache/heavy', ROOT.parent.parent
+        if not heavy.is_file():
+            heavy, shell = ROOT / '.rd/cache/heavy', ROOT
+        subprocess.run([str(heavy), 'direnv', 'exec', str(shell),
                         'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked'], cwd=ROOT, check=True)
     files = sorted({f for p in args.paths for f in (p.rglob('*.i') if p.is_dir() else [p]) if f.suffix == '.i' and f.is_file()})
     sources = [f.read_text() for f in files]
     process = subprocess.run([str(BINARY)], input=''.join(json.dumps(s, ensure_ascii=False) + '\n' for s in sources), text=True, capture_output=True, check=True)
     results = [json.loads(line) for line in process.stdout.splitlines()]
     assert len(results) == len(files), 'parser result count mismatch'
-    failures, packages, count = [], set(), 0
+    failures, packages, count = [], {}, 0
     for path, source, result in zip(files, sources, results):
         if 'error' in result:
             if re.search(r'(?m)^\s*@test\b', source):
@@ -45,7 +48,7 @@ def main():
             failures.append(f'{path}: existing test name or std/test import requires review')
             continue
         package = package_of(path)
-        if package is None:
+        if package is None and not re.search(r'(?m)^// spec:', source):
             failures.append(f'{path}: no package manifest')
             continue
         data = source.encode()
@@ -55,7 +58,7 @@ def main():
             a, b = test['attr_start'], test['attr_end']
             start, end = test['binding_start'], test['binding_end']
             value_start, value_end = test['value_start'], test['value_end']
-            if test['referenced']:
+            if test['referenced'] or b'AssertionFailure(' in data[value_start:value_end]:
                 edits.append((a, b, b''))
                 edits.append((end, end, f'\n\ntest({json.dumps(name)}, () {{ {name}() }})'.encode()))
             else:
@@ -64,7 +67,7 @@ def main():
                 edits.append((value_end, value_end, b')'))
         imports = result['imports']
         if imports:
-            edits.append((imports[0] + 1, imports[0] + 1, b'\n\ttestlib = (test) = std/test'))
+            edits.append((imports[0] + 1, imports[0] + 1, b'\n\ttestlib = (test) = std/test\n\t'))
         else:
             prefix = re.match(r'(?:(?:[ \t]*//[^\n]*|[ \t]*)\n)*', source).group()
             at = len(prefix.encode())
@@ -72,20 +75,23 @@ def main():
         for start, end, replacement in sorted(edits, reverse=True):
             data = data[:start] + replacement + data[end:]
         path.write_bytes(data)
-        packages.add(package)
+        if package is not None:
+            source_module = path.resolve().is_relative_to(package / "src")
+            packages[package] = packages.get(package, False) or source_module
         count += len(tests)
-    for package in packages:
+    for package, source_module in packages.items():
         manifest = package / 'i.toml'
         text = manifest.read_text()
         manifest_data = tomllib.loads(text)
-        if manifest_data.get('name') != 'std' and not any('std' in manifest_data.get(section, {}) for section in ('dependencies', 'dev-dependencies')):
+        if manifest_data.get('name') != 'std' and 'std' not in manifest_data.get('dependencies', {}) and (source_module or 'std' not in manifest_data.get('dev-dependencies', {})):
             relative = os.path.relpath(ROOT / 'std', package)
-            dependency = f'std = {{ path = {json.dumps(relative)} }}\n'
-            section = re.search(r'(?m)^\[dev-dependencies\][^\n]*\n', text)
+            dev_std = re.search(r'(?m)^std\s*=.*$', text) if 'std' in manifest_data.get('dev-dependencies', {}) else None
+            dependency = (dev_std.group() + '\n') if dev_std else f'std = {{ path = {json.dumps(relative)} }}\n'
+            section = re.search(r'(?m)^\[dependencies\][^\n]*\n', text)
             if section:
                 text = text[:section.end()] + dependency + text[section.end():]
             else:
-                text += '\n[dev-dependencies]\n' + dependency
+                text += '\n[dependencies]\n' + dependency
         existing = manifest_data.get('test', {})
         if 'collection' in existing:
             if existing['collection'] != 'std/test.tests':

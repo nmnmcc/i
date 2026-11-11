@@ -32,7 +32,7 @@
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
 
-use ilang_cli::{BuildError, BuildOptions, Level, build, run_test_with};
+use ilang_cli::{BuildError, BuildOptions, Level, build, build_tests, run_test_with};
 use ilang_host::services::{Log, testing};
 use ilang_host::{HostOptions, Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
@@ -162,7 +162,13 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                             }
                         }
                         let dir = tempfile::tempdir().unwrap();
-                        std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+                        let manifest = if text.contains("std/test") {
+                            let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+                            format!("name = \"spec\"\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n", std_path.to_str().unwrap())
+                        } else {
+                            "name = \"spec\"\n".to_string()
+                        };
+                        std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
                         single_file::write(dir.path(), &stem, &text);
                         Case {
                             name,
@@ -206,16 +212,27 @@ fn stop_text(stop: &ilang_host::Stop) -> String {
 }
 
 fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
-    let built = match build(
-        project,
-        BuildOptions {
-            tests: true,
-            opt,
-            offline: false,
-            target: Default::default(),
-        },
-    ) {
-        Ok(b) => b,
+    let manifest: toml_edit::DocumentMut = std::fs::read_to_string(project.join("i.toml"))
+        .map_err(|e| e.to_string())?
+        .parse()
+        .map_err(|e: toml_edit::TomlError| e.to_string())?;
+    let collection = manifest
+        .get("test")
+        .and_then(|t| t.get("collection"))
+        .and_then(|v| v.as_str());
+    let options = BuildOptions {
+        tests: true,
+        opt,
+        offline: false,
+        target: Default::default(),
+    };
+    let result = if collection.is_some() {
+        build_tests(project, options, collection)
+    } else {
+        build(project, options).map(|built| (built, Vec::new()))
+    };
+    let (built, entries) = match result {
+        Ok(value) => value,
         Err(BuildError::Program { lines, codes, .. }) => {
             return Ok(Outcome2::CompileError {
                 codes: codes.iter().map(|c| c.to_string()).collect(),
@@ -238,12 +255,45 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
     };
     let mut tests = Vec::new();
     for t in &program.abi().tests {
+        if t.name.starts_with("i.tool.") {
+            continue;
+        }
         let r = match run_test_with(&program, &t.name, options(&Log::default())) {
             TestResult::Passed => Ok(()),
             TestResult::Stopped(stop) => Err(stop_text(&stop)),
             TestResult::Failed(e) => return Err(format!("{}: {e:#}", t.name)),
         };
         tests.push((t.name.clone(), r));
+    }
+    for entry in entries {
+        let index = entry.handle.rsplit(':').next().unwrap();
+        let export = format!("i.tool.{index}");
+        let outcome = ilang_host::block_on(async {
+            let mut instance = program.instantiate(options(&Log::default()))?;
+            if program
+                .abi()
+                .tests
+                .iter()
+                .any(|t| t.name == export && t.is_async)
+            {
+                instance.run_async(&export).await
+            } else {
+                instance.run(&export)
+            }
+        });
+        let result = match outcome {
+            Ok(Outcome::Ok(_)) => Ok(()),
+            Ok(Outcome::Stop(stop)) => Err(stop_text(&stop)),
+            Ok(Outcome::Err(error)) => Err(format!("error {:?}", error.0)),
+            Err(error) => return Err(format!("{error:#}")),
+        };
+        let name = entry
+            .data
+            .iter()
+            .find(|(key, _)| key == "name")
+            .map(|(_, v)| v.as_str())
+            .unwrap();
+        tests.push((format!("{}.{name}", entry.module), result));
     }
     let output = log.lock().unwrap().clone();
     Ok(Outcome2::Ran {
@@ -322,7 +372,9 @@ fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
 
 fn main() {
     let filter: Option<String> = std::env::args().skip(1).find(|a| !a.starts_with('-'));
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+    let root = std::env::var_os("I_SPEC_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec"));
     let all = cases(&root);
     let mut failures: Vec<String> = Vec::new();
     let mut ready = Vec::new();

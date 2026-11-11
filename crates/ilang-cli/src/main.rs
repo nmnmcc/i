@@ -484,7 +484,11 @@ fn cmd_test(
                     .find(|(k, _)| k == key)
                     .map(|(_, v)| v.as_str())
             };
-            let name = format!("{}.{}", entry.module, get("name").unwrap_or(&entry.target.path));
+            let name = format!(
+                "{}.{}",
+                entry.module,
+                get("name").unwrap_or(&entry.target.path)
+            );
             let mode = get("mode").unwrap_or("test");
             if filter.is_some_and(|f| !name.contains(f)) {
                 continue;
