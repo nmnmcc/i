@@ -14,7 +14,7 @@ const app = await instantiate(new URL("./app.wasm", import.meta.url), {
     "app:console/v1": { print: (text) => console.log(text) },
     "app:storage/v1": {
       read: (key) => {
-        if (!records.has(key)) throw new GuestError(`no ${key}`); // an error of `? String`
+        if (!records.has(key)) throw new GuestError(`no ${key}`); // an error of `^ String`
         return records.get(key);
       },
     },
@@ -47,7 +47,7 @@ section; it cannot replace a section. `rawImports` adds other Wasm imports.
 ## Calls and stops
 
 `call(name, args)` calls a host export (B.2). It gives the value, throws
-`GuestError` with `.value` when the function gives an error of its `? E`, and
+`GuestError` with `.value` when the function gives an error of its `^ E`, and
 throws `Stop` when the program stops. `stopMessage` is the stop message of
 spec §11.7 (the reason, then the source positions), or `null` when the module
 trapped without one. After a stop, or any other trap, the instance refuses every

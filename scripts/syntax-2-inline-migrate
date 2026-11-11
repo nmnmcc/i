@@ -4,7 +4,8 @@ from pathlib import Path
 import json,re,subprocess
 import os
 os.chdir(Path(__file__).resolve().parent.parent)
-paths=[Path('README.md'),*Path('docs').rglob('*.md')]
+readmes=subprocess.check_output(['git','ls-files','--','README*','**/README*'],text=True).splitlines()
+paths=sorted(set([*map(Path,readmes),*Path('docs').rglob('*.md')]))
 quoted=[]
 changes={}
 for p in paths:
@@ -24,7 +25,7 @@ if quoted:
   text=p.read_text()
   for a,b,out in reversed(edits): text=text[:a]+out+text[b:]
   p.write_text(text)
-items=[]; forms=[]
+items=[]; forms=[]; error_changes=set()
 for p in paths:
  text=p.read_text()
  def errors(m):
@@ -33,6 +34,7 @@ for p in paths:
  migrated=re.sub(r'(?<!`)`([^`\n]+)`(?!`)',errors,text)
  if migrated != text:
   p.write_text(migrated)
+  error_changes.add(p)
   text=migrated
  for m in re.finditer(r'(?<!`)`([^`\n]+)`(?!`)',text):
   src=m[1]
@@ -54,5 +56,5 @@ for p,changes in edits.items():
  text=p.read_text()
  for a,b,out,src in reversed(changes): text=text[:a]+out+text[b:]
  p.write_text(text)
-print('changed',sum(map(len,edits.values())) + sum(map(len,changes.values())),
-      'files',len(set(edits) | set(changes)))
+print('changed',sum(map(len,edits.values())) + sum(map(len,changes.values())) + len(error_changes),
+      'files',len(set(edits) | set(changes) | error_changes))

@@ -53,7 +53,7 @@ and gives an `Outcome`:
 
 - `Outcome::Ok(value)`;
 - `Outcome::Err(GuestError(value))` when the function gave an error of its
-  `? E`; the tag selects the member of `E` in the canonical order Nil, Bool, Int,
+  `^ E`; the tag selects the member of `E` in the canonical order Nil, Bool, Int,
   Float, String, BitArray;
 - `Outcome::Stop(Stop { message, trap })` when the program stopped. `message` is
   the stop message given to `panic` (spec §11.7): the reason, then the source
