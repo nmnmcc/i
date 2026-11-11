@@ -2099,7 +2099,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 > | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 > | WASI pure tasks/random; WASI module requiring Fs | Pure calculations work; report ordinary blocking imports requiring an embedder; §B.7, no fake fd-as-externref |
-> | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+> | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 > | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
 - New sentence(s):
@@ -2153,7 +2153,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 > | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 > | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-> | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+> | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 > | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
 - Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
@@ -4710,7 +4710,7 @@ Old sentence(s)/block:
 > | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 > | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 > | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-> | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+> | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 > | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
 New sentence(s)/block:
@@ -4764,7 +4764,7 @@ New sentence(s)/block:
 > | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 > | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 > | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-> | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+> | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 > | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
 Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.

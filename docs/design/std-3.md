@@ -668,11 +668,11 @@ take_start: (from: String, up_to: Int) -> String
 take_end: (from: String, up_to: Int) -> String
 split_once_last: (string: String, on: String) -> Option((String, String))
 replace_n: (in: String, each: String, with: String, up_to: Int) -> String
-split_when(E, N): (string: String, on: (UtfCodepoint) -> Bool ? E ! N) -> List(String) ? E ! N
+split_when(E, N): (string: String, on: (UtfCodepoint) -> Bool ^ E ! N) -> List(String) ^ E ! N
 words: (string: String) -> List(String)
-map(E, N): (string: String, with: (UtfCodepoint) -> UtfCodepoint ? E ! N) -> String ? E ! N
-filter(E, N): (string: String, keeping: (UtfCodepoint) -> Bool ? E ! N) -> String ? E ! N
-fold(A, E, N): (string: String, from: A, with: (A, UtfCodepoint) -> A ? E ! N) -> A ? E ! N
+map(E, N): (string: String, with: (UtfCodepoint) -> UtfCodepoint ^ E ! N) -> String ^ E ! N
+filter(E, N): (string: String, keeping: (UtfCodepoint) -> Bool ^ E ! N) -> String ^ E ! N
+fold(A, E, N): (string: String, from: A, with: (A, UtfCodepoint) -> A ^ E ! N) -> A ^ E ! N
 ```
 
 **S1 Access.** at returns one scalar as String, like first/last. For length n,

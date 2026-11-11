@@ -596,7 +596,7 @@ An adapter declaration names an accessible ordinary generalized function with
 this checked type (schema notation, R and S are the declared service unions):
 
 ```text
-adapter(A,E,N): (body: () -> A ? E ! N) -> A ? E ! R | N - S
+adapter(A,E,N): (body: () -> A ^ E ! N) -> A ^ E ! R | N - S
 ```
 
 It is generalized over arbitrary A, E and N; no extra result/error restriction
@@ -1607,13 +1607,13 @@ F2 originally said “allowing parentheses or a one-expression group around the 
 - Baseline paragraph/row 1976: [ ] Run permission/error/resource/security and concurrency reviews; include unsupported browser/preview-1 behavior and user-supplied host fakes.
 - Baseline paragraph/row 2054: | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 - Baseline paragraph/row 2055: | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-- Baseline paragraph/row 2056: | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+- Baseline paragraph/row 2056: | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 - Baseline paragraph/row 2476: Inferred entry-service classification, pure/fake-only synchronous cases, task/host-only async cases, and no host poll for pure or raw-only runnable work.
 
 **docs/design/meta.md**
 
 - Baseline paragraph/row 368: An attribute whose name is one of the built-in attributes (`external`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
-- Baseline paragraph/row 378: The attributes `@external`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5).
+- Baseline paragraph/row 378: The attributes `@external`, `@host`, `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5).
 - Baseline paragraph/row 494: This is the only case where two items have one name, and the only use of a declaration other than `@external`.
 
 **docs/design/syntax.md**

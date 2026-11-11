@@ -94,7 +94,7 @@ So until A3 these rules of the new text do not hold yet, and these old rules sti
 - `Binding { pattern, value, span, type_params: Vec<Ident> }` (top-level bindings and `Stmt::Bind`).
 - `ItemKind::Declaration { name, type_params: Vec<Ident>, ty }`.
 - `ItemKind::MacroItem { module: Option<Ident>, name: Ident, args: Vec<Arg> }`.
-- `Attribute { module: Option<Ident>, name, args: Vec<(String, Span)>, call: Option<(Vec<Arg>, Span)>, span }`. `args` is filled as today when every argument is a string literal with no label and there is at least one. `call` is kept in every other case with `( )`, including `@main()`.
+- `Attribute { module: Option<Ident>, name, args: Vec<(String, Span)>, call: Option<(Vec<Arg>, Span)>, span }`. `args` is filled as today when every argument is a string literal with no label and there is at least one. `call` is kept in every other case with `( )`, including `@custom()`.
 - `TypeDef { name, params: Vec<Ident>, head: Vec<TypeExpr>, body }`. `params` holds a plain head: all lowercase names (old, until A3) or all `UpName`s with no module and no arguments (new). `head` is filled, and `params` is empty, when the head is anything else.
 - `TypeKind::ValueOf { module: Option<Ident>, name: Ident }` for a lowercase `a.x`.
 - `TypeKind::Call { module: Option<Ident>, name: Ident, args: Vec<TypeArg> }` and `enum TypeArg { Type(TypeExpr), Int(..), String(..) }`.
@@ -236,8 +236,8 @@ The general parameter in the example corrects the earlier `(Int) -> Int` text he
 
 - `MacroItem`: E0234, "a call at the top level is kept for macros".
 - A declaration with no `@external`: E0308, message now "a declaration with no `@external` is kept for macros".
-- An attribute with a module, or whose name is not built in: E0301, message now "the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`".
-- A built-in attribute with `call` present: E0302, with `@x` the name written. When the attribute takes no arguments in the arity table of `attributes()` (`@main`, `@test`) and the `( )` is empty: "`@x` takes no arguments and is written with no `( )`". In every other case: "the arguments of `@x` are string literals given by position: <form>", where <form> is the form that `attributes()` already gives for that attribute (for `@external`, `` `@external("module", "function")` ``).
+- An attribute with a module, or whose name is not built in: E0301, message now "the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`".
+- A built-in attribute with `call` present: E0302, with `@x` the name written. When the attribute takes no arguments in the arity table of `attributes()` (`@test`) and the `( )` is empty: "`@x` takes no arguments and is written with no `( )`". In every other case: "the arguments of `@x` are string literals given by position: <form>", where <form> is the form that `attributes()` already gives for that attribute (for `@external`, `` `@external("module", "function")` ``).
 - `@external` on a binding: E0303, which exists today.
 - Type definition heads, in `type_defs` (after imports are known), in this order (finding 3):
   1. `head` is not empty (a part is not a plain name, or the parts mix lowercase names and `UpName`s): a custom type gives E0232 TYPE_PARAM_FORM, "a type parameter is an `UpName` with no module name and no arguments"; an alias gives E0233 ALIAS_PATTERN_RESERVED, "the left side of an alias that is not a list of type parameters is kept for alias patterns". The body is not resolved.
@@ -476,7 +476,7 @@ Not changed: the lexer, `infer.rs`, `lower.rs`, `coverage.rs`, `order.rs`, hir.
   - `err_attribute_line`: the errors become exactly one error (rule 2 of §3.4 skips the group, so `recover()` does not report it again), `E0115 @2:1 a group in ( ) with an attribute before it is not a binding, because no = follows it; the imports and the exports have no attribute before them` (finding 14); the tree is `main = () { Nil }`.
   - `err_block_end`: the third error goes; line 3 prints `h = {}`.
   - `err_toplevel`: no parse errors; the tree prints `f(x)`, `Some(x) = y`, and `@external("m", "f")` with `g = 1` (the checker reports E0234 and E0303).
-  - `err_trailing`: `E0101 @1:3 expected a type, found ,` (was "a name"); the error at 4:7 goes, and `@main()` with `x = 1` prints (the checker reports E0302).
+  - `err_trailing`: `E0101 @1:3 expected a type, found ,` (was "a name"); the error at 4:7 goes, and `@custom()` with `x = 1` prints (the checker reports E0301).
   - `err_pipe_target`: the five E0111 lines read "the right side of `|>` must be a name, a call, a function, or a clause block" (§3.6); `golden_old/err_pipe_target.out` keeps the base text.
 - New golden inputs (new syntax): `header_groups.i` (a mix of keywords and groups, a header followed by `(a, b) = …`), `clauses.i` (every block and clause block of §6.1, `{}`, `?` guards, a function type before `?`, the first-clause group), `type_params.i` (`id(A) = …`, `id(A): (A) -> A = …`, `inspect(A): …`, `Option(A) { … }`, `send(Stop)` as an expression), `attr_next_line.i` (`@m`, then `(even, odd) = …` on the next line), `kept_forms.i` (`p.name`, `m(Int)` in a type, `f(x)` at the top level, `Schema(User, _) = user`).
 - New error goldens: `err_attr_same_line.i` (`@m (even, odd) = …`), `err_record.i`, `err_dual_ambiguous.i` (its message has the bound-function fix of D4), `err_header_empty.i`, `err_header_order.i`, `err_pipe_group.i` (`n |> { 0 -> 1  _ -> 2 } * 10`), `err_guard_word.i` (`v |> { x if c -> 1 }`, which test 2 decides as Clauses because `if` follows `x` (§3.5), so the clause reader gives E0101 "a guard in a clause block is written with `?`"; `v |> { 0 -> 1  x if c -> 2 }` with the same message; and `case v { x ? c -> 1 }` with the old message), `err_clause_tuple_note.i` (`v |> { 0 -> 1  p: (Int, Int) -> e }` and the lone `{ 0 -> 1  p: (Int, Int) -> e }`, each with the tuple-type note of §3.6).
@@ -494,7 +494,7 @@ Not changed: the lexer, `infer.rs`, `lower.rs`, `coverage.rs`, `order.rs`, hir.
 - `hir.rs`: the shapes of the desugaring, with the made-up `Bind` span equal to `p.span`.
 - `query.rs`: completions inside the subject `e` of a one-clause match offer local names, including inside a function in `e`; the names of `p` are offered in the body; `%arg` is never offered or shown, including hover and definitions with the cursor at the `{` of a lone clause block or right after a `,` before it.
 - `ilang-wasm/tests/codegen.rs`: top-level `f = { 0 -> 1  _ -> 2 }` is a known function; `get = (o) { o |> { Some(x) -> x } }` called with `None` stops at the position of `Some(x)`.
-- `ilang-cli/tests/check.rs`: §10.2 with a header exports group: a package whose `main` is in `(main)` runs, and a private `@main` runs too; only host exports must be in the exports of their module; `i check` on an old file with a J1 form gives the `--from-old` hint.
+- `ilang-cli/tests/check.rs`: §10.2 with a header exports group: a package whose `main` is in `(main)` runs, and a private program entry runs too; only host exports must be in the exports of their module; `i check` on an old file with a J1 form gives the `--from-old` hint.
 - An interface test in `package_commands.rs`: an exported `g = { 0 -> 1  _ -> 2 }` is printed with no label, never `%arg`.
 - A test that `migrate::UNQUALIFIED_TYPES` equals the built-in and prelude types, and one that, for every corpus file, the R4 owners equal the frames resolve builds.
 - `R4` capture test (stage 3, in `ilang-check/tests/`, since it needs resolve): for every corpus file and every input of `ilang-syntax/tests/migrate/`, resolve the tree before and after `apply(plan, …)` and map each type variable use (by its position in the old file, through the plan) to the span of its owner; the two maps must be equal. In the same walk it maps each name use to the binder it resolves to (top-level definition, or the span of a local binder, through the plan), and those maps must be equal too, so a split that changes what a name refers to fails (the `(f, n) = ((x: a) { f(x) }, list.length([1]))` input of R4 is refused, and a direct variant of it is split with the same binders). Its inputs include the two mixed cases of R4: `f = (x: b) { g(B) = (y: B, z: b) { z }  g(1, x) }` and `f(A) = (x: A) { g = (y: a, z: A) { y }  g(1, x) }`, which must get `A1`-style names, not `B` and `A`.
@@ -533,7 +533,7 @@ The checks use base for shared exports and the unformatted A1 source for added b
 
 `i test` and `wasi-smoke` stay green at every stage, because the sources stay old and old heads and lowercase variables are still read (finding 9).
 
-`i new` and `format()`: from stage 3, `i new` (`package.rs:147`) writes the new syntax from the old templates. Checked at base: `package_commands.rs:207-221` asserts only `contains("(Io) = i/io")` and `contains("@main")`, which still hold; `:721` runs `i fmt --check` on the output, which passes because `format()` is idempotent; `ilang-lsp/tests/protocol.rs:334` compares with `format()` itself; `ilang-cli/tests/fmt.rs` uses text with no old forms. So no test beyond the one dev-verify check fails, and the templates stay for A2 partition 3.
+`i new` and `format()`: from stage 3, `i new` (`package.rs:147`) writes the new syntax from the old templates. Checked at base: `package_commands.rs:207-221` asserts only `contains("(Io) = i/io")` and `contains("main")`, which still hold; `:721` runs `i fmt --check` on the output, which passes because `format()` is idempotent; `ilang-lsp/tests/protocol.rs:334` compares with `format()` itself; `ilang-cli/tests/fmt.rs` uses text with no old forms. So no test beyond the one dev-verify check fails, and the templates stay for A2 partition 3.
 
 ## 8. A2 mechanics
 
@@ -613,7 +613,7 @@ negative parser fixtures or accepted later-track examples.
 - Shown names: the Namer and the interface printer of `package.rs` change in A2 phase 0 and no longer keep written names (§8).
 - `format()` reads Both mode only, with no Old fallback (D10).
 - Kept forms: records are a parse error, the rest checker errors (D9).
-- `err_trailing` line 1 expects "a type", not "an `UpName`"; `@main()` moves to the checker.
+- `err_trailing` line 1 expects "a type", not "an `UpName`"; `@custom()` moves to the checker.
 - The A3 list gains: E0113; E0236; the old `if` line rule and the old `case` `{` rule (already there); `sample.i` moves to A3.
 - The list of edits outside A1's ranges is §5 of this note; `lower.rs` and `infer.rs` leave it.
 - R4: a type variable whose owner pattern is not one name is never declared "on the nearest binding of one name around it". The binding is split into one binding per name when that keeps generalization, and otherwise the file goes to the hand list (`tyvar-owner`). The clash rule also counts `UpName` variables that the file already declares.
@@ -765,7 +765,7 @@ Two statements in §6.2 above are corrected from the earlier note:
   a compile error. The blind recursion and identity case checks this rule.
 - Syntax.md §10.2 edits the host-export bullet of spec §10.2. "They must be in
   the exports of their module" applies to host exports. The program-entry
-  bullet instead says "the function marked `@main` in the package that is
+  bullet instead says "the selected entry function in the package that is
   compiled" and does not require an export. The private-main case now expects
   success, with the same program, as the coordinator's S4 ruling requires.
 

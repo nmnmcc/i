@@ -2113,7 +2113,7 @@ The acceptance server in §9 is a complete module.
 | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 | Missing env variable with supplied Environment; generated browser raw TCP without provider | ProcessError(...,"not_found"); compile error naming Net even inside fail.catch; §7, §8.2 and spec §2.6 |
 | WASI pure tasks/random; WASI requiring private Fs without/with explicit host plan | Pure calculations work; missing Fs compile error / report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-| @main needs user State without/with a target provider | Target-plan compile error / construct ordinary State; source-only check accepts both, async classification follows the complete D5 graph without changing the type |
+| program entry needs user State without/with a target provider | Target-plan compile error / construct ordinary State; source-only check accepts both, async classification follows the complete D5 graph without changing the type |
 | Ready answer returned from within, then take | Original answer, then Taken; closing Owner cancels outstanding work only, not detached Ready answers (§5.1/§5.4) |
 | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 

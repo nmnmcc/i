@@ -40,7 +40,7 @@ The hard parts:
 **D4. `control.keep_env`: a general way to keep the services of a place.** A new function in `i/control`:
 
 ```
-keep_env(S, A, E, N): (f: (x: S) -> A ? E ! N) -> { (x: S) -> A ? E } ! N
+keep_env(S, A, E, N): (f: (x: S) -> A ^ E ! N) -> { (x: S) -> A ^ E } ! N
 ```
 
 (In a type, `{ }` groups; `( … )` with no `->` after it is a tuple type, §3 and §6.4.) It gives a function that, when called anywhere, runs `f` with the services that are bound at the place of the `keep_env` call. It keeps **every** service bound there when the program runs, also those that `f` does not need. `go` uses it to give the child the parent's services. Before the call, `go` binds `Scheduler` to a portable stand-in, and the task gets its real scheduler as the parameter `x` (part 4).
