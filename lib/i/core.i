@@ -30,6 +30,7 @@
 	bit_array_concat
 	inspect
 	hash
+	portable
 )
 
 /// `True` for `False`, and `False` for `True`.
@@ -147,3 +148,7 @@ inspect(A): (A) -> String
 /// A number from 0 to 2^32 - 1; values that are the same give the same number.
 @external("ilang:core", "hash")
 hash(A): (A) -> Int
+
+/// Whether this value and every capture or held value can cross workers.
+@external("ilang:core", "portable")
+portable(A): (value: A) -> Bool

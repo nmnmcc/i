@@ -1252,7 +1252,14 @@ Solo(A) { Solo(A, Int) }
             }
         }
         let mut c = Checker::new(&p, &graph.sources);
-        let id = |name| TypeId(p.types.iter().position(|t| t.name == name).unwrap() as u32);
+        let id = |name| {
+            TypeId(
+                p.types
+                    .iter()
+                    .position(|t| t.name == name && p.module(t.module).path == "app/main")
+                    .unwrap() as u32,
+            )
+        };
         assert!(c.field_shared(
             CtorRef {
                 ty: id("Pair"),

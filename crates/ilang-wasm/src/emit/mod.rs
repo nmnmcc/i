@@ -65,6 +65,10 @@ const DECLARED: &[&str] = &[
     "$boundary_reenter",
     "$cancel_reenter",
     "$control_unpend",
+    "$keep_call",
+    "$keep_reenter",
+    "$request_handoff",
+    "$wait_requests_reenter",
 ];
 
 /// The WAT text of the whole module.
@@ -118,7 +122,7 @@ pub fn wat(p: &Program) -> String {
         let _ = writeln!(
             m,
             "(type $fn{n} (func (param (ref null $obj) (ref null $env){params}) (result eqref)))\n\
-             (type $clo{n} (sub final $obj (struct (field i32) (field i32) (field i64) (field f64) \
+             (type $clo{n} (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64) \
              (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
              (field (ref null $call)) (field (ref $fn{n})))))"
         );
@@ -131,6 +135,9 @@ pub fn wat(p: &Program) -> String {
         }
     } else {
         m.push_str(runtime::HOST);
+    }
+    if p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
+        m.push_str("(import \"ilang:host/v1\" \"cancel\" (func $host_cancel (param i32)))\n");
     }
     // The imports of B.4, before every definition.
     for (i, x) in p.imports.iter().enumerate() {
@@ -184,10 +191,13 @@ pub fn wat(p: &Program) -> String {
             );
         }
     }
+    if !p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
+        m.push_str("(func $host_cancel (param i32) unreachable)\n");
+    }
     m.push_str(runtime::wat_for_host_references(references));
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
-    m.push_str(host::EFFECTS);
+    m.push_str(&host::effects());
     m.push_str(ENTRY);
     m.push_str(&e.data);
     for (id, label) in p.labels.iter().enumerate() {
@@ -236,7 +246,7 @@ pub fn wat(p: &Program) -> String {
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, f, "(ref.null $values)")
+            closure(n, f, "(ref.null $values)", false)
         );
     }
     m.push_str(&e.out);
@@ -248,9 +258,10 @@ pub fn wat(p: &Program) -> String {
     m
 }
 
-fn closure(arity: u32, f: FuncId, captures: &str) -> String {
+fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
+    let flags = u32::from(patched);
     format!(
-        "(struct.new $clo{arity} (i32.const 7) (i32.const 0) (i64.const {arity}) (f64.const 0) \
+        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const 0) \
          (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
         f.0
     )
@@ -612,6 +623,15 @@ impl<'p> Emitter<'p> {
             Op::Suspend => format!("(call $control_suspend {a} {b})"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
+            Op::KeepEnv => format!("(call $control_keep_env {a} {env})"),
+            Op::WaitRequests => format!("(call $request_wait_any {a} {env})"),
+            Op::PollRequests => {
+                if self.p.target == Target::Wasi {
+                    "(ref.null eq)".to_string()
+                } else {
+                    format!("(call $request_poll {env})")
+                }
+            }
         }
     }
 
@@ -633,19 +653,24 @@ impl<'p> Emitter<'p> {
             Value::Service(env, id) => {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
-            Value::Closure { func, captures } => {
+            Value::Closure {
+                func,
+                captures,
+                patched,
+            } => {
                 let n = self.p.funcs[func.0 as usize].arity();
                 self.arities.insert(n);
-                let caps = if captures.is_empty() {
+                let caps = if captures.is_empty() && !patched {
                     "(ref.null $values)".to_string()
                 } else {
                     format!(
-                        "(array.new_fixed $values {}{})",
-                        captures.len(),
-                        self.atoms(captures)
+                        "(array.new_fixed $values {}{}{})",
+                        captures.len() + usize::from(*patched),
+                        self.atoms(captures),
+                        if *patched { " (ref.null eq)" } else { "" }
                     )
                 };
-                closure(n, *func, &caps)
+                closure(n, *func, &caps, *patched)
             }
             Value::Tuple(parts) => format!(
                 "(call $tuple (array.new_fixed $values {}{}))",
@@ -755,7 +780,11 @@ impl<'p> Emitter<'p> {
                 let reply = self.host_reply(*import, *result);
                 format!("(block (result eqref)\n{call}\n{reply})")
             }
-            Value::HostStart { import, args } => self.host_start(*import, args),
+            Value::HostStart {
+                import,
+                args,
+                result,
+            } => self.host_start(*import, args, *result),
             Value::HostReply(reply) => self.host_reply(reply.import, reply.result),
         }
     }

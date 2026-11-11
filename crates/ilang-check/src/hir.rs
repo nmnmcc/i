@@ -97,6 +97,8 @@ pub struct HostFn {
     pub result: crate::types::HostType,
     /// The members of the errors, in the canonical order of B.2.
     pub errors: Vec<crate::types::HostType>,
+    /// Preserve Result(A, Never) as distinct from a plain answer.
+    pub request_result: bool,
 }
 
 impl Program {
@@ -194,6 +196,7 @@ pub struct TypeDef {
 pub struct Host {
     pub namespace: String,
     pub is_async: bool,
+    pub is_request: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -229,10 +232,14 @@ pub enum BuiltinType {
     Record,
     Boundary,
     Continuation,
+    Key,
+    Keyed,
+    Request,
+    Ticket,
 }
 
 impl BuiltinType {
-    pub const ALL: [BuiltinType; 10] = [
+    pub const ALL: [BuiltinType; 14] = [
         BuiltinType::Int,
         BuiltinType::Float,
         BuiltinType::String,
@@ -243,6 +250,10 @@ impl BuiltinType {
         BuiltinType::Record,
         BuiltinType::Boundary,
         BuiltinType::Continuation,
+        BuiltinType::Key,
+        BuiltinType::Keyed,
+        BuiltinType::Request,
+        BuiltinType::Ticket,
     ];
 
     pub fn name(self) -> &'static str {
@@ -257,13 +268,17 @@ impl BuiltinType {
             BuiltinType::Record => "Record",
             BuiltinType::Boundary => "Boundary",
             BuiltinType::Continuation => "Continuation",
+            BuiltinType::Key => "Key",
+            BuiltinType::Keyed => "Keyed",
+            BuiltinType::Request => "Request",
+            BuiltinType::Ticket => "Ticket",
         }
     }
 
     /// The number of type parameters (§4.2, §4.5 rule 7).
     pub fn arity(self) -> usize {
         match self {
-            BuiltinType::List => 1,
+            BuiltinType::List | BuiltinType::Key | BuiltinType::Request => 1,
             BuiltinType::Boundary => 3,
             BuiltinType::Continuation => 4,
             _ => 0,

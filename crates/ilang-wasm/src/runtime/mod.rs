@@ -43,7 +43,7 @@
 //! | 4 | Tuple | field 5: the parts |
 //! | 5 | Custom type value | field 1: constructor id, field 2: type id, field 5: the fields, or null when there are none |
 //! | 6 | List | `[]` is an `$obj` (the global `$value_empty_list`); any other list is a `$cons`: field 1 the head, field 2 the tail |
-//! | 7 | Function | field 2: the number of parameters, without environment parameters |
+//! | 7 | Function | field 1 bit 0: patched captures with a final walk stamp; field 2: arity |
 //! | 8 | Int | `i31ref` for -2^30..2^30-1, else field 1: sign, field 6: magnitude limbs |
 //! | 9 | BitArray | field 1: bit offset, field 2: bit length, field 4: bytes, highest bit first |
 //! | 10 | Host reference | a `$hostref` struct (not `$obj`): the `externref`, its `reference_id`, and the nominal type id |
@@ -51,6 +51,10 @@
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
 //! | 14 | Record | field 5: labels and values, interleaved, sorted by the UTF-8 bytes of the labels |
+//! | 15 | Key | identity value; no parts |
+//! | 16 | Keyed | field 5: key, value |
+//! | 17 | Request | identity cell with private mutable completion state |
+//! | 18 | Ticket | field 5: the underlying request cell |
 //!
 //! Code outside `values.rs` goes through lists only with `$list_is_empty`,
 //! `$list_head` and `$list_tail`. A list cell is a lean `$cons`, one small
@@ -235,12 +239,12 @@ pub const TYPES: &str = r#"
 (type $values (array (mut eqref)))
 (type $limbs (array (mut i32)))
 (type $call (func (param eqref eqref) (result eqref)))
-(type $val (sub (struct (field i32))))
+(type $val (sub (struct (field (mut i32)))))
 (type $obj (sub $val (struct
- (field i32) (field i32) (field i64) (field f64)
+ (field (mut i32)) (field i32) (field i64) (field f64)
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
-(type $cons (sub final $val (struct (field i32) (field eqref) (field eqref))))
+(type $cons (sub final $val (struct (field (mut i32)) (field eqref) (field eqref))))
 (type $hostref (struct (field externref) (field i32) (field i64)))
 (type $sites (array i32))
 (type $frames (array (mut i32)))

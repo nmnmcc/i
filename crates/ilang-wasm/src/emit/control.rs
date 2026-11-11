@@ -427,7 +427,7 @@ pub(super) const EFFECTS: &str = r#"
     (return_call $ensure_end (local.get $mode) (local.get $r)))
   (call $capture_rethrow (struct.new $frame (ref.func $final_reenter)
     (array.new_fixed $values 2 (local.get $r) (ref.i31 (local.get $mode)))
-    (i32.const -1) (i32.const 5) (ref.null $values)))
+    (i32.const -1) (i32.const 37) (ref.null $values)))
   (unreachable))
 
 (func $ensure_end (param $mode i32) (param $r eqref) (result eqref)
@@ -435,6 +435,8 @@ pub(super) const EFFECTS: &str = r#"
   (if (i32.eq (local.get $mode) (i32.const 2)) (then (throw $cancel (local.get $r))))
   (local.get $r))
 
+;; Kind 37 has the same low five dispatch bits as kind 5, with a final-only
+;; marker so ordinary host-wait re-entry cannot protect a task from cancel.
 ;; The final function returned: end as `body` did.
 (func $final_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
     (param $mode i32) (result eqref)
@@ -448,7 +450,8 @@ pub(super) const EFFECTS: &str = r#"
 (func $control_boundary (param $body eqref) (param $env (ref null $env)) (result eqref)
   (return_call $boundary_core
     (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
-      (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1))
+      (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)
+      (ref.null eq) (i32.const 0))
     (local.get $env) (local.get $body) (ref.null $sub) (ref.null eq) (i32.const 0)))
 
 ;; Kept with these parameters for `emit/host.rs`. `rest`, `cancel` and
@@ -491,7 +494,7 @@ pub(super) const EFFECTS: &str = r#"
         (return_call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env)
           (struct.new $cont (i32.const 12) (i32.const 0) (i64.const 0) (f64.const 0)
             (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))))
+            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))) (ref.null eq))
           (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f))))))
     ;; A capture for an outer boundary: this one is paused with it.
     (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $boundary_reenter)
@@ -527,9 +530,89 @@ pub(super) const EFFECTS: &str = r#"
 (func $continuation_take (param $k eqref) (result (ref $cont))
   (local $c (ref $cont))
   (local.set $c (ref.cast (ref $cont) (local.get $k)))
-  (if (struct.get $cont 8 (local.get $c)) (then (call $stop_continuation_used) (unreachable)))
+  (if (i32.and (struct.get $cont 8 (local.get $c)) (i32.const 1)) (then (call $stop_continuation_used) (unreachable)))
   (struct.set $cont 8 (local.get $c) (i32.const 1))
   (local.get $c))
+
+;; A read of immutable continuation metadata, without taking the continuation.
+;; Boundary identity limits the query to finals inside that delimiter, so a
+;; new scope inside a final still has its own cancellable body.
+(func $sub_has_final (param $s (ref null $sub)) (result i32)
+  (local $node (ref null $flist)) (local $f (ref $frame))
+  (if (ref.is_null (local.get $s)) (then (return (i32.const 0))))
+  (local.set $node (struct.get $sub 0 (ref.as_non_null (local.get $s))))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $node)))
+    (local.set $f (struct.get $flist 0 (ref.as_non_null (local.get $node))))
+    (if (i32.eq (struct.get $frame 3 (local.get $f)) (i32.const 37))
+      (then (return (i32.const 1))))
+    (if (i32.eq (struct.get $frame 3 (local.get $f)) (i32.const 3))
+      (then (if (call $sub_has_final (ref.cast (ref null $sub)
+        (array.get $values (struct.get $frame 1 (local.get $f)) (i32.const 1))))
+        (then (return (i32.const 1))))))
+    (local.set $node (struct.get $flist 1 (ref.as_non_null (local.get $node))))
+    (br $each)))
+  (i32.const 0))
+(func $sub_finalizing_at (param $s (ref null $sub)) (param $b eqref) (result i32)
+  (local $node (ref null $flist)) (local $f (ref $frame))
+  (local $saved (ref $values)) (local $inner (ref null $sub)) (local $found i32)
+  (if (ref.is_null (local.get $s)) (then (return (i32.const -1))))
+  (local.set $node (struct.get $sub 0 (ref.as_non_null (local.get $s))))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $node)))
+    (local.set $f (struct.get $flist 0 (ref.as_non_null (local.get $node))))
+    (if (i32.eq (struct.get $frame 3 (local.get $f)) (i32.const 3)) (then
+      (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $f))))
+      (local.set $inner (ref.cast (ref null $sub)
+        (array.get $values (local.get $saved) (i32.const 1))))
+      (if (ref.eq (array.get $values (local.get $saved) (i32.const 0)) (local.get $b))
+        (then (return_call $sub_has_final (local.get $inner))))
+      (local.set $found (call $sub_finalizing_at (local.get $inner) (local.get $b)))
+      (if (i32.ge_s (local.get $found) (i32.const 0)) (then (return (local.get $found))))))
+    (local.set $node (struct.get $flist 1 (ref.as_non_null (local.get $node))))
+    (br $each)))
+  (i32.const -1))
+(func $stamp_finalizing (param $s (ref null $sub)) (param $token eqref) (result i32)
+  (local $node (ref null $flist)) (local $f (ref $frame)) (local $saved (ref $values))
+  (local $owner eqref) (local $inside i32) (local $result i32)
+  (if (ref.is_null (local.get $s)) (then (return (i32.const 0))))
+  (local.set $node (struct.get $sub 0 (ref.as_non_null (local.get $s))))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $node)))
+    (local.set $f (struct.get $flist 0 (ref.as_non_null (local.get $node))))
+    (if (i32.eq (struct.get $frame 3 (local.get $f)) (i32.const 37))
+      (then (local.set $result (i32.const 1))))
+    (if (i32.eq (struct.get $frame 3 (local.get $f)) (i32.const 3)) (then
+      (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $f))))
+      (local.set $inside (call $stamp_finalizing (ref.cast (ref null $sub)
+        (array.get $values (local.get $saved) (i32.const 1))) (local.get $token)))
+      (local.set $owner (array.get $values (local.get $saved) (i32.const 0)))
+      (if (ref.test (ref $boundary) (local.get $owner)) (then
+        (struct.set $boundary 9 (ref.cast (ref $boundary) (local.get $owner)) (local.get $token))
+        (struct.set $boundary 10 (ref.cast (ref $boundary) (local.get $owner)) (local.get $inside))))
+      (local.set $result (i32.or (local.get $result) (local.get $inside)))))
+    (local.set $node (struct.get $flist 1 (ref.as_non_null (local.get $node))))
+    (br $each)))
+  (local.get $result))
+(func $control_finalizing (param $k eqref) (param $b eqref) (result eqref)
+  (local $c (ref $cont)) (local $boundary (ref $boundary)) (local $token eqref)
+  (local.set $c (ref.cast (ref $cont) (local.get $k)))
+  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
+  (if (i32.and (struct.get $cont 8 (local.get $c)) (i32.const 1))
+    (then (call $stop_continuation_used) unreachable))
+  (local.set $token (struct.get $cont 11 (local.get $c)))
+  (if (ref.is_null (local.get $token)) (then
+    (local.set $token (call $key_new))
+    (struct.set $cont 11 (local.get $c) (local.get $token))))
+  (if (i32.eqz (i32.and (struct.get $cont 8 (local.get $c)) (i32.const 2))) (then
+    (drop (call $stamp_finalizing (struct.get $cont 10 (local.get $c)) (local.get $token)))
+    (struct.set $cont 8 (local.get $c) (i32.const 2))))
+  (if (ref.eq (struct.get $boundary 9 (local.get $boundary)) (local.get $token))
+    (then (return (call $bool_new (struct.get $boundary 10 (local.get $boundary))))))
+  ;; Another continuation can have refreshed the same boundary's cache, or
+  ;; this delimiter is absent from k. The immutable records remain the oracle.
+  (call $bool_new (i32.gt_s (call $sub_finalizing_at
+    (struct.get $cont 10 (local.get $c)) (local.get $b)) (i32.const 0))))
 
 ;; `control.resume(k, v)`: the paused computation goes on in a boundary that
 ;; is active again, on top of this place (rule 3).
@@ -581,13 +664,107 @@ pub(super) const EFFECTS: &str = r#"
     (ref.cast (ref $cont) (array.get $values (local.get $saved) (i32.const 0)))
     (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
     (local.get $env) (local.get $v) (local.get $mode)))
+;; Kept slots are ordinary tuple fields, so the general portable walk sees
+;; every service, including slots unused by the argument's inferred type.
+(func $control_keep_env (param $f eqref) (param $env (ref null $env)) (result eqref)
+  (local $slots (ref $values)) (local $i i32) (local $n i32)
+  (local.set $n (array.len (local.get $env)))
+  (local.set $slots (array.new_default $values (local.get $n)))
+  (block $done (loop $copy
+    (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+    (array.set $values (local.get $slots) (local.get $i)
+      (array.get $env (local.get $env) (local.get $i)))
+    (local.set $i (i32.add (local.get $i) (i32.const 1)))
+    (br $copy)))
+  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+    (ref.null $bytes)
+    (array.new_fixed $values 2 (local.get $f) (call $tuple (local.get $slots)))
+    (ref.null $limbs) (ref.null $call) (ref.func $keep_call)))
+
+(func $keep_call (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
+    (param $arg eqref) (result eqref)
+  (local $caps (ref $values)) (local $slots (ref $values)) (local $kept (ref $env))
+  (local $i i32) (local $n i32)
+  (local.set $caps (ref.as_non_null (struct.get $obj 5 (ref.as_non_null (local.get $clo)))))
+  (local.set $slots (ref.as_non_null (struct.get $obj 5
+    (ref.cast (ref $obj) (array.get $values (local.get $caps) (i32.const 1))))))
+  (local.set $n (array.len (local.get $slots)))
+  (local.set $kept (array.new_default $env (local.get $n)))
+  (block $done (loop $copy
+    (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+    (array.set $env (local.get $kept) (local.get $i)
+      (array.get $values (local.get $slots) (local.get $i)))
+    (local.set $i (i32.add (local.get $i) (i32.const 1)))
+    (br $copy)))
+  (return_call $keep_run (array.get $values (local.get $caps) (i32.const 0))
+    (local.get $arg) (local.get $kept)))
+
+;; A delimiter packs its inner records. Re-entry always uses the kept base,
+;; before applying any environment statements made inside the kept call.
+(func $keep_run (param $f eqref) (param $arg eqref) (param $env (ref null $env)) (result eqref)
+  (block $captured (result (ref $cap) exnref)
+    (return (try_table (result eqref) (catch_ref $capture $captured)
+      (call $call1 (local.get $f) (local.get $arg) (local.get $env)))))
+  (call $capture_pack (ref.func $keep_reenter) (local.get $env))
+  unreachable)
+
+(func $keep_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env))
+    (param $v eqref) (param $mode i32) (result eqref)
+  (local $saved (ref $values)) (local $kept (ref null $env))
+  (local $c (ref $cap)) (local $x exnref)
+  (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
+  (local.set $kept (ref.cast (ref null $env) (array.get $values (local.get $saved) (i32.const 0))))
+  (block $captured (result (ref $cap) exnref)
+    (return (try_table (result eqref) (catch_ref $capture $captured)
+      (call $tramp_run
+        (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
+        (local.get $kept) (local.get $v) (local.get $mode)))))
+  (local.set $x)
+  (local.set $c)
+  (call $capture_pack (local.get $c) (local.get $x) (ref.func $keep_reenter) (local.get $kept))
+  unreachable)
+
+;; Request waits use the same one-root capture and re-entry machinery.
+(func $request_handoff (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
+    (param $k eqref) (result eqref)
+  (call $host_wait (local.get $k)))
+(func $request_pause (param $status i32) (param $env (ref null $env)) (result eqref)
+  (if (i32.eqz (global.get $async_live)) (then (call $request_fail (i32.const 4)) unreachable))
+  (if (i32.and (i32.eq (local.get $status) (i32.const 1)) (i32.eqz (global.get $req_total)))
+    (then unreachable))
+  (global.set $host_pending_status (local.get $status))
+  (return_call $control_suspend (call $host_root_boundary)
+    (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+      (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
+      (ref.func $request_handoff))))
+(func $request_wait_loop (param $tickets eqref) (param $env (ref null $env)) (result eqref)
+  (if (call $request_any_settled (local.get $tickets)) (then (return (ref.null eq))))
+  (block $captured (result (ref $cap) exnref)
+    (drop (try_table (result eqref) (catch_ref $capture $captured)
+      (call $request_pause (i32.const 1) (local.get $env))))
+    (return_call $request_wait_loop (local.get $tickets) (local.get $env)))
+  (call $capture_rethrow
+    (struct.new $frame (ref.func $wait_requests_reenter)
+      (array.new_fixed $values 1 (local.get $tickets)) (i32.const -1) (i32.const 5) (ref.null $values)))
+  unreachable)
+(func $wait_requests_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env))
+    (param $value eqref) (param $mode i32) (result eqref)
+  (return_call $request_wait_loop
+    (array.get $values (ref.as_non_null (struct.get $frame 1 (local.get $frame))) (i32.const 0))
+    (local.get $env)))
+(func $request_wait_any (param $tickets eqref) (param $env (ref null $env)) (result eqref)
+  (if (call $list_is_empty (local.get $tickets)) (then (call $request_fail (i32.const 3)) unreachable))
+  (return_call $request_wait_loop (call $request_unique (local.get $tickets)) (local.get $env)))
+(func $request_poll (param $env (ref null $env)) (result eqref)
+  (return_call $request_pause (i32.const 2) (local.get $env)))
+
 "#;
 
 /// The types of control (§9.4), after `$env`.
 pub(super) const TYPES: &str = r#"
-(type $boundary (sub final $obj (struct (field i32) (field i32) (field i64) (field f64)
+(type $boundary (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
-  (field (ref null $call)) (field (mut i32)))))
+  (field (ref null $call)) (field (mut i32)) (field (mut eqref)) (field (mut i32)))))
 (rec
   ;; 0 re-entry function, 1 saved values, 2 shadow slot, 3 kind, 4 delta (kind 1 only)
   (type $frame (struct (field (ref $refn)) (field (ref null $values)) (field i32) (field i32)
@@ -601,9 +778,9 @@ pub(super) const TYPES: &str = r#"
 ;; The records of a paused computation: first and last record, first and last kind-1 record.
 (type $sub (struct (field (ref null $flist)) (field (ref null $flist))
   (field (ref null $flist)) (field (ref null $flist))))
-(type $cont (sub final $obj (struct (field i32) (field i32) (field i64) (field f64)
+(type $cont (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
-  (field (ref null $call)) (field (mut i32)) (field (ref $boundary)) (field (ref null $sub)))))
+  (field (ref null $call)) (field (mut i32)) (field (ref $boundary)) (field (ref null $sub)) (field (mut eqref)))))
 ;; boundary, f, first, last, first kind-1, last kind-1
 (type $cap (struct (field (ref $boundary)) (field eqref)
   (field (mut (ref null $flist))) (field (mut (ref null $flist)))

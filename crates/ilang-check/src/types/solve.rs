@@ -2742,10 +2742,21 @@ pub(crate) fn builtin_variance(b: BuiltinType) -> Vec<Variance> {
 fn builtin_variance_values(b: BuiltinType) -> &'static [Variance] {
     use Variance::*;
     match b {
-        BuiltinType::List => &[Co],
+        BuiltinType::List | BuiltinType::Request => &[Co],
+        BuiltinType::Key => &[Inv],
         BuiltinType::Boundary => &[Inv, Inv, Inv],
         BuiltinType::Continuation => &[Contra, Co, Co, Co],
         _ => &[],
+    }
+}
+
+#[cfg(test)]
+mod primitive_variance_tests {
+    use super::*;
+
+    #[test]
+    fn typed_keys_are_invariant() {
+        assert_eq!(builtin_variance(BuiltinType::Key), vec![Variance::Inv]);
     }
 }
 
