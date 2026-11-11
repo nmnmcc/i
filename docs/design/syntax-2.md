@@ -679,7 +679,7 @@ not unquote. Backtick, `~`, and `~..` keep their quote/unquote/splice roles
 (meta.md:74–103). No collision with caret is present.
 
 The simplest record mapping is to retain records@0d0ce19 §13's proposed
-explicit `.is` datums, `{ (: name e) }` and `{ .. }`, while changing only their
+explicit `.is` datums, `{ (: name e) }` and ` Record `, while changing only their
 normal-surface printing. They are already structural data in a deliberately
 different surface. Then bare `.is` `()` remains a parameter list, not the
 normal surface's empty value; `(,)` is removed in expression, type and pattern

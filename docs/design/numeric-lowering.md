@@ -32,7 +32,7 @@ The controlling spec sections are §4.7–4.8 (principal inference), §6.2
   (§11.8, §13). Preserve bits, not just equality.
 - Tail calls use bounded stack (§11.6). Stops retain exact logical source call
   positions, including tail-site rules (§11.7), and do not run finals (§9.5).
-  `? Never ! Never` does not prove a function cannot stop (§11.7).
+  `^ Never ! Never` does not prove a function cannot stop (§11.7).
 
 Examples use accepted `syntax.md` syntax. The plan's “已定的设计” requires ordinary
 libraries and general features. The ledger's Std-3 profile ruling keeps correct

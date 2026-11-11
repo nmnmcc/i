@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Migrate parseable inline record snippets in the repository Markdown."""
+from pathlib import Path
+import json,re,subprocess
+import os
+os.chdir(Path(__file__).resolve().parent.parent)
+paths=[Path('README.md'),*Path('docs').rglob('*.md')]
+items=[]; forms=[]
+for p in paths:
+ text=p.read_text()
+ def errors(m):
+  if '|>' in m[1]: return m[0]
+  return '`'+re.sub(r'\?(?=\s+(?!(?:True|False)\b)[A-Z]\w*)','^',m[1])+'`'
+ migrated=re.sub(r'(?<!`)`([^`\n]+)`(?!`)',errors,text)
+ if migrated != text:
+  p.write_text(migrated)
+  text=migrated
+ for m in re.finditer(r'(?<!`)`([^`\n]+)`(?!`)',text):
+  src=m[1]
+  if not re.search(r'\{\s*(?:\.\.|[a-zA-Z][\w-]*\s*:)',src): continue
+  if '\\|' in src: continue
+  items.append((p,m.start(1),m.end(1),src))
+  forms.extend([src,'v = '+src,'T = '+src])
+r=subprocess.run(['target/debug/examples/migrate-syntax2'],input=''.join(json.dumps(s,ensure_ascii=False)+'\n' for s in forms),text=True,capture_output=True,check=True)
+res=[json.loads(line) for line in r.stdout.splitlines()]; edits={}
+for j,(p,a,b,src) in enumerate(items):
+ for prefix,result in zip(['','v = ','T = '],res[3*j:3*j+3]):
+  if result['diagnostics'] or result['empty'] or result['mains']: continue
+  out=result['source']
+  if not out.startswith(prefix): continue
+  out=out[len(prefix):]
+  if out!=src: edits.setdefault(p,[]).append((a,b,out,src))
+  break
+for p,changes in edits.items():
+ text=p.read_text()
+ for a,b,out,src in reversed(changes): text=text[:a]+out+text[b:]
+ p.write_text(text)
+print('changed',sum(map(len,edits.values())),'files',len(edits))

@@ -37,7 +37,7 @@ Facts checked by reading code:
 
 | Code region | Evidence and consequence |
 |---|---|
-| `std/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `? E ! N`; folds run left to right. Keep these conventions. |
+| `std/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `^ E ! N`; folds run left to right. Keep these conventions. |
 | `std/src/dict.i:24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
 | `std/src/string.i:4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
 | `std/src/option.i:1–6`, `:27–31`, `:54–59`; `std/src/result.i:1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |

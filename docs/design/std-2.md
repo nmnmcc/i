@@ -78,7 +78,7 @@ functions with their stated error and environment types.
    or historical jurisdiction rules: these require versioned external data and
    ambiguity policy. A later ordinary package can provide both. UTC here uses
    the Unix timeline; leap seconds have no distinct representation.
-4. **Use Result for pure validation; expose effects as `? E ! N`.** Reason:
+4. **Use Result for pure validation; expose effects as `^ E ! N`.** Reason:
    std option/result style above and spec §9.3. A parser error is stored data;
    callers choose fail.from_result to raise it. No expected bad input asserts.
 5. **Compose typed CLI decoders with fixed metadata.** Reason: spec §4.7;

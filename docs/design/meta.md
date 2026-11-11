@@ -264,7 +264,7 @@ SyntaxError { SyntaxError(message: String, at: Syntax) }
 | `make` | `(node: Node, like: Syntax) -> Syntax` | A new `Syntax` with this node, and the span and the scope of `like`. §5 says how a name made in this way is looked up. |
 | `same_code` | `(Syntax, Syntax) -> Bool` | `True` when the two are the same datum. Spans and scopes are not looked at. |
 | `show` | `(Syntax) -> String` | The datum in the Lisp surface, on one line |
-| `show_as` | `(Syntax, Position) -> String ? SyntaxError` | The code in the normal surface, on one line, read by §2.3 for this position. A `SyntaxError` when it fits no row. |
+| `show_as` | `(Syntax, Position) -> String ^ SyntaxError` | The code in the normal surface, on one line, read by §2.3 for this position. A `SyntaxError` when it fits no row. |
 | `definition` | | §6 |
 | `type_of`, `signature`, `subtype`, `members` | | §7.4 |
 
@@ -307,7 +307,7 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
 ```
 
 - The pattern of the binding is one name, with no type variables. The value is a function expression `(-> …)`. Each parameter is a name or an environment parameter.
-- The value is checked against the type `(Syntax, …) -> Syntax ? SyntaxError ! Definitions | Assert`, with one `Syntax` for each parameter. If it does not have a subtype of this type, it is a compile error.
+- The value is checked against the type `(Syntax, …) -> Syntax ^ SyntaxError ! Definitions | Assert`, with one `Syntax` for each parameter. If it does not have a subtype of this type, it is a compile error.
 - `@macro` in a `.i` file is a compile error. An item with `@macro` in the result of an expansion is a compile error.
 - A macro is exported and imported by its name, as a value is. It is in the space of value names.
 - The name of a macro may only be used in these ways: in the imports and the exports, and as the macro of a macro call (§4.3). Any other use is a compile error.
@@ -495,7 +495,7 @@ A **typed macro** is a declaration and a binding with the same name in a `.is` f
 ```
 
 - The declaration is the **signature**. It is a full function type, with its type variables declared after the name. It may have errors and an environment. It may not have `_`. The rules for written types (spec §4.4) and for types in exported items (spec §2.4) are used for it.
-- The binding is the **implementation**. It follows the rules of §4.1, with these changes: it has one parameter for each parameter of the signature, in the same order, and it is checked against `(Syntax, …) -> Syntax ? SyntaxError ! Types | Definitions | Assert`.
+- The binding is the **implementation**. It follows the rules of §4.1, with these changes: it has one parameter for each parameter of the signature, in the same order, and it is checked against `(Syntax, …) -> Syntax ^ SyntaxError ! Types | Definitions | Assert`.
 - This is the only case where two items have one name, and the only use of a declaration other than `@external` or `@js`.
 - The documentation comment of the macro is on the declaration.
 
@@ -623,7 +623,7 @@ A type is given to a macro, and taken from a macro, as the `Syntax` of a written
 ## 11. Open questions
 
 1. **A sign on macro calls.** A call does not show that it is a macro, so a reader cannot see that an argument may be worked out zero or many times. Rust (`m!`) and Julia (`@m`) put a sign on such calls; Elixir and Lisp do not. This draft has no sign and leaves it to the editor (§9).
-2. **Other plans for the syntax.** `docs/design/syntax.md` keeps a lowercase name in a type for "the type of a value" (stream T2), and `{ name: e }` for records (stream T3). This draft uses `m(…)` and `a.m(…)` in a type for a macro call, and reads a `{ }` with one part as a group. Both must be checked together with T2 and T3.
+2. **Other plans for the syntax.** `docs/design/syntax.md` keeps a lowercase name in a type for "the type of a value" (stream T2), and `( name: e )` for records (stream T3). This draft uses `m(…)` and `a.m(…)` in a type for a macro call, and reads a `{ }` with one part as a group. Both must be checked together with T2 and T3.
 3. **The units and the numbers of the limits** in §4.4.
 4. **The order of work.** After stream A1: the Lisp surface and the changing between surfaces; then syntax macros with marks; then `definition`; then typed macros.
 5. **Choosing by the needed type.** §7.5 does not let a typed macro choose by the type that its call needs. It could be let in for a type variable that is not generalized, by fixing the variable to the type that is needed at the time of the expansion. This needs a careful look at inference (spec §4.7).

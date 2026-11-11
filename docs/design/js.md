@@ -553,7 +553,7 @@ its lexical scope. It does not union incompatible instantiations into one
 environment; spec §9.2's same-constructor restrictions still apply to each
 actual function environment. This changes no source inference.
 
-A factory for service S has type `(generated arguments) -> S ? Never ! R`,
+A factory for service S has type `(generated arguments) -> S ^ Never ! R`,
 with R its ordinary inferred environment. The selected arguments have these
 exact types and meanings:
 
@@ -1057,7 +1057,7 @@ Outcome itself is a private branded object without a then property.
 Public `nil`, `bool`, `int`, `float`, `string`, `bits` convert into Value.
 `to_nil`, `to_bool`, `to_int`, `to_float`, `to_string`, `to_bits` give the
 corresponding i type with error `Mismatch { Mismatch }`. Implement each raw
-extractor with a primitive error, e.g. `(Value) -> Float ? Nil`; validate in
+extractor with a primitive error, e.g. `(Value) -> Float ^ Nil`; validate in
 the JS bridge *before* returning the Float. The ordinary wrapper maps that
 Nil error to Mismatch. This is implementable by §10.3 and avoids using the
 SDK's permissive `ofType` predicate as a conversion test.
@@ -1215,12 +1215,12 @@ wraps it. Root APIs expose operations, not the table.
 
 | Field | Type |
 |---|---|
-| alloc | `(size: Int) -> Int ? String` |
-| free | `(token: Int) -> Nil ? String` |
-| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ? String` |
-| load | `(token: Int, offset: Int, size: Int) -> BitArray ? String` |
-| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ? String` |
-| proc_exit | `(code: Int) -> Nil ? String` |
+| alloc | `(size: Int) -> Int ^ String` |
+| free | `(token: Int) -> Nil ^ String` |
+| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ^ String` |
+| load | `(token: Int, offset: Int, size: Int) -> BitArray ^ String` |
+| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ^ String` |
+| proc_exit | `(code: Int) -> Nil ^ String` |
 
 This deliberately replaces the old four raw-address fields and the promise
 of an unchecked field for every preview-1 function. `Wasi` is an ordinary

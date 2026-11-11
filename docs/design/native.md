@@ -1100,7 +1100,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Public open takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
 > truncate. Public read/write/flush/remove/rename/read_file/write_file otherwise
-> use exactly these parameter and success types, with `? FsError`. Public close
+> use exactly these parameter and success types, with `^ FsError`. Public close
 > has no errors and is idempotent. A read requires max_bytes > 0, returns up to
 > that many bytes, and returns `<<>>` only at EOF. All bytes parameters must have
 > a whole number of bytes; otherwise give invalid before an OS operation. write
@@ -1128,7 +1128,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
 > truncate. Public read/write/flush/remove/rename/read_file/write_file otherwise
-> use File in place of resource Int parameters, with `? FsError`; other success
+> use File in place of resource Int parameters, with `^ FsError`; other success
 > types stay the same. Unwrap File(number) before each raw call. Public close
 > has no errors and is idempotent. A read requires max_bytes > 0, returns up to
 > that many bytes, and returns `<<>>` only at EOF. All bytes parameters must have
@@ -1191,7 +1191,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | `close_listener` | `(listener: Listener) -> Request(Nil)` |
 >
 > The same names are public wrappers with the same parameters and success types,
-> `? NetError`, and no errors for the two close functions. Address is a numeric
+> `^ NetError`, and no errors for the two close functions. Address is a numeric
 > IPv4/IPv6 address in v1, not a URL or a DNS name. Ports are 0..65535 for listen
 > (0 asks the OS to choose) and 1..65535 for connect. local_port returns the bound
 > port. Empty address, bad addresses/ports, nonpositive read bounds and partial-byte
@@ -1282,7 +1282,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | `close` | `(child: Child) -> Request(Nil)` |
 >
 > Public args gives List(String); spawn takes `(program: String, args: List(String))`;
-> other wrappers keep raw parameters/success values, with `? ProcessError` except
+> other wrappers keep raw parameters/success values, with `^ ProcessError` except
 > close, which has no errors. Program args exclude the interpreter/program name;
 > spawn's args exclude argv[0]. Each child inherits cwd, environment, and standard
 > streams. There is no shell expansion, pipeline, or implicit command parsing.
@@ -1307,7 +1307,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Public args gives List(String); spawn takes `(program: String, args: List(String))`
 > and returns Child; wait/terminate/close take Child. Match Child(number)
 > to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
-> keep raw parameters/success values, with `? ProcessError` except
+> keep raw parameters/success values, with `^ ProcessError` except
 > close, which has no errors. Program args exclude the interpreter/program name;
 > spawn's args exclude argv[0]. Each child inherits cwd, environment, and standard
 > streams. There is no shell expansion, pipeline, or implicit command parsing.
@@ -2880,7 +2880,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 - Old sentence(s):
 
-> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `{ k: b }` is False.
+> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k: b )` is False.
 > - **T2** `tests/spec/9.7`, with a host fixture as in `tests/spec/11/equality_externals.i`: `portable` of a host reference is False, and of a tuple that holds one too.
 > - **T3** `tests/spec/11/equality.i` stays unchanged; it guards that §11.4 did not change.
 > - **T4** Captures are exact: the example of part 3.1 is True; a closure whose only use of `b` is in a clause that never runs is False. Both run at O0 and O2 and give the same answers.
@@ -2901,7 +2901,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 - New sentence(s):
 
-> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `{ k: b }` is False.
+> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k: b )` is False.
 > - **T2** `tests/spec/9.7`, with a host fixture as in `tests/spec/11/equality_externals.i`: `portable` of a host reference is False, and of a tuple that holds one too.
 > - **T3** `tests/spec/11/equality.i` stays unchanged; it guards that §11.4 did not change.
 > - **T4** Captures are exact: the example of part 3.1 is True; a closure whose only use of `b` is in a clause that never runs is False. Both run at O0 and O2 and give the same answers.
@@ -2993,7 +2993,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - Old sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ? E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. How long may a victim wait before it answers a steal request? Poll points only, or a heartbeat in function prologues later?
@@ -3004,7 +3004,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - New sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ? E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.
@@ -3908,7 +3908,7 @@ Old sentence(s)/block:
 > | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
 > | `outstanding` | `(owner: Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
 > | `outstanding_root` | `(root: Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
-> | `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 > | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
 > | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 > | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
@@ -3935,7 +3935,7 @@ New sentence(s)/block:
 > | `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
 > | `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
 > | `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-> | `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 > | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
 > | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 > | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
@@ -4059,8 +4059,8 @@ Reason: N-R1: use placement-independent group observations/cancellation, keep al
 
 Old sentence(s)/block:
 
-> * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ? E`.
->   Its actual i field type is `(P...) -> A ? E ! Await | Owner`. Conceptually its body
+> * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ^ E`.
+>   Its actual i field type is `(P...) -> A ^ E ! Await | Owner`. Conceptually its body
 >   starts Request(Result(A,E)), calls request.await, then fail.from_result.
 >   With no errors it starts Request(A) and awaits it. The attribute's type
 >   expansion happens before ordinary inference and interface display. A user
@@ -4078,8 +4078,8 @@ Old sentence(s)/block:
 
 New sentence(s)/block:
 
-> * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ? E`.
->   Its actual i field type is `(P...) -> A ? E ! Await | Owner`. Conceptually its body
+> * `@host("ns", "async")` writes its fields with wire type `(P...) -> A ^ E`.
+>   Its actual i field type is `(P...) -> A ^ E ! Await | Owner`. Conceptually its body
 >   starts Request(Result(A,E)), calls request.await_owned, then fail.from_result.
 >   With no errors it starts Request(A) and uses the same owning helper. The attribute's type
 >   expansion happens before ordinary inference and interface display. A user
@@ -4403,7 +4403,7 @@ Reason: N-R2: distinguish owned non-creating operations from borrowed waits and 
 
 Old sentence(s)/block:
 
-> Public wrappers unwrap those results, giving `? StdioError ! Stdio | request.Await | request.Owner`.
+> Public wrappers unwrap those results, giving `^ StdioError ! Stdio | request.Await | request.Owner`.
 > read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 > and stderr are distinct directions; one write per direction may be pending,
 > with busy for a competing write. A cancelled write may have written a prefix.
@@ -4416,7 +4416,7 @@ Old sentence(s)/block:
 New sentence(s)/block:
 
 > Public wrappers use request.await_owned to unwrap those results, giving
-> `? StdioError ! Stdio | request.Await | request.Owner`.
+> `^ StdioError ! Stdio | request.Await | request.Owner`.
 > read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 > and stderr are distinct directions; one write per direction may be pending,
 > with busy for a competing write. A cancelled write may have written a prefix.
