@@ -19,8 +19,6 @@ type PResult<X> = Result<X, Diagnostic>;
 enum Brace {
     Block,
     Clauses,
-    /// `{ name: … }`, kept for records (E0114); read as clauses.
-    Record,
 }
 
 /// Counts of one parse, for tests: the `{` that were decided, and the
@@ -66,7 +64,6 @@ fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
         decisions: 0,
         tuple_type: false,
         cache,
-        clause_head: false,
     };
     let module = parser.module();
     let stats = ParseStats {
@@ -110,7 +107,6 @@ struct Parser<'a> {
     /// clause (§7.1).
     tuple_type: bool,
     cache: bool,
-    clause_head: bool,
 }
 
 fn binop(kind: &T) -> Option<BinOp> {
@@ -312,12 +308,9 @@ impl Parser<'_> {
     /// Runs `f` inside brackets, where the guard restriction does not hold.
     fn nested<X>(&mut self, f: impl FnOnce(&mut Self) -> PResult<X>) -> PResult<X> {
         let saved = self.guard;
-        let saved_head = self.clause_head;
         self.guard = false;
-        self.clause_head = false;
         let result = f(self);
         self.guard = saved;
-        self.clause_head = saved_head;
         result
     }
 
@@ -1187,9 +1180,6 @@ impl Parser<'_> {
             T::LBrace => match self.decide() {
                 Brace::Block => ExprKind::Block(self.block()?),
                 Brace::Clauses => ExprKind::Clauses(self.clauses()?),
-                Brace::Record => {
-                    return self.error("a block or clause block; record fields use `( )`");
-                }
             },
             _ => return self.error("an expression"),
         };
@@ -1382,9 +1372,7 @@ impl Parser<'_> {
     fn clause(&mut self) -> PResult<Clause> {
         let start = self.start();
         self.tuple_type = false;
-        self.clause_head = true;
         let patterns = self.clause_patterns();
-        self.clause_head = false;
         let note = self.tuple_type;
         let noted = |mut d: Diagnostic| {
             if note {
@@ -1500,10 +1488,6 @@ impl Parser<'_> {
         // 3: an environment statement.
         if self.at(&T::Bang) {
             return Brace::Block;
-        }
-        // 4: `{ name: … }`, kept for records.
-        if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon {
-            return Brace::Record;
         }
         // 5: a clause whose pattern is wrong.
         if self.arrow_before_break(s, end) {

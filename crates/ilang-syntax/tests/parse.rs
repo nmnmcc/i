@@ -86,8 +86,8 @@ fn brace_decisions_follow_the_ordered_tests() {
     // §3.5 test 4 and test 5: records vs a clause with a wrong pattern.
     for (src, code) in [
         (
-            /* old-syntax-check: E0102 */ "a = { p: (Int, Int) -> e }",
-            Code::MissingBody,
+            /* old-syntax-check: E0101 */ "a = { p: (Int, Int) -> e }",
+            Code::Unexpected,
         ),
         (
             /* old-syntax-check: E0108 */ "a = x |> { -y -> 1 }",

@@ -33,7 +33,6 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         by_path: HashMap::new(),
         builtin_values: HashMap::new(),
         builtin_types: HashMap::new(),
-        mains: Vec::new(),
         cur: ModuleId(0),
         locals: Vec::new(),
         fn_depth: 0,
@@ -145,8 +144,6 @@ struct Resolver<'a> {
     /// The built-in names (§12): the prelude and the built-in types.
     builtin_values: HashMap<String, Entry>,
     builtin_types: HashMap<String, TypeRef>,
-    /// `@main` bindings in the compiled package.
-    mains: Vec<(ModuleId, Span)>,
     // The state of the module and body being resolved.
     cur: ModuleId,
     locals: Vec<Frame>,
@@ -368,26 +365,11 @@ impl<'a> Resolver<'a> {
                         e.module == here.path && names.iter().any(|(n, _)| *n == e.function)
                     })
                     .collect::<Vec<_>>();
-                let legacy = parsed
-                    .iter()
-                    .filter(|p| self.graph.root == Some(p.package))
-                    .any(|p| {
-                        p.ast.items.iter().any(|i| {
-                            i.attributes
-                                .iter()
-                                .any(|a| a.module.is_none() && a.name.name == "main")
-                        })
-                    });
                 let selected = match &self.graph.entry {
                     Some(name) => declared.iter().any(|(n, _)| n == name),
-                    None => default && !legacy,
+                    None => default,
                 };
-                if (default || !declared.is_empty())
-                    && !item
-                        .attributes
-                        .iter()
-                        .any(|a| a.module.is_none() && a.name.name == "main")
-                {
+                if default || !declared.is_empty() {
                     self.entry_form("entry", b.pattern.span, b, true);
                 }
                 if self.graph.entry.is_some() {
@@ -644,7 +626,7 @@ impl<'a> Resolver<'a> {
                     matches!(item.kind, ast::ItemKind::TypeDef(_)),
                     "a type definition",
                 ),
-                "main" | "test" => (
+                "test" => (
                     &[0],
                     matches!(item.kind, ast::ItemKind::Binding(_)),
                     "a binding",
@@ -655,7 +637,6 @@ impl<'a> Resolver<'a> {
             let form = match name {
                 "external" => r#"`@external("module", "function")`"#,
                 "host" => r#"`@host("namespace")` or `@host("namespace", "async")`"#,
-                "main" => "`@main`, with no arguments",
                 "test" => "`@test`, with no arguments",
                 _ => r#"`@deprecated("note")`"#,
             };
@@ -707,7 +688,7 @@ impl<'a> Resolver<'a> {
                         });
                     }
                 }
-                "main" | "test" => {
+                "test" => {
                     let ast::ItemKind::Binding(b) = &item.kind else {
                         unreachable!()
                     };
@@ -723,33 +704,10 @@ impl<'a> Resolver<'a> {
                         );
                         continue;
                     }
-                    if name == "main" {
-                        out.main = true;
-                        if compiled {
-                            self.mains.push((self.cur, b.pattern.span));
-                        }
-                    } else {
-                        out.test = true;
-                    }
+                    out.test = true;
                 }
                 _ => out.deprecated = Some(args[0].to_string()),
             }
-        }
-        // B.5: the program entry and a test have the export name `module
-        // path.function name`, so one function may not be both.
-        if out.main
-            && out.test
-            && Some(self.p.module(self.cur).package) == self.graph.root
-            && let Some(a) = item
-                .attributes
-                .iter()
-                .rfind(|a| matches!(a.name.name.as_str(), "main" | "test"))
-        {
-            self.error(
-                code::EXPORT_NAME_TWICE,
-                a.span,
-                "this function is the program entry and also a test, so their export names would be the same (B.5)",
-            );
         }
         if let ast::ItemKind::Declaration { name, .. } = &item.kind
             && out.external.is_none()
@@ -3412,15 +3370,6 @@ impl<'a> Resolver<'a> {
     // ---- Phase 6: rules about the whole program ----
 
     fn program_rules(&mut self) {
-        // §10.2: one `@main` in the compiled package.
-        for &(m, span) in self.mains.clone().iter().skip(1) {
-            self.cur = m;
-            self.error(
-                code::MAIN_TWICE,
-                span,
-                "the compiled package has more than one `@main`",
-            );
-        }
         if let Some(root) = self.graph.root {
             let pkg = &self.graph.packages[root];
             let mut bad = Vec::new();

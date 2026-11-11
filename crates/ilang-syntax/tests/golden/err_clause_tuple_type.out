@@ -1,2 +1,4 @@
+f = p |> { p }
 --- errors ---
-E0102 @3:31 expected the function body, a `{` on the same line, found `}`
+E0111 @3:10 the right side of `|>` must be a name, a call, a function, or a clause block
+E0101 @3:13 expected an expression, found `:`

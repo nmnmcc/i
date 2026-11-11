@@ -99,11 +99,7 @@ fn raw_string_lines(src: &str) -> Vec<usize> {
 
 /// Checks the properties for one source that parses without errors.
 fn check(src: &str) -> Result<(), String> {
-    let (mut module, _) = parse_module(src);
-    for item in &mut module.items {
-        item.attributes
-            .retain(|a| a.module.is_some() || a.name.name != "main");
-    }
+    let (module, _) = parse_module(src);
     let out = format(src).map_err(|d| format!("not formatted: {d:?}"))?;
     let (again, diags) = parse_module(&out);
     if !diags.is_empty() {
@@ -221,13 +217,4 @@ fn format_golden() {
         failed.is_empty(),
         "formatted files differ: {failed:?} (run with UPDATE=1 to bless)"
     );
-}
-
-#[test]
-fn removes_legacy_main_attribute_and_keeps_comments() {
-    let source = "// before\n@main // entry\nmain = () { Nil }\n";
-    let output = format(source).unwrap();
-    assert!(!output.contains("@main"), "{output}");
-    assert_eq!(kept_comments(source), comments(&output));
-    assert_eq!(format(&output).unwrap(), output);
 }
