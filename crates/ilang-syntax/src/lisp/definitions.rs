@@ -123,45 +123,49 @@ pub fn source_definition(
         parameters: &HashMap<&str, u32>,
         sites: &mut HashMap<(Span, String), u32>,
     ) {
-        match &ty.kind {
-            TypeKind::Named { module, name, args } => {
-                if module.is_none()
-                    && let Some(&id) = parameters.get(name.name.as_str())
-                {
-                    sites.insert((name.span, name.name.clone()), id);
+        let mut work = vec![ty];
+        while let Some(ty) = work.pop() {
+            match &ty.kind {
+                TypeKind::Named { module, name, args } => {
+                    if module.is_none()
+                        && let Some(&id) = parameters.get(name.name.as_str())
+                    {
+                        sites.insert((name.span, name.name.clone()), id);
+                    }
+                    work.extend(args);
                 }
-                for arg in args {
-                    type_sites(arg, parameters, sites);
+                TypeKind::Call { args, .. }
+                | TypeKind::Tuple(args)
+                | TypeKind::Union(args)
+                | TypeKind::Inter(args)
+                | TypeKind::Diff(args) => work.extend(args),
+                TypeKind::Record {
+                    base,
+                    fields,
+                    removed,
+                } => {
+                    for label in fields.iter().map(|(label, _)| label).chain(removed) {
+                        if label.parameter
+                            && let Some(&id) = parameters.get(label.name.as_str())
+                        {
+                            sites.insert((label.span, label.name.clone()), id);
+                        }
+                    }
+                    work.extend(base.iter().map(Box::as_ref));
+                    work.extend(fields.iter().map(|(_, ty)| ty));
                 }
+                TypeKind::Fn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                } => {
+                    work.extend(params.iter().map(|p| &p.ty));
+                    work.push(ret);
+                    work.extend(err.iter().chain(env.iter()).map(Box::as_ref));
+                }
+                TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
             }
-            TypeKind::Call { args, .. } => {
-                for arg in args {
-                    type_sites(arg, parameters, sites);
-                }
-            }
-            TypeKind::Tuple(types)
-            | TypeKind::Union(types)
-            | TypeKind::Inter(types)
-            | TypeKind::Diff(types) => {
-                for ty in types {
-                    type_sites(ty, parameters, sites);
-                }
-            }
-            TypeKind::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => {
-                for param in params {
-                    type_sites(&param.ty, parameters, sites);
-                }
-                type_sites(ret, parameters, sites);
-                for ty in err.iter().chain(env.iter()) {
-                    type_sites(ty, parameters, sites);
-                }
-            }
-            TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
         }
     }
     for ty in &def.head {

@@ -256,6 +256,27 @@ fn typ(t: &TypeExpr) -> String {
         TypeKind::ValueOf { module, name } => qualified(module, name),
         TypeKind::Hole => "_".into(),
         TypeKind::Tuple(ts) => form(",", ts.iter().map(typ)),
+        TypeKind::Record {
+            base,
+            fields,
+            removed,
+        } => braced(
+            "{ ",
+            " }",
+            base.iter()
+                .flat_map(|b| ["..".into(), typ(b)])
+                .chain(
+                    removed
+                        .iter()
+                        .map(|n| form("-", [crate::print::record_label(&n.name, n.parameter)])),
+                )
+                .chain(fields.iter().map(|(n, t)| {
+                    form(
+                        ":",
+                        [crate::print::record_label(&n.name, n.parameter), typ(t)],
+                    )
+                })),
+        ),
         TypeKind::Fn {
             params,
             ret,
@@ -313,6 +334,16 @@ fn expr(e: &Expr) -> String {
         ExprKind::Float(n) => float(*n),
         ExprKind::String(s) => string_literal(s),
         ExprKind::Name { module, name } => qualified(module, name),
+        ExprKind::Record { base, fields } if base.is_none() && fields.is_empty() => "()".into(),
+        ExprKind::Record { base, fields } => braced(
+            "{ ",
+            " }",
+            base.iter().flat_map(|b| ["..".into(), expr(b)]).chain(
+                fields
+                    .iter()
+                    .map(|(n, e)| form(":", [crate::print::record_label(&n.name, false), expr(e)])),
+            ),
+        ),
         ExprKind::Tuple(es) if es.is_empty() => "()".into(),
         ExprKind::Tuple(es) => form(",", es.iter().map(expr)),
         ExprKind::List { items, rest } => braced(
