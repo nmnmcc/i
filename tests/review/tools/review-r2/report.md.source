@@ -1,0 +1,148 @@
+Independent R2 correctness review — 0573e8863c73be1576a1bbf705c207007e3ccd72
+
+**Verdict: do not merge this revision.** Fix the cleanup interruption and the two demonstrated scheduler scalability defects below. No tracked files were edited and no commit was made. The comparison base is 82375c02ae8e3db2dff0e758007f81822c22608d. Scratch programs, raw output, benchmark samples and allocation evidence are under `/tmp/review-r2/`.
+
+**Criteria and reference basis.**
+
+I wrote [criteria.md](/tmp/review-r2/criteria.md) before inspecting the implementation diff. The criteria were structured child lifetime and complete scope exit; once-only, ordered finalization; cancellation at suspension points with protected unwinding; failure propagation and least-path selection; race loser cancellation followed by cleanup; FIFO partners, source-ordered choice, exactly one commit and removal of losing registrations; no lost wakeups; correct program-root/borrowed-request quiescence; Ready-answer survival, consuming take and borrowed versus owned await; run/chain identity and portable-value boundaries; matching inferred errors/services; reproducible pure/scripted traces and streams; and bounded retention plus honest scheduler complexity.
+
+The normative basis was spec §9, runtime §§4–6/10, and native/multicore's single-worker constraints. Reference implementations were source-read, not executed: Go `proc.go` ready queues/checkdead, `chan.go` wait queues and `select.go` loser withdrawal; Eio `switch.ml` failure/await_idle/release and `cancel.ml` protected cancellation contexts; Trio `_run.py` nursery completion/cancellation/shielding; GHC `RaiseAsync.c` blocked-operation revocation and masking; and CML `event.sml`/`channel.sml` transaction identities, atomic commitment, cleanup and channel queues. I also read the worktree's concurrency prior-art analysis.
+
+Two corrections to the proposed negative-test expectations matter. The accepted contract permits returning a Task handle; joining outside its scope must stop at runtime. It also permits nonportable go captures and silently pins them: rejecting the capture would be wrong. I tested both stated behaviors. Only portable transfer paths reject nonportable values. Real IO completion order is not promised deterministic; pure FIFO and fixed test schedules are.
+
+**Finding 1 — major: cancellation truncates a finalizer already unwinding a typed error. Ran on Rust and Node, O0 and O2; traced the implementation.**
+
+Concrete program: [cancel_error_final/src/main.i](/tmp/review-r2/cancel_error_final/src/main.i).
+
+```i
+(i/task, i/resource, i/fail, i/core, (Io) = i/io)
+@main
+main = (io ! Io) {
+  r = fail.catch(() { task.scope((s) {
+    gate: task.Channel(Nil) = task.channel()
+    task.go(s, () {
+      resource.ensure(() { fail.raise("child") }, () {
+        io.print("final-start")
+        task.send(gate, Nil)
+        task.yield()
+        io.print("final-end")
+      })
+    })
+    task.receive(gate)
+    fail.raise("parent")
+  }) })
+  io.print(core.inspect(r))
+}
+```
+
+Expected: `final-start`, `final-end`, `Error("parent")`. The rendezvous establishes that error unwinding has entered the finalizer before the parent's failure. Parent has the least path, so the parent error remains the expected result. [multicore.md:261](/home/agent/Programming/i/.rd/b/docs/design/multicore.md:261) says a task being unwound is not cancelled again and its final functions run to their end. Spec §9.3/9.5 explicitly make typed-error propagation an unwind. This is not a stop, nor an error raised by the finalizer.
+
+Actual on all four combinations: `final-start`, `Error("parent")`; `final-end` is absent. The scope returns after discarding the rest of the finalizer. A real release sequence after that suspension would be skipped.
+
+Cause: [task.i:1050](/home/agent/Programming/i/.rd/b/lib/i/task.i:1050) only shields a frame after scheduler cancellation has populated `unwinding`; ordinary error unwinding through `resource.ensure` does not notify that mechanism. `accept_cancel` can therefore cancel a continuation inside a finalizer already running because of `fail.raise`. [control.rs:422](/home/agent/Programming/i/.rd/b/crates/ilang-wasm/src/emit/control.rs:422) executes the final without establishing that scheduler protection. This is an R2 integration gap even though the ordinary ensure machinery predates R2.
+
+The [normal-return variant](/tmp/review-r2/cancel_normal_final/src/main.i) also loses `final-end`; the typed-error variant above is the stronger contract violation. By contrast, finals entered after the scheduler accepts cancellation finish correctly in the blocked-send/choice/nested-cleanup tests. Protect error-unwind cleanup as well, while preserving the rule that a fresh cleanup scope can process its own failures. Do not fix this by disabling all cancellation inside fresh cleanup scopes.
+
+Evidence: `cancel_error_final/rust0.log`, `rust2.log`, `node-observed.json`, `node-probes-final.log`. Node's assertions for these two suspect cases deliberately confirm reproduction; their passing status is not a correctness endorsement.
+
+**Finding 2 — major: global event rescanning makes ordinary channel contention cubic. Ran on Rust O0/O2; FIFO checked on Node; complexity derived from source.**
+
+Concrete programs: [senders_128](/tmp/review-r2/senders_128/src/main.i), [senders_256](/tmp/review-r2/senders_256/src/main.i), [senders_1000](/tmp/review-r2/senders_1000/src/main.i). They recursively go N children, each sending its descending index to one unbuffered channel, then receive N values and assert FIFO order. There are N sends, N receives and no IO wait.
+
+Expected: all values in FIFO order, with queue/registration work proportional to the affected channel's operations (plus the chosen task-store logarithm), rather than a full all-pairs rescan at every command. Go and CML keep per-channel queues. This finding is a demonstrated scalability defect, not a claim that the language specifies a numeric latency bound.
+
+Observed repeated CLI wall times (include compilation and host setup):
+
+| Senders | Rust O0 | Rust O2 |
+|---|---:|---:|
+| 128 | 1.85 s | 1.91 s |
+| 256 | 10.51 s | 7.65 s |
+| 1,000 | exceeded 45 s | exceeded 45 s |
+
+The completed runs return the correct FIFO values. Initial and repeated runs agree on the growth; the initial O2 times were 1.78/7.55 seconds. These are scale probes, not the quiet primitive measurements below. The independent 32-sender test also passes on Node O0/O2.
+
+Cause: [task.i:1669](/home/agent/Programming/i/.rd/b/lib/i/task.i:1669) invokes `recheck_events` at every maintenance step. For each of R blocked registrations, [task.i:1473](/home/agent/Programming/i/.rd/b/lib/i/task.i:1473) scans `registration_alive`, copies/filters the complete list with `remove_registration`, then probes the complete list for a partner. Even when every waiter is a sender and no receiver exists, this is Θ(R²) work and temporary allocation per pass. Starting/blocking/draining N senders performs Θ(N³) such work overall. `select` also appends to that same global list. A yield by an unrelated task pays for these scans too.
+
+Fix with channel-local sender/receiver queues and direct registration withdrawal; wake join registrations from their target's outcome transition. Only affected registrations should be reconsidered. A two-task channel microbenchmark cannot establish this property.
+
+Scope pending counters exist, but scope lookup and retirement still scan lists. The deep-scope probe with one child at each level completed at depth 200 in 4.23/3.84 seconds and exceeded 45 seconds at depth 1,000 at both levels. This supports the broader observation that the full maintenance loop is not constant-time; I do not classify a timeout alone as a semantic deadlock.
+
+**Finding 3 — major: go performs an unused exponential portability walk on shared captures. Ran on Rust O0/O2; traced the implementation.**
+
+Concrete program: [dag_28/src/main.i](/tmp/review-r2/dag_28/src/main.i).
+
+```i
+Tree { Leaf
+  Node(Tree, Tree) }
+make = (n: Int) -> Tree {
+  n |> {
+    0 -> Leaf
+    _ -> { x = make(n - 1)
+      Node(x, x) }
+  }
+}
+```
+
+The main makes `x = make(28)`, then starts and joins one child that pattern-matches only the outer constructor and returns 1. There are only 29 distinct tree nodes. The task returns a portable Int; it does not send the tree anywhere.
+
+Expected: spawning a local task with that small immutable shared capture should not expand its exponentially many paths. In the accepted single-worker implementation the captured reference can remain local. The full published-record portability classification is needed for multicore publication, which this implementation does not perform.
+
+Actual total CLI times:
+
+| Shared-tree depth | O0 | O2 |
+|---|---:|---:|
+| 20 | 0.28 s | 0.78 s |
+| 24 | 0.81 s | 1.20 s |
+| 28 | 9.02 s | 8.09 s |
+
+The program eventually gives the correct result. Changing only `scope` to `local_scope` makes the depth-28 O2 program finish in 0.74 seconds (see `dag-local.jsonl`), consistent with the local witness short-circuiting the walk. Adding four actual nodes adds approximately sixteen times the traversal work once fixed compilation/setup cost is excluded.
+
+Cause: [task.i:1808](/home/agent/Programming/i/.rd/b/lib/i/task.i:1808) always computes `core.portable((start, info, scope.chain))` for `TaskState.portable_record`. That field is never read anywhere in this implementation. [values.rs:416](/home/agent/Programming/i/.rd/b/crates/ilang-wasm/src/runtime/values.rs:416) walks every occurrence of ordinary tuple/constructor/list nodes; only patched recursive closures get visitation stamps. Thus shared acyclic data is repeatedly expanded. The prior-art note's shared-graph warning applies directly.
+
+Remove the unused classification from the one-worker spawn path. A future required publication walk must also bound work by distinct graph nodes rather than expanded paths. This is scheduler-triggered work, not an unavoidable consequence of Wasm continuation lowering. Raw results are in `dag.jsonl`.
+
+**Other correctness and typing results.**
+
+The independent programs exercised scope exit without explicit join; blocked send cancellation with nested finals; cancellation of a three-leaf choose followed by probes for stale leaves; protected cleanup opening a nested run/scope and waiting for children; child failure while the parent blocks in join; two ready race contenders and loser cleanup; one committed channel branch with exactly one mapper; deadlock on never; task paths and full generator state; escaped Task and nonportable result checks; raw group waits, Ready survival, slot reuse/cancel aliases, borrowed/owned await, unlisted answers with duplicate tickets, fake-only entry classification, and stop with a pending producer.
+
+Results other than the findings match their stated expectations at O0/O2. Nine selected traces, including paths and generator values, match byte-for-byte between Rust and Node at both levels. The request reuse case performs 200 cancel/restart/await/close cycles. Node explicitly checks that the owned producer is aborted, that stop aborts its pending producer, and that invocation contexts are no longer live. The existing Rust gate tests additionally verify producer drops and context retirement over 200 repetitions of each case per optimization level, including owned versus unrelated root deadlock and nested borrowed interests.
+
+The two negative typing expectations corrected above behave as specified: the escaped handle compiles, then join stops with `task: join outside its scope`; a Boundary captured by go works locally; returning it through a portable child result stops with `task: value is not portable`. A child's unsupplied ordinary service remains a requirement and rejects the entry with E0522. The public interface table agrees with runtime §§5/6, including Owner/Root retention, routing-service subtraction, and ordinary child error unions. The library interface golden and name checks pass without regenerating expectations.
+
+`services_require_async` implements the recorded coordinator-approved default-plan specialization: request/async host needs and Scheduler/Runner qualify; Await/Owner/Root alone do not. The fake-only request probe is synchronous and the request/task probes are async. I did not label the explicitly deferred JP provider-closure implementation as an R2 defect.
+
+Five Rust `r2_runtime` tests pass, both `r2_fixtures` checks pass, and the final npm invocation reports 97 passing tests: 79 existing plus 18 independent Node tests, generally testing both optimization levels. The two cleanup reproduction tests assert the observed bug, as explained above. No private-GC reachability proof follows from these functional tests: slot clearing/generation checks and observer removal were also source-read, but I did not measure every live request/table object after collection. No additional resource leak is claimed.
+
+The 5,000-child program completes at both levels. A repeated full CLI run took 1.39 s / 1.43 s with peak process RSS 346 / 371 MiB (O0/O2); these include the compiler, Wasmtime and GC heap, and are not live scheduler bytes. The non-yielding task times out after four seconds with no child output on both levels, as cooperative M:1 explicitly permits. Deep nesting and 1,000 blocked senders were killed at the stated 45-second limits, not reported as runtime deadlocks.
+
+**Primitive performance and allocation attribution.**
+
+I ran the repository's `tests/r2-measure.py` with output redirected to `/tmp/review-r2/performance`. It built through heavy and measured through `/home/agent/Programming/i/.rd/cache/quiet`. Its three tests and separate instrumented counter test pass. Own unrestricted probes had finished before the timed phase. Median-of-five-batch-medians, inside the scope, microseconds per operation:
+
+| Primitive | n=32 | n=64 | n=128 | Published n=128 |
+|---|---:|---:|---:|---:|
+| Empty spawn+join | 89.55 | 97.31 | 108.63 | 107.25 |
+| Ready-task switch | 13.20 | 13.26 | 13.52 | 13.05 |
+| Channel send+receive | 35.12 | 35.45 | 37.15 | 34.87 |
+
+The outer timer at n=128 gives 113.31 / 13.30 / 35.15 µs. These substantiate the report's approximate costs, not Go-like latency. Dynamic allocation counts reproduce exactly: 1,551.898 per spawn+join, 152.480 per switch and 470.992 per channel transfer. Function entries also reproduce: 6,691.75 / 535.77 / 1,509.85. Instrumented code is not used for timings; attribution confirms all optimized function bodies match the actual timed artifact.
+
+The source algorithms are only partly like the references. The two-list ready queue has amortized O(1) list operations, but queued-flag/task-state access costs O(log T) in the persistent AVL tree. Scope pending counters are present; scope lookup/retirement are not indexed. Channels have no local wait queues and maintenance retains the Θ(R²) event scan described above. These qualifications matter more than the small-kernel timing.
+
+The 1,552 allocations are not all compiler overhead. I mapped the actual O2 counter owners back to source:
+
+- **545.27 allocations in `first_path`:** each recursive path comparison materializes the temporary `(a,b)` tuple as one generic object plus one value array. These are transient comparison operands, not retained scheduler state; aggregate scalar replacement could remove them. The number of comparisons still comes from the scheduler's chosen index.
+- **245.06 in `update_task`, plus 32.16 in `tree_node`:** persistent AVL path copies/new nodes, each represented by object and backing array. The persistent update is a scheduler algorithm choice; its two-object representation is a compiler representation cost.
+- **70 in `tree_find`, 68 in `record_task`, 32 in `reply`:** typed lookup wrappers and immutable scheduler-state updates. These mix ordinary source data construction with opportunities for compiler specialization; they cannot honestly all be assigned to continuation capture.
+- **102.03 explicit control objects:** 6 capture/continuation objects, 60.03 frame/frame-list objects, and 36 subcontinuation/trampoline objects. These are generated control/re-entry machinery for the scheduler's chosen suspension points. There are also 2 boundaries and 50 closure objects; saved environments account for some additional arrays.
+- Across all owners there are **638.93 generic object records, 710.94 value arrays, 45 list cells and 3 byte arrays**. Generic object/array categories overlap the source-attributed numbers above. The representation merges record, tuple, environment and capture storage, so an exact exhaustive scheduler-versus-compiler percentage is not supported by these counters. Small loop Ints and Float boxes do not account for the cost.
+
+Raw paired samples, WAT and the independent source-attribution summary are linked from [performance/summary.json](/tmp/review-r2/performance/summary.json) and [allocation-attribution.json](/tmp/review-r2/performance/outer/allocation-attribution.json).
+
+**User-visible differences from the references.**
+
+These are allowed differences, not additional findings. Go goroutines do not automatically belong to a joining scope, while i/Eio/Trio structure child lifetime. Go select randomizes ready cases and CML uses dynamic priorities; i chooses source order, so a permanently ready first alternative can starve later ones. FIFO partner order does not imply fair choice among alternatives. Trio/Eio can aggregate failures; i returns one least-path actual failure. i uses cancellation outcomes and immediate shielded cancelled-join stops instead of a catchable cancellation error/result. Trio requires explicit shielding for asynchronous cleanup in a finally block; Eio protects release hooks, and GHC's interruptible masking is not identical to i's shield. The expected result for Finding 1 comes from i's own unwind guarantee, not from imposing Trio's default finally behavior. Pure non-yielding work can monopolize i's worker; it is closer to cooperative Eio/Trio here than native Go's preemptive runtime. Finally, i's task stream is immutable: calling random twice at the same path does not silently advance a hidden RNG.
+
+**Merge conditions.**
+
+Protect finalizers already unwinding errors, with Rust/Node O0/O2 regression tests; replace full event-table rescans with affected waiter queues/indexes and add contention tests; remove the unused one-worker portability classification and add a shared-DAG capture test. The full JP provider-plan work remains its recorded later-track responsibility. No new public API, worker preemption, aggregate error type or Go-level performance promise is necessary to fix these findings.

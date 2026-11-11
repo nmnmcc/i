@@ -445,6 +445,30 @@ impl<'a> Query<'a> {
                 let parts: Vec<String> = parts.iter().map(|a| self.show_type(a)).collect();
                 format!("({})", parts.join(", "))
             }
+            TypeKind::Record {
+                base,
+                fields,
+                removed,
+            } => {
+                let mut parts = Vec::new();
+                if let Some(base) = base {
+                    parts.push(format!("..{}", self.show_type(base)));
+                }
+                parts.extend(fields.iter().map(|(name, ty)| {
+                    format!(
+                        "{}: {}",
+                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some()),
+                        self.show_type(ty)
+                    )
+                }));
+                parts.extend(removed.iter().map(|name| {
+                    format!(
+                        "-{}",
+                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some())
+                    )
+                }));
+                format!("({})", parts.join(", "))
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -1153,6 +1177,8 @@ fn builtin_head(b: BuiltinType) -> String {
     const PARAMS: [&str; 4] = ["A", "R", "E", "N"];
     match b {
         BuiltinType::List => "List(A)".into(),
+        BuiltinType::Key => "Key(A)".into(),
+        BuiltinType::Request => "Request(A)".into(),
         BuiltinType::Boundary => "Boundary(R, E, N)".into(),
         BuiltinType::Continuation => format!("Continuation({})", PARAMS.join(", ")),
         b => b.name().into(),
@@ -1323,6 +1349,14 @@ impl Walk<'_> {
             | TypeKind::Union(ts)
             | TypeKind::Inter(ts)
             | TypeKind::Diff(ts) => ts.iter().for_each(|a| self.ty(a)),
+            TypeKind::Record { base, fields, .. } => {
+                if let Some(base) = base {
+                    self.ty(base);
+                }
+                for (_, field) in fields {
+                    self.ty(field);
+                }
+            }
             TypeKind::Fn {
                 params,
                 ret,
@@ -1372,6 +1406,14 @@ impl Walk<'_> {
                 self.occ.push((span, t));
             }
             ExprKind::Tuple(xs) => xs.iter().for_each(|x| self.expr(x)),
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                for (_, value) in fields {
+                    self.expr(value);
+                }
+            }
             ExprKind::List { items, rest } => {
                 items.iter().for_each(|x| self.expr(x));
                 if let Some(r) = rest {
@@ -1573,6 +1615,14 @@ impl Scope<'_> {
                 }
             }
             ExprKind::Tuple(xs) => xs.iter().for_each(|x| self.expr(x)),
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                for (_, value) in fields {
+                    self.expr(value);
+                }
+            }
             ExprKind::List { items, rest } => {
                 items.iter().for_each(|x| self.expr(x));
                 if let Some(r) = rest {

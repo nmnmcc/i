@@ -24,7 +24,7 @@ pub mod syntax;
 mod to_ast;
 mod to_source;
 pub(crate) mod trampoline;
-pub use encode::{expression_syntax, item_syntax, pattern_syntax, type_syntax};
+pub use encode::{SourceEncoder, expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
     parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type,

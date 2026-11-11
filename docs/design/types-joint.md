@@ -328,11 +328,11 @@ Apply the individual accepted replacement texts only where the table says to, wi
 
 > A record type may be the closed result bound to a pattern’s alias name. This does not make a record-shaped type pattern legal. Generic aliases may contain ordinary formal parameters and closed value-derived parts, but their formal parameters may not be record labels.
 
-**§4.4, members/places:** install T1’s value-set union/intersection/difference paragraphs and T3’s one-Rec-plus-spreads exception together. Add:
+**§4.4, members/places:** install T1’s value-set union/intersection/difference paragraphs and T3’s exact-record-union exception (records §20) together. Add:
 
-> Int and String members merge their value sets. Record members merge their common fields for union and all their fields for intersection (§4.9). An unresolved spread stays separate from an ordinary record member. Runtime overlap and removal count it as a record, but this does not merge it with that record member. A union retaining a spread member is allowed only in output places. This restriction is checked on expanded annotations and on shown inferred binding types, including non-generalized bindings. Reading a value’s type cannot hide an illegal place.
+> Int and String members merge their value sets. Record union retains all alternatives; it never replaces them by common fields. Record intersection combines all required fields (§4.9). Runtime overlap and head removal count every record or spread alternative as Record. Closed record unions are ordinary types in every position. Open record unions are also legal to write; U3 restricts only inclusion obligations that need alternative-specific bounds. Ordinary variable-member place restrictions remain. Every operation must be valid on every inhabited alternative and returns the union of the results.
 
-**§4.5:** keep rules 1–7 with T1’s amendments to disjointness and environment equality. Rule 8 is the T1 value-set subset rule. Rule 9 is “Records obey the width, intersection, join, and forgetting rules of §4.9.3.” There is no literal-subset rule for record labels.
+**§4.5:** keep rules 1–7 with T1’s amendments to disjointness and environment equality. Rule 8 is the T1 value-set subset rule. Rule 9 is “Records obey the width, intersection, exact union, and forgetting rules of §4.9.3.” There is no literal-subset rule for record labels.
 
 **§4.7:** install T2 §7.5’s full completion rules, retain principal inference/value restriction, and retain T1’s full-versus-limited text rule. Add:
 
@@ -360,7 +360,7 @@ Apply the individual accepted replacement texts only where the table says to, wi
 
 **§4.9.2–3, forgetting:** apply T3’s set meaning and rules, with the J8 qualification:
 
-> Forgetting from an empty type is empty. Dropping a field from a record type is an exact rewrite only when the discarded field is known to be inhabited for every remaining choice of its variables. Otherwise the forgetting form remains. Closing a value-derived type may make this rewrite possible later. Normalization before or after substituting a closed type must describe the same set.
+> Forgetting from an empty type is empty. Dropping a field from a record type is an exact rewrite only when the discarded field is known to be inhabited for every remaining choice of its variables. Otherwise the forgetting form remains. Closing a value-derived type may make this rewrite possible later. Normalization before or after substituting a closed type must describe the same set. Normalize a record with a plainly empty field to Never. Preserve exact union alternatives before and after substitution, including label substitution. Common-field joins belong only to conservative known summaries. Forgetting distributes over exact union, not over intersection.
 
 **§4.9.4:** retain T3 L1–L9, and replace its value-type sentence with:
 
@@ -406,6 +406,18 @@ Apply the individual accepted replacement texts only where the table says to, wi
 | §11.1, §11.4, §11.8 | Canonical literal equality/escaping stays | No runtime change for reads | Add record values/equality/text; one escape implementation |
 | §14 (new) | Supplies singleton String keys | No library privilege | Ordinary `i/record` declarations/operations from T3 |
 | Future macro sections | Literal Syntax and members decomposition | Written Definitions and readiness | Record node kinds, hygienic label parameters; §5 contract |
+
+### Record substitution amendment (T3 hand-off)
+
+Records §20 replaces the common-field union and one-Rec routing assumptions in J2, J4, J5 and J8; J1, J3, J6 and J7 retain their contracts. This section takes precedence over the earlier representation sketch and routing list. Use N1/N2, E0–E5 with J8’s inhabitance guard, and U1–U6. Shared Union/Inter/Without nodes retain exact alternatives without eager expansion. `head()` identifies a runtime constructor, not permission to merge alternatives. A known summary is not a solver type or a permanent alias. Do not join field bounds merely because two lower record bounds share a label.
+
+Install the revised record paragraphs in spec §4.4, subtype rule 9, and §4.9.2–3 as in records §20. Right-side multiple-record constraints must use the no-new-bounds gate U3 before left-intersection or Without routing. Remove the record-count/spread output-only restriction from written and inferred types. Keep existing ordinary-variable place restrictions. U3 includes pure structural field inclusion, exact field case splitting and read-only established bounds; retry unresolved obligations after ordinary group constraints and before generalization/T2 publication. Never read a lower bound as an upper bound or create a branch-specific bound. All alternatives feed field checking, type tests and coverage; only runtime Record/All tests are deduplicated. Empty normalization can remove a record from coverage, but known summaries may remain conservative.
+
+This amendment proves normalization commutation for the nonrecursive record fragment. It does not import MLstruct’s principality theorem into i’s different set semantics. T3 must test the choice-free inference restriction and preserve J7; unproved open right-union constraints report the missing inclusion, and actual bound choices report the choice. Neither is solved by selecting field bounds. Use the resource diagnostic, not either proof diagnostic, when U6 exhausts its 65,536-state demand budget. Required tests are in records §20, `tests/t3-record-substitution.py` and `tests/t3-record-demand.py`.
+
+R1–R4 acceptance hand-off: install spec §4.9.3's structural/bound proof, every-position closed-union, graph/interface and resource paragraphs together. Accept `wrap_union`, `pair`, the branch-derived `Schema(Row)` input and closed `forward`; test both directions of established bounds and reject choice-dependent fresh variables. U6 replaces eager DNF construction throughout J4 completion, J7 rebuilding, display and interfaces. Its graph bundle refines full-source read-back for shared record types; small types still use source. No common summary may become a published alias. Require the 20-step fresh-label branch and Fan scale gates, including graph round-trip and Fan(Never), well under one second excluding compiler startup. Earlier J4/J5 tables and later test lists that expect E0518 solely for record/spread unions are superseded by this section. Current source locations and exact changed expectations are in records §20.6; full principality and arbitrary leaf-algebra completeness are not claimed by the model.
+
+Prior-art algorithm hand-off: records §21 selects Elixir’s lazy BDD and map emptiness/projection as the demanded proof kernel, with shared suspended operations for i’s open/undemanded types. Use its reference-first implementation table; do not replace it with MLstruct’s common-field union or eager DNF products. Unknown and ResourceLimit are distinct from Empty and Refuted. Pending U3 obligations retain their owner, scope and origin through ordinary solving and T2 completion, and are discharged or diagnosed before generalization/publication. Preserve one scheme-wide variable map across branches and invariant occurrences, including retained ordinary constraints and graph-interface metadata. Add `tests/t3-record-bdd.py` to the two existing models, the negative-map projection, cache-off, reordered-atom and resource-retry gates, and the demanded closed-Fan scale probe. These refinements change no example verdict from the R1–R4 contract.
 
 ## 7. Error allocation and reporting order
 

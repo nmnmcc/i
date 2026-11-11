@@ -5,13 +5,14 @@ This document is the definition of the i programming language. A compiler or a p
 This document is complete in itself. It defines:
 
 - the source language (§1 to §8);
-- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, and `i/random` (§9);
+- effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, and `i/request` (§9);
 - the library module `i/core`, which has the operations that are not written in i (§13);
+- the library module `i/record`, which reads and sets fields of records (§14);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-Every compiler must give the seven library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. The paths `i/task`, `i/clock`, `i/fs`, `i/process`, `i/net`, and `i/stdio` are kept for planned library modules: only the capability requirements stated in §9.7 are defined here until their operation APIs are installed. A program may not define a module with one of these paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
+Every compiler must give the library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. The paths `i/clock`, `i/fs`, `i/process`, `i/net`, and `i/stdio` are kept for planned library modules: only the capability requirements stated in §9.7 are defined here until their operation APIs are installed. A program may not define a module with one of these paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a clause block is a function too (§6.12). A binding is a binding wherever it is written, and a clause block with one clause and no guard binds its pattern as a parameter does. Where two forms look the same, they have the same rules, with these exceptions, where the place of a form decides its rules:
 
@@ -64,7 +65,7 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 
 i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
 
-Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with neither `@external` nor `@js` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
+Macro calls and attributes use the ordinary grammar of their position and are expanded before checking (Appendix D). The parser reads them without resolving their names.
 
 ### 1.5 Symbols
 
@@ -106,6 +107,7 @@ Comments are not tokens, so the tokens on the two sides of a comment are what co
 A break ends something. What it ends depends on the brackets it is directly inside:
 
 - Directly inside `{ }` (a block, a clause block, or the constructors of a type), and at the top level of a file, a break ends a statement, a clause, a constructor, or an item. Attributes are part of the item after them, so a break after an attribute does not end the item.
+- Directly inside the `( )` of a record (§6.13) or a record type (§3), a break is a `,`.
 - Directly inside a `{ }` that groups a type (§3), a break is a compile error.
 - Directly inside `( )`, `[ ]`, or `<< >>`, a break is the same as a `,`. A `,` at the end of a line may be left out.
 
@@ -136,7 +138,7 @@ A test module may be imported only by test modules of the same package. Its expo
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the **library modules** (§9, §10, §13, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: operations that cannot be written in i may be built into the compiler. A compiler-managed macro or test instance may receive compiler-owned operations through the ordinary host ABI; these operations are not capabilities of an ordinary program entry (§10.1);
+- `i`, for the **library modules** (§9, §10, §13, §14, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: operations that cannot be written in i may be built into the compiler. A compiler-managed macro or test instance may receive compiler-owned operations through the ordinary host ABI; these operations are not capabilities of an ordinary program entry (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
@@ -175,18 +177,19 @@ A file has at most one imports group and at most one exports group. They come fi
 
 An item that is a `name`, with or without type parameters (§2.5), then `:` and a type, with no `=` after the type, is a declaration, whatever its attributes. Any other item that starts with an `UpName` is a type definition (§4.3). An item that is a call, `m(args)` or `a.m(args)`, with no `=` or `:` after its `)`, is a `MacroItem`. Every other item is a binding (§2.5).
 
-A `MacroItem` is kept for macros. It is a compile error, and the message says that a call at the top level is kept for macros.
+A `MacroItem` must name a syntax macro and is expanded as an item (Appendix D).
 
-A declaration requires `@external` or `@js` (§10.1), or expansion by a macro. A declaration with neither attribute is kept for macros, where it goes with a binding of the same name. Until that expansion is defined, it is a compile error, and the message says that the declaration is kept for macros.
+A declaration requires `@external` or `@js` (§10.1), or an attribute macro that replaces it (Appendix D). A declaration left without either foreign attribute after expansion is a compile error.
 
 In one module, every top-level name is defined one time only. Two bindings may not bind the same name, two type definitions may not define the same type, and two constructors may not have the same name. A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
 
-These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@test`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@test()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
+These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@test`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@test()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is expanded as a macro (Appendix D). An attribute in another place, or a built-in attribute given two times on one item, is a compile error.
 
 - `@js("expression")`: on a declaration of a closed opaque type (§10.1.1). A declaration cannot have both `@js` and `@external`.
 - `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:` or `i:compiler/`, which are kept for the runtime and compiler (§B.4).
 - `@host("namespace")` and `@host("namespace", "async")`: on a type definition (§9.7). The namespace may not start with `ilang:` or `i:compiler/`.
 - `@test`: on such a binding in a module under `test/` (§10.2).
+- `@macro`: on a syntax macro binding in a `.is` module (Appendix D).
 - `@deprecated("note")`: on any item. Using the marked item from another module gives a compile warning.
 
 ### 2.3 Imports
@@ -255,7 +258,7 @@ A binding whose pattern is one name, with or without a type, may declare type va
 
 An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is always a binding or a declaration with type parameters. It is never a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1). So `wrap(A) = (x: A) { Some(x) }` declares `A`. The same is true for a statement of a block (§6.1).
 
-An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
+An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is a macro item, not a binding (§2.2, Appendix D).
 
 An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
 
@@ -585,6 +588,11 @@ TypeCall  = [ name "." ] name "(" [ TypeArg { "," TypeArg } [ "," ] ] ")" .
 TypeArg   = Type .
 Literal   = int_lit | "-" IntPart | string_lit .
 IntPart   = int_lit | "{" IntPart "}" .
+RecordType = "(" ".." Type { "," RPart } [ "," ] ")"
+           | "(" FPart { "," FPart } [ "," ] ")" .
+RPart      = Label ":" Type | "-" Label .
+FPart      = Label ":" Type .
+Label      = name | string_lit | UpName .
 ```
 
 - An `UpName` with no module name before it is a type variable when a type variable with that name is declared where the type is written (§4.7, §5), and a type when not. `_` is a hole that type inference fills in.
@@ -594,13 +602,17 @@ IntPart   = int_lit | "{" IntPart "}" .
 - A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `^` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
 - A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
 - A value type, directly or through aliases, may not occur in a custom constructor field, an external or host declaration, or a service/environment type. Those types must be complete before inference.
-- A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is kept for macros, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says that it is kept for macros.
+- A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is a syntax macro call in a type (Appendix D). Its arguments are read by the type grammar.
 - `A | B` is a union, `A & B` is an intersection, and `A - B` is a difference (§4.4). `-` is stronger than `&`, and `&` is stronger than `|`.
 - `( … )` with `->` after it is a function type. Without `->`, a first `..` or label followed by `:` selects a record type; other nonempty contents select a positional tuple type. Empty `()` is a compile error suggesting `Record`. A record parameter type needs nesting: `((a: Int)) -> T`; `(a: Int) -> T` has one Int parameter labelled `a`.
 - A parameter of a function type may have a label: `(in: String, each: String) -> String` (§4.6).
 - A function type goes as far to the right as it can: `(A) -> B | C` gives `B | C`. `{ }` puts a type in a group: `{ (A) -> B } | C`, `(A) -> { (B) -> C } ! E`.
 - `^` and `!` are part of the nearest `->`. `^` comes before `!`. A `^` or `!` that the nearest `->` cannot take, because it already has one or because `!` came first, is a compile error: in `(A) -> (B) -> C ! N ^ E`, the inner function type is put in `{ }` to give `^ E` to the outer `->`.
 - In a written function type, a missing `^ E` means `^ Never`, and a missing `! N` means `! Never`. This is the same in every place where a type is written.
+
+- `Record` is the type of all records. A `{ }` in a type groups exactly one type. Breaks in record types separate fields; breaks directly in type groups are errors.
+- A record label is a `name`, a string with no interpolation, or a declared label parameter (§4.9.4). A fixed label starting with a capital letter is written as a string. Labels are compared after decoding escapes: `a`, `"a"`, and `"\u{61}"` are the same label. A label may not occur twice, including as a field and a forgotten label.
+- `(..R, f: T)` sets the field type; `(..R, -f)` forgets the field; `(..R)` is `R & Record` (§4.9.2).
 
 ## 4. Types
 
@@ -610,6 +622,7 @@ Every type is a set of values.
 
 - Values of different type constructors are never the same.
 - Values of different forms of one type constructor, such as `List(Int)` and `List(String)`, may not be told apart at run time (§7.1).
+- Records (§4.9) are values of one type constructor.
 - Tuples with different numbers of parts are different. The values of a function type are functions.
 
 A **member** of a type (§4.4) is a type constructor, its type arguments, and a **value set**: the values of that type constructor that are in the member. Only `Int` and `String` may have a value set that is not all of their values (§4.2). For every other type constructor, the value set is all of its values.
@@ -637,7 +650,7 @@ Nil { Nil }
 Result(A, E) { Ok(A) Error(E) }
 ```
 
-The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4.
+The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4. The types `Key` and `Keyed` are in §9.8. Request(A) and Ticket are built-in types, with operations in i/request (§9.11). Request(A) contains request handles whose answer belongs to A. Ticket is an answer-erased handle. Neither has public constructors.
 
 #### Literal types
 
@@ -696,8 +709,8 @@ Pair(Tree, _) = parsed
 ### 4.4 Union, intersection, and difference
 
 - The values of `A | B` are the values of `A` and the values of `B`. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
-- Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Tuples of the same size count as one type constructor, and so do all function types, whose parameters go in the other direction and whose value, errors, and environment go in the same direction. Function types with different numbers of parameters cannot be put together; that is a compile error. A label is kept only where both have it. So `List(Int) | List(String)` is `List(Int | String)`.
-- The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor. A type variable may be a member.
+- Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Tuples of the same size count as one type constructor, and so do all function types, whose parameters go in the other direction and whose value, errors, and environment go in the same direction. Function types with different numbers of parameters cannot be put together; that is a compile error. A label is kept only where both have it. So `List(Int) | List(String)` is `List(Int | String)`. All records have one runtime type constructor. Record unions are an exception to same-constructor merging: they retain their alternatives and denote set union. Record intersections combine all required fields (§4.9). A spread is also a record alternative; runtime overlap and head removal count every alternative as a record.
+- The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor, except that a union may have several record and spread alternatives (§4.9.3). A type variable may be a member.
 - The values of `A & B` are the values that are in both `A` and `B`. `{ A | B } & C` is `A & C | B & C`. When `T` and `U` are not type variables, `T & U` is `Never` when they have different type constructors; when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change. For `Int` and `String`, the value set is the values in both; when there are none, `T & U` is `Never`. So `"a" & String` is `"a"`, and `"a" & "b"` is `Never`. `a & T`, with a type variable `a`, stays as it is.
 - Intersections come from inference. `(x) { x + 1  x }` has the type `(x: a & Int) -> a`: the value that comes in is given back, and it must be an `Int`.
 - `A - B` takes out of `A` every member whose type constructor is the type constructor of a member of `B`. For `Int` and `String`, it takes out only the values of the value set of that member of `B` (below). These rules work it out:
@@ -707,7 +720,7 @@ Pair(Tree, _) = parsed
   - The right side of `-` may not have a type variable as a member. `a - U`, with a type variable `a`, stays as it is until `a` is known.
 - So `{ Int | String | Nil } - String` is `Int | Nil`, `A - A` is `Never`, and `{ Yield(a) | n } - Yield(a)` is `n - Yield(a)`.
 - `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
-- Unions, intersections, and differences may be used in every place where a type may be used: values, errors, and environments. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameters of a function are input places; its `->` part, the type at the top of a binding pattern, and the fields of a type are output places.
+- Unions, intersections, and differences may be used in every place where a type may be used: values, errors, and environments. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameters of a function are input places; its `->` part, the type at the top of a binding pattern, and the fields of a type are output places. Record fields and spread bases preserve the direction of their surrounding place. A spread with a field or a forgotten label is not an intersection with a type-variable member, so it may be in any place; `(..R)` alone is `R & Record`, so it may only be in an input place when `R` is a type variable. A record union is not restricted by its number of alternatives or its place. Closed record unions are ordinary types in every position; their uses obey §4.9.3. The existing restrictions on ordinary variable members still apply to expanded annotations and shown types, including after substitution and completion.
 
 ### 4.5 Subtypes
 
@@ -724,7 +737,11 @@ Pair(Tree, _) = parsed
 
 8. A member of `Int` or `String` is a subtype of a member with the same type constructor when every value of its value set is in the value set of the other. So `"a" <: "a" | "b" <: String`, and `String - "a" <: String`, but `String` is not a subtype of `"a" | "b"`, and `String - "a"` is not a subtype of `"b"`.
 
+9. Records obey the width, intersection, exact union, and forgetting rules of §4.9.3.
+
 Two types are **equal** when each is a subtype of the other. A value of a subtype may be used in every place where a value of the type is needed.
+
+`Key(A)` (§9.8) does not change. `Request(A)` (§9.11) goes in the same direction as A. The variance of task types follows their ordinary custom definitions (§9.9).
 
 ### 4.6 Function types
 
@@ -759,7 +776,8 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - Parameters (§6.11) and clause patterns (§6.12) are matched like bindings, but they are not generalized. Their values are not known where they are written, so each of their names has one type in the whole body or clause. So `(f) { (f(1), f("a")) }` needs `f` to take both `Int` and `String`.
 - Inside its own value (§6.10), a name of a binding is not general: all its uses there have one type. It becomes general when the binding is generalized.
 - A **group** is a set of top-level bindings that use one another, directly or through other bindings of the group. The bindings of a group are worked out together and then generalized together, after the groups that they use. Inside the group, their names are not general.
-- A type that has itself inside it, through a type variable, is a compile error.
+- A type that has itself inside it, through a type variable, is a compile error. Record fields and spread bases count as places inside a type constructor.
+- Simplification and display preserve type variables affecting invariant arguments, including inside records. Reading a type never generalizes a weak variable. Label parameters alone are rigid labels (§4.9.4).
 - A long union of literal types may be shortened in messages and hovers, as `"a" | "b" | … (40 more)`, but never in a type scheme or in the interface of a package. An inferred type may have literal types in it, also in the interface: an exported constant or an unannotated exported function whose value is a literal has that literal type, so giving one more literal as a value changes the interface. Exported functions should have written types, as the standard library has.
 - Simplification and type display must preserve type variables that affect invariant arguments, even when their input and output forms print alike.
 
@@ -796,9 +814,13 @@ Simplification and type display must preserve type variables that affect invaria
 
     A clause block with one clause and no guard is not typed by this rule. It is the function `(p) { e }` of rule 4: its pattern is fitted to the type of the parameter (below), it is not checked for coverage, and `S` is `Assert` when the pattern may fail. A match `s.{ p -> e }` with such a clause block is typed as the binding `p = s` followed by `e` (rule 10), with the one difference that `p` is not generalized, as a parameter is not. So the subject `s` gets the expected type that a binding gives its value (below).
 
-12. **Narrowing.** Let a catch-all be at some place in a clause pattern, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the clause pattern matches, with a value of `T` at that place, is matched by an earlier clause without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the clause pattern matches with it at that place is matched by an earlier clause without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s.{ "a" -> 0  rest -> f(rest) }` with `s: String`, `rest` gets `String - "a"`. So in §9.3, `other` gets `HttpError`, because the clause before it takes every `Error` with a `ParseError` in it.
-13. **Fields and tuple parts.** For `v.f`, every constructor that may have made `v` (§6.7) must have a field with the label `f`. The inferred result is the union of those field types with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v` must fit the bound. With no possible constructors, the result is `Never`. For `v.k`, `v` must have a known type and every member must be a tuple with more than k parts. Its inferred type must fit the bound of that known type, and the result is the union of parts k from those bound forms. If not, it is a compile error. The bound takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Use this bound also when a known function type constrains a call. Known field and tuple results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
+12. **Narrowing.** Let a catch-all be at some place in a clause pattern, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the clause pattern matches, with a value of `T` at that place, is matched by an earlier clause without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the clause pattern matches with it at that place is matched by an earlier clause without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. A taken record or spread member is represented by `Record`: a record test takes all records, and field types do not form runtime cases. So in `s.{ "a" -> 0  rest -> f(rest) }` with `s: String`, `rest` gets `String - "a"`. So in §9.3, `other` gets `HttpError`, because the clause before it takes every `Error` with a `ParseError` in it.
+13. **Fields and tuple parts.** For `v.f`, when `v` is known to be made by one constructor (§7.5), or `v` has a known type whose members are all custom types (including no members), every constructor that may have made `v` must have field `f`. The inferred result is the union of those field types with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v` must fit the bound. With no possible constructors, the result is `Never`.
+    Otherwise, when `v` has no known type, or its known type has at least one member and only record, unknown, or variable members, `v.f` has a fresh type `a` and requires `type(v) <: (f: a)`. Its known type is the guaranteed field type from the conservative record summary, when available. No constraint is added against that known field fact.
+    For `v.k`, `v` must have a known type and every member must be a tuple with more than k parts. Its inferred type must fit the bound of that known type, and the result is the union of parts k from those bound forms. In every other case field or tuple access is a compile error.
+    The bound in the constructor and tuple rules takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Record fields and spread bases are covariant for this operation. Use this bound also when a known function type constrains a call. Known field and tuple results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
 14. **Generalization.** A binding whose value is a direct value is generalized (§4.7) after its value is typed. Other bindings, parameters, and clause patterns are not.
+15. **Records.** If every `ei : Ti`, then `(f1: e1, …, fn: en) : (f1: T1, …, fn: Tn)`. If `r : R`, `R <: Record`, and every `ei : Ti`, then `(..r, f1: e1, …) : (..R, f1: T1, …)`. `() : Record`.
 
 A **catch-all** is a `name`, a discard, or `x = q` where `q` is a catch-all.
 
@@ -819,8 +841,11 @@ The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 
 A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or clause narrowing do not refine this shape. Thus `((a: Int, b: String)) { q: a = a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s: String`, x's inferred type is String even though its known type is "a"; an annotation naming x uses String.
 
+Record fields and spread bases are covariant in the hidden-input and whole-literal operations below; invariant arguments inside them still count in both directions. A field written in a literal or after a spread gets its matching expected record field, when guaranteed. The base expression of a spread gets no expected type.
+
 The **known type** `K(e)` of an expression is found from the parts of the expression, left to right, and from the expected type of its place (below). Where no case below gives it, `e` has no known type.
 
+- A record literal has the record of the known types of its fields, with `_` for a field that has none. A spread has the base’s conservative record summary, forgetting equal or possibly equal labels, and the known types of its new fields. An unknown base supplies all records. Only guaranteed fields shared by every possible record alternative survive; non-record and unknown alternatives of an enclosing union remain. Thus `(..e)` always has a record known type, and rule 13b reads the guaranteed field known type separately from inference.
 - A literal, also `-` and an integer literal, also inside groups, has its type (§6.3), and a bit array has `BitArray`. A tuple has the tuple of the known types of its parts, with `_` for a part that has none. A list has `List` of the union of the known types of its parts when they all have one, and `List(_)` when not. So `[]` has `List(Never)`.
 - An operator expression has the result type of §6.9; `a | f(…)` is the call `f(a, …)`.
 - A match `e.{ … }` has the union of the known types of its clause expressions when they all have one. A record update `C(..v, f1: e1, …)` has the known type of the call of `C` with the given fields and the other fields of `v` as its arguments.
@@ -830,8 +855,9 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - A clause block that is not the right side of a match has a known function type with one parameter, made as for a function expression: the label of its parameter (§6.12); for the parameter, `Never` when the block has no clauses, the type written at the top of its pattern when the block has one clause, no guard, and no choices, or else the type it gets from an expected type, or else `_`; and for the result, the union of the known types of its clause expressions when they all have one, or else `_`. When the parameter has a known type `B`, from a written type or from an expected type, every clause pattern is a pattern fitted to a value with the known type `B`, as in a match (the bullet on matches, before **Names in patterns**, below), and the narrowing by earlier clauses of §4.8 rule 12 is used in the same way. So with `opts: List(Option(User))`, `list.map(opts, { Some(u) -> u.name  None -> "" })` is correct, as `list.map(opts, (o) { o.{ Some(u) -> u.name  None -> "" } })` is. In the bullets on expected types, such a clause block counts as a function expression of one parameter.
 - A name used inside the value of its own binding, and a top-level name of the same group, get their known types only from what is written, because their values are not yet known there: from `x: T` at the top of the binding's pattern when it is there, or else from what is written in the value, with `_` for the rest. So, as in TypeScript, a function that uses its own result in `.f`, `.k`, or a call by label needs a written `->` part. Every other name bound by a pattern gets its known type as below.
 - A known type may have `_` in it, for a part that is not known. A part that is `_` has no known type, but the rest of the type is still known. So the labels of a function are known even when its types are not.
+- Before a call of a binding with label parameters, those labels are fixed (§4.9.4) and substituted in both its inferred and known function types before other arguments are matched. Key arguments are inferred once, before the other arguments; this does not change runtime evaluation order (§6.2).
 - A call `f(a1, …)`, also when written with `|`, has a known type when `f` has a known function type, and every type variable of its result gets a type when its parameter types are matched with the known types of the arguments (below). Then it has the result type with those types put in. A constructor with arguments is a call.
-- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a tuple type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the tuple parts, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(x: a | Nil)` with `User | Nil` gives `a` the type `User`.
+- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a tuple type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the tuple parts, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is a record, each field is matched with the same guaranteed field of the conservative record summary of `K`. A missing field supplies unknown information, including `_` for variables there; it is not proof that no value arrives. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(x: a | Nil)` with `User | Nil` gives `a` the type `User`.
 - **Expected types.** An expression may have an **expected type** from its place, as in TypeScript:
   - An argument of a call (also with `|`) whose callee has a known function type has the type of its parameter there. Its type variables are put in when matching the parameter types with the known types of the arguments before it fixes them. Function expressions that have a parameter with no written type are left out of this matching, and come last: their expected types use all the other arguments. A function given as an argument may give values to the called function that the other arguments do not show: as its result or errors, as the argument of a function it is given (a parameter of a parameter), or to a service of its environment. A service in the called function's own environment gives it values that come from the caller's environment statement. And a function that the called function gives back may get values from a later caller. Walk the type of the called function, also its own environment: its parameters are given to it, its result is given by it, and every type variable in its own environment is given to it (an environment statement of the caller gives it those values), and the direction turns at each parameter of a function type and at each contravariant argument of a constructor; an argument of a constructor that is invariant or bivariant, and an environment, count as both directions. A type variable at a place given to the called function, other than a place in a parameter reached from the top of that parameter only through parts of tuples and covariant arguments of constructors (the argument shows the values there), is matched as usual, and then its type is made whole, both in the expected type of every argument and in the known type of the call (the bullet on a call `f(a1, …)` above): every `Int` and `String` member, also in an argument of a tuple or a constructor, or in the result of a function type, has all its values, `Never` there is `_`, and every other part that is not covariant (a parameter of a function type, an argument of a constructor that is not covariant, an environment) is `_`. So in `list.fold(xs, 0, (n, x) { … })`, `n` has the known type `Int`, not `0`; with `(0, 0)` as the start, `(Int, Int)`; with `[]` as the start, `List(_)`. With `loop(S): (init: S, body: (S, (S) -> Nil) -> Nil) -> Nil`, in `loop(0, (n, again) { … })`, `n` has the known type `Int`. With `make(S): (init: S) -> ((S) -> S) -> S`, `make(0)` has the known type `((Int) -> Int) -> Int`. With `cur(S): (seed: S) -> S ! State(S)`, `cur(0)` has the known type `Int`, so `cur(0) == 5` is correct.
   - The value of a binding whose pattern has `x: T` at its top has `T`. The body of a function with a written `->` part has that type.
@@ -843,9 +869,49 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - In a match `e.{ … }`, every clause pattern is a pattern fitted to a value with the known type of `e` (below), also when the clause block has one clause and no guard. So with `opt: Option(User)`, `opt.{ Some(u) -> u.name }` is correct, as `Some(u) = opt` followed by `u.name` is.
 - **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`); if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in; the rest `r` of `"lit" <> r` has the known type `String`, all its values, because it is only the end of the value, so the known type of the value says nothing about it. The name `x` of `x = q` gets that member. The name `x` of `x: T` gets `T`, whatever the value. So in `f: (x: Int) -> Int = (y) { … }`, `f` has the label `x`, from its annotation.
 
-So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(User)`, `opt.{ Some(u) -> u.name  None -> "" }` is correct.
+So `(u) { u.name }` has the principal type `(u: (name: A)) -> A` and may not be given a `User`. `(u: User) { u.name }` reads the constructor field, but with `opt: Option(User)`, `opt.{ Some(u) -> u.name  None -> "" }` is correct.
 
-`Record` follows ordinary built-in lookup and may be shadowed, like `Int`. The empty record value is `()`; its open type is `Record`, not an exact zero-field type. Records have name or noninterpolated string labels; record types also admit declared uppercase label parameters. Tuples, tuple types and tuple patterns have at least one positional part. Empty tuple patterns are compile errors suggesting `Nil` or a binder; there are no record patterns. `{ T }` still groups a type. Bare `..` remains in list and constructor patterns and constructor export groups.
+### 4.9 Records
+
+#### 4.9.1 Values
+
+A record is a value made of fields. Each field has a label, which is a String, and a value. No label is in a record twice. The order of the fields has no meaning: `(name: "ada", age: 36)` and `(age: 36, name: "ada")` are the same record.
+
+#### 4.9.2 Types
+
+`(f1: T1, …, fn: Tn)` is the type of the records that have at least the fields `f1 … fn`, where the value of `fi` is in `Ti`. A record may have more fields than its type says. They are kept, and `==`, `core.inspect` and `core.hash` see them. `(f1: T1, …, fn: Tn)` is the same as `(f1: T1) & … & (fn: Tn)`. `Record` is the type of all records.
+
+`(..R, f1: T1, …, -g1, …)` is `R` with the labels `f1 …` and `g1 …` **forgotten**, and `(f1: T1, …)`. `R` with the label `f` forgotten is the type of the records that have the same fields as a record of `R` at every other label; at `f` they may have any value, or no field. So `(..(age: Int, name: String), age: String)` is `(age: String, name: String)`. Forgetting from an empty type is empty. Dropping a field from a record type is an exact rewrite only when each discarded field is known to be inhabited for every remaining choice of its variables, and every field label is either the same as or definitely different from each removed label. Otherwise the forgetting form remains. Closing a value-derived type may make this rewrite possible later. Normalization before or after substituting a closed type must describe the same set. A record with a plainly empty field normalizes to Never before any other record operation; plainly empty means Never, or a record or tuple with a plainly empty field or part. This test does not use current variable bounds. Forgetting distributes over exact union, composes by taking the union of the forgotten labels, and does not distribute over intersection. When `R` has no values, the spread has none: `(..(a: Never, b: Int), -a)` has no values, as `(..Never, -a)`. Only the records of `R` count, so `(..R)` is `R & Record`, and `(..Int, a: Int)` has no values. A spread with a field or a `-` part is one form, in which `R` is in an output place, as in `List(R)`; it is not an intersection that has `R` as a member (§4.4).
+
+#### 4.9.3 Rules
+
+Records are one type constructor. So a record is never a value of a custom type, a tuple, a function type, or another built-in type, but their union alternatives remain separate as specified in §4.4:
+
+- `(f1: F1, …) <: (g1: G1, …)` when every field label on the right is on the left, and its field type on the left is a subtype of its field type on the right (width).
+- `(f1: F1, …) & (g1: G1, …)` has the labels of both. A label in both has the `&` of its two types.
+- `(f1: F1, …) | (g1: G1, …)` contains exactly the records in either operand. It is not replaced by the common fields. Thus `(a: Int, b: Int) | (a: String)` does not contain `(a: 1)`, even though `(a: Int | String)` does. Empty alternatives are removed and identical alternatives are deduplicated. Union and intersection are kept in a compact exact form with shared subexpressions. Distributivity and `(a: X | Y, b: R) = (a: X, b: R) | (a: Y, b: R)` are set equalities, not instructions to expand every alternative when constructing a type.
+- A closed union of records is an ordinary type in every position. An operation is valid when it is valid on every alternative, and its result is the union of those results. Thus reading `r.a` from `(a: 1) | (a: "x")` gives `1 | "x"`; a missing required field on any inhabited alternative is an error. Open record unions may also be written in any place, subject to the existing restrictions on ordinary variable members. The restriction is on choosing bounds, as follows, not on the number of record alternatives.
+- When checking inclusion against several record alternatives, prove it without creating variable bounds. Use ordinary structural subtyping beneath fields, including tuple parts, declared nominal variance, function types and literal sets. First try structural inclusion and existing bounds, then exact coverage by splitting relevant source field unions and target-tested field sets, one label at a time in label order. Scalar partitions include their residual sets. Every source case must be covered by the complete target union. Equivalent closed annotations have equal acceptance when checking finishes. A fresh variable's established upper bounds can prove an inclusion from it; its established lower bounds can prove an inclusion into it. A lower bound is not an upper bound. Unresolved obligations are retried after ordinary group constraints finish and before generalization or permanent alias completion; the proof never fixes a variable, creates a trial bound, or assumes a recursive goal. Whole-union variable storage and left-union conjunction remain ordinary inference. An obligation that still needs alternative-specific bounds is a compile error explaining the missing proof or bound choice; the checker never picks an alternative by order. A single record target uses ordinary constraints. Known summaries are not subtype targets.
+- Keep record union, intersection and forgetting expressions shared and exact. Construction, substitution, completion, display and interface serialization must not expand products of alternatives. Field operations demand only relevant fields and any emptiness facts needed to justify them; inclusion and equality demand only their relevant uncovered cases. Equality and subtyping concern denoted sets, not graph or text identity. Full display and interfaces may encode a versioned type graph with a root, ordered nodes, scoped variable identities, child references and retained scheme bounds and ordinary obligations; decoding it preserves the exact type. Unresolved union-proof obligations are not exported. Inline full types still parse back as source. This graph form is an interface artifact, not new source syntax; shortened diagnostic text is never the interface type.
+- Demanded checking has a resource limit of 65,536 distinct proof, Boolean-apply, partition, projection and visitor states per operation, including recursive suboperations; charge split outcomes before allocating them. This is a resource limit, not a typing rule. Exhaustion reports “type too large to check here”, at the operation requiring the work, with a suggested local annotation or source simplification. It never widens a type, reports a false subtype mismatch, or publishes a partial alias. Equal types can take different work to check, so one spelling may exhaust the limit; successful checks cannot give them different meanings. The detailed demand order and accounting are records U6 (§20.3a and §21).
+- An emptiness or inclusion check distinguishes a proved result, an unresolved proof, and resource exhaustion. An unresolved or exhausted check is never evidence of an empty set or a failed inclusion. Internal Boolean difference used to check record coverage does not change written type difference. Substitution and simplification preserve shared variables in invariant arguments and all retained ordinary constraints. Unresolved union-proof obligations are discharged or diagnosed before generalization or permanent alias publication.
+- In a type test or a clause, a record type that is taken (§4.8 rule 12) is `Record`.
+- A record type is a type constructor for §4.7: a type may not have itself inside it through a field or through the base of a spread. So `last = (r) { r.next |> { Nil -> r.v  n -> last(n) } }` is a compile error. Recursive data, such as a chain or a tree, is a custom type: `Node(A) { Node(v: A, next: Node(A) | Nil) }`. A function that sets a field in a loop, such as `build = (r, n) { n |> { 0 -> r  _ -> build(record.put(r, "a", n), n - 1) } }`, needs a written type for its parameter: `build = (r: Record, n: Int) -> Record { … }`. The same holds for the accumulator of a fold whose callback uses a spread or `record.put` on it: `list.fold(xs, (n: 0, total: 0), (acc, x) { (..acc, n: acc.n + 1) })` is a compile error, and `(acc: (n: Int, total: Int), x)` or the full literal `(n: acc.n + 1, total: acc.total)` is correct. A loop cannot keep the other fields as a type variable: with a written type that is not a type variable, they are only the fields of that type.
+- A type test `x: (a: Int)` in a clause takes every record (§4.8 rule 11). So `x: (a: Int)` on a value of type `(a: Int) | (a: String)` is a compile error.
+
+Why setting a field forgets it first: if `record.put(r, "age", "old")` had the type `R & (age: String)`, then for `r = (age: 36)` it would be `(age: 36 & String)`, which has no values, and `.age + 1` would be correct and add 1 to `"old"`. With `(..R, age: String)` it is `(age: String)`, and `.age + 1` is a compile error.
+
+#### 4.9.4 Label parameters
+
+A type variable declared on a binding or a declaration that is used as a label in a record type anywhere in the binding, also in a type written inside its value, as `K` in `get(K, V): (r: (K: V), key: K) -> V`, is a **label parameter**. A label that starts with a capital letter is always a label parameter of a binding around it. A declared type variable that is not used as a label anywhere in its binding is not a label parameter, also when it is the whole type of a parameter. A label parameter may be used as a label. As a type, it may only be the whole type of a parameter of the binding's own function, or of a top-level parameter of the written function type of a declaration (as `key: K` in `get` above). It may not be the type of a parameter of an inner function, of a parameter of a function type inside another type, or of a parameter of a function type written for a binding that has a value, and it may not be in another pattern, a result or another type. When the binding's value is a clause block with one clause and no guard, its parameter counts as a parameter of the function (§6.12). Such a parameter is a **key parameter**, and every label parameter must be the type of some key parameter. The binding must be generalized (§4.8 rule 14), it may not be in a recursive group with other bindings (§4.7), and it may not be an entry point (§10.2), because the host gives its keys with no check. A type with the label parameter may not become part of the type of a name from outside the binding, such as a parameter of an outer function; that is a compile error. A type of a value (§3) or an alias pattern may not name a name that refers to a key parameter (below), or a name bound by a binding with label parameters.
+
+At each call of a name whose type has label parameters, each label parameter takes a label from its key arguments. A name **refers to a key parameter** when the pattern of that key parameter binds it at its top: `key` in `key: K`, and `key` and `k2` in the alias parameter `k2 = key: K` (§6.11). Nothing else refers to a key parameter: not a name bound to it by `k2 = key`, and not the parameter of a function or a clause block that it is given to. When the argument is a name that refers to a key parameter of a binding around the call, the label parameter takes that outer label parameter. Otherwise the known type of the argument must be a String type with exactly one value, and the label parameter takes that string; the argument must then have that one-value type. In every other case it is a compile error. So `record.get(r, "name")` is correct, and `record.get(r, s)` with `s: String` is not. When a label parameter is the type of more than one key parameter, all their arguments must give the same label. A name bound by a binding with label parameters may only be called, also inside the binding's own value: it may not be used as a value, given to another name, or passed to a function. Inside its own value, a call of itself gives each label parameter its own key parameter, in the same place: each key argument is a name that refers to one of the binding's own key parameters whose type is the same label parameter as the type of the parameter it is given to.
+
+Inside its binding, a label parameter `K` is one string that is not known. A key parameter `key: K` there has the type `String`. `(K: A)` and `(f: B)` have different fields, and `(..R, K: V)` forgets every field of `R` that may be `K`. Where a check needs to know that `K` is not `f`, it is a compile error: "the key `K` may be `f`".
+
+#### 4.9.5 The module `i/record`
+
+See §14.
 
 ## 5. Names and scope
 
@@ -914,7 +980,7 @@ CtorUpdate = Name "(" ".." Expr { "," name ":" Expr } [ "," ] ")" .
 
 ### 6.2 Order of evaluation
 
-i is strict. Expressions are worked out from left to right:
+i is strict. Expressions are worked out from left to right. In a record `(f1: e1, …)`, fields are done in the order written. In `(..e, f1: e1, …)`, `e` is done first:
 
 - In a call, first the function, then the arguments from left to right as they are written (also when they have labels), then the call.
 - The parts of tuples, lists, constructor arguments, and bit arrays are done from left to right. Structural record fields are done in written order, the spread base first; sorting labels never changes this order. In a record update `C(..v, f: e, …)`, `v` is done first, then the fields as they are written.
@@ -951,7 +1017,7 @@ A labelled argument is not a record argument; use `f((label: value))` to pass a 
 
 Selecting a field of a nominal value requires the same constructor visibility as taking it apart by a constructor pattern (§2.4). Exporting `T` without its constructors permits neither field selection nor constructor update outside its module. Structural record fields retain their own rules.
 
-`v.f` gets the field with the label `f` from the value `v`. The constructors that **may have made** `v` are the one constructor that `v` is known to be made by (§7.5), when there is one. If not, every member of the known type of `v` (§4.8) must be a custom type, and they are all the constructors of these types. Each of them must have a field with the label `f`, but it may be in any position and of any type (§4.8 rule 13). So, as in TypeScript, `v.f` is correct on a union when every member has the field, and its type is the union of the field types.
+`v.f` gets the field with the label `f` from the value `v`. The constructors that **may have made** `v` are the one constructor that `v` is known to be made by (§7.5), when there is one. If not, and every member of the known type of `v` (§4.8) is a custom type, they are all the constructors of these types. When `v` has no known type, or a nonempty known type with only record, unknown, or variable members, `v.f` reads a field of a record (§6.13). In every other case it is a compile error. See §4.8 rule 13. Each of them must have a field with the label `f`, but it may be in any position and of any type (§4.8 rule 13). So, as in TypeScript, `v.f` is correct on a union when every member has the field, and its type is the union of the field types.
 
 `C(..v, f1: e1, …)` makes a new value. Its fields are the given fields, and the other fields come from `v`. `v` must be known to be made by `C`: its type has only `C`, or §7.5 says so. The type of the new value comes from `C` and the types of all its fields.
 
@@ -992,7 +1058,7 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 The statements of a block are done in order. The value of a block is the value of its last expression. The last statement may not be a binding or an environment statement. A block with only one expression puts it in a group: `{ a + b } * c`.
 
-An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, clause blocks, and tuples, lists, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|`, a match, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
+An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, clause blocks, and tuples, lists, records with no `..`, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|`, a match, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
 
 `p = e` is a binding. It works out `e` and matches it with the pattern `p`. The names in `p` may be used from the next statement. A binding whose pattern is one name, with or without a type, may declare type variables after the name, as in `twice(A) = (f: (A) -> A, x: A) { f(f(x)) }` and `id(A): (A) -> A = (x) { x }` (§4.7).
 
@@ -1002,7 +1068,7 @@ An expression statement that is not the last, and whose working out can do nothi
 
 `name = pattern` is itself a pattern (§7.1). So `a = (x, y) = e` binds `e` to `a` and to `(x, y)`.
 
-A **direct value** is an expression that is made without running any code: a function expression or a clause block; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`); a name; or a tuple, a list, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
+A **direct value** is an expression that is made without running any code: a function expression or a clause block; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`); a name; or a tuple, a list, a record with no `..`, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
 
 ```i future-SYN2
 fact = (n) {
@@ -1041,6 +1107,18 @@ A clause block `{ clauses }` is a function of one parameter. When it is called w
 - A clause block is a direct value (§6.10), as every function is. Where §2.5, §5, and §6.10 speak of the function bodies in a value, the guards and clause expressions of a clause block count as function bodies. So `loop = { 0 -> Done  n -> loop(n - 1) }` is correct: `loop` is not among its own needs, and as a local binding it may be used in its clause expressions.
 - Where this document speaks of a function expression, a clause block counts as one, unless the text says otherwise. So a clause block whose value is not used gives a compile warning (§6.10), and each time a clause block is worked out, it makes a new value, which is the same only as itself (§11.4).
 
+### 6.13 Records
+
+`(f1: e1, …, fn: en)` makes a record (§4.9). An explicit label may not be given twice; `a` and `"a"` are the same label. `(..e, f1: e1, …)` makes the record `e` with the given fields added or put in place of its fields, including fields already in `e`; `e` must be a record. `()` is the record with no fields; `{}` is the clause block with no clauses (§6.12).
+
+`v.f` reads the field `f` (§4.8 rule 13). A field whose label is not a `name` is read with `record.get`. Fields are set and removed with `record.put` and `record.remove` (§14):
+
+```i
+ada = (name: "ada", age: 36)
+older = (..ada, age: ada.age + 1)
+r = () |> record.put("name", "ada") |> record.put("age", 36)
+```
+
 ## 7. Patterns
 
 ### 7.1 Grammar
@@ -1067,6 +1145,8 @@ Rest       = ".." [ name | discard ] .
 - The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. A `?` after a function type begins the guard; error slots use `^`. A missing clause arrow after a function type is an arrow/type-boundary error; group a tuple or record type in `{ T }` when needed. A `|` after a type is part of the type, so a type test is written after the other choices: `True | _: Int`. The type is read with no going back: once `( … )` is followed by `->`, it is a function type, and once a `|` follows a type, the next part is a type. When what follows cannot be read as a type, the pattern is wrong; it is not read again as a shorter pattern. So `v.{ p: (Int, Int) -> 0  _ -> 1 }` is a compile error, in the first clause and in any other. In `v.{ x: Int | y -> a  _ -> b }`, `Int | y` is a type; `y` is a value type (§3). But `v.{ x: Int | 0 -> a  _ -> b }` is correct, because `0` is a literal type (§4.2) and `Int | 0` is `Int`; so is `_: Int | "a"`.
 
 `x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding or a parameter, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a clause block with more than one clause or with a guard, and in a pattern with choices, `x: T` tests the value. In a clause block with one clause, no guard, and no choices, the pattern is a parameter (§6.12), so `x: T` there is a type annotation. At run time, a member of `T` is tested by its type constructor; a member of `Int` or `String` whose value set is not all the values is also tested by equality (§11.4) with the values in it. So `x: "a" | "b"` takes the strings `"a"` and `"b"`, and `x: String - "a"` takes every other string, but no Int. So in a test, `T` may not have a type variable as a member. Custom types with no constructors cannot be told apart at run time, so for a type test they all count as one type constructor, as all function types do.
+
+A type test whose type is a record or spread tests only the record head: every possible record there must satisfy the written field requirements (§4.9.3). There are no record patterns.
 
 ### 7.2 What patterns match
 
@@ -1103,6 +1183,8 @@ A literal pattern matches its own value, and `"lit" <> r` matches every string t
 When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the clause block already says so (§4.8 rule 11: `(n: Int) { n.{ 0 -> "zero"  1 -> "one" } }` needs `Int <: 0 | 1`). In a match whose subject already has such a type, that is reported as this error alone, with a value that no clause matches, such as `2`. A clause block that is not the right side of a match gets these values later, through its parameter, so there it is a type error where the values come and also this error (§4.8 rule 11). When a value that is not covered is at a list item place, or at such a field, where the clauses have only literals, the message also says to write that type, such as `List("a" | "b")` or `Pair("a" | "b")`.
 
 Only a clause block with no clauses, with more than one clause, or with a guard must cover the type of its parameter (§6.12). A clause block with one clause and no guard is not checked for coverage: when its pattern may fail, it reports to `Assert`.
+
+All records count as one type constructor for coverage.
 
 ### 7.5 Known constructors
 
@@ -1187,7 +1269,7 @@ user = () { retry(3, () { load_user("1") }) }
 
 ### 9.2 Environment and services
 
-A **service** is a value of a named type, normally a record of functions. The **environment** `N` in a function type is the union of the service types that the function needs. Services are taken and given with two forms of syntax:
+A **service** is a value of a named type, normally a custom type whose constructor holds functions. A record (§4.9) is not a value of a custom type, so a record type, also through an alias, is never a service type. The **environment** `N` in a function type is the union of the service types that the function needs. Services are taken and given with two forms of syntax:
 
 - An **environment parameter** `name ! T` in the parameter list of a function (§6.11) gets the service of type `T` from the environment when the function is called. The caller does not give it as an argument. `T` is in the environment of the function.
 - An **environment statement** `! T = e` in a block (§6.10) puts the value of `e`, which must have the type `T`, in the environment for the rest of the block. `T` is taken out of the environment that the rest of the block needs.
@@ -1210,7 +1292,13 @@ fixed = () {
 - An environment may not have two forms of one type constructor with different arguments: `State(Int) | State(String)` is a compile error, also for a service type whose parameter goes in one direction (§4.5 rule 4). Two environment parameters of one function may not have the same type constructor. A later environment statement for the same type constructor takes the place of an earlier one.
 - A nominal type is the name of a service. To have two services of the same form, make two types.
 - A service is a normal value. It may be stored and given to functions, and code that has it may call its functions directly.
+- `control.keep_env(f)` (§9.4) gives a function that, wherever it is called, calls `f` with the services that were bound at the place of the `keep_env` call when it ran. It keeps every service bound there, also those that `f` does not need. An environment statement inside `f` gives its service its own value there as usual.
 - Type checking makes certain that every environment parameter gets its service. Getting it never fails at run time.
+
+Await, Root and Owner (§9.11), Scheduler and Runner (§9.9) are normal service values.
+Replacing a host service in i uses an environment statement as for any
+service. Replacing a random seed with task.top keeps the run route of the
+current Runner. Entry defaults do not change call-site service lookup.
 
 A provider can capture a service value. Replacing the service later changes calls that take it from their caller, not the captured value. This is the same rule for shipped and user providers:
 
@@ -1267,15 +1355,24 @@ The module `i/control` has one operation to pause a computation and go on with i
 | `control.suspend` | `(b: Boundary(R, E, N), f: (k: Continuation(A, R, E, N)) -> R ^ E ! N) -> A` |
 | `control.resume` | `(k: Continuation(A, R, E, N), value: A) -> R ^ E ! N` |
 | `control.cancel` | `(k: Continuation(A, R, E, N)) -> Nil ! N` |
+| `control.keep_env` | `(f: (x: S) -> A ? E ! N) -> { (x: S) -> A ? E } ! N` |
 
 `Boundary` and `Continuation` are built-in types. They are not custom types: their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
 
 1. `boundary(body)` makes a boundary `b` and does `body(b)`. The value of `body` is the value of `boundary`. `b` is **active** while the computation between it and the running code is on the stack: from the start of `body` until `body` ends, but not while that part is paused in a continuation. After `resume`, it is active again.
 2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, with the environment of that place, and its value is the value of `boundary`. If `b` is not active, the program stops.
 3. `resume(k, v)` goes on with the paused computation, with `v` as the value of `suspend`. It goes on on top of the place where `resume` is called, and the value that the computation has when it gets to the boundary is the value of `resume`. The paused part keeps the environment statements that were inside it; for the rest, it gets the environment of the place where `resume` is called.
+   The services that a function made by `control.keep_env` keeps count, for the code inside that function, like environment statements inside the paused part: when a paused part that holds such a function's frame is resumed, that code still gets the kept services.
 4. `cancel(k)` unwinds the paused computation (§9.5) and gives `Nil`. While it unwinds, the boundary stays not active, and the final functions get the environment as in rule 3, from the place where `cancel` is called.
+   The same holds for final functions inside a function made by `control.keep_env`: they get the kept services, and the place of `cancel` gives only the services that are not kept.
 5. **One use only**: `resume` and `cancel` together may be used one time for a continuation. A second use stops the program.
 6. If a continuation is never resumed or cancelled, its final functions are not run.
+7. A boundary and a continuation stay on the worker that made them (§11.9). They are not portable.
+
+A structured task cancel resumes its scheduling continuation with a cancel
+answer; i code then cancels an inner continuation (§9.9). It does not change
+control.cancel's rule that the boundary of the cancelled continuation is
+not active during unwinding.
 
 Generators, async code, and schedulers are libraries made from services and this operation. For example, a generator:
 
@@ -1303,6 +1400,12 @@ The module `i/resource` puts final functions in place:
 | `resource.acquire` | `(open: () -> R ^ E ! N, release: (R) -> Nil ! N, use: (R) -> A ^ E ! N) -> A ^ E ! N` | After `open` is done, runs `release` when `use` ends or is unwound |
 
 A final function may not give errors. When the program stops (§11.7), final functions are not run.
+
+A structured scope waits for cancelled children and their final functions
+before it returns (§9.9). Those final functions may suspend and resume and
+use services, but may not raise errors. An unstarted child has no installed
+final functions. A host failure or a destroyed instance cannot run i final
+functions; the host instead releases its own work and resources (Appendix B).
 
 ### 9.6 Assert
 
@@ -1403,6 +1506,371 @@ The process module separates its capabilities as follows, keeping its existing o
 
 The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
+### 9.8 Keys
+
+`Key(A)` and `Keyed` are built-in types. They are not custom types: their values are made only by `key.new` and `key.wrap`. A key is the same only as itself (§11.4). Two `Keyed` values are equal when their keys are the same and their values are equal. `Key(A)` does not change (§4.5 rule 7). A `Keyed` holds its value (§11.9).
+
+| Function | Type | What it does |
+|---|---|---|
+| `new` | `() -> Key(A)` | A new key, the same only as itself |
+| `wrap` | `(k: Key(A), value: A) -> Keyed` | The value, marked with the key |
+| `unwrap` | `(k: Key(A), x: Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
+
+`Lookup(A) { Found(A) Missing }` is a custom type of `i/key`, not a built-in name.
+
+### 9.9 Tasks
+
+
+
+i/task is a library implemented using i/control, i/key and i/request. A run
+owns its tasks and scheduler state. Its implicit root permits local values.
+Scopes constrain the lifetime of spawned work: none outlives its scope.
+Values pass between tasks only through go captures/kept services, channels,
+child results/errors and shares. Portable paths check core.portable even
+with one worker: sends at the call, send events at construction, children
+at completion, scope body errors at failure, shares at creation. Failure
+stops with panic("task: value is not portable"). go never rejects for
+non-portability; on multiple workers it silently classifies the complete task
+record at go and publishes portable records. Other records stay local.
+Local scopes/channels hold the maker's boundary only as a non-portability
+witness. A Task/join event from a local scope holds that scope too. Every
+stateful handle checks run identity; events have fresh keys and sync checks
+only their stateful leaves, including losing alternatives. Channels belong
+to the first scope in their maker's chain, or the run; channels and shares are freed at scope exit.
+Every run has the result of some serial order of task steps. Timing may
+choose a sender, a race/select winner, which failures precede cancellation,
+or whether a handle is used before its owner ends. These order-dependent
+results may change between runs or worker counts. Tests must either avoid
+that dependence or list the allowed outcomes. No task API observes workers.
+
+Export types Scheduler, Runner, Scope(E), Task(A,E), Channel(A), Event(A,E,N),
+Shared(A), and ScheduleError; export only ScheduleError's constructors. The
+other constructors and scheduler protocol are private ordinary custom types,
+not host opaque types. Scope, Task, Channel, and Shared contain invariant keys;
+their parameters are therefore invariant. Event's answer/error/environment
+parameters are covariant: its private representation keeps typed decoding
+functions, rather than Key(A) in an output field. A public Event can hold user
+mapping functions and the local handles of its leaves. Such contents affect
+portability by the normal walk. The library creates no event that captures its
+Scheduler or mutable loop state. A join event keeps its task's scope handle.
+
+Schemes below declare their capital variables on their bindings. N is the body
+service requirement; supplying Scheduler/Runner/Await/Owner/Root discharges those members.
+Assert and user host services remain in N where the body needs them.
+
+| Binding | Type |
+|---|---|
+| `top` | `(seed: random.Generator) -> Runner ! Runner` |
+| `run(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ? E ! N) -> A ? E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ? E ! N) -> A ? E ! N \| Scheduler` |
+| `local_scope(A,E,N)` | Same scheme as scope |
+| `go(A,E,N)` | `(s: Scope(E), body: () -> A ? E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `join(A,E)` | `(t: Task(A,E)) -> A ? E ! Scheduler` |
+| `yield` | `() -> Nil ! Scheduler` |
+| `path` | `() -> List(Int) ! Scheduler` |
+| `random` | `() -> random.Generator ! Scheduler` |
+| `keep(S,A,E,N)` | `(f: (S) -> A ? E ! N) -> { (S) -> A ? E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `channel(A)` | `() -> Channel(A) ! Scheduler` |
+| `local_channel(A)` | `() -> Channel(A) ! Scheduler` |
+| `send(A)` | `(c: Channel(A), value: A) -> Nil ! Scheduler` |
+| `receive(A)` | `(c: Channel(A)) -> A ! Scheduler` |
+| `send_event(A)` | `(c: Channel(A), value: A) -> Event(Nil,Never,Never)` |
+| `receive_event(A)` | `(c: Channel(A)) -> Event(A,Never,Never)` |
+| `join_event(A,E)` | `(t: Task(A,E)) -> Event(A,E,Never)` |
+| `always(A)` | `(value: A) -> Event(A,Never,Never)` |
+| `never` | `() -> Event(Never,Never,Never)` |
+| `choose(A,E,N)` | `(events: List(Event(A,E,N))) -> Event(A,E,N)` |
+| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ? F ! M) -> Event(B,E \| F,N \| M)` |
+| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ? E ! N \| Scheduler` |
+| `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
+| `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
+| `both(A,B,E,N)` | `(left: () -> A ? E ! N, right: () -> B ? E ! N) -> (A,B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `race(A,E,N)` | `(left: () -> A ? E ! N, right: () -> A ? E ! N) -> A ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+
+In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
+for combinators use one common E and N; subtyping admits either child's error
+and needs. No union of invariant Task(Int,E) and Task(String,E) is required:
+`both` keeps two separate handles. No local variants of these three combinators
+are exported in v1. Local callers write a local_scope explicitly.
+
+The differences in the go/keep/combinator environments matter: their wrappers
+supply Scheduler/Runner/Await themselves, so requiring all of N at their call
+sites would overstate their principal needs. Owner is kept, and is not subtracted
+there. Root is kept there too. run/test supply a fresh Root and default Owner,
+so they subtract both. test still needs
+the calling Runner for its nested path/wait route. Attribute expansion for host
+fields happens before ordinary constraint generation; it adds fixed ordinary
+service types, not a type-dependent constraint. Keys are invariant and obey the
+existing value restriction; Request and Event add no qualified types or higher
+rank quantification. Thus the design reduces inference to the existing rules,
+with the new primitive variance rows. The prototype gate checks that argument
+against the implementation rather than assuming it from the notation.
+
+No public spawn detaches a task. `go` never checks its closure's portability.
+It increments the calling task's spawn/run counter, beginning at 1; the child
+path is the parent's path with that index appended. A nested run takes an index
+from that same counter. `path` and `random` are data reads without a suspend.
+A top seed that was already split or drawn keeps that entire derivation state.
+
+A scope waits for all children even when its body returns without joining them.
+Returning a Task handle does not extend the right to join it. Handles check run
+identity before other checks, then chain membership or liveness. `share` checks
+membership as `go` does (same outside-scope stop), including local scopes; values
+shared through either scope kind must be portable. get checks run then share
+liveness. Handle equality means the same object of the same run, never equal
+numeric ids in two runs. Text uses constructors without hidden ids: a private
+identity-bearing key is printed as `//key`, and implementation ids/paths
+are kept under Keyed fields whose text is //keyed, not exposed as plain fields. `path()` alone exposes the semantic task path.
+
+#### Scopes, errors, and cancellation
+
+R1. A task's chain is its active scope bodies, inner first, followed by its
+starting scope's chain. A scope's chain is itself plus its opener's chain at
+opening. `go` and join require the relevant scope in this chain. Run-key mismatch
+stops with `task: handle of another run`; failed membership stops with
+`task: go outside its scope` or `task: join outside its scope`. These messages
+are passed to panic, so the stop prefix is `panic: `.
+
+R2. A scope body executes in the opener task under an inner scope boundary;
+it does not start another scheduler. A child executes from the run loop under
+its own task boundary. On body/child failure, mark the scope cancelling, cancel
+its body and every child, and propagate down their active scope trees. Wait for
+all unwind operations, including scopes created by finals. Choose the least
+path among actual failures; a prefix sorts before its extensions and the scope
+body has the opener's path. A cancellation is not a failure. Types accumulate
+ordinary error unions; stops cannot be caught. A go accepted while cancelling
+creates an unstarted, immediately dropped child and its ordinary Task(A,E)
+handle. A shielded final receives that handle; its body never runs. If that
+scope's cancellation can unwind the caller, the command delivers cancellation
+instead of returning the handle. This priority also applies at a valid join.
+A cancelling scope never starts new user work just to manufacture a join value.
+
+R3. On a normal scope exit, join every live child before returning its body
+value. Before either successful or failing return, free the scope's channels,
+shares, completed-task table entries, and registration records. The owning
+Scope/Task handle can survive but does not retain its result/state after exit.
+Reads needing dead state stop by the defined checks. Channel ownership is the
+first scope in the maker's chain, or the run. A channel wait still present when
+that owner ends stops with `task: channel is gone`, including a waiter in an
+outer scope; it is not silently dropped. share get after exit stops with
+`task: shared value is gone`. Scope ends are scheduling/commit steps.
+
+R4. A paused or runnable started task receives Cancel at the next switch after
+cancellation reaches it. A running task sees it at its next scheduler suspend.
+An unstarted task is dropped without calling its body. The Scheduler command
+which receives Cancel suspends to the innermost cancellation delimiter being
+cancelled; that handler calls control.cancel only on that inner continuation.
+The outer task boundary stays active. Finals use the task's saved services;
+all awaits and sends they perform go to that still-active task boundary. An
+unwind flag excludes that task from a second cancel, including cancellation
+of scopes it creates while unwinding. Such new scopes still obey their own
+internal failure/normal-exit rules. The outer cancel waits for them to end.
+A final that waits forever can keep cancellation waiting forever.
+
+R4a. Keep outcome and cleanup completion separate. A task outcome is pending,
+success, failure or cancelled; drop sets cancelled immediately, and a started
+task sets cancelled when its home scheduler accepts cancellation, before running
+its unwind. A mere cancellation request not yet accepted is not a cancelled
+outcome: that task can still finish first. Normal success/failure is recorded
+after its final functions end. Scope exit still waits for cleanup completion,
+independently of the outcome. Keep dropped/cancelled records until scope exit.
+A cancelled outcome retains its causing scope and cancellation epoch, so a join
+can apply that cause even before its caller receives a cancel message. Do not
+use only a worker-local “cancel delivered” flag to decide whether to stop.
+join's type remains `(Task(A,E)) -> A ? E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
+before observing a target's cancellation outcome. A joiner still cancellable by
+that cancellation is unwound; it never races between this path and a join panic.
+This includes a final executing a fresh scope body that the fresh scope can
+cancel: unwind that inner body, not the already-shielded outer final. A cleanup
+scope and its children are exempt from the older cancellation as R4 requires.
+
+A joiner shielded from the target scope's cancellation cannot obtain A or E
+from a dropped/cancelled child. It stops immediately with
+`panic("task: join of a cancelled task")` when that outcome is known; it does
+not wait for the cancelled target's final functions. If it joined while the
+outcome was still pending, accepting cancellation wakes that join immediately.
+This also avoids cycles between shielded finals joining one another. The stop
+ends the run and, as with any stop, may abandon remaining i finals. In a valid
+structured exit without that stop, scopes still wait for all cleanup to finish.
+An already recorded success or failure gives ordinary A or E. No Cancelled
+error value, aggregate error, or changed join signature is introduced. A join
+can wait for genuinely live work, but never for an already cancelled outcome.
+
+A join_event has the same rule when selected/committed. A known cancelled
+outcome makes that alternative ready, even if cleanup is not complete; it is not a prevalidation fault of a losing
+alternative. A cancellable syncing task processes cancellation first. A shielded
+syncing task stops only if that join alternative wins; losing map functions
+still do not execute. This preserves CML selection and prevents an invalid
+stop from racing cancellation of an ordinary joiner.
+
+R5. A race commits the first successful child completion observed by its
+scope. Commit atomically records the winner and initiates the ordinary scope
+cancel of the loser and body wait. Return only after their finals end. Failure
+before a success commits invokes R2; a failure already observed wins over a
+later success. Once success has committed, cancellation suppresses later
+unobserved errors. Thus race is first completion unless that completion was a
+failure; errors use the same scope rules as other combinators. It is not “first
+successful result despite failures”. Both/map_concurrently give argument/input
+order and R2's errors. All three use portable scopes and check child results
+and errors before recording a completion, including race losers that finish
+before cancellation reaches them.
+
+R6. The runtime entry wrapper and every explicit run own a local root task,
+which they run to completion with structured children. An entry error is
+reported only after the run has unwound; a host export receives its ordinary
+error. A stop immediately traps and runs no finals, as §9.5 requires. Host
+trap/failure/drop also invalidates the instance under ABI H8–H11; it cannot
+promise to resume i cleanup. “Cancellation runs finals” refers to i structured
+cancellation, not destruction of a trapped instance by its host.
+
+#### Events, FIFO behavior, and fairness
+
+Channels are unbuffered rendezvous channels in v1. No close-channel operation is
+needed: owner-scope exit frees their state. An event is a reusable immutable
+description. choose([]) behaves as never(); sync(always(x)) gives x. New event constructions
+have fresh identity keys, independent of A/E/N, so equality means the same
+event handle rather than a comparison of event meanings. map/choose
+perform no Scheduler operation. send_event checks portable payloads immediately;
+receive_event and join_event do not test liveness until sync. A send_event can
+also be built without Scheduler; its handle records whether it is local.
+
+One sync creates one registration identity with ordered alternatives. Validate
+run identities, join chains and channel liveness of all leaves before registering
+any. An invalid losing alternative is still an invalid sync. Register without
+running map callbacks. Among ready alternatives use source order; among partner
+registrations use FIFO arrival order. Distinct leaves from the same registration
+must never rendezvous with one another. A registration may commit once. Commit
+atomically marks both partner registrations, removes all their losing leaves,
+transfers one value, then queues the tasks. Apply only the winning branch's map
+functions, in composition order, in the syncing task after commit. A mapper can
+raise, await, spawn, or stop; it cannot roll back the message. No guard or nack
+operation is exported. Cancelling a sync unregisters all leaves before unwinding.
+
+go appends the child to the FIFO queue and returns to the parent in the same
+turn, after cancellation checks and a host poll only if a task needs host
+progress; it does not yield the parent. yield ends the current turn and queues the caller at the tail. A blocking command removes
+its task until ready; a nonblocking sync/join still makes a scheduling point.
+A completion queues waiters FIFO. Cancellation bookkeeping runs before another
+normal task turn; a task already unwinding is queued normally. Scope ends,
+async awaits, and each loop switch are poll points too. path/random are not.
+
+At every switch, first run cancellation bookkeeping and scan terminal ticket
+waiters. Build the progress-interest set from tasks actually suspended in
+Await.wait on Waiting tickets, including interests forwarded by nested runs.
+Root-level Runner.poll calls request.poll once only when this set is nonempty.
+Otherwise skip it, including before the first task turn. Pure go/yield/join/
+scope operations and merely starting an unawaited raw request do not by
+themselves return status 2. A task/run which never blocks, and makes no explicit
+root wait/poll call, therefore never yields to the host. A pure Scheduler-only
+entry can return async status 0 immediately. A runnable pure task can of course
+share its run with a sibling needing host progress: that sibling's wait causes
+the run's hand-off. This is service of an existing wait, not an implicit yield
+added to the pure task.
+
+While there is progress interest and a task is runnable, poll once before its
+next turn, using status 2. Scan settled tickets, then run a task even if further
+host answers might be ready. This keeps an infinite yielding task from starving
+an IO-waiting sibling, without making pure task switches pay an event-loop yield.
+Unawaited raw work alone does not force progress hand-offs during a runnable
+loop; its caller must eventually wait/poll explicitly or let the run become
+idle. Idle accounting still counts it as specified next.
+
+A nested loop's private Runner.poll passes its current interest tickets to the
+outer Scheduler with its nested-run id, then yields only its calling outer task.
+The outer loop keeps that interest registration while the nested run lives and
+forwards it in turn if nested again. Thus an inner IO waiter alongside an inner
+CPU-yielding task can receive host answers even when the outer caller is runnable.
+Terminal tickets are filtered; each poll replaces that run's prior interests,
+and an error-free final removes the registration on every nested-run exit.
+Cancellation removes a nested registration before completing the calling task's
+unwind; borrowed tickets themselves are not cancelled by unregistering interest.
+No new ABI operation is needed: these are private ordinary Scheduler commands.
+The root Runner's poll takes the aggregated tickets; it never scans all instance
+requests to invent a wait. Explicit low-level request.poll still intentionally
+hands off, and stops request: no active entry from a synchronous entry.
+
+When no task is runnable, scan terminal tickets first. The logical waitable set
+is the union of outstanding requests in every group of the run's stored program
+Root and Waiting tickets its tasks explicitly await, including borrowed tickets
+from another root on the same worker. Group-observer tickets contribute their
+underlying outstanding members, not the observer cell itself (§9.11). Deduplicate
+identities, including an owned request also explicitly awaited. This is a set of work, not a List(Ticket) that
+can be exported across workers: observe owned groups through their counts and
+revision notifications (§9.11); borrowed Ticket values stay local. If this union
+is nonempty, Runner.wait waits for a member to settle and then rescans. An
+unawaited raw request in any custom group prevents deadlock until it settles.
+Its detached Ready answer is retained only by its handle. If the set is empty
+and no task or completion delivery can run, stop with panic("task: deadlock"),
+even if an unrelated root has work. A nested run therefore includes an explicitly
+borrowed outer request, but not unrelated outer work.
+
+A dispatcher may own several ordinary Roots with separate Owners. It chooses
+which root's work it drives; no Root or request has a magic module-based class.
+The scheduler driver keeps a separate control Root/Owner for its wake requests,
+scoped to the run's driver lifetime and closed on every driver exit. It does not
+bind that Owner for user tasks or expose its wake tickets. The stored program
+Root plus explicit borrowed waits above alone justify program progress; the
+control root does not. This same separation serves a batch dispatcher, a timeout
+manager and a plugin notification loop. Both kinds still use the same Root/Owner
+registration, count, cancel and teardown rules. The distinction is which roots
+the ordinary driver selects, not a host import name or a compiler exception.
+
+Quiescence snapshots count runnable/claimed-but-unstarted/running tasks and
+pending completion-to-task or group-notification processing as work. Requests
+stay counted until their answer/cancel transition publishes that work atomically;
+there is no gap where both counts are zero. With no such work, zero members of
+the program waitable set means deadlock, whatever the control count. MC takes
+that snapshot and records the stop under the shared scheduler lock; a wake-only
+control delivery does not count as program work. At the ABI level every actual
+outstanding request, including a wake, still satisfies status 1's requirement.
+Never return status 1 with zero actual outstanding requests or busy-poll with no
+runnable task. A one-worker run needs no wake request. CPU code without suspension
+can monopolize M:1; a go-only loop may postpone children. No bounded wall-time
+guarantee is made for final functions.
+
+#### Runner, nested runs, and testing
+
+The runtime supplies an initial portable Runner: prefix, full seed generator,
+policy, the enclosing request-context Root, and constant functions implementing
+root wait/poll. run uses that Root while opening its fresh run Root, so its
+public environment still needs Runner rather than an extra Root argument. `top(seed)` replaces
+only the seed in the current Runner and preserves its path allocator and wait
+route. This is why its scheme needs Runner: rebinding a seed inside a task must
+not reset its nested-run prefix or make its nested wait bypass the outer loop.
+Entry provisioning uses the private ordinary root-runner constructor, not top.
+The ledger supplies this initial service, so a fixed-seed test can write
+`! task.Runner = task.top(random.from_seed(7))` without a bootstrap problem. In each task its Runner
+routes wait/poll to the outer Scheduler and takes paths from that task's shared
+spawn/run counter. That per-task Runner is non-portable; go's detached substitution
+above prevents accidental retention in children. Explicit run inside the entry's
+default root task is nested. Each run opens a fresh request.Root and its default Owner around its entire
+loop, in a retained frame. Tasks keep Root and their go-site Owner. Custom
+within groups remain registered to that root. The run closes the entire root
+after all tasks/finals end, not just its default group.
+Only the runtime-created entry run
+is eligible for future multicore execution; v1 has one worker throughout.
+
+A nested loop owns fresh run identity and FIFO state on the caller task's stack.
+Nested children do not execute an outer task's channel commands: all handle
+uses check their run key. Its wait hands tickets to the outer task's Scheduler;
+its poll yields that calling task without directly yielding to the host. Only that task is paused; other outer tasks
+continue. When nested work ends it cancels remaining requests/children before
+return. A nested deadlock is detected from that nested run's own tasks and
+waitable requests. It does not return status 1 from a task stack. Chains do not
+cross run identities.
+
+`task.test(seed, choices, body)` supplies a Runner for a fresh nested run. Before
+a turn, take the next script path, if any; it must be runnable, otherwise raise
+`ScheduleError { NotRunnable(path: List(Int)) }` after structured cleanup. When
+the script ends choose FIFO. Do not root-poll or use real clocks. Completed fake
+requests are allowed; reaching a required wait on an unsettled host request stops
+with `panic("task: test needs fake IO")`. Fixed inputs and script give the same
+values, task paths, selected alternatives and trace on every run. Tests for real
+host overlap use ABI completion gates instead. The testing policy changes only
+which legal runnable step is chosen; it cannot commit an unready event.
+
 ### 9.10 Random generators
 
 The module `i/random` gives pure, repeatable random computations. It needs no
@@ -1477,6 +1945,191 @@ result is in [0, 1); at most 53 bits enter the conversion.
 `at_path(g, path)` requires every index to be strictly positive. Otherwise it
 raises `InvalidPath(path)` without a draw or derivation, carrying the whole
 supplied path.
+
+### 9.11 Requests
+
+Request(A) and Ticket are compiler-defined names available in every module,
+like Boundary and Continuation. They have no public constructors. i/request
+exports the following ordinary status/service types, their constructors, and
+functions; it does not redeclare or re-export the primitive types.
+
+```i
+Await { Await(wait: (ticket: Ticket) -> Nil) }
+Root { Root(key: Key(Nil)) }
+Owner { Owner(key: Key(Nil), root: Root) }
+RequestState(A) { Waiting Ready(A) Cancelled Taken }
+```
+
+| Function | Type | Rule |
+|---|---|---|
+| `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
+| `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
+| `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+| `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
+| `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
+| `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
+| `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
+| `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
+| `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
+| `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
+| `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+| `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+| `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+| `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+| `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+| `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+| `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+| `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+| `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+
+`cancel` makes every alias observe Cancelled, even for a previously Ready cell.
+A Taken request stays Taken on cancel. It invokes ABI cancel only for a still-outstanding host id. Cancelling a Ready
+request never invokes that import. `await` or take on Cancelled stops with
+`panic("request: cancelled")`; on Taken it stops with `panic("request: taken")`;
+take on Waiting stops with `panic("request: not ready")`; if Await.wait returns with Waiting it stops with
+`panic("request: wait returned early")`. `wait_any([])` stops with
+`panic("request: empty wait")`. A nonempty list may contain aliases; deduplicate
+by identity. Terminal tickets make it return immediately. It must keep waiting
+through answers of unlisted requests, which are stored for later use. All-listed
+cancelled tickets count as settled. No root continuation is stored on a cell.
+
+Cancellation ownership and run affiliation are separate. Root identifies a
+request run and its enclosing entry context. The runtime creates the initial
+Root only for an entry whose inferred needs require request/task support.
+open_root needs an existing live Root to retain that entry context; it does
+not require the new root to share the old root's request count. A dispatcher
+can thus open an independent root without inventing a second entry. The
+initial bootstrap is part of the narrow entry provision, not a public unscoped
+root allocator. Entry request contexts and each task.run open a fresh Root and
+bind it for their whole lifetime. open_owner uses that Root, not the currently
+bound Owner, to register its group. request.within opens/binds a fresh Owner and
+ensures close_owner on exit; it leaves Root unchanged. Thus custom groups of a
+run have the same root, and a nested task.run has a different root. Both Root
+and Owner are ordinary portable key-bearing service values, not host requests.
+
+Every raw host start records its Owner group and that group's immutable root.
+close_owner cancels only its own group. close_root closes all groups registered
+at that root; no subgroup or old Owner binding escapes it. All group operations
+include every worker, including groups made inside request.within and retained
+by go. Counts and readiness are atomic snapshots; a later start can change them.
+A closed group/root has count zero and is settled. cancel_all cancels the Waiting
+members at its linearization step, not subsequent starts or detached Ready values;
+close additionally refuses future starts. Opening a group under a closed Root
+stops with request: root is gone; a host start under a closed Owner stops with
+request: owner is gone, before making the ABI import. Only live registrations
+and outstanding cells are retained; absence supplies the gone check.
+
+There is no public outstanding/outstanding_root enumeration, including no
+worker-local variant. A Root/Owner operation never returns a Request or Ticket.
+Group cancellation is accepted atomically and forbids later success publication
+for its selected members. Before returning it applies the host cancellation
+actions, including lease revocation. Every state, settled, take, cancel, wait
+and delivery operation observes that terminal state. A host id is retired once.
+
+wait_none/wait_none_root use Await, so a task waits without pausing runnable
+siblings. They return immediately on zero, including for a closed group.
+Otherwise a private local Request(Nil) observation cell subscribes to the group
+and settles on its next zero observation. It has no host id, producer operation
+or Owner membership: a wait is not work that can complete itself. Its Ticket
+never leaves the observer's worker. Check-and-subscribe shares the registration
+lock so completion cannot be lost between checking and sleeping. A concurrent
+start before the zero observation is included; one after it does not undo the
+return. An ordinary ensure unregisters/cancels this local observer on waiter
+exit without cancelling the group's producers. These private cells use the
+same typed state/await machinery as requests; no foreign Ticket is manufactured.
+For progress accounting, an observation cell depends on the actual outstanding
+members of its target group, not on itself; add those members as explicitly
+borrowed work and deduplicate identities (§9.9). In particular it cannot keep
+an otherwise deadlocked empty group alive. Remote members are driven on their
+home workers; group changes reach the local observer through its wake route.
+The private Runner idle operation subscribes to group revisions for any change,
+combined with explicitly borrowed local tickets (§9.9), without enumerating
+foreign tickets. Its observation/check/subscription must be atomic too.
+
+Root is kept at go sites as a normal service. Changing Owner alone cannot move
+a group/request to another run. open_owner under a nested run's Root makes a
+nested group even if user code temporarily rebinds an outer Owner. Explicitly
+using a previously made outer Owner for a raw start still charges that outer
+group/root; this is a capability use, not a transfer of the group. Borrowed
+request tickets may be awaited by another run on the same worker. Opening or
+rebinding an independent Root is the public low-level operation for writing a
+separate request dispatcher, like calling root wait directly; it does not
+silently reaffiliate an existing i/task run's stored root or its old groups.
+The default task scheduler counts the root it owns, not whichever Owner is
+bound at an idle point. An independent request dispatcher must drive its root.
+
+A Ready cell has left its group and belongs to its handle. Closing a group/root
+does not discard such an answer; raw callers must own it just as they own files
+returned by open. Completed cells retain decoded i values only while handles
+are reachable, not through the outstanding table. Low-level cancellation cannot
+roll back a host side effect or run i final functions. Closing a root after its
+structured tasks/finals end cancels any still-outstanding unowned raw work.
+
+Root wait/poll require an active async entry context when they must hand off;
+otherwise they stop with `panic("request: no active entry")`. A later synchronous export must not hand off through a stale boundary from a completed async call. An immediate wait
+on completed fake requests works without that context. They are public primitives
+for writing dispatchers, batch IO, or request races. Direct use inside a task
+pauses that entire run until it returns; normal await uses Await instead. This
+is explicit control use, like suspending to an outer boundary, and does not
+create multiple scheduler histories.
+
+Root and Owner are ordinary services, not primitive types or built-in names.
+They use Key(Nil) and are portable; outstanding request values remain non-portable.
+Root/group registration and observation use internal accounting. Local Ticket
+cancel uses v3 cancel on its home worker; MC group cancellation uses the
+registered host cancellation actions above and retires the home id once. MC
+routes notifications through ordinary request-mode wake services, without new
+runtime imports. Generic
+request groups also serve batch cancellation, request timeouts, and host plugin
+cleanup, independently of tasks. Request operations introduce no new error-row
+or environment polymorphism. Ticket
+cannot recover A; state only reads through the original Request(A). The
+value restriction prevents a fresh request from being generalized at multiple
+unrelated answer types. A cell's state transitions are Waiting -> Ready or
+Cancelled, and Ready -> Taken or Cancelled; there is no write of another A.
+
+In a task, Await.wait submits a WaitRequest(ticket) command to its Scheduler,
+with the task's inner-unwind target registered privately. The loop records the
+waiting task and ticket and queues another task. On each switch it scans settled
+tickets; a ticket may have several waiters. Await consumes the answer once; multiple
+waiters deliberately competing for it may therefore meet request: taken.
+The plain async adapter owns its just-started request through resource.ensure,
+and cancels it on exit, including while unwinding. A raw starter gives ownership
+to the caller, who can use the same pattern. Cancelling one waiter of a manually
+shared raw request does not cancel the producer unless its owner's final function
+does so; cancelling a ticket wakes all waiters, whose await then stops as above.
+
+Because request.cancel also discards Ready answers, an implicit adapter must
+take its A before its final cancels the cell. For resource-creating imports,
+IO wrappers additionally transfer resource ownership as section 8 specifies;
+discarding an unclaimed Ready answer releases its resource. These are two
+separate ownership transfers, not a promise that all raw results are resources.
+
+The ordinary helper for an owned operation that produces no resource is:
+
+```i
+await_owned(A) = (r: Request(A)) -> A ! Await {
+  resource.ensure(
+    () { await(r) }
+    () { cancel(ticket(r)) }
+  )
+}
+```
+
+This definition lives in i/request and uses its local function names. The final
+runs on success, error and task cancellation; after take, cancel is a no-op.
+request.await itself remains a borrowed wait and never takes producer ownership.
+File/Stream/Child wrappers and other non-creating IO wrappers use await_owned,
+including their close operations; resource creators use resource guards (§9.7).
+Cancelling a pending Stream read revokes its read lease before the cancelled
+wrapper finishes unwinding, so a following read cannot see busy from that
+abandoned request. Already consumed bytes or committed effects are not rolled
+back. A cancelled Child wait releases its wait lease without closing the Child;
+a cancelled blocking File operation instead closes that File as §9.7 requires.
 
 ## 10. The host boundary
 
@@ -1632,6 +2285,10 @@ These functions are **entry points**:
 
 An error that comes to the program entry or a test stops the program. An error that comes to a host export is given to the host (Appendix B).
 
+<!-- future-track: JP implements chosen provider graphs, factory/adapter provisioning
+and wasm.synchronous validation. R2 implements the shipped-default inferred-service
+special case; see tests/r2-stages.md and tests/spec/9.11/providers_pending. -->
+
 On targets using the v3 asynchronous entry protocol, an entry is **async** exactly when its complete chosen provider graph (§2.6.1), including both scopes and adapter requirements, contains a request-mode service provider, a scheduler role or a runner role. Normalize an async host declaration to its request-and-await provider first. A service node's declared request/async mode counts even when a factory supplies a completed fake. A pure bundle with no such dependency may be synchronous. Await, Owner and Root alone do not qualify. No source-body reachability or selected-field analysis changes this classification. Metadata and wrapper shape follow the graph before linking and optimization; a requested synchronous export that classifies async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7).
 
 Open the dependency-free primitive entry context before chosen factories, enabling async admission exactly for an async entry. It constructs no replaceable service. Construct all services in §2.6.1's one topological order, enter the sole adapter at its place in that order, and invoke the unchanged source entry with the chosen body services. Finish structured cleanup before delivering the result or error; retire the primitive context on every exit. A stop runs no i finals. Synchronous fake-only contexts cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; pure scheduler switches alone do not yield to the host.
@@ -1649,13 +2306,15 @@ mode: () -> "on" | "off"           // compile error: the host gives the value
 log: (level: "info" | "warn") -> Nil   // correct: i code gives the value
 ```
 
-The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above.
+The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. Requests, tickets, tasks, scopes, channels and events cannot cross the ABI. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above. No library-specific exception is added.
+
+Records may neither be given to the host nor received from it through this interface. A binding with label parameters (§4.9.4) cannot be an entry point even when its ordinary parameter types would fit the host interface.
 
 ## 11. Run-time behavior
 
 ### 11.1 Values
 
-No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, values of custom types, functions, boundaries, continuations, and host references.
+No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, records, values of custom types, functions, boundaries, continuations, keys, keyed values, requests, tickets, and host references.
 
 ### 11.2 Int
 
@@ -1678,7 +2337,12 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 - Ints are the same when their numbers are equal. Floats are the same when they are equal by IEEE 754, so `0.0 == -0.0`.
 - Strings are the same when their scalar values are equal. Codepoints are the same when their numbers are equal. Bit arrays are the same when their bits are equal.
 - Tuples, lists, and values of custom types are the same when they have the same constructor and their parts are the same, in order. Values with different type constructors, and tuples of different sizes, are never the same.
+- Records are the same when they have the same labels and the values with the same label are the same. Field order has no effect. Additional fields count, also when static types hide them. A record is never the same as a value that is not a record.
 - A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression or a clause block, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, a library function, and each `@external` declaration are each one value; two declarations of one import are two values. So two function expressions that are written the same way give values that are not the same.
+
+- Each call of `control.keep_env` (§9.4) makes a new function, the same only as itself. A key (§9.8) is the same only as itself. Two keyed values are equal when their keys are the same and their values are equal.
+- A request or ticket compares by its underlying request identity, which does not change on answer, take or cancel. Ticket identity is not a fresh value on each call of ticket. Request and Ticket are different type constructors and are not equal to one another.
+- A value stays the same value when the program copies it from one worker to another (§11.9).
 
 ### 11.5 Comparing
 
@@ -1731,6 +2395,8 @@ The **text form** of a value is given by `core.inspect` (§13):
 | UtfCodepoint | `//utfcodepoint(`, the character, `)` |
 | Function | `//fn(`, one name for each parameter of its type with `, ` between them, `) { ... }`. Environment parameters are not counted. Parameter i (counting from 0) is named by the letter `a` + (i mod 26), with the decimal number i div 26 after it when i is 26 or more: `//fn(a, b) { ... }` |
 | Boundary, continuation | `//boundary`, `//continuation` |
+| Key, keyed value | `//key`, `//keyed` |
+| Request, ticket | `//request`, `//ticket` |
 | Host reference | `//wasm(opaque)` |
 
 A **Float** is written in this way. Let d1 … dn be the shortest list of decimal digits, with dn not 0, such that 0.d1…dn × 10^k gives back the same float when read. When more than one list of that length does this, take the one nearest to the exact value of the float; when two are equally near, take the one whose last digit is even. `-` comes first for a negative float, including -0.0. Zero is `0.0`. Let p = k − n.
@@ -1739,20 +2405,34 @@ A **Float** is written in this way. Let d1 … dn be the shortest list of decima
 - In the long form, the digits are written as a decimal number, with `.` and at least one digit after it: `123.0`, `12.67`, `0.0123`.
 - In the short form, d1 is written, then `.`, then d2 … dn, or `0` when n = 1, then `e`, then k − 1 as a decimal number with `-` when it is negative: `3.0e26`, `1.0e-7`, `1.0e3`.
 
+The text form of a function, a key or a keyed value never depends on which worker made it or holds it. Task handles keep bookkeeping ids under keyed fields, whose text is `//keyed`; only task.path exposes the semantic task path. Requests and tickets show no ids, state or answers.
+
+### 11.9 Workers
+
+A program may run on one or more **workers** at the same time. Which worker does which part of the work cannot be seen. Tasks that run at the same time take their steps (sends and receives, joins, host calls, failures and stops) one after another, in an order that the program does not fix; this order may differ from run to run and with the number of workers. Every run gives a result that some order of the steps gives, and each step does what it would do if the steps were taken one at a time in that order. The number of workers only changes which order happens. So anything that depends on the order of steps may change, for example which sender a receive pairs with, which event of a `choose` commits, whether a step comes before or after the end of a scope, which tasks fail before a cancel reaches them, which of two stops is first, and the order of output. A program whose results do not depend on the order of its steps gives one result. Running out of memory or stack (§11.7) is not covered by this rule. The host chooses the number of workers.
+
+The **captures** of a function made by a function expression are the local names that its body uses and that are bound outside it, after macro expansion; a name counts when it is written in the body, also in a part that never runs. Top-level names are not captures. A function made by `control.keep_env` (§9.4) has the captures of its argument and the services it keeps. Other functions have no captures.
+
+The values that a value **holds** are: the parts of a tuple, a list, a value of a custom type or a record (§11.4); the values of the captures of a function; and the value in a `Keyed` (§9.8). `==` does not look at what a function holds (§11.4). A value is **portable** when it is not a boundary, a continuation, a host reference, a request, a ticket or a `Syntax` value (`meta.md` §8), and every value it holds is portable. A value may hold itself, through a local function that calls itself; only the other values it holds then count.
+
+A value that is not portable never goes to another worker. Values may be copied between workers; a copy is the same value (§11.4).
+
 ## 12. Built-in names
 
 These names may be used in every module. Other names may cover them.
 
 | Name | What it is | See |
 |---|---|---|
-| `Int` `Float` `String` `List` `BitArray` `UtfCodepoint` `Never` | Types | §4.2 |
+| `Int` `Float` `String` `List` `BitArray` `UtfCodepoint` `Never` `Record` | Types | §4.2, §4.9 |
 | `Bool` `Nil` `Result`, and `True` `False` `Nil` `Ok` `Error` | Custom types and their constructors | §4.2 |
 | `Assert` `AssertionFailure` | Custom types and their constructors | §9.6 |
 | `Boundary` `Continuation` | Built-in types made by `i/control` | §9.4 |
+| `Key` `Keyed` | Built-in types made by `i/key` | §9.8 |
+| `Request` `Ticket` | Built-in types operated on by `i/request` | §9.11 |
 | `panic` | `(message: String) -> Never` | §11.7 |
 | `assert` | `(c: Bool) -> Nil ! Assert` | §9.6 |
 
-These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), and `i/core` (§13) have the other functions and types.
+These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/key` (§9.8), `i/task` (§9.9), `i/random` (§9.10), `i/request` (§9.11), `i/core` (§13), and `i/record` (§14) give the other names. The IO module list is extended with its service definitions.
 
 ## 13. The module `i/core`
 
@@ -1760,6 +2440,7 @@ These are normal functions: they are called, given, and compared like any other 
 
 | Function | Type | What it gives |
 |---|---|---|
+| `portable` | `(value: A) -> Bool` | `True` when the value is portable (§11.9) |
 | `not` | `(Bool) -> Bool` | `True` for `False`, and `False` for `True` |
 | `to_float` | `(Int) -> Float` | The nearest Float, with ties to even. If it is not finite, the program stops. |
 | `truncate` | `(Float) -> Int` | The Float without its fraction, rounded toward zero |
@@ -1788,6 +2469,22 @@ These are normal functions: they are called, given, and compared like any other 
 | `inspect` | `(a) -> String` | The text form of the value (§11.8) |
 | `hash` | `(a) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed. |
 
+## 14. The module `i/record`
+
+These are ordinary library functions, using the label parameters of §4.9.4. They have no errors and need no environment. Keys for `get`, `put`, and `remove` must be one known string, or an enclosing key parameter passed by its own name. There is no privilege for this module in inference.
+
+| Function | Type | What it gives |
+|---|---|---|
+| `get(K, V)` | `(r: (K: V), key: K) -> V` | The field `key` of `r` |
+| `put(R, K, V)` | `(r: R & Record, key: K, value: V) -> (..R, K: V)` | A record with the field added or replaced |
+| `remove(R, K)` | `(r: R & Record, key: K) -> (..R, -K)` | A record without the field, if it has one |
+| `has` | `(r: Record, key: String) -> Bool` | Whether the record has the field, including fields hidden by its static type |
+| `keys` | `(r: Record) -> List(String)` | The labels, sorted by UTF-8 bytes |
+| `size` | `(r: Record) -> Int` | The number of fields |
+| `texts` | `(r: Record) -> List((String, String))` | Each label with its value's text form (§11.8), sorted by label bytes |
+
+There is no `empty` function: `()` is the empty record. `has` and `keys` do not change any type. There is no operation returning all fields as values of one type: fields may have different types. Code that knows their types reads them by label; code that shows them uses `texts`.
+
 ## Appendix A. Choices
 
 This appendix lists the rules that were chosen without a full discussion, until they are confirmed. Each one says which rule of Gleam or TypeScript it follows, or why it does not. All choices so far have been confirmed, so the list is empty.
@@ -1806,6 +2503,8 @@ A compiled program is one Wasm module. It needs the Wasm features garbage collec
 Checked Wasi buffers are separate table-owned allocations (§B.3, §B.7.1); they do not change these host allocation exports.
 
 The module has no Wasm start function, so that imports called while top-level values are worked out may call `ilang_alloc`. The module has one custom section named `ilang.abi` with the metadata of §B.6.
+
+This version runs one instance for each run of the program. Workers (§11.9) come with a later version of this interface.
 
 ### B.2 Values
 
@@ -1865,7 +2564,7 @@ So for an export, the host makes the parameter buffers with `ilang_alloc`, frees
 - The host answers a request by calling the export `ilang_resume:namespace:label` of the function that started it. The first parameter is the request id, and the others are the results of the function as in §B.2. The result is a status again. The host may answer outstanding requests in any order, but one at a time. It makes the result buffers with `ilang_alloc` just before the call that gives them. A module that starts a request of a function and has no such export for it, or one of the wrong type, has a fault, and the host does not use the instance again.
 - A call of `ilang_resume:…` with an id that is not outstanding, or that another function started, traps.
 - When the status is 1 and no request is outstanding, the program can never go on. This is a fault of the module, and the host does not use the instance again.
-- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; a module made by this compiler has no outstanding request at that point.
+- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; structured entry cleanup normally leaves no outstanding request; a deliberately unowned raw request is dropped by the host at status 0.
 - When the work of an async function fails in the host (not an error of its `^ E`, which is an answer), the host drops every outstanding request and does not use the instance again.
 - While an async entry point is waiting or runnable, the host may only call `ilang_resume:…`, `ilang_continue`, `ilang_alloc`, and `ilang_free`. So an instance runs one async entry point at a time. The module does not check every export for this; a host that calls another export breaks the instance.
 - When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again. Every outstanding request is dropped, and an answer that comes later is ignored. The host makes a new instance and calls `ilang_start` on it.
@@ -2178,3 +2877,180 @@ fact = (n) {
     (-> 0 1)
     (-> _ (* n (fact (- n 1)))) })))
 ```
+
+## Appendix D. Syntax macros
+
+A syntax macro is a top-level binding in a `.is` module with `@macro`. Its
+pattern is one name without type parameters, and its value is a function
+expression whose parameters are names or environment parameters. With one
+ordinary parameter per argument, its type must be a subtype of
+`(Syntax, …) -> Syntax ^ SyntaxError ! Definitions | Items | Diagnostics | Assert`.
+`@macro` in a `.i` file or in an expansion is a compile error. A macro is
+imported and exported like a value, in the same name space, but its name may
+only be used in imports, exports, and macro calls. It cannot be called in the
+module that defines it; a call written in a template is code, not a call in
+that module.
+
+### D.1. Syntax values and quotes
+
+`i/syntax` exports the opaque `Syntax` type and `Node`, `Position`, and
+`SyntaxError`. Their public definitions are:
+
+```i
+Syntax {}
+Node {
+  Name(String)  Discard(String)  Up(String)  Symbol(String)
+  Int(Int)  Float(Float)  Text(String)
+  Round(List(Syntax))  Square(List(Syntax))  Curly(List(Syntax))
+  Bits(List(Syntax))  Quote(Syntax)  Unquote(Syntax)  Splice(Syntax)
+}
+Position {
+  ImportItem  ExportItem  Item  Attribute  Constructor  Field  Type
+  FunctionResult  Parameter  Expression  Statement  CallArgument  Clause
+  ClauseHead  Pattern  Segment  Format
+}
+SyntaxError { SyntaxError(message: String, at: Syntax) }
+```
+
+A `Syntax` is one datum of Appendix C with its source position and scope. `node` gives its node; `make(node, like: s)` makes one with the
+position and scope of `s` and fails with `SyntaxError` if an atom cannot be a
+single token of its kind. An integer or float atom is nonnegative and a float
+atom cannot be negative zero. `same_code` compares datums without positions or
+scopes; `==` compares value identity. `show` gives the Lisp datum and `show_as`
+gives the normal syntax for a requested `Position`, or a `SyntaxError` if the
+datum cannot be written in that position. The compiler supplies these
+operations to compiler instances and tests, not to ordinary program entries.
+
+The compiler gives a macro the Lisp datum for code from either surface, with
+semantic groups removed and without documentation comments. In `.is`, quote
+`` `d `` makes the `Syntax` of its template with the source position and scope
+of each part. Inside it `~e` inserts one `Syntax`, and `~..e` inserts a
+`List(Syntax)` into a bracket. In a quote pattern, `~p` captures one node and
+`~..p` captures the remaining parts of a bracket; the splice must be last.
+Other nodes match by kind and value, without positions or scopes. A quote
+pattern can fail. An expansion result cannot contain quote, unquote, or splice
+nodes.
+
+### D.2. Calls and expansion
+
+A macro can be called in an expression, as a top-level item, before an item as
+`@m` or `@m(args)`, or in a type. A local binding covers a macro or module name
+as usual. The parser reads arguments according to their position: expression
+and item arguments are expressions, while type arguments are types, including
+literal and value types. Type arguments have no labels. Expression pipe calls
+`e | m` and `e | m(args)` pass `e` as the first argument. Arguments are not
+evaluated or expanded before they are passed. Labels choose parameters as in
+ordinary calls, and the macro receives the argument without its label.
+
+A result in an expression or type position must be one expression or type.
+An item result is one item or a flat `Curly` of zero or more items. A nested
+item sequence or an import or export header in a result is a compile error.
+A result is read in the call's position using Appendix C. A macro cannot add a
+statement to the enclosing block. A failure of `SyntaxError(message, at)` is a
+compile error at `at`; a template location is reported at the call with the
+template location as a note. A stopped macro is a compile error at its call.
+
+An attribute macro receives the item after its explicit arguments, including
+any attributes written after it. The first attribute macro is expanded first.
+Before a type definition the written definition stays and the result is added
+after it; before a binding, declaration, or item call the result replaces the
+item. A built-in attribute before a macro attribute is a compile error. An
+item's documentation stays with a written type definition or goes to the first
+result item defining the same name. An attribute macro can receive an item
+macro call, and returned calls and attributes are expanded in turn.
+
+The compiler expands imported modules first. In each module it first expands
+item calls, attribute macros, and type calls inside type definitions until all
+top-level names and complete type definitions are known; it then checks
+exports. It then expands calls in bodies and remaining type calls. Each call
+is expanded outside in: an argument retains its unexpanded calls until it is
+placed in a result. Each run has a fresh instance and fresh mark. Expansion
+nesting is limited to 256. A run is limited to 100,000,000 work units,
+2^28 allocation words and 10,000 frame units, counted independently of the
+machine and optimizer; exceeding a limit is a compile error naming the macro
+and limit. The abstract charges are given in `docs/design/macro-budget.md`.
+
+Foreign authority cannot be manufactured by a macro. `@external`, `@js`, or
+`@host` may occur in a result only when the entire attributed item came from
+the caller's source, passed unchanged through arguments of every run, and
+occurs at most once. A result may not define a macro.
+
+### D.3. Scope and names
+
+Every syntax node has a scope: a module and a set of marks. Source code has
+its module and no marks. Each run puts its fresh mark on arguments and on
+answers of `Definitions`, and flips that mark on the output. Thus arguments
+and answers retain their scopes, while template and made nodes receive the
+run's mark. A delayed retry is a new run. `make` takes the scope of its `like`
+argument; it does not acquire the authority of a source foreign attribute.
+
+A lexical name binds a use only when both text and scope match. If no lexical
+binding matches, an unmarked name is looked up in its scope's module and then
+among built-ins. A marked name first looks among names defined by expansions in
+the call's module with the same text and scope; otherwise it is looked up in
+its scope's module and then among built-ins. A made name looking into another
+module can reach only exported names. A made name derived from a definition
+answer does not use the expansion-defined-name step. Labels are compared by
+text only. A marked top-level name is not exportable and may not have the text
+of a top-level, imported, or module name of its scope's module. An unmarked
+name of another module cannot define a top-level name in the caller.
+
+A definition answer's type parameters have identities specific to that answer.
+Only the corresponding original definition head binds them. Copying a whole
+head carries its binders and uses together; separate answers and repeated
+copies have fresh identities. Other names from an answer cannot become binders,
+including names made like those answer nodes. Built-in names in synthetic
+answers retain their built-in identities. Making a name with one of these
+special identities and different text is a compile error. These rules apply to
+all checks for duplicate names, shadowing and export visibility. An exported
+item may not expose a type that its defining module does not export.
+
+### D.4. Compiler services
+
+`definition(of, d ! Definitions)` asks for the definition of an `UpName` or
+qualified type name. A malformed request, a type variable, or a type whose
+constructors are not visible gives a catchable `SyntaxError`. An unresolved
+name is a compile error at the requested node. The answer is the written alias
+or expanded type definition with attributes and parameter identities, not an
+inferred field set. Each alias of a value-dependent alias pattern returns the
+written pattern item. `Bool`, `Nil`, `Result`, `Assert`, and
+`AssertionFailure` have synthetic answers; other built-ins have no definition.
+
+In the item phase a definition is ready when it exists and has no remaining
+type macro calls. An unresolved or incomplete local definition, or a marked
+name that an unfinished expansion may define, defers the run while other runs
+remain. A deferred run and all its contributions are discarded and retried
+from the beginning with a fresh mark. A run's own fresh mark is never waited
+for. When all remaining runs wait, they are retried in call order against the
+current definitions and then the scoped module and built-ins. If none can
+proceed, each waiting name is diagnosed. Every fallback answer and answer for
+the run's own mark is checked again against the completed module; a changed
+answer is a compile error. In the body phase all definitions are ready.
+
+`Items` is available only in item expansions. `add(collection, target, data,
+at)` requests collection of a same-module, zero-ordinary-parameter function
+under an exported ordinary binding that names the collection. Metadata is a
+list of unique string keys and values. Duplicate collection/target pairs are
+errors; `at` must come from the invocation's arguments or call location.
+`expose(name)` requests an export of a same-module unmarked caller-scope name;
+repeated identical requests are harmless. Requests and `Diagnostics.note`
+messages are buffered per run and committed only with a successful, valid
+result, with the same mark transformation as that result. Deferred or failed
+runs contribute nothing. Collection does not evaluate a target, grant foreign
+authority, change imports, or alter configured entries; tools select checked
+targets before provider planning. Diagnostics and collected entries retain
+source and expansion locations.
+
+Macro programs run in the compiler with `Definitions`, `Diagnostics`,
+`Assert`, and, for item calls, `Items`. They receive no clock, file, network,
+or other program capability. An executable non-library foreign function or JS
+binding in their transitive needs is a compile error. A compile-time binding is
+a macro or a top-level binding whose transitive needs contain a quote or an
+`i/syntax` function. A normal entry or host export cannot depend on one, and
+compile-time bindings are not included in its program. Other bindings of a
+module containing macros are included normally. `i test` may use `i/syntax`,
+provide its own compiler services, and evaluate quotes with the test module's
+unmarked scope. Each run starts in fresh
+state, regardless of target or optimization. Tests may give their own ordinary
+service values. A diagnostic in expanded caller code points to that code; a
+diagnostic or stop from a template points to the call and notes the template.

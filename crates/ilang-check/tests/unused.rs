@@ -55,6 +55,17 @@ odd = (n: Int) { n != 0 && even(n - 1) }
 }
 
 #[test]
+fn record_spreads_and_fields_count_references() {
+    assert_eq!(
+        names(&[(
+            "src/main.i",
+            "(use_record)\nbase = (x: 1)\nvalue = 2\ndead = 3\nuse_record = () { (..base, y: value) }\n"
+        )]),
+        ["dead"]
+    );
+}
+
+#[test]
 fn entries_tests_and_ordinary_exports_retain_their_helpers() {
     // Rules 1–2: no warning on public API, entries, tests, or their uses.
     assert!(

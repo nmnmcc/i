@@ -243,6 +243,10 @@ impl Walk for ExprKind {
                 push(base, work);
                 push(fields, work);
             }
+            Self::Record { base, fields } => {
+                push(base, work);
+                push(fields, work);
+            }
             Self::Unary { op: _, expr } => push(expr, work),
             Self::Binary { op: _, lhs, rhs } => {
                 push(lhs, work);
@@ -329,6 +333,11 @@ impl Walk for TypeKind {
             }
             Self::Hole => {}
             Self::Tuple(ts) | Self::Union(ts) | Self::Inter(ts) | Self::Diff(ts) => push(ts, work),
+            Self::Record { base, fields, removed } => {
+                push(base, work);
+                push(fields, work);
+                push(removed, work);
+            }
             Self::Fn {
                 params,
                 ret,
@@ -425,5 +434,11 @@ mod tests {
         let mut v = Replace(Vec::new());
         e.walk(&mut v);
         assert_eq!(v.0, ["new"]);
+    }
+}
+
+impl Walk for RecordLabel {
+    fn enqueue(&mut self, work: &mut Vec<Action>) {
+        push(&mut self.ident, work);
     }
 }

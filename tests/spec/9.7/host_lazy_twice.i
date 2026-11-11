@@ -3,12 +3,12 @@
 // output: double 10
 // output: double 20
 // output: double -1
-(i/control, i/fail)
+(i/control, i/fail, i/request)
 
 @host("test:async/v1", "async")
 Later { Later(double: (n: Int) -> Int ? String) }
 
-Step { Paused(Continuation(Nil, Step, String, Later))  Done(Int) }
+Step { Paused(Continuation(Nil, Step, String, Later | request.Await | request.Owner))  Done(Int) }
 
 check = (ok) { ok |> { True -> Nil  False -> panic("async resume") } }
 

@@ -8,6 +8,8 @@ use crate::hir::TypeRef;
 /// [`ShownType::text`] writes it in the syntax of §3.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ShownType {
+    /// An exact shared graph; its full output is a versioned interface artifact.
+    Graph(super::ShownGraph),
     /// The canonical source text of an Int or String literal.
     Lit(String),
     /// A built-in or custom type, with its arguments.
@@ -155,6 +157,7 @@ impl ShownType {
             }
         };
         match self {
+            ShownType::Graph(g) => out.push_str(&g.text_with(n.ty, n.var)),
             ShownType::Lit(s) => out.push_str(s),
             ShownType::Var(v) => out.push_str(&(n.var)(v)),
             ShownType::Never => out.push_str("Never"),
@@ -243,6 +246,12 @@ impl ShownType {
     /// Nominal identities in the complete tree, including function inputs.
     pub fn type_refs(&self, out: &mut Vec<TypeRef>) {
         match self {
+            ShownType::Graph(g) => {
+                out.extend(g.named_types());
+                for (_, t) in &g.names {
+                    t.type_refs(out);
+                }
+            }
             ShownType::Named(ty, ts) => {
                 out.push(*ty);
                 for t in ts {

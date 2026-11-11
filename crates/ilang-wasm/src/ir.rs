@@ -110,6 +110,9 @@ pub struct FuncId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GlobalId(pub u32);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct LabelConst(pub u32);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LocalType {
     Value,
@@ -135,6 +138,8 @@ pub enum Atom {
     Local(Local),
     /// A top-level value that is worked out in `ilang_start`.
     Global(GlobalId),
+    /// The one String object for these label bytes in the module.
+    Label(LabelConst),
     /// The one closure of a function that captures nothing: a top-level
     /// function, a constructor, or a library function used as a value.
     Func(FuncId),
@@ -205,6 +210,10 @@ pub enum Op {
     Resume,
     /// `control.cancel(k)`.
     Cancel,
+    /// Keeps all currently bound services in a fresh one-argument function.
+    KeepEnv,
+    WaitRequests,
+    PollRequests,
 }
 
 impl Op {
@@ -225,6 +234,8 @@ impl Op {
                 | Op::Suspend
                 | Op::Resume
                 | Op::Cancel
+                | Op::WaitRequests
+                | Op::PollRequests
         )
     }
 
@@ -232,7 +243,14 @@ impl Op {
     pub fn needs_env(self) -> bool {
         matches!(
             self,
-            Op::Catch | Op::Ensure | Op::Boundary | Op::Resume | Op::Cancel
+            Op::Catch
+                | Op::Ensure
+                | Op::Boundary
+                | Op::Resume
+                | Op::Cancel
+                | Op::KeepEnv
+                | Op::WaitRequests
+                | Op::PollRequests
         )
     }
 
@@ -241,7 +259,14 @@ impl Op {
     pub fn suspends(self) -> bool {
         matches!(
             self,
-            Op::Catch | Op::Ensure | Op::Boundary | Op::Suspend | Op::Resume | Op::Cancel
+            Op::Catch
+                | Op::Ensure
+                | Op::Boundary
+                | Op::Suspend
+                | Op::Resume
+                | Op::Cancel
+                | Op::WaitRequests
+                | Op::PollRequests
         )
     }
 }
@@ -273,8 +298,12 @@ pub enum Value {
     Closure {
         func: FuncId,
         captures: Vec<Atom>,
+        patched: bool,
     },
     Tuple(Vec<Atom>),
+    RecNew(Vec<(LabelConst, Atom)>),
+    RecGet(Atom, LabelConst),
+    RecWith(Atom, Vec<(LabelConst, Atom)>),
     Record {
         ctor: u32,
         ty: u32,
@@ -336,10 +365,11 @@ pub enum Value {
         result: AbiType,
     },
     /// Starts the async import with the arguments, and records that the
-    /// program waits for it (B.4). Its value is Nil.
+    /// host may answer it (B.4). Its value is the typed request cell.
     HostStart {
         import: ImportId,
         args: Vec<Atom>,
+        result: AbiType,
     },
     /// The answer of the async import, given to its `ilang_resume:…`
     /// export (B.5): its value, or its error thrown.
@@ -383,6 +413,7 @@ pub enum Cond {
     Or(Box<Cond>, Box<Cond>),
     /// The value tag of `runtime/mod.rs`.
     Tag(Atom, u32),
+    IsRec(Atom),
     Bool(Atom, bool),
     Ctor(Atom, u32),
     /// A custom value of the type with this id.
@@ -709,6 +740,9 @@ pub struct Import {
     pub name: String,
     pub abi: ExportAbi,
     pub kind: ImportKind,
+    pub request: bool,
+    pub request_result: bool,
+    pub awaited: bool,
 }
 
 /// A host service that the host gives (§9.7): its value is put in the root
@@ -732,6 +766,8 @@ pub struct SitePos {
 /// The whole program in the intermediate form.
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Label bytes, by LabelConst. Labels are numbered, never WAT names.
+    pub labels: Vec<String>,
     pub funcs: Vec<FuncKind>,
     /// The points of the calls that may suspend (§9.4).
     pub points: Vec<Point>,
@@ -743,6 +779,7 @@ pub struct Program {
     pub globals: u32,
     /// The number of service ids, at least 1 for `Assert` (§9.2).
     pub services: u32,
+    pub request_owner: Option<u32>,
     /// The code of `ilang_start` after the tables are installed.
     pub start: Option<Func>,
     pub exports: Vec<Export>,
