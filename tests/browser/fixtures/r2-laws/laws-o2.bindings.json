@@ -1,8 +1,8 @@
 {
-  "artifact_digest": "sha256-a3517b48aefa4604f1c7f80caf34c4f4e44d81227aada89d2086f080fac26d47",
+  "artifact_digest": "sha256-ea9c360456eee6feaa7d2ed4748f1e484b2e4570b520bffef166ce5d12004dfe",
   "declarations": [
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_early_wait",
       "module_digest": "sha256-573ff9a91edef4a91bebbe88095f47ce06d2a8f2fa9c0b9ec0c12c6ff8ae3f9a",
       "declaration": "Later.echo",
@@ -19,7 +19,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_groups",
       "module_digest": "sha256-b1b6d88e08d587a0be3096c377b2a880f4ee2eb8733789ab2c6256d566371b5d",
       "declaration": "Later.echo",
@@ -36,7 +36,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_literal_parameter",
       "module_digest": "sha256-a9cde76d6dbd45a9be80c1246f4ab063948cd6a5238886c80928dbe3280d9625",
       "declaration": "Later.echo",
@@ -53,7 +53,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_owner_gone",
       "module_digest": "sha256-10e6d5227852e2ca71ab9347a7df7cf1641bf6e4e6090babe29642082f40ad14",
       "declaration": "Later.echo",
@@ -70,7 +70,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_ownership",
       "module_digest": "sha256-f3cb151a84080eb812a0d294bad2287699e425afd8dc1beafda466499619534e",
       "declaration": "Later.echo",
@@ -87,7 +87,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_raw",
       "module_digest": "sha256-38a92575cbde88b28b283dc50582e889334e377b7de4b6324b8d6392ff1da0ef",
       "declaration": "Later.double",
@@ -106,7 +106,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_raw",
       "module_digest": "sha256-38a92575cbde88b28b283dc50582e889334e377b7de4b6324b8d6392ff1da0ef",
       "declaration": "Later.echo",
@@ -123,7 +123,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_raw_cancel",
       "module_digest": "sha256-65b30d7ab2dab56a8d12462dde89d2d03b50eba7829a1f82c00d47cdd290568b",
       "declaration": "Later.echo",
@@ -140,7 +140,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_result_never",
       "module_digest": "sha256-6cb45c033ca430223c801b457e1743c28f60b0ca5a46c23f16734de90f6d8cbf",
       "declaration": "Later.double",
@@ -157,7 +157,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_11_take_waiting",
       "module_digest": "sha256-874dad2ade348e6c8d91616d1e7e3f29e2440f51344902f4461e808476ad4269",
       "declaration": "Later.echo",
@@ -174,7 +174,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_async_tasks",
       "module_digest": "sha256-78869b7a883d380a0b39d2e741d3560e588538d00420f103129d1647cf831afd",
       "declaration": "Later.double",
@@ -193,7 +193,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_async_tasks",
       "module_digest": "sha256-78869b7a883d380a0b39d2e741d3560e588538d00420f103129d1647cf831afd",
       "declaration": "Later.echo",
@@ -210,7 +210,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_cancel_cleanup",
       "module_digest": "sha256-1d4dacb4bcc28854d2c82b382cfabf4e9b367a549cf915e94ce186bc558e8060",
       "declaration": "Out.print",
@@ -227,9 +227,9 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_cancel_points",
-      "module_digest": "sha256-b10f57a8268e78a6638facb3f6fad994c0481f01e700645676a0a072e6ba9572",
+      "module_digest": "sha256-3fc90c7a7124eb164184d411413155f2038b8f5cf99a5bf6563fdd705314bef9",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:cancel_points:test:io/v1",
       "name": "print",
@@ -244,7 +244,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_error_final_cancel",
       "module_digest": "sha256-b498968b85aa52dfd007bb0e1a9fc8cc706f18e6f6d01abddcc0cebf0eed412c",
       "declaration": "Out.print",
@@ -261,7 +261,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_failed_sibling_join",
       "module_digest": "sha256-28008ac09a83da862dbae66c713ca7da615bd029dcbb14b0d7eccbf4f9089286",
       "declaration": "Out.print",
@@ -278,7 +278,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_final_cancel_phases",
       "module_digest": "sha256-41b984b8bca013006ec7b946b60040018488897d96665a952c5561e47182ab1d",
       "declaration": "Out.print",
@@ -295,7 +295,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_foreign_blocked_callback",
       "module_digest": "sha256-75bc3a3a53ef1e627a33ed82da299b5f85e92b10fac35cd80c7468fd0ef126de",
       "declaration": "Out.print",
@@ -312,7 +312,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_foreign_deep_blocked_callback",
       "module_digest": "sha256-97e17826a35ad62026122daf2e1f28980e88b87f123af7b5eb44e1f59d4d38c2",
       "declaration": "Out.print",
@@ -329,7 +329,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_foreign_scope_deep_cleanup",
       "module_digest": "sha256-2702234db7d4f35332c01001b04c5c46bd09b912263e8f56c55cb3874a93c94f",
       "declaration": "Out.print",
@@ -346,7 +346,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_foreign_scope_nested_cleanup",
       "module_digest": "sha256-ae9808020bd6d9baf83d02fb624cf118d3829a981e894030e556365c78a7e18d",
       "declaration": "Out.print",
@@ -363,7 +363,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_fresh_cleanup_failure",
       "module_digest": "sha256-ee5b472be67967668e239a9fda4f00c533f808d7ea5346989b034b86df9e11a8",
       "declaration": "Out.print",
@@ -380,7 +380,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_lifetimes",
       "module_digest": "sha256-0a5c586220ccc58a6ba74393a368ee5ca7b668ccd020cfc2f886e5e4538d61b5",
       "declaration": "Out.print",
@@ -397,7 +397,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_nested_borrowed",
       "module_digest": "sha256-210971d7ad3bb4c7cbaf85f10f2f0a3c845066336ba1c58e6ba7a01f7b3b414b",
       "declaration": "Later.echo",
@@ -414,7 +414,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_nested_cancel",
       "module_digest": "sha256-4579951f7a8ff743aeef3f9875a456f6d88981f88cd3342a574edae98b2963ca",
       "declaration": "Out.print",
@@ -431,7 +431,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_nested_cancel_two",
       "module_digest": "sha256-cb4f1580db1358502e3feb6d0f85cbe5d14b4c1c557f876d992a748e8ff10c71",
       "declaration": "Out.print",
@@ -448,7 +448,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_outer_control_cancel",
       "module_digest": "sha256-38761ba9f90fd9f60baf3e29f364b9c60ae3f92f90e5444cf3c815e471fde390",
       "declaration": "Out.print",
@@ -465,7 +465,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_scripted_cleanup",
       "module_digest": "sha256-27fb4ff1211a8920994201f520c74ec5d972921b5ae9dc7732e057a390762e4d",
       "declaration": "Out.print",
@@ -482,7 +482,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_shielded_final_io",
       "module_digest": "sha256-ab04168807d3666393ad33a79c66fa4abfa7a1c2455c11a120d12cbce7121ae0",
       "declaration": "Later.echo",
@@ -499,7 +499,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_test_needs_fake",
       "module_digest": "sha256-2f3039605024c6ece9b688ba631f58c0c6edc84f2aa7a309ec5a3c74f293d9ce",
       "declaration": "Later.echo",
@@ -516,7 +516,7 @@
       }
     },
     {
-      "package": "sha256-bd48dcad678100399c7635fa394178be924676731b0a123225c81985a851677f",
+      "package": "sha256-a3a290ec3cf57d9585fddc97dedb52103b6b9d8d8384de710c1817ede118430c",
       "module": "app/s9_9_typed_final_fresh_scope",
       "module_digest": "sha256-fecb3bbfcc843b08a519897aa7f657a7ede82e36bd69daa8f9d5223ab7b4987f",
       "declaration": "Out.print",
