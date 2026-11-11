@@ -1,5 +1,69 @@
 mod common;
 
+fn entry_needs(source: &str) -> (ilang_check::types::ShownType, ilang_check::hir::Program) {
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    let program = checked.program.unwrap();
+    let typed = checked.types.unwrap();
+    let module = common::module(&program, "app/main");
+    let index = program
+        .module(module)
+        .defs
+        .iter()
+        .position(|d| d.name == "main")
+        .unwrap();
+    let id = ilang_check::hir::DefId {
+        module,
+        index: index as u32,
+    };
+    (typed.entry_provider_needs[&id].clone(), program)
+}
+
+#[test]
+fn entry_without_services_has_empty_provider_environment() {
+    let (needs, _) = entry_needs("@main\nmain = () { Nil }\n");
+    assert_eq!(needs, ilang_check::types::ShownType::Never);
+}
+
+#[test]
+fn entry_retains_ordinary_service_for_provider_planning() {
+    let (needs, program) =
+        entry_needs("Service { Service }\n@main\nmain = (s ! Service) { Nil }\n");
+    let service = program
+        .types
+        .iter()
+        .position(|t| t.name == "Service" && program.module(t.module).path == "app/main")
+        .unwrap();
+    assert_eq!(
+        needs,
+        ilang_check::types::ShownType::Named(
+            ilang_check::hir::TypeRef::Custom(ilang_check::hir::TypeId(service as u32)),
+            vec![]
+        )
+    );
+}
+
+#[test]
+fn entry_retains_generic_service_arguments() {
+    let (needs, program) =
+        entry_needs("Service(A) { Service(value: A) }\n@main\nmain = (s ! Service(Int)) { Nil }\n");
+    let service = program
+        .types
+        .iter()
+        .position(|t| t.name == "Service" && program.module(t.module).path == "app/main")
+        .unwrap();
+    assert_eq!(
+        needs,
+        ilang_check::types::ShownType::Named(
+            ilang_check::hir::TypeRef::Custom(ilang_check::hir::TypeId(service as u32)),
+            vec![ilang_check::types::ShownType::Named(
+                ilang_check::hir::TypeRef::Builtin(ilang_check::hir::BuiltinType::Int),
+                vec![]
+            )]
+        )
+    );
+}
+
 #[test]
 fn private_factory_scheme_is_available_to_provider_checking() {
     let (graph, _, _) =

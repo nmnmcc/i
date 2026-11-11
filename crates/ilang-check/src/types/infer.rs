@@ -785,6 +785,15 @@ impl<'a> Checker<'a> {
             }
             return;
         };
+        match display::scheme(&self.s, &f.env, opts) {
+            Ok(env) => {
+                self.out.entry_provider_needs.insert(d, env);
+            }
+            Err(()) => {
+                self.report_coalescing(span);
+                return;
+            }
+        }
         let mut services = Vec::new();
         for m in known::members(&f.env) {
             let ok = match &m {

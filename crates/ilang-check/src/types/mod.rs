@@ -464,6 +464,10 @@ pub struct Typed {
     /// The host services in the environment of each entry point (§10.2),
     /// which the host gives (§9.7).
     pub entry_services: HashMap<DefId, Vec<crate::hir::TypeId>>,
+    /// The complete inferred environment of each entry, including ordinary
+    /// services and their type arguments. Provider planning must use this
+    /// rather than the host-only list used by existing lowering.
+    pub entry_provider_needs: HashMap<DefId, ShownType>,
     /// The types of the local names, only from [`check_keeping_locals`]:
     /// for editors (`crate::query`).
     pub locals: Option<std::sync::Arc<LocalTypes>>,
