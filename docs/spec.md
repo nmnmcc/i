@@ -306,9 +306,9 @@ exports = ["app/math.add"]                     # host exports (§10.2): module p
 - The packages that a package uses, directly or through other packages, may not be in a circle.
 - The `dev-dependencies` of a package are only used when its own tests are compiled. The `dev-dependencies` of other packages are not used.
 
-#The optional `[entries]` table maps entry names (ordinary `name`s) to
-strings `"package/module.function"`, with the same path spelling as
-`[wasm].exports`. Targets must be top-level functions of this package;
+The optional `[entries]` table maps entry names (ordinary `name`s) to
+strings `"module.path.function"`. The module path is relative to this package;
+its components name directories below `src` or `test`, followed by the function. Targets must be top-level functions of this package;
 they need not be exported. Each has no value parameters (environment
 parameters do not count). All declarations are checked even when unselected.
 Names are unique as TOML keys; several names may select the same function.

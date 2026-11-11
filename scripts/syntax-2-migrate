@@ -126,11 +126,10 @@ def entry_migration(item, result):
         return source, None, None
     if package is None:
         return None, None, f'legacy entry `{name}` needs a reviewed rename or [entries] declaration'
-    manifest = tomllib.loads((package / 'i.toml').read_text())
     relative = path.relative_to(package)
     if relative.parts[0] not in ('src', 'test'):
         return None, None, f'entry outside src/test: {relative}'
-    module = manifest['name'] + '/' + '/'.join(relative.with_suffix('').parts[1:])
+    module = '.'.join(relative.with_suffix('').parts[1:])
     return source, (package / 'i.toml', module + '.' + name), None
 
 
