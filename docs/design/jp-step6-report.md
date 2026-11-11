@@ -65,3 +65,8 @@ Corrected development failures:
   `crates/ilang-check/tests/provider_graph.rs:27 ... actual ['E0101: expected an item: a type definition, or a binding pattern = value, found [']`.
   Added exact host-literal identities, retained parsing for the import fragment,
   and removed stale manifest identities. Final audit passes.
+
+`UPDATE=1 cargo test -p ilang-check -p ilang-wasm -p ilang-host -p ilang-macro
+-p ilang-cli --locked` passed completely. This includes 417/417 spec cases at
+O0/O2. It regenerated the migrated `10.2/test_stops.i` trace from line 6 to
+line 7; that expectation is committed. The focused rustfmt check passed.
