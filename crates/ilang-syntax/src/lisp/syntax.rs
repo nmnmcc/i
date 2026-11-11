@@ -175,8 +175,13 @@ impl Syntax {
         let mut built = Vec::new();
         while let Some((datum, finish)) = tasks.pop() {
             let children: &[Datum] = match &datum.kind {
-                DatumKind::Round(xs) | DatumKind::Square(xs) | DatumKind::Curly(xs) | DatumKind::Bits(xs) => xs,
-                DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => std::slice::from_ref(x.as_ref()),
+                DatumKind::Round(xs)
+                | DatumKind::Square(xs)
+                | DatumKind::Curly(xs)
+                | DatumKind::Bits(xs) => xs,
+                DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
+                    std::slice::from_ref(x.as_ref())
+                }
                 _ => &[],
             };
             if !finish && !children.is_empty() {
@@ -593,12 +598,20 @@ impl Syntax {
         let mut pending = vec![(self, other)];
         while let Some((left, right)) = pending.pop() {
             match (left.node(), right.node()) {
-                (Name(a), Name(b)) | (Discard(a), Discard(b)) | (Up(a), Up(b))
-                | (Symbol(a), Symbol(b)) | (Text(a), Text(b)) if a == b => {},
-                (Int(a), Int(b)) if a == b => {},
-                (Float(a), Float(b)) if a == b => {},
-                (Round(a), Round(b)) | (Square(a), Square(b))
-                | (Curly(a), Curly(b)) | (Bits(a), Bits(b)) if a.len() == b.len() => {
+                (Name(a), Name(b))
+                | (Discard(a), Discard(b))
+                | (Up(a), Up(b))
+                | (Symbol(a), Symbol(b))
+                | (Text(a), Text(b))
+                    if a == b => {}
+                (Int(a), Int(b)) if a == b => {}
+                (Float(a), Float(b)) if a == b => {}
+                (Round(a), Round(b))
+                | (Square(a), Square(b))
+                | (Curly(a), Curly(b))
+                | (Bits(a), Bits(b))
+                    if a.len() == b.len() =>
+                {
                     pending.extend(a.iter().zip(b));
                 }
                 (Quote(a), Quote(b)) | (Unquote(a), Unquote(b)) | (Splice(a), Splice(b)) => {
