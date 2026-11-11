@@ -181,6 +181,17 @@ impl<H: Hook> Walker<'_, H> {
                         ExprKind::Tuple(items) => {
                             tasks.extend(items.iter_mut().rev().map(|e| Task::Expr(e, depth)))
                         }
+                        ExprKind::Record { base, fields } => {
+                            tasks.extend(
+                                fields
+                                    .iter_mut()
+                                    .rev()
+                                    .map(|(_, value)| Task::Expr(value, depth)),
+                            );
+                            if let Some(base) = base {
+                                tasks.push(Task::Expr(base, depth));
+                            }
+                        }
                         ExprKind::List { items, rest } => {
                             if let Some(rest) = rest {
                                 tasks.push(Task::Expr(rest, depth));
@@ -297,6 +308,13 @@ impl<H: Hook> Walker<'_, H> {
                         | ast::TypeKind::Inter(args)
                         | ast::TypeKind::Diff(args) => {
                             tasks.extend(args.iter_mut().rev().map(|a| Task::Ty(a, depth)))
+                        }
+                        ast::TypeKind::Record { base, fields, .. } => {
+                            tasks
+                                .extend(fields.iter_mut().rev().map(|(_, ty)| Task::Ty(ty, depth)));
+                            if let Some(base) = base {
+                                tasks.push(Task::Ty(base, depth));
+                            }
                         }
                         ast::TypeKind::Fn {
                             params,
