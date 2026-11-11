@@ -8,6 +8,7 @@
 //! the level of the variable first (extrusion), so that generalization only
 //! takes the variables of the binding.
 
+use super::TyParts;
 use super::{FnTy, Head, Ty, V, Variance};
 use crate::hir::{BuiltinType, TypeId, TypeRef};
 // The maps and sets of the solver hold small keys and are on the hot path:
@@ -247,32 +248,12 @@ impl Solver {
     }
 
     fn observe_type(&self, t: &Ty) {
-        match t {
-            Ty::Var(v) => self.observe(*v),
-            Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
-                for t in ts {
-                    self.observe_type(t);
+        if self.observation.is_some() {
+            super::tree::visit(t, |t| {
+                if let Ty::Var(v) = t {
+                    self.observe(*v);
                 }
-            }
-            Ty::Fn(f) => {
-                for (_, t) in &f.params {
-                    self.observe_type(t);
-                }
-                for t in [&f.ret, &f.err, &f.env] {
-                    self.observe_type(t);
-                }
-            }
-            Ty::Diff(t, ts) => {
-                self.observe_type(t);
-                for t in ts {
-                    self.observe_type(t);
-                }
-            }
-            Ty::Both(a, b) => {
-                self.observe_type(a);
-                self.observe_type(b);
-            }
-            Ty::Never | Ty::Top => {}
+            });
         }
     }
 
@@ -374,27 +355,28 @@ impl Solver {
 
     /// The highest level of the variables in `t`.
     pub fn level_of(&self, t: &Ty) -> u32 {
-        match t {
-            Ty::Var(v) => self.var(*v).level,
-            Ty::Con(_, _, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
-            Ty::Fn(f) => f
-                .params
-                .iter()
-                .map(|p| &p.1)
-                .chain([&f.ret, &f.err, &f.env])
-                .map(|a| self.level_of(a))
-                .max()
-                .unwrap_or(0),
-            Ty::Union(ms) | Ty::Inter(ms) => ms.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
-            Ty::Diff(a, h) => h
-                .iter()
-                .map(|x| self.level_of(x))
-                .max()
-                .unwrap_or(0)
-                .max(self.level_of(a)),
-            Ty::Both(a, b) => self.level_of(a).max(self.level_of(b)),
-            Ty::Never | Ty::Top => 0,
+        let mut pending = vec![t];
+        let mut level = 0;
+        while let Some(t) = pending.pop() {
+            match t {
+                Ty::Var(v) => level = level.max(self.var(*v).level),
+                Ty::Con(_, _, args) | Ty::Union(args) | Ty::Inter(args) => pending.extend(args),
+                Ty::Fn(f) => {
+                    pending.extend(f.params.iter().map(|(_, t)| t));
+                    pending.extend([&f.ret, &f.err, &f.env]);
+                }
+                Ty::Diff(a, h) => {
+                    pending.push(a);
+                    pending.extend(h);
+                }
+                Ty::Both(a, b) => {
+                    pending.push(a);
+                    pending.push(b);
+                }
+                Ty::Never | Ty::Top => {}
+            }
         }
+        level
     }
 
     // ---- Constraints ----
@@ -469,8 +451,8 @@ impl Solver {
         let mut todo = vec![t.clone()];
         let mut added = Vec::new();
         while let Some(t) = todo.pop() {
-            match t {
-                Ty::Var(v) if self.var(v).row < mode => {
+            match t.into_parts() {
+                TyParts::Var(v) if self.var(v).row < mode => {
                     self.observe(v);
                     self.var_mut(v).row = mode;
                     added.push(v);
@@ -478,9 +460,9 @@ impl Solver {
                     todo.extend(st.lower.iter().chain(&st.upper).cloned());
                     todo.extend(st.from.iter().chain(&st.into).copied().map(Ty::Var));
                 }
-                Ty::Union(ms) | Ty::Inter(ms) => todo.extend(ms),
-                Ty::Diff(a, _) => todo.push(*a),
-                Ty::Both(a, b) => {
+                TyParts::Union(ms) | TyParts::Inter(ms) => todo.extend(ms),
+                TyParts::Diff(a, _) => todo.push(*a),
+                TyParts::Both(a, b) => {
                     todo.push(*a);
                     todo.push(*b);
                 }
@@ -498,23 +480,21 @@ impl Solver {
     }
 
     pub fn is_row(&self, t: &Ty) -> bool {
-        match t {
-            Ty::Var(v) => self.var(*v).row != Mode::Value,
-            Ty::Union(ms) | Ty::Inter(ms) => ms.iter().any(|m| self.is_row(m)),
-            Ty::Diff(a, _) => self.is_row(a),
-            _ => false,
-        }
+        self.mode(t) != Mode::Value
     }
 
     fn mode(&self, t: &Ty) -> Mode {
-        match t {
-            Ty::Var(v) => self.var(*v).row,
-            Ty::Union(ms) | Ty::Inter(ms) => {
-                ms.iter().map(|m| self.mode(m)).max().unwrap_or_default()
+        let mut pending = vec![t];
+        let mut mode = Mode::Value;
+        while let Some(t) = pending.pop() {
+            match t {
+                Ty::Var(v) => mode = mode.max(self.var(*v).row),
+                Ty::Union(ms) | Ty::Inter(ms) => pending.extend(ms),
+                Ty::Diff(a, _) => pending.push(a),
+                _ => {}
             }
-            Ty::Diff(a, _) => self.mode(a),
-            _ => Mode::Value,
         }
+        mode
     }
 
     pub fn constrain_row(&mut self, l: &Ty, r: &Ty) {
@@ -587,84 +567,159 @@ impl Solver {
     }
 
     fn same_form_in(&self, a: &Ty, b: &Ty, expanding: &mut HashSet<V>) -> bool {
-        if a == b {
-            return true;
+        enum Proof<'a> {
+            Compare(&'a Ty, &'a Ty),
+            All(Vec<Proof<'a>>),
+            Any(Vec<Proof<'a>>),
+            AllNext(Vec<Proof<'a>>),
+            AnyNext(Vec<Proof<'a>>),
+            Release(V),
+            Constant(bool),
         }
-        let sets = |xs: &[Ty], ys: &[Ty], expanding: &mut HashSet<V>| {
-            xs.iter()
-                .all(|x| ys.iter().any(|y| self.same_form_in(x, y, expanding)))
-                && ys
-                    .iter()
-                    .all(|y| xs.iter().any(|x| self.same_form_in(x, y, expanding)))
-        };
-        match (a, b) {
-            (Ty::Var(v), Ty::Var(w))
-                if self.reach(vec![*v], true).0.contains(w)
-                    && self.reach(vec![*v], false).0.contains(w) =>
-            {
-                true
-            }
-            (Ty::Var(v), t) | (t, Ty::Var(v)) => {
-                // L <: v <: U proves v = T when both L and U equal T.
-                // A hole fixed by a concrete service form is such a case.
-                self.observe(*v);
-                let st = self.var(*v);
-                if (st.lower.is_empty() && st.from.is_empty() && !matches!(t, Ty::Never))
-                    || (st.upper.is_empty() && st.into.is_empty() && !matches!(t, Ty::Top))
-                {
-                    return false;
-                }
-                if !expanding.insert(*v) {
-                    return false;
-                }
-                let lower = self.reach(vec![*v], true).0;
-                let upper = self.reach(vec![*v], false).0;
-                let equal = (matches!(t, Ty::Never)
-                    || lower.iter().any(|w| {
-                        self.var(*w)
-                            .lower
-                            .iter()
-                            .any(|b| !matches!(b, Ty::Var(_)) && self.same_form_in(b, t, expanding))
+        fn sets<'a>(xs: &'a [Ty], ys: &'a [Ty]) -> Proof<'a> {
+            Proof::All(
+                xs.iter()
+                    .map(|x| Proof::Any(ys.iter().map(|y| Proof::Compare(x, y)).rev().collect()))
+                    .chain(ys.iter().map(|y| {
+                        Proof::Any(xs.iter().map(|x| Proof::Compare(x, y)).rev().collect())
                     }))
-                    && (matches!(t, Ty::Top)
-                        || upper.iter().any(|w| {
-                            self.var(*w).upper.iter().any(|b| {
-                                !matches!(b, Ty::Var(_)) && self.same_form_in(b, t, expanding)
-                            })
-                        }));
-                expanding.remove(v);
-                equal
-            }
-            (Ty::Con(h, values, xs), Ty::Con(k, other, ys)) => {
-                h == k
-                    && values == other
-                    && xs.len() == ys.len()
-                    && xs
-                        .iter()
-                        .zip(ys)
-                        .all(|(x, y)| self.same_form_in(x, y, expanding))
-            }
-            (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => {
-                sets(xs, ys, expanding)
-            }
-            (Ty::Diff(a, hs), Ty::Diff(b, ks)) => {
-                self.same_form_in(a, b, expanding) && sets(hs, ks, expanding)
-            }
-            (Ty::Both(a, b), Ty::Both(c, d)) => {
-                self.same_form_in(a, c, expanding) && self.same_form_in(b, d, expanding)
-            }
-            (Ty::Fn(f), Ty::Fn(g)) => {
-                f.params.len() == g.params.len()
-                    && f.params
-                        .iter()
-                        .zip(&g.params)
-                        .all(|(p, q)| self.same_form_in(&p.1, &q.1, expanding))
-                    && self.same_form_in(&f.ret, &g.ret, expanding)
-                    && self.same_form_in(&f.err, &g.err, expanding)
-                    && self.same_form_in(&f.env, &g.env, expanding)
-            }
-            _ => false,
+                    .rev()
+                    .collect(),
+            )
         }
+        let mut pending = vec![Proof::Compare(a, b)];
+        let mut result = false;
+        while let Some(proof) = pending.pop() {
+            match proof {
+                Proof::Constant(b) => result = b,
+                Proof::All(mut terms) => match terms.pop() {
+                    Some(next) => {
+                        pending.push(Proof::AllNext(terms));
+                        pending.push(next);
+                    }
+                    None => result = true,
+                },
+                Proof::Any(mut terms) => match terms.pop() {
+                    Some(next) => {
+                        pending.push(Proof::AnyNext(terms));
+                        pending.push(next);
+                    }
+                    None => result = false,
+                },
+                Proof::AllNext(terms) => {
+                    if result {
+                        pending.push(Proof::All(terms));
+                    }
+                }
+                Proof::AnyNext(terms) => {
+                    if !result {
+                        pending.push(Proof::Any(terms));
+                    }
+                }
+                Proof::Release(v) => {
+                    expanding.remove(&v);
+                }
+                Proof::Compare(a, b) => {
+                    if a == b {
+                        result = true;
+                        continue;
+                    }
+                    match (a, b) {
+                        (Ty::Var(v), Ty::Var(w))
+                            if self.reach(vec![*v], true).0.contains(w)
+                                && self.reach(vec![*v], false).0.contains(w) =>
+                        {
+                            result = true
+                        }
+                        (Ty::Var(v), t) | (t, Ty::Var(v)) => {
+                            self.observe(*v);
+                            let st = self.var(*v);
+                            if (st.lower.is_empty()
+                                && st.from.is_empty()
+                                && !matches!(t, Ty::Never))
+                                || (st.upper.is_empty()
+                                    && st.into.is_empty()
+                                    && !matches!(t, Ty::Top))
+                                || !expanding.insert(*v)
+                            {
+                                result = false;
+                                continue;
+                            }
+                            let lower = self.reach(vec![*v], true).0;
+                            let upper = self.reach(vec![*v], false).0;
+                            let lower = if matches!(t, Ty::Never) {
+                                Proof::Constant(true)
+                            } else {
+                                Proof::Any(
+                                    lower
+                                        .iter()
+                                        .flat_map(|w| self.var(*w).lower.iter())
+                                        .filter(|b| !matches!(b, Ty::Var(_)))
+                                        .map(|b| Proof::Compare(b, t))
+                                        .collect::<Vec<_>>()
+                                        .into_iter()
+                                        .rev()
+                                        .collect(),
+                                )
+                            };
+                            let upper = if matches!(t, Ty::Top) {
+                                Proof::Constant(true)
+                            } else {
+                                Proof::Any(
+                                    upper
+                                        .iter()
+                                        .flat_map(|w| self.var(*w).upper.iter())
+                                        .filter(|b| !matches!(b, Ty::Var(_)))
+                                        .map(|b| Proof::Compare(b, t))
+                                        .collect::<Vec<_>>()
+                                        .into_iter()
+                                        .rev()
+                                        .collect(),
+                                )
+                            };
+                            pending.push(Proof::Release(*v));
+                            pending.push(Proof::All(vec![upper, lower]));
+                        }
+                        (Ty::Con(h, values, xs), Ty::Con(k, other, ys))
+                            if h == k && values == other && xs.len() == ys.len() =>
+                        {
+                            pending.push(Proof::All(
+                                xs.iter()
+                                    .zip(ys)
+                                    .rev()
+                                    .map(|(x, y)| Proof::Compare(x, y))
+                                    .collect(),
+                            ));
+                        }
+                        (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+                            let mut terms = vec![
+                                Proof::Compare(&f.env, &g.env),
+                                Proof::Compare(&f.err, &g.err),
+                                Proof::Compare(&f.ret, &g.ret),
+                            ];
+                            terms.extend(
+                                f.params
+                                    .iter()
+                                    .zip(&g.params)
+                                    .rev()
+                                    .map(|(x, y)| Proof::Compare(&x.1, &y.1)),
+                            );
+                            pending.push(Proof::All(terms));
+                        }
+                        (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => {
+                            pending.push(sets(xs, ys))
+                        }
+                        (Ty::Diff(a, xs), Ty::Diff(b, ys)) => {
+                            pending.push(Proof::All(vec![sets(xs, ys), Proof::Compare(a, b)]))
+                        }
+                        (Ty::Both(a, b), Ty::Both(c, d)) => pending
+                            .push(Proof::All(vec![Proof::Compare(b, d), Proof::Compare(a, c)])),
+                        _ => result = false,
+                    }
+                }
+            }
+        }
+        result
     }
 
     /// A shown scheme must express every handler restriction. A visible
@@ -675,40 +730,12 @@ impl Solver {
         if !self.has_handlers {
             return Vec::new();
         }
-        fn parts(t: &Ty, out: &mut Vec<Ty>) {
-            out.push(t.clone());
-            match t {
-                Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
-                    for x in xs {
-                        parts(x, out);
-                    }
-                }
-                Ty::Fn(f) => {
-                    for p in &f.params {
-                        parts(&p.1, out);
-                    }
-                    for x in [&f.ret, &f.err, &f.env] {
-                        parts(x, out);
-                    }
-                }
-                Ty::Diff(a, hs) => {
-                    parts(a, out);
-                    for h in hs {
-                        parts(h, out);
-                    }
-                }
-                Ty::Both(a, b) => {
-                    parts(a, out);
-                    parts(b, out);
-                }
-                _ => {}
-            }
-        }
         let mut all = Vec::new();
-        parts(t, &mut all);
+        super::tree::visit(t, |part| all.push(part));
         let mut hidden = Vec::new();
         for v in all
             .iter()
+            .copied()
             .filter_map(|t| if let Ty::Var(v) = t { Some(*v) } else { None })
         {
             if self.var(v).level <= level || self.var(v).row == Mode::Value {
@@ -731,7 +758,7 @@ impl Solver {
                     {
                         continue;
                     }
-                    let witnessed = all.iter().any(|part| match part {
+                    let witnessed = all.iter().copied().any(|part| match part {
                         Ty::Diff(a, hs) => is_var(a) && hs.iter().any(|m| self.same_form(m, h)),
                         Ty::Union(ms) => {
                             ms.iter().any(&is_var) && ms.iter().any(|m| self.same_form(m, h))
@@ -756,198 +783,224 @@ impl Solver {
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: Mode) {
-        let env = env.max(self.mode(l)).max(self.mode(r));
-        if env != Mode::Value {
-            self.mark_mode(l, env);
-            self.mark_mode(r, env);
+        enum Work<'a> {
+            Check(&'a Ty, &'a Ty, Mode),
+            Equal(&'a Ty, &'a Ty, FailKind),
+            FinishEqual(&'a Ty, &'a Ty, FailKind, usize),
         }
-        if self.observed_shape
-            && (matches!(r, Ty::Union(ts) if ts.contains(l))
-                || matches!(l,Ty::Inter(ts) if ts.contains(r)))
-        {
-            return;
-        }
-        if l != r {
-            self.observe_type(l);
-            self.observe_type(r);
-        }
-        if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
-            return;
-        }
-        // §4.5 rule 3: subtracting members never adds values. The
-        // difference's separate same-form obligation remains in the scheme.
-        if let Ty::Diff(a, _) = l
-            && (a.as_ref() == r
-                || matches!((a.as_ref(), r), (Ty::Var(u), Ty::Var(v))
+        let mut work = vec![Work::Check(l, r, env)];
+        while let Some(next) = work.pop() {
+            let (l, r, env) = match next {
+                Work::Check(l, r, env) => (l, r, env),
+                Work::Equal(l, r, kind) => {
+                    work.push(Work::FinishEqual(l, r, kind, self.failures.len()));
+                    work.push(Work::Check(r, l, Mode::Value));
+                    work.push(Work::Check(l, r, Mode::Value));
+                    continue;
+                }
+                Work::FinishEqual(l, r, kind, before) => {
+                    if self.failures.len() > before {
+                        self.failures.truncate(before);
+                        self.fail(kind, l, r);
+                    }
+                    continue;
+                }
+            };
+            let env = env.max(self.mode(l)).max(self.mode(r));
+            if env != Mode::Value {
+                self.mark_mode(l, env);
+                self.mark_mode(r, env);
+            }
+            if self.observed_shape
+                && (matches!(r, Ty::Union(ts) if ts.contains(l))
+                    || matches!(l,Ty::Inter(ts) if ts.contains(r)))
+            {
+                continue;
+            }
+            if l != r {
+                self.observe_type(l);
+                self.observe_type(r);
+            }
+            if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
+                continue;
+            }
+            // §4.5 rule 3: subtracting members never adds values. The
+            // difference's separate same-form obligation remains in the scheme.
+            if let Ty::Diff(a, _) = l
+                && (a.as_ref() == r
+                    || matches!((a.as_ref(), r), (Ty::Var(u), Ty::Var(v))
                 if self.reach(vec![*u], false).0.contains(v)))
-        {
-            return;
-        }
-        // §4.5 rule 2: these are inclusions, not recursive bounds such as
-        // `n <: n | S(n)`. Recording them would invent an occurs cycle.
-        if matches!(l, Ty::Var(_)) && matches!(r, Ty::Union(ms) if ms.contains(l)) {
-            return;
-        }
-        if (matches!(l, Ty::Var(_)) || matches!(r, Ty::Var(_)))
-            && !self.cache.insert((l.clone(), r.clone(), env))
-        {
-            return;
-        }
-        match (l, r) {
-            (Ty::Union(ms), _) => {
-                for m in ms {
-                    self.constrain_in(m, r, env);
-                }
+            {
+                continue;
             }
-            (_, Ty::Inter(ms)) => {
-                for m in ms {
-                    self.constrain_in(l, m, env);
-                }
+            // §4.5 rule 2: these are inclusions, not recursive bounds such as
+            // `n <: n | S(n)`. Recording them would invent an occurs cycle.
+            if matches!(l, Ty::Var(_)) && matches!(r, Ty::Union(ms) if ms.contains(l)) {
+                continue;
             }
-            (Ty::Var(_), Ty::Var(v)) if env != Mode::Value => {
-                // Collect requirements in the receiving row. An upper
-                // bound on its member can lead back through a service's
-                // invariant argument: n <: row, S(n) <: row is finite.
-                // Do this across levels too, after copying the member to
-                // the receiver's level; do not make its upper bound the
-                // whole receiving row.
-                let level = self.var(*v).level;
-                if self.level_of(l) > level {
-                    let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
-                    self.constrain_in(&l2, r, env);
-                    return;
-                }
-                self.add_bound(*v, l.clone(), true, env);
-                for ub in self.var(*v).upper.clone() {
-                    self.constrain_in(l, &ub, env);
-                }
+            if (matches!(l, Ty::Var(_)) || matches!(r, Ty::Var(_)))
+                && !self.cache.insert((l.clone(), r.clone(), env))
+            {
+                continue;
             }
-            (Ty::Var(v), _) if self.level_of(r) <= self.var(*v).level => {
-                if self.add_bound(*v, r.clone(), false, env) {
-                    for lb in self.var(*v).lower.clone() {
-                        self.constrain_in(&lb, r, env);
+            match (l, r) {
+                (Ty::Union(ms), _) => {
+                    for m in ms.iter().rev() {
+                        work.push(Work::Check(m, r, env));
                     }
                 }
-            }
-            (_, Ty::Var(v)) if self.level_of(l) <= self.var(*v).level => {
-                if self.add_bound(*v, l.clone(), true, env) {
+                (_, Ty::Inter(ms)) => {
+                    for m in ms.iter().rev() {
+                        work.push(Work::Check(l, m, env));
+                    }
+                }
+                (Ty::Var(_), Ty::Var(v)) if env != Mode::Value => {
+                    // Collect requirements in the receiving row. An upper
+                    // bound on its member can lead back through a service's
+                    // invariant argument: n <: row, S(n) <: row is finite.
+                    // Do this across levels too, after copying the member to
+                    // the receiver's level; do not make its upper bound the
+                    // whole receiving row.
+                    let level = self.var(*v).level;
+                    if self.level_of(l) > level {
+                        let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
+                        self.constrain_in(&l2, r, env);
+                        continue;
+                    }
+                    self.add_bound(*v, l.clone(), true, env);
                     for ub in self.var(*v).upper.clone() {
                         self.constrain_in(l, &ub, env);
                     }
                 }
-            }
-            (Ty::Var(v), _) => {
-                let level = self.var(*v).level;
-                let r2 = self.extrude(r, Pol::Neg, level, env, &mut HashMap::default());
-                self.constrain_in(l, &r2, env);
-            }
-            (_, Ty::Var(v)) => {
-                let level = self.var(*v).level;
-                let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
-                self.constrain_in(&l2, r, env);
-            }
-            (Ty::Inter(ms), _) => {
-                // `a & T <: R` is true when `T <: R` or when `a <: R`
-                // (§4.5 rule 2). The members that are not type variables
-                // are tried first; when they fail, each variable is tried.
-                // Only the members with a type constructor are put together
-                // into one: the others (variables, differences, unions that
-                // stay) are tried one by one, so that the type tried is
-                // always smaller than `l`.
-                let (conc, vars): (Vec<Ty>, Vec<Ty>) = ms
-                    .iter()
-                    .cloned()
-                    .partition(|m| matches!(m, Ty::Con(..) | Ty::Fn(_)));
-                let mut tries = Vec::new();
-                if !conc.is_empty() {
-                    tries.push(self.normalize_mode(Ty::Inter(conc), env));
-                }
-                tries.extend(vars);
-                let before = self.failures.len();
-                let last = tries.len().saturating_sub(1);
-                for (i, t) in tries.iter().enumerate() {
-                    self.constrain_in(t, r, env);
-                    if self.failures.len() == before || i == last {
-                        break;
+                (Ty::Var(v), _) if self.level_of(r) <= self.var(*v).level => {
+                    if self.add_bound(*v, r.clone(), false, env) {
+                        for lb in self.var(*v).lower.clone() {
+                            self.constrain_in(&lb, r, env);
+                        }
                     }
-                    self.failures.truncate(before);
                 }
-            }
-            (Ty::Diff(a, h), _) => self.diff_left(a, h, r, env),
-            (Ty::Top, _) => self.fail(FailKind::Mismatch, l, r),
-            (Ty::Both(a, _), _) => self.constrain_in(&a.clone(), r, env),
-            (_, Ty::Both(_, b)) => self.constrain_in(l, &b.clone(), env),
-            (_, Ty::Union(ms)) => self.route(l, ms, env),
-            (_, Ty::Diff(a, h)) => {
-                if h.iter()
-                    .any(|m| m.head() == l.head() && !m.values().disjoint(l.values()))
-                {
-                    let partial = !l.values().is_all()
-                        || h.iter()
-                            .any(|m| m.head() == l.head() && !m.values().is_all());
-                    self.fail(
-                        if partial && env == Mode::Value {
-                            FailKind::Values
-                        } else {
-                            FailKind::Mismatch
-                        },
-                        l,
-                        r,
-                    );
-                } else {
-                    self.constrain_in(l, a, env);
-                }
-            }
-            (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
-                if (env == Mode::Env && s1 != s2) || (env != Mode::Env && !s1.subset(s2)) {
-                    self.fail(
-                        if env != Mode::Value {
-                            FailKind::EnvForms
-                        } else {
-                            FailKind::Values
-                        },
-                        l,
-                        r,
-                    );
-                    return;
-                }
-                if env != Mode::Value {
-                    // §4.5 rule 4: service arguments are equal.
-                    for (x, y) in a1.iter().zip(a2) {
-                        self.equal(x, y, FailKind::EnvForms);
+                (_, Ty::Var(v)) if self.level_of(l) <= self.var(*v).level => {
+                    if self.add_bound(*v, l.clone(), true, env) {
+                        for ub in self.var(*v).upper.clone() {
+                            self.constrain_in(l, &ub, env);
+                        }
                     }
-                    return;
                 }
-                let vs = self.variances(*h1, a1.len());
-                for (((x, y), v), row) in a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len())) {
-                    self.constrain_by(x, y, v, row);
+                (Ty::Var(v), _) => {
+                    let level = self.var(*v).level;
+                    let r2 = self.extrude(r, Pol::Neg, level, env, &mut HashMap::default());
+                    self.constrain_in(l, &r2, env);
                 }
+                (_, Ty::Var(v)) => {
+                    let level = self.var(*v).level;
+                    let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
+                    self.constrain_in(&l2, r, env);
+                }
+                (Ty::Inter(ms), _) => {
+                    // `a & T <: R` is true when `T <: R` or when `a <: R`
+                    // (§4.5 rule 2). The members that are not type variables
+                    // are tried first; when they fail, each variable is tried.
+                    // Only the members with a type constructor are put together
+                    // into one: the others (variables, differences, unions that
+                    // stay) are tried one by one, so that the type tried is
+                    // always smaller than `l`.
+                    let (conc, vars): (Vec<Ty>, Vec<Ty>) = ms
+                        .iter()
+                        .cloned()
+                        .partition(|m| matches!(m, Ty::Con(..) | Ty::Fn(_)));
+                    let mut tries = Vec::new();
+                    if !conc.is_empty() {
+                        tries.push(self.normalize_mode(Ty::Inter(conc), env));
+                    }
+                    tries.extend(vars);
+                    let before = self.failures.len();
+                    let last = tries.len().saturating_sub(1);
+                    for (i, t) in tries.iter().enumerate() {
+                        self.constrain_in(t, r, env);
+                        if self.failures.len() == before || i == last {
+                            break;
+                        }
+                        self.failures.truncate(before);
+                    }
+                }
+                (Ty::Diff(a, h), _) => self.diff_left(a, h, r, env),
+                (Ty::Top, _) => self.fail(FailKind::Mismatch, l, r),
+                (Ty::Both(a, _), _) => work.push(Work::Check(a, r, env)),
+                (_, Ty::Both(_, b)) => work.push(Work::Check(l, b, env)),
+                (_, Ty::Union(ms)) => self.route(l, ms, env),
+                (_, Ty::Diff(a, h)) => {
+                    if h.iter()
+                        .any(|m| m.head() == l.head() && !m.values().disjoint(l.values()))
+                    {
+                        let partial = !l.values().is_all()
+                            || h.iter()
+                                .any(|m| m.head() == l.head() && !m.values().is_all());
+                        self.fail(
+                            if partial && env == Mode::Value {
+                                FailKind::Values
+                            } else {
+                                FailKind::Mismatch
+                            },
+                            l,
+                            r,
+                        );
+                    } else {
+                        work.push(Work::Check(l, a, env));
+                    }
+                }
+                (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
+                    if (env == Mode::Env && s1 != s2) || (env != Mode::Env && !s1.subset(s2)) {
+                        self.fail(
+                            if env != Mode::Value {
+                                FailKind::EnvForms
+                            } else {
+                                FailKind::Values
+                            },
+                            l,
+                            r,
+                        );
+                        continue;
+                    }
+                    if env != Mode::Value {
+                        // §4.5 rule 4: service arguments are equal.
+                        for (x, y) in a1.iter().zip(a2).rev() {
+                            work.push(Work::Equal(x, y, FailKind::EnvForms));
+                        }
+                        continue;
+                    }
+                    let vs = self.variances(*h1, a1.len());
+                    let children: Vec<_> = a1
+                        .iter()
+                        .zip(a2)
+                        .zip(vs)
+                        .zip(self.rows(*h1, a1.len()))
+                        .collect();
+                    for (((x, y), v), row) in children.into_iter().rev() {
+                        match v {
+                            Variance::Co => work.push(Work::Check(x, y, row)),
+                            Variance::Contra => work.push(Work::Check(y, x, row)),
+                            Variance::Inv => {
+                                work.push(Work::Check(y, x, row));
+                                work.push(Work::Check(x, y, row));
+                            }
+                            Variance::Bi => {}
+                        }
+                    }
+                }
+                (Ty::Fn(f), Ty::Fn(g)) => {
+                    if f.params.len() != g.params.len() {
+                        self.fail(FailKind::Arity, l, r);
+                        continue;
+                    }
+                    work.push(Work::Check(&f.env, &g.env, Mode::Env));
+                    work.push(Work::Check(&f.err, &g.err, Mode::Row));
+                    work.push(Work::Check(&f.ret, &g.ret, Mode::Value));
+                    for (p, q) in f.params.iter().zip(&g.params).rev() {
+                        work.push(Work::Check(&q.1, &p.1, Mode::Value));
+                    }
+                }
+                _ => self.fail(FailKind::Mismatch, l, r),
             }
-            (Ty::Fn(f), Ty::Fn(g)) => {
-                if f.params.len() != g.params.len() {
-                    self.fail(FailKind::Arity, l, r);
-                    return;
-                }
-                for (p, q) in f.params.iter().zip(&g.params) {
-                    self.constrain(&q.1, &p.1);
-                }
-                self.constrain(&f.ret, &g.ret);
-                self.constrain_row(&f.err, &g.err);
-                self.constrain_env(&f.env, &g.env);
-            }
-            _ => self.fail(FailKind::Mismatch, l, r),
-        }
-    }
-
-    fn constrain_by(&mut self, x: &Ty, y: &Ty, v: Variance, row: Mode) {
-        match v {
-            Variance::Co => self.constrain_in(x, y, row),
-            Variance::Contra => self.constrain_in(y, x, row),
-            Variance::Inv => {
-                self.constrain_in(x, y, row);
-                self.constrain_in(y, x, row);
-            }
-            Variance::Bi => {}
         }
     }
 
@@ -1254,48 +1307,47 @@ impl Solver {
     /// values whose type constructor is in `H` go to `H`, and the rest go
     /// to `R`: `a <: H | R`, with the members of `H` first.
     fn diff_left(&mut self, a: &Ty, h: &[Ty], r: &Ty, env: Mode) {
-        match a {
-            Ty::Never => {}
-            Ty::Union(ms) => {
-                for m in ms {
-                    self.diff_left(m, h, r, env);
-                }
-            }
-            Ty::Con(..) if a.scalar().is_some() => {
-                let sets: Vec<_> = h
-                    .iter()
-                    .filter(|m| m.head() == a.head())
-                    .map(|m| m.values().clone())
-                    .collect();
-                if sets.is_empty() {
-                    self.constrain_in(a, r, env);
-                } else {
-                    let excluded = super::lits::ValueSet::join_all(&sets);
-                    if !a.values().subset(&excluded) {
-                        let rest = a.with_values(a.values().minus(&excluded));
-                        self.constrain_in(&rest, r, env);
+        let mut pending = vec![a];
+        while let Some(a) = pending.pop() {
+            match a {
+                Ty::Never => {}
+                Ty::Union(ms) => pending.extend(ms.iter().rev()),
+                Ty::Con(..) if a.scalar().is_some() => {
+                    let sets: Vec<_> = h
+                        .iter()
+                        .filter(|m| m.head() == a.head())
+                        .map(|m| m.values().clone())
+                        .collect();
+                    if sets.is_empty() {
+                        self.constrain_in(a, r, env);
+                    } else {
+                        let excluded = super::lits::ValueSet::join_all(&sets);
+                        if !a.values().subset(&excluded) {
+                            let rest = a.with_values(a.values().minus(&excluded));
+                            self.constrain_in(&rest, r, env);
+                        }
                     }
                 }
-            }
-            Ty::Con(..) | Ty::Fn(_) => match h.iter().find(|m| m.head() == a.head()) {
-                Some(m) => {
-                    let m = m.clone();
-                    self.constrain_in(a, &m, env);
-                }
-                None => self.constrain_in(a, r, env),
-            },
-            _ => {
-                // `H | R`, flat and with no member twice, so that the same
-                // constraint is not made again in a bigger form.
-                let mut ms = Vec::new();
-                flatten_union(&[Ty::Union(h.to_vec()), r.clone()], &mut ms);
-                let mut out: Vec<Ty> = Vec::new();
-                for m in ms {
-                    if !out.contains(&m) {
-                        out.push(m);
+                Ty::Con(..) | Ty::Fn(_) => match h.iter().find(|m| m.head() == a.head()) {
+                    Some(m) => {
+                        let m = m.clone();
+                        self.constrain_in(a, &m, env);
                     }
+                    None => self.constrain_in(a, r, env),
+                },
+                _ => {
+                    // `H | R`, flat and with no member twice, so that the same
+                    // constraint is not made again in a bigger form.
+                    let mut ms = Vec::new();
+                    flatten_union(&[Ty::Union(h.to_vec()), r.clone()], &mut ms);
+                    let mut out: Vec<Ty> = Vec::new();
+                    for m in ms {
+                        if !out.contains(&m) {
+                            out.push(m);
+                        }
+                    }
+                    self.constrain_in(a, &Ty::Union(out), env);
                 }
-                self.constrain_in(a, &Ty::Union(out), env);
             }
         }
     }
@@ -1310,145 +1362,378 @@ impl Solver {
         env: Mode,
         cache: &mut HashMap<(V, Pol, Mode), V>,
     ) -> Ty {
-        let env = env.max(self.mode(t));
-        self.observe_type(t);
-        if self.level_of(t) <= level {
-            return t.clone();
+        enum Task {
+            Visit(Ty, Pol, Mode),
+            Handled(V, V, Pol, Mode, usize),
+            Lower(V, V, Pol, Mode, usize, bool),
+            Upper(V, usize, bool),
+            Con(Head, super::lits::ValueSet, usize),
+            Fn(Vec<Option<String>>),
+            Union(usize, Mode),
+            Inter(usize),
+            Diff(usize),
+            Both,
         }
-        match t {
-            Ty::Var(v) => {
-                if let Some(nv) = cache.get(&(*v, pol, env)) {
-                    return Ty::Var(*nv);
-                }
-                let nv = self.fresh_at(level);
-                self.vars[nv.0 as usize].input = self.var(*v).input;
-                self.vars[nv.0 as usize].row = self.var(*v).row;
-                self.vars[nv.0 as usize].difference = self.var(*v).difference;
-                cache.insert((*v, pol, env), nv);
-                let handled = self.var(*v).handled.clone();
-                let handled = handled
-                    .iter()
-                    .map(|h| self.extrude(h, Pol::Both, level, Mode::Value, cache))
-                    .collect();
-                self.var_mut(nv).handled = handled;
-                if pol != Pol::Neg {
-                    self.var_mut(*v).upper.push(Ty::Var(nv));
-                    self.var_mut(nv).from.push(*v);
-                    let lower = self.var(*v).lower.clone();
-                    let lower = lower
-                        .iter()
-                        .map(|b| self.extrude(b, Pol::Pos, level, env, cache))
-                        .collect();
-                    self.set_lower(nv, lower);
-                }
-                if pol != Pol::Pos {
-                    self.var_mut(*v).lower.push(Ty::Var(nv));
-                    self.var_mut(nv).into.push(*v);
-                    let upper = self.var(*v).upper.clone();
-                    let upper = upper
-                        .iter()
-                        .filter(|b| **b != Ty::Var(nv))
-                        .map(|b| self.extrude(b, Pol::Neg, level, env, cache))
-                        .collect();
-                    self.set_upper(nv, upper);
-                }
-                Ty::Var(nv)
-            }
-            Ty::Con(h, values, args) => {
-                // §4.5 rule 4: service arguments stay equal across levels,
-                // independently of their ordinary value variance. Inside
-                // an argument, ordinary type rules apply again.
-                Ty::Con(
-                    *h,
-                    values.clone(),
-                    args.iter()
-                        .zip(self.variances(*h, args.len()))
-                        .zip(self.rows(*h, args.len()))
-                        .map(|((a, variance), row)| {
-                            self.extrude(
-                                a,
-                                if env != Mode::Value {
-                                    Pol::Both
-                                } else {
-                                    pol.by(variance)
-                                },
-                                level,
-                                row,
-                                cache,
-                            )
-                        })
-                        .collect(),
-                )
-            }
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(label, p)| {
-                        (
-                            label.clone(),
-                            self.extrude(p, pol.flip(), level, Mode::Value, cache),
-                        )
-                    })
-                    .collect(),
-                ret: self.extrude(&f.ret, pol, level, Mode::Value, cache),
-                err: self.extrude(&f.err, pol, level, Mode::Row, cache),
-                env: self.extrude(&f.env, pol, level, Mode::Env, cache),
-            })),
-            Ty::Union(ms) if env != Mode::Value || self.is_row(t) => {
-                let mode = env.max(self.mode(t));
-                let ms = ms
-                    .iter()
-                    .map(|m| self.extrude(m, pol, level, mode, cache))
-                    .collect();
-                self.union_mode(ms, mode)
-            }
-            _ => self.map_children(t, pol, &mut |s, x, p| s.extrude(x, p, level, env, cache)),
+        fn take(out: &mut Vec<Ty>, count: usize) -> Vec<Ty> {
+            let start = out
+                .len()
+                .checked_sub(count)
+                .expect("extrude result stack underflow");
+            out.split_off(start)
         }
+        fn schedule(tasks: &mut Vec<Task>, children: Vec<(Ty, Pol, Mode)>) {
+            tasks.extend(
+                children
+                    .into_iter()
+                    .rev()
+                    .map(|(t, p, m)| Task::Visit(t, p, m)),
+            );
+        }
+        let mut tasks = vec![Task::Visit(t.clone(), pol, env)];
+        let mut out = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t, pol, env) => {
+                    let env = env.max(self.mode(&t));
+                    self.observe_type(&t);
+                    if self.level_of(&t) <= level {
+                        out.push(t);
+                        continue;
+                    }
+                    match t.into_parts() {
+                        TyParts::Var(v) => {
+                            if let Some(nv) = cache.get(&(v, pol, env)) {
+                                out.push(Ty::Var(*nv));
+                                continue;
+                            }
+                            let nv = self.fresh_at(level);
+                            self.vars[nv.0 as usize].input = self.var(v).input;
+                            self.vars[nv.0 as usize].row = self.var(v).row;
+                            self.vars[nv.0 as usize].difference = self.var(v).difference;
+                            cache.insert((v, pol, env), nv);
+                            let handled = self.var(v).handled.clone();
+                            tasks.push(Task::Handled(v, nv, pol, env, handled.len()));
+                            schedule(
+                                &mut tasks,
+                                handled
+                                    .into_iter()
+                                    .map(|t| (t, Pol::Both, Mode::Value))
+                                    .collect(),
+                            );
+                        }
+                        TyParts::Con(h, values, args) => {
+                            let n = args.len();
+                            let variances = self.variances(h, n);
+                            let rows = self.rows(h, n);
+                            let children = args
+                                .into_iter()
+                                .zip(variances)
+                                .zip(rows)
+                                .map(|((t, v), row)| {
+                                    (
+                                        t,
+                                        if env != Mode::Value {
+                                            Pol::Both
+                                        } else {
+                                            pol.by(v)
+                                        },
+                                        row,
+                                    )
+                                })
+                                .collect();
+                            tasks.push(Task::Con(h, values, n));
+                            schedule(&mut tasks, children);
+                        }
+                        TyParts::Fn(f) => {
+                            let f = *f;
+                            let mut labels = Vec::with_capacity(f.params.len());
+                            let mut children = Vec::with_capacity(f.params.len() + 3);
+                            for (label, t) in f.params {
+                                labels.push(label);
+                                children.push((t, pol.flip(), Mode::Value));
+                            }
+                            children.extend([
+                                (f.ret, pol, Mode::Value),
+                                (f.err, pol, Mode::Row),
+                                (f.env, pol, Mode::Env),
+                            ]);
+                            tasks.push(Task::Fn(labels));
+                            schedule(&mut tasks, children);
+                        }
+                        TyParts::Union(ms) => {
+                            tasks.push(Task::Union(ms.len(), env));
+                            schedule(&mut tasks, ms.into_iter().map(|t| (t, pol, env)).collect());
+                        }
+                        TyParts::Inter(ms) => {
+                            tasks.push(Task::Inter(ms.len()));
+                            schedule(&mut tasks, ms.into_iter().map(|t| (t, pol, env)).collect());
+                        }
+                        TyParts::Diff(a, hs) => {
+                            tasks.push(Task::Diff(hs.len()));
+                            schedule(
+                                &mut tasks,
+                                hs.into_iter().map(|t| (t, Pol::Both, env)).collect(),
+                            );
+                            tasks.push(Task::Visit(*a, pol, env));
+                        }
+                        TyParts::Both(a, b) => {
+                            tasks.push(Task::Both);
+                            tasks.push(Task::Visit(*b, Pol::Neg, env));
+                            tasks.push(Task::Visit(*a, Pol::Pos, env));
+                        }
+                        TyParts::Never => out.push(Ty::Never),
+                        TyParts::Top => out.push(Ty::Top),
+                    }
+                }
+                Task::Handled(v, nv, pol, env, n) => {
+                    self.var_mut(nv).handled = take(&mut out, n);
+                    let lower = if pol != Pol::Neg {
+                        self.var_mut(v).upper.push(Ty::Var(nv));
+                        self.var_mut(nv).from.push(v);
+                        self.var(v).lower.clone()
+                    } else {
+                        Vec::new()
+                    };
+                    tasks.push(Task::Lower(v, nv, pol, env, lower.len(), pol != Pol::Neg));
+                    schedule(
+                        &mut tasks,
+                        lower.into_iter().map(|t| (t, Pol::Pos, env)).collect(),
+                    );
+                }
+                Task::Lower(v, nv, pol, env, n, set) => {
+                    let lower = take(&mut out, n);
+                    if set {
+                        self.set_lower(nv, lower);
+                    }
+                    let upper = if pol != Pol::Pos {
+                        self.var_mut(v).lower.push(Ty::Var(nv));
+                        self.var_mut(nv).into.push(v);
+                        self.var(v)
+                            .upper
+                            .iter()
+                            .filter(|b| **b != Ty::Var(nv))
+                            .cloned()
+                            .collect::<Vec<_>>()
+                    } else {
+                        Vec::new()
+                    };
+                    tasks.push(Task::Upper(nv, upper.len(), pol != Pol::Pos));
+                    schedule(
+                        &mut tasks,
+                        upper.into_iter().map(|t| (t, Pol::Neg, env)).collect(),
+                    );
+                }
+                Task::Upper(nv, n, set) => {
+                    let upper = take(&mut out, n);
+                    if set {
+                        self.set_upper(nv, upper);
+                    }
+                    out.push(Ty::Var(nv));
+                }
+                Task::Con(h, values, n) => {
+                    let args = take(&mut out, n);
+                    out.push(Ty::Con(h, values, args));
+                }
+                Task::Fn(labels) => {
+                    let mut parts = take(&mut out, labels.len() + 3).into_iter();
+                    let params = labels
+                        .into_iter()
+                        .map(|label| (label, parts.next().unwrap()))
+                        .collect();
+                    out.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: parts.next().unwrap(),
+                        err: parts.next().unwrap(),
+                        env: parts.next().unwrap(),
+                    })));
+                }
+                Task::Union(n, env) => {
+                    let ms = take(&mut out, n);
+                    out.push(if env == Mode::Value {
+                        Ty::Union(ms)
+                    } else {
+                        self.union_mode(ms, env)
+                    });
+                }
+                Task::Inter(n) => {
+                    let ms = take(&mut out, n);
+                    out.push(Ty::Inter(ms));
+                }
+                Task::Diff(n) => {
+                    let mut parts = take(&mut out, n + 1).into_iter();
+                    let a = parts.next().unwrap();
+                    out.push(Ty::Diff(Box::new(a), parts.collect()));
+                }
+                Task::Both => {
+                    let mut parts = take(&mut out, 2).into_iter();
+                    out.push(Ty::Both(
+                        Box::new(parts.next().unwrap()),
+                        Box::new(parts.next().unwrap()),
+                    ));
+                }
+            }
+        }
+        assert_eq!(out.len(), 1, "extrude must produce exactly one type");
+        out.pop().unwrap()
     }
 
     /// Instantiates a type scheme: copies the variables deeper than `above`
     /// to new variables at the current level, with their bounds.
     pub fn freshen(&mut self, t: &Ty, above: u32, map: &mut StdHashMap<V, V>) -> Ty {
+        // Solver-variable bounds form a graph. Insert the fresh variable before
+        // scheduling its obligations so shared and cyclic bounds keep one
+        // identity, just as in Simple-sub's freshenAbove.
+        enum Task {
+            Visit(Ty),
+            Handled(V, V, usize),
+            Bounds(V, usize, usize),
+            Con(Head, super::lits::ValueSet, usize),
+            Fn(Vec<Option<String>>),
+            Union(usize, Mode),
+            Inter(usize),
+            Diff(usize),
+            Both,
+        }
+        fn take(out: &mut Vec<Ty>, count: usize) -> Vec<Ty> {
+            let start = out
+                .len()
+                .checked_sub(count)
+                .expect("freshen result stack underflow");
+            out.split_off(start)
+        }
+        fn schedule(tasks: &mut Vec<Task>, children: Vec<Ty>) {
+            tasks.extend(children.into_iter().rev().map(Task::Visit));
+        }
         if self.level_of(t) <= above {
             return t.clone();
         }
-        match t {
-            Ty::Var(v) => {
-                if let Some(nv) = map.get(v) {
-                    return Ty::Var(*nv);
+        let mut tasks = vec![Task::Visit(t.clone())];
+        let mut out = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t) => {
+                    if self.level_of(&t) <= above {
+                        out.push(t);
+                        continue;
+                    }
+                    let row = if matches!(t, Ty::Union(_)) {
+                        self.mode(&t)
+                    } else {
+                        Mode::Value
+                    };
+                    match t.into_parts() {
+                        TyParts::Var(v) if self.var(v).level > above => {
+                            if let Some(nv) = map.get(&v) {
+                                out.push(Ty::Var(*nv));
+                                continue;
+                            }
+                            let nv = self.fresh_at(self.level);
+                            map.insert(v, nv);
+                            self.var_mut(nv).row = self.var(v).row;
+                            self.var_mut(nv).difference = self.var(v).difference;
+                            let handled = self.var(v).handled.clone();
+                            tasks.push(Task::Handled(v, nv, handled.len()));
+                            schedule(&mut tasks, handled);
+                        }
+                        TyParts::Var(v) => out.push(Ty::Var(v)),
+                        TyParts::Never => out.push(Ty::Never),
+                        TyParts::Top => out.push(Ty::Top),
+                        TyParts::Con(h, values, args) => {
+                            tasks.push(Task::Con(h, values, args.len()));
+                            schedule(&mut tasks, args);
+                        }
+                        TyParts::Fn(f) => {
+                            let f = *f;
+                            let (labels, mut params): (Vec<_>, Vec<_>) =
+                                f.params.into_iter().unzip();
+                            params.extend([f.ret, f.err, f.env]);
+                            tasks.push(Task::Fn(labels));
+                            schedule(&mut tasks, params);
+                        }
+                        TyParts::Union(ms) => {
+                            tasks.push(Task::Union(ms.len(), row));
+                            schedule(&mut tasks, ms);
+                        }
+                        TyParts::Inter(ms) => {
+                            tasks.push(Task::Inter(ms.len()));
+                            schedule(&mut tasks, ms);
+                        }
+                        TyParts::Diff(a, ms) => {
+                            tasks.push(Task::Diff(ms.len()));
+                            schedule(&mut tasks, ms);
+                            tasks.push(Task::Visit(*a));
+                        }
+                        TyParts::Both(a, b) => {
+                            tasks.push(Task::Both);
+                            tasks.push(Task::Visit(*b));
+                            tasks.push(Task::Visit(*a));
+                        }
+                    }
                 }
-                let nv = self.fresh_at(self.level);
-                map.insert(*v, nv);
-                self.var_mut(nv).row = self.var(*v).row;
-                self.var_mut(nv).difference = self.var(*v).difference;
-                let handled = self.var(*v).handled.clone();
-                let handled = handled
-                    .iter()
-                    .map(|h| self.freshen(h, above, map))
-                    .collect();
-                self.var_mut(nv).handled = handled;
-                let (lower, upper) = (self.var(*v).lower.clone(), self.var(*v).upper.clone());
-                let lower = lower.iter().map(|b| self.freshen(b, above, map)).collect();
-                let upper = upper.iter().map(|b| self.freshen(b, above, map)).collect();
-                self.set_lower(nv, lower);
-                self.set_upper(nv, upper);
-                Ty::Var(nv)
+                Task::Handled(v, nv, n) => {
+                    self.var_mut(nv).handled = take(&mut out, n);
+                    let (lower, upper) = (self.var(v).lower.clone(), self.var(v).upper.clone());
+                    tasks.push(Task::Bounds(nv, lower.len(), upper.len()));
+                    schedule(&mut tasks, upper);
+                    schedule(&mut tasks, lower);
+                }
+                Task::Bounds(nv, nl, nu) => {
+                    let mut bounds = take(&mut out, nl + nu);
+                    let upper = bounds.split_off(nl);
+                    self.set_lower(nv, bounds);
+                    self.set_upper(nv, upper);
+                    out.push(Ty::Var(nv));
+                }
+                Task::Con(h, values, n) => {
+                    let args = take(&mut out, n);
+                    out.push(Ty::Con(h, values, args));
+                }
+                Task::Fn(labels) => {
+                    let mut parts = take(&mut out, labels.len() + 3).into_iter();
+                    let params = labels
+                        .into_iter()
+                        .map(|label| (label, parts.next().unwrap()))
+                        .collect();
+                    out.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: parts.next().unwrap(),
+                        err: parts.next().unwrap(),
+                        env: parts.next().unwrap(),
+                    })));
+                }
+                Task::Union(n, mode) => {
+                    let ms = take(&mut out, n);
+                    out.push(if mode == Mode::Value {
+                        Ty::Union(ms)
+                    } else {
+                        self.union_mode(ms, mode)
+                    });
+                }
+                Task::Inter(n) => {
+                    let ms = take(&mut out, n);
+                    out.push(Ty::Inter(ms));
+                }
+                Task::Diff(n) => {
+                    let mut parts = take(&mut out, n + 1).into_iter();
+                    let a = parts.next().unwrap();
+                    out.push(Ty::Diff(Box::new(a), parts.collect()));
+                }
+                Task::Both => {
+                    let mut parts = take(&mut out, 2).into_iter();
+                    out.push(Ty::Both(
+                        Box::new(parts.next().unwrap()),
+                        Box::new(parts.next().unwrap()),
+                    ));
+                }
             }
-            Ty::Union(ms) if self.is_row(t) => {
-                // Rebuild the row's collector for these fresh variables.
-                // Otherwise generalization can leave its only receiver
-                // behind, losing comparisons of forms instantiated later.
-                let mode = self.mode(t);
-                let ms = ms.iter().map(|m| self.freshen(m, above, map)).collect();
-                self.union_mode(ms, mode)
-            }
-            _ => self.map_children(t, Pol::Pos, &mut |s, x, _| s.freshen(x, above, map)),
         }
+        assert_eq!(out.len(), 1, "freshen must produce exactly one type");
+        out.pop().unwrap()
     }
 
     /// `t` with each type directly inside it changed by `f`, which is given
     /// the polarity of the place.
+    #[cfg(test)]
     pub fn map_children(
         &mut self,
         t: &Ty,
@@ -1592,9 +1877,9 @@ impl Solver {
     fn inter_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         for m in ms {
-            match m {
-                Ty::Inter(inner) => flat.extend(inner),
-                m => flat.push(m),
+            match m.into_parts() {
+                TyParts::Inter(inner) => flat.extend(inner),
+                m => flat.push(m.into()),
             }
         }
         // `{ A | B } & C` is `A & C | B & C` (§4.4), for a union whose
@@ -1605,7 +1890,7 @@ impl Solver {
             _ => false,
         }) && flat.len() > 1
         {
-            let Ty::Union(xs) = flat.remove(i) else {
+            let TyParts::Union(xs) = flat.remove(i).into_parts() else {
                 unreachable!()
             };
             let parts = xs
@@ -1650,8 +1935,8 @@ impl Solver {
     /// and by intersection when not. In an environment (`env`), the
     /// arguments must be equal (§9.2).
     fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
-        match (a, b) {
-            (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
+        match (a.into_parts(), b.into_parts()) {
+            (TyParts::Con(h, values, xs), TyParts::Con(_, other, ys)) if xs.len() == ys.len() => {
                 if env {
                     if values != other {
                         self.fail(
@@ -1684,7 +1969,7 @@ impl Solver {
                     .collect();
                 Ty::Con(h, values, args)
             }
-            (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+            (TyParts::Fn(f), TyParts::Fn(g)) if f.params.len() == g.params.len() => {
                 let f = *f;
                 let g = *g;
                 let params = f
@@ -1714,6 +1999,7 @@ impl Solver {
                 }))
             }
             (a, b) => {
+                let (a, b) = (Ty::from(a), Ty::from(b));
                 self.fail(FailKind::Arity, &a, &b);
                 a
             }
@@ -1746,127 +2032,236 @@ impl Solver {
     }
 
     fn diff_mode(&mut self, a: Ty, h: Vec<Ty>, mode: Mode) -> Ty {
-        let mode = mode.max(self.mode(&a));
-        let env = mode != Mode::Value;
-        let mut hs = Vec::new();
-        flatten_union(&h, &mut hs);
-        hs.retain(|m| !matches!(m, Ty::Never));
-        if hs.is_empty() {
-            return a;
+        enum Task {
+            Visit(Ty, Vec<Ty>, Mode),
+            Union(usize, bool),
         }
-        match a {
-            Ty::Never => Ty::Never,
-            Ty::Union(ms) => {
-                let parts = ms
-                    .into_iter()
-                    .map(|m| self.diff_mode(m, hs.clone(), mode))
-                    .collect();
-                self.union_in(parts, env)
-            }
-            Ty::Con(..) if a.scalar().is_some() && mode != Mode::Env => {
-                let sets: Vec<_> = hs
-                    .iter()
-                    .filter(|m| m.head() == a.head())
-                    .map(|m| m.values().clone())
-                    .collect();
-                if sets.is_empty() {
-                    a
-                } else {
-                    let excluded = super::lits::ValueSet::join_all(&sets);
-                    a.with_values(a.values().minus(&excluded))
+        let mut tasks = vec![Task::Visit(a, h, mode)];
+        let mut results = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Union(n, env) => {
+                    let parts = results.split_off(results.len() - n);
+                    results.push(self.union_in(parts, env));
                 }
-            }
-            Ty::Con(..) | Ty::Fn(_) => match hs.iter().find(|m| m.head() == a.head()) {
-                Some(m) => {
-                    let m = m.clone();
-                    if env {
-                        self.equal(&a, &m, FailKind::EnvForms);
-                    } else {
-                        self.constrain(&a, &m);
+                Task::Visit(a, h, mode) => {
+                    let mode = mode.max(self.mode(&a));
+                    let env = mode != Mode::Value;
+                    let mut hs = Vec::new();
+                    flatten_union(&h, &mut hs);
+                    hs.retain(|m| !matches!(m, Ty::Never));
+                    if hs.is_empty() {
+                        results.push(a);
+                        continue;
                     }
-                    Ty::Never
-                }
-                None => a,
-            },
-            Ty::Diff(b, mut h0) => {
-                self.diff_bound_mode(&b, &hs, mode);
-                for m in hs {
-                    if !h0.contains(&m) {
-                        h0.push(m);
+                    if matches!(a, Ty::Union(_)) {
+                        let TyParts::Union(ms) = a.into_parts() else {
+                            unreachable!()
+                        };
+                        tasks.push(Task::Union(ms.len(), env));
+                        tasks.extend(
+                            ms.into_iter()
+                                .rev()
+                                .map(|m| Task::Visit(m, hs.clone(), mode)),
+                        );
+                        continue;
                     }
+                    let result =
+                        if matches!(a, Ty::Con(..)) && a.scalar().is_some() && mode != Mode::Env {
+                            let sets: Vec<_> = hs
+                                .iter()
+                                .filter(|m| m.head() == a.head())
+                                .map(|m| m.values().clone())
+                                .collect();
+                            if sets.is_empty() {
+                                a
+                            } else {
+                                let excluded = super::lits::ValueSet::join_all(&sets);
+                                a.with_values(a.values().minus(&excluded))
+                            }
+                        } else if matches!(a, Ty::Con(..) | Ty::Fn(_)) {
+                            match hs.iter().find(|m| m.head() == a.head()) {
+                                Some(m) => {
+                                    let m = m.clone();
+                                    if env {
+                                        self.equal(&a, &m, FailKind::EnvForms);
+                                    } else {
+                                        self.constrain(&a, &m);
+                                    }
+                                    Ty::Never
+                                }
+                                None => a,
+                            }
+                        } else {
+                            match a.into_parts() {
+                                TyParts::Never => Ty::Never,
+                                TyParts::Diff(b, mut h0) => {
+                                    self.diff_bound_mode(&b, &hs, mode);
+                                    for m in hs {
+                                        if !h0.contains(&m) {
+                                            h0.push(m);
+                                        }
+                                    }
+                                    Ty::Diff(b, h0)
+                                }
+                                a => {
+                                    let a = Ty::from(a);
+                                    self.diff_bound_mode(&a, &hs, mode);
+                                    Ty::Diff(Box::new(a), hs)
+                                }
+                            }
+                        };
+                    results.push(result);
                 }
-                Ty::Diff(b, h0)
-            }
-            a => {
-                self.diff_bound_mode(&a, &hs, mode);
-                Ty::Diff(Box::new(a), hs)
             }
         }
+        assert_eq!(results.len(), 1, "difference result stack");
+        results.pop().unwrap()
     }
 
     /// Normalize closed or open type algebra without losing the row
     /// mode of constructor arguments or function effects.
     pub fn normalize_mode(&mut self, t: Ty, mode: Mode) -> Ty {
-        let mode = mode.max(self.mode(&t));
-        match t {
-            Ty::Con(h, values, args) => {
-                let modes = self.rows(h, args.len());
-                Ty::Con(
-                    h,
-                    values,
-                    args.into_iter()
-                        .zip(modes)
-                        .map(|(t, mode)| self.normalize_mode(t, mode))
-                        .collect(),
-                )
-            }
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .into_iter()
-                    .map(|(n, t)| (n, self.normalize_mode(t, Mode::Value)))
-                    .collect(),
-                ret: self.normalize_mode(f.ret, Mode::Value),
-                err: self.normalize_mode(f.err, Mode::Row),
-                env: self.normalize_mode(f.env, Mode::Env),
-            })),
-            Ty::Union(ms) => {
-                let ms = ms
-                    .into_iter()
-                    .map(|t| self.normalize_mode(t, mode))
-                    .collect();
-                self.union_mode(ms, mode)
-            }
-            Ty::Inter(ms) => {
-                let ms: Vec<_> = ms
-                    .into_iter()
-                    .map(|t| self.normalize_mode(t, mode))
-                    .collect();
-                let scalar = ms.iter().any(|t| t.scalar().is_some());
-                self.inter_in(ms, mode != Mode::Value && !(mode == Mode::Row && scalar))
-            }
-            Ty::Diff(t, hs) => {
-                let t = self.normalize_mode(*t, mode);
-                let hs = hs
-                    .into_iter()
-                    .map(|t| self.normalize_mode(t, mode))
-                    .collect();
-                self.diff_mode(t, hs, mode)
-            }
-            Ty::Both(a, b) => Ty::Both(
-                Box::new(self.normalize_mode(*a, mode)),
-                Box::new(self.normalize_mode(*b, mode)),
-            ),
-            t => t,
+        enum Task {
+            Visit(Ty, Mode),
+            Con(Head, super::lits::ValueSet, usize),
+            Fn(Vec<Option<String>>),
+            Union(usize, Mode),
+            Inter(usize, Mode),
+            Diff(usize, Mode),
+            Both,
         }
+        let mut tasks = vec![Task::Visit(t, mode)];
+        let mut results = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t, mode) => {
+                    let mode = mode.max(self.mode(&t));
+                    match t.into_parts() {
+                        TyParts::Con(h, values, args) => {
+                            let modes = self.rows(h, args.len());
+                            tasks.push(Task::Con(h, values, args.len()));
+                            let children: Vec<_> = args.into_iter().zip(modes).collect();
+                            tasks
+                                .extend(children.into_iter().rev().map(|(t, m)| Task::Visit(t, m)));
+                        }
+                        TyParts::Fn(f) => {
+                            let FnTy {
+                                params,
+                                ret,
+                                err,
+                                env,
+                            } = *f;
+                            let mut names = Vec::with_capacity(params.len());
+                            let mut children = Vec::with_capacity(params.len() + 3);
+                            for (n, t) in params {
+                                names.push(n);
+                                children.push((t, Mode::Value));
+                            }
+                            children.extend([
+                                (ret, Mode::Value),
+                                (err, Mode::Row),
+                                (env, Mode::Env),
+                            ]);
+                            tasks.push(Task::Fn(names));
+                            tasks
+                                .extend(children.into_iter().rev().map(|(t, m)| Task::Visit(t, m)));
+                        }
+                        TyParts::Union(ms) => {
+                            tasks.push(Task::Union(ms.len(), mode));
+                            tasks.extend(ms.into_iter().rev().map(|t| Task::Visit(t, mode)));
+                        }
+                        TyParts::Inter(ms) => {
+                            tasks.push(Task::Inter(ms.len(), mode));
+                            tasks.extend(ms.into_iter().rev().map(|t| Task::Visit(t, mode)));
+                        }
+                        TyParts::Diff(t, hs) => {
+                            tasks.push(Task::Diff(hs.len(), mode));
+                            tasks.extend(hs.into_iter().rev().map(|t| Task::Visit(t, mode)));
+                            tasks.push(Task::Visit(*t, mode));
+                        }
+                        TyParts::Both(a, b) => {
+                            tasks.push(Task::Both);
+                            tasks.push(Task::Visit(*b, mode));
+                            tasks.push(Task::Visit(*a, mode));
+                        }
+                        t => results.push(t.into()),
+                    }
+                }
+                Task::Con(h, values, n) => {
+                    let args = results.split_off(results.len() - n);
+                    results.push(Ty::Con(h, values, args));
+                }
+                Task::Fn(names) => {
+                    let mut children = results
+                        .split_off(results.len() - names.len() - 3)
+                        .into_iter();
+                    let params = names
+                        .into_iter()
+                        .map(|n| (n, children.next().expect("normalized parameter")))
+                        .collect();
+                    results.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: children.next().expect("normalized return"),
+                        err: children.next().expect("normalized error"),
+                        env: children.next().expect("normalized environment"),
+                    })));
+                }
+                Task::Union(n, mode) => {
+                    let ms = results.split_off(results.len() - n);
+                    results.push(self.union_mode(ms, mode));
+                }
+                Task::Inter(n, mode) => {
+                    let ms = results.split_off(results.len() - n);
+                    let scalar = ms.iter().any(|t| t.scalar().is_some());
+                    results.push(
+                        self.inter_in(ms, mode != Mode::Value && !(mode == Mode::Row && scalar)),
+                    );
+                }
+                Task::Diff(n, mode) => {
+                    let mut values = results.split_off(results.len() - n - 1).into_iter();
+                    let t = values.next().expect("normalized difference subject");
+                    results.push(self.diff_mode(t, values.collect(), mode));
+                }
+                Task::Both => {
+                    let b = results.pop().expect("normalized right side");
+                    let a = results.pop().expect("normalized left side");
+                    results.push(Ty::Both(Box::new(a), Box::new(b)));
+                }
+            }
+        }
+        assert_eq!(results.len(), 1, "normalization result stack");
+        results.pop().unwrap()
     }
 
     /// `t` with each `Top` in it changed to a new variable at `level`.
     pub fn no_top(&mut self, t: &Ty, level: u32) -> Ty {
-        match t {
-            Ty::Top => Ty::Var(self.fresh_at(level)),
-            _ => self.map_children(t, Pol::Pos, &mut |s, x, _| s.no_top(x, level)),
+        let mut result = t.clone();
+        let mut pending = vec![&mut result];
+        while let Some(t) = pending.pop() {
+            match t {
+                Ty::Top => *t = Ty::Var(self.fresh_at(level)),
+                Ty::Con(_, _, args) | Ty::Union(args) | Ty::Inter(args) => {
+                    pending.extend(args.iter_mut().rev());
+                }
+                Ty::Fn(f) => {
+                    pending.push(&mut f.env);
+                    pending.push(&mut f.err);
+                    pending.push(&mut f.ret);
+                    pending.extend(f.params.iter_mut().rev().map(|(_, p)| p));
+                }
+                Ty::Diff(t, hs) => {
+                    pending.extend(hs.iter_mut().rev());
+                    pending.push(t);
+                }
+                Ty::Both(a, b) => {
+                    pending.push(b);
+                    pending.push(a);
+                }
+                Ty::Var(_) | Ty::Never => {}
+            }
         }
+        result
     }
 
     /// §4.4: in `a - H`, a value of `a` whose type constructor is in `H`
@@ -2273,62 +2668,86 @@ fn edge_vars(s: &Solver, (v, p): (V, bool)) -> Vec<(V, bool, bool)> {
 /// polarity and whether it is inside a type constructor, as coalescing
 /// goes into them.
 fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
-    match t {
-        Ty::Var(v) => out.push((*v, pos, con)),
-        Ty::Con(h, _, args) => {
-            let vs = s.variances(*h, args.len());
-            for ((a, v), row) in args.iter().zip(vs).zip(s.rows(*h, args.len())) {
-                if row != Mode::Value {
-                    env_vars(s, a, pos, true, out);
-                    continue;
-                }
-                match v {
-                    Variance::Co | Variance::Bi => bound_vars(s, a, pos, true, out),
-                    Variance::Contra => bound_vars(s, a, !pos, true, out),
-                    Variance::Inv => {
-                        bound_vars(s, a, pos, true, out);
-                        bound_vars(s, a, !pos, true, out);
-                    }
-                }
-            }
-        }
-        Ty::Fn(f) => {
-            for p in &f.params {
-                bound_vars(s, &p.1, !pos, true, out);
-            }
-            bound_vars(s, &f.ret, pos, true, out);
-            env_vars(s, &f.err, pos, true, out);
-            env_vars(s, &f.env, pos, true, out);
-        }
-        Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| bound_vars(s, a, pos, con, out)),
-        Ty::Diff(a, h) => {
-            bound_vars(s, a, pos, con, out);
-            h.iter().for_each(|x| bound_vars(s, x, pos, con, out));
-        }
-        Ty::Both(a, b) => {
-            bound_vars(s, a, true, con, out);
-            bound_vars(s, b, false, con, out);
-        }
-        Ty::Never | Ty::Top => {}
-    }
+    collect_vars(s, t, pos, con, false, out);
 }
 
 /// `bound_vars` for an environment: the arguments of its members are on
 /// both sides.
 fn env_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
-    match t {
-        Ty::Con(_, _, args) => {
-            for a in args {
-                bound_vars(s, a, true, true, out);
-                bound_vars(s, a, false, true, out);
+    collect_vars(s, t, pos, con, true, out);
+}
+
+fn collect_vars(
+    s: &Solver,
+    t: &Ty,
+    pos: bool,
+    con: bool,
+    env: bool,
+    out: &mut Vec<(V, bool, bool)>,
+) {
+    let mut pending = vec![(t, pos, con, env)];
+    while let Some((t, pos, con, env)) = pending.pop() {
+        if env {
+            match t {
+                Ty::Con(_, _, args) => {
+                    for a in args.iter().rev() {
+                        pending.push((a, false, true, false));
+                        pending.push((a, true, true, false));
+                    }
+                }
+                Ty::Union(ms) | Ty::Inter(ms) => {
+                    pending.extend(ms.iter().rev().map(|a| (a, pos, con, true)))
+                }
+                Ty::Diff(a, hs) => {
+                    pending.extend(hs.iter().rev().map(|h| (h, pos, true, false)));
+                    pending.push((a, pos, con, true));
+                }
+                _ => pending.push((t, pos, con, false)),
             }
+            continue;
         }
-        Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| env_vars(s, a, pos, con, out)),
-        Ty::Diff(a, h) => {
-            env_vars(s, a, pos, con, out);
-            h.iter().for_each(|x| bound_vars(s, x, pos, true, out));
+        match t {
+            Ty::Var(v) => out.push((*v, pos, con)),
+            Ty::Con(h, _, args) => {
+                let children: Vec<_> = args
+                    .iter()
+                    .zip(s.variances(*h, args.len()))
+                    .zip(s.rows(*h, args.len()))
+                    .collect();
+                for ((a, variance), row) in children.into_iter().rev() {
+                    if row != Mode::Value {
+                        pending.push((a, pos, true, true));
+                    } else {
+                        match variance {
+                            Variance::Co | Variance::Bi => pending.push((a, pos, true, false)),
+                            Variance::Contra => pending.push((a, !pos, true, false)),
+                            Variance::Inv => {
+                                pending.push((a, !pos, true, false));
+                                pending.push((a, pos, true, false));
+                            }
+                        }
+                    }
+                }
+            }
+            Ty::Fn(f) => {
+                pending.push((&f.env, pos, true, true));
+                pending.push((&f.err, pos, true, true));
+                pending.push((&f.ret, pos, true, false));
+                pending.extend(f.params.iter().rev().map(|(_, p)| (p, !pos, true, false)));
+            }
+            Ty::Union(ms) | Ty::Inter(ms) => {
+                pending.extend(ms.iter().rev().map(|a| (a, pos, con, false)))
+            }
+            Ty::Diff(a, hs) => {
+                pending.extend(hs.iter().rev().map(|h| (h, pos, con, false)));
+                pending.push((a, pos, con, false));
+            }
+            Ty::Both(a, b) => {
+                pending.push((b, false, con, false));
+                pending.push((a, true, con, false));
+            }
+            Ty::Never | Ty::Top => {}
         }
-        t => bound_vars(s, t, pos, con, out),
     }
 }
 
@@ -2343,9 +2762,10 @@ fn needs_join(t: &Ty) -> bool {
 }
 
 pub(crate) fn flatten_union(ms: &[Ty], out: &mut Vec<Ty>) {
-    for m in ms {
+    let mut pending: Vec<_> = ms.iter().rev().collect();
+    while let Some(m) = pending.pop() {
         match m {
-            Ty::Union(inner) => flatten_union(inner, out),
+            Ty::Union(inner) => pending.extend(inner.iter().rev()),
             m => out.push(m.clone()),
         }
     }
@@ -2746,5 +3166,567 @@ mod handler_proof_tests {
         assert!(!s.same_form(&a, &list(b)));
         let Ty::Var(v) = a else { unreachable!() };
         assert!(s.occurs(vec![v]));
+    }
+    #[test]
+    fn proof_compares_unordered_rows_and_exact_bounds() {
+        let mut s = Solver::new(StdHashMap::new(), Vec::new());
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        let a = Ty::Union(vec![int.clone(), string.clone()]);
+        let b = Ty::Union(vec![string.clone(), int.clone()]);
+        assert!(s.same_form(&a, &b));
+        assert!(!s.same_form(&a, &Ty::Union(vec![int.clone()])));
+        let v = s.fresh();
+        s.constrain(&int, &v);
+        s.constrain(&v, &int);
+        assert!(s.same_form(&v, &int));
+        assert!(!s.same_form(&v, &string));
+    }
+}
+
+#[cfg(test)]
+mod deep_tree_tests {
+    use super::*;
+
+    fn recursive_vars(
+        s: &Solver,
+        t: &Ty,
+        pos: bool,
+        con: bool,
+        env: bool,
+        out: &mut Vec<(V, bool, bool)>,
+    ) {
+        if env {
+            match t {
+                Ty::Con(_, _, args) => {
+                    for a in args {
+                        recursive_vars(s, a, true, true, false, out);
+                        recursive_vars(s, a, false, true, false, out);
+                    }
+                }
+                Ty::Union(ms) | Ty::Inter(ms) => {
+                    for a in ms {
+                        recursive_vars(s, a, pos, con, true, out);
+                    }
+                }
+                Ty::Diff(a, hs) => {
+                    recursive_vars(s, a, pos, con, true, out);
+                    for h in hs {
+                        recursive_vars(s, h, pos, true, false, out);
+                    }
+                }
+                _ => recursive_vars(s, t, pos, con, false, out),
+            }
+            return;
+        }
+        match t {
+            Ty::Var(v) => out.push((*v, pos, con)),
+            Ty::Con(h, _, args) => {
+                for ((a, variance), row) in args
+                    .iter()
+                    .zip(s.variances(*h, args.len()))
+                    .zip(s.rows(*h, args.len()))
+                {
+                    if row != Mode::Value {
+                        recursive_vars(s, a, pos, true, true, out);
+                        continue;
+                    }
+                    match variance {
+                        Variance::Co | Variance::Bi => recursive_vars(s, a, pos, true, false, out),
+                        Variance::Contra => recursive_vars(s, a, !pos, true, false, out),
+                        Variance::Inv => {
+                            recursive_vars(s, a, pos, true, false, out);
+                            recursive_vars(s, a, !pos, true, false, out);
+                        }
+                    }
+                }
+            }
+            Ty::Fn(f) => {
+                for (_, p) in &f.params {
+                    recursive_vars(s, p, !pos, true, false, out);
+                }
+                recursive_vars(s, &f.ret, pos, true, false, out);
+                recursive_vars(s, &f.err, pos, true, true, out);
+                recursive_vars(s, &f.env, pos, true, true, out);
+            }
+            Ty::Union(ms) | Ty::Inter(ms) => {
+                for a in ms {
+                    recursive_vars(s, a, pos, con, false, out);
+                }
+            }
+            Ty::Diff(a, hs) => {
+                recursive_vars(s, a, pos, con, false, out);
+                for h in hs {
+                    recursive_vars(s, h, pos, con, false, out);
+                }
+            }
+            Ty::Both(a, b) => {
+                recursive_vars(s, a, true, con, false, out);
+                recursive_vars(s, b, false, con, false, out);
+            }
+            Ty::Never | Ty::Top => {}
+        }
+    }
+
+    #[test]
+    fn iterative_bound_walk_preserves_recursive_order_and_polarity() {
+        let s = Solver::new(StdHashMap::new(), Vec::new());
+        let boundary = Ty::named(
+            TypeRef::Builtin(BuiltinType::Boundary),
+            vec![Ty::Var(V(0)), Ty::Var(V(1)), Ty::Var(V(2))],
+        );
+        let t = Ty::Fn(Box::new(FnTy {
+            params: vec![
+                (None, boundary.clone()),
+                (
+                    None,
+                    Ty::Both(Box::new(Ty::Var(V(3))), Box::new(Ty::Var(V(4)))),
+                ),
+            ],
+            ret: Ty::Diff(Box::new(Ty::Var(V(5))), vec![Ty::Var(V(6))]),
+            err: Ty::Union(vec![boundary.clone(), Ty::Var(V(7))]),
+            env: Ty::Diff(Box::new(boundary), vec![Ty::Var(V(8))]),
+        }));
+        for pos in [false, true] {
+            for con in [false, true] {
+                for env in [false, true] {
+                    let (mut actual, mut expected) = (Vec::new(), Vec::new());
+                    collect_vars(&s, &t, pos, con, env, &mut actual);
+                    recursive_vars(&s, &t, pos, con, env, &mut expected);
+                    assert_eq!(actual, expected);
+                }
+            }
+        }
+    }
+
+    fn recursive_extrude(
+        s: &mut Solver,
+        t: &Ty,
+        pol: Pol,
+        level: u32,
+        env: Mode,
+        cache: &mut HashMap<(V, Pol, Mode), V>,
+    ) -> Ty {
+        let env = env.max(s.mode(t));
+        s.observe_type(t);
+        if s.level_of(t) <= level {
+            return t.clone();
+        }
+        match t {
+            Ty::Var(v) => {
+                if let Some(nv) = cache.get(&(*v, pol, env)) {
+                    return Ty::Var(*nv);
+                }
+                let nv = s.fresh_at(level);
+                s.vars[nv.0 as usize].input = s.var(*v).input;
+                s.vars[nv.0 as usize].row = s.var(*v).row;
+                s.vars[nv.0 as usize].difference = s.var(*v).difference;
+                cache.insert((*v, pol, env), nv);
+                let handled = s
+                    .var(*v)
+                    .handled
+                    .clone()
+                    .iter()
+                    .map(|h| recursive_extrude(s, h, Pol::Both, level, Mode::Value, cache))
+                    .collect();
+                s.var_mut(nv).handled = handled;
+                if pol != Pol::Neg {
+                    s.var_mut(*v).upper.push(Ty::Var(nv));
+                    s.var_mut(nv).from.push(*v);
+                    let lower = s
+                        .var(*v)
+                        .lower
+                        .clone()
+                        .iter()
+                        .map(|b| recursive_extrude(s, b, Pol::Pos, level, env, cache))
+                        .collect();
+                    s.set_lower(nv, lower);
+                }
+                if pol != Pol::Pos {
+                    s.var_mut(*v).lower.push(Ty::Var(nv));
+                    s.var_mut(nv).into.push(*v);
+                    let upper = s
+                        .var(*v)
+                        .upper
+                        .clone()
+                        .iter()
+                        .filter(|b| **b != Ty::Var(nv))
+                        .map(|b| recursive_extrude(s, b, Pol::Neg, level, env, cache))
+                        .collect();
+                    s.set_upper(nv, upper);
+                }
+                Ty::Var(nv)
+            }
+            Ty::Con(h, values, args) => {
+                let variance = s.variances(*h, args.len());
+                let rows = s.rows(*h, args.len());
+                Ty::Con(
+                    *h,
+                    values.clone(),
+                    args.iter()
+                        .zip(variance)
+                        .zip(rows)
+                        .map(|((a, v), row)| {
+                            recursive_extrude(
+                                s,
+                                a,
+                                if env != Mode::Value {
+                                    Pol::Both
+                                } else {
+                                    pol.by(v)
+                                },
+                                level,
+                                row,
+                                cache,
+                            )
+                        })
+                        .collect(),
+                )
+            }
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+                params: f
+                    .params
+                    .iter()
+                    .map(|(label, p)| {
+                        (
+                            label.clone(),
+                            recursive_extrude(s, p, pol.flip(), level, Mode::Value, cache),
+                        )
+                    })
+                    .collect(),
+                ret: recursive_extrude(s, &f.ret, pol, level, Mode::Value, cache),
+                err: recursive_extrude(s, &f.err, pol, level, Mode::Row, cache),
+                env: recursive_extrude(s, &f.env, pol, level, Mode::Env, cache),
+            })),
+            Ty::Union(ms) if env != Mode::Value || s.is_row(t) => {
+                let mode = env.max(s.mode(t));
+                let ms = ms
+                    .iter()
+                    .map(|m| recursive_extrude(s, m, pol, level, mode, cache))
+                    .collect();
+                s.union_mode(ms, mode)
+            }
+            _ => s.map_children(t, pol, &mut |s, x, p| {
+                recursive_extrude(s, x, p, level, env, cache)
+            }),
+        }
+    }
+
+    #[test]
+    fn iterative_extrusion_matches_recursive_rule_with_shared_rows() {
+        let mut base = Solver::new(StdHashMap::new(), Vec::new());
+        let a = base.fresh_at(3);
+        let b = base.fresh_at(3);
+        let weak = base.fresh_at(0);
+        base.var_mut(a).row = Mode::Env;
+        base.var_mut(a).difference = true;
+        base.var_mut(a).handled.push(Ty::Var(b));
+        base.var_mut(b).handled.push(Ty::Var(a));
+        base.var_mut(a)
+            .lower
+            .push(Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()));
+        base.var_mut(b).upper.push(Ty::Var(weak));
+        let t = Ty::Fn(Box::new(FnTy {
+            params: vec![(Some("x".into()), Ty::Var(a)), (None, Ty::Var(weak))],
+            ret: Ty::tuple(vec![Ty::Var(a), Ty::Var(b)]),
+            err: Ty::Never,
+            env: Ty::Union(vec![Ty::Var(a), Ty::Var(b)]),
+        }));
+        for pol in [Pol::Pos, Pol::Neg, Pol::Both] {
+            let (mut actual, mut reference) = (base.clone(), base.clone());
+            let (mut am, mut rm) = (HashMap::default(), HashMap::default());
+            let a = actual.extrude(&t, pol, 0, Mode::Value, &mut am);
+            let b = recursive_extrude(&mut reference, &t, pol, 0, Mode::Value, &mut rm);
+            assert_eq!(a, b);
+            assert_eq!(am, rm);
+            assert_eq!(actual, reference);
+        }
+    }
+
+    // The previous recursive rule is an independent oracle on bounded trees;
+    // compare solver state as well as the returned tree and variable map.
+    fn recursive_freshen(s: &mut Solver, t: &Ty, above: u32, map: &mut StdHashMap<V, V>) -> Ty {
+        if s.level_of(t) <= above {
+            return t.clone();
+        }
+        match t {
+            Ty::Var(v) => {
+                if let Some(nv) = map.get(v) {
+                    return Ty::Var(*nv);
+                }
+                let nv = s.fresh_at(s.level);
+                map.insert(*v, nv);
+                s.var_mut(nv).row = s.var(*v).row;
+                s.var_mut(nv).difference = s.var(*v).difference;
+                let handled = s
+                    .var(*v)
+                    .handled
+                    .clone()
+                    .iter()
+                    .map(|h| recursive_freshen(s, h, above, map))
+                    .collect();
+                s.var_mut(nv).handled = handled;
+                let (lower, upper) = (s.var(*v).lower.clone(), s.var(*v).upper.clone());
+                let lower = lower
+                    .iter()
+                    .map(|b| recursive_freshen(s, b, above, map))
+                    .collect();
+                let upper = upper
+                    .iter()
+                    .map(|b| recursive_freshen(s, b, above, map))
+                    .collect();
+                s.set_lower(nv, lower);
+                s.set_upper(nv, upper);
+                Ty::Var(nv)
+            }
+            Ty::Union(ms) if s.is_row(t) => {
+                let mode = s.mode(t);
+                let ms = ms
+                    .iter()
+                    .map(|m| recursive_freshen(s, m, above, map))
+                    .collect();
+                s.union_mode(ms, mode)
+            }
+            _ => s.map_children(t, Pol::Pos, &mut |s, x, _| {
+                recursive_freshen(s, x, above, map)
+            }),
+        }
+    }
+
+    #[test]
+    fn iterative_freshening_matches_recursive_rule_on_shared_row_obligations() {
+        let mut base = Solver::new(StdHashMap::new(), Vec::new());
+        let a = base.fresh_at(3);
+        let b = base.fresh_at(3);
+        let weak = base.fresh_at(0);
+        base.var_mut(a).row = Mode::Env;
+        base.var_mut(a).difference = true;
+        base.var_mut(a).handled.push(Ty::Var(b));
+        base.var_mut(b).handled.push(Ty::Var(a));
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        base.var_mut(a).lower.push(int);
+        base.var_mut(b).upper.push(Ty::Var(weak));
+        base.level = 2;
+        let t = Ty::Fn(Box::new(FnTy {
+            params: vec![(Some("x".into()), Ty::Var(a)), (None, Ty::Var(weak))],
+            ret: Ty::tuple(vec![Ty::Var(a), Ty::Var(b)]),
+            err: Ty::Never,
+            env: Ty::Union(vec![Ty::Var(a), Ty::Var(b)]),
+        }));
+        let (mut actual, mut reference) = (base.clone(), base);
+        let (mut am, mut rm) = (StdHashMap::new(), StdHashMap::new());
+        let a = actual.freshen(&t, 0, &mut am);
+        let b = recursive_freshen(&mut reference, &t, 0, &mut rm);
+        assert_eq!(a, b);
+        assert_eq!(am, rm);
+        assert_eq!(actual, reference);
+    }
+
+    #[test]
+    fn extrusion_of_deep_shared_type_preserves_bounds() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let v = s.fresh_at(4);
+                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                s.constrain(&int, &Ty::Var(v));
+                let mut t = Ty::tuple(vec![Ty::Var(v), Ty::Var(v)]);
+                for _ in 0..10_000 {
+                    t = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
+                }
+                let mut cache = HashMap::default();
+                let result = s.extrude(&t, Pol::Pos, 0, Mode::Value, &mut cache);
+                let new = cache[&(v, Pol::Pos, Mode::Value)];
+                assert_ne!(v, new);
+                assert!(s.var(new).lower.contains(&int));
+                assert!(s.var(new).from.contains(&v));
+                let mut end = &result;
+                for _ in 0..10_000 {
+                    let Ty::Con(_, _, args) = end else {
+                        panic!("expected list")
+                    };
+                    end = &args[0];
+                }
+                let Ty::Con(Head::Tuple(2), _, args) = end else {
+                    panic!("expected tuple")
+                };
+                assert!(args == &[Ty::Var(new), Ty::Var(new)]);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn nested_constructor_function_and_row_constraints_use_no_call_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                fn deep(mut t: Ty, function: bool) -> Ty {
+                    for _ in 0..10_000 {
+                        t = if function {
+                            Ty::Fn(Box::new(FnTy {
+                                params: Vec::new(),
+                                ret: t,
+                                err: Ty::Never,
+                                env: Ty::Never,
+                            }))
+                        } else {
+                            Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t])
+                        };
+                    }
+                    t
+                }
+                let int = || Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let string = || Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                for function in [false, true] {
+                    let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                    let a = deep(int(), function);
+                    let b = deep(string(), function);
+                    s.constrain(&a, &b);
+                    assert_eq!(s.failures.len(), 1);
+                    assert_eq!(s.failures[0].kind, FailKind::Mismatch);
+                    drop((a, b, s));
+                }
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let a = deep(int(), false);
+                let b = deep(string(), false);
+                s.constrain_env(&a, &b);
+                assert_eq!(s.failures.len(), 1);
+                assert_eq!(s.failures[0].kind, FailKind::EnvForms);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn deep_bound_and_union_walks_are_iterative() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let v = s.fresh_at(0);
+                let mut t = Ty::Var(v);
+                for _ in 0..10_000 {
+                    t = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
+                }
+                let mut vars = Vec::new();
+                bound_vars(&s, &t, true, false, &mut vars);
+                assert_eq!(vars, vec![(v, true, true)]);
+                let mut u = Ty::Var(v);
+                for _ in 0..10_000 {
+                    u = Ty::Union(vec![u]);
+                }
+                let mut flat = Vec::new();
+                flatten_union(&[u], &mut flat);
+                assert!(flat == vec![Ty::Var(v)]);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn deep_normalization_preserves_type() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let mut t = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                for i in 0..10_000 {
+                    t = if i % 2 == 0 {
+                        Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t])
+                    } else {
+                        Ty::Fn(Box::new(FnTy {
+                            params: Vec::new(),
+                            ret: t,
+                            err: Ty::Never,
+                            env: Ty::Never,
+                        }))
+                    };
+                }
+                let expected = t.clone();
+                assert_eq!(s.normalize_mode(t, Mode::Value), expected);
+                let mut top = Ty::Top;
+                for _ in 0..10_000 {
+                    top = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![top]);
+                }
+                let replaced = s.no_top(&top, 0);
+                let mut end = &replaced;
+                for _ in 0..10_000 {
+                    let Ty::Con(_, _, args) = end else {
+                        panic!("expected list")
+                    };
+                    end = &args[0];
+                }
+                assert!(matches!(end, Ty::Var(_)));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn same_form_handles_deep_mismatch_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let s = Solver::new(StdHashMap::new(), Vec::new());
+                let mut a = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let mut b = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                for _ in 0..10_000 {
+                    a = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![a]);
+                    b = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![b]);
+                }
+                assert!(!s.same_form(&a, &b));
+                let mut a = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let mut b = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                for _ in 0..10_000 {
+                    a = Ty::Union(vec![a, Ty::Never]);
+                    b = Ty::Union(vec![b, Ty::Never]);
+                }
+                assert!(!s.same_form(&a, &b));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn difference_distributes_over_deep_union_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                let mut t = int.clone();
+                for _ in 0..10_000 {
+                    t = Ty::Union(vec![t]);
+                }
+                assert_eq!(s.diff(t, vec![string]), int);
+                assert!(s.failures.is_empty());
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn left_difference_checks_deep_unions_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                let mut t = int.clone();
+                for _ in 0..10_000 {
+                    t = Ty::Union(vec![t]);
+                }
+                s.constrain(&Ty::Diff(Box::new(t), vec![string]), &int);
+                assert!(s.failures.is_empty());
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }

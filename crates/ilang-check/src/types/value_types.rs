@@ -1,5 +1,6 @@
 //! Permanent value reads use immutable candidates and checked solver trials
 //! (§4.7; value-types R3–R7). Nothing here inspects a runtime value.
+use super::TyParts;
 use super::infer::Checker;
 use super::solve::Solver;
 use super::{FnTy, Head, ShownType, Ty, V};
@@ -1154,7 +1155,7 @@ impl Checker<'_> {
             }
             TypePattern::Named(head, args) => {
                 let t = c.expose(source)?;
-                let Ty::Con(Head::Named(got), _, parts) = t else {
+                let TyParts::Con(Head::Named(got), _, parts) = t.into_parts() else {
                     return Err(code::TYPE_PATTERN_MISMATCH);
                 };
                 if *head != got || args.len() != parts.len() {
@@ -1167,7 +1168,7 @@ impl Checker<'_> {
             }
             TypePattern::Tuple(args) => {
                 let t = c.expose(source)?;
-                let Ty::Con(Head::Tuple(n), _, parts) = t else {
+                let TyParts::Con(Head::Tuple(n), _, parts) = t.into_parts() else {
                     return Err(code::TYPE_PATTERN_MISMATCH);
                 };
                 if n as usize != args.len() {
@@ -1820,10 +1821,10 @@ mod tests {
         let before = s.clone();
         let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
         let exposed = c.expose(&Ty::Var(root)).unwrap();
-        let Ty::Con(Head::Tuple(2), _, parts) = exposed else {
+        let Ty::Con(Head::Tuple(2), _, parts) = &exposed else {
             panic!("tuple required")
         };
-        for part in &parts {
+        for part in parts {
             let mut vars = HashSet::new();
             super::super::alias::map_vars(part, &mut |v| {
                 vars.insert(v);

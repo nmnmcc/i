@@ -8,6 +8,7 @@
 //! schemes, of constructors, and of annotations; it never takes part in
 //! constraints, so they only stand for the parts that matching fills in.
 
+use super::TyParts;
 use super::display;
 use super::infer::Checker;
 use super::lits::ValueSet;
@@ -104,11 +105,13 @@ pub(super) fn disjoint(x: &Ty, y: &Ty) -> bool {
 }
 
 /// The type at the top of a pattern, through `x = …`: `x: T`.
-pub(super) fn top_written(q: &Pattern) -> Option<&Type> {
-    match &q.kind {
-        PatternKind::Typed { ty, .. } => Some(ty),
-        PatternKind::Named { pattern, .. } => top_written(pattern),
-        _ => None,
+pub(super) fn top_written(mut q: &Pattern) -> Option<&Type> {
+    loop {
+        match &q.kind {
+            PatternKind::Typed { ty, .. } => return Some(ty),
+            PatternKind::Named { pattern, .. } => q = pattern,
+            _ => return None,
+        }
     }
 }
 
@@ -424,13 +427,13 @@ impl Checker<'_> {
         }
         match p {
             Ty::Var(v) => sigma.entry(*v).or_default().push(k.clone()),
-            Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head())) {
-                (Ty::Con(_, _, ps), Some(Ty::Con(_, _, ks))) if ps.len() == ks.len() => {
+            Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head()).map(Ty::into_parts)) {
+                (Ty::Con(_, _, ps), Some(TyParts::Con(_, _, ks))) if ps.len() == ks.len() => {
                     for (x, y) in ps.iter().zip(&ks) {
                         self.match_k(x, y, sigma, depth + 1);
                     }
                 }
-                (Ty::Fn(f), Some(Ty::Fn(g))) if f.params.len() == g.params.len() => {
+                (Ty::Fn(f), Some(TyParts::Fn(g))) if f.params.len() == g.params.len() => {
                     for (x, y) in f.params.iter().zip(&g.params) {
                         self.match_k(&x.1, &y.1, sigma, depth + 1);
                     }
@@ -583,8 +586,10 @@ impl Checker<'_> {
                 self.kbind(x.var, prim(BuiltinType::String), in_case);
             }
             PatternKind::Constructor { ctor, args, spread } => {
-                let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-                    Some(Ty::Con(_, _, xs)) => Some(xs),
+                let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty))))
+                    .map(Ty::into_parts)
+                {
+                    Some(TyParts::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let n = match &self.p.ty(ctor.ty).body {
@@ -613,8 +618,9 @@ impl Checker<'_> {
                 }
             }
             PatternKind::Tuple(ps) => {
-                let parts = match member(b, Some(Head::Tuple(ps.len() as u32))) {
-                    Some(Ty::Con(_, _, xs)) => xs,
+                let parts = match member(b, Some(Head::Tuple(ps.len() as u32))).map(Ty::into_parts)
+                {
+                    Some(TyParts::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 for (x, k) in ps.iter().zip(&parts) {
@@ -656,32 +662,58 @@ impl Checker<'_> {
     /// of a name inside the value of its own binding, and of a top-level
     /// name of the same group. The body of a function is not looked at.
     pub fn written_known(&self, e: &Expr) -> Ty {
-        let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
-        match &e.kind {
-            ExprKind::Int(n) => scalar_literal(BuiltinType::Int, n.to_string()),
-            ExprKind::Float(_) => prim(BuiltinType::Float),
-            ExprKind::String(s) => scalar_literal(BuiltinType::String, s.clone()),
-            ExprKind::BitArray(_) => prim(BuiltinType::BitArray),
-            ExprKind::Unary {
-                op: ilang_syntax::ast::UnOp::Neg,
-                expr,
-            } if neg_literal(expr).is_some() => {
-                scalar_literal(BuiltinType::Int, neg_literal(expr).unwrap())
-            }
-            ExprKind::Unary { op, .. } => prim(match op {
-                ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
-                ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
-            }),
-            ExprKind::Tuple(items) => {
-                Ty::tuple(items.iter().map(|x| self.written_known(x)).collect())
-            }
-            ExprKind::Block(b) => match b.stmts.as_slice() {
-                [Stmt::Expr(x)] => self.written_known(x),
-                _ => Ty::Top,
-            },
-            ExprKind::Fn(f) => self.fn_known(f, &[], Ty::Top),
-            _ => Ty::Top,
+        enum Task<'a> {
+            Visit(&'a Expr),
+            Tuple(usize),
         }
+        let mut todo = vec![Task::Visit(e)];
+        let mut values = Vec::new();
+        while let Some(task) = todo.pop() {
+            match task {
+                Task::Visit(e) => {
+                    let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
+                    match &e.kind {
+                        ExprKind::Int(n) => {
+                            values.push(scalar_literal(BuiltinType::Int, n.to_string()))
+                        }
+                        ExprKind::Float(_) => values.push(prim(BuiltinType::Float)),
+                        ExprKind::String(s) => {
+                            values.push(scalar_literal(BuiltinType::String, s.clone()))
+                        }
+                        ExprKind::BitArray(_) => values.push(prim(BuiltinType::BitArray)),
+                        ExprKind::Unary {
+                            op: ilang_syntax::ast::UnOp::Neg,
+                            expr,
+                        } if neg_literal(expr).is_some() => {
+                            values.push(scalar_literal(
+                                BuiltinType::Int,
+                                neg_literal(expr).expect("negative literal"),
+                            ));
+                        }
+                        ExprKind::Unary { op, .. } => values.push(prim(match op {
+                            ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
+                            ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
+                        })),
+                        ExprKind::Tuple(items) => {
+                            todo.push(Task::Tuple(items.len()));
+                            todo.extend(items.iter().rev().map(Task::Visit));
+                        }
+                        ExprKind::Block(b) => match b.stmts.as_slice() {
+                            [Stmt::Expr(x)] => todo.push(Task::Visit(x)),
+                            _ => values.push(Ty::Top),
+                        },
+                        ExprKind::Fn(f) => values.push(self.fn_known(f, &[], Ty::Top)),
+                        _ => values.push(Ty::Top),
+                    }
+                }
+                Task::Tuple(n) => {
+                    let parts = values.split_off(values.len() - n);
+                    values.push(Ty::tuple(parts));
+                }
+            }
+        }
+        assert_eq!(values.len(), 1, "written known type left multiple results");
+        values.pop().expect("written known type produced no result")
     }
 
     /// The known type of a function expression (§4.8): its labels; for each
@@ -914,14 +946,16 @@ fn coverage_literal(q: &Pattern) -> Option<Ty> {
 }
 
 /// Only brace groups around an unsigned literal are transparent to unary minus.
-pub(super) fn neg_literal(e: &Expr) -> Option<String> {
-    match &e.kind {
-        ExprKind::Int(n) => Some(super::lits::int_text(true, n)),
-        ExprKind::Block(b) => match b.stmts.as_slice() {
-            [Stmt::Expr(x)] => neg_literal(x),
-            _ => None,
-        },
-        _ => None,
+pub(super) fn neg_literal(mut e: &Expr) -> Option<String> {
+    loop {
+        match &e.kind {
+            ExprKind::Int(n) => return Some(super::lits::int_text(true, n)),
+            ExprKind::Block(b) => match b.stmts.as_slice() {
+                [Stmt::Expr(inner)] => e = inner,
+                _ => return None,
+            },
+            _ => return None,
+        }
     }
 }
 
