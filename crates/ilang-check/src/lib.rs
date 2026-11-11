@@ -303,3 +303,6 @@ fn check_resolved(
         diags,
     }
 }
+
+mod hir_tree;
+mod hir_trampoline;
