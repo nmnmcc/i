@@ -3,6 +3,7 @@
 	i/fail
 	i/net
 	i/tls
+	i/clock
 	i/task
 	i/resource
 	std/list
@@ -10,6 +11,8 @@
 	std/int
 	std/bit_array
 	std/uri
+	std/json
+	std/schema
 	(Option, Some, None) = std/option
 )
 
@@ -42,6 +45,12 @@
 	send
 	client
 	body_text
+	body_json
+	body_decode
+	BodyError(..)
+	send_with
+	send_timeout
+	route
 	content_length
 	content_type
 	transfer_encoding
@@ -1074,7 +1083,7 @@ send_once = (req: Request) {
 	}
 	secure |> {
 		False -> resource.ensure(() {
-			transport = net.byte_stream(stream)
+			transport = net_transport(stream)
 			transport.write(wire)
 			read_reply(transport, req.method, <<>>)
 		}, () { net.close_stream(stream) })
@@ -1090,7 +1099,7 @@ send_once = (req: Request) {
 				Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
 			}
 			resource.ensure(() {
-				transport = tls.byte_stream(secure_stream)
+				transport = tls_transport(secure_stream)
 				transport.write(wire)
 				read_reply(transport, req.method, <<>>)
 			}, () { tls.close(secure_stream) })
@@ -1099,14 +1108,137 @@ send_once = (req: Request) {
 }
 
 read_reply = (transport, method, buffer) {
-	bytes = transport.read(65536)
-	eof = bit_array.bit_size(bytes) == 0
-	feed_response_for(buffer, bytes, method, eof, 32768) |> {
-		Complete(res, _) -> res
-		Invalid(why)     -> fail.raise(Protocol(why))
+	read_progress(transport, method, buffer, False)
+}
+
+read_progress = (transport, method, buffer, eof) {
+	feed_response_for(<<>>, buffer, method, eof, 32768) |> {
+		Complete(res, rest) -> {
+			Status(code) = res.status
+			{ code >= 100 && code < 200 && code != 101 } |> {
+				True  -> read_progress(transport, method, rest, eof)
+				False -> res
+			}
+		}
+		Invalid(why) -> fail.raise(Protocol(why))
 		More(next) -> eof |> {
-			True  -> fail.raise(Protocol("unexpected end of response"))
-			False -> read_reply(transport, method, next)
+			True -> fail.raise(Protocol("unexpected end of response"))
+			False -> {
+				bytes = transport.read(65536)
+				read_progress(
+					transport
+					method
+					bit_array.concat([next, bytes])
+					bit_array.bit_size(bytes) == 0
+				)
+			}
 		}
 	}
+}
+
+BodyError {
+	InvalidText
+	InvalidJson(json.JsonError)
+	InvalidSchema(schema.SchemaError)
+}
+
+body_json = (res: Response) -> Result(json.Json, BodyError) {
+	body_text(res) |> {
+		Error(_) -> Error(InvalidText)
+		Ok(text) -> json.parse(text) |> {
+			Ok(value)    -> Ok(value)
+			Error(error) -> Error(InvalidJson(error))
+		}
+	}
+}
+
+body_decode(A) = (
+	res: Response
+	codec: schema.Schema(A, schema.SchemaError)
+) -> Result(A, BodyError) {
+	body_json(res) |> {
+		Error(error) -> Error(error)
+		Ok(value) -> schema.decode(codec, value) |> {
+			Ok(decoded)  -> Ok(decoded)
+			Error(error) -> Error(InvalidSchema(error))
+		}
+	}
+}
+
+send_with = (provider, req) { provider.send(req) }
+
+send_timeout = (provider, req, duration_ns) {
+	task.race(() { provider.send(req) }, () {
+		clock.sleep_ns(duration_ns)
+		fail.raise(Timeout)
+	})
+}
+
+/// Match a method and slash-separated path; segments prefixed with ':' bind parameters.
+route = (
+	method: Method
+	pattern: String
+	req: Request
+) -> Option(List((String, String))) {
+	{ method == req.method } |> {
+		False -> None
+		True -> match_segments(
+			string.split(pattern, "/")
+			string.split(req.target, "/")
+		)
+	}
+}
+
+match_segments = (
+	pattern: List(String)
+	path: List(String)
+) -> Option(List((String, String))) {
+	(pattern, path) |> {
+		([], []) -> Some([])
+		([p, ..ps], [v, ..vs]) -> {
+			string.starts_with(p, ":") |> {
+				True -> match_segments(ps, vs) |> {
+					Some(rest) -> Some([(string.drop_start(p, 1), v), ..rest])
+					None       -> None
+				}
+				False -> { p == v } |> {
+					True  -> match_segments(ps, vs)
+					False -> None
+				}
+			}
+		}
+		_ -> None
+	}
+}
+
+net_transport = (stream) {
+	(read: (max) {
+		fail.catch(() { net.read(stream, max) }) |> {
+			Ok(value) -> value
+			Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+				Connect(code)
+			)
+		}
+	}, write: (bytes) {
+		fail.catch(() { net.write(stream, bytes) }) |> {
+			Ok(value) -> value
+			Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+				Connect(code)
+			)
+		}
+	})
+}
+
+tls_transport = (stream) {
+	(read: (max) {
+		fail.catch(() { tls.read(stream, max) }) |> {
+			Ok(value)                          -> value
+			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+		}
+	}, write: (bytes) {
+		fail.catch(() { tls.write(stream, bytes) }) |> {
+			Ok(value)                          -> value
+			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+		}
+	})
 }
