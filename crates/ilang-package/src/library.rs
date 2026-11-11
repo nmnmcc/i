@@ -41,6 +41,10 @@ pub(crate) fn add(graph: &mut PackageGraph) {
             kind,
         });
     }
+    let text = format!("name = \"standard\"\n{}", include_str!("../../../lib/provider-plan.toml"));
+    let (manifest, diagnostics) = crate::manifest::parse_manifest(&text);
+    assert!(diagnostics.is_empty(), "invalid shipped provider plan: {diagnostics:?}");
+    let provider_plan = manifest.expect("shipped plan has a name").provider_plan;
     graph.packages.push(Package {
         name: "i".to_string(),
         dir: None,
@@ -49,6 +53,8 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         dev_dependencies: Vec::new(),
         modules,
         wasm_exports: Vec::new(),
+        wasm_synchronous: Vec::new(),
+        provider_plan,
         location: None,
     });
 }

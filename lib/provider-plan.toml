@@ -1,0 +1,15 @@
+# Registered capabilities with no implicit Host cell. Implementations selected
+# by the target backends will be installed as ordinary factories in JP.
+[providers."i/io.Io"]
+[providers."i/clock.Clock"]
+[providers."i/process.Entropy"]
+[providers."i/process.Arguments"]
+[providers."i/process.Environment"]
+[providers."i/process.WorkingDirectory"]
+[providers."i/process.Process"]
+[providers."i/fs.Fs"]
+[providers."i/net.Net"]
+[providers."i/tls.Tls"]
+[providers."i/stdio.Stdio"]
+[providers."i/target.Target"]
+discriminant = { js = "i/target.Js", nodejs = "i/target.NodeJS", native = "i/target.Native", wasi = "i/target.Wasi", host = "i/target.Host" }

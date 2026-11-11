@@ -8,6 +8,8 @@ use toml::de::{DeTable, DeValue};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
+    pub provider_plan: crate::providers::ProviderPlan,
+    pub wasm_synchronous: Vec<WasmExport>,
     pub name: String,
     pub name_span: Span,
     pub dependencies: Vec<Dependency>,
@@ -111,13 +113,18 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut deps = Vec::new();
     let mut dev_deps = Vec::new();
     let mut wasm_exports = Vec::new();
+    let mut wasm_synchronous = Vec::new();
+    let mut provider_plan = crate::providers::ProviderPlan::default();
     for (key, value) in doc.get_ref().iter() {
         match key.get_ref().as_ref() {
-            "providers" | "provider_adapters" => diags.push(err(
-                code::PROVIDERS_PENDING,
-                span(key.span()),
-                "target provider plans are not implemented yet (JP; §2.6.1)",
-            )),
+            "providers" => {
+                provider_plan.span = Some(span(key.span()));
+                crate::providers::rows(value, &mut provider_plan, &mut diags);
+            }
+            "provider_adapters" => {
+                provider_plan.span = Some(span(key.span()));
+                crate::providers::adapters(value, &mut provider_plan, &mut diags);
+            }
             "name" => match value.get_ref() {
                 DeValue::String(s) => name = Some((s.to_string(), span(value.span()))),
                 _ => diags.push(err(
@@ -130,7 +137,10 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
             "dev-dependencies" if compiled => {
                 dev_deps = dependencies("dev-dependencies", value, &mut diags)
             }
-            "wasm" if compiled => wasm_exports = wasm(value, &mut diags),
+            "wasm" if compiled => {
+                wasm_exports = wasm(value, "exports", &mut diags);
+                if matches!(value.get_ref(), DeValue::Table(_)) { wasm_synchronous = wasm(value, "synchronous", &mut diags); }
+            }
             _ => {}
         }
     }
@@ -179,7 +189,21 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     };
     let dependencies = keep(deps, &mut diags);
     let dev_dependencies = keep(dev_deps, &mut diags);
+    for e in &wasm_synchronous {
+        if !wasm_exports
+            .iter()
+            .any(|x| x.module == e.module && x.function == e.function)
+        {
+            diags.push(err(
+                code::WASM_EXPORT,
+                e.span,
+                "wasm.synchronous must be a subset of wasm.exports",
+            ));
+        }
+    }
     let manifest = Manifest {
+        provider_plan,
+        wasm_synchronous,
         name,
         name_span,
         dependencies,
@@ -276,7 +300,7 @@ fn path_of(t: &DeTable) -> Option<String> {
         })
 }
 
-fn wasm(value: &Spanned<DeValue>, diags: &mut Vec<Diagnostic>) -> Vec<WasmExport> {
+fn wasm(value: &Spanned<DeValue>, field: &str, diags: &mut Vec<Diagnostic>) -> Vec<WasmExport> {
     let DeValue::Table(table) = value.get_ref() else {
         diags.push(err(
             code::MANIFEST_SHAPE,
@@ -287,7 +311,7 @@ fn wasm(value: &Spanned<DeValue>, diags: &mut Vec<Diagnostic>) -> Vec<WasmExport
     };
     let mut out = Vec::new();
     for (key, value) in table.iter() {
-        if key.get_ref().as_ref() != "exports" {
+        if key.get_ref().as_ref() != field {
             continue;
         }
         let DeValue::Array(items) = value.get_ref() else {

@@ -275,19 +275,9 @@ fn former_keywords_are_package_and_dependency_names() {
     }
 }
 
-/// The R2 coordinator ruling reserves provider plans for JP. They must not
-/// silently change an entry's host calling convention before that track lands.
 #[test]
-fn provider_plans_are_explicitly_pending_jp() {
-    for text in [
-        "name = \"app\"\n[providers]\n",
-        "name = \"app\"\n[provider_adapters]\n",
-    ] {
-        for parse in [parse_manifest, parse_dependency_manifest] {
-            let (_, diagnostics) = parse(text);
-            assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
-            assert_eq!(diagnostics[0].code, code::PROVIDERS_PENDING);
-            assert!(diagnostics[0].message.contains("not implemented yet"));
-        }
+fn provider_empty_tables_are_valid() {
+    for parse in [parse_manifest, parse_dependency_manifest] {
+        assert!(parse("name = \"app\"\n[providers]\n[provider_adapters]\n").1.is_empty());
     }
 }
