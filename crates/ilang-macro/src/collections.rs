@@ -277,7 +277,7 @@ fn lookup(
             program.module(caller).source.0,
             &[],
             &generated,
-            &module_lookup,
+            module_lookup,
             |_| None,
             |_| None,
         )
