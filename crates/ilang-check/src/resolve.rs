@@ -473,6 +473,8 @@ impl<'a> Resolver<'a> {
             let here = self.p.module(m);
             let root = self.graph.root == Some(here.package);
             if root && let ast::ItemKind::Binding(b) = &item.kind {
+                // attributes() already reported the legacy @main/@test collision.
+                let entry_test_reported = attrs.main && attrs.test;
                 let mut names = Vec::new();
                 ast_binders(&b.pattern, &mut names);
                 let pkg = &self.graph.packages[here.package];
@@ -523,7 +525,7 @@ impl<'a> Resolver<'a> {
                 } else if selected {
                     attrs.main = true;
                 }
-                if attrs.main && attrs.test {
+                if attrs.main && attrs.test && !entry_test_reported {
                     self.error(
                         code::EXPORT_NAME_TWICE,
                         b.pattern.span,
