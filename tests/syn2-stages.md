@@ -117,3 +117,9 @@ collision with `@main\n@test\nboth = () { Nil }`: the single-file runner
 constructs `src/main.i`, and reports E0305 (test placement) instead of the
 expected E0321 (entry/test collision). Two attempts to reconcile this fixture
 with the new single-file runner have not restored its expected diagnostic.
+
+The `i/record.All` capture-free source form described above is not installed:
+`lib/i/record.i` does not export that alias, and the migrator currently writes
+`Record` for legacy `{..}`. A module that shadows `Record` therefore needs a
+manual migration before this rewrite can be relied on. The per-file syntax
+marker is also still needed for a function-type guard in a file with no `^`.
