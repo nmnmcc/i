@@ -81,6 +81,8 @@ def build():
     if heavy.is_file():
         command = [str(heavy), 'direnv', 'exec', str(shell)] + command
     subprocess.run(command, cwd=ROOT, check=True)
+    command[-5:] = ['-p', 'ilang-check', '--example', 'migration-types', '--locked']
+    subprocess.run(command, cwd=ROOT, check=True)
 
 
 def migrate_many(sources):
@@ -184,6 +186,7 @@ def main():
         parser.error('name source files/directories, or use --repo')
     results = migrate_many([item['host'] if item['kind'] == 'file' else item['source'] for item in items])
     changes = collections.defaultdict(list)
+    checked_packages = {}
     report = {'areas': {}, 'changed': [], 'manual': [], 'invalid': [], 'entries': []}
     for item, result in zip(items, results):
         label = f"{item['path']}:{item['line']}"
@@ -191,12 +194,23 @@ def main():
             report['invalid'].append({'source': label, 'diagnostics': result['diagnostics']})
             continue
         if result['empty']:
+            package = package_of(ROOT / item['path']) if item['kind'] == 'file' else None
+            records = {}
+            if package is not None:
+                if package not in checked_packages:
+                    binary = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/migration-types'
+                    checked_packages[package] = json.loads(subprocess.run([str(binary), str(package)], cwd=ROOT, text=True, capture_output=True, check=True).stdout)
+                records = checked_packages[package]
+            path = str((ROOT / item['path']).relative_to(package)) if package else ''
             source_bytes = item['source'].encode()
             for case in result['empty']:
                 offset = int(case.rsplit(' ', 1)[1])
+                if case.startswith('empty tuple expression ') and offset in records.get(path, []):
+                    continue
                 line = item['line'] + source_bytes[:offset].count(b'\n')
                 report['manual'].append({'source': f"{item['path']}:{line}", 'empty_tuples': case})
-            continue
+            if any(case['source'].startswith(item['path'] + ':') for case in report['manual']):
+                continue
         after, declaration, error = entry_migration(item, result)
         if error:
             report['manual'].append({'source': label, 'entry': error})

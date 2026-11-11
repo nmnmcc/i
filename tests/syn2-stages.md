@@ -107,20 +107,15 @@ between span edits, and Cargo `src/workspace/parser/targets.rs` and Gleam
 `compiler-cli/src/run.rs` distinguish conventional and explicitly selected
 entry modules.
 
-## Remaining verification issue
+## Current migration state
 
-The full spec suite's second run passed 400/402 cases. The old record
-reservation case now accepts a record and its expectation has been updated.
-The `tests/spec/10.2/main_and_test.i` fixture expects E0305: `both` is not
-the default entry, and the test is outside `test/` (§10.2).
+The 10.2 fixture expects E0305 because `both` is not the default entry and
+`@test` is outside `test/`. Manifest entry targets are dotted module paths
+relative to the package. Clause-head `?` starts a guard by grammar (§4.1).
+The formatter removes `@main`; migration declares non-default entries.
 
-The `i/record.All` capture-free source form described above is not installed:
-`lib/i/record.i` does not export that alias, and the migrator currently writes
-`Record` for legacy `{..}`. A module that shadows `Record` therefore needs a
-manual migration before this rewrite can be relied on. The formatter removes legacy `@main` attributes and preserves their comments.
-Relocating a non-default entry requires `scripts/syntax-2-migrate`.
-The migrator flags `x = ()` as an empty tuple because the two surfaces share
-its spelling; checker-based disambiguation remains unfinished. Per-file legacy syntax mode and its markers have been removed; the frozen
-legacy reader remains available to migration tools.
-The migrator writes by default and reports individual source locations.
-The old-syntax inventory remains unfinished.
+For `{..}`, migration keeps the legacy spelling where `Record` appears in
+the module, avoiding capture. Empty expressions are accepted only when the
+package checker, including tests, succeeds and records an empty-record type
+at that span; otherwise they are reported for manual review. The old forms
+are listed in `scripts/old-syntax-check.json`.

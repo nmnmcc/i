@@ -10,6 +10,7 @@ struct Migrator<'a> {
     edits: Vec<(usize, usize, &'static str)>,
     counts: [usize; 4],
     empty: Vec<String>,
+    record_shadowed: bool,
 }
 impl<'a> Migrator<'a> {
     fn edit(&mut self, span: Span, text: &'static str) {
@@ -65,6 +66,9 @@ impl<'a> Migrator<'a> {
             TypeKind::Named { name, args, .. }
                 if name.name == "Record" && self.src.as_bytes()[t.span.start as usize] == b'{' =>
             {
+                if self.record_shadowed {
+                    return;
+                }
                 let source = &self.src[t.span.start as usize..t.span.end as usize];
                 let dots = lex(source)
                     .tokens
@@ -280,6 +284,11 @@ fn migrate(src: &str) -> Value {
         edits: vec![],
         counts: [0; 4],
         empty: vec![],
+        // Keep the unambiguous legacy form if a local Record could capture it.
+        record_shadowed: lex(src)
+            .tokens
+            .iter()
+            .any(|t| matches!(&t.kind, T::UpName(n) if n == "Record")),
     };
     let mut mains = vec![];
     for item in &m.items {
@@ -375,6 +384,14 @@ mod tests {
         assert_eq!(result["diagnostics"], json!([]));
         assert_eq!(result["empty"], json!([]));
         assert_eq!(result["source"], source);
+    }
+
+    #[test]
+    fn shadowed_record_keeps_uncapturable_legacy_type() {
+        let source = "Record = Int\nT = {..}";
+        let result = migrate(source);
+        assert_eq!(result["source"], source);
+        assert_eq!(result["diagnostics"], json!([]));
     }
 
     #[test]
