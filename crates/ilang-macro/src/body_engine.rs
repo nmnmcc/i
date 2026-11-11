@@ -23,11 +23,19 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum Error {
-    Compile(run::CompileError),
+    Compile(Vec<ilang_package::Diagnostic>),
     Preparation(Vec<ilang_package::Diagnostic>),
-    Run(Failure),
+    Run {
+        failure: Failure,
+        macro_name: String,
+        call: Syntax,
+    },
     Conversion(ScopedError),
-    Resource(Box<dyn std::error::Error + Send + Sync>),
+    Resource {
+        error: Box<dyn std::error::Error + Send + Sync>,
+        macro_name: String,
+        call: Syntax,
+    },
     SameModule(Span),
     Depth(Span),
 }
@@ -172,8 +180,31 @@ impl<'a> BodyEngine<'a> {
                 .find(|b| b.module == module.path && b.name == mac.definition.name)
                 .expect("registered macro must be prepared");
             let (path, name) = prepare::add_wrapper(&mut graph, &mut parsed, binding, position);
-            let program =
-                run::compile(&graph, &parsed, &[(&path, &name)]).map_err(Error::Compile)?;
+            let wrapper_source = parsed.last().expect("wrapper module was added").source;
+            let definition_span = module.ast.items[mac.definition.item].span;
+            let program = run::compile(&graph, &parsed, &[(&path, &name)]).map_err(|error| {
+                let mut diagnostics = match error {
+                    run::CompileError::Program(diagnostics) => diagnostics,
+                    run::CompileError::Internal(message) => vec![ilang_package::Diagnostic::error(
+                        ilang_check::code::MACRO_RESERVED,
+                        Some(mac.source),
+                        definition_span,
+                        format!(
+                            "compiler error while compiling macro `{}`: {message}",
+                            mac.definition.name
+                        ),
+                    )],
+                };
+                for diagnostic in &mut diagnostics {
+                    if diagnostic.source == Some(wrapper_source) {
+                        diagnostic.source = Some(mac.source);
+                        diagnostic.span = definition_span;
+                        diagnostic.message =
+                            format!("macro `{}`: {}", mac.definition.name, diagnostic.message);
+                    }
+                }
+                Error::Compile(diagnostics)
+            })?;
             self.cache.insert(
                 key.clone(),
                 Compiled {
@@ -205,7 +236,11 @@ impl<'a> BodyEngine<'a> {
                     })
                 },
             )
-            .map_err(Error::Run)?;
+            .map_err(|failure| Error::Run {
+                failure,
+                macro_name: mac.definition.name.clone(),
+                call: call.clone(),
+            })?;
         Ok((
             result.syntax,
             output_budget.expect("successful run supplies its budget"),
@@ -245,7 +280,7 @@ impl Hook for BodyEngine<'_> {
             .expression_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
-            .map_err(metered_error)?;
+            .map_err(|error| metered_error(error, &mac.definition.name, &call))?;
         self.transactions.extend(transactions);
         Ok(expression)
     }
@@ -286,7 +321,7 @@ impl Hook for BodyEngine<'_> {
             .ty_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
-            .map_err(metered_error)?;
+            .map_err(|error| metered_error(error, &mac.definition.name, &call))?;
         self.transactions.extend(transactions);
         Ok(ty)
     }
@@ -354,9 +389,13 @@ impl Hook for BodyEngine<'_> {
     }
 }
 
-fn metered_error(error: MeteredError) -> Error {
+fn metered_error(error: MeteredError, macro_name: &str, call: &Syntax) -> Error {
     match error {
         MeteredError::Syntax(error) => Error::Conversion(error),
-        MeteredError::Resource(error) => Error::Resource(error),
+        MeteredError::Resource(error) => Error::Resource {
+            error,
+            macro_name: macro_name.to_owned(),
+            call: call.clone(),
+        },
     }
 }
