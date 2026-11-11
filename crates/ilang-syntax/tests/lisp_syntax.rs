@@ -1210,6 +1210,8 @@ fn deeply_nested_syntax_marks_and_drops_without_host_stack_growth() {
             ilang_syntax::lisp::syntax::validate_expansion(&marked, &[]).unwrap();
             let fresh = ilang_syntax::lisp::definitions::freshen_parameters(&marked, 1, 2);
             drop(fresh);
+            let answer = marked.as_answer();
+            drop(answer);
             drop(marked);
             drop(syntax);
         })
@@ -1276,5 +1278,54 @@ fn duplicate_definition_heads_are_freshened_with_all_uses() {
             matches!(head[1].scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer, parameter: 0, .. }) if *answer == id)
         );
         assert_eq!(head[1].scope_identity(), ctor[1].scope_identity());
+    }
+}
+
+#[test]
+fn definition_table_charges_before_freshening_written_and_expanded_answers() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{
+        Definition, DefinitionCost, DefinitionTable, Lookup,
+    };
+    let of = root("Box");
+    let source = "Box(A) { Box(A) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty());
+    let mut table = DefinitionTable::default();
+    table.insert(
+        1,
+        Definition::Written {
+            item: Box::new(module.items[0].clone()),
+            source: source.into(),
+            scope: of.scope().clone(),
+            ready: true,
+        },
+    );
+    let expanded =
+        ilang_syntax::lisp::definitions::builtin_definition("Result", of.scope(), of.span(), 9)
+            .unwrap();
+    table.insert(
+        2,
+        Definition::Expanded {
+            syntax: expanded,
+            parameter_answer: Some(9),
+            ready: true,
+        },
+    );
+    for key in [1, 2] {
+        let mut charged = false;
+        let result = table.query_metered(
+            &of,
+            Mode::Normal,
+            10,
+            |_, _| Lookup::Found(key),
+            |cost| {
+                assert!(matches!(cost, DefinitionCost::Syntax(_)));
+                charged = true;
+                Err(Box::new(std::io::Error::other("allocation limit")))
+            },
+        );
+        assert!(charged);
+        assert!(matches!(result, Err(error) if error.to_string() == "allocation limit"));
     }
 }

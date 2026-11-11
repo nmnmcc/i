@@ -408,6 +408,24 @@ pub fn charge_tree(budget: &MacroBudget, root: &Syntax, output: bool) -> Result<
     Ok(())
 }
 
+/// Preflight a definition answer before its syntax nodes are constructed.
+pub fn charge_definition(
+    budget: &MacroBudget,
+    cost: ilang_syntax::lisp::definition_table::DefinitionCost<'_>,
+) -> Result<()> {
+    match cost {
+        ilang_syntax::lisp::definition_table::DefinitionCost::Syntax(syntax) => {
+            charge_tree(budget, syntax, true)
+        }
+        // All five synthesized builtins fit this fixed bound, including the
+        // lexer, answer nodes, parameter identities and temporary strings.
+        ilang_syntax::lisp::definition_table::DefinitionCost::Builtin(_) => {
+            budget.charge(512, 512)?;
+            Ok(())
+        }
+    }
+}
+
 fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
     // Every compiler service call takes one unit and a bounded result wrapper.
     budget.charge(1, 8)?;
