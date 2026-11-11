@@ -5,6 +5,7 @@
 	list = std/list
 	order = (Less, Equal, Greater) = std/order
 	option = (Some, None) = std/option
+	property = std/property
 	result = std/result
 )
 
@@ -2104,4 +2105,203 @@ inverse_and_norm_special_values_test = () {
 	Ok(d) = float.degrees(negative_zero)
 	assert(core.float_to_bits(d) == core.float_to_bits(negative_zero))
 	assert(float.degrees(float.max_finite) == Error(Nil))
+}
+
+@test
+hypot_symmetry_property = () {
+	Ok(gen) = property.int(-100000, 100000)
+	property.test(
+		property.pair(gen, gen)
+		property.Config(123, 100, 30, 0, 100)
+		(pair) {
+			(x, y) = pair
+			a = core.to_float(x) /. 100.0
+			b = core.to_float(y) /. 100.0
+			assert(float.hypot(a, b) == float.hypot(b, a))
+		}
+		core.inspect
+	)
+}
+
+@test
+atan2_quadrants_property = () {
+	Ok(gen) = property.int(1, 100000)
+	property.test(
+		property.pair(gen, gen)
+		property.Config(456, 100, 30, 0, 100)
+		(pair) {
+			(x, y) = pair
+			a = core.to_float(x)
+			b = core.to_float(y)
+			assert(float.atan2(b, a) >. 0.0)
+			assert(float.atan2(b, -.a) >. 1.5707963267948966)
+			assert(float.atan2(-.b, a) <. 0.0)
+			assert(float.atan2(-.b, -.a) <. -.1.5707963267948966)
+		}
+		core.inspect
+	)
+}
+
+@test
+sign_bit_reference_0_test = () {
+	assert(float.sign_bit(0.0) == False)
+	Nil
+}
+
+@test
+sign_bit_reference_1_test = () {
+	assert(float.sign_bit(-.0.0) == True)
+	Nil
+}
+
+@test
+sign_bit_reference_2_test = () {
+	assert(float.sign_bit(1.0) == False)
+	Nil
+}
+
+@test
+sign_bit_reference_3_test = () {
+	assert(float.sign_bit(-.1.0) == True)
+	Nil
+}
+
+@test
+sign_bit_reference_4_test = () {
+	assert(float.sign_bit(1.0e-300) == False)
+	Nil
+}
+
+@test
+sign_bit_reference_5_test = () {
+	assert(float.sign_bit(-.1.0e-300) == True)
+	Nil
+}
+
+@test
+sign_bit_reference_6_test = () {
+	assert(float.sign_bit(1.0e300) == False)
+	Nil
+}
+
+@test
+sign_bit_reference_7_test = () {
+	assert(float.sign_bit(-.1.0e300) == True)
+	Nil
+}
+
+@test
+sign_bit_reference_8_test = () {
+	assert(float.sign_bit(float.min_positive) == False)
+	Nil
+}
+
+@test
+sign_bit_reference_9_test = () {
+	assert(float.sign_bit(-.float.min_positive) == True)
+	Nil
+}
+
+@test
+sign_bit_reference_10_test = () {
+	assert(float.sign_bit(float.max_finite) == False)
+	Nil
+}
+
+@test
+sign_bit_reference_11_test = () {
+	assert(float.sign_bit(-.float.max_finite) == True)
+	Nil
+}
+
+@test
+copy_sign_reference_0_test = () {
+	assert(core.float_to_bits(float.copy_sign(0.0, 1.0)) == 0)
+	Nil
+}
+
+@test
+copy_sign_reference_1_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(0.0, -.1.0)) == 9223372036854775808
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_2_test = () {
+	assert(core.float_to_bits(float.copy_sign(-.0.0, 1.0)) == 0)
+	Nil
+}
+
+@test
+copy_sign_reference_3_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(-.0.0, -.1.0)) == 9223372036854775808
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_4_test = () {
+	assert(core.float_to_bits(float.copy_sign(1.0, 1.0)) == 4607182418800017408)
+	Nil
+}
+
+@test
+copy_sign_reference_5_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(1.0, -.1.0)) == 13830554455654793216
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_6_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(-.1.0, 1.0)) == 4607182418800017408
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_7_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(-.1.0, -.1.0)) ==
+			13830554455654793216
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_8_test = () {
+	assert(core.float_to_bits(float.copy_sign(float.min_positive, 1.0)) == 1)
+	Nil
+}
+
+@test
+copy_sign_reference_9_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(float.min_positive, -.1.0)) ==
+			9223372036854775809
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_10_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(float.max_finite, 1.0)) ==
+			9218868437227405311
+	)
+	Nil
+}
+
+@test
+copy_sign_reference_11_test = () {
+	assert(
+		core.float_to_bits(float.copy_sign(float.max_finite, -.1.0)) ==
+			18442240474082181119
+	)
+	Nil
 }
