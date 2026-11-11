@@ -103,32 +103,69 @@ fn opener(kind: &T) -> Option<T> {
 }
 
 fn pair_brackets(tokens: &[Token], diags: &mut Vec<Diagnostic>) -> Vec<Option<u32>> {
+    // Each kind has a link to its nearest open bracket. When a mismatched
+    // closer searches below the top, every discarded opener is popped once;
+    // an absent opener is found without rescanning the whole stack.
+    fn index(kind: &T) -> usize {
+        match kind {
+            T::LParen => 0,
+            T::LBracket => 1,
+            T::LBrace => 2,
+            T::LtLt => 3,
+            _ => unreachable!("not an opening bracket"),
+        }
+    }
+    struct Open {
+        token: usize,
+        kind: usize,
+        previous: Option<usize>,
+    }
     let mut close = vec![None; tokens.len()];
-    let mut stack: Vec<usize> = Vec::new();
+    let mut stack: Vec<Open> = Vec::new();
+    let mut nearest = [None; 4];
     for (i, tok) in tokens.iter().enumerate() {
         match &tok.kind {
-            T::LParen | T::LBracket | T::LBrace | T::LtLt => stack.push(i),
+            kind @ (T::LParen | T::LBracket | T::LBrace | T::LtLt) => {
+                let kind = index(kind);
+                stack.push(Open {
+                    token: i,
+                    kind,
+                    previous: nearest[kind],
+                });
+                nearest[kind] = Some(stack.len() - 1);
+            }
             kind => {
                 let Some(open) = opener(kind) else { continue };
-                if stack.last().is_some_and(|&o| tokens[o].kind == open) {
-                    close[stack.pop().unwrap()] = Some(i as u32);
+                let target = index(&open);
+                if let Some(entry) = stack.pop_if(|entry| entry.kind == target) {
+                    nearest[target] = entry.previous;
+                    close[entry.token] = Some(i as u32);
                     continue;
                 }
                 let msg = match stack.last() {
-                    Some(&o) => format!("{} does not close {}", kind, tokens[o].kind),
+                    Some(entry) => format!("{} does not close {}", kind, tokens[entry.token].kind),
                     None => format!("{kind} has no opening bracket"),
                 };
                 diags.push(Diagnostic::new(Code::UnmatchedBracket, tok.span, msg));
-                if let Some(depth) = stack.iter().rposition(|&o| tokens[o].kind == open) {
-                    stack.truncate(depth + 1);
-                    close[stack.pop().unwrap()] = Some(i as u32);
+                if let Some(depth) = nearest[target] {
+                    while stack.len() > depth {
+                        let entry = stack.pop().unwrap();
+                        nearest[entry.kind] = entry.previous;
+                        if entry.kind == target {
+                            close[entry.token] = Some(i as u32);
+                        }
+                    }
                 }
             }
         }
     }
-    for o in stack {
-        let msg = format!("{} is not closed", tokens[o].kind);
-        diags.push(Diagnostic::new(Code::UnclosedBracket, tokens[o].span, msg));
+    for entry in stack {
+        let msg = format!("{} is not closed", tokens[entry.token].kind);
+        diags.push(Diagnostic::new(
+            Code::UnclosedBracket,
+            tokens[entry.token].span,
+            msg,
+        ));
     }
     close
 }
