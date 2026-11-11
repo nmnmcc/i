@@ -184,3 +184,155 @@ fn type_macros_are_expanded_outside_in_in_body_annotations() {
     body_walk::expressions(&mut module, &mut hook).unwrap();
     assert_eq!(hook.0, ["outer", "inner"]);
 }
+
+#[test]
+fn deep_mixed_bodies_patterns_and_types_do_not_use_the_host_stack() {
+    use ilang_syntax::ast::{Block, Function, Pattern, PatternKind, TypeExpr, TypeKind};
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let (mut module, errors) = ilang_syntax::parse_module("f = () { Nil }\nx: Int");
+            assert!(errors.is_empty(), "{errors:?}");
+            let span = Span::default();
+            let mut value = expression("m()");
+            for index in 0..10_000 {
+                let kind = match index % 4 {
+                    0 => ExprKind::Tuple(vec![value]),
+                    1 => ExprKind::Block(Block {
+                        stmts: vec![Stmt::Expr(value)],
+                        span,
+                    }),
+                    2 => ExprKind::Fn(Box::new(Function {
+                        params: vec![],
+                        ret: None,
+                        body: Block {
+                            stmts: vec![Stmt::Expr(value)],
+                            span,
+                        },
+                    })),
+                    _ => ExprKind::Call {
+                        callee: Box::new(value),
+                        args: vec![],
+                    },
+                };
+                value = Expr { kind, span };
+            }
+            let ItemKind::Binding(binding) = &mut module.items[0].kind else {
+                panic!()
+            };
+            let ExprKind::Fn(function) = &mut binding.value.kind else {
+                panic!()
+            };
+            function.body.stmts[0] = Stmt::Expr(value);
+            let mut pattern = Pattern {
+                kind: PatternKind::Discard("_".into()),
+                span,
+            };
+            for _ in 0..10_000 {
+                pattern = Pattern {
+                    kind: PatternKind::Tuple(vec![pattern]),
+                    span,
+                };
+            }
+            binding.pattern = pattern;
+            let ItemKind::Declaration { ty, .. } = &mut module.items[1].kind else {
+                panic!()
+            };
+            let mut nested = TypeExpr {
+                kind: TypeKind::Hole,
+                span,
+            };
+            for _ in 0..10_000 {
+                nested = TypeExpr {
+                    kind: TypeKind::Tuple(vec![nested]),
+                    span,
+                };
+            }
+            *ty = nested;
+            let mut hook = TestHook::default();
+            body_walk::expressions(&mut module, &mut hook).unwrap();
+            assert_eq!(hook.calls, ["m"]);
+            // Dropping the fully traversed tree on the same small stack is
+            // part of the regression: no recursive cleanup is permitted.
+            drop(module);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn bit_segment_binders_cover_later_sizes_and_only_their_clause() {
+    let (mut module, errors) =
+        ilang_syntax::parse_module("f = { <<m:u(8), _:u(m())>> -> m()  _ -> m() }");
+    assert!(errors.is_empty(), "{errors:?}");
+    let mut hook = TestHook::default();
+    body_walk::expressions(&mut module, &mut hook).unwrap();
+    // First segment binds m for the next size and that clause's body. It
+    // must not leak to the next clause.
+    assert_eq!(hook.calls, ["m"]);
+}
+
+#[test]
+fn macro_result_is_traversed_without_the_host_stack() {
+    use ilang_syntax::ast::Block;
+    struct Generate;
+    impl Hook for Generate {
+        type Error = &'static str;
+        fn is_macro(&mut self, e: &Expr, _: &[Local], _: u32) -> Result<bool, Self::Error> {
+            Ok(matches!(&e.kind, ExprKind::Call { callee, .. }
+                if matches!(&callee.kind, ExprKind::Name { name, .. } if name.name == "m")))
+        }
+        fn expand(&mut self, _: &Expr, _: &[Local], _: u32) -> Result<Expr, Self::Error> {
+            let span = Span::default();
+            let mut result = expression("1");
+            for index in 0..10_000 {
+                result = Expr {
+                    span,
+                    kind: if index % 2 == 0 {
+                        ExprKind::Tuple(vec![result])
+                    } else {
+                        ExprKind::Block(Block {
+                            stmts: vec![Stmt::Expr(result)],
+                            span,
+                        })
+                    },
+                };
+            }
+            Ok(result)
+        }
+        fn is_type_macro(
+            &mut self,
+            _: &ilang_syntax::ast::TypeExpr,
+            _: &[Local],
+            _: u32,
+        ) -> Result<bool, Self::Error> {
+            Ok(false)
+        }
+        fn expand_type(
+            &mut self,
+            _: &ilang_syntax::ast::TypeExpr,
+            _: &[Local],
+            _: u32,
+        ) -> Result<ilang_syntax::ast::TypeExpr, Self::Error> {
+            unreachable!()
+        }
+        fn depth_error(&mut self, _: Span) -> Self::Error {
+            "depth"
+        }
+        fn is_direct(&mut self, _: &Expr, _: &[Local], _: u32) -> bool {
+            false
+        }
+    }
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let (mut module, errors) = ilang_syntax::parse_module("f = () { m() }");
+            assert!(errors.is_empty(), "{errors:?}");
+            body_walk::expressions(&mut module, &mut Generate).unwrap();
+            drop(module);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
