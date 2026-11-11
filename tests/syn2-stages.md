@@ -185,3 +185,17 @@ now pass. `crates/ilang-check/tests/projects/entry_dependency` was rejected on
 the baseline by a legacy `@main` on a non-function in a dependency; that
 annotation has been removed, and dependency entries have no effect on the
 root package (§2.6).
+
+Entry loading interpretation: a target in `src/` does not require test modules
+or dev-dependencies; a target in `test/` does. This follows §2.1 and §2.6 and
+keeps unrelated broken test dependencies out of source-entry builds. The deep
+R2 review programs retain their explicit effect annotations, extended with the
+Root and Owner services required by task operations (§9.2); all three pass
+their review checks and runs at O0/O2.
+
+Additional verification: the syntax inventory passed for 4,098 extracted
+snippets, with six exact future-track entries. The short generation run, the
+six editor tests, the 85 JavaScript tests, and the O0/O2 standard-library
+runs (1,836 tests each) passed. The first review regeneration reported the
+three deep R2 failures above; their focused retry and the six named-entry
+review cases passed.
