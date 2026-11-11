@@ -21,7 +21,6 @@ use ilang_syntax::{
         definition_schedule::Mode,
         definition_table::{Definition, DefinitionCost, DefinitionTable, Lookup, QueryResult},
         definitions::type_query,
-        scoped::ScopedSource,
         syntax::{Node, Scope, ScopeIdentity, Syntax},
     },
     span::Span,
@@ -61,6 +60,7 @@ pub struct DefinitionWorld {
     parsed: Vec<Parsed>,
     next_answer: Arc<AtomicU64>,
     lisp_documents: HashMap<u32, Vec<Datum>>,
+    source_encoders: HashMap<u32, ilang_syntax::lisp::SourceEncoder>,
     current: Mutex<Option<(u32, u64, Arc<Index>)>>,
 }
 impl DefinitionWorld {
@@ -73,18 +73,50 @@ impl DefinitionWorld {
         parsed: &[Parsed],
         next_answer: Arc<AtomicU64>,
     ) -> Self {
-        let lisp_documents = parsed.iter().filter_map(|p| {
-            let file = graph.sources.get(p.source);
-            file.display.ends_with(".is").then(|| {
-                let end = p.scoped.as_ref().map_or(file.text.len(), |scoped| scoped.original_len() as usize);
-                (p.source.0, ilang_syntax::lisp::parse(&file.text[..end]).expect("parsed Lisp source remains valid").datums)
+        let lisp_documents = parsed
+            .iter()
+            .filter_map(|p| {
+                let file = graph.sources.get(p.source);
+                file.display.ends_with(".is").then(|| {
+                    let end = p
+                        .scoped
+                        .as_ref()
+                        .map_or(file.text.len(), |scoped| scoped.original_len() as usize);
+                    (
+                        p.source.0,
+                        ilang_syntax::lisp::parse(&file.text[..end])
+                            .expect("parsed Lisp source remains valid")
+                            .datums,
+                    )
+                })
             })
-        }).collect();
+            .collect();
+        let source_encoders = parsed
+            .iter()
+            .filter_map(|p| {
+                let file = graph.sources.get(p.source);
+                (!file.display.ends_with(".is")).then(|| {
+                    let end = p
+                        .scoped
+                        .as_ref()
+                        .map_or(file.text.len(), |scoped| scoped.original_len() as usize);
+                    let scope = Scope {
+                        module: p.source.0,
+                        marks: Default::default(),
+                    };
+                    (
+                        p.source.0,
+                        ilang_syntax::lisp::SourceEncoder::new(&scope, &file.text[..end]),
+                    )
+                })
+            })
+            .collect();
         Self {
             graph: graph.clone(),
             parsed: parsed.to_vec(),
             next_answer,
             lisp_documents,
+            source_encoders,
             current: Mutex::new(None),
         }
     }
@@ -200,11 +232,17 @@ impl DefinitionWorld {
                     } else {
                         scoped.and_then(|source| source.item_override(item.span))
                     };
-                    let expanded = override_syntax.map(|(syntax, _)| syntax.clone()).or_else(|| {
-                        scoped.filter(|s| s.is_generated(item.span)).map(|s| {
-                            s.origin(item.span).expect("generated type item retains its origin").syntax.clone()
-                        })
-                    });
+                    let expanded =
+                        override_syntax
+                            .map(|(syntax, _)| syntax.clone())
+                            .or_else(|| {
+                                scoped.filter(|s| s.is_generated(item.span)).map(|s| {
+                                    s.origin(item.span)
+                                        .expect("generated type item retains its origin")
+                                        .syntax
+                                        .clone()
+                                })
+                            });
                     let n = index.entries.len();
                     index.entries.push(TypeEntry {
                         key: key.clone(),
@@ -275,8 +313,14 @@ fn pattern_binders(ty: &TypeExpr, output: &mut Vec<ilang_syntax::ast::Ident>) {
     let mut pending = vec![ty];
     while let Some(ty) = pending.pop() {
         match &ty.kind {
-            TypeKind::Named { module: None, name, args } if args.is_empty() => output.push(name.clone()),
-            TypeKind::Named { args, .. } | TypeKind::Tuple(args) => pending.extend(args.iter().rev()),
+            TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => output.push(name.clone()),
+            TypeKind::Named { args, .. } | TypeKind::Tuple(args) => {
+                pending.extend(args.iter().rev())
+            }
             _ => {}
         }
     }
@@ -472,32 +516,64 @@ impl Definitions for DefinitionWorld {
             let construction = if let Some(syntax) = &entry.expanded {
                 charge_definition(budget, DefinitionCost::Syntax(syntax))
                     .and_then(|()| charge_definition(budget, DefinitionCost::Syntax(syntax)))
-                    .map(|()| ilang_syntax::lisp::definitions::expanded_definition(syntax, answer)
-                        .expect("expanded type item remains valid"))
-            } else {
-                let parsed = self.source_module(entry.key.source).expect("definition source exists");
-                let current = entry.key.source == snapshot.source;
-                let module = if current { &snapshot.module } else { &parsed.ast };
-                let scoped = if current { Some(&snapshot.scoped) } else { parsed.scoped.as_ref() };
-                let file = self.graph.sources.get(parsed.source);
-                let text = scoped.map_or(file.text.as_str(), ScopedSource::text);
-                if let Some(document) = self.lisp_documents.get(&parsed.source.0) {
-                    let item = &module.items[entry.position];
-                    let datum = document.iter().find(|datum| datum.span == item.span).expect("written Lisp type has its source datum");
-                    charge_definition(budget, DefinitionCost::Datum(datum)).map(|()| {
-                        let syntax = Syntax::from_datum(datum, &Scope { module: parsed.source.0, marks: Default::default() });
-                        ilang_syntax::lisp::definitions::expanded_definition(&syntax, answer).expect("written Lisp type remains valid")
+                    .map(|()| {
+                        ilang_syntax::lisp::definitions::expanded_definition(syntax, answer)
+                            .expect("expanded type item remains valid")
                     })
-                } else { charge_definition(budget, DefinitionCost::Written(text)).map(|()| {
-                    ilang_syntax::lisp::definitions::source_definition(
-                        &module.items[entry.position], text,
-                        &Scope { module: parsed.source.0, marks: Default::default() }, answer,
-                    )
-                }) }
+            } else {
+                let parsed = self
+                    .source_module(entry.key.source)
+                    .expect("definition source exists");
+                let current = entry.key.source == snapshot.source;
+                let module = if current {
+                    &snapshot.module
+                } else {
+                    &parsed.ast
+                };
+                let item = &module.items[entry.position];
+                if let Some(document) = self.lisp_documents.get(&parsed.source.0) {
+                    let datum = document
+                        .iter()
+                        .find(|datum| datum.span == item.span)
+                        .expect("written Lisp type has its source datum");
+                    charge_definition(budget, DefinitionCost::Datum(datum)).map(|()| {
+                        let syntax = Syntax::from_datum(
+                            datum,
+                            &Scope {
+                                module: parsed.source.0,
+                                marks: Default::default(),
+                            },
+                        );
+                        ilang_syntax::lisp::definitions::expanded_definition(&syntax, answer)
+                            .expect("written Lisp type remains valid")
+                    })
+                } else {
+                    let encoder = self
+                        .source_encoders
+                        .get(&parsed.source.0)
+                        .expect("written source has a lexical index");
+                    encoder
+                        .visit_item_charge(item, |event| {
+                            charge_definition(budget, DefinitionCost::Event(event))
+                        })
+                        .map(|()| {
+                            ilang_syntax::lisp::definitions::source_definition_from_syntax(
+                                item,
+                                &encoder.item(item),
+                                answer,
+                            )
+                        })
+                }
             };
             match construction {
                 Ok(syntax) => resolution(DefinitionReply::Answer(syntax), early.then_some(key)),
-                Err(error) => resolution(DefinitionReply::CompileError { message: error.to_string(), at: query.name }, None),
+                Err(error) => resolution(
+                    DefinitionReply::CompileError {
+                        message: error.to_string(),
+                        at: query.name,
+                    },
+                    None,
+                ),
             }
         } else if builtin_name {
             let key = DefinitionIdentity {

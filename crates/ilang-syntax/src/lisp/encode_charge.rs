@@ -434,7 +434,7 @@ pub(super) fn item<E>(
                 }
             }
             Pattern(p) => match &p.kind {
-                PatternKind::Quote(d) => work.push(Datum(d)),
+                PatternKind::Quote { datum, .. } => work.push(Datum(datum)),
                 PatternKind::Var(s) | PatternKind::Discard(s) | PatternKind::String(s) => {
                     work.push(Atom(s))
                 }
