@@ -275,7 +275,7 @@ impl ShownGraph {
                         .join(", ");
                     let mut body = format!("({params}) -> {}", group(fun.ret));
                     if fun.err != super::Id::NEVER {
-                        body.push_str(&format!(" ? {}", group(fun.err)));
+                        body.push_str(&format!(" ^ {}", group(fun.err)));
                     }
                     if fun.env != super::Id::NEVER {
                         body.push_str(&format!(" ! {}", group(fun.env)));
