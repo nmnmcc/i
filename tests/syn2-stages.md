@@ -125,6 +125,6 @@ manual migration before this rewrite can be relied on. The per-file syntax
 marker is also still needed for a function-type guard in a file with no `^`.
 The formatter preserves legacy `@main` attributes; removing or relocating an
 entry currently requires `scripts/syntax-2-migrate` rather than `i fmt`.
-The migrator's legacy-first parse also flags a new empty record `x = ()` as
-an empty tuple, since those values have the same spelling across the two
-surfaces. It does not yet distinguish an already-migrated empty record.
+The migrator flags an unmarked `x = ()` as an empty tuple because the two
+surfaces share its spelling. Marking the file `// syntax: syn2` distinguishes
+an already-migrated empty record.
