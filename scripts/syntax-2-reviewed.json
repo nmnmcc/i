@@ -30,11 +30,6 @@
       "E0115: a file with nothing to import or export leaves the group out"
     ]
   },
-  "tests/review/cases/review-a1/_loose/cases/09_attr_tuple_same_line/original/.invalid/src/main.i:107c7a7cad072cad": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/cases/11_attributed_header/original/.invalid/src/main.i:b5e2e8844dc75630": {
     "diagnostics": [
       "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
@@ -101,32 +96,14 @@
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i:47b7331c670212b3": {
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i:47b7331c670212b3": {
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i:47b7331c670212b3": {
@@ -139,76 +116,9 @@
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i:47b7331c670212b3": {
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:410a94ef7c0d830b": {
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:410a94ef7c0d830b": {
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:410a94ef7c0d830b": {
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:410a94ef7c0d830b": {
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:12c9c8ce6cbfb2c7": {
-    "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:0ea583b279d075e4": {
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:d3342c4bf974a7f1": {
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:60ba47edf6175dda": {
-    "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:6097e81d346de1ab": {
-    "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:23823fdfc5b3a649": {
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:7afc9e29afa2369e": {
-    "diagnostics": [
-      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:576bd12dc0cd6e56": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
   "tests/review/cases/review-a1/capture/.invalid/src/types.i:47b7331c670212b3": {
@@ -224,11 +134,6 @@
   "tests/review/cases/review-a1/cases/05_empty_header/.invalid/src/main.i:33b9e0bcbbd4fa71": {
     "diagnostics": [
       "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
-  "tests/review/cases/review-a1/cases/09_attr_tuple_same_line/.invalid/src/main.i:107c7a7cad072cad": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
   "tests/review/cases/review-a1/cases/11_attributed_header/.invalid/src/main.i:b5e2e8844dc75630": {
@@ -281,16 +186,6 @@
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:d3342c4bf974a7f1": {
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:6097e81d346de1ab": {
-    "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
     "diagnostics": [
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
@@ -304,70 +199,6 @@
   "tests/review/cases/review-k4c/cases/plain_3/.invalid/src/main.i:4bc4c5382ab708da": {
     "diagnostics": [
       "E0105: a block ends with an expression"
-    ]
-  },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:1e3adef4d558270c": {
-    "diagnostics": [
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `{` or `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
-    ]
-  },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:3309fab275f3e94d": {
-    "diagnostics": [
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `{` or `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
     ]
   },
   "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:36b001eec0ad49d6": {
@@ -386,54 +217,9 @@
       "E0101: expected an expression, found `!`"
     ]
   },
-  "tests/review/cases/review-native3/alias/.invalid/src/main.i:99202954a39fb9f4": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/direct/.invalid/src/main.i:317c40877294e409": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/external/.invalid/src/main.i:a7678ccd6b3bba52": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/field/.invalid/src/main.i:e6a2b33a8ff88ecd": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:afd55319505d72c1": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-native3/injection_control/.invalid/src/resource.i:681a205b48798d32": {
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:ee71313076a655d6": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/positive/.invalid/src/main.i:843c29762d098b1b": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:65364e04cfc80e91": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/update/.invalid/src/main.i:fd1a50946bb7ce16": {
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i:21150877805e373b": {
@@ -604,6 +390,210 @@
     "empty": [
       "empty tuple expression at byte 266",
       "empty tuple expression at byte 273"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:d7aadc88b0f2612d": {
+    "diagnostics": [
+      "E0101: expected an expression, found `*`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `{` or `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:2c1078179fb1f7f1": {
+    "diagnostics": [
+      "E0101: expected an expression, found `*`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `{` or `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
+    ]
+  },
+  "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:f086f99c43191055": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:c864d76f9a000845": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/update/.invalid/src/main.i:e06635cfdf19fbe7": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/direct/.invalid/src/main.i:78a2498add68d821": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/field/.invalid/src/main.i:c38c97ca5474c71f": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/positive/.invalid/src/main.i:3860e77c59025332": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/external/.invalid/src/main.i:6afb90ee7686b5ff": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:41b47228df8e379a": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/alias/.invalid/src/main.i:2eb034cc7da0d130": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:81932c29ebee8f35": {
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:33078f177ef0d17f": {
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:691e54109b62d9f8": {
+    "diagnostics": [
+      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:099e9a962cc984c3": {
+    "diagnostics": [
+      "E0102: expected the function body, a `{` on the same line, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:01ee4a918a766e4b": {
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:dd8dc6c53c080c32": {
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:e90d53cb31f70349": {
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:39d4bf0764d81dda": {
+    "diagnostics": [
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:e073a655a29348d6": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:a6fdcd6cdb2bad35": {
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:a6fdcd6cdb2bad35": {
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:e073a655a29348d6": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:e073a655a29348d6": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:e073a655a29348d6": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:a6fdcd6cdb2bad35": {
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:a6fdcd6cdb2bad35": {
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:81932c29ebee8f35": {
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:01ee4a918a766e4b": {
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
     ]
   }
 }

@@ -31,7 +31,7 @@ h1 = () {
   x5 = ask()
   ask()
 }
-@main
+
 main = () {
   ! Cov(Int) = Cov(() { 2 })
   with_dep(() { with_int(() { get() + ask() }) })
