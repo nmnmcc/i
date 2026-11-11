@@ -65,6 +65,7 @@ pub fn standard(print: impl Fn(&str) + Send + Sync + 'static) -> HostImports {
     clock::register(&mut imports);
     fs::register(&mut imports);
     net::register(&mut imports);
+    process::register(&mut imports);
     stdio::register(&mut imports);
     imports
 }
