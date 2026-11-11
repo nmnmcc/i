@@ -188,6 +188,9 @@ fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
     let t = table(v, d, "provider cell")?;
     let mut factory = None;
     let mut host = None;
+    let mut has_factory = false;
+    let mut has_host = false;
+    let mut host_span = at(v.span());
     let mut args = vec![];
     let mut required = false;
     let mut has_args = false;
@@ -195,8 +198,15 @@ fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
     let mut required_span = at(v.span());
     for (k, v) in t.iter() {
         match k.get_ref().as_ref() {
-            "factory" => factory = qualified(v, d, "factory"),
-            "host" => host = boolean(v, d, "host"),
+            "factory" => {
+                has_factory = true;
+                factory = qualified(v, d, "factory");
+            }
+            "host" => {
+                has_host = true;
+                host_span = at(v.span());
+                host = boolean(v, d, "host");
+            }
             "arguments" => {
                 has_args = true;
                 if let DeValue::Array(a) = v.get_ref() {
@@ -229,17 +239,13 @@ fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
     if has_required && !args.contains(&Argument::Seed) {
         error(d, required_span, "seed_required requires a seed argument");
     }
-    if host.is_some() && (factory.is_some() || has_args || has_required) {
-        error(
-            d,
-            at(v.span()),
-            "host and factory variants cannot be combined",
-        );
+    if has_host && (has_factory || has_args || has_required) {
+        error(d, host_span, "host and factory variants cannot be combined");
         return None;
     }
     if let Some(h) = host {
         if !h {
-            error(d, at(v.span()), "host must be true");
+            error(d, host_span, "host must be true");
             return None;
         }
         return Some(Cell::Host);
@@ -251,7 +257,9 @@ fn cell(v: &Spanned<DeValue>, d: &mut Vec<Diagnostic>) -> Option<Cell> {
             seed_required: required,
         });
     }
-    error(d, at(v.span()), "provider cell requires factory or host");
+    if !has_factory && !has_host {
+        error(d, at(v.span()), "provider cell requires factory or host");
+    }
     None
 }
 pub(crate) fn rows(v: &Spanned<DeValue>, plan: &mut ProviderPlan, d: &mut Vec<Diagnostic>) {
