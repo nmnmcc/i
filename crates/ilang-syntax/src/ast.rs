@@ -353,7 +353,13 @@ pub struct Binder {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {
     /// A Lisp quote pattern used by a compile-time macro.
-    Quote(Box<crate::lisp::Datum>),
+    Quote {
+        datum: Box<crate::lisp::Datum>,
+        /// Template table slot, populated when preparing a compiler program.
+        template: Option<u32>,
+        /// Capture patterns in matcher order; bool denotes a splice.
+        captures: Vec<(bool, Pattern)>,
+    },
     Var(String),
     Discard(String),
     /// `x: T` (§7.1).

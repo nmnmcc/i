@@ -352,6 +352,9 @@ impl Walk {
 
     fn pattern(&mut self, p: &Pattern) {
         match &p.kind {
+            PatternKind::Quote { captures, .. } => {
+                captures.iter().for_each(|(_, p)| self.pattern(p))
+            }
             PatternKind::Var(b) => self.binder(b),
             PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
             PatternKind::Named { binder, pattern } => {
@@ -2247,6 +2250,34 @@ impl<'a> Lowerer<'a> {
     /// when it does not match (§7.2).
     fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
         match &p.kind {
+            PatternKind::Quote {
+                template,
+                functions,
+                captures,
+                ..
+            } => {
+                let template = self.pattern_call(
+                    fx,
+                    out,
+                    functions[0],
+                    p.span,
+                    vec![Atom::Int((*template).into())],
+                );
+                let result = self.pattern_call(fx, out, functions[1], p.span, vec![template, v]);
+                let success =
+                    self.pattern_call(fx, out, functions[2], p.span, vec![result.clone()]);
+                guard(out, Cond::True(success), fail);
+                for (index, (many, pattern)) in captures.iter().enumerate() {
+                    let value = self.pattern_call(
+                        fx,
+                        out,
+                        functions[if *many { 4 } else { 3 }],
+                        p.span,
+                        vec![result.clone(), Atom::Int(index.into())],
+                    );
+                    self.pattern(fx, out, pattern, value, fail);
+                }
+            }
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {
@@ -2328,6 +2359,32 @@ impl<'a> Lowerer<'a> {
             PatternKind::BitArray(segs) => self.bits_pattern(fx, out, v, segs, fail),
             PatternKind::Error(_) => out.push(Stmt::Unreachable),
         }
+    }
+
+    fn pattern_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        function: DefId,
+        span: Span,
+        args: Vec<Atom>,
+    ) -> Atom {
+        let callee = Expr {
+            kind: ExprKind::Name(ValueRef::Def(function)),
+            span,
+        };
+        let target = self.target(fx, out, &callee);
+        let value = match target {
+            Target::Callee(callee) => Value::Call {
+                callee,
+                args,
+                env: fx.env,
+            },
+            Target::Op(op) if op.needs_env() => Value::OpEnv(op, args, fx.env),
+            Target::Op(op) => Value::Op(op, args),
+            Target::Ctor(_) => unreachable!("quote service is a function"),
+        };
+        let_value(fx, out, value, self.site(fx, span.start))
     }
 
     /// The test of a type test `x: T` for one member of `T` (§7.1).

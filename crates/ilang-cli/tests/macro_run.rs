@@ -39,6 +39,96 @@ fn input() -> Syntax {
 }
 
 #[test]
+fn quote_pattern_selects_original_syntax_and_falls_through() {
+    use ilang_syntax::lisp::syntax::Node;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> ((: x (. syntax Syntax))) (. syntax Syntax) (. x { (-> (? `(f ~item) False) item) (-> `(f ~`(g ~item)) item) (-> `(f ~item) item) (-> `(s ~..[first ..rest]) first) (-> (| `(h ~item) `(i ~item)) item) (-> _ x) }))))\n").unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let source = parsed.iter().find(|m| m.path == "app/main").unwrap().source;
+    let mut parsed = ilang_macro::prepare::import_closure(&graph, &parsed, source).unwrap();
+    let templates = ilang_macro::prepare::prepare(&graph, &mut parsed)
+        .unwrap()
+        .templates;
+    let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "choose")]).unwrap();
+    let original = input();
+    let Node::Round(children) = original.node() else {
+        panic!("expected round syntax");
+    };
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[original.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&children[1]));
+    for code in ["(h a)", "(i a)"] {
+        let choice = Syntax::from_datum(&parse(code).unwrap()[0], original.scope());
+        let Node::Round(children) = choice.node() else {
+            panic!("expected round syntax");
+        };
+        let got = ilang_macro::run::invoke_with_templates(
+            &built,
+            "app/main.choose",
+            &[choice.clone()],
+            templates.clone().into(),
+        )
+        .unwrap();
+        assert!(got.identical(&children[1]));
+    }
+    let empty = Syntax::from_datum(&parse("(s)").unwrap()[0], original.scope());
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[empty.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&empty));
+    let nested = Syntax::from_datum(&parse("(f (g y))").unwrap()[0], original.scope());
+    let Node::Round(outer) = nested.node() else {
+        panic!("expected round syntax");
+    };
+    let Node::Round(inner) = outer[1].node() else {
+        panic!("expected nested syntax");
+    };
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[nested.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&inner[1]));
+    let spliced = Syntax::from_datum(&parse("(s z q)").unwrap()[0], original.scope());
+    let Node::Round(children) = spliced.node() else {
+        panic!("expected round syntax");
+    };
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[spliced.clone()],
+        templates.clone().into(),
+    )
+    .unwrap();
+    assert!(got.identical(&children[1]));
+    let other = Syntax::from_datum(&parse("(g x)").unwrap()[0], original.scope());
+    let got = ilang_macro::run::invoke_with_templates(
+        &built,
+        "app/main.choose",
+        &[other.clone()],
+        templates.into(),
+    )
+    .unwrap();
+    assert!(got.identical(&other));
+}
+
+#[test]
 fn syntax_crosses_the_compiler_export_without_losing_identity() {
     let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n");
     let original = input();
@@ -356,13 +446,25 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
         at: at.clone(),
     }));
     let error = ilang_macro::run::invoke_with_items_budget(
-        &built, &format!("{path}.{name}"), &[input()], prepared.templates.into(),
-        context, None, budget.clone(),
-    ).unwrap_err();
-    assert_eq!(budget.exceeded(), Some(ilang_host::macro_budget::Limit::Work));
-    assert_eq!(error.downcast_ref::<ilang_host::macro_budget::Exceeded>(),
-        Some(&ilang_host::macro_budget::Exceeded(ilang_host::macro_budget::Limit::Work)));
-
+        &built,
+        &format!("{path}.{name}"),
+        &[input()],
+        prepared.templates.into(),
+        context,
+        None,
+        budget.clone(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        budget.exceeded(),
+        Some(ilang_host::macro_budget::Limit::Work)
+    );
+    assert_eq!(
+        error.downcast_ref::<ilang_host::macro_budget::Exceeded>(),
+        Some(&ilang_host::macro_budget::Exceeded(
+            ilang_host::macro_budget::Limit::Work
+        ))
+    );
 }
 
 #[test]

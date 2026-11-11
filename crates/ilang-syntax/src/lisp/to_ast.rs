@@ -171,7 +171,11 @@ pub fn parse_pattern(d: &Datum) -> Result<Pattern> {
     let kind = match &d.kind {
         K::Quote(_) => {
             check_quote(d, true)?;
-            PatternKind::Quote(Box::new(d.clone()))
+            PatternKind::Quote {
+                datum: Box::new(d.clone()),
+                template: None,
+                captures: super::quote_lower::pattern_captures(d),
+            }
         }
         K::Name(n) => PatternKind::Var(n.clone()),
         K::Discard(n) => PatternKind::Discard(n.clone()),
