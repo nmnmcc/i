@@ -274,7 +274,7 @@ pub enum TypeRef {
     Builtin(BuiltinType),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Type {
     pub kind: TypeKind,
     pub span: Span,
@@ -355,7 +355,7 @@ pub struct Block {
     pub span: Span,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
@@ -483,7 +483,7 @@ pub struct Format {
     pub arg: Option<Box<Expr>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
@@ -577,7 +577,7 @@ pub struct AliasPattern {
     pub pattern: TypePattern,
     pub binders: Vec<TypeId>,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum TypePattern {
     Bind(TypeId),
     Skip,
@@ -589,36 +589,36 @@ pub enum TypePattern {
 
 /// Visits every type node, preserving value-reference provenance.
 pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
-    f(t);
-    match &t.kind {
-        TypeKind::Named { args, .. }
-        | TypeKind::Tuple(args)
-        | TypeKind::Union(args)
-        | TypeKind::Inter(args)
-        | TypeKind::Diff(args) => {
-            for t in args {
-                walk_type(t, f);
+    let mut work = vec![t];
+    while let Some(t) = work.pop() {
+        f(t);
+        match &t.kind {
+            TypeKind::Named { args, .. }
+            | TypeKind::Tuple(args)
+            | TypeKind::Union(args)
+            | TypeKind::Inter(args)
+            | TypeKind::Diff(args) => work.extend(args.iter().rev()),
+            TypeKind::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } => {
+                if let Some(t) = env {
+                    work.push(t);
+                }
+                if let Some(t) = err {
+                    work.push(t);
+                }
+                work.push(ret);
+                work.extend(params.iter().rev().map(|p| &p.ty));
             }
+            TypeKind::Lit(_)
+            | TypeKind::Of { .. }
+            | TypeKind::Var(_)
+            | TypeKind::Hole
+            | TypeKind::Error => {}
         }
-        TypeKind::Fn {
-            params,
-            ret,
-            err,
-            env,
-        } => {
-            for p in params {
-                walk_type(&p.ty, f);
-            }
-            walk_type(ret, f);
-            for t in err.iter().chain(env) {
-                walk_type(t, f);
-            }
-        }
-        TypeKind::Lit(_)
-        | TypeKind::Of { .. }
-        | TypeKind::Var(_)
-        | TypeKind::Hole
-        | TypeKind::Error => {}
     }
 }
 
@@ -639,23 +639,27 @@ pub fn value_dependent(p: &Program, t: &Type) -> bool {
         });
         return found;
     }
-    fn go(p: &Program, t: &Type, seen: &mut std::collections::HashSet<TypeId>) -> bool {
-        let mut found = false;
-        walk_type(t, &mut |t| match &t.kind {
-            TypeKind::Of { .. } => found = true,
+    let mut work = vec![t];
+    let mut seen = std::collections::HashSet::new();
+    while let Some(t) = work.pop() {
+        let mut direct = false;
+        walk_type(t, &mut |node| match &node.kind {
+            TypeKind::Of { .. } => direct = true,
             TypeKind::Named {
                 ty: TypeRef::Custom(id),
                 ..
             } if seen.insert(*id) => {
                 if let TypeBody::Alias(body) = &p.ty(*id).body {
-                    found |= go(p, body, seen);
+                    work.push(body);
                 }
             }
             _ => {}
         });
-        found
+        if direct {
+            return true;
+        }
     }
-    go(p, t, &mut std::collections::HashSet::new())
+    false
 }
 
 /// Summaries use only direct written edges; propagating provenance visits
@@ -734,120 +738,118 @@ pub fn summarize_aliases(p: &mut Program) {
 /// All written types in a binding, including nested bodies and patterns.
 /// Runtime-use analysis deliberately does not call this visitor.
 pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
-    fn pattern(p: &Pattern, f: &mut impl FnMut(&Type)) {
-        match &p.kind {
-            PatternKind::Typed { ty, .. } => f(ty),
-            PatternKind::Named { pattern: p, .. } => pattern(p, f),
-            PatternKind::Constructor { args, .. }
-            | PatternKind::Tuple(args)
-            | PatternKind::Error(args) => {
-                for p in args {
-                    pattern(p, f);
-                }
+    enum Node<'a> {
+        Binding(&'a Binding),
+        Pattern(&'a Pattern),
+        Expr(&'a Expr),
+        Block(&'a Block),
+        Type(&'a Type),
+    }
+    let mut work = vec![Node::Binding(b)];
+    while let Some(node) = work.pop() {
+        match node {
+            Node::Type(t) => f(t),
+            Node::Binding(b) => {
+                work.push(Node::Expr(&b.value));
+                work.push(Node::Pattern(&b.pattern));
             }
-            PatternKind::List { items, .. } => {
-                for p in items {
-                    pattern(p, f);
+            Node::Pattern(p) => match &p.kind {
+                PatternKind::Typed { ty, .. } => work.push(Node::Type(ty)),
+                PatternKind::Named { pattern, .. } => work.push(Node::Pattern(pattern)),
+                PatternKind::Constructor { args, .. }
+                | PatternKind::Tuple(args)
+                | PatternKind::Error(args) => work.extend(args.iter().rev().map(Node::Pattern)),
+                PatternKind::List { items, .. } => {
+                    work.extend(items.iter().rev().map(Node::Pattern))
                 }
-            }
-            PatternKind::BitArray(segs) => {
-                for seg in segs {
-                    pattern(&seg.value, f);
-                    if let Some(arg) = seg.format.as_ref().and_then(|s| s.arg.as_deref()) {
-                        expr(arg, f);
+                PatternKind::BitArray(xs) => {
+                    for x in xs.iter().rev() {
+                        if let Some(e) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                            work.push(Node::Expr(e));
+                        }
+                        work.push(Node::Pattern(&x.value));
+                    }
+                }
+                _ => {}
+            },
+            Node::Block(b) => {
+                for st in b.stmts.iter().rev() {
+                    match st {
+                        Stmt::Bind(b) => work.push(Node::Binding(b)),
+                        Stmt::Env { ty, value, .. } => {
+                            work.push(Node::Expr(value));
+                            work.push(Node::Type(ty));
+                        }
+                        Stmt::Expr(e) => work.push(Node::Expr(e)),
                     }
                 }
             }
-            _ => {}
+            Node::Expr(e) => match &e.kind {
+                ExprKind::Fn(fun) => {
+                    work.push(Node::Block(&fun.body));
+                    if let Some(r) = &fun.ret {
+                        if let Some(t) = &r.env {
+                            work.push(Node::Type(t));
+                        }
+                        if let Some(t) = &r.err {
+                            work.push(Node::Type(t));
+                        }
+                        work.push(Node::Type(&r.value));
+                    }
+                    for p in fun.params.iter().rev() {
+                        match p {
+                            Param::Pattern { pattern, .. } => work.push(Node::Pattern(pattern)),
+                            Param::Env { ty, .. } => work.push(Node::Type(ty)),
+                        }
+                    }
+                }
+                ExprKind::Block(b) => work.push(Node::Block(b)),
+                ExprKind::Case { subject, clauses } => {
+                    for c in clauses.iter().rev() {
+                        work.push(Node::Expr(&c.body));
+                        if let Some(g) = &c.guard {
+                            work.push(Node::Expr(g));
+                        }
+                        work.extend(c.patterns.iter().rev().map(Node::Pattern));
+                    }
+                    work.push(Node::Expr(subject));
+                }
+                ExprKind::Tuple(xs) => work.extend(xs.iter().rev().map(Node::Expr)),
+                ExprKind::List { items, rest } => {
+                    if let Some(e) = rest {
+                        work.push(Node::Expr(e));
+                    }
+                    work.extend(items.iter().rev().map(Node::Expr));
+                }
+                ExprKind::Call { callee, args } => {
+                    work.extend(args.iter().rev().map(|a| Node::Expr(&a.value)));
+                    work.push(Node::Expr(callee));
+                }
+                ExprKind::Field { target, .. }
+                | ExprKind::TupleIndex { target, .. }
+                | ExprKind::Unary { expr: target, .. } => work.push(Node::Expr(target)),
+                ExprKind::RecordUpdate { base, fields, .. } => {
+                    work.extend(fields.iter().rev().map(|(_, e)| Node::Expr(e)));
+                    work.push(Node::Expr(base));
+                }
+                ExprKind::Binary { lhs, rhs, .. } => {
+                    work.push(Node::Expr(rhs));
+                    work.push(Node::Expr(lhs));
+                }
+                ExprKind::BitArray(xs) => {
+                    for x in xs.iter().rev() {
+                        if let Some(e) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
+                            work.push(Node::Expr(e));
+                        }
+                        work.push(Node::Expr(&x.value));
+                    }
+                }
+                ExprKind::Int(_)
+                | ExprKind::Float(_)
+                | ExprKind::String(_)
+                | ExprKind::Name(_)
+                | ExprKind::Error => {}
+            },
         }
     }
-    fn block(b: &Block, f: &mut impl FnMut(&Type)) {
-        for s in &b.stmts {
-            match s {
-                Stmt::Bind(b) => binding_types(b, f),
-                Stmt::Env { ty, value, .. } => {
-                    f(ty);
-                    expr(value, f);
-                }
-                Stmt::Expr(e) => expr(e, f),
-            }
-        }
-    }
-    fn expr(e: &Expr, f: &mut impl FnMut(&Type)) {
-        match &e.kind {
-            ExprKind::Fn(fun) => {
-                for p in &fun.params {
-                    match p {
-                        Param::Pattern { pattern: p, .. } => pattern(p, f),
-                        Param::Env { ty, .. } => f(ty),
-                    }
-                }
-                if let Some(ret) = &fun.ret {
-                    for t in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
-                        .into_iter()
-                        .flatten()
-                    {
-                        f(t);
-                    }
-                }
-                block(&fun.body, f);
-            }
-            ExprKind::Block(b) => block(b, f),
-            ExprKind::Case { subject, clauses } => {
-                expr(subject, f);
-                for c in clauses {
-                    for p in &c.patterns {
-                        pattern(p, f);
-                    }
-                    if let Some(g) = &c.guard {
-                        expr(g, f);
-                    }
-                    expr(&c.body, f);
-                }
-            }
-            ExprKind::Tuple(ts) => {
-                for e in ts {
-                    expr(e, f);
-                }
-            }
-            ExprKind::List { items, rest } => {
-                for e in items.iter().chain(rest.as_deref()) {
-                    expr(e, f);
-                }
-            }
-            ExprKind::Call { callee, args } => {
-                expr(callee, f);
-                for a in args {
-                    expr(&a.value, f);
-                }
-            }
-            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => expr(target, f),
-            ExprKind::RecordUpdate { base, fields, .. } => {
-                expr(base, f);
-                for (_, e) in fields {
-                    expr(e, f);
-                }
-            }
-            ExprKind::Unary { expr: e, .. } => expr(e, f),
-            ExprKind::Binary { lhs, rhs, .. } => {
-                expr(lhs, f);
-                expr(rhs, f);
-            }
-            ExprKind::BitArray(segs) => {
-                for seg in segs {
-                    expr(&seg.value, f);
-                    if let Some(arg) = seg.format.as_ref().and_then(|s| s.arg.as_deref()) {
-                        expr(arg, f);
-                    }
-                }
-            }
-            ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Name(_)
-            | ExprKind::Error => {}
-        }
-    }
-    pattern(&b.pattern, f);
-    expr(&b.value, f);
 }
