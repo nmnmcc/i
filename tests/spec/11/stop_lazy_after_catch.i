@@ -1,8 +1,8 @@
 // spec: 11.7, 9.4, 9.3
 // expect: stop "panic: after"
-// at: spec/stop_lazy_after_catch:36:3
-// at: spec/stop_lazy_after_catch:44:5
-// at: spec/stop_lazy_after_catch:48:18
+// at: spec/main:36:3
+// at: spec/main:44:5
+// at: spec/main:48:18
 (i/control, i/core, i/fail)
 
 check = (got: String, want: String) {

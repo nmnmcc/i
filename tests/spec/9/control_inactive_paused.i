@@ -1,7 +1,7 @@
 // spec: 9.4, 11.7
 // expect: stop "control: boundary is not active"
-// at: spec/control_inactive_paused:13:28
-// at: spec/control_inactive_paused:12:2
+// at: spec/main:13:28
+// at: spec/main:12:2
 (
 	i/control
 )

@@ -1,7 +1,7 @@
 // spec: 9.4, 11.7
 // expect: stop "control: boundary is not active"
-// at: spec/control_lazy_inactive:14:36
-// at: spec/control_lazy_inactive:11:3
+// at: spec/main:14:36
+// at: spec/main:11:3
 (i/control)
 
 // `inner` is paused inside `k`, and is active again after the resume. The

@@ -1,6 +1,6 @@
 // spec: 9.7, 9.3, 10.2, 11.7
 // expect: stop "error: "negative""
-// at: spec/async_error_main:15:1
+// at: spec/main:15:1
 // output: double 2
 // output: double -1
 

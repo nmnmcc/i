@@ -1,6 +1,6 @@
 // spec: 9.5, 11.7
 // expect: stop "panic: final"
-// at: spec/ensure_normal:8:14
+// at: spec/main:8:14
 (
 	i/resource
 )

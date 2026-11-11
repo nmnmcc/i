@@ -1,11 +1,11 @@
 // spec: 11.7, 9.4
 // expect: stop "panic: after"
-// at: spec/stop_lazy_pending:31:3
-// at: spec/stop_lazy_pending:25:7
-// at: spec/stop_lazy_pending:20:7
-// at: spec/stop_lazy_pending:15:7
-// at: spec/stop_lazy_pending:39:5
-// at: spec/stop_lazy_pending:43:18
+// at: spec/main:31:3
+// at: spec/main:25:7
+// at: spec/main:20:7
+// at: spec/main:15:7
+// at: spec/main:39:5
+// at: spec/main:43:18
 (i/control)
 
 Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }

@@ -1,7 +1,7 @@
 // spec: 8.3, 11.7
 // expect: stop "bit array: bytes are not whole"
-// at: spec/stop_not_whole:11:6
-// at: spec/stop_not_whole:17:2
+// at: spec/main:11:6
+// at: spec/main:17:2
 
 make = (n: Int) {
 	b = <<1:u1>>

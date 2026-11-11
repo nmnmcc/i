@@ -1,11 +1,11 @@
 // spec: 11.7, 9.4
 // expect: stop "panic: inside"
-// at: spec/stop_lazy_descent:21:3
-// at: spec/stop_lazy_descent:15:7
-// at: spec/stop_lazy_descent:26:9
-// at: spec/stop_lazy_descent:25:7
-// at: spec/stop_lazy_descent:37:5
-// at: spec/stop_lazy_descent:42:11
+// at: spec/main:21:3
+// at: spec/main:15:7
+// at: spec/main:26:9
+// at: spec/main:25:7
+// at: spec/main:37:5
+// at: spec/main:42:11
 (i/control)
 
 Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }

@@ -1,16 +1,16 @@
 // spec: 11.7, 9.4
 // expect: stop "panic: inner"
-// at: spec/stop_lazy_nested:31:3
-// at: spec/stop_lazy_nested:25:7
-// at: spec/stop_lazy_nested:20:7
-// at: spec/stop_lazy_nested:66:5
-// at: spec/stop_lazy_nested:54:11
-// at: spec/stop_lazy_nested:47:7
-// at: spec/stop_lazy_nested:41:7
-// at: spec/stop_lazy_nested:36:7
-// at: spec/stop_lazy_nested:70:5
-// at: spec/stop_lazy_nested:54:11
-// at: spec/stop_lazy_nested:73:3
+// at: spec/main:31:3
+// at: spec/main:25:7
+// at: spec/main:20:7
+// at: spec/main:66:5
+// at: spec/main:54:11
+// at: spec/main:47:7
+// at: spec/main:41:7
+// at: spec/main:36:7
+// at: spec/main:70:5
+// at: spec/main:54:11
+// at: spec/main:73:3
 (i/control)
 
 Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
