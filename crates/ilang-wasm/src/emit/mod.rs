@@ -1211,7 +1211,12 @@ fn int(n: &BigInt) -> String {
 
 /// Appends the `ilang.abi` custom section (B.6).
 pub fn add_abi_section(wasm: &mut Vec<u8>, json: &str) {
-    let name = b"ilang.abi";
+    add_json_section(wasm, "ilang.abi", json);
+}
+
+/// Diagnostic identities for chosen host leaves, outside the fixed v3 ABI.
+pub(crate) fn add_json_section(wasm: &mut Vec<u8>, name: &str, json: &str) {
+    let name = name.as_bytes();
     let mut payload = Vec::new();
     leb(&mut payload, name.len() as u64);
     payload.extend_from_slice(name);

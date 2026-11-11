@@ -198,6 +198,9 @@ pub fn resolve_program_plans(
     let mut out = BTreeMap::new();
     let schema = Schema::resolve(p, t, graph, target);
     for (&entry, needs) in &t.entry_provider_needs {
+        if !entry_is_eligible(p, entry, target) {
+            continue;
+        }
         let mut errors = Vec::new();
         errors.extend(schema.errors.iter().map(|(authority, span, msg)| {
             let mut d = diagnostic(p, entry, target, *span, msg);
@@ -270,6 +273,12 @@ pub fn resolve_program_plans(
         out.insert(entry, result);
     }
     out
+}
+
+/// WASI emits one command; test bodies are still source-checked, but have no
+/// construction plan on that target (§B.7).
+pub fn entry_is_eligible(p: &Program, entry: DefId, target: Target) -> bool {
+    target != Target::Wasi || p.module(entry.module).kind != ModuleKind::Test
 }
 
 /// A target still validates declarations when a package has no entry to build.

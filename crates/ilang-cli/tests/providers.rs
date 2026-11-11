@@ -54,7 +54,7 @@ fn parameter_instances_have_separate_factory_environments() {
 #[test]
 fn seed_aware_factory_runs_inside_user_adapter() {
     passes(
-        "S { S(value: Int) }\nretain = (x) { x }\nadapt(A,E,N) = (body: () -> A ^ E ! N) -> A ^ E ! N - S { ! S = S(40) retain(body()) }\nmake = (seeds: List(S)) -> S { seeds |> { [s] -> S(s.value + 2) _ -> panic(\"missing seed\") } }\nmain = (s ! S) { assert(s.value == 42) }",
+        "(i/core)\nS { S(value: Int) }\nretain = (x) { x }\nadapt(A,E,N) = (body: () -> A ^ E ! N) -> A ^ E ! N - S { core.portable(body) |> { True -> panic(\"entry body escaped portability\") False -> Nil } ! S = S(40) retain(body()) }\nmake = (seeds: List(S)) -> S { seeds |> { [s] -> S(s.value + 2) _ -> panic(\"missing seed\") } }\nmain = (s ! S) { assert(s.value == 42) }",
         "[providers.\"app/main.S\"]\nrole = \"runner\"\nadapter = \"app/main.adapt\"\nnative = {factory=\"app/main.make\", arguments=[\"seed\"], seed_required=true}\n[provider_adapters.\"app/main.adapt\"]\nsupplies = [\"app/main.S\"]\nrequires = []\n",
     );
 }
@@ -72,7 +72,7 @@ fn adapter_cannot_call_body_twice() {
 #[test]
 fn columns_and_cli_ilang_alias_select_their_factories() {
     let dir = project(
-        "(S, probe)\nS { S(value: Int) }\na = () { S(1) }\nb = () { S(2) }\nc = () { S(3) }\nd = () { S(4) }\ne = () { S(5) }\nprobe = (s ! S) { s.value }\n",
+        "(S, probe)\nS { S(value: Int) }\na = () { S(1) }\nb = () { S(2) }\nc = () { S(3) }\nd = () { S(4) }\ne = () { S(5) }\nprobe = (s ! S) { s.value }\nmain = () { Nil }\n",
         "[wasm]\nexports = [\"app/main.probe\"]\n[providers.\"app/main.S\"]\njs = \"app/main.a\"\nnodejs = \"app/main.b\"\nnative = \"app/main.c\"\nwasi = \"app/main.d\"\nhost = \"app/main.e\"\n",
     );
     for (target, expected) in [
@@ -91,7 +91,7 @@ fn columns_and_cli_ilang_alias_select_their_factories() {
             matches!(instance.call("app/main.probe", &[]).unwrap(), Outcome::Ok(Value::Int(n)) if n == expected.into())
         );
     }
-    for target in ["js", "nodejs", "native", "host", "ilang"] {
+    for target in ["js", "nodejs", "native", "wasi", "host", "ilang"] {
         let out = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
             .args(["build", "--opt", "0", "--target", target, "--project"])
             .arg(dir.path())
@@ -103,6 +103,16 @@ fn columns_and_cli_ilang_alias_select_their_factories() {
             String::from_utf8_lossy(&out.stderr)
         );
     }
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--opt", "0", "--target", "wasi", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 #[test]
 fn missing_provider_is_a_build_error_but_source_check_passes() {
@@ -134,8 +144,7 @@ fn missing_host_registration_names_the_service_before_execution() {
         "",
     );
     let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
-    let error = b
-        .host_program()
+    let error = ilang_host::Program::from_bytes(&b.wasm)
         .unwrap()
         .instantiate(b.host_options())
         .err()
@@ -189,4 +198,28 @@ fn target_schema_is_checked_without_an_entry() {
         .unwrap()
         .to_string();
     assert!(error.contains("must return its service"), "{error}");
+}
+
+#[test]
+fn generated_discriminant_provisions_constructor_fields() {
+    passes(
+        "Part { Part(value: Int) }\nBundle { On(Part) Off }\npart = () { Part(42) }\nmain = (b ! Bundle) { b |> { On(p) -> assert(p.value == 42) Off -> panic(\"wrong target\") } }",
+        &(row("Part", "part")
+            + "[providers.\"app/main.Bundle\"]\ndiscriminant = {js=\"app/main.Off\", nodejs=\"app/main.On\", native=\"app/main.On\", wasi=\"app/main.Off\", host=\"app/main.Off\"}\n"),
+    );
+}
+
+#[test]
+fn factory_request_dependencies_classify_and_suspend_the_entry() {
+    let dir = project(
+        "(i/clock, i/fail)\nS { S(value: Int) }\nmake = () { fail.catch(() { clock.sleep_ns(1000) }) |> { Ok(_) -> S(42) Error(_) -> panic(\"clock failed\") } }\nmain = (s ! S) { assert(s.value == 42) }",
+        &row("S", "make"),
+    );
+    let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
+    let program = b.host_program().unwrap();
+    assert!(program.abi().entry.as_ref().unwrap().is_async);
+    assert!(matches!(
+        program.run_entry(b.host_options()).unwrap(),
+        Outcome::Ok(_)
+    ));
 }

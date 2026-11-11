@@ -23,7 +23,7 @@ async function build(source, plan, use) {
 
 test('user providers and their host leaves run in plan order on Node', async () => {
   await build('(S, probe)\n@host("custom")\nHost { Host(read: () -> Int) }\nS { S(value: Int) }\nmake = (host ! Host) { S(host.read() + 2) }\nprobe = (s ! S) { s.value }', '[wasm]\nexports = ["app/main.probe"]\n[providers."app/main.S"]\nnodejs = "app/main.make"\n', async (bindings) => {
-    await assert.rejects(instantiate(bindings.module, { bindings }), /Missing host function custom read for service app\/main.Host/);
+    await assert.rejects(instantiate(bindings.module), /Missing host function custom read for service app\/main.Host/);
     let calls = 0;
     const guest = await instantiate(bindings.module, { bindings, contextImports: { custom: { read: () => { calls++; return 40n; } } } });
     assert.equal(calls, 0);

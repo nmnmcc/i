@@ -809,6 +809,24 @@ export async function authorizeBindings(source, plan, approve, options = {}) {
   return token;
 }
 
+// Diagnostic names for host registration leaves; these grant no authority.
+function providerRegistrations(module, abi) {
+  const sections = WebAssembly.Module.customSections(module, "ilang.providers");
+  expect(sections.length <= 1, "Duplicate ilang.providers sections");
+  if (!sections.length) return [];
+  let registrations;
+  try { registrations = JSON.parse(decoder.decode(sections[0])); }
+  catch (cause) { throw new AbiError("Malformed ilang.providers metadata", { cause }); }
+  expect(Array.isArray(registrations), "ilang.providers must be an array");
+  for (const registration of registrations) {
+    plainObject(registration, "provider registration");
+    only(registration, ["service", "namespace", "name"], "provider registration");
+    for (const field of ["service", "namespace", "name"]) expect(typeof registration[field] === "string", `Provider registration needs ${field}`);
+    expect(Object.hasOwn(abi.services[registration.namespace] ?? {}, registration.name), `Provider service ${registration.service} refers to an undeclared host function ${registration.namespace} ${registration.name}`);
+  }
+  return registrations;
+}
+
 function checkBindings(module, abi, options) {
   if (options.bindings) {
     const authorization = bindingAuthorizations.get(options.bindings);
@@ -843,6 +861,7 @@ export async function instantiate(source, options = {}) {
   }
   const module = await compile(source);
   const abi = readAbi(module, options.abi);
+  const registrations = providerRegistrations(module, abi);
   const standard = options.standardServices ? standardServices(options.standardServices === true ? {} : options.standardServices) : {};
   checkBindings(module, abi, options);
   const bridge = new Bridge();
@@ -907,8 +926,8 @@ export async function instantiate(source, options = {}) {
         const legacy = options.imports?.[moduleName]?.[name];
         const contextFn = options.contextImports?.[moduleName]?.[name] ?? (!legacy ? standard[moduleName]?.[name] : undefined);
         expect(!(legacy && contextFn), `Host function ${moduleName} ${name} is registered twice`);
-        const declaration = options.bindings && bindingAuthorizations.get(options.bindings).plan.declarations.find((d) => d.kind === "service" && d.namespace === moduleName && d.name === name);
-        const service = declaration ? ` for service ${declaration.module}.${declaration.declaration.split(".")[0]}` : "";
+        const services = registrations.filter((d) => d.namespace === moduleName && d.name === name).map((d) => d.service);
+        const service = services.length ? ` for service ${services.join(", ")}` : "";
         expect(typeof (contextFn ?? legacy) === "function", `Missing host function ${moduleName} ${name}${service}`);
         expect(!Object.hasOwn(imports[moduleName], name), `Host function ${moduleName} ${name} is registered twice`);
         // Nothing is thrown into the module (B.1): an exception of the

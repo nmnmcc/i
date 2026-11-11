@@ -754,6 +754,16 @@ struct State {
     requests: Requests,
 }
 
+/// Service identities attached to required host fields by the compiler. They
+/// improve registration diagnostics and confer no binding authority.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderRegistration {
+    service: String,
+    namespace: String,
+    name: String,
+}
+
 /// A compiled program. Reuse it to make independent instances, for example
 /// one per test, without compiling again.
 pub struct Program {
@@ -763,6 +773,7 @@ pub struct Program {
     embedded_abi: bool,
     artifact_digest: String,
     binding_plan: Option<bindings::BindingPlan>,
+    provider_registrations: Vec<ProviderRegistration>,
 }
 
 impl Program {
@@ -770,6 +781,33 @@ impl Program {
         let embedded = Abi::from_wasm(bytes)?;
         let embedded_abi = embedded.is_some();
         let abi = embedded.unwrap_or_default();
+        let mut registrations = None;
+        for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+            if let wasmparser::Payload::CustomSection(section) = payload?
+                && section.name() == "ilang.providers"
+            {
+                ensure!(
+                    registrations.is_none(),
+                    "duplicate ilang.providers custom section"
+                );
+                registrations = Some(
+                    serde_json::from_slice::<Vec<ProviderRegistration>>(section.data())
+                        .context("invalid ilang.providers metadata")?,
+                );
+            }
+        }
+        let provider_registrations = registrations.unwrap_or_default();
+        for registration in &provider_registrations {
+            ensure!(
+                abi.services
+                    .get(&registration.namespace)
+                    .is_some_and(|fields| fields.contains_key(&registration.name)),
+                "provider service {} refers to an undeclared host function {} {}",
+                registration.service,
+                registration.namespace,
+                registration.name
+            );
+        }
         if let Some(target) = &abi.target {
             bail!(
                 "the module was built for the {target} target (B.7); run it with a WASI host such as `wasmtime run`"
@@ -802,6 +840,7 @@ impl Program {
             embedded_abi,
             artifact_digest: bindings::artifact_digest(bytes),
             binding_plan: None,
+            provider_registrations,
         })
     }
 
@@ -844,23 +883,19 @@ impl Program {
                             .functions
                             .contains_key(&(namespace.clone(), name.clone())),
                         "missing host function {namespace} {name}{}",
-                        self.binding_plan
-                            .as_ref()
-                            .and_then(|plan| plan
-                                .declarations
+                        {
+                            let services: Vec<_> = self
+                                .provider_registrations
                                 .iter()
-                                .find(|d| d.namespace == *namespace
-                                    && d.name == *name
-                                    && d.kind == "service"))
-                            .map(|d| format!(
-                                " for service {}.{}",
-                                d.module,
-                                d.declaration
-                                    .split('.')
-                                    .next()
-                                    .expect("service declaration")
-                            ))
-                            .unwrap_or_default()
+                                .filter(|d| d.namespace == *namespace && d.name == *name)
+                                .map(|d| d.service.as_str())
+                                .collect();
+                            if services.is_empty() {
+                                String::new()
+                            } else {
+                                format!(" for service {}", services.join(", "))
+                            }
+                        }
                     );
                 }
             }

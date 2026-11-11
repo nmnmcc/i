@@ -466,12 +466,12 @@ pub struct Typed {
     /// The signature of each host export (§10.2, B.2) whose types the host
     /// can take.
     pub host_exports: HashMap<DefId, HostSignature>,
-    /// The host services in the environment of each entry point (§10.2),
-    /// which the host gives (§9.7).
+    /// Service constructors in each entry's inferred environment (§10.2),
+    /// used to bind the chosen body instances during lowering.
     pub entry_services: HashMap<DefId, Vec<crate::hir::TypeId>>,
     /// The complete inferred environment of each entry, including ordinary
     /// services and their type arguments. Provider planning must use this
-    /// rather than the host-only list used by existing lowering.
+    /// rather than the constructor-only list used to bind entry slots.
     pub entry_provider_needs: HashMap<DefId, ShownType>,
     /// The types of the local names, only from [`check_keeping_locals`]:
     /// for editors (`crate::query`).

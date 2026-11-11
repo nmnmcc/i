@@ -69,6 +69,18 @@ pub fn compile_with_bindings(
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);
+    let registrations: Vec<_> = bindings.iter().filter(|d| d["kind"] == "service").map(|d| {
+        let declaration = d["declaration"].as_str().expect("service declaration");
+        serde_json::json!({
+            "service": format!("{}.{}", d["module"].as_str().expect("source module"), declaration.split('.').next().expect("service name")),
+            "namespace": d["namespace"], "name": d["name"],
+        })
+    }).collect();
+    emit::add_json_section(
+        &mut wasm,
+        "ilang.providers",
+        &serde_json::to_string(&registrations).expect("host registration metadata"),
+    );
     validate(&wasm).map_err(Error::Internal)?;
     Ok((wasm, bindings))
 }

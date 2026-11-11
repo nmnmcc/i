@@ -741,7 +741,9 @@ fn deps(project: &Path, target: ilang_wasm::Target) -> Result<ExitCode> {
     }
     let p = checked.program.as_ref().expect("checked program");
     let t = checked.types.as_ref().expect("checked types");
-    if t.entry_provider_needs.is_empty() {
+    if t.entry_provider_needs.keys().all(|&entry| {
+        !ilang_check::providers::entry_is_eligible(p, entry, target.provider_target())
+    }) {
         let ds =
             ilang_check::providers::validate_plan_schema(p, t, &graph, target.provider_target());
         if !ds.is_empty() {

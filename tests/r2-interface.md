@@ -97,11 +97,13 @@ Printed differences and their meaning:
 - Public functions keep Assert and arbitrary user services exactly where the
   source table says N includes them. No host namespace has special treatment.
 
-The entry classifier is `Lowerer::services_require_async(services: &[TypeId])`.
-Per the coordinator's R2/JP ruling it receives the inferred environment now.
-JP can pass the chosen provider closure to that same function. Provider tables
-are rejected with E0522. The inherited JP clauses are listed in r2-stages.md;
-they do not change any of the schemes above.
+JP now resolves each entry's full chosen provider graph in
+`ilang_check::providers::resolve_program_plans`. `ResolvedPlan.is_async` is
+computed from both scopes' declared request modes and scheduler/runner roles;
+WASI retains its blocking ABI. Lowering constructs the graph and enters its
+ordinary adapter without recognizing service or factory names. The temporary
+provider-table rejection is removed. The JP implementation and execution cases
+are recorded in r2-stages.md; none changes the public schemes above.
 
 The quiet-performance follow-up changes only private storage and helpers:
 TaskTree(A), creation-ordered path indexes, FIFO storage, cleanup counters and

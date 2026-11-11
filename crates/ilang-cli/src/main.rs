@@ -307,6 +307,20 @@ fn cmd_run(
     let Some(b) = built_entry(project, options, entry)? else {
         return Ok(ExitCode::FAILURE);
     };
+    if target == Target::Wasi {
+        let file = tempfile::Builder::new().suffix(".wasm").tempfile()?;
+        std::fs::write(file.path(), &b.wasm)?;
+        let status = std::process::Command::new(
+            std::env::var_os("WASMTIME").unwrap_or_else(|| "wasmtime".into()),
+        )
+        .arg("run")
+        .arg(file.path())
+        .args(args)
+        .status()?;
+        return Ok(status
+            .code()
+            .map_or(ExitCode::FAILURE, |code| ExitCode::from(code as u8)));
+    }
     let program = b.host_program()?;
     if program.abi().entry.is_none() {
         anyhow::bail!(
@@ -338,6 +352,9 @@ fn cmd_test(
     time: bool,
     target: Target,
 ) -> anyhow::Result<ExitCode> {
+    if target == Target::Wasi {
+        anyhow::bail!("the WASI target runs a command entry and does not compile tests (§B.7)");
+    }
     let options = BuildOptions {
         target,
         ..options(opt, true, offline)?

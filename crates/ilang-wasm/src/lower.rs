@@ -512,7 +512,9 @@ pub fn lower_with_bindings(
         return Err(typed.coalescing_errors().to_vec());
     }
     let mut plans = std::collections::BTreeMap::new();
-    let mut errors = if typed.entry_provider_needs.is_empty() {
+    let mut errors = if typed.entry_provider_needs.keys().all(|&entry| {
+        !providers::entry_is_eligible(program, entry, options.target.provider_target())
+    }) {
         providers::validate_plan_schema(program, typed, graph, options.target.provider_target())
     } else {
         Vec::new()
@@ -520,7 +522,9 @@ pub fn lower_with_bindings(
     for (entry, plan) in
         providers::resolve_program_plans(program, typed, graph, options.target.provider_target())
     {
-        if program.module(entry.module).kind == ModuleKind::Test && !options.tests {
+        if program.module(entry.module).kind == ModuleKind::Test
+            && (!options.tests || options.target == ir::Target::Wasi)
+        {
             continue;
         }
         match plan {
@@ -706,7 +710,8 @@ impl<'a> Lowerer<'a> {
     fn included(&self, m: ModuleId) -> bool {
         let module = self.program.module(m);
         self.packages.contains(&module.package)
-            && (module.kind != ModuleKind::Test || self.options.tests)
+            && (module.kind != ModuleKind::Test
+                || (self.options.tests && self.options.target != ir::Target::Wasi))
     }
 
     fn is_library(&self, m: ModuleId) -> bool {
@@ -832,6 +837,21 @@ impl<'a> Lowerer<'a> {
             }
         }
         self.start();
+        // Resolve host leaves before generating wrappers. Import conflicts are
+        // source diagnostics; no wrapper is emitted from an invalid binding.
+        let hosts: BTreeSet<_> = self
+            .plans
+            .values()
+            .flat_map(|p| p.steps.iter())
+            .filter(|step| step.supply == Supply::Host)
+            .map(|step| step.service.constructor)
+            .collect();
+        for host in hosts {
+            self.host_service(host);
+        }
+        if !self.diags.is_empty() {
+            return;
+        }
         self.entries();
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
@@ -1420,7 +1440,6 @@ impl<'a> Lowerer<'a> {
             let env = self.provider_environment(plan, &dependencies, values, fx, out);
             let value = match step.supply {
                 Supply::Host => {
-                    self.host_service(step.service.constructor);
                     let host = self
                         .out
                         .host_services

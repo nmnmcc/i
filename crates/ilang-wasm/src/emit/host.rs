@@ -583,26 +583,34 @@ pub(super) fn effects() -> String {
 }
 
 const PROVIDERS: &str = r#"
-(type $provider_guard (struct (field (mut i32)) (field (mut i32))))
+;; An entry-lifetime continuation token. Its ordinary value header lets the
+;; shared portability walk classify the generated body's capture as local.
+(type $provider_guard (sub $obj (struct
+  (field (mut i32)) (field i32) (field i64) (field f64)
+  (field (ref null $bytes)) (field (ref null $values))
+  (field (ref null $limbs)) (field (ref null $call))
+  (field (mut i32)) (field (mut i32)))))
 (func $provider_guard_new (result eqref)
-  (struct.new $provider_guard (i32.const 1) (i32.const 0)))
+  (struct.new $provider_guard (i32.const 19) (i32.const 0) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
+    (i32.const 1) (i32.const 0)))
 (func $provider_guard_enter (param $value eqref) (result eqref)
   (local $g (ref $provider_guard))
   (local.set $g (ref.cast (ref $provider_guard) (local.get $value)))
-  (if (i32.eqz (struct.get $provider_guard 0 (local.get $g)))
+  (if (i32.eqz (struct.get $provider_guard 8 (local.get $g)))
     (then (call $panic {{provider_inactive}}) unreachable))
-  (if (struct.get $provider_guard 1 (local.get $g))
+  (if (struct.get $provider_guard 9 (local.get $g))
     (then (call $panic {{provider_called}}) unreachable))
-  (struct.set $provider_guard 1 (local.get $g) (i32.const 1))
+  (struct.set $provider_guard 9 (local.get $g) (i32.const 1))
   (ref.null eq))
 (func $provider_guard_complete (param $value eqref) (result eqref)
-  (struct.set $provider_guard 1 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 2))
+  (struct.set $provider_guard 9 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 2))
   (ref.null eq))
 (func $provider_guard_leave (param $value eqref) (result eqref)
-  (struct.set $provider_guard 0 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 0))
+  (struct.set $provider_guard 8 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 0))
   (ref.null eq))
 (func $provider_guard_check (param $value eqref) (result eqref)
-  (if (i32.ne (struct.get $provider_guard 1 (ref.cast (ref $provider_guard) (local.get $value))) (i32.const 2))
+  (if (i32.ne (struct.get $provider_guard 9 (ref.cast (ref $provider_guard) (local.get $value))) (i32.const 2))
     (then (call $panic {{provider_incomplete}}) unreachable))
   (ref.null eq))
 "#;

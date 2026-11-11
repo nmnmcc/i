@@ -1213,3 +1213,31 @@ provideLayer (effect/packages/effect/src/Layer.ts and internal/layer.ts) and
 ZIO ZLayer.build / MemoMap (zio/core/shared/src/main/scala/zio/ZLayer.scala):
 construct dependencies before dependents, once per graph instance and scope,
 then supply the completed environment to the consumer.
+
+Adapter scheme validation compares the entire generalized type. Source inference
+can retain or simplify the environment identity
+`N & ((N - S) | S) = N` for nullary services; normalization now treats both
+forms equally before the existing scheme comparison. Parameterized service
+constraints remain intact. A minimal formerly rejected example was
+`wrap(A,E,N) = (body: () -> A ^ E ! N) -> A ^ E ! N - S { ! S = S retain(body()) }`
+with a nullary `S` and an adapter declaring supplies `[S]`, requires `[]`.
+
+The generated `ilang.providers` diagnostic section identifies each required
+host-registration field by its nominal service path. Both hosts validate the
+section against required ABI imports and name the service on a missing
+registration, including when loading raw compiler output without a binding
+plan. The section grants no authority and leaves ABI v3 unchanged. Binaryen's
+existing `ilang.*` section preservation retains it during optimization.
+The generated adapter continuation's guard has an ordinary runtime value
+header, so the existing portability walk recognizes its entry lifetime instead
+of trapping when an adapter inspects the body's portability.
+
+Spec B.7's "Tests are not compiled" controls the WASI test-command case:
+`i test --target wasi` reports that command-only rule. `i run --target wasi`
+selects the WASI column and executes its blocking command through `WASMTIME`
+(default `wasmtime`); the other run/test targets use the in-process host.
+
+The first complete spec run passed 407/408 cases. The remaining failure was
+`9.9/cancel_points.i: error[E0212]: request is put in by more than one import`:
+the fixture contained two identical `i/request` imports. Removing the duplicate
+preserves its cancellation assertions and expected output.
