@@ -9,10 +9,7 @@ use crate::span::Span;
 fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
     let mut cursor = definition;
     let mut wrappers = Vec::new();
-    loop {
-        let Node::Round(parts) = cursor.node() else {
-            break;
-        };
+    while let Node::Round(parts) = cursor.node() {
         if let [marker, _, inner] = parts.as_slice()
             && matches!(marker.node(), Node::Symbol(s) if s == "@")
         {
@@ -378,10 +375,7 @@ pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
     {
         let mut wrappers = Vec::new();
         let mut body = item;
-        loop {
-            let Node::Round(parts) = body.node() else {
-                break;
-            };
+        while let Node::Round(parts) = body.node() {
             if let [marker, _, inner] = parts.as_slice()
                 && matches!(marker.node(), Node::Symbol(s) if s == "@")
             {
