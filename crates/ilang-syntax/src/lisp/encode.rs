@@ -3,32 +3,313 @@ use super::syntax::{Node, Scope, Syntax};
 use crate::ast::*;
 use crate::span::Span;
 use crate::token::{Token, TokenKind};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 pub fn expression_syntax(e: &Expr, scope: &Scope, source: &str) -> Syntax {
-    Encoder::new(scope, source).expr(e)
+    SourceEncoder::new(scope, source).expression(e)
 }
 pub fn item_syntax(item: &Item, scope: &Scope, source: &str) -> Syntax {
-    Encoder::new(scope, source).item(item)
+    SourceEncoder::new(scope, source).item(item)
 }
 pub fn pattern_syntax(p: &Pattern, scope: &Scope, source: &str) -> Syntax {
-    Encoder::new(scope, source).pattern(p)
+    SourceEncoder::new(scope, source).pattern(p)
 }
 pub fn type_syntax(t: &TypeExpr, scope: &Scope, source: &str) -> Syntax {
-    Encoder::new(scope, source).ty(t)
+    SourceEncoder::new(scope, source).ty(t)
+}
+
+/// Encodes nodes from one source using a reusable lexical index.
+///
+/// The input nodes must belong to the source passed to `new`. Results carry
+/// the scope and the original spans of those nodes.
+pub struct SourceEncoder<'a> {
+    encoder: Encoder<'a>,
+}
+impl<'a> SourceEncoder<'a> {
+    pub fn new(scope: &'a Scope, source: &str) -> Self {
+        Self {
+            encoder: Encoder::new(scope, source),
+        }
+    }
+    pub fn expression(&self, expression: &Expr) -> Syntax {
+        self.encoder.prepare(vec![Work::Expr(expression, false)]);
+        let value = self.encoder.expr(expression);
+        self.encoder.clear();
+        value
+    }
+    pub fn item(&self, item: &Item) -> Syntax {
+        self.encoder.prepare(vec![Work::Item(item)]);
+        let value = self.encoder.item(item);
+        self.encoder.clear();
+        value
+    }
+    pub fn pattern(&self, pattern: &Pattern) -> Syntax {
+        self.encoder.prepare(vec![Work::Pattern(pattern, false)]);
+        let value = self.encoder.pattern(pattern);
+        self.encoder.clear();
+        value
+    }
+    pub fn ty(&self, ty: &TypeExpr) -> Syntax {
+        self.encoder.prepare(vec![Work::Type(ty, false)]);
+        let value = self.encoder.ty(ty);
+        self.encoder.clear();
+        value
+    }
 }
 
 struct Encoder<'a> {
     scope: &'a Scope,
     tokens: Vec<Token>,
     close: Vec<Option<u32>>,
+    positions: Vec<usize>,
+    expressions: RefCell<HashMap<*const Expr, Syntax>>,
+    patterns: RefCell<HashMap<*const Pattern, Syntax>>,
+    types: RefCell<HashMap<*const TypeExpr, Syntax>>,
+}
+
+// Visit nodes in postorder, so encoding a parent only reads already encoded
+// children. Auxiliary structures are work items as well: nested functions,
+// blocks, segments and type annotations must not reintroduce recursion.
+enum Work<'a> {
+    Expr(&'a Expr, bool),
+    Pattern(&'a Pattern, bool),
+    Type(&'a TypeExpr, bool),
+    Item(&'a Item),
+    Binding(&'a Binding),
+    Block(&'a Block),
+    Clause(&'a Clause),
+    Arg(&'a Arg),
 }
 impl Encoder<'_> {
     fn new<'a>(scope: &'a Scope, source: &str) -> Encoder<'a> {
         let lexed = crate::lex(source);
+        // Map each byte boundary to the first token beginning there or later.
+        // This makes each token lookup O(1) before its bounded local scan.
+        let mut positions = vec![lexed.tokens.len(); source.len() + 1];
+        let mut next = lexed.tokens.len();
+        for offset in (0..=source.len()).rev() {
+            while next > 0 && lexed.tokens[next - 1].span.start as usize >= offset {
+                next -= 1;
+            }
+            positions[offset] = next;
+        }
         Encoder {
             scope,
             tokens: lexed.tokens,
             close: lexed.close,
+            positions,
+            expressions: RefCell::new(HashMap::new()),
+            patterns: RefCell::new(HashMap::new()),
+            types: RefCell::new(HashMap::new()),
+        }
+    }
+    fn clear(&self) {
+        self.expressions.borrow_mut().clear();
+        self.patterns.borrow_mut().clear();
+        self.types.borrow_mut().clear();
+    }
+    fn prepare<'a>(&self, mut work: Vec<Work<'a>>) {
+        while let Some(task) = work.pop() {
+            match task {
+                Work::Expr(e, true) => {
+                    let value = self.encode_expr(e);
+                    self.expressions
+                        .borrow_mut()
+                        .insert(e as *const Expr, value);
+                }
+                Work::Pattern(p, true) => {
+                    let value = self.encode_pattern(p);
+                    self.patterns
+                        .borrow_mut()
+                        .insert(p as *const Pattern, value);
+                }
+                Work::Type(t, true) => {
+                    let value = self.encode_ty(t);
+                    self.types.borrow_mut().insert(t as *const TypeExpr, value);
+                }
+                Work::Expr(e, false) => {
+                    work.push(Work::Expr(e, true));
+                    match &e.kind {
+                        ExprKind::Quote(_)
+                        | ExprKind::Int(_)
+                        | ExprKind::Float(_)
+                        | ExprKind::String(_)
+                        | ExprKind::Name { .. } => {}
+                        ExprKind::Tuple(xs) => work.extend(xs.iter().map(|x| Work::Expr(x, false))),
+                        ExprKind::List { items, rest } => {
+                            work.extend(items.iter().map(|x| Work::Expr(x, false)));
+                            if let Some(x) = rest {
+                                work.push(Work::Expr(x, false));
+                            }
+                        }
+                        ExprKind::BitArray(xs) => {
+                            for x in xs {
+                                work.push(Work::Expr(&x.value, false));
+                                if let Some(arg) = x.format.as_ref().and_then(|f| f.arg.as_deref())
+                                {
+                                    work.push(Work::Expr(arg, false));
+                                }
+                            }
+                        }
+                        ExprKind::Block(b) => work.push(Work::Block(b)),
+                        ExprKind::Fn(f) => {
+                            work.push(Work::Block(&f.body));
+                            for p in &f.params {
+                                match p {
+                                    Param::Pattern(p) => work.push(Work::Pattern(p, false)),
+                                    Param::Env { ty, .. } => work.push(Work::Type(ty, false)),
+                                }
+                            }
+                            if let Some(r) = &f.ret {
+                                work.push(Work::Type(&r.value, false));
+                                if let Some(t) = &r.err {
+                                    work.push(Work::Type(t, false));
+                                }
+                                if let Some(t) = &r.env {
+                                    work.push(Work::Type(t, false));
+                                }
+                            }
+                        }
+                        ExprKind::Case { subject, clauses } => {
+                            work.push(Work::Expr(subject, false));
+                            work.extend(clauses.iter().map(Work::Clause));
+                        }
+                        ExprKind::Clauses(cs) => work.extend(cs.iter().map(Work::Clause)),
+                        ExprKind::Call { callee, args } => {
+                            work.push(Work::Expr(callee, false));
+                            work.extend(args.iter().map(Work::Arg));
+                        }
+                        ExprKind::Field { target, .. }
+                        | ExprKind::TupleIndex { target, .. }
+                        | ExprKind::Unary { expr: target, .. } => {
+                            work.push(Work::Expr(target, false))
+                        }
+                        ExprKind::RecordUpdate {
+                            constructor,
+                            base,
+                            fields,
+                        } => {
+                            work.push(Work::Expr(constructor, false));
+                            work.push(Work::Expr(base, false));
+                            work.extend(fields.iter().map(|(_, e)| Work::Expr(e, false)));
+                        }
+                        ExprKind::Binary { lhs, rhs, .. } => {
+                            work.push(Work::Expr(lhs, false));
+                            work.push(Work::Expr(rhs, false));
+                        }
+                    }
+                }
+                Work::Pattern(p, false) => {
+                    work.push(Work::Pattern(p, true));
+                    match &p.kind {
+                        PatternKind::Quote(_)
+                        | PatternKind::Var(_)
+                        | PatternKind::Discard(_)
+                        | PatternKind::Int { .. }
+                        | PatternKind::Float { .. }
+                        | PatternKind::String(_)
+                        | PatternKind::Prefix { .. } => {}
+                        PatternKind::Typed { ty, .. } => work.push(Work::Type(ty, false)),
+                        PatternKind::Named { pattern, .. } => {
+                            work.push(Work::Pattern(pattern, false))
+                        }
+                        PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
+                            work.extend(args.iter().map(|p| Work::Pattern(p, false)));
+                        }
+                        PatternKind::List { items, .. } => {
+                            work.extend(items.iter().map(|p| Work::Pattern(p, false)));
+                        }
+                        PatternKind::BitArray(xs) => {
+                            for x in xs {
+                                work.push(Work::Pattern(&x.value, false));
+                                if let Some(arg) = x.format.as_ref().and_then(|f| f.arg.as_deref())
+                                {
+                                    work.push(Work::Expr(arg, false));
+                                }
+                            }
+                        }
+                    }
+                }
+                Work::Type(t, false) => {
+                    work.push(Work::Type(t, true));
+                    match &t.kind {
+                        TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
+                        TypeKind::Named { args, .. }
+                        | TypeKind::Call { args, .. }
+                        | TypeKind::Tuple(args)
+                        | TypeKind::Union(args)
+                        | TypeKind::Inter(args)
+                        | TypeKind::Diff(args) => {
+                            work.extend(args.iter().map(|t| Work::Type(t, false)));
+                        }
+                        TypeKind::Fn {
+                            params,
+                            ret,
+                            err,
+                            env,
+                        } => {
+                            work.extend(params.iter().map(|p| Work::Type(&p.ty, false)));
+                            work.push(Work::Type(ret, false));
+                            if let Some(t) = err {
+                                work.push(Work::Type(t, false));
+                            }
+                            if let Some(t) = env {
+                                work.push(Work::Type(t, false));
+                            }
+                        }
+                    }
+                }
+                Work::Item(item) => {
+                    for attr in &item.attributes {
+                        if let Some((args, _)) = &attr.call {
+                            work.extend(args.iter().map(Work::Arg));
+                        }
+                    }
+                    match &item.kind {
+                        ItemKind::Binding(b) => work.push(Work::Binding(b)),
+                        ItemKind::Declaration { ty, .. } => work.push(Work::Type(ty, false)),
+                        ItemKind::TypeDef(t) => {
+                            work.extend(t.head.iter().map(|t| Work::Type(t, false)));
+                            match &t.body {
+                                TypeBody::Alias(t) => work.push(Work::Type(t, false)),
+                                TypeBody::Custom(cs) => {
+                                    for c in cs {
+                                        work.extend(
+                                            c.fields.iter().map(|f| Work::Type(&f.ty, false)),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        ItemKind::MacroItem { args, .. } => work.extend(args.iter().map(Work::Arg)),
+                    }
+                }
+                Work::Binding(b) => {
+                    work.push(Work::Pattern(&b.pattern, false));
+                    work.push(Work::Expr(&b.value, false));
+                }
+                Work::Block(b) => {
+                    for stmt in &b.stmts {
+                        match stmt {
+                            Stmt::Bind(b) => work.push(Work::Binding(b)),
+                            Stmt::Env { ty, value, .. } => {
+                                work.push(Work::Type(ty, false));
+                                work.push(Work::Expr(value, false));
+                            }
+                            Stmt::Expr(e) => work.push(Work::Expr(e, false)),
+                        }
+                    }
+                }
+                Work::Clause(c) => {
+                    work.extend(c.patterns.iter().map(|p| Work::Pattern(p, false)));
+                    if let Some(g) = &c.guard {
+                        work.push(Work::Expr(g, false));
+                    }
+                    work.push(Work::Expr(&c.body, false));
+                }
+                Work::Arg(a) => work.push(Work::Expr(&a.value, false)),
+            }
         }
     }
     fn node(&self, n: Node, span: Span) -> Syntax {
@@ -38,7 +319,7 @@ impl Encoder<'_> {
         self.node(Node::Symbol(s.into()), span)
     }
     fn token_span(&self, range: Span, matches: impl Fn(&TokenKind) -> bool) -> Span {
-        self.tokens[self.tokens.partition_point(|t| t.span.start < range.start)..]
+        self.tokens[self.positions[range.start as usize]..]
             .iter()
             .take_while(|t| t.span.start <= range.end)
             .find(|t| t.span.end <= range.end && matches(&t.kind))
@@ -54,7 +335,7 @@ impl Encoder<'_> {
         self.symbol(spelling, span)
     }
     fn bracket(&self, range: Span, kind: TokenKind) -> Span {
-        let start = self.tokens.partition_point(|t| t.span.start < range.start);
+        let start = self.positions[range.start as usize];
         let (i, token) = self
             .tokens
             .iter()
@@ -235,6 +516,13 @@ impl Encoder<'_> {
         result
     }
     fn ty(&self, t: &TypeExpr) -> Syntax {
+        self.types
+            .borrow()
+            .get(&(t as *const TypeExpr))
+            .expect("type child was not prepared")
+            .clone()
+    }
+    fn encode_ty(&self, t: &TypeExpr) -> Syntax {
         match &t.kind {
             TypeKind::Lit(LitValue::Str(s)) => self.node(Node::Text(s.clone()), t.span),
             TypeKind::Lit(LitValue::Int(n)) => {
@@ -413,6 +701,13 @@ impl Encoder<'_> {
         self.node(Node::Curly(parts), span)
     }
     fn expr(&self, e: &Expr) -> Syntax {
+        self.expressions
+            .borrow()
+            .get(&(e as *const Expr))
+            .expect("expression child was not prepared")
+            .clone()
+    }
+    fn encode_expr(&self, e: &Expr) -> Syntax {
         match &e.kind {
             ExprKind::Quote(d) => Syntax::from_datum(d, self.scope),
             ExprKind::Int(n) => self.node(Node::Int(n.clone()), e.span),
@@ -527,6 +822,13 @@ impl Encoder<'_> {
         }
     }
     fn pattern(&self, p: &Pattern) -> Syntax {
+        self.patterns
+            .borrow()
+            .get(&(p as *const Pattern))
+            .expect("pattern child was not prepared")
+            .clone()
+    }
+    fn encode_pattern(&self, p: &Pattern) -> Syntax {
         match &p.kind {
             PatternKind::Quote(d) => Syntax::from_datum(d, self.scope),
             PatternKind::Var(n) => self.node(Node::Name(n.clone()), p.span),
