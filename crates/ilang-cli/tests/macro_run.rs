@@ -2152,3 +2152,17 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
         .join()
         .unwrap();
 }
+
+#[test]
+fn real_macro_definition_query_stops_before_oversize_source_construction() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask)\n(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))\n").unwrap();
+    let source = format!("(m = app/macros)\nT = Int\nm.ask(T)\n// {}\n", "x".repeat(800_000));
+    std::fs::write(dir.path().join("src/main.i"), source).unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let errors = match ilang_macro::project::expand(&mut graph) { Ok(_) => panic!("oversize definition should exceed budget"), Err(errors) => errors };
+    assert!(errors.iter().any(|e| e.message.contains("limit exceeded")), "{errors:?}");
+}
