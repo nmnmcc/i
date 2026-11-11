@@ -2033,65 +2033,91 @@ impl Solver {
     }
 
     fn diff_mode(&mut self, a: Ty, h: Vec<Ty>, mode: Mode) -> Ty {
-        let mode = mode.max(self.mode(&a));
-        let env = mode != Mode::Value;
-        let mut hs = Vec::new();
-        flatten_union(&h, &mut hs);
-        hs.retain(|m| !matches!(m, Ty::Never));
-        if hs.is_empty() {
-            return a;
+        enum Task {
+            Visit(Ty, Vec<Ty>, Mode),
+            Union(usize, bool),
         }
-        if matches!(a, Ty::Con(..)) && a.scalar().is_some() && mode != Mode::Env {
-            let sets: Vec<_> = hs
-                .iter()
-                .filter(|m| m.head() == a.head())
-                .map(|m| m.values().clone())
-                .collect();
-            if sets.is_empty() {
-                a
-            } else {
-                let excluded = super::lits::ValueSet::join_all(&sets);
-                a.with_values(a.values().minus(&excluded))
-            }
-        } else if matches!(a, Ty::Con(..) | Ty::Fn(_)) {
-            match hs.iter().find(|m| m.head() == a.head()) {
-                Some(m) => {
-                    let m = m.clone();
-                    if env {
-                        self.equal(&a, &m, FailKind::EnvForms);
-                    } else {
-                        self.constrain(&a, &m);
+        let mut tasks = vec![Task::Visit(a, h, mode)];
+        let mut results = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Union(n, env) => {
+                    let parts = results.split_off(results.len() - n);
+                    results.push(self.union_in(parts, env));
+                }
+                Task::Visit(a, h, mode) => {
+                    let mode = mode.max(self.mode(&a));
+                    let env = mode != Mode::Value;
+                    let mut hs = Vec::new();
+                    flatten_union(&h, &mut hs);
+                    hs.retain(|m| !matches!(m, Ty::Never));
+                    if hs.is_empty() {
+                        results.push(a);
+                        continue;
                     }
-                    Ty::Never
-                }
-                None => a,
-            }
-        } else {
-            match a.into_parts() {
-                TyParts::Never => Ty::Never,
-                TyParts::Union(ms) => {
-                    let parts = ms
-                        .into_iter()
-                        .map(|m| self.diff_mode(m, hs.clone(), mode))
-                        .collect();
-                    self.union_in(parts, env)
-                }
-                TyParts::Diff(b, mut h0) => {
-                    self.diff_bound_mode(&b, &hs, mode);
-                    for m in hs {
-                        if !h0.contains(&m) {
-                            h0.push(m);
-                        }
+                    if matches!(a, Ty::Union(_)) {
+                        let TyParts::Union(ms) = a.into_parts() else {
+                            unreachable!()
+                        };
+                        tasks.push(Task::Union(ms.len(), env));
+                        tasks.extend(
+                            ms.into_iter()
+                                .rev()
+                                .map(|m| Task::Visit(m, hs.clone(), mode)),
+                        );
+                        continue;
                     }
-                    Ty::Diff(b, h0)
-                }
-                a => {
-                    let a = Ty::from(a);
-                    self.diff_bound_mode(&a, &hs, mode);
-                    Ty::Diff(Box::new(a), hs)
+                    let result =
+                        if matches!(a, Ty::Con(..)) && a.scalar().is_some() && mode != Mode::Env {
+                            let sets: Vec<_> = hs
+                                .iter()
+                                .filter(|m| m.head() == a.head())
+                                .map(|m| m.values().clone())
+                                .collect();
+                            if sets.is_empty() {
+                                a
+                            } else {
+                                let excluded = super::lits::ValueSet::join_all(&sets);
+                                a.with_values(a.values().minus(&excluded))
+                            }
+                        } else if matches!(a, Ty::Con(..) | Ty::Fn(_)) {
+                            match hs.iter().find(|m| m.head() == a.head()) {
+                                Some(m) => {
+                                    let m = m.clone();
+                                    if env {
+                                        self.equal(&a, &m, FailKind::EnvForms);
+                                    } else {
+                                        self.constrain(&a, &m);
+                                    }
+                                    Ty::Never
+                                }
+                                None => a,
+                            }
+                        } else {
+                            match a.into_parts() {
+                                TyParts::Never => Ty::Never,
+                                TyParts::Diff(b, mut h0) => {
+                                    self.diff_bound_mode(&b, &hs, mode);
+                                    for m in hs {
+                                        if !h0.contains(&m) {
+                                            h0.push(m);
+                                        }
+                                    }
+                                    Ty::Diff(b, h0)
+                                }
+                                a => {
+                                    let a = Ty::from(a);
+                                    self.diff_bound_mode(&a, &hs, mode);
+                                    Ty::Diff(Box::new(a), hs)
+                                }
+                            }
+                        };
+                    results.push(result);
                 }
             }
         }
+        assert_eq!(results.len(), 1, "difference result stack");
+        results.pop().unwrap()
     }
 
     /// Normalize closed or open type algebra without losing the row
@@ -3650,6 +3676,25 @@ mod deep_tree_tests {
                     b = Ty::Union(vec![b, Ty::Never]);
                 }
                 assert!(!s.same_form(&a, &b));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+    #[test]
+    fn difference_distributes_over_deep_union_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+                let mut t = int.clone();
+                for _ in 0..10_000 {
+                    t = Ty::Union(vec![t]);
+                }
+                assert_eq!(s.diff(t, vec![string]), int);
+                assert!(s.failures.is_empty());
             })
             .unwrap()
             .join()
