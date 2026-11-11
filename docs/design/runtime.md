@@ -1206,8 +1206,10 @@ close_stream = (Stream(number), raw ! Net) {
 ```
 
 Raw accept returns Int; neither Stream nor NetError crosses the ABI.
-Address is a numeric
-IPv4/IPv6 address in v1, not a URL or a DNS name. Ports are 0..65535 for listen
+The listen address is a numeric IPv4/IPv6 address. Connect accepts a numeric
+address or a host name, and resolve(name) returns its addresses. The native host
+uses the system resolver and tries resolved addresses in order, without racing
+IPv4 and IPv6. Addresses are not URLs. Ports are 0..65535 for listen
 (0 asks the OS to choose) and 1..65535 for connect. local_port returns the bound
 port. Empty address, bad addresses/ports, nonpositive read bounds and partial-byte
 writes give invalid. read and write follow fs's EOF/all-bytes rules. TCP is a
@@ -1217,8 +1219,8 @@ write is pending. Later writes on the shut-down direction give closed. Close rel
 whole stream/listener, is idempotent, and settles other pending operations on
 that object with closed unless their answer already committed. A concurrent
 read and write are allowed. A second concurrent read, write, or accept on the
-same direction/object gives busy, not an unspecified interleaving. There is no
-TLS, UDP, HTTP or DNS in v1. Missing, closed, foreign-context or wrong-kind
+same direction/object gives busy, not an unspecified interleaving. DNS is part
+of i/net; TLS is i/tls (a later task); UDP is not in v1. Missing, closed, foreign-context or wrong-kind
 numbers give closed; close gives Nil. Stream values can cross workers, while
 their pending Request values cannot.
 
