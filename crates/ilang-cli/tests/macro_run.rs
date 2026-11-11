@@ -62,7 +62,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let got = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.choose",
-        &[original.clone()],
+        std::slice::from_ref(&original),
         templates.clone().into(),
     )
     .unwrap();
@@ -75,7 +75,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
         let got = ilang_macro::run::invoke_with_templates(
             &built,
             "app/main.choose",
-            &[choice.clone()],
+            std::slice::from_ref(&choice),
             templates.clone().into(),
         )
         .unwrap();
@@ -85,7 +85,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let got = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.choose",
-        &[empty.clone()],
+        std::slice::from_ref(&empty),
         templates.clone().into(),
     )
     .unwrap();
@@ -100,7 +100,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let got = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.choose",
-        &[nested.clone()],
+        std::slice::from_ref(&nested),
         templates.clone().into(),
     )
     .unwrap();
@@ -112,7 +112,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let got = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.choose",
-        &[spliced.clone()],
+        std::slice::from_ref(&spliced),
         templates.clone().into(),
     )
     .unwrap();
@@ -121,7 +121,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let got = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.choose",
-        &[other.clone()],
+        std::slice::from_ref(&other),
         templates.into(),
     )
     .unwrap();
@@ -134,7 +134,8 @@ fn syntax_crosses_the_compiler_export_without_losing_identity() {
     let original = input();
     for _ in 0..2 {
         let result =
-            ilang_macro::run::invoke(&built, "app/main.identity", &[original.clone()]).unwrap();
+            ilang_macro::run::invoke(&built, "app/main.identity", std::slice::from_ref(&original))
+                .unwrap();
         assert!(result.identical(&original));
         assert_eq!(result.scope(), original.scope());
     }
@@ -165,7 +166,9 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     assert!(diagnostics.is_empty());
     let built = ilang_macro::run::compile(&graph, &parsed, &[("app/main", "identity")]).unwrap();
     let value = input();
-    let result = ilang_macro::run::invoke(&built, "app/main.identity", &[value.clone()]).unwrap();
+    let result =
+        ilang_macro::run::invoke(&built, "app/main.identity", std::slice::from_ref(&value))
+            .unwrap();
     assert!(result.identical(&value));
 }
 
@@ -193,7 +196,7 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.quoted",
-        &[original.clone()],
+        std::slice::from_ref(&original),
         templates.into(),
     )
     .unwrap();
@@ -228,7 +231,7 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
     let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/main.quoted",
-        &[original.clone()],
+        std::slice::from_ref(&original),
         templates.into(),
     )
     .unwrap();
@@ -300,7 +303,7 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     let result = ilang_macro::run::invoke_with_templates(
         &built,
         "app/macros.id",
-        &[original.clone()],
+        std::slice::from_ref(&original),
         prepared.templates.into(),
     )
     .unwrap();
@@ -334,7 +337,7 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     let result = ilang_macro::run::invoke_with_context(
         &built,
         "app/main.report",
-        &[original.clone()],
+        std::slice::from_ref(&original),
         Arc::from([]),
         context,
     )
@@ -381,7 +384,7 @@ fn compiler_wrapper_reports_a_macro_syntax_error_with_original_position() {
     let result = ilang_macro::run::invoke_with_context(
         &built,
         &format!("{path}.{name}"),
-        &[input.clone()],
+        std::slice::from_ref(&input),
         prepared.templates.into(),
         context,
     )
@@ -549,7 +552,7 @@ fn compiler_wrapper_buffers_items_and_notes_for_success() {
     let outcome = ilang_macro::run::invoke_with_items(
         &built,
         &format!("{path}.{name}"),
-        &[argument.clone()],
+        std::slice::from_ref(&argument),
         prepared.templates.into(),
         context.clone(),
         Some(items.clone()),
