@@ -347,6 +347,22 @@ mod deep_tests {
         );
     }
     #[test]
+    fn normal_module_renders_deep_expression_without_host_stack_growth() {
+        let binding = datum(K::Round(vec![
+            datum(K::Symbol("=".into())),
+            datum(K::Name("value".into())),
+            nest(10000, "f"),
+        ]));
+        let module = Document {
+            datums: vec![binding],
+            trailing_docs: vec![],
+        };
+        assert_eq!(
+            normal_source(&module).unwrap(),
+            format!("value = {}x{}\n", "f(".repeat(10000), ")".repeat(10000))
+        );
+    }
+    #[test]
     fn render_long_list_preserves_each_element() {
         let d = datum(K::Square(
             (0..10000).map(|_| datum(K::Name("x".into()))).collect(),
