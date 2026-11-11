@@ -164,3 +164,51 @@ fn tests_use_each_builds_unmarked_quote_templates() {
         }
     }
 }
+
+#[test]
+fn selected_test_collection_installs_its_quote_templates() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "i.toml", "name = \"app\"\n");
+    write(
+        root,
+        "src/macros.is",
+        "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x body (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { ~body })) })))\n",
+    );
+    write(
+        root,
+        "src/main.i",
+        "(m = app/macros)\n(anchor)\nanchor = Nil\n",
+    );
+    write(
+        root,
+        "src/quote.is",
+        "(, quoted)\n(= quoted (-> () _ `(a b)))\n",
+    );
+    write(
+        root,
+        "test/check.is",
+        "(, (= m (/ app macros)) (= syntax (/ i syntax)) (= main (/ app main)) (= q (/ app quote)))\n((. m emit) (. main anchor) check (assert (== ((. syntax show) ((. q quoted))) \"(a b)\")))\n",
+    );
+    let manifest = ilang_cli::collections(root, true, true).unwrap();
+    assert_eq!(manifest.entries.len(), 1);
+    for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
+        let options = ilang_cli::BuildOptions {
+            tests: true,
+            opt,
+            offline: true,
+            target: ilang_cli::Target::Ilang,
+        };
+        let built = ilang_cli::build_collection(
+            root,
+            options,
+            &manifest.entries[0].handle,
+            ilang_cli::CollectionResult::Nil,
+        )
+        .unwrap();
+        assert!(matches!(
+            built.run_with(built.built.host_options()).unwrap(),
+            ilang_host::Outcome::Ok(_)
+        ));
+    }
+}
