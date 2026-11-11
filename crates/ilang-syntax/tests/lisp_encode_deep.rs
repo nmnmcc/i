@@ -1,0 +1,364 @@
+use std::collections::BTreeSet;
+
+use ilang_syntax::ast::{
+    Arg, Block, Expr, ExprKind, Function, Ident, Param, Pattern, PatternKind, RetType, Stmt,
+    TypeExpr, TypeKind,
+};
+use ilang_syntax::lisp::syntax::{Node, Scope};
+use ilang_syntax::lisp::{expression_syntax, pattern_syntax, type_syntax};
+use ilang_syntax::span::Span;
+
+fn ident(name: &str, start: usize) -> Ident {
+    Ident {
+        name: name.into(),
+        span: Span::new(start as u32, (start + name.len()) as u32),
+    }
+}
+fn scope() -> Scope {
+    Scope {
+        module: 17,
+        marks: BTreeSet::from([3, 9]),
+    }
+}
+
+#[test]
+fn deep_calls_types_and_patterns_preserve_spans_and_scope_on_a_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let depth = 10_000;
+            let source = format!("{}x{}", "f(".repeat(depth), ")".repeat(depth));
+            let end = source.len();
+            let mut expr = Expr {
+                kind: ExprKind::Name {
+                    module: None,
+                    name: ident("x", depth * 2),
+                },
+                span: Span::new((depth * 2) as u32, (depth * 2 + 1) as u32),
+            };
+            for i in (0..depth).rev() {
+                let f = ident("f", i * 2);
+                expr = Expr {
+                    span: Span::new((i * 2) as u32, (end - i) as u32),
+                    kind: ExprKind::Call {
+                        callee: Box::new(Expr {
+                            span: f.span,
+                            kind: ExprKind::Name {
+                                module: None,
+                                name: f,
+                            },
+                        }),
+                        args: vec![Arg {
+                            label: None,
+                            value: expr,
+                        }],
+                    },
+                };
+            }
+            let scope = scope();
+            let encoded = expression_syntax(&expr, &scope, &source);
+            let mut current = &encoded;
+            for i in 0..depth {
+                assert_eq!(current.scope(), &scope);
+                assert_eq!(current.span(), Span::new((i * 2) as u32, (end - i) as u32));
+                let Node::Round(parts) = current.node() else {
+                    panic!("expected call")
+                };
+                assert_eq!(parts.len(), 2);
+                assert!(matches!(parts[0].node(), Node::Name(name) if name == "f"));
+                assert_eq!(
+                    parts[0].span(),
+                    Span::new((i * 2) as u32, (i * 2 + 1) as u32)
+                );
+                current = &parts[1];
+            }
+            assert!(matches!(current.node(), Node::Name(name) if name == "x"));
+            drop(encoded);
+            drop(expr);
+
+            let source = format!("{}Int{}", "T(".repeat(depth), ")".repeat(depth));
+            let end = source.len();
+            let pos = depth * 2;
+            let mut ty = TypeExpr {
+                span: Span::new(pos as u32, (pos + 3) as u32),
+                kind: TypeKind::Named {
+                    module: None,
+                    name: ident("Int", pos),
+                    args: vec![],
+                },
+            };
+            for i in (0..depth).rev() {
+                ty = TypeExpr {
+                    span: Span::new((i * 2) as u32, (end - i) as u32),
+                    kind: TypeKind::Named {
+                        module: None,
+                        name: ident("T", i * 2),
+                        args: vec![ty],
+                    },
+                };
+            }
+            let encoded = type_syntax(&ty, &scope, &source);
+            let mut current = &encoded;
+            for i in 0..depth {
+                assert_eq!(current.span(), Span::new((i * 2) as u32, (end - i) as u32));
+                let Node::Round(parts) = current.node() else {
+                    panic!("expected type call")
+                };
+                assert!(matches!(parts[0].node(), Node::Up(name) if name == "T"));
+                assert_eq!(parts[0].scope(), &scope);
+                current = &parts[1];
+            }
+            assert!(matches!(current.node(), Node::Up(name) if name == "Int"));
+            drop(encoded);
+            drop(ty);
+
+            let source = format!("{}x{}", "C(".repeat(depth), ")".repeat(depth));
+            let end = source.len();
+            let pos = depth * 2;
+            let mut pattern = Pattern {
+                span: Span::new(pos as u32, (pos + 1) as u32),
+                kind: PatternKind::Var("x".into()),
+            };
+            for i in (0..depth).rev() {
+                pattern = Pattern {
+                    span: Span::new((i * 2) as u32, (end - i) as u32),
+                    kind: PatternKind::Constructor {
+                        module: None,
+                        name: ident("C", i * 2),
+                        args: vec![pattern],
+                        spread: false,
+                    },
+                };
+            }
+            let encoded = pattern_syntax(&pattern, &scope, &source);
+            let mut current = &encoded;
+            for i in 0..depth {
+                assert_eq!(current.span(), Span::new((i * 2) as u32, (end - i) as u32));
+                let Node::Round(parts) = current.node() else {
+                    panic!("expected constructor")
+                };
+                assert!(matches!(parts[0].node(), Node::Up(name) if name == "C"));
+                current = &parts[1];
+            }
+            assert!(matches!(current.node(), Node::Name(name) if name == "x"));
+            drop(encoded);
+            drop(pattern);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn deeply_nested_functions_visit_patterns_types_and_blocks_without_recursion() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let depth = 10_000;
+            let prefix = "(x: T) -> T {";
+            let source = format!("{}x{}", prefix.repeat(depth), "}".repeat(depth));
+            let end = source.len();
+            let pos = prefix.len() * depth;
+            let mut expr = Expr {
+                span: Span::new(pos as u32, (pos + 1) as u32),
+                kind: ExprKind::Name {
+                    module: None,
+                    name: ident("x", pos),
+                },
+            };
+            for i in (0..depth).rev() {
+                let start = prefix.len() * i;
+                let binder_pos = start + 1;
+                let ty_pos = start + 4;
+                let ret_pos = start + 10;
+                let body_pos = start + 12;
+                let ty = TypeExpr {
+                    span: Span::new(ty_pos as u32, (ty_pos + 1) as u32),
+                    kind: TypeKind::Named {
+                        module: None,
+                        name: ident("T", ty_pos),
+                        args: vec![],
+                    },
+                };
+                let pattern = Pattern {
+                    span: Span::new(binder_pos as u32, (ty_pos + 1) as u32),
+                    kind: PatternKind::Typed {
+                        binder: ilang_syntax::ast::Binder {
+                            name: "x".into(),
+                            discard: false,
+                            span: Span::new(binder_pos as u32, (binder_pos + 1) as u32),
+                        },
+                        ty,
+                    },
+                };
+                let ret = TypeExpr {
+                    span: Span::new(ret_pos as u32, (ret_pos + 1) as u32),
+                    kind: TypeKind::Named {
+                        module: None,
+                        name: ident("T", ret_pos),
+                        args: vec![],
+                    },
+                };
+                expr = Expr {
+                    span: Span::new(start as u32, (end - i) as u32),
+                    kind: ExprKind::Fn(Box::new(Function {
+                        params: vec![Param::Pattern(pattern)],
+                        ret: Some(RetType {
+                            value: ret,
+                            err: None,
+                            env: None,
+                        }),
+                        body: Block {
+                            stmts: vec![Stmt::Expr(expr)],
+                            span: Span::new(body_pos as u32, (end - i) as u32),
+                        },
+                    })),
+                };
+            }
+            let scope = scope();
+            let encoded = expression_syntax(&expr, &scope, &source);
+            let mut current = &encoded;
+            for i in 0..depth {
+                let Node::Round(parts) = current.node() else {
+                    panic!("expected function")
+                };
+                assert!(matches!(parts[0].node(), Node::Symbol(s) if s == "->"));
+                let Node::Round(params) = parts[1].node() else {
+                    panic!("expected params")
+                };
+                let Node::Round(typed) = params[0].node() else {
+                    panic!("expected annotation")
+                };
+                assert!(matches!(typed[0].node(), Node::Symbol(s) if s == ":"));
+                assert_eq!(typed[1].scope(), &scope);
+                assert_eq!(typed[1].span().start, (i * prefix.len() + 1) as u32);
+                let Node::Curly(body) = parts[3].node() else {
+                    panic!("expected body")
+                };
+                current = &body[0];
+            }
+            assert!(matches!(current.node(), Node::Name(s) if s == "x"));
+            drop(encoded);
+            drop(expr);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn reusable_encoder_preserves_source_spans_and_scope_across_items() {
+    use ilang_syntax::lisp::{SourceEncoder, item_syntax};
+    let source = "first = (x: Int) -> Int { x + 1 }\nsecond = (y: String) { y }\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let scope = scope();
+    let encoder = SourceEncoder::new(&scope, source);
+    for item in &module.items {
+        let reused = encoder.item(item);
+        let separate = item_syntax(item, &scope, source);
+        assert!(reused.same_code(&separate));
+        assert_eq!(reused.span(), separate.span());
+        assert_eq!(reused.scope(), &scope);
+    }
+    // Re-encoding an earlier node must not return a stale cached result.
+    let first = encoder.item(&module.items[0]);
+    assert!(first.same_code(&item_syntax(&module.items[0], &scope, source)));
+    assert_eq!(first.span(), module.items[0].span);
+}
+
+#[test]
+fn reusable_encoder_agrees_with_independent_lisp_printer_on_spec_corpus() {
+    use ilang_syntax::lisp::SourceEncoder;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+    let mut dirs = vec![root];
+    let scope = scope();
+    let mut checked = 0;
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                dirs.push(path);
+                continue;
+            }
+            if path.extension().is_none_or(|ext| ext != "i") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).unwrap();
+            let (module, diagnostics) = ilang_syntax::parse_module(&source);
+            if !diagnostics.is_empty() {
+                // The spec corpus includes deliberately invalid source files.
+                continue;
+            }
+            let encoder = SourceEncoder::new(&scope, &source);
+            for item in &module.items {
+                let mut clean = item.clone();
+                clean.doc.clear();
+                let expected = ilang_syntax::ast::Module {
+                    items: vec![clean],
+                    ..Default::default()
+                };
+                assert_eq!(
+                    encoder.item(item).show(),
+                    ilang_syntax::lisp::print_module(&expected).trim_end(),
+                    "{}",
+                    path.display()
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(
+        checked > 100,
+        "expected substantive valid spec corpus, saw {checked} items"
+    );
+}
+
+#[test]
+fn written_macro_argument_preserves_identity_scope_and_locations_through_quote() {
+    use ilang_syntax::lisp::parse;
+    use ilang_syntax::lisp::syntax::{Substitution, Syntax};
+    let source = "main = () { foo(1) }\n";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!("expected binding")
+    };
+    let ExprKind::Fn(function) = &binding.value.kind else {
+        panic!("expected function")
+    };
+    let Stmt::Expr(call) = &function.body.stmts[0] else {
+        panic!("expected call")
+    };
+    let caller_scope = scope();
+    let arg = expression_syntax(call, &caller_scope, source);
+    assert_eq!(arg.show(), "(foo 1)");
+    let template_scope = Scope {
+        module: 24,
+        marks: BTreeSet::from([11]),
+    };
+    let template = Syntax::from_datum(&parse("`(wrap ~x)").unwrap()[0], &template_scope);
+    let result = template
+        .instantiate(&mut |_| Ok(Substitution::One(arg.clone())))
+        .unwrap();
+    let Node::Round(parts) = result.node() else {
+        panic!("expected expanded call")
+    };
+    assert!(parts[1].identical(&arg));
+    assert_eq!(parts[1].scope(), &caller_scope);
+    assert_eq!(
+        &source[parts[1].span().start as usize..parts[1].span().end as usize],
+        "foo(1)"
+    );
+    let Node::Round(call_parts) = parts[1].node() else {
+        panic!("expected original call")
+    };
+    assert_eq!(
+        &source[call_parts[0].span().start as usize..call_parts[0].span().end as usize],
+        "foo"
+    );
+    assert_eq!(
+        &source[call_parts[1].span().start as usize..call_parts[1].span().end as usize],
+        "1"
+    );
+}
