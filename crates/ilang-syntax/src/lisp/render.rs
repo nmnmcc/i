@@ -41,7 +41,15 @@ enum Step<'a> {
 }
 
 pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
+    render_anchored(d, pos).map(|(text, _)| text)
+}
+
+pub(super) fn render_anchored(
+    d: &Datum,
+    pos: P,
+) -> Result<(String, Vec<(crate::span::Span, usize)>)> {
     let mut out = String::new();
+    let mut anchors = Vec::new();
     let mut boundary = false;
     let mut stack = vec![Step::Node(pos, d)];
     while let Some(step) = stack.pop() {
@@ -64,6 +72,9 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
             }
             Step::Node(p, d) => (p, d),
         };
+        if matches!(p, P::Statement) {
+            anchors.push((d.span, out.len() + usize::from(boundary)));
+        }
         let mut tasks = Vec::new();
         macro_rules! text {
             ($v:expr) => {
@@ -177,7 +188,7 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
                     [h, a, it] if symbol(h, "@") => {
                         text!("@");
                         node!(Attribute, a);
-                        text!("\n");
+                        tasks.push(Step::Boundary);
                         node!(Item, it);
                     }
                     [h, l, r] if symbol(h, "=") => {
@@ -648,5 +659,5 @@ pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
         }
         stack.extend(tasks.into_iter().rev());
     }
-    Ok(out)
+    Ok((out, anchors))
 }

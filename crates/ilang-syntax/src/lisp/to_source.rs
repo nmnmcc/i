@@ -1,8 +1,6 @@
 //! Position-directed conversion of datums to the normal surface.
 use super::{Datum, DatumKind as K, Document, show};
-use crate::ast::{Block, Expr, ExprKind, Stmt};
 use crate::span::Span;
-use crate::walk::{Visitor, Walk};
 use crate::{Code, Diagnostic};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
@@ -94,17 +92,22 @@ fn joined(xs: &[Datum], f: fn(&Datum) -> Result<String>, sep: &str) -> Result<St
 /// Convert a Lisp-surface module to normal source. Errors refer to the datum's
 /// original span. A future macro phase consumes quotes without printing them.
 pub fn normal_source(document: &Document) -> Result<String> {
-    let mut lines = Vec::new();
+    normal_module(document).map(|(text, _)| text)
+}
+
+fn normal_module(document: &Document) -> Result<(String, Vec<(Span, usize)>)> {
+    let mut output = String::new();
+    let mut anchors = Vec::new();
     let mut headers = 0;
     let mut items_started = false;
     for datum in &document.datums {
         for doc in &datum.docs {
-            lines.push(format!(
-                "{}{}",
-                if doc.module { "////" } else { "///" },
-                doc.text
-            ));
+            output.push_str(if doc.module { "////" } else { "///" });
+            output.push_str(&doc.text);
+            output.push('\n');
         }
+        let base = output.len();
+        anchors.push((datum.span, base));
         if let Some([first, rest @ ..]) = round(datum)
             && symbol(first, ",")
         {
@@ -116,97 +119,32 @@ pub fn normal_source(document: &Document) -> Result<String> {
                 return Err(bad(datum, "an imports header"));
             }
             headers = if imports { 1 } else { 2 };
-            lines.push(format!(
-                "({})",
-                joined(rest, if imports { import } else { export }, ", ")?
-            ));
-            continue;
+            output.push('(');
+            output.push_str(&joined(rest, if imports { import } else { export }, ", ")?);
+            output.push(')');
+        } else {
+            items_started = true;
+            let (text, nested) = super::render::render_anchored(datum, super::render::P::Item)?;
+            output.push_str(&text);
+            anchors.extend(nested.into_iter().map(|(span, at)| (span, base + at)));
         }
-        items_started = true;
-        lines.push(item(datum)?);
+        output.push('\n');
     }
     for doc in &document.trailing_docs {
-        lines.push(format!(
-            "{}{}",
-            if doc.module { "////" } else { "///" },
-            doc.text
-        ));
+        output.push_str(if doc.module { "////" } else { "///" });
+        output.push_str(&doc.text);
+        output.push('\n');
     }
-    Ok(if lines.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n", lines.join("\n"))
-    })
+    Ok((output, anchors))
 }
 
 /// Convert to normal source and transfer standalone comments at item and
 /// statement boundaries. Return the spans of comments that cannot be kept.
 pub fn normal_with_comments(source: &str, document: &Document) -> Result<(String, Vec<Span>)> {
-    let output = normal_source(document)?;
-    let mut anchors = Vec::new();
-    for datum in &document.datums {
-        let text = if let Some([first, rest @ ..]) = round(datum)
-            && symbol(first, ",")
-        {
-            if rest.is_empty() {
-                return Err(bad(datum, "a module header"));
-            }
-            let f = if rest.iter().any(is_import) {
-                import
-            } else {
-                export
-            };
-            format!("({})", joined(rest, f, ", ")?)
-        } else {
-            item(datum)?
-        };
-        anchors.push((datum.span, text));
-    }
-    struct Statements(Vec<Span>);
-    impl Visitor for Statements {
-        fn expr(&mut self, e: &mut Expr, enter: bool) {
-            if !enter {
-                return;
-            }
-            let body: Option<&Block> = match &e.kind {
-                ExprKind::Block(b) => Some(b),
-                ExprKind::Fn(f) => Some(&f.body),
-                _ => None,
-            };
-            if let Some(body) = body {
-                for s in &body.stmts {
-                    self.0.push(match s {
-                        Stmt::Bind(b) => b.span,
-                        Stmt::Env { span, .. } => *span,
-                        Stmt::Expr(e) => e.span,
-                    });
-                }
-            }
-        }
-    }
-    let mut module = super::to_ast::parse_module(document)?;
-    let mut stmts = Statements(Vec::new());
-    module.walk(&mut stmts);
-    let mut by_span = std::collections::HashMap::new();
-    let mut pending: Vec<_> = document.datums.iter().rev().collect();
-    while let Some(d) = pending.pop() {
-        by_span.entry(d.span).or_insert(d);
-        match &d.kind {
-            K::Round(xs) | K::Square(xs) | K::Curly(xs) | K::Bits(xs) => {
-                pending.extend(xs.iter().rev())
-            }
-            K::Quote(x) | K::Unquote(x) | K::Splice(x) => pending.push(x),
-            _ => {}
-        }
-    }
-    for span in stmts.0 {
-        if let Some(d) = by_span.get(&span) {
-            anchors.push((span, statement(d)?));
-        }
-    }
-    Ok(super::comments::transfer(
-        source, output, anchors, true, false, false,
-    ))
+    let (output, anchors) = normal_module(document)?;
+    // Validate the same item and statement forms as the core conversion.
+    let _ = super::to_ast::parse_module(document)?;
+    Ok(super::comments::transfer_anchored(source, output, anchors))
 }
 
 pub(super) fn import_name(d: &Datum) -> Result<String> {
@@ -266,9 +204,6 @@ fn import(d: &Datum) -> Result<String> {
 }
 fn export(d: &Datum) -> Result<String> {
     super::render::render(d, super::render::P::Export)
-}
-fn statement(d: &Datum) -> Result<String> {
-    super::render::render(d, super::render::P::Statement)
 }
 fn expr(d: &Datum) -> Result<String> {
     super::render::render(d, super::render::P::Expr)
@@ -362,6 +297,104 @@ mod deep_tests {
             format!("value = {}x{}\n", "f(".repeat(10000), ")".repeat(10000))
         );
     }
+    #[test]
+    fn deep_comment_conversion_is_linear_and_keeps_the_anchor() {
+        struct Frame {
+            call: usize,
+            curly: usize,
+            stmt: usize,
+        }
+        fn at(kind: K, start: usize, end: usize) -> Datum {
+            Datum {
+                kind,
+                span: Span::new(start as u32, end as u32),
+                docs: vec![],
+            }
+        }
+        let mut source = String::from("(= value ");
+        let mut frames = Vec::new();
+        for depth in 0..10000 {
+            let call = source.len();
+            source.push_str("(f { ");
+            let curly = call + 3;
+            if depth == 5000 {
+                source.push_str("\n// marker\n");
+            }
+            let stmt = source.len();
+            source.push_str("(= v ");
+            frames.push(Frame { call, curly, stmt });
+        }
+        let x = source.len();
+        source.push('x');
+        let mut value = at(K::Name("x".into()), x, x + 1);
+        for frame in frames.into_iter().rev() {
+            source.push(')');
+            let statement = at(
+                K::Round(vec![
+                    at(K::Symbol("=".into()), frame.stmt + 1, frame.stmt + 2),
+                    at(K::Name("v".into()), frame.stmt + 3, frame.stmt + 4),
+                    value,
+                ]),
+                frame.stmt,
+                source.len(),
+            );
+            source.push_str(" v");
+            let tail = at(K::Name("v".into()), source.len() - 1, source.len());
+            source.push_str(" })");
+            let curly = at(
+                K::Curly(vec![statement, tail]),
+                frame.curly,
+                source.len() - 1,
+            );
+            value = at(
+                K::Round(vec![
+                    at(K::Name("f".into()), frame.call + 1, frame.call + 2),
+                    curly,
+                ]),
+                frame.call,
+                source.len(),
+            );
+        }
+        source.push(')');
+        let root = at(
+            K::Round(vec![
+                at(K::Symbol("=".into()), 1, 2),
+                at(K::Name("value".into()), 3, 8),
+                value,
+            ]),
+            0,
+            source.len(),
+        );
+        let document = Document {
+            datums: vec![root],
+            trailing_docs: vec![],
+        };
+        let (output, lost) = normal_with_comments(&source, &document).unwrap();
+        assert!(lost.is_empty(), "{lost:?}");
+        assert_eq!(output.matches("// marker").count(), 1);
+        assert!(output.contains("// marker\nv = "));
+    }
+
+    #[test]
+    fn many_comment_insertions_keep_source_order() {
+        let mut source = String::from("(= f (-> () _ {\n");
+        for n in 0..10000 {
+            source.push_str(&format!("// c{n}\nx\n"));
+        }
+        source.push_str("}))\n");
+        let document = super::super::parse(&source).unwrap();
+        let (output, lost) = normal_with_comments(&source, &document).unwrap();
+        assert!(lost.is_empty(), "{lost:?}");
+        let mut at = 0;
+        for n in 0..10000 {
+            let wanted = format!("// c{n}\n");
+            let found = output[at..]
+                .find(&wanted)
+                .expect("comment remains in order");
+            at += found + wanted.len();
+        }
+    }
+
     #[test]
     fn render_long_list_preserves_each_element() {
         let d = datum(K::Square(
