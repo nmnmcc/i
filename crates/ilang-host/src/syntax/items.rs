@@ -66,6 +66,17 @@ struct MetadataLink {
     value: String,
     previous: Option<Arc<MetadataLink>>,
 }
+// Metadata is a persistent list and a macro may construct a long list.
+// Release its unique tail iteratively instead of recursing through Arc drops.
+impl Drop for MetadataLink {
+    fn drop(&mut self) {
+        let mut next = self.previous.take();
+        while let Some(mut link) = next {
+            let Some(unique) = Arc::get_mut(&mut link) else { break };
+            next = unique.previous.take();
+        }
+    }
+}
 struct ItemResult(Result<(), (String, Syntax)>);
 
 fn is_value_name(syntax: &Syntax) -> bool {
@@ -309,4 +320,24 @@ fn rebuild_requests(
             },
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn long_metadata_tail_drops_on_a_small_stack() {
+        std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
+            let mut list = None;
+            for _ in 0..50_000 {
+                list = Some(Arc::new(MetadataLink {
+                    key: String::new(), value: String::new(), previous: list,
+                }));
+            }
+            let shared = list.clone();
+            drop(list);
+            drop(shared);
+        }).unwrap().join().unwrap();
+    }
 }
