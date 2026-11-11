@@ -52,6 +52,11 @@ pub const IO: &str = "i:io/v1";
 
 /// The standard services, which print with `print`.
 pub fn standard(print: impl Fn(&str) + Send + Sync + 'static) -> HostImports {
+    standard_with_args(print, Vec::new())
+}
+
+/// Standard services with arguments belonging to the program.
+pub fn standard_with_args(print: impl Fn(&str) + Send + Sync + 'static, args: Vec<String>) -> HostImports {
     let mut imports = HostImports::default();
     imports
         .service(IO, "print", move |arguments| {
@@ -65,19 +70,23 @@ pub fn standard(print: impl Fn(&str) + Send + Sync + 'static) -> HostImports {
     clock::register(&mut imports);
     fs::register(&mut imports);
     net::register(&mut imports);
-    process::register(&mut imports);
+    process::register(&mut imports, args);
     stdio::register(&mut imports);
     imports
 }
 
 /// The standard services, which print to the standard output.
 pub fn stdout() -> HostImports {
-    standard(|text| {
+    stdout_with_args(Vec::new())
+}
+
+pub fn stdout_with_args(args: Vec<String>) -> HostImports {
+    standard_with_args(|text| {
         use std::io::Write;
         let mut out = std::io::stdout().lock();
         let _ = writeln!(out, "{text}");
         let _ = out.flush();
-    })
+    }, args)
 }
 
 /// What the services of [`testing`] were given, in order.

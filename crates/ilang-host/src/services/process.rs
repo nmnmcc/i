@@ -83,16 +83,11 @@ fn mode(s: &str) -> Option<Stdio> {
         _ => None,
     }
 }
-pub(super) fn register(imports: &mut HostImports) {
+pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
     imports
-        .async_service("i:arguments/v1", "args", |_| async {
-            let values = std::env::args_os()
-                .skip(1)
-                .map(|s| s.into_string())
-                .collect::<Result<Vec<_>, _>>();
-            Ok(values
-                .map(|v| bits(encode(v.into_iter())))
-                .map_err(|_| code("not_utf8")))
+        .async_service("i:arguments/v1", "args", move |_| {
+            let values = program_args.clone();
+            async move { Ok(Ok(bits(encode(values.into_iter())))) }
         })
         .expect(super::ONE);
     imports
