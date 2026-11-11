@@ -7,6 +7,7 @@
 pub mod hir;
 pub mod identity;
 pub mod order;
+pub mod providers;
 pub mod query;
 pub mod resolve;
 pub mod types;
