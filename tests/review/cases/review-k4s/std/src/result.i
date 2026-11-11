@@ -57,8 +57,8 @@ is_error(A, E) = (result: Result(A, E)) -> Bool {
 /// ```
 map(A, E, B, E2, N) = (
 	over: Result(A, E)
-	with: (A) -> B ? E2 ! N
-) -> Result(B, E) ? E2 ! N {
+	with: (A) -> B ^ E2 ! N
+) -> Result(B, E) ^ E2 ! N {
 	over |> {
 		Ok(value)    -> Ok(with(value))
 		Error(error) -> Error(error)
@@ -68,8 +68,8 @@ map(A, E, B, E2, N) = (
 /// Changes the error of an `Error` with a function. An `Ok` stays.
 map_error(A, E, F, E2, N) = (
 	over: Result(A, E)
-	with: (E) -> F ? E2 ! N
-) -> Result(A, F) ? E2 ! N {
+	with: (E) -> F ^ E2 ! N
+) -> Result(A, F) ^ E2 ! N {
 	over |> {
 		Ok(value)    -> Ok(value)
 		Error(error) -> Error(with(error))
@@ -84,8 +84,8 @@ map_error(A, E, F, E2, N) = (
 /// ```
 then(A, E, B, E2, N) = (
 	result: Result(A, E)
-	apply: (A) -> Result(B, E) ? E2 ! N
-) -> Result(B, E) ? E2 ! N {
+	apply: (A) -> Result(B, E) ^ E2 ! N
+) -> Result(B, E) ^ E2 ! N {
 	result |> {
 		Ok(value)    -> apply(value)
 		Error(error) -> Error(error)
@@ -111,8 +111,8 @@ unwrap(A, E) = (result: Result(A, E), or: A) -> A {
 /// The value of an `Ok`, or the value of `or()` for an `Error`.
 lazy_unwrap(A, E, E2, N) = (
 	result: Result(A, E)
-	or: () -> A ? E2 ! N
-) -> A ? E2 ! N {
+	or: () -> A ^ E2 ! N
+) -> A ^ E2 ! N {
 	result |> {
 		Ok(value) -> value
 		Error(_)  -> or()
@@ -147,8 +147,8 @@ or(A, E) = (first: Result(A, E), second: Result(A, E)) -> Result(A, E) {
 /// The first result when it is `Ok`, and the value of `second()` when not.
 lazy_or(A, E, E2, N) = (
 	first: Result(A, E)
-	second: () -> Result(A, E) ? E2 ! N
-) -> Result(A, E) ? E2 ! N {
+	second: () -> Result(A, E) ^ E2 ! N
+) -> Result(A, E) ^ E2 ! N {
 	first |> {
 		Ok(_)    -> first
 		Error(_) -> second()
@@ -221,8 +221,8 @@ replace_error(A, E, F) = (result: Result(A, E), error: F) -> Result(A, F) {
 /// result. An `Ok` stays.
 recover(A, E, F, E2, N) = (
 	result: Result(A, E)
-	with: (E) -> Result(A, F) ? E2 ! N
-) -> Result(A, F) ? E2 ! N {
+	with: (E) -> Result(A, F) ^ E2 ! N
+) -> Result(A, F) ^ E2 ! N {
 	result |> {
 		Ok(value)    -> Ok(value)
 		Error(error) -> with(error)
@@ -247,7 +247,7 @@ to_option(A, E) = (result: Result(A, E)) -> Option(A) {
 
 /// The value of an `Ok`. For `Error(x)`, the computation ends with the
 /// error `x` (§9.3), which `catch` or `i/fail` can take.
-to_error(A, E) = (result: Result(A, E)) -> A ? E { fail.from_result(result) }
+to_error(A, E) = (result: Result(A, E)) -> A ^ E { fail.from_result(result) }
 
 /// Does `body`, and gives `Ok` with its value, or `Error` with the error it
 /// ends with.
@@ -255,7 +255,7 @@ to_error(A, E) = (result: Result(A, E)) -> A ? E { fail.from_result(result) }
 /// ```i
 /// result.catch(() { fail.raise("no") })  // Error("no")
 /// ```
-catch(A, E, N) = (body: () -> A ? E ! N) -> Result(A, E) ! N {
+catch(A, E, N) = (body: () -> A ^ E ! N) -> Result(A, E) ! N {
 	fail.catch(body)
 }
 

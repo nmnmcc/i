@@ -15,7 +15,7 @@ at = (seed: random.Generator, path: List(Int)) {
 	}
 }
 
-@main
+
 main = () {
 	(_, advanced) = random.word(random.from_seed(-7))
 	(left, _) = random.split(advanced)

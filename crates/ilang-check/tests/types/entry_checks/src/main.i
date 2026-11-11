@@ -43,7 +43,7 @@ opaque = (h: Handle, flag: Bool) {
 	}
 }
 
-errors = (x: Int) -> Nil ? Int | String {
+errors = (x: Int) -> Nil ^ Int | String {
 	x |> {
 		0 -> fail.raise(1)
 		1 -> fail.raise("one")
@@ -62,9 +62,9 @@ bad_value = () { (1, 2) }
 
 generic = (x) { x }
 
-bad_errors = () -> Int ? (Int, Int) { fail.raise((1, 2)) }
+bad_errors = () -> Int ^ (Int, Int) { fail.raise((1, 2)) }
 
-twice_error = () -> Int ? Handle { 1 }
+twice_error = () -> Int ^ Handle { 1 }
 
 // A host export is a function.
 number = 1
@@ -77,7 +77,7 @@ with_host = (s ! Storage) {
 
 with_clock = (c ! Clock) { c.now() }
 
-@main
+
 main = (s ! Storage, c ! Clock) {
 	s.read(c.now() |> core_text)
 	Nil

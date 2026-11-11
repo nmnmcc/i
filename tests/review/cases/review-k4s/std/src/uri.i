@@ -256,7 +256,7 @@ parse_query = (query: String) -> Result(List((String, String)), CodecError) {
 			rest: List(Int)
 			offset: Int
 			acc: List((String, String))
-		) -> List((String, String)) ? CodecError {
+		) -> List((String, String)) ^ CodecError {
 			(piece, tail, more) = cut(rest, 38)
 			next = { piece == [] } |> {
 				True -> acc
@@ -315,7 +315,7 @@ validated = (p: Parts, parsing: Bool) -> Result(Uri, UriError) {
 
 // Parse validates complete components in order after its whole-input scan.
 // Build scans all fields, then checks their grammar, then cross-field rules.
-validate = (p: Parts, parsing: Bool) -> Nil ? UriError {
+validate = (p: Parts, parsing: Bool) -> Nil ^ UriError {
 	scan_option(p.scheme, SchemePart)
 	p.authority |> {
 		None -> Nil
@@ -365,7 +365,7 @@ validate = (p: Parts, parsing: Bool) -> Nil ? UriError {
 	}
 }
 
-path_constraints = (p: Parts) -> Nil ? UriError {
+path_constraints = (p: Parts) -> Nil ^ UriError {
 	path_bytes = bytes(p.path)
 	p.authority |> {
 		Some(_) -> path_bytes |> {
@@ -389,7 +389,7 @@ path_constraints = (p: Parts) -> Nil ? UriError {
 	}
 }
 
-problem = (part: UriPart, offset: Int, why: UriProblem) -> Never ? UriError {
+problem = (part: UriPart, offset: Int, why: UriProblem) -> Never ^ UriError {
 	fail.raise(UriError(part, offset, why))
 }
 
@@ -398,22 +398,22 @@ require = (
 	part: UriPart
 	offset: Int
 	why: UriProblem
-) -> Nil ? UriError {
+) -> Nil ^ UriError {
 	ok |> {
 		True  -> Nil
 		False -> problem(part, offset, why)
 	}
 }
 
-scan_option = (s: Option(String), part: UriPart) -> Nil ? UriError {
+scan_option = (s: Option(String), part: UriPart) -> Nil ^ UriError {
 	s |> {
 		None       -> Nil
 		Some(text) -> lexical(bytes(text), part)
 	}
 }
 
-lexical = (xs: List(Int), part: UriPart) -> Nil ? UriError {
-	go = (rest: List(Int), at: Int) -> Nil ? UriError {
+lexical = (xs: List(Int), part: UriPart) -> Nil ^ UriError {
+	go = (rest: List(Int), at: Int) -> Nil ^ UriError {
 		rest |> {
 			[] -> Nil
 			[x, ..tail] -> { x == 37 } |> {
@@ -444,7 +444,7 @@ grammar_option = (
 	part: UriPart
 	why: UriProblem
 	allowed: (Int) -> Bool
-) -> Nil ? UriError {
+) -> Nil ^ UriError {
 	text |> {
 		None    -> Nil
 		Some(s) -> grammar(bytes(s), part, why, allowed, 0)
@@ -457,7 +457,7 @@ grammar = (
 	why: UriProblem
 	allowed: (Int) -> Bool
 	at: Int
-) -> Nil ? UriError {
+) -> Nil ^ UriError {
 	xs |> {
 		[] -> Nil
 		[x, ..tail] -> {
@@ -480,7 +480,7 @@ grammar = (
 read_authority = (
 	raw: List(Int)
 	start: Int
-) -> (Authority, List((UriPart, Int))) ? UriError {
+) -> (Authority, List((UriPart, Int))) ^ UriError {
 	(before_at, after_at, at) = cut(raw, 64)
 	(userinfo, hostport, hstart) = at |> {
 		True -> {
@@ -802,12 +802,12 @@ encode_octets = (xs: List(Int), form: Bool) -> String {
 	}
 }
 
-decode_raw = (xs: List(Int), form: Bool) -> BitArray ? CodecError {
+decode_raw = (xs: List(Int), form: Bool) -> BitArray ^ CodecError {
 	go = (
 		rest: List(Int)
 		at: Int
 		acc: List(BitArray)
-	) -> BitArray ? CodecError {
+	) -> BitArray ^ CodecError {
 		rest |> {
 			[] -> bit_array.concat(list.reverse(acc))
 			[x, ..tail] -> { x == 37 } |> {
@@ -838,7 +838,7 @@ decode_raw = (xs: List(Int), form: Bool) -> BitArray ? CodecError {
 	go(xs, 0, [])
 }
 
-decode_text = (text: String, form: Bool) -> String ? CodecError {
+decode_text = (text: String, form: Bool) -> String ^ CodecError {
 	bit_array.to_string(decode_raw(bytes(text), form)) |> {
 		Ok(s)    -> s
 		Error(_) -> fail.raise(InvalidUtf8)

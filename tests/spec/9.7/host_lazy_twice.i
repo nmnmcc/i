@@ -6,7 +6,7 @@
 (i/control, i/fail, i/request)
 
 @host("test:async/v1", "async")
-Later { Later(double: (n: Int) -> Int ? String) }
+Later { Later(double: (n: Int) -> Int ^ String) }
 
 Step { Paused(Continuation(Nil, Step, String, Later | request.Await | request.Owner))  Done(Int) }
 
@@ -27,7 +27,7 @@ down = (b, n) {
   n |> { 0 -> leaf(b)  _ -> down(b, n - 1) + 1 }
 }
 
-@main
+
 main = (later ! Later) {
   k = control.boundary((b) { Done(down(b, 10)) }) |> {
     Paused(k) -> k

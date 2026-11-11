@@ -3,7 +3,7 @@
 (main)
 Schema = make(Int, 2, "name")
 
-@main
+
 main = () {
   assert(True)
   Nil

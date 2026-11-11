@@ -3,7 +3,7 @@
 // multicore.md D13: a fresh key is not generalized between unrelated types.
 (i/key)
 
-@main
+
 main = () {
   k = key.new()
   x = key.wrap(k, 1)

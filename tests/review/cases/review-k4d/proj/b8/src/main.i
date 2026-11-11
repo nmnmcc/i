@@ -17,7 +17,7 @@ ping2 = (n: Int) { n |> {
   _ -> pong2(n - 1)
 } }
 pong2 = (n: Int) { ping2(n) }
-@main
+
 main = () {
   ! S(Dep) = S(() { get() })
   pong2(3)

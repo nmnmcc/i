@@ -3,7 +3,7 @@ bad(N) = (s ! S(N)) -> Int ! N {
   f()
 }
 
-@main
+
 main = () {
   closed()
   Nil

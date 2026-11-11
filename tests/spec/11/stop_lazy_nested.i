@@ -60,7 +60,7 @@ resume = (p) {
 
 // A stop inside a resume inside a resumed computation shows the frames
 // that wait in both.
-@main
+
 main = () {
   first = control.boundary((b) {
     a1(b)

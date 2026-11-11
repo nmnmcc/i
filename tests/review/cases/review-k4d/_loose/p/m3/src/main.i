@@ -8,7 +8,7 @@ use(N) = (s ! S(N)) {
 uset(N) = (s ! T(N)) {
   s.f()
 }
-@main
+
 main = () {
   ! S(Dep) = S(() { get() })
   ! T(S(Dep)) = T(() { use() }, (_: S(Dep)) { Nil })

@@ -1,6 +1,6 @@
 both(N) = () -> Int ! N | S(N) | T(Int, N) { pong(2) }
 
-@main
+
 main = () {
   closed()
   Nil

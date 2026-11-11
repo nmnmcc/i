@@ -1,5 +1,5 @@
 (i/task, i/resource, i/fail, i/core, (Io) = i/io)
-@main
+
 main = (io ! Io) {
  r = fail.catch(() { task.scope((s) {
   gate: task.Channel(Nil) = task.channel()

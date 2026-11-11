@@ -5,7 +5,7 @@
 // W520: exact literal types allow ordinary runtime comparisons.
 status = () { "ok" }
 
-@main
+
 main = () {
 	x = 1
 	assert({x == 2} == False)

@@ -13,5 +13,5 @@ dependencies_first = () {
   ! Await = make_await()
   body()
 }
-@main
+
 main = () { assert(dependencies_first() == "configured") }

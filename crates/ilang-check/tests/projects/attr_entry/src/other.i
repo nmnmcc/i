@@ -1,2 +1,2 @@
-@main
+
 other = () { Nil }

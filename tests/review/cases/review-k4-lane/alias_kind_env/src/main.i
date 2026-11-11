@@ -10,5 +10,5 @@ bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	second
 }
 
-@main
+
 main = () { Nil }

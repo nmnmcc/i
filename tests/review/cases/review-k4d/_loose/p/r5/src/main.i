@@ -17,7 +17,7 @@ tell = (x: Int) { x |> {
   _ -> "many"
 } }
 
-@main
+
 main(N) = () {
   local: () -> Int ! N | S(N) = () { fw() }
   local()

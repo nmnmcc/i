@@ -42,7 +42,7 @@ spawn = (depth: Int) {
 	assert(core.portable(value))
 }
 
-@main
+
 main = () {
 	spawn(28)
 	spawn(60)

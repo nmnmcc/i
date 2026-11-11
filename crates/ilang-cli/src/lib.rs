@@ -634,7 +634,7 @@ mod binding_tests {
 first: (Float) -> Float
 @external("plugin:raw/v1", "number")
 second: (Float) -> Float
-@main
+
 main = () {
   first(1.0)
   second(2.0)

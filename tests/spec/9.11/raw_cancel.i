@@ -5,7 +5,7 @@
 (i/request)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later, owner ! request.Owner, root ! request.Root) {
   old = later.echo("old")
   request.cancel(request.ticket(old))

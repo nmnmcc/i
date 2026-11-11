@@ -14,7 +14,7 @@ check = (got: String, want: String) {
 counter = [1, 2, 3]
 
 // The value of the program entry is not used.
-@main
+
 main = () {
 	check(core.inspect(counter), "[1, 2, 3]")
 	core.inspect(counter)

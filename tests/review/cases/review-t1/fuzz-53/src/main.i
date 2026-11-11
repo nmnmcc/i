@@ -6,7 +6,7 @@ f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) { x |> {
 (_,_) -> 4
 ("ab",_) -> 5
 } }
-@main
+
 main = () {
 assert(f(("a",True)) == 1)
 assert(f(("a",False)) == 4)

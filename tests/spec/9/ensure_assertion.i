@@ -7,7 +7,7 @@
 
 // An `Assert` failure taken by `assertion.catch` unwinds, so final
 // functions run.
-@main
+
 main = () {
 	assertion.catch(() {
 		resource.ensure(() { assert(False) }, () { panic("final") })

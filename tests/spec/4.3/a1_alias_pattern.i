@@ -5,7 +5,7 @@
 User { User }
 Schema(User, _) = Int
 
-@main
+
 main = () {
   assert(True)
   Nil

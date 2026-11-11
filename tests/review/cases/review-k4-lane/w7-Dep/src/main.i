@@ -18,7 +18,7 @@ wrap(N) = (svc: S(N)) {
 	use()
 }
 
-@main
+
 main = () {
 	! Dep = Dep(7)
 	assert(wrap(S(() { get() })) == 7)

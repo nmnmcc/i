@@ -9,7 +9,7 @@ get = (d ! Dep) { d.v }
 
 loop = (x) { x(x) }
 
-@main
+
 main = () {
   closed()
   Nil

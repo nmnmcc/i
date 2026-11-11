@@ -1,1 +1,4 @@
 name = "app"
+
+[entries]
+legacy = "both_test.both"

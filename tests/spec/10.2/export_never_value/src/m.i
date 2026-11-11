@@ -6,4 +6,4 @@
 	f
 )
 
-f = (n: Int) -> Never ? String { fail.raise("no") }
+f = (n: Int) -> Never ^ String { fail.raise("no") }

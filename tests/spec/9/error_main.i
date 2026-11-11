@@ -16,5 +16,5 @@ get = (n) {
 	}
 }
 
-@main
+
 main = () { get(10) }

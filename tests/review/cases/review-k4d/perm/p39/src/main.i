@@ -31,7 +31,7 @@ ping = (n: Int) { n |> {
 
 run(A, N) = (body: () -> A ! N) { body() }
 
-@main
+
 main = () {
   closed()
   Nil

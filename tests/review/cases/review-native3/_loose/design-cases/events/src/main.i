@@ -1,7 +1,7 @@
 // Design counterexamples; not run.
 (i/task, i/control, i/core)
 event = task.always(1)
-@main
+
 main = () {
   task.run(() { assert(task.sync(event) == 1) })
   control.boundary((b) {

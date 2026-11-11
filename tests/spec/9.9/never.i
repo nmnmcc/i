@@ -5,5 +5,5 @@
 	i/task
 )
 
-@main
+
 main = () { task.sync(task.choose([])) }

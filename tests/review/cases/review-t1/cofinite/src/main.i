@@ -9,7 +9,7 @@ h = (n: Int | String) { n |> {
  _: Int - 0 -> 3
  0 -> 4
 } }
-@main
+
 main = () {
  assert(g("b")==2) assert(g("z")==3)
  assert(h(0)==4) assert(h(1073741824)==3)

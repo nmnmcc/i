@@ -11,7 +11,7 @@ forever = () -> Never ! task.Scheduler {
 	forever()
 }
 
-@main
+
 main = (io ! Io) {
 	answer = task.race(() {
 		task.yield()

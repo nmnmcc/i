@@ -28,7 +28,7 @@ h0 = () { run(h0) }
 h1 = () {
   1
 }
-@main
+
 main = () {
   ! Dep = Dep(1)
   ! Svc(Int) = Svc(() { get() }, (_: Int) { Nil })

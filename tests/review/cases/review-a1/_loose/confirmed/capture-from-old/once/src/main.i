@@ -18,7 +18,7 @@ f = () {
 		10
 }
 
-@main
+
 main = () {
 	assert(f() == 10)
 	Nil

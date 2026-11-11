@@ -7,7 +7,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	control.boundary((b) {
 		fail.catch(() {

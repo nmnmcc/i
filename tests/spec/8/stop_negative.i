@@ -12,7 +12,7 @@ make = (n: Int) {
 	x
 }
 
-@main
+
 main = () {
 	make(-3)
 	Nil

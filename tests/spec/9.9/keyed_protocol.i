@@ -74,7 +74,7 @@ begin = (start: Start) {
 	})
 }
 
-@main
+
 main = () {
 	ints = Channel(key.new())
 	strings = Channel(key.new())

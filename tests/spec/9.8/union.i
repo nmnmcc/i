@@ -3,7 +3,7 @@
 // multicore.md D13: one key can collect Int | String, but reads keep that union.
 (i/key)
 
-@main
+
 main = () {
   k = key.new()
   number = key.wrap(k, 1)

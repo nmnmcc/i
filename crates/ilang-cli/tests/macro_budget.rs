@@ -67,7 +67,7 @@ fn run(wasm: &[u8], limits: Limits) -> (Result<Outcome, anyhow::Error>, MacroBud
 
 #[test]
 fn charges_are_identical_before_and_after_optimization() {
-    let source = "f = (n) { n |> { 0 -> [\"end\"] _ -> [\"x\", ..f(n - 1)] } }\n@main\nmain = () { f(5) Nil }\n";
+    let source = "f = (n) { n |> { 0 -> [\"end\"] _ -> [\"x\", ..f(n - 1)] } }\n\nmain = () { f(5) Nil }\n";
     let a = compile(source, false);
     let b = compile(source, true);
     let (out_a, count_a) = run(&a, Limits::default());
@@ -101,7 +101,7 @@ fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
 
 #[test]
 fn work_and_allocation_stop_before_crossing_the_limit() {
-    let wasm = compile("@main\nmain = () { [1, 2, 3] Nil }\n", false);
+    let wasm = compile("\nmain = () { [1, 2, 3] Nil }\n", false);
     let (_, work) = run(
         &wasm,
         Limits {
@@ -125,11 +125,11 @@ fn work_and_allocation_stop_before_crossing_the_limit() {
 #[test]
 fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
     let tail = compile(
-        "f = (n) { n |> { 0 -> Nil _ -> f(n - 1) } }\n@main\nmain = () { f(40) }\n",
+        "f = (n) { n |> { 0 -> Nil _ -> f(n - 1) } }\n\nmain = () { f(40) }\n",
         false,
     );
     let non_tail = compile(
-        "f = (n) { n |> { 0 -> 0 _ -> f(n - 1) + 1 } }\n@main\nmain = () { f(40) Nil }\n",
+        "f = (n) { n |> { 0 -> 0 _ -> f(n - 1) + 1 } }\n\nmain = () { f(40) Nil }\n",
         false,
     );
     let limits = Limits {
@@ -146,7 +146,7 @@ fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
 #[test]
 fn data_dependent_work_and_allocation_grow_with_values() {
     let program = |content: &str| {
-        format!("f = (s) {{ s <> s }}\n@main\nmain = () {{ f(\"{content}\") Nil }}\n")
+        format!("f = (s) {{ s <> s }}\n\nmain = () {{ f(\"{content}\") Nil }}\n")
     };
     let small = compile(&program("a"), false);
     let large = compile(&program(&"a".repeat(512)), false);
@@ -160,7 +160,7 @@ fn data_dependent_work_and_allocation_grow_with_values() {
 
 #[test]
 fn frame_accounting_restores_after_errors_and_continuation_resume() {
-    let source = "(i/fail\n i/control)\ninner = (n) { n |> { 0 -> fail.raise(\"err\") _ -> inner(n - 1) + 1 } }\n@main\nmain = () { fail.catch(() { inner(5) }) control.boundary((b) { control.suspend(b, (k) { control.resume(k, 1) }) }) Nil }\n";
+    let source = "(i/fail\n i/control)\ninner = (n) { n |> { 0 -> fail.raise(\"err\") _ -> inner(n - 1) + 1 } }\n\nmain = () { fail.catch(() { inner(5) }) control.boundary((b) { control.suspend(b, (k) { control.resume(k, 1) }) }) Nil }\n";
     for optimized in [false, true] {
         let wasm = compile(source, optimized);
         let (outcome, budget) = run(&wasm, Limits::default());

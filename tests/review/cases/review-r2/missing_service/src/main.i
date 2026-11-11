@@ -2,7 +2,7 @@
 Missing { Missing(value: Int) }
 needs = (m ! Missing) { m.value }
 
-@main
+
 main = (io ! Io) {
 task.scope((s) { task.go(s, () { needs() })
  Nil })

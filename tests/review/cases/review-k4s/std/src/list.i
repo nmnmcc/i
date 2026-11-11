@@ -111,7 +111,7 @@ length(A) = (of: List(A)) -> Int {
 }
 
 /// The number of elements for which the function gives `True`.
-count(A, E, N) = (list: List(A), where: (A) -> Bool ? E ! N) -> Int ? E ! N {
+count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
 	go = (rest, n) {
 		rest |> {
 			[] -> n
@@ -221,8 +221,8 @@ index_of(A) = (list: List(A), item: A) -> Option(Int) {
 /// ```
 group(V, K, E, N) = (
 	list: List(V)
-	by: (V) -> K ? E ! N
-) -> Dict(K, List(V)) ? E ! N { dict.group(list, by) }
+	by: (V) -> K ^ E ! N
+) -> Dict(K, List(V)) ^ E ! N { dict.group(list, by) }
 
 /// Keeps the elements for which the function gives `True`, in order.
 ///
@@ -231,8 +231,8 @@ group(V, K, E, N) = (
 /// ```
 filter(A, E, N) = (
 	list: List(A)
-	keeping: (A) -> Bool ? E ! N
-) -> List(A) ? E ! N {
+	keeping: (A) -> Bool ^ E ! N
+) -> List(A) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[] -> reverse(acc)
@@ -253,8 +253,8 @@ filter(A, E, N) = (
 /// ```
 filter_map(A, B, E, N) = (
 	list: List(A)
-	with: (A) -> Option(B) ? E ! N
-) -> List(B) ? E ! N {
+	with: (A) -> Option(B) ^ E ! N
+) -> List(B) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[] -> reverse(acc)
@@ -272,7 +272,7 @@ filter_map(A, B, E, N) = (
 /// ```i
 /// list.map([1, 2, 3], (x) { x * 2 })  // [2, 4, 6]
 /// ```
-map(A, B, E, N) = (list: List(A), with: (A) -> B ? E ! N) -> List(B) ? E ! N {
+map(A, B, E, N) = (list: List(A), with: (A) -> B ^ E ! N) -> List(B) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[]        -> reverse(acc)
@@ -291,8 +291,8 @@ map(A, B, E, N) = (list: List(A), with: (A) -> B ? E ! N) -> List(B) ? E ! N {
 map2(A, B, C, E, N) = (
 	list1: List(A)
 	list2: List(B)
-	with: (A, B) -> C ? E ! N
-) -> List(C) ? E ! N {
+	with: (A, B) -> C ^ E ! N
+) -> List(C) ^ E ! N {
 	go = (xs, ys, acc) {
 		(xs, ys) |> {
 			([x, ..xs], [y, ..ys]) -> go(xs, ys, [with(x, y), ..acc])
@@ -312,8 +312,8 @@ map2(A, B, C, E, N) = (
 map_fold(A, Acc, B, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A) -> (Acc, B) ? E ! N
-) -> (Acc, List(B)) ? E ! N {
+	with: (Acc, A) -> (Acc, B) ^ E ! N
+) -> (Acc, List(B)) ^ E ! N {
 	go = (rest, acc, out) {
 		rest |> {
 			[] -> (acc, reverse(out))
@@ -330,8 +330,8 @@ map_fold(A, Acc, B, E, N) = (
 /// counting from 0.
 index_map(A, B, E, N) = (
 	list: List(A)
-	with: (A, Int) -> B ? E ! N
-) -> List(B) ? E ! N {
+	with: (A, Int) -> B ^ E ! N
+) -> List(B) ^ E ! N {
 	go = (rest, i, acc) {
 		rest |> {
 			[]        -> reverse(acc)
@@ -350,8 +350,8 @@ index_map(A, B, E, N) = (
 /// ```
 try_map(A, B, F, E, N) = (
 	over: List(A)
-	with: (A) -> Result(B, F) ? E ! N
-) -> Result(List(B), F) ? E ! N {
+	with: (A) -> Result(B, F) ^ E ! N
+) -> Result(List(B), F) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[] -> Ok(reverse(acc))
@@ -438,8 +438,8 @@ concat(A) = (lists: List(List(A))) -> List(A) {
 /// ```
 flat_map(A, B, E, N) = (
 	over: List(A)
-	with: (A) -> List(B) ? E ! N
-) -> List(B) ? E ! N {
+	with: (A) -> List(B) ^ E ! N
+) -> List(B) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[]        -> reverse(acc)
@@ -457,8 +457,8 @@ flat_map(A, B, E, N) = (
 fold(A, Acc, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	with: (Acc, A) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	over |> {
 		[]        -> from
 		[x, ..xs] -> fold(xs, with(from, x), with)
@@ -473,15 +473,15 @@ fold(A, Acc, E, N) = (
 fold_right(A, Acc, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A) -> Acc ? E ! N
-) -> Acc ? E ! N { fold(reverse(over), from, with) }
+	with: (Acc, A) -> Acc ^ E ! N
+) -> Acc ^ E ! N { fold(reverse(over), from, with) }
 
 /// Like `fold`, and the function also gets the index of the element.
 index_fold(A, Acc, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A, Int) -> Acc ? E ! N
-) -> Acc ? E ! N {
+	with: (Acc, A, Int) -> Acc ^ E ! N
+) -> Acc ^ E ! N {
 	go = (rest, acc, i) {
 		rest |> {
 			[]        -> acc
@@ -500,8 +500,8 @@ index_fold(A, Acc, E, N) = (
 try_fold(A, Acc, F, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A) -> Result(Acc, F) ? E ! N
-) -> Result(Acc, F) ? E ! N {
+	with: (Acc, A) -> Result(Acc, F) ^ E ! N
+) -> Result(Acc, F) ^ E ! N {
 	over |> {
 		[] -> Ok(from)
 		[x, ..xs] -> with(from, x) |> {
@@ -522,8 +522,8 @@ try_fold(A, Acc, F, E, N) = (
 fold_until(A, Acc, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A) -> ContinueOrStop(Acc) ? E ! N
-) -> Acc ? E ! N {
+	with: (Acc, A) -> ContinueOrStop(Acc) ^ E ! N
+) -> Acc ^ E ! N {
 	over |> {
 		[] -> from
 		[x, ..xs] -> with(from, x) |> {
@@ -540,8 +540,8 @@ fold_until(A, Acc, E, N) = (
 /// ```
 find(A, E, N) = (
 	in: List(A)
-	one_that: (A) -> Bool ? E ! N
-) -> Option(A) ? E ! N {
+	one_that: (A) -> Bool ^ E ! N
+) -> Option(A) ^ E ! N {
 	in |> {
 		[] -> None
 		[x, ..xs] -> one_that(x) |> {
@@ -554,8 +554,8 @@ find(A, E, N) = (
 /// The first `Some` value that the function gives, or `None`.
 find_map(A, B, E, N) = (
 	in: List(A)
-	with: (A) -> Option(B) ? E ! N
-) -> Option(B) ? E ! N {
+	with: (A) -> Option(B) ^ E ! N
+) -> Option(B) ^ E ! N {
 	in |> {
 		[] -> None
 		[x, ..xs] -> with(x) |> {
@@ -567,7 +567,7 @@ find_map(A, B, E, N) = (
 
 /// `True` when the function gives `True` for every element. It stops at the
 /// first `False`. `True` for the empty list.
-all(A, E, N) = (in: List(A), satisfying: (A) -> Bool ? E ! N) -> Bool ? E ! N {
+all(A, E, N) = (in: List(A), satisfying: (A) -> Bool ^ E ! N) -> Bool ^ E ! N {
 	in |> {
 		[]        -> True
 		[x, ..xs] -> satisfying(x) && all(xs, satisfying)
@@ -576,7 +576,7 @@ all(A, E, N) = (in: List(A), satisfying: (A) -> Bool ? E ! N) -> Bool ? E ! N {
 
 /// `True` when the function gives `True` for some element. It stops at the
 /// first `True`. `False` for the empty list.
-any(A, E, N) = (in: List(A), satisfying: (A) -> Bool ? E ! N) -> Bool ? E ! N {
+any(A, E, N) = (in: List(A), satisfying: (A) -> Bool ^ E ! N) -> Bool ^ E ! N {
 	in |> {
 		[]        -> False
 		[x, ..xs] -> satisfying(x) || any(xs, satisfying)
@@ -674,8 +674,8 @@ unique(A) = (list: List(A)) -> List(A) {
 /// ```
 sort(A, E, N) = (
 	list: List(A)
-	by: (A, A) -> Order ? E ! N
-) -> List(A) ? E ! N {
+	by: (A, A) -> Order ^ E ! N
+) -> List(A) ^ E ! N {
 	list |> {
 		[] | [_] -> list
 		_        -> merge_all(runs(list, by, []), by)
@@ -687,9 +687,9 @@ sort(A, E, N) = (
 // run, so that the sort stays stable. The runs are given in order.
 runs(A, E, N) = (
 	list: List(A)
-	by: (A, A) -> Order ? E ! N
+	by: (A, A) -> Order ^ E ! N
 	acc: List(List(A))
-) -> List(List(A)) ? E ! N {
+) -> List(List(A)) ^ E ! N {
 	list |> {
 		[]  -> reverse(acc)
 		[x] -> reverse([[x], ..acc])
@@ -705,9 +705,9 @@ ascending(A, E, N) = (
 	list: List(A)
 	last: A
 	run: List(A)
-	by: (A, A) -> Order ? E ! N
+	by: (A, A) -> Order ^ E ! N
 	acc: List(List(A))
-) -> List(List(A)) ? E ! N {
+) -> List(List(A)) ^ E ! N {
 	list |> {
 		[] -> reverse([reverse([last, ..run]), ..acc])
 		[x, ..rest] -> by(last, x) |> {
@@ -723,9 +723,9 @@ descending(A, E, N) = (
 	list: List(A)
 	last: A
 	run: List(A)
-	by: (A, A) -> Order ? E ! N
+	by: (A, A) -> Order ^ E ! N
 	acc: List(List(A))
-) -> List(List(A)) ? E ! N {
+) -> List(List(A)) ^ E ! N {
 	list |> {
 		[] -> reverse([[last, ..run], ..acc])
 		[x, ..rest] -> by(last, x) |> {
@@ -737,8 +737,8 @@ descending(A, E, N) = (
 
 merge_all(A, E, N) = (
 	runs: List(List(A))
-	by: (A, A) -> Order ? E ! N
-) -> List(A) ? E ! N {
+	by: (A, A) -> Order ^ E ! N
+) -> List(A) ^ E ! N {
 	runs |> {
 		[]    -> []
 		[run] -> run
@@ -748,9 +748,9 @@ merge_all(A, E, N) = (
 
 merge_pairs(A, E, N) = (
 	runs: List(List(A))
-	by: (A, A) -> Order ? E ! N
+	by: (A, A) -> Order ^ E ! N
 	acc: List(List(A))
-) -> List(List(A)) ? E ! N {
+) -> List(List(A)) ^ E ! N {
 	runs |> {
 		[]             -> reverse(acc)
 		[run]          -> reverse([run, ..acc])
@@ -762,9 +762,9 @@ merge_pairs(A, E, N) = (
 merge(A, E, N) = (
 	xs: List(A)
 	ys: List(A)
-	by: (A, A) -> Order ? E ! N
+	by: (A, A) -> Order ^ E ! N
 	acc: List(A)
-) -> List(A) ? E ! N {
+) -> List(A) ^ E ! N {
 	xs |> {
 		[] -> reverse_onto(acc, ys)
 		[x, ..xs2] -> ys |> {
@@ -833,8 +833,8 @@ split(A) = (list: List(A), at: Int) -> (List(A), List(A)) {
 /// The first elements for which the function gives `True`, and the rest.
 split_while(A, E, N) = (
 	list: List(A)
-	satisfying: (A) -> Bool ? E ! N
-) -> (List(A), List(A)) ? E ! N {
+	satisfying: (A) -> Bool ^ E ! N
+) -> (List(A), List(A)) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[] -> (reverse(acc), [])
@@ -912,7 +912,7 @@ key_set(K, V) = (list: List((K, V)), key: K, value: V) -> List((K, V)) {
 }
 
 /// Calls a function on every element, in order, for its effects.
-each(A, B, E, N) = (list: List(A), with: (A) -> B ? E ! N) -> Nil ? E ! N {
+each(A, B, E, N) = (list: List(A), with: (A) -> B ^ E ! N) -> Nil ^ E ! N {
 	list |> {
 		[] -> Nil
 		[x, ..xs] -> {
@@ -926,8 +926,8 @@ each(A, B, E, N) = (list: List(A), with: (A) -> B ? E ! N) -> Nil ? E ! N {
 /// stops at the first `Error`.
 try_each(A, B, F, E, N) = (
 	over: List(A)
-	with: (A) -> Result(B, F) ? E ! N
-) -> Result(Nil, F) ? E ! N {
+	with: (A) -> Result(B, F) ^ E ! N
+) -> Result(Nil, F) ^ E ! N {
 	over |> {
 		[] -> Ok(Nil)
 		[x, ..xs] -> with(x) |> {
@@ -945,8 +945,8 @@ try_each(A, B, F, E, N) = (
 /// ```
 partition(A, E, N) = (
 	list: List(A)
-	with: (A) -> Bool ? E ! N
-) -> (List(A), List(A)) ? E ! N {
+	with: (A) -> Bool ^ E ! N
+) -> (List(A), List(A)) ^ E ! N {
 	go = (rest, yes, no) {
 		rest |> {
 			[] -> (reverse(yes), reverse(no))
@@ -1030,8 +1030,8 @@ window_by_2(A) = (list: List(A)) -> List((A, A)) {
 /// `True`.
 drop_while(A, E, N) = (
 	in: List(A)
-	satisfying: (A) -> Bool ? E ! N
-) -> List(A) ? E ! N {
+	satisfying: (A) -> Bool ^ E ! N
+) -> List(A) ^ E ! N {
 	in |> {
 		[] -> []
 		[x, ..xs] -> satisfying(x) |> {
@@ -1044,8 +1044,8 @@ drop_while(A, E, N) = (
 /// The first elements for which the function gives `True`.
 take_while(A, E, N) = (
 	in: List(A)
-	satisfying: (A) -> Bool ? E ! N
-) -> List(A) ? E ! N {
+	satisfying: (A) -> Bool ^ E ! N
+) -> List(A) ^ E ! N {
 	go = (rest, acc) {
 		rest |> {
 			[] -> reverse(acc)
@@ -1067,8 +1067,8 @@ take_while(A, E, N) = (
 /// ```
 chunk(A, K, E, N) = (
 	in: List(A)
-	by: (A) -> K ? E ! N
-) -> List(List(A)) ? E ! N {
+	by: (A) -> K ^ E ! N
+) -> List(List(A)) ^ E ! N {
 	in |> {
 		[] -> []
 		[x, ..xs] -> {
@@ -1129,8 +1129,8 @@ sized_chunk(A) = (in: List(A), into: Int) -> List(List(A)) {
 /// ```
 reduce(A, E, N) = (
 	over: List(A)
-	with: (A, A) -> A ? E ! N
-) -> Option(A) ? E ! N {
+	with: (A, A) -> A ^ E ! N
+) -> Option(A) ^ E ! N {
 	over |> {
 		[]        -> None
 		[x, ..xs] -> Some(fold(xs, x, with))
@@ -1145,8 +1145,8 @@ reduce(A, E, N) = (
 scan(A, Acc, E, N) = (
 	over: List(A)
 	from: Acc
-	with: (Acc, A) -> Acc ? E ! N
-) -> List(Acc) ? E ! N {
+	with: (Acc, A) -> Acc ^ E ! N
+) -> List(Acc) ^ E ! N {
 	go = (rest, acc, out) {
 		rest |> {
 			[] -> reverse(out)
@@ -1223,8 +1223,8 @@ transpose(A) = (list_of_lists: List(List(A))) -> List(List(A)) {
 /// list. Of equal greatest elements, the first is given.
 max(A, E, N) = (
 	over: List(A)
-	with: (A, A) -> Order ? E ! N
-) -> Option(A) ? E ! N {
+	with: (A, A) -> Order ^ E ! N
+) -> Option(A) ^ E ! N {
 	over |> {
 		[] -> None
 		[x, ..xs] -> Some(fold(xs, x, (best, y) {
@@ -1240,8 +1240,8 @@ max(A, E, N) = (
 /// list. Of equal smallest elements, the first is given.
 min(A, E, N) = (
 	over: List(A)
-	with: (A, A) -> Order ? E ! N
-) -> Option(A) ? E ! N {
+	with: (A, A) -> Order ^ E ! N
+) -> Option(A) ^ E ! N {
 	over |> {
 		[] -> None
 		[x, ..xs] -> Some(fold(xs, x, (best, y) {

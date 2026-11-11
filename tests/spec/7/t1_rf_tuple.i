@@ -7,5 +7,5 @@ f = (p: (String, Bool)) { p |> {
      ("a", True) -> 0
     (t, _) -> strict(t)
 } }
-@main
+
 main = () { f(("a", False)) }

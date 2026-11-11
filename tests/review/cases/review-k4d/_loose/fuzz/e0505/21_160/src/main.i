@@ -20,7 +20,7 @@ h1 = () {
   ! Dep = Dep(2)
   h0()
 }
-@main
+
 main = () {
   a = h1()
   ! Dep = Dep(3)

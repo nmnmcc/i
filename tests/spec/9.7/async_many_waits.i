@@ -4,7 +4,7 @@
 // Each call waits for the host before the next request starts.
 @host("test:async/v1", "async")
 Later {
-	Later(double: (n: Int) -> Int ? String)
+	Later(double: (n: Int) -> Int ^ String)
 }
 
 sum = (n: Int, total: Int, later ! Later) {
@@ -14,7 +14,7 @@ sum = (n: Int, total: Int, later ! Later) {
 	}
 }
 
-@main
+
 main = () {
 	// The host doubles each of 1 through 1000: 2 * 1000 * 1001 / 2.
 	assert(sum(1000, 0) == 1001000)

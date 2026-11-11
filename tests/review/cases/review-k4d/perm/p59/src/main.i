@@ -27,7 +27,7 @@ both(N) = () -> Int ! N | S(N) | T(Int, N) { pong(2) }
 
 T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
 
-@main
+
 main = () {
   closed()
   Nil

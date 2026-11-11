@@ -12,7 +12,7 @@ Later {
 	Later(echo: (text: String) -> String)
 }
 
-@main
+
 main = (later ! Later) {
 	task.test(random.from_seed(1), [], () { later.echo("real") })
 }

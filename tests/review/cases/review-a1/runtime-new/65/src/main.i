@@ -8,7 +8,7 @@ f = () {
 	}
 }
 
-@main
+
 main = () {
 	assert(f() == "yes")
 	Nil

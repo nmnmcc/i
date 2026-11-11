@@ -1,7 +1,7 @@
 (i/task, i/request, i/resource, i/core)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later, root ! request.Root) {
  owner = request.open_owner()
  ! request.Owner = owner

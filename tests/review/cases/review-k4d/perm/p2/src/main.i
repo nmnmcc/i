@@ -34,7 +34,7 @@ loop = (x) { x(x) }
 
 fr = () { run(() { use() }) }
 
-@main
+
 main = () {
   closed()
   Nil

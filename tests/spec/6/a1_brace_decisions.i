@@ -7,7 +7,7 @@ take_tuple = { t = (0, _) -> t  _ -> (0, 0) }
 take_result = { r = Ok(v) -> v  _ -> 0 }
 take_prefix = { s = "ab" <> rest -> s  _ -> "" }
 
-@main
+
 main = () {
   assert({ id(A) = (x: A) -> A { x }  id(3) } == 3)
   assert({ go = (n) -> Int { n + 1 }  go(3) } == 4)

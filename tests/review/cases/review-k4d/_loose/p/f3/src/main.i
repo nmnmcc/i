@@ -19,7 +19,7 @@ bad = () {
   } })
   ua(1)
 }
-@main
+
 main = () {
   bad()
   Nil

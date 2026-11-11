@@ -28,7 +28,7 @@ fn template_stop_keeps_call_and_template_locations() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    let main = "@main\nmain = () { fake() }\n";
+    let main = "\nmain = () { fake() }\n";
     let template = "// (assert False)\nhelper = 1\n";
     std::fs::write(dir.path().join("src/main.i"), main).unwrap();
     std::fs::write(dir.path().join("src/template.i"), template).unwrap();

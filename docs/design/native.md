@@ -527,7 +527,7 @@ hangs; do not use sleep timing as the semantic oracle.
 
 spin = () { spin() }
 
-@main
+
 main = () {
   task.scope((s) {
     task.go(s, spin)
@@ -568,7 +568,7 @@ cleanup; an already-removed alias gives Nil.
 @host("i:net/v1", "request")
 Pretend { Pretend(read: (stream: Int, max_bytes: Int) -> Request(Result(BitArray, String))) }
 
-@main
+
 main = (raw ! Pretend) {
   request.await(raw.read(1, 1))
 }
@@ -680,7 +680,7 @@ timeouts and plugin cleanup, not only tasks.
 (i/task, i/request)
 @host("review:gate/v1", "request")
 Gate { Gate(wait: () -> Request(Nil)) }
-@main
+
 main = (gate ! Gate, root ! request.Root) {
   pending = gate.wait()
   task.scope((s) {
@@ -755,7 +755,7 @@ for H4/status 1, independently of this program-progress predicate.
 ```i
 (i/task, i/control, i/core)
 event = task.always(1)
-@main
+
 main = () {
   task.run(() { assert(task.sync(event) == 1) })
   task.run(() { assert(task.sync(event) == 1) })
@@ -780,7 +780,7 @@ by a nested run on the same worker:
 (i/task, i/request)
 @host("review:gate/v1", "request")
 Gate { Gate(wait: () -> Request(Nil)) }
-@main
+
 main = (gate ! Gate) {
   pending = gate.wait()
   task.run(() { request.await(pending) })
@@ -798,7 +798,7 @@ A captured Request pins a child normally; no cross-worker borrow is introduced.
 
 ```i
 (i/task)
-@main
+
 main = () {
   task.scope((s) {
     a = task.go(s, task.path)

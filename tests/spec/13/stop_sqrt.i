@@ -10,7 +10,7 @@
 // A library function of the runtime in tail position keeps its position.
 value = () { core.sqrt(-.1.0) }
 
-@main
+
 main = () {
 	value()
 	Nil

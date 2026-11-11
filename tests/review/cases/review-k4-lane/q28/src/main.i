@@ -9,7 +9,7 @@ use(N) = (s ! S(N)) {
 
 fw(M) = () -> Int ! M | S(M) { use() }
 
-@main
+
 main = () {
 	! S(Never) = S(() { 1 })
 	assert(fw() == 1)

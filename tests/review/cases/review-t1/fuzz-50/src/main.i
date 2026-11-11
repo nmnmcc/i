@@ -3,7 +3,7 @@ f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) { x |> {
 (_: String - "a",False) -> 1
 (_,_) -> 2
 } }
-@main
+
 main = () {
 assert(f(("a",True)) == 0)
 assert(f(("a",False)) == 2)

@@ -17,7 +17,7 @@ one = (s ! S(Int)) { Nil }
 
 two = (s ! S(Int)) { Nil }
 
-@main
+
 main = () {
 	! S(Int) = S(1)
 	used = merge(T(one), T(two))

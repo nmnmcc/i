@@ -410,7 +410,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "One = {1 | 2} - 2\n@external(\"app\", \"write\")\nwrite: (One) -> Nil\n",
         "One = Int & 1\n@external(\"app\", \"write\")\nwrite: (One) -> Nil\n",
         "Whole = {Int - 0} | 0\n@external(\"app\", \"read\")\nread: () -> Whole\n",
-        "@host(\"app\")\nSvc { Svc(get: () -> String ? String | \"error\") }\n",
+        "@host(\"app\")\nSvc { Svc(get: () -> String ^ String | \"error\") }\n",
     ] {
         let (ds, _) = check(source);
         assert!(ds.is_empty(), "{source}: {ds:?}");
@@ -456,7 +456,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "{String - \"a\"} | \"a\"",
         "String | \"error\"",
     ] {
-        let (ds, _) = check(&"Whole = BoundaryType\n@external(\"app\", \"read\")\nread: () -> Whole\n@host(\"app\")\nSvc { Svc(get: () -> Whole ? Whole | Nil) }\n".replace("BoundaryType", ty));
+        let (ds, _) = check(&"Whole = BoundaryType\n@external(\"app\", \"read\")\nread: () -> Whole\n@host(\"app\")\nSvc { Svc(get: () -> Whole ^ Whole | Nil) }\n".replace("BoundaryType", ty));
         assert!(ds.is_empty(), "{ty}: {ds:?}");
     }
     for env in ["Never", "Int - Int", "String - String"] {
@@ -484,7 +484,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "Int - Int",
     ] {
         let (ds, _) = check(
-            &"Errors = BoundaryType\n@host(\"app\")\nSvc { Svc(get: () -> String ? Errors) }\n"
+            &"Errors = BoundaryType\n@host(\"app\")\nSvc { Svc(get: () -> String ^ Errors) }\n"
                 .replace("BoundaryType", err),
         );
         assert!(ds.is_empty(), "{err}: {ds:?}");
@@ -495,7 +495,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "{String - \"error\"} | \"other\"",
     ] {
         let (ds, _) = check(
-            &"@host(\"app\")\nSvc { Svc(get: () -> String ? BoundaryType) }\n"
+            &"@host(\"app\")\nSvc { Svc(get: () -> String ^ BoundaryType) }\n"
                 .replace("BoundaryType", err),
         );
         assert_eq!(

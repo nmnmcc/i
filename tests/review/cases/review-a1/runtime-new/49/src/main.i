@@ -7,7 +7,7 @@ f = (n: Int) {
 	} * 10
 }
 
-@main
+
 main = () {
 	assert(f(0) == 10 && f(1) == 20)
 	Nil

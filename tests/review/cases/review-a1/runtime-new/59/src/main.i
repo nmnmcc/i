@@ -3,7 +3,7 @@ outer(A) = (x: A) {
 	inner(42, x)
 }
 
-@main
+
 main = () {
 	assert(outer("s") == (42, "s"))
 	Nil

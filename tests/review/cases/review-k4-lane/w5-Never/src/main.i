@@ -12,5 +12,5 @@ wrap = (body, svc) {
 	body()
 }
 
-@main
+
 main = () { assert(wrap(() { use() }, S(() { 1 })) == 1) }

@@ -4,7 +4,7 @@
 	(Io) = i/io
 )
 
-@main
+
 main = (io ! Io) {
 	task.scope((s) {
 		c: task.Channel(String) = task.channel()

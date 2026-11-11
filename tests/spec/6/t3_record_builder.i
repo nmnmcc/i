@@ -5,7 +5,7 @@
 set(R, K, V) = (r: R & Record, key: K, value: V) -> (..R, K: V) {
   record.put(r, key, value)
 }
-@main
+
 main = () {
   x = set((name: "Ada", age: 1), "age", "old")
   assert(x.name == "Ada")

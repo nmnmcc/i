@@ -12,5 +12,5 @@ wrap = (svc) {
 	use()
 }
 
-@main
+
 main = () { assert(wrap(S(() { 1 }, (_: Never) { Nil })) == 1) }

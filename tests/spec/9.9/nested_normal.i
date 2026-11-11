@@ -6,7 +6,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	assert(task.run(() {
 		task.scope((s) {

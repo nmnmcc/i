@@ -15,7 +15,7 @@ check = (c: Bool, a ! Assert) {
 
 apply = (f, x) { [f(x)] }
 
-@main
+
 main = () {
 	apply((v) { check(v == 0) }, 1)
 	Nil

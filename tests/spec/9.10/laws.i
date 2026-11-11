@@ -102,7 +102,7 @@ check_range = (
 	g: random.Generator
 	below: Int
 	count: Int
-) -> Nil ? random.RandomError ! Assert {
+) -> Nil ^ random.RandomError ! Assert {
 	{ count == 0 } |> {
 		True -> Nil
 		False -> {
@@ -153,7 +153,7 @@ histogram = (
 	a: Int
 	b: Int
 	c: Int
-) -> (Int, Int, Int) ? random.RandomError {
+) -> (Int, Int, Int) ^ random.RandomError {
 	{ count == 0 } |> {
 		True -> (a, b, c)
 		False -> {

@@ -31,8 +31,8 @@ swap(A, B) = (pair: (A, B)) -> (B, A) {
 /// Changes the first part of a pair with a function.
 map_first(A, B, C, E, N) = (
 	of: (A, B)
-	with: (A) -> C ? E ! N
-) -> (C, B) ? E ! N {
+	with: (A) -> C ^ E ! N
+) -> (C, B) ^ E ! N {
 	(x, y) = of
 	(with(x), y)
 }
@@ -40,8 +40,8 @@ map_first(A, B, C, E, N) = (
 /// Changes the second part of a pair with a function.
 map_second(A, B, C, E, N) = (
 	of: (A, B)
-	with: (B) -> C ? E ! N
-) -> (A, C) ? E ! N {
+	with: (B) -> C ^ E ! N
+) -> (A, C) ^ E ! N {
 	(x, y) = of
 	(x, with(y))
 }

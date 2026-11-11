@@ -3,7 +3,7 @@
 (main)
 User { User(name: String) }
 Cfg = (cb: (User) -> String, n: Int)
-@main
+
 main = () {
   base: Cfg = (cb: (u) { u.name }, n: 0)
   next: Cfg = (..base, cb: (u) { u.name })

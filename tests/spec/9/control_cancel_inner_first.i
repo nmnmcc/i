@@ -7,7 +7,7 @@
 
 // Final functions run from the innermost to the outermost when a
 // continuation is cancelled.
-@main
+
 main = () {
 	control.boundary((b) {
 		resource.ensure(() {

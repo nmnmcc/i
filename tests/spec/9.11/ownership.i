@@ -5,7 +5,7 @@
 (i/request, i/control)
 @host("test:async/v1", "request")
 Later { Later(echo: (text: String) -> Request(String)) }
-@main
+
 main = (later ! Later) {
   borrowed = later.echo("borrowed")
   control.boundary((b) {

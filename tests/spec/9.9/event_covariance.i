@@ -9,5 +9,5 @@ widen = (
 	e: task.Event(Int, Never, Never)
 ) -> task.Event(Int | String, String, task.Scheduler) { e }
 
-@main
+
 main = () { assert(task.sync(widen(task.always(7))) == 7) }

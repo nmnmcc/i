@@ -3,5 +3,5 @@
 // runtime.md D2: Request(A) is covariant; reading a widened handle keeps the union.
 (i/request)
 widen = (r: Request(Int | String)) { request.take(r) }
-@main
+
 main = () { assert(widen(request.ready(37)) == 37) }

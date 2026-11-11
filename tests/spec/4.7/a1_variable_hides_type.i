@@ -3,7 +3,7 @@
 (main)
 id(Int) = (x: Int) { x }
 
-@main
+
 main = () {
   assert(True)
   Nil

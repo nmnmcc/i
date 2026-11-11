@@ -5,7 +5,7 @@ f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) { x |> {
 (_: String - "a",True) -> 3
 (_: String - "ab" - "b",_) -> 4
 } }
-@main
+
 main = () {
 assert(f(("a",True)) == 4)
 assert(f(("a",False)) == 4)

@@ -2,7 +2,7 @@
 // expect: pass
 (i/record)
 (main)
-@main
+
 main = () {
   a = (name: "Ada", age: 36)
   assert(record.get(a, "name") == "Ada")

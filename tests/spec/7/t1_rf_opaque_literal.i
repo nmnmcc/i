@@ -3,5 +3,5 @@
 Box(A) { Box(value: A) }
 strict = (x: Box("a")) -> Int { Box(value: "a") = x  1 }
 f = (b: Box(String)) { b |> { x: Box("a") -> strict(x)  _ -> 0 } }
-@main
+
 main = () { f(Box(value: "b")) }

@@ -5,5 +5,5 @@ f = (s: String) -> Int {
     ! Assert = Assert((_) { panic("inner choices") })
     s |> { "a" | "c" -> a }
 }
-@main
+
 main = () { f("b") }

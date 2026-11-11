@@ -7,7 +7,7 @@ f = (value: Record | Int) -> Int {
     _: Int -> 2
   }
 }
-@main
+
 main = () {
   assert(f((x: 5)) == 1)
   assert(f(8) == 2)

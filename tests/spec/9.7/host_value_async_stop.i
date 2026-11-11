@@ -14,7 +14,7 @@ half = (later ! Later) {
 	x /. 2.0
 }
 
-@main
+
 main = () {
 	half()
 	Nil

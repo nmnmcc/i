@@ -6,5 +6,5 @@ f = (t: Target) {
     Host -> Nil
   }
 }
-@main
+
 main = () { f(Host) }

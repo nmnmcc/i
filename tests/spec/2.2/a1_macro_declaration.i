@@ -3,7 +3,7 @@
 (main)
 inspect(A): (A) -> String
 
-@main
+
 main = () {
   assert(True)
   Nil

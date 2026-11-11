@@ -4,7 +4,7 @@ Tree { Leaf
 make = (n: Int) -> Tree { n |> { 0 -> Leaf
  _ -> { x = make(n - 1)
  Node(x, x) } } }
-@main
+
 main = (io ! Io) {
  x = make(16)
  task.scope((s) {

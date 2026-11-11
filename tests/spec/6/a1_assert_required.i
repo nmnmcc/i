@@ -3,7 +3,7 @@
 (main)
 pure: (Int) -> Int = { 0 -> 7 }
 
-@main
+
 main = () {
   assert(True)
   Nil

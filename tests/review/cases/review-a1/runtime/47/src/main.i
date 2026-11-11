@@ -11,7 +11,7 @@ f = (n: Int) {
 	}.name
 }
 
-@main
+
 main = () {
 	assert(f(0) == "yes" && f(1) == "no")
 	Nil

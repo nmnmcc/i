@@ -1,5 +1,5 @@
 S(E, N) {
-	S(() -> Nil ? E ! N)
+	S(() -> Nil ^ E ! N)
 }
 
 use(E, N) = (s ! S(E, N)) {
@@ -7,9 +7,9 @@ use(E, N) = (s ! S(E, N)) {
 	f()
 }
 
-run(E, N) = (body: () -> Nil ? E ! N) { body() }
+run(E, N) = (body: () -> Nil ^ E ! N) { body() }
 
-example(E, N) = () { run(() -> Nil ? E ! N | S(E, N) { use() }) }
+example(E, N) = () { run(() -> Nil ^ E ! N | S(E, N) { use() }) }
 
-@main
+
 main = () { example() }

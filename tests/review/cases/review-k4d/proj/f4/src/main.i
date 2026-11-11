@@ -17,7 +17,7 @@ tell = (x: Int) { x |> {
   2 -> "two"
   _ -> "many"
 } }
-@main
+
 main = (io ! Io) {
   ! B(A(Int, Never)) = B((d: Int) {
     io.print("in B")

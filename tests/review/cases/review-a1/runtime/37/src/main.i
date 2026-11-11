@@ -4,7 +4,7 @@ f = (v: Int) {
 	}
 }
 
-@main
+
 main = () {
 	assert(f(42) == 42)
 	Nil

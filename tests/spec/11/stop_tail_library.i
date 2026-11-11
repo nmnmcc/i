@@ -10,7 +10,7 @@
 // first position.
 root = (x: Float) { core.sqrt(x) }
 
-@main
+
 main = () {
 	root(-.1.0)
 	Nil

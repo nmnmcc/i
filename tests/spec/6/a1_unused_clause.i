@@ -2,7 +2,7 @@
 // expect: warning W0502
 (main)
 
-@main
+
 main = () {
   { n -> n }
   Nil

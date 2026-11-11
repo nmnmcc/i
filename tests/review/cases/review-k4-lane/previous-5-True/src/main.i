@@ -12,5 +12,5 @@ example(N) = () {
 	local()
 }
 
-@main
+
 main = () { example() }

@@ -29,7 +29,7 @@ closed = () {
   both()
 }
 
-@main
+
 main = () {
   closed()
   Nil

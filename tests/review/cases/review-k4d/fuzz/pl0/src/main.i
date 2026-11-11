@@ -30,7 +30,7 @@ h1 = () {
   ! Cov(Int) = Cov(() { askc() + call(Cb(() { ask() }, (_) { Nil })) + ask() })
   run(() { ask() })
 }
-@main
+
 main = () {
   ! Svc(Int) = Svc(() { get() }, (_: Int) { Nil })
   ! Cov(Int) = Cov(() { 2 })

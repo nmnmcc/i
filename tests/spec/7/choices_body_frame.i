@@ -7,7 +7,7 @@ f = (s: String) {
         1
     } }
 }
-@main
+
 main = () {
     ! Assert = Assert((_) { panic("outer choices") })
     f("b")

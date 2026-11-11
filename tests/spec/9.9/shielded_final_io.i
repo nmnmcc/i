@@ -15,7 +15,7 @@ Later {
 	Later(echo: (text: String) -> Request(String))
 }
 
-@main
+
 main = (later ! Later) {
 	result = fail.catch(() {
 		task.scope((s) {

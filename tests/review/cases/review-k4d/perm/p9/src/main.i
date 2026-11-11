@@ -45,7 +45,7 @@ S(N) { S(f: () -> Int ! N) }
 
 get = (d ! Dep) { d.v }
 
-@main
+
 main = () {
   closed()
   Nil

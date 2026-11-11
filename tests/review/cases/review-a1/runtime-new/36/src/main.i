@@ -5,7 +5,7 @@ f = (v: Int | String) {
 	}
 }
 
-@main
+
 main = () {
 	assert(f(42) == 42 && f("s") == 0)
 	Nil

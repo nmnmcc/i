@@ -45,7 +45,7 @@ ping = (n: Int) { n |> {
   _ -> pong(n - 1)
 } }
 
-@main
+
 main = () {
   closed()
   Nil

@@ -9,7 +9,7 @@
 // A call of `fail.catch` in tail position counts as a tail call: it is gone.
 safe = () { fail.catch(() { 1 + panic("boom") }) }
 
-@main
+
 main = () {
 	safe()
 	Nil

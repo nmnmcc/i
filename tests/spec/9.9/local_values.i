@@ -8,7 +8,7 @@
 	i/core
 )
 
-@main
+
 main = () {
 	task.local_scope((s) {
 		c = task.local_channel()

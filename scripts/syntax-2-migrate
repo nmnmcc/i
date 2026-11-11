@@ -185,12 +185,20 @@ def main():
     if not items:
         parser.error('name source files/directories, or use --repo')
     results = migrate_many([item['host'] if item['kind'] == 'file' else item['source'] for item in items])
+    reviewed = json.loads((ROOT / 'scripts/syntax-2-reviewed.json').read_text())
     changes = collections.defaultdict(list)
     checked_packages = {}
-    report = {'areas': {}, 'changed': [], 'manual': [], 'invalid': [], 'entries': []}
+    report = {'areas': {}, 'changed': [], 'manual': [], 'invalid': [], 'entries': [], 'reviewed': []}
     for item, result in zip(items, results):
         label = f"{item['path']}:{item['line']}"
+        decision = reviewed.get(EXTRACT.identity(item['path'], item['source']), {})
+        if decision.get('legacy_test'):
+            report['reviewed'].append(label + ': legacy compatibility test')
+            continue
         if result.get('diagnostics'):
+            if result['diagnostics'] == decision.get('diagnostics'):
+                report['reviewed'].append(label)
+                continue
             report['invalid'].append({'source': label, 'diagnostics': result['diagnostics']})
             continue
         if result['empty']:
@@ -204,6 +212,9 @@ def main():
             path = str((ROOT / item['path']).relative_to(package)) if package else ''
             source_bytes = item['source'].encode()
             for case in result['empty']:
+                if case in decision.get('empty', []):
+                    report['reviewed'].append(label + ': ' + case)
+                    continue
                 offset = int(case.rsplit(' ', 1)[1])
                 if case.startswith('empty tuple expression ') and offset in records.get(path, []):
                     continue
@@ -221,7 +232,7 @@ def main():
         if declaration:
             path, target = declaration
             name = add_entry(path, target) if args.write else '(pending)'
-            report['entries'].append({'manifest': str(path), 'name': name, 'target': target, 'command': '--entry ' + name})
+            report['entries'].append({'manifest': str(path), 'name': name, 'target': target, 'command': name})
         area = item['path'].split('/')[0]
         counts = report['areas'].setdefault(area, [0, 0, 0, 0])
         for i, count in enumerate(result['counts']):

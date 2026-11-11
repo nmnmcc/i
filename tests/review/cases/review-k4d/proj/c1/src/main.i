@@ -9,7 +9,7 @@ ub(N) = (s ! B(N)) {
   f()
 }
 (Io) = i/io
-@main
+
 main = (io ! Io) {
   ! B(Never) = B(() { 1 })
   ! A(B(Never)) = A(() { ub() + 1 })

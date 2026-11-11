@@ -11,7 +11,7 @@ bad(N) = (s ! S(N)) -> Int ! S(N) {
   S(f) = s
   f()
 }
-@main
+
 main = () {
   ! S(Dep) = S(() { get() })
   bad()

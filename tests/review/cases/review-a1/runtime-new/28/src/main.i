@@ -4,7 +4,7 @@ f = () {
 	id(k)
 }
 
-@main
+
 main = () {
 	assert(f() == 42)
 	Nil

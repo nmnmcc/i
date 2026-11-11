@@ -7,5 +7,5 @@ f = (p: (String, Int | String)) { p |> {
      ("a", _: Int) -> 0
     (t, _) -> strict(t)
 } }
-@main
+
 main = () { f(("a", "x")) }

@@ -99,7 +99,7 @@ accepted this cost verbatim: **“接受这个代价” (J1)**. For example:
 ```i
 (i/fs, i/fail)
 
-@main
+
 main = () {
   fail.catch(() { fs.read_file("settings.txt") })
   Nil
@@ -207,7 +207,7 @@ This complete example covers all five constructors and needs only Target:
 ```i
 (target = i/target)
 
-@main
+
 main = (t ! target.Target) {
   t |> {
     target.Js(_) -> Nil
@@ -232,7 +232,7 @@ The printing example has its required import:
 ```i
 ((Io) = i/io)
 
-@main
+
 main = (io ! Io) { io.print("Hello from i!") }
 ```
 
@@ -301,7 +301,7 @@ host = "app/main.fallback"
 (Settings(..), filesystem, fallback)
 
 Settings {
-  Settings(read: () -> BitArray ? fs.FsError ! request.Await | request.Owner)
+  Settings(read: () -> BitArray ^ fs.FsError ! request.Await | request.Owner)
 }
 
 filesystem = (f ! fs.Fs) {
@@ -313,7 +313,7 @@ filesystem = (f ! fs.Fs) {
 
 fallback = () { Settings(read: () { <<>> }) }
 
-@main
+
 main = (settings ! Settings) { settings.read() }
 ```
 
@@ -454,7 +454,7 @@ bundle = (remote ! Remote) {
   })
 }
 
-@main
+
 main = (b ! Bundle) { b.fetch() }
 ```
 
@@ -714,7 +714,7 @@ make_bundle = (remote ! Remote) -> Bundle {
   Bundle(fetch: () { request.await_owned(remote.fetch()) })
 }
 
-@main
+
 main = (b ! Bundle) -> Int ! request.Await | request.Owner { b.fetch() }
 ```
 
@@ -804,12 +804,12 @@ config_from_seed = (values: List(Config)) -> Config {
 make_session = (cfg ! Config) -> Session {
   Session(read: () { cfg.label })
 }
-with_session(A, E, N) = (body: () -> A ? E ! N) -> A ? E ! N - Config {
+with_session(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! N - Config {
   ! Config = Config("inside")
   body()
 }
 
-@main
+
 main = (s ! Session) { s.read() }
 ```
 
@@ -1841,7 +1841,7 @@ foreign: Foreign
 
 Family { Web NonWeb }
 
-@main
+
 main = (f ! Family) {
   f |> {
     Web -> foreign == foreign
@@ -1947,7 +1947,7 @@ A further concrete buildability probe is:
 @js("() => Promise.resolve(7n)")
 seven: js.Value
 
-@main
+
 main = () { js.to_int(js.await(js.call(seven, []))) }
 ```
 
@@ -1976,7 +1976,7 @@ uses = (t: target.Target) {
   }
 }
 
-@main
+
 main = (t ! target.Target) { uses(t) }
 ```
 
@@ -2008,7 +2008,7 @@ choose = (b) {
   }
 }
 
-@main
+
 main = () {
   _ = choose(True)
   choose(False) |> {
@@ -2039,7 +2039,7 @@ inspect = (t ! target.Target) {
   }
 }
 
-@main
+
 main = () {
   ! target.Target = target.Native
   inspect()
@@ -2151,7 +2151,7 @@ make_cell(A) = (next ! Cell(List(A))) -> Cell(A) {
   _ = next
   Cell
 }
-@main
+
 main = (c ! Cell(Int)) { Nil }
 ```
 
@@ -2165,7 +2165,7 @@ A concrete lifetime attack replaces T11's with_session body with this
 well-typed ordinary function:
 
 ```i
-with_session(A, E, N) = (body: () -> A ? E ! N) -> A ? E ! N - Config {
+with_session(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! N - Config {
   ! Config = Config("inside")
   _ = body()
   body()

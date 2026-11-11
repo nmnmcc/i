@@ -77,14 +77,14 @@ SyntaxError {
 }
 
 Definitions {
-	Definitions(definition: (of: Syntax) -> Syntax ? SyntaxError)
+	Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError)
 }
 
 /// Asks the installed definition service for a type's written definition.
 definition = (
 	of: Syntax
 	service ! Definitions
-) -> Syntax ? SyntaxError ! Definitions { service.definition(of) }
+) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
 
 Diagnostics {
 	Diagnostics(note: (String) -> Nil)
@@ -106,8 +106,8 @@ Items {
 			target:     Syntax
 			data:       List((String, String))
 			at:         Syntax
-		) -> Nil ? SyntaxError
-		expose: (name: Syntax) -> Nil ? SyntaxError
+		) -> Nil ^ SyntaxError
+		expose: (name: Syntax) -> Nil ^ SyntaxError
 	)
 }
 
@@ -145,7 +145,7 @@ build_metadata = (
 	}
 }
 
-item_result = (result: ItemResult) -> Nil ? SyntaxError {
+item_result = (result: ItemResult) -> Nil ^ SyntaxError {
 	raw_items_ok(result) |> {
 		True -> Nil
 		False -> fail.raise(
@@ -157,7 +157,7 @@ item_result = (result: ItemResult) -> Nil ? SyntaxError {
 /// Constructs the compiler's transactional item service for one macro run.
 _items = () -> Items {
 	Items(
-		(collection, target, data, at) -> Nil ? SyntaxError {
+		(collection, target, data, at) -> Nil ^ SyntaxError {
 			item_result(
 				raw_items_add(
 					collection
@@ -167,7 +167,7 @@ _items = () -> Items {
 				)
 			)
 		}
-		(name) -> Nil ? SyntaxError { item_result(raw_items_expose(name)) }
+		(name) -> Nil ^ SyntaxError { item_result(raw_items_expose(name)) }
 	)
 }
 
@@ -191,7 +191,7 @@ raw_definition_at: (DefinitionResult) -> Syntax
 
 /// Constructs the compiler's definition service for one macro run.
 _definitions = () -> Definitions {
-	Definitions((of) -> Syntax ? SyntaxError {
+	Definitions((of) -> Syntax ^ SyntaxError {
 		result = raw_definition(of)
 		raw_definition_ok(result) |> {
 			True -> raw_definition_value(result)
@@ -389,7 +389,7 @@ _rebuild = (template: Syntax, children: List(Syntax)) -> Syntax {
 }
 
 /// Makes syntax at the span and scope of `like`.
-make = (node: Node, like: Syntax) -> Syntax ? SyntaxError {
+make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
 	result = node |> {
 		Name(value)    -> raw_make_text(0, value, like)
 		Discard(value) -> raw_make_text(1, value, like)
@@ -457,7 +457,7 @@ position_id = (position: Position) -> Int {
 }
 
 /// Writes syntax in the normal surface at the requested position.
-show_as = (syntax: Syntax, position: Position) -> String ? SyntaxError {
+show_as = (syntax: Syntax, position: Position) -> String ^ SyntaxError {
 	result = raw_show_as(syntax, position_id(position))
 	raw_text_ok(result) |> {
 		True -> raw_text_value(result)

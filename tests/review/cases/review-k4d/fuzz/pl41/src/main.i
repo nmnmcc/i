@@ -29,7 +29,7 @@ h1 = () {
   ! Svc(Int) = Svc(() { call(Cb(() { ask() }, (_) { Nil })) + with_dep(() { with_int(() { get() + ask() }) }) }, (_: Int) { Nil })
   with_int(() { ask() })
 }
-@main
+
 main = () {
   ! Cov(Int) = Cov(() { with_cov(() { askc() }, 3) })
   ! Cov(Int) = Cov(() { twice(() { get() }) })

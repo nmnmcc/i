@@ -4,5 +4,5 @@
 (list = std/list)
 x = list.map(["a"], (s) { s == "b" })
 
-@main
+
 main = () { assert(x == [False]) }

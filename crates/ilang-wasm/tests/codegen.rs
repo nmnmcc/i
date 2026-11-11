@@ -60,7 +60,7 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
 #[test]
 fn metered_macro_program_is_valid_wasm() {
     let (graph, c, _dir) = checked(
-        "loop = (n) { n |> { 0 -> [\"x\"] _ -> [\"x\", ..loop(n - 1)] } }\n@main\nmain = () { loop(3) }\n",
+        "loop = (n) { n |> { 0 -> [\"x\"] _ -> [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
     );
     let (wasm, _) = ilang_wasm::compile_macro(
         &graph,
@@ -70,7 +70,7 @@ fn metered_macro_program_is_valid_wasm() {
     )
     .unwrap();
     ilang_wasm::validate(&wasm).unwrap();
-    assert!(!wat("@main\nmain = () { Nil }\n").contains("ilang:macro/budget/v1"));
+    assert!(!wat("\nmain = () { Nil }\n").contains("ilang:macro/budget/v1"));
 }
 
 /// The text of the function with this comment line.
@@ -83,7 +83,7 @@ fn function<'a>(wat: &'a str, name: &str) -> &'a str {
 #[test]
 fn tail_calls_are_return_calls() {
     let text = wat(
-        "loop = (n) {\n   n |> {\n    0 -> 0\n    _ -> loop(n - 1)\n  }\n}\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n@main\nmain = () { (either(1), right(1)) }\n",
+        "loop = (n) {\n   n |> {\n    0 -> 0\n    _ -> loop(n - 1)\n  }\n}\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
     );
     let l = function(&text, "app/main.loop");
     assert!(l.contains("(return_call $f"), "{l}");
@@ -103,7 +103,7 @@ fn tail_calls_are_return_calls() {
 
 #[test]
 fn closures_capture_what_they_use() {
-    let text = wat("make = (a, b) { (x) { x + a } }\n@main\nmain = () { make(1, 2)(3) }\n");
+    let text = wat("make = (a, b) { (x) { x + a } }\n\nmain = () { make(1, 2)(3) }\n");
     let m = function(&text, "app/main.make");
     assert!(m.contains("(array.new_fixed $values 1"), "{m}");
     let main = function(&text, "app/main.main");
@@ -112,7 +112,7 @@ fn closures_capture_what_they_use() {
 
 #[test]
 fn metadata() {
-    let bytes = wasm("@main\nmain = () { Nil }\n").unwrap();
+    let bytes = wasm("\nmain = () { Nil }\n").unwrap();
     let mut found = None;
     for payload in wasmparser::Parser::new(0).parse_all(&bytes) {
         if let wasmparser::Payload::CustomSection(s) = payload.unwrap()
@@ -194,7 +194,7 @@ fn externals_are_imports() {
 #[test]
 fn calls_that_may_suspend_are_split() {
     let text = wat(
-        " (i/control)\ntwice = (f) { f(1) + f(2) }\nlast = (f) { f(1) }\nplain = (n) { n + 1 }\nuses = (n) { plain(n) + twice((x) { x }) }\n@main\nmain = () {\n  control.boundary((b) { uses(1) + last((x) { x }) })\n  Nil\n}\n",
+        " (i/control)\ntwice = (f) { f(1) + f(2) }\nlast = (f) { f(1) }\nplain = (n) { n + 1 }\nuses = (n) { plain(n) + twice((x) { x }) }\n\nmain = () {\n  control.boundary((b) { uses(1) + last((x) { x }) })\n  Nil\n}\n",
     );
     // Each call of a closure that is not a tail call is in a handler that
     // adds its frame record (§9.4), with a segment and a re-entry function.
@@ -213,7 +213,7 @@ fn calls_that_may_suspend_are_split() {
     let uses = function(&text, "app/main.uses");
     assert_eq!(uses.matches("(catch_ref $capture").count(), 1, "{uses}");
     // `assertion.catch` is i code now.
-    assert!(wasm(" (i/assertion)\n@main\nmain = () {\n  assertion.catch(() { assert(False) })\n  Nil\n}\n").is_ok());
+    assert!(wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False) })\n  Nil\n}\n").is_ok());
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn environments() {
     let text = wat("Clock { Clock(now: () -> Int) }\n\
          f = (c ! Clock) { c.now() }\n\
          g = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n\
-         @main\nmain = () { g() }\n");
+         \nmain = () { g() }\n");
     // A service's slot is chosen from all services in the compiled program;
     // its read and the corresponding environment statement must agree.
     let f = function(&text, "app/main.f");
@@ -253,7 +253,7 @@ fn environments() {
 fn bindings_that_may_fail_report_to_assert() {
     let text = wat("f = (r) {\n  Ok(v) = r\n  v\n}\n\
          g = ((a, b)) { a + b }\n\
-         @main\nmain = () { (f(Ok(1)), g((1, 2))) }\n");
+         \nmain = () { (f(Ok(1)), g((1, 2))) }\n");
     let f = function(&text, "app/main.f");
     assert!(
         f.contains("(array.get $env (local.get $env) (i32.const 0))"),
@@ -324,7 +324,7 @@ repeated = () { equal(get_a(), get_alias()) }
 different = () { equal(get_a(), get_b()) }
 same_a = (a: A, b: Alias) { equal(a, b) }
 echo = (a: A) { a }
-@main
+
 main = () { Nil }
 "#;
     let (graph, checked, _dir) = checked_with_exports(

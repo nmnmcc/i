@@ -11,7 +11,7 @@ T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
 
 run(A, N) = (body: () -> A ! N) { body() }
 
-@main
+
 main = () {
   closed()
   Nil

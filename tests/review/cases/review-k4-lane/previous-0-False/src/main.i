@@ -9,5 +9,5 @@ use(N) = (s ! S(N)) -> Nil ! N | S(N) {
 
 example = () { use() }
 
-@main
+
 main = () { example() }

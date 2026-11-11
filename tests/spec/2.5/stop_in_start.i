@@ -17,5 +17,5 @@ check = (n: Int) {
 }
 
 // No entry point runs when working out a value stops.
-@main
+
 main = () { core.inspect(ready) }

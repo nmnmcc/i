@@ -6,5 +6,5 @@
 	i/fail
 )
 
-@main
+
 main = () { resource.ensure(() { Nil }, () { fail.raise("final") }) }

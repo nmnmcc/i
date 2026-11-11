@@ -1,6 +1,6 @@
 // Design counterexample; not run. Runtime gives ([1], [2], [3]).
 (i/task)
-@main
+
 main = () {
   task.scope((s) {
     a = task.go(s, task.path)

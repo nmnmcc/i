@@ -19,7 +19,7 @@ tell = (x: Int) { x |> {
 
 T(N) { T(f: () -> Int ! N, m: (N) -> Nil) }
 uset(N) = (s ! T(N)) { s.f() }
-@main
+
 main = () {
   ! S(Never) = S(() { 1 })
   ! T(S(Never)) = T(() { fw() }, (_: S(Never)) { Nil })

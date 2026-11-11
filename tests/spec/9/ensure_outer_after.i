@@ -6,7 +6,7 @@
 )
 
 // After the inner final function, the error goes on to the outer one.
-@main
+
 main = () {
 	fail.catch(() {
 		resource.ensure(

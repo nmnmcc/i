@@ -3,7 +3,7 @@
 (main)
 make(1)
 
-@main
+
 main = () {
   assert(True)
   Nil

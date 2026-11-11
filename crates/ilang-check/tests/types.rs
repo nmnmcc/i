@@ -193,7 +193,7 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(
         dir.path().join("src/main.i"),
-        "A { A }\nE { E }\nN { N }\nkeep(Z) = (v: Z) -> Z { v }\nagain(K) = (v: K) -> K { v }\neffect(X, Y, Z) = (f: () -> X ? Y ! Z) { f() }\n",
+        "A { A }\nE { E }\nN { N }\nkeep(Z) = (v: Z) -> Z { v }\nagain(K) = (v: K) -> K { v }\neffect(X, Y, Z) = (f: () -> X ^ Y ! Z) { f() }\n",
     )
     .unwrap();
     let (graph, diags) = ilang_package::load(dir.path());

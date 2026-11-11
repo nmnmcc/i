@@ -28,7 +28,7 @@ h0 = () { run(h0) }
 h1 = () {
   call(Cb(() { get() }, (_: Dep) { Nil }))
 }
-@main
+
 main = () {
   ! Cov(Int) = Cov(() { 2 })
   1 + run(h0) + 1

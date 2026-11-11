@@ -8,7 +8,7 @@
 	i/fail
 )
 
-@main
+
 main = () {
 	task.scope((s) {
 		gate: task.Channel(Nil) = task.channel()

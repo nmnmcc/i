@@ -18,7 +18,7 @@ wrap(N) = (body: () -> Int ! N | S(N), svc: S(N)) -> Int ! N {
 	body()
 }
 
-@main
+
 main = () {
 	! Dep = Dep(7)
 	assert(wrap(() { use() }, S(() { get() }, (_: Dep) { Nil })) == 7)

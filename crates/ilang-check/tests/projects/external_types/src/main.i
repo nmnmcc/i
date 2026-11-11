@@ -44,7 +44,7 @@ f9: (Int | String, (Int, Int)) -> Int
 
 // No errors and no environment.
 @external("a", "f4")
-f4: () -> Int ? String
+f4: () -> Int ^ String
 
 @external("a", "f10")
-f10: () -> Int ? Int ! Assert
+f10: () -> Int ^ Int ! Assert

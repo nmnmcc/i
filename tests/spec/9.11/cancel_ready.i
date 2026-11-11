@@ -2,7 +2,7 @@
 // expect: stop "panic: request: cancelled"
 // runtime.md 5.1: cancel discards Ready; aliases see Cancelled; take stops.
 (i/request)
-@main
+
 main = () {
   r = request.ready("answer")
   alias = r

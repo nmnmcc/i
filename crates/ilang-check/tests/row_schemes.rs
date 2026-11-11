@@ -231,7 +231,7 @@ T(N) { T(f: () -> Nil ! N) }
 merge(N, M) = (a: T(N), b: T(M)) { T(() { a.f() b.f() }) }
 one = (s ! S(Int)) { Nil }
 two = (s ! S(String)) { Nil }
-@main
+
 main = () { unused = merge(T(one), T(two)) Nil }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
@@ -250,8 +250,8 @@ fn function_type_joins_preserve_scalar_error_inclusion() {
     // are joined; the row mode must reach merge_arg as well as calls.
     types(
         "(i/fail)
-one = () -> Nil ? 1 { fail.raise(1) }
-two = () -> Nil ? 2 { fail.raise(2) }
+one = () -> Nil ^ 1 { fail.raise(1) }
+two = () -> Nil ^ 2 { fail.raise(2) }
 pick = (b: Bool) { b |> { True -> one False -> two } }",
     );
 }

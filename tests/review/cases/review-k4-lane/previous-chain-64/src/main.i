@@ -137,5 +137,5 @@ forward_62 = () { run(() { forward_61() }) }
 
 forward_63 = () { run(() { forward_62() }) }
 
-@main
+
 main = () { forward_63() }

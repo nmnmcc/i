@@ -32,7 +32,7 @@ last = (n) {
   }
 }
 
-@main
+
 main = () {
   p = control.boundary((b) {
     w1(b)

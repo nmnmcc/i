@@ -28,7 +28,7 @@ probe = (wait: () -> Nil ! request.Await) {
 	assert(result == Error("boom"))
 }
 
-@main
+
 main = () {
 	borrowed = request.ready(Nil)
 	probe(() { request.await(borrowed) })

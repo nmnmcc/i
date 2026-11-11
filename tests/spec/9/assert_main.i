@@ -8,7 +8,7 @@ positive = (n) {
 	n
 }
 
-@main
+
 main = () {
 	positive(0)
 	Nil

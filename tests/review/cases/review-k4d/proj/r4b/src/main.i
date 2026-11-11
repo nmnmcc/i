@@ -20,7 +20,7 @@ tell = (x: Int) { x |> {
   _ -> "many"
 } }
 
-@main
+
 main = (io ! Io) {
   ! S(Dep) = S(() { get() })
   ! Dep = Dep(2)

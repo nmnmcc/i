@@ -10,7 +10,7 @@ repeat = (n, xs) {
   }
 }
 
-@main
+
 main = () {
   assert(core.portable((Nil, True, 42, 3.0, "a", <<1>>, [1, 2])))
   assert(core.portable(repeat(1000000, [])))

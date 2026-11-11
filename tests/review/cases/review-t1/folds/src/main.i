@@ -1,7 +1,7 @@
 (list = std/list)
 Box(A) { Box(value: A) }
 rec = (n, acc) { n |> { 0 -> acc  _ -> rec(n - 1, acc + 1) } }
-@main
+
 main = () {
  assert(rec(4, 0) == 4)
  assert(list.fold([1,2,3], 0, (n,x) { { n == 1 } |> { True -> n + x  False -> n + 1 } }) == 4)

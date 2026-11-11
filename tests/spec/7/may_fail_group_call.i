@@ -7,7 +7,7 @@ pair = ((x) { x }, () {
 	1
 })
 
-@main
+
 main = () {
 	! Assert = Assert((_) { panic("caught group call") })
 	pair.1()

@@ -4,7 +4,7 @@
 (i/key)
 
 wide = (k: Key(Int | String)) { key.wrap(k, "x") }
-@main
+
 main = () {
   narrow: Key(Int) = key.new()
   wide(narrow)

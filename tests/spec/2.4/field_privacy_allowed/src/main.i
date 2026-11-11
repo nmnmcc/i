@@ -9,8 +9,8 @@ pass(A) = (value: secret.Secret(A)) { id(value) }
 
 public = (value: facade.OpenAlias) { value.value }
 
-@main
-allowed = () {
+
+main = () {
 	value = pass(facade.value)
 	assert(secret.read(value) == 42)
 	assert(secret.read(secret.local_update(value, 23)) == 23)

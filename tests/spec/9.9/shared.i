@@ -7,7 +7,7 @@
 	i/core
 )
 
-@main
+
 main = () {
 	task.local_scope((s) {
 		shared = task.share(s, [1, 2, 3])

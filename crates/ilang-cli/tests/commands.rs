@@ -28,7 +28,7 @@ fn i(args: &[&str], project: &Path) -> std::process::Output {
 fn build_writes_the_module() {
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
-        ("src/main.i", "@main\nmain = () { 1 + 2 }\n"),
+        ("src/main.i", "\nmain = () { 1 + 2 }\n"),
     ]);
     let out = i(&["build"], dir.path());
     assert!(
@@ -96,7 +96,7 @@ fn run_prints_the_stop_message() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "f = (x) {\n  panic(x)\n}\n\n@main\nmain = () {\n  f(\"boom\")\n  Nil\n}\n",
+            "f = (x) {\n  panic(x)\n}\n\n\nmain = () {\n  f(\"boom\")\n  Nil\n}\n",
         ),
     ]);
     for opt in ["0", "2"] {
@@ -258,7 +258,7 @@ divide = (a: Int, b: Int) {
 }
 
 // `Nil` and `Bool` errors have their own tags.
-check = (n: Int) -> Float ? Bool | Nil {
+check = (n: Int) -> Float ^ Bool | Nil {
    n |> {
     0 -> fail.raise(Nil)
     1 -> fail.raise(True)
@@ -273,7 +273,7 @@ positive = (n: Int) {
 }
 
 // A `BitArray` error.
-bits = (b: Bool) -> Nil ? BitArray {
+bits = (b: Bool) -> Nil ^ BitArray {
    b |> {
     True -> fail.raise(<<1, 2>>)
     False -> Nil
@@ -384,10 +384,10 @@ fn host_exports_with_services_and_async() {
  (Kv, Later, lookup, quadruple, both, pure)
 
 @host("test:kv/v1")
-Kv { Kv(get: (key: String) -> String ? String) }
+Kv { Kv(get: (key: String) -> String ^ String) }
 
 @host("test:async/v1", "async")
-Later { Later(double: (n: Int) -> Int ? String, echo: (text: String) -> String) }
+Later { Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String) }
 
 lookup = (key: String, kv ! Kv) { kv.get(key) }
 
@@ -500,7 +500,7 @@ fn async_entry_points_and_needed_services() {
         ("test/fake_service.i", &text),
         (
             "src/main.i",
-            "@host(\"test:unused/v1\")\nUnused { Unused(f: () -> Nil) }\n\n@main\nmain = () { Nil }\n",
+            "@host(\"test:unused/v1\")\nUnused { Unused(f: () -> Nil) }\n\n\nmain = () { Nil }\n",
         ),
     ]);
     let built = build(
@@ -565,7 +565,7 @@ fn run_gives_the_standard_services() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            " ((Io) = i/io)\n\n@main\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
+            " ((Io) = i/io)\n\n\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
         ),
         (
             "test/main_test.i",
@@ -680,7 +680,7 @@ fn located_packages() {
         ),
         (
             "src/main.i",
-            " (lib/lib)\n\n@main\nmain = () {\n  lib.boom(\"x\")\n  Nil\n}\n",
+            " (lib/lib)\n\n\nmain = () {\n  lib.boom(\"x\")\n  Nil\n}\n",
         ),
     ]);
     let run = |cache: &str, args: &[&str]| {
@@ -739,7 +739,7 @@ fn incorrect_host_answers_stop_in_the_module() {
              \n\
              half = (bad ! Bad) {\n  x = bad.nan()\n  x /. 2.0\n}\n\
              \n\
-             @main\nmain = () {\n  half()\n  Nil\n}\n",
+             \nmain = () {\n  half()\n  Nil\n}\n",
         ),
     ]);
     let built = build(

@@ -46,7 +46,7 @@ probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 	assert(result == Error("boom"))
 }
 
-@main
+
 main = () {
 	probe("yield", () { task.yield() })
 	c: task.Channel(Nil) = task.channel()

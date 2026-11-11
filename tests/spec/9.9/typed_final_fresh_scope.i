@@ -25,7 +25,7 @@ forever = () -> Never ! task.Scheduler {
 	forever()
 }
 
-@main
+
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {

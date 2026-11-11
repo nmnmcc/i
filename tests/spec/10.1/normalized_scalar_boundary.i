@@ -8,5 +8,5 @@ Whole = {Int - 0} | 0
 @external("test:math/v1", "add")
 add: (a: One, b: Two) -> Whole
 
-@main
+
 main = () { assert(add(1, 2) == 3) }

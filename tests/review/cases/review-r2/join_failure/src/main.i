@@ -1,6 +1,6 @@
 (i/task, i/resource, i/fail, i/request, i/control, i/core, rng = i/random, (Io) = i/io)
 
-@main
+
 main = (io ! Io) {
 r = fail.catch(() { task.scope((s) {
  t = task.go(s, () { resource.ensure(() { task.sync(task.never()) }, () { task.yield()

@@ -1,9 +1,9 @@
 (i/fail)
 Dep { Dep(value: Int) }
 get = (d ! Dep) { d.value }
-S(A, E, N) { S((A) -> A ? E ! N, (N) -> Nil) }
+S(A, E, N) { S((A) -> A ^ E ! N, (N) -> Nil) }
 use(A, E, N) = (x: A, s ! S(A, E, N)) { S(f, _) = s f(x) }
-run(A,E,N) = (body: () -> A ? E ! N) { body() }
+run(A,E,N) = (body: () -> A ^ E ! N) { body() }
 forward(A,E,N) = (x: A, s ! S(A,E,N)) { run(() { use(x) }) }
 left(N) = (b: Bool, s ! S(Int,Never,N)) {
  b |> { True -> right(False) False -> use(1) }

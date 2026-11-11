@@ -4,3 +4,6 @@ name = "spec"
 
 [dependencies]
 std = { path = "../../../../std" }
+
+[entries]
+legacy = "main.main"

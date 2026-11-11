@@ -84,7 +84,7 @@ fn a_local_annotation_cannot_hide_an_entry_service() {
     // a provider before entry. Both annotations have the same finite type.
     let annotated = "S(N) { S(() -> Nil ! N) }
 use(N) = (s ! S(N)) { S(f) = s f() }
-@main
+
 main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
     for source in [
         annotated.to_string(),
@@ -129,7 +129,7 @@ Dependency { Dependency }
 read = (d ! Dependency) { Nil }
 use(N) = (s ! S(N)) { S(f) = s f() }
 apply(N) = () { local: () -> Nil ! N = () { use() } local() }
-@main
+
 main = () { ! S(Dependency) = S(() { read() }) apply() }";
     for supplied in [false, true] {
         let source = if supplied {
@@ -184,7 +184,7 @@ main = () { ! S(Dependency) = S(() { read() }) apply() }";
 fn lowering_rejects_an_uncoalesced_partial_result() {
     // §4.7 prohibits recursive types even when a caller of the compiler
     // API accidentally ignores the checker diagnostics.
-    let dir = front_end_project("bad = (x) { x(x) }\n@main\nmain = () { Nil }");
+    let dir = front_end_project("bad = (x) { x(x) }\n\nmain = () { Nil }");
     let (graph, _) = ilang_cli::load(dir.path(), false, true);
     let checked = ilang_check::check(&graph);
     assert!(checked.diags.iter().any(|d| d.code == "E0505"));
@@ -214,7 +214,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
     // A1 §3.9 / spec §6.12: a top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.
-    let source = "f = { 0 -> 1  _ -> 2 }\nget = (o) { o |> { Ok(x) -> x } }\n@main\nmain = () { assert(f(1) == 2)  get(Error(Nil))  Nil }\n";
+    let source = "f = { 0 -> 1  _ -> 2 }\nget = (o) { o |> { Ok(x) -> x } }\n\nmain = () { assert(f(1) == 2)  get(Error(Nil))  Nil }\n";
     let dir = front_end_project(source);
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["build", "--wat", "--opt", "0", "--project"])

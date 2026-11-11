@@ -3,5 +3,5 @@ use(N) = (s ! S(N)) { S(f, _) = s f() }
 run = (f) { f() }
 id = (x) { x }
 f(N) = (s ! S(N)) -> Nil ! N | S(N) { run(() { use() use() }) }
-@main
+
 main = () { ! S(Never) = S(() { Nil }, (_: Never) { Nil }) f() }

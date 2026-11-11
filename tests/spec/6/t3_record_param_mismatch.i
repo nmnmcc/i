@@ -2,5 +2,5 @@
 // expect: compile-error E0512
 (main)
 f(K) = (r: (K: Int), key: K) -> Int { 1 }
-@main
+
 main = () { f((name: 9), "other") }

@@ -5,7 +5,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	c: task.Channel(Int) = task.channel()
 	task.run(() { task.send(c, 1) })

@@ -2,7 +2,7 @@
 // expect: pass
 (list = std/list, i/record)
 (main)
-@main
+
 main = () {
   r = list.fold([1, 2, 3], (n: 0, total: 0), (acc: (n: Int, total: Int), x) {
     (..acc, n: acc.n + 1, total: acc.total + x)

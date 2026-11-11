@@ -5,5 +5,5 @@
 
 // §6.12: a fitted clause reports its first pattern, like a parameter.
 f = { 0 | 1 -> 2 }
-@main
+
 main = () { f(2)  Nil }

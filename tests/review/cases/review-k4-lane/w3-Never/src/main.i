@@ -12,5 +12,5 @@ wrap(N) = (body: () -> Int ! N | S(N), svc: S(N)) -> Int ! N {
 	body()
 }
 
-@main
+
 main = () { assert(wrap(() { use() }, S(() { 1 })) == 1) }

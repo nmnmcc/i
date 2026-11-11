@@ -4,7 +4,7 @@
 method = "GET"
 port = 8080
 take = (first: method, last: port) { (first, last) }
-@main
+
 main = () {
     _ = take(last: panic("first written"), first: panic("second written"))
     Nil

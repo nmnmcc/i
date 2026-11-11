@@ -6,7 +6,7 @@
 	i/control
 )
 
-@main
+
 main = () {
 	control.boundary((b) {
 		task.scope((s) {

@@ -12,7 +12,7 @@ f = () {
 	}
 }
 
-@main
+
 main = () {
 	assert(f() == "2")
 	Nil

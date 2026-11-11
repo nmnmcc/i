@@ -6,7 +6,7 @@
 
 // §9.3, with `http_get` and `parse_user` declared with written types.
 Http {
-	Http(get: (url: String) -> String ? HttpError)
+	Http(get: (url: String) -> String ^ HttpError)
 }
 
 HttpError {
@@ -21,11 +21,11 @@ User {
 	User(name: String)
 }
 
-http_get = (url: String, http ! Http) -> String ? HttpError ! Http {
+http_get = (url: String, http ! Http) -> String ^ HttpError ! Http {
 	http.get(url)
 }
 
-parse_user = (text: String) -> User ? ParseError {
+parse_user = (text: String) -> User ^ ParseError {
 	text |> {
 		""   -> fail.raise(ParseError("empty"))
 		name -> User(name)

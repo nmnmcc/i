@@ -38,7 +38,7 @@ given = (c: Clock) {
 
 // §9.3: errors come together by union.
 Http {
-	Http(get: (url: String) -> String ? Int)
+	Http(get: (url: String) -> String ^ Int)
 }
 
 fetch = (url, http ! Http) { http.get(url) }

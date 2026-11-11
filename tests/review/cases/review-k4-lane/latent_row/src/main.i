@@ -17,7 +17,7 @@ one = (s ! S(Int)) { Nil }
 
 two = (s ! S(String)) { Nil }
 
-@main
+
 main = () {
 	unused = merge(T(one), T(two))
 	Nil

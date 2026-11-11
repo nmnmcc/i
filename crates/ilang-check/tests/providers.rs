@@ -21,14 +21,14 @@ fn entry_needs(source: &str) -> (ilang_check::types::ShownType, ilang_check::hir
 
 #[test]
 fn entry_without_services_has_empty_provider_environment() {
-    let (needs, _) = entry_needs("@main\nmain = () { Nil }\n");
+    let (needs, _) = entry_needs("\nmain = () { Nil }\n");
     assert_eq!(needs, ilang_check::types::ShownType::Never);
 }
 
 #[test]
 fn entry_retains_ordinary_service_for_provider_planning() {
     let (needs, program) =
-        entry_needs("Service { Service }\n@main\nmain = (s ! Service) { Nil }\n");
+        entry_needs("Service { Service }\n\nmain = (s ! Service) { Nil }\n");
     let service = program
         .types
         .iter()
@@ -46,7 +46,7 @@ fn entry_retains_ordinary_service_for_provider_planning() {
 #[test]
 fn entry_retains_generic_service_arguments() {
     let (needs, program) =
-        entry_needs("Service(A) { Service(value: A) }\n@main\nmain = (s ! Service(Int)) { Nil }\n");
+        entry_needs("Service(A) { Service(value: A) }\n\nmain = (s ! Service(Int)) { Nil }\n");
     let service = program
         .types
         .iter()

@@ -5,7 +5,7 @@
 	i/task
 )
 
-@main
+
 main = () {
 	shared = task.scope((s) { task.share(s, 7) })
 	task.get(shared)

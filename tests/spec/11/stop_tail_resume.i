@@ -14,7 +14,7 @@ step = (b) {
 	panic("after")
 }
 
-@main
+
 main = () {
 	control.boundary((b) {
 		step(b)

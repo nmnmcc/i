@@ -246,7 +246,7 @@ fn two_new_packages_work_together() {
         &app,
         &[(
             "src/main.i",
-            " (\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\n (greeting)\n\ngreeting = (who: String) { greet.greeting(who) }\n\n@main\nmain = (io ! Io) { io.print(greeting(\"i\")) }\n",
+            " (\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\n (greeting)\n\ngreeting = (who: String) { greet.greeting(who) }\n\n\nmain = (io ! Io) { io.print(greeting(\"i\")) }\n",
         )],
     );
     let out = w.ok(&["check", "--project", &project]);

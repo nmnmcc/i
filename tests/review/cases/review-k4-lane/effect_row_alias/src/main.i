@@ -10,5 +10,5 @@ Bad = S(Never) | S(Dep)
 
 use = (body: () -> Nil ! Bad) { body() }
 
-@main
+
 main = () { Nil }

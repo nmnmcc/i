@@ -6,7 +6,7 @@ use(N) = (s ! S(N)) -> Int ! N | S(N) { s.f() }
 
 fw(N) = () -> Int ! S(N) | N { use() }
 
-@main
+
 main = () {
 	! S(Never) = S(() { 1 })
 	assert(fw() == 1)

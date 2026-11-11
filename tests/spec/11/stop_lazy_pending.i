@@ -33,7 +33,7 @@ leaf = (b) {
 
 // After the resume, the stop shows the innermost frame, the three frames
 // that wait, then the place of `resume`.
-@main
+
 main = () {
   p = control.boundary((b) {
     f1(b)

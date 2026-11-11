@@ -6,7 +6,7 @@
 	i/resource
 )
 
-@main
+
 main = () {
 	task.scope((s) {
 		child = task.go(s, () {

@@ -54,7 +54,7 @@ is declared in the library module `i/io`. A program that prints imports it:
 ```i
 ((Io) = i/io)
 
-@main
+
 main = (io ! Io) { io.print("Hello from i!") }
 ```
 

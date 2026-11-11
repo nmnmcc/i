@@ -5,7 +5,7 @@ use(N) = (s ! S(N)) {
 
 T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
 
-@main
+
 main = () {
   closed()
   Nil

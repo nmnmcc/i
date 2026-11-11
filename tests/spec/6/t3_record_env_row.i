@@ -4,5 +4,5 @@
 S(A) { S(A) }
 Bad = (f: () -> Nil ! S(Int) | S(String))
 use = (x: Bad) { x }
-@main
+
 main = () { Nil }

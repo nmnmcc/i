@@ -13,7 +13,7 @@ e = task.always(5)
 
 unused = task.map(task.always(9), (_) { panic("losing map ran") })
 
-@main
+
 main = () {
 	assert(equal(e, e))
 	assert(core.not(equal(e, task.always(5))))

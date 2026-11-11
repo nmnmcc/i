@@ -12,7 +12,7 @@ Bad {
 
 take = (bad ! Bad) { bad.bits() }
 
-@main
+
 main = () {
 	take()
 	Nil

@@ -11,7 +11,7 @@
 
 // `cancel` unwinds the paused computation: its final functions run (§9.5),
 // on top of the place of `cancel`.
-@main
+
 main = () {
 	control.boundary((b) {
 		resource.ensure(() {

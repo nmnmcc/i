@@ -72,7 +72,7 @@ fn entries_tests_and_ordinary_exports_retain_their_helpers() {
         names(&[
             (
                 "src/main.i",
-                "@main main = () { helper() }\nhelper = () { Nil }"
+                " main = () { helper() }\nhelper = () { Nil }"
             ),
             ("src/api.i", "(api)\napi = () { hidden }\nhidden = 1"),
             (

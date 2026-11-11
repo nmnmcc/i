@@ -10,7 +10,7 @@ list_map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
   }
 }
 
-@main
+
 main = () {
   opts: List(Option(User)) = [Some(User("Ada")), None, Some(User("Bob"))]
   names = list_map(opts, { Some(u) -> u.name  None -> "" })

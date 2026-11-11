@@ -17,7 +17,7 @@ usa(N) = (s ! S(N)) -> Int ! N | S(N) {
 run(A, N) = (body: () -> A ! N) { body() }
 h0 = () { run(() { us() }) + 1 }
 h1 = () { usa() }
-@main
+
 main = () {
   ! Dep = Dep(1)
   w = () {

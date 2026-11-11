@@ -24,7 +24,7 @@ fn annotated_local_keeps_the_missing_service() {
     // §4.8 rules 4–5 retain S(N); §10.2 requires it before entry.
     let source = "S(N) { S(() -> Nil ! N) }
 use(N) = (s ! S(N)) { S(f) = s f() }
-@main
+
 main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
     entry(source);
     entry(&source.replace("local: () -> Nil ! N | S(N)", "local"));
@@ -63,16 +63,16 @@ run(N) = (body: () -> Nil ! N) { body() }";
     // remove a requirement. Every case is a finite scheme needing S(N).
     for body in [
         "helper(N): () -> Nil ! N | S(N) = () { use() }
-@main
+
 main = () { helper() }",
         "helper(N) = () -> Nil ! N | S(N) { use() }
-@main
+
 main = () { helper() }",
-        "@main
+        "
 main(N) = () { run(() -> Nil ! N | S(N) { use() }) }",
-        "@main
+        "
 main(N) = () { local: () -> Nil ! N | S(N) = () { use() } run(local) }",
-        "@main
+        "
 main(N) = () { run(() { local: () -> Nil ! N | S(N) = () { use() } local() }) }",
     ] {
         entry(&format!("{base}\n{body}"));
@@ -85,19 +85,19 @@ main(N) = () { run(() { local: () -> Nil ! N | S(N) = () { use() } local() }) }"
 
 #[test]
 fn two_parameters_retain_the_service() {
-    let base = "S(E, N) { S(() -> Nil ? E ! N) }
+    let base = "S(E, N) { S(() -> Nil ^ E ! N) }
 use(E, N) = (s ! S(E, N)) { S(f) = s f() }
-run(E, N) = (body: () -> Nil ? E ! N) { body() }";
+run(E, N) = (body: () -> Nil ^ E ! N) { body() }";
     for body in [
-        "@main
-main(E, N) = () { local: () -> Nil ? E ! N | S(E, N) = () { use() } local() }",
-        "@main
+        "
+main(E, N) = () { local: () -> Nil ^ E ! N | S(E, N) = () { use() } local() }",
+        "
 main(E, N) = () { local = () { use() } local() }",
-        "helper(E, N): () -> Nil ? E ! N | S(E, N) = () { use() }
-@main
+        "helper(E, N): () -> Nil ^ E ! N | S(E, N) = () { use() }
+
 main = () { helper() }",
-        "@main
-main(E, N) = () { run(() -> Nil ? E ! N | S(E, N) { use() }) }",
+        "
+main(E, N) = () { run(() -> Nil ^ E ! N | S(E, N) { use() }) }",
     ] {
         entry(&format!("{base}\n{body}"));
         let inferred = body
@@ -111,7 +111,7 @@ main(E, N) = () { run(() -> Nil ? E ! N | S(E, N) { use() }) }",
 fn two_environment_parameters_retain_the_service() {
     let source = "S(A, B) { S(() -> Nil ! A, () -> Nil ! B) }
 use(A, B) = (s ! S(A, B)) { S(f, g) = s f() g() }
-@main
+
 main(A, B) = () { local: () -> Nil ! A | B | S(A, B) = () { use() } local() }";
     entry(source);
     entry(&source.replace("local: () -> Nil ! A | B | S(A, B)", "local"));
@@ -123,7 +123,7 @@ fn a_captured_row_annotation_can_contain_the_service() {
     // Merely making an unused function needs nothing (§4.8 rule 4).
     let source = "S(N) { S(() -> Nil ! N) }
 use(N) = (s ! S(N)) { S(f) = s f() }
-@main
+
 main(N) = () { local: () -> Nil ! N = () { use() } local() }";
     entry(source);
     let unused = source.replace("local() }", "Nil }");
@@ -145,7 +145,7 @@ Dependency { Dependency }
 read = (d ! Dependency) { Nil }
 use(N) = (s ! S(N)) { S(f) = s f() }
 apply(N) = () { local: () -> Nil ! N = () { use() } local() }
-@main
+
 main = () { ! S(Dependency) = S(() { read() }) apply() }";
     entry(dependency);
     let supplied = dependency.replace(
@@ -181,7 +181,7 @@ helper(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
         ("src/service.i", source),
         (
             "src/main.i",
-            "(app/service)\n@main\nmain = () { service.helper() }",
+            "(app/service)\n\nmain = () { service.helper() }",
         ),
     ]);
     let checked = ilang_check::check(&graph);

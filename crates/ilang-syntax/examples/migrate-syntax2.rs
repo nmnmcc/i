@@ -1,6 +1,6 @@
 //! Span-based first-surface migration. Source between edits stays untouched.
 use ilang_syntax::{
-    ast::*, lexer::lex, parser::parse_module_legacy, span::Span, token::TokenKind as T,
+    ast::*, lexer::lex, parser_legacy::parse_module_legacy, span::Span, token::TokenKind as T,
 };
 use serde_json::{Value, json};
 use std::io::{self, BufRead};
@@ -68,6 +68,7 @@ impl<'a> Migrator<'a> {
                 if name.name == "Record" && self.src.as_bytes()[t.span.start as usize] == b'{' =>
             {
                 if self.record_shadowed {
+                    self.mark_empty(t.span, "record type shadowed by Record");
                     return;
                 }
                 let source = &self.src[t.span.start as usize..t.span.end as usize];
@@ -388,10 +389,11 @@ mod tests {
     }
 
     #[test]
-    fn shadowed_record_keeps_uncapturable_legacy_type() {
-        let source = "Record = Int\nT = {..}";
+    fn shadowed_record_is_reported_for_manual_migration() {
+        let source = /* old-syntax-check: E0101 */ "Record = Int\nT = {..}";
         let result = migrate(source);
         assert_eq!(result["source"], source);
+        assert!(!result["empty"].as_array().unwrap().is_empty());
         assert_eq!(result["diagnostics"], json!([]));
     }
 
@@ -400,10 +402,10 @@ mod tests {
         for source in [
             "result = 1 + x |> { 0 -> 1 _ -> 2 }",
             "result = x // a comment\n |> { 0 -> 1 _ -> 2 }",
-            "result = (x) -> Int ? String { x }",
+            /* old-syntax-check: E0102 */ "result = (x) -> Int ? String { x }",
             "result = x |> f",
-            "T = {..}",
-            "result = { name: 1 }",
+            /* old-syntax-check: E0101 */ "T = {..}",
+            /* old-syntax-check: E0101 */ "result = { name: 1 }",
         ] {
             let result = migrate(source);
             assert_eq!(result["diagnostics"], json!([]), "{result}");

@@ -14,7 +14,7 @@ show = (x) { core.inspect(x) }
 
 Paused(B) { Paused(Continuation(Nil, Paused(B), Never, Never), B)  Done }
 
-@main
+
 main = () {
   // A cancel goes through `inner`, which is paused inside `k`. The final
   // function inside it runs, and suspends to `top`.

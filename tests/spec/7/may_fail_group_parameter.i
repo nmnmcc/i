@@ -6,7 +6,7 @@ pair = ("b", {
 	("a", _) -> 1
 })
 
-@main
+
 main = () {
 	! Assert = Assert((_) { panic("caught group parameter") })
 	pair.1(pair)

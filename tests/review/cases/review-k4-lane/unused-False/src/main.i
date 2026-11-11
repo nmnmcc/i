@@ -7,7 +7,7 @@ use(N) = (s ! S(N)) {
 	f()
 }
 
-@main
+
 main(N) = () {
 	local: () -> Nil ! N | S(N) = () { use() }
 	Nil

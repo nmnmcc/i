@@ -3,7 +3,7 @@
 
 f = () { a + b }
 
-@main
+
 main = () {
 	assert(f() == 42)
 	Nil
