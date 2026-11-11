@@ -472,8 +472,9 @@ fn ends_with_fn(t: &TypeExpr) -> bool {
     }
 }
 
-/// Whether the printed type ends with a tuple type, which becomes a function
-/// type when `->` comes after it (§7.1).
+/// Whether the printed type ends with a tuple or record type: both are written
+/// in `( )`, which becomes the parameters of a function type when `->` comes
+/// after it (§7.1).
 fn ends_with_tuple(t: &TypeExpr) -> bool {
     match &t.kind {
         TypeKind::Tuple(_) | TypeKind::Record { .. } => true,
