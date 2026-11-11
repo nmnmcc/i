@@ -42,6 +42,10 @@
 	is_integer
 	max_finite
 	min_positive
+	pi
+	tau
+	sign_bit
+	copy_sign
 )
 
 /// The greatest finite Float, about `1.8e308`.
@@ -50,7 +54,24 @@ max_finite = 1.7976931348623157e308
 /// The smallest Float greater than `0.0`: `5.0e-324`, a subnormal number.
 min_positive = 5.0e-324
 
-sign_bit = 9223372036854775808
+/// The nearest binary64 value to pi.
+pi = 3.141592653589793
+
+/// The nearest binary64 value to two pi.
+tau = 6.283185307179586
+
+sign_mask = 9223372036854775808
+
+/// Whether the sign bit is set, including for negative zero.
+sign_bit = (x: Float) -> Bool { core.float_to_bits(x) >= sign_mask }
+
+/// Copy the sign bit of `sign` to `magnitude`.
+copy_sign = (magnitude: Float, sign: Float) -> Float {
+	core.float_from_bits(
+		core.float_to_bits(magnitude) % sign_mask +
+			core.float_to_bits(sign) / sign_mask * sign_mask
+	)
+}
 
 fraction_unit = 4503599627370496
 
@@ -199,7 +220,7 @@ decimal = (
 	exponent: Int
 ) -> Result(Float, Nil) {
 	sign = negative |> {
-		True  -> sign_bit
+		True  -> sign_mask
 		False -> 0
 	}
 	magnitude = digits + exponent - 1
@@ -641,7 +662,7 @@ bits_of = (x: Float) -> Int { core.float_to_bits(x) }
 
 from_bits = (x: Int) -> Float { core.float_from_bits(x) }
 
-abs_bits = (x: Float) -> Float { from_bits(bits_of(x) % sign_bit) }
+abs_bits = (x: Float) -> Float { from_bits(bits_of(x) % sign_mask) }
 
 high = (x: Float) -> Int { bits_of(x) / word }
 
@@ -865,7 +886,7 @@ pow = (base: Float, exponent: Float) -> Result(Float, Nil) {
 		0.0 -> Ok(1.0)
 		1.0 -> Ok(base)
 		_ -> {
-			negative = bits_of(base) >= sign_bit
+			negative = bits_of(base) >= sign_mask
 			odd = negative && is_odd_whole(exponent)
 			direction = odd |> {
 				True  -> -.1.0

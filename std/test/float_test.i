@@ -1212,3 +1212,29 @@ loosely_huge_test = () {
 			Greater
 	)
 }
+
+@test
+trigonometric_constants_and_signs_test = () {
+	negative_zero = core.float_from_bits(0x8000000000000000)
+	assert(core.float_to_bits(float.pi) == 0x400921fb54442d18)
+	assert(core.float_to_bits(float.tau) == 0x401921fb54442d18)
+	assert(float.sign_bit(negative_zero))
+	assert(core.not(float.sign_bit(0.0)))
+	assert(float.sign_bit(-.1.0))
+	assert(core.not(float.sign_bit(1.0)))
+	assert(float.sign_bit(-.float.max_finite))
+	assert(core.not(float.sign_bit(float.min_positive)))
+	assert(float.sign_bit(-.float.min_positive))
+	assert(core.not(float.sign_bit(float.max_finite)))
+	assert(
+		core.float_to_bits(float.copy_sign(2.0, negative_zero)) ==
+			0xc000000000000000
+	)
+	assert(core.float_to_bits(float.copy_sign(negative_zero, 1.0)) == 0)
+	assert(float.copy_sign(1.0, -.1.0) == -.1.0)
+	assert(float.copy_sign(-.1.0, 1.0) == 1.0)
+	assert(float.copy_sign(2.0, 1.0) == 2.0)
+	assert(float.copy_sign(-.2.0, -.1.0) == -.2.0)
+	assert(float.copy_sign(float.min_positive, -.1.0) == -.float.min_positive)
+	assert(float.copy_sign(float.max_finite, 1.0) == float.max_finite)
+}
