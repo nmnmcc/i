@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Explicit local extension setup; workspace settings cannot install extensions.
+set -euo pipefail
+repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+cd -- "$repo"
+
+build() {
+  git submodule update --init crates/ilang-binaryen/binaryen
+  CARGO_TARGET_DIR="$repo/target" cargo build --release --locked -p ilang-cli
+}
+
+vscode() {
+  npm --prefix editors/vscode ci --ignore-scripts
+  local extension_dir="${VSCODE_EXTENSIONS_DIR:-$HOME/.vscode/extensions}"
+  local link="$extension_dir/ilang.ilang-0.1.0"
+  mkdir -p -- "$extension_dir"
+  if [[ -e "$link" || -L "$link" ]]; then
+    if [[ -L "$link" && "$(readlink -- "$link")" == "$repo/editors/vscode" ]]; then
+      printf 'VS Code already linked: %s\n' "$link"
+      return
+    fi
+    echo "Refusing to replace existing extension: $link" >&2
+    exit 1
+  fi
+  ln -s -- "$repo/editors/vscode" "$link"
+  printf 'VS Code linked: %s. Run Developer: Reload Window.\n' "$link"
+}
+
+zed() {
+  # Git grammar URLs cannot expand workspace variables. Prepare a dev copy;
+  # never rewrite tracked files or create a nested repository/worktree.
+  python3 - "$repo" <<'PY'
+from pathlib import Path
+import shutil, subprocess, sys, re
+root = Path(sys.argv[1])
+destination = root / 'target' / 'editor-dev' / 'zed'
+destination.mkdir(parents=True, exist_ok=True)
+for name in ['Cargo.toml', 'Cargo.lock', 'src', 'languages', 'README.md']:
+    source = root / 'editors' / 'zed' / name
+    if source.is_dir():
+        shutil.copytree(source, destination / name, dirs_exist_ok=True)
+    else:
+        shutil.copy2(source, destination / name)
+manifest = (root / 'editors' / 'zed' / 'extension.toml').read_text()
+# The extension builder fetches this revision with Git; it must be committed.
+revision = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
+manifest = re.sub(r'(?m)^repository = "file:[^"]*"$', 'repository = "' + root.as_uri() + '"', manifest)
+manifest = re.sub(r'(?m)^commit = "[^"]*"$', 'commit = "' + revision + '"', manifest)
+(destination / 'extension.toml').write_text(manifest)
+print(f'Zed: run extensions: install dev extension and select {destination}')
+print('After committing grammar edits, rerun scripts/dev-editors zed and rebuild the dev extension.')
+PY
+}
+
+case "${1:-all}" in
+  build) build ;;
+  vscode) vscode ;;
+  zed) zed ;;
+  all) build; vscode; zed ;;
+  *) echo 'Usage: scripts/dev-editors [all|build|vscode|zed]' >&2; exit 2 ;;
+esac

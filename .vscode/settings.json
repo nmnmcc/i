@@ -1,0 +1,7 @@
+{
+  "ilang.path": "./target/release/i",
+  "[i]": {
+    "editor.defaultFormatter": "ilang.ilang",
+    "editor.formatOnSave": true
+  }
+}

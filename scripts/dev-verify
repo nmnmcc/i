@@ -2,9 +2,10 @@
 # Verifies the project. The parts are independent, so CI runs them in
 # parallel; with no arguments, all of them run one after another.
 #
-#   scripts/dev-verify            rust, i and js
+#   scripts/dev-verify            rust, i, js and editors
 #   scripts/dev-verify rust       Rust formatting, Clippy and the workspace tests
 #   scripts/dev-verify i          the release `i`, and with it the i sources
+#   scripts/dev-verify editors    VS Code tests, tree-sitter tests and Zed build
 #   scripts/dev-verify js         the JavaScript SDK and browser tests
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
@@ -42,11 +43,40 @@ js() {
   npm run test:browser
 }
 
+editors() {
+  npm --prefix editors/vscode ci --ignore-scripts
+  npm --prefix editors/vscode test
+  (
+    cd editors/tree-sitter-i
+    npm ci
+    npx tree-sitter generate
+    git diff --exit-code -- src
+    npx tree-sitter test
+    cmp queries/highlights.scm ../zed/languages/i/highlights.scm
+    for query in queries/highlights.scm ../zed/languages/i/{brackets,indents,outline}.scm; do
+      npx tree-sitter query -q "$query" ../../examples/hello/src/main.i
+    done
+    while IFS= read -r -d '' source; do
+      npx tree-sitter parse -q "$source"
+    done < <(find ../../lib ../../std ../../examples -name '*.i' -print0)
+  )
+  (
+    cd editors/zed
+    local target_libdir
+    target_libdir=$(rustc --print target-libdir --target wasm32-wasip1)
+    if [[ -d "$target_libdir" ]]; then
+      cargo check --locked --target wasm32-wasip1
+    else
+      cargo check --locked
+    fi
+  )
+}
+
 parts=("$@")
-if [[ ${#parts[@]} -eq 0 ]]; then parts=(rust i js); fi
+if [[ ${#parts[@]} -eq 0 ]]; then parts=(rust i js editors); fi
 for part in "${parts[@]}"; do
   case "$part" in
-    rust | i | js) "$part" ;;
-    *) echo "dev-verify: unknown part '$part' (rust, i or js)" >&2; exit 2 ;;
+    rust | i | js | editors) "$part" ;;
+    *) echo "dev-verify: unknown part '$part' (rust, i, js or editors)" >&2; exit 2 ;;
   esac
 done

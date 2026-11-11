@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "i: build compiler",
+      "type": "process",
+      "command": "cargo",
+      "args": ["build", "--release", "--locked", "-p", "ilang-cli"],
+      "options": { "cwd": "${workspaceFolder}", "env": { "CARGO_TARGET_DIR": "${workspaceFolder}/target" } },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "i: install VS Code dependencies",
+      "type": "process",
+      "command": "npm",
+      "args": ["ci", "--ignore-scripts"],
+      "options": { "cwd": "${workspaceFolder}/editors/vscode" },
+      "problemMatcher": []
+    },
+    {
+      "label": "i: prepare editor development",
+      "dependsOrder": "sequence",
+      "dependsOn": ["i: build compiler", "i: install VS Code dependencies"],
+      "problemMatcher": []
+    }
+  ]
+}
