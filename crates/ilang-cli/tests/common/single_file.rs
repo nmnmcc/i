@@ -28,7 +28,12 @@ pub fn write(dir: &Path, stem: &str, source: &str) {
             };
             // A default entry marked as a test remains a source placement
             // error, just as it would in an ordinary src/main.i.
-            if name == "main" {
+            if name == "main"
+                || item
+                    .attributes
+                    .iter()
+                    .any(|a| a.module.is_none() && a.name.name == "main")
+            {
                 continue;
             }
             for attr in &item.attributes {
