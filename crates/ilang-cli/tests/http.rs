@@ -310,3 +310,61 @@ main = () {{
     ));
     server.join().unwrap();
 }
+
+#[test]
+fn http_reuse() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut accepts = 1;
+        for request_number in 0..2 {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap() == 0 {
+                let (next, _) = listener.accept().unwrap();
+                next.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                stream = next;
+                reader = BufReader::new(stream.try_clone().unwrap());
+                accepts += 1;
+                reader.read_line(&mut line).unwrap();
+            }
+            assert!(line.starts_with("GET /"));
+            loop {
+                line.clear();
+                reader.read_line(&mut line).unwrap();
+                if line == "\r\n" {
+                    break;
+                }
+                assert!(!line.is_empty());
+            }
+            let connection = if request_number == 1 {
+                "close"
+            } else {
+                "keep-alive"
+            };
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: {connection}\r\n\r\n"
+            )
+            .unwrap();
+        }
+        accepts
+    });
+    run_http_program(&format!(
+        r#"
+(std/http)
+@main
+main = () {{
+ client = http.client()
+ req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
+ assert(http.send_with(client, req).status == http.Status(200))
+ assert(http.send_with(client, req).status == http.Status(200))
+}}
+"#
+    ));
+    assert_eq!(server.join().unwrap(), 1, "client did not reuse connection");
+}
