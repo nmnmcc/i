@@ -2085,7 +2085,7 @@ fn definition_query_charges_source_before_constructing_answer() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    let text = format!("T = Int\n// {}\n", "x".repeat(20_000));
+    let text = format!("T = {}\n", "X".repeat(20_000));
     std::fs::write(dir.path().join("src/main.i"), text).unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -2159,10 +2159,63 @@ fn real_macro_definition_query_stops_before_oversize_source_construction() {
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask)\n(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))\n").unwrap();
-    let source = format!("(m = app/macros)\nT = Int\nm.ask(T)\n// {}\n", "x".repeat(800_000));
+    let source = format!("(m = app/macros)\nT = {}\nm.ask(T)\n", "X".repeat(9_000_000));
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let errors = match ilang_macro::project::expand(&mut graph) { Ok(_) => panic!("oversize definition should exceed budget"), Err(errors) => errors };
     assert!(errors.iter().any(|e| e.message.contains("limit exceeded")), "{errors:?}");
+}
+
+#[test]
+fn definition_budget_does_not_depend_on_unrelated_source() {
+    use ilang_host::{macro_budget::{Limits, MacroBudget}, syntax::DefinitionReply};
+    use ilang_macro::{definition_world::DefinitionWorld, item_phase::{Definitions, Snapshot}};
+    use ilang_syntax::lisp::{definition_schedule::Mode, scoped::ScopedSource};
+    let mut usages = Vec::new();
+    for suffix in [String::new(), format!("// {}\n", "x".repeat(20_000))] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/main.i"), format!("T = Int\n{suffix}")).unwrap();
+        let (graph, _) = ilang_cli::load(dir.path(), false, true);
+        let (parsed, diagnostics) = ilang_check::parse(&graph);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+        let snapshot = Snapshot { module: module.ast.clone(), ready: vec![true; module.ast.items.len()], scoped: ScopedSource::new(graph.sources.get(module.source).text.clone()), source: module.source.0, other_runs: false, active: None, epoch: 0, item_overrides: Default::default() };
+        let world = DefinitionWorld::new(&graph, &parsed);
+        world.prepare(&snapshot);
+        let query = Syntax::from_datum(&parse("T").unwrap()[0], &Scope { module: module.source.0, marks: BTreeSet::new() });
+        let budget = MacroBudget::new(Limits { work: 10_000, allocation: 10_000, frames: 100 });
+        let result = world.resolve(&snapshot, &query, &query, Mode::Normal, 99, &budget);
+        assert!(matches!(result.reply, DefinitionReply::Answer(_)), "{:?}", budget.exceeded());
+        usages.push(budget.usage());
+    }
+    assert_eq!(usages[0], usages[1]);
+}
+
+#[test]
+fn lisp_definition_budget_excludes_unrelated_items() {
+    use ilang_host::{macro_budget::{Limits, MacroBudget}, syntax::DefinitionReply};
+    use ilang_macro::{definition_world::DefinitionWorld, item_phase::{Definitions, Snapshot}};
+    use ilang_syntax::lisp::{definition_schedule::Mode, scoped::ScopedSource};
+    let mut usages = Vec::new();
+    for suffix in [String::new(), format!("(= other \"{}\")\n", "x".repeat(20_000))] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/main.is"), format!("(= T Int)\n{suffix}")).unwrap();
+        let (graph, _) = ilang_cli::load(dir.path(), false, true);
+        let (parsed, diagnostics) = ilang_check::parse(&graph);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+        let snapshot = Snapshot { module: module.ast.clone(), ready: vec![true; module.ast.items.len()], scoped: ScopedSource::new(graph.sources.get(module.source).text.clone()), source: module.source.0, other_runs: false, active: None, epoch: 0, item_overrides: Default::default() };
+        let world = DefinitionWorld::new(&graph, &parsed);
+        world.prepare(&snapshot);
+        let query = Syntax::from_datum(&parse("T").unwrap()[0], &Scope { module: module.source.0, marks: BTreeSet::new() });
+        let budget = MacroBudget::new(Limits { work: 10_000, allocation: 10_000, frames: 100 });
+        assert!(matches!(world.resolve(&snapshot, &query, &query, Mode::Normal, 99, &budget).reply, DefinitionReply::Answer(_)));
+        usages.push(budget.usage());
+    }
+    assert_eq!(usages[0], usages[1]);
 }

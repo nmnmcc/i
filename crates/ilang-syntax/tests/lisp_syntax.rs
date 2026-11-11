@@ -1337,3 +1337,57 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         assert!(matches!(result, Err(error) if error.to_string() == "allocation limit"));
     }
 }
+
+#[test]
+fn deep_written_definition_query_preserves_parameter_identity() {
+    std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
+        use ilang_syntax::{ast::{Ident, Item, ItemKind, TypeBody, TypeDef, TypeExpr, TypeKind}, lisp::{definitions::source_definition_from_syntax, syntax::{Node, Scope, ScopeIdentity, Syntax}}, span::Span};
+        use std::collections::BTreeSet;
+        let span = Span::new(1, 2);
+        let ident = |name: &str| Ident { name: name.into(), span };
+        let scope = Scope { module: 1, marks: BTreeSet::new() };
+        let atom = |name: &str| Syntax::written(Node::Up(name.into()), &scope, span);
+        let mut ty = TypeExpr { kind: TypeKind::Named { module: None, name: ident("A"), args: vec![] }, span };
+        let mut body = atom("A");
+        for _ in 0..10_000 {
+            ty = TypeExpr { kind: TypeKind::Named { module: None, name: ident("Box"), args: vec![ty] }, span };
+            body = Syntax::written(Node::Round(vec![atom("Box"), body]), &scope, span);
+        }
+        let item = Item { doc: vec![], attributes: vec![], kind: ItemKind::TypeDef(TypeDef { alias_pattern: false, name: ident("T"), params: vec![ident("A")], head: vec![], body: TypeBody::Alias(ty) }), span };
+        let head = Syntax::written(Node::Round(vec![atom("T"), atom("A")]), &scope, span);
+        let eq = Syntax::written(Node::Symbol("=".into()), &scope, span);
+        let syntax = Syntax::written(Node::Round(vec![eq, head, body]), &scope, span);
+        let answer = source_definition_from_syntax(&item, &syntax, 42);
+        use ilang_syntax::lisp::{definition_schedule::Mode, definition_table::{Definition, DefinitionTable, Lookup, QueryResult}};
+        let mut table = DefinitionTable::default();
+        table.insert(1, Definition::Expanded { syntax: answer, parameter_answer: Some(42), ready: true });
+        let QueryResult::Answer { syntax: answer, .. } = table.query(&atom("T"), Mode::Normal, 43, |_, _| Lookup::Found(1)) else { panic!("query") };
+        let Node::Round(parts) = answer.node() else { panic!("definition") };
+        let mut current = &parts[2];
+        for _ in 0..10_000 { let Node::Round(children) = current.node() else { panic!("type") }; current = &children[1]; }
+        assert!(matches!(current.scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer: 43, parameter: 0, .. })));
+    }).unwrap().join().unwrap();
+}
+
+#[test]
+fn deep_expanded_definition_query_preserves_parameter_identity() {
+    std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
+        use ilang_syntax::{lisp::{definitions::expanded_definition, syntax::{Node, Scope, ScopeIdentity, Syntax}, definition_schedule::Mode, definition_table::{Definition, DefinitionTable, Lookup, QueryResult}}, span::Span};
+        use std::collections::BTreeSet;
+        let span = Span::new(1, 2);
+        let scope = Scope { module: 1, marks: BTreeSet::new() };
+        let atom = |name: &str| Syntax::written(Node::Up(name.into()), &scope, span);
+        let mut body = atom("A");
+        for _ in 0..10_000 { body = Syntax::written(Node::Round(vec![atom("Box"), body]), &scope, span); }
+        let head = Syntax::written(Node::Round(vec![atom("T"), atom("A")]), &scope, span);
+        let syntax = Syntax::written(Node::Round(vec![Syntax::written(Node::Symbol("=".into()), &scope, span), head, body]), &scope, span);
+        let expanded = expanded_definition(&syntax, 42).unwrap();
+        let mut table = DefinitionTable::default();
+        table.insert(1, Definition::Expanded { syntax: expanded, parameter_answer: Some(42), ready: true });
+        let QueryResult::Answer { syntax: answer, .. } = table.query(&atom("T"), Mode::Normal, 43, |_, _| Lookup::Found(1)) else { panic!("query") };
+        let Node::Round(parts) = answer.node() else { panic!("definition") };
+        let mut current = &parts[2];
+        for _ in 0..10_000 { let Node::Round(children) = current.node() else { panic!("type") }; current = &children[1]; }
+        assert!(matches!(current.scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer: 43, parameter: 0, .. })));
+    }).unwrap().join().unwrap();
+}

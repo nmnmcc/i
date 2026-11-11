@@ -69,18 +69,25 @@ pub enum DefinitionCost<'a> {
     Builtin(&'a str),
     /// The source that must be scanned to construct a written definition.
     Written(&'a str),
+    /// Already parsed Lisp item, without constructing Syntax nodes.
+    Datum(&'a super::Datum),
 }
 
 const TEMPLATE_ANSWER: u64 = u64::MAX;
 struct Entry {
     definition: Definition,
+    lisp_document: Option<Vec<super::Datum>>,
 }
 impl Entry {
     fn new(definition: Definition) -> Self {
         if let Definition::Written { item, .. } = &definition {
             assert!(matches!(item.kind, ItemKind::TypeDef(_)), "definition table accepts type definitions only");
         }
-        Self { definition }
+        let lisp_document = match &definition {
+            Definition::Written { item, source, .. } if source[item.span.start as usize..item.span.end as usize].starts_with('(') => Some(super::parse(source).expect("parsed Lisp source remains valid").datums),
+            _ => None,
+        };
+        Self { definition, lisp_document }
     }
 }
 
@@ -217,8 +224,15 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                 });
             }
             Definition::Written { item, source, scope, ready: true } => {
-                preflight(DefinitionCost::Written(source))?;
-                source_definition(item, source, scope, answer)
+                if let Some(document) = &definition.lisp_document {
+                    let datum = document.iter().find(|datum| datum.span == item.span).expect("written Lisp type has its source datum");
+                    preflight(DefinitionCost::Datum(datum))?;
+                    let syntax = Syntax::from_datum(datum, scope);
+                    super::definitions::expanded_definition(&syntax, answer).expect("written Lisp type remains valid")
+                } else {
+                    preflight(DefinitionCost::Written(source))?;
+                    source_definition(item, source, scope, answer)
+                }
             }
             Definition::Expanded {
                 syntax,

@@ -60,6 +60,7 @@ pub struct DefinitionWorld {
     graph: PackageGraph,
     parsed: Vec<Parsed>,
     next_answer: Arc<AtomicU64>,
+    lisp_documents: HashMap<u32, Vec<Datum>>,
     current: Mutex<Option<(u32, u64, Arc<Index>)>>,
 }
 impl DefinitionWorld {
@@ -72,10 +73,18 @@ impl DefinitionWorld {
         parsed: &[Parsed],
         next_answer: Arc<AtomicU64>,
     ) -> Self {
+        let lisp_documents = parsed.iter().filter_map(|p| {
+            let file = graph.sources.get(p.source);
+            file.display.ends_with(".is").then(|| {
+                let end = p.scoped.as_ref().map_or(file.text.len(), |scoped| scoped.original_len() as usize);
+                (p.source.0, ilang_syntax::lisp::parse(&file.text[..end]).expect("parsed Lisp source remains valid").datums)
+            })
+        }).collect();
         Self {
             graph: graph.clone(),
             parsed: parsed.to_vec(),
             next_answer,
+            lisp_documents,
             current: Mutex::new(None),
         }
     }
@@ -472,12 +481,19 @@ impl Definitions for DefinitionWorld {
                 let scoped = if current { Some(&snapshot.scoped) } else { parsed.scoped.as_ref() };
                 let file = self.graph.sources.get(parsed.source);
                 let text = scoped.map_or(file.text.as_str(), ScopedSource::text);
-                charge_definition(budget, DefinitionCost::Written(text)).map(|()| {
+                if let Some(document) = self.lisp_documents.get(&parsed.source.0) {
+                    let item = &module.items[entry.position];
+                    let datum = document.iter().find(|datum| datum.span == item.span).expect("written Lisp type has its source datum");
+                    charge_definition(budget, DefinitionCost::Datum(datum)).map(|()| {
+                        let syntax = Syntax::from_datum(datum, &Scope { module: parsed.source.0, marks: Default::default() });
+                        ilang_syntax::lisp::definitions::expanded_definition(&syntax, answer).expect("written Lisp type remains valid")
+                    })
+                } else { charge_definition(budget, DefinitionCost::Written(text)).map(|()| {
                     ilang_syntax::lisp::definitions::source_definition(
                         &module.items[entry.position], text,
                         &Scope { module: parsed.source.0, marks: Default::default() }, answer,
                     )
-                })
+                }) }
             };
             match construction {
                 Ok(syntax) => resolution(DefinitionReply::Answer(syntax), early.then_some(key)),
