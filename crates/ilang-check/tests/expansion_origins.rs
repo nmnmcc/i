@@ -26,7 +26,7 @@ fn syntax(name: &str, source: u32, span: Span, marks: &[u64]) -> Syntax {
 
 #[test]
 fn template_error_uses_call_site_and_related_template_and_suppresses_warnings() {
-    let main = "@main\nmain = () { fake(1) }\n";
+    let main = "\nmain = () { fake(1) }\n";
     let template = "// missing\nhelper = 1\n";
     let (mut graph, _, _) =
         common::check_files(&[("src/main.i", main), ("src/template.i", template)]);
@@ -94,7 +94,7 @@ fn template_error_uses_call_site_and_related_template_and_suppresses_warnings() 
 
 #[test]
 fn argument_location_and_query_use_written_source() {
-    let main = "@main\nmain = () { x = 3\n fake(x) }\n";
+    let main = "\nmain = () { x = 3\n fake(x) }\n";
     let template = "// template\nhelper = 1\n";
     let (mut graph, _, _) =
         common::check_files(&[("src/main.i", main), ("src/template.i", template)]);
@@ -161,7 +161,7 @@ fn argument_location_and_query_use_written_source() {
 
 #[test]
 fn nested_template_error_uses_outer_call_and_both_template_locations() {
-    let main = "@main\nmain = () { first(1) }\n";
+    let main = "\nmain = () { first(1) }\n";
     let (mut graph, _, _) = common::check_files(&[
         ("src/main.i", main),
         ("src/first.i", "// second\nfirst_helper = 1\n"),
@@ -222,7 +222,7 @@ fn nested_template_error_uses_outer_call_and_both_template_locations() {
 
 #[test]
 fn template_name_hover_and_definition_navigate_across_modules() {
-    let main = "@main\nmain = () { fake() }\n";
+    let main = "\nmain = () { fake() }\n";
     let template = "// helper\nhelper = 7\n";
     let (mut graph, _, _) =
         common::check_files(&[("src/main.i", main), ("src/template.i", template)]);

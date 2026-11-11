@@ -84,7 +84,7 @@ fn syntax_library_round_trips_through_the_host() {
 @external("test:syntax", "source")
 source: () -> syntax.Syntax
 @test
-exercise = () -> Nil ? syntax.SyntaxError ! Assert {
+exercise = () -> Nil ^ syntax.SyntaxError ! Assert {
   value = source()
   assert(source() == value)
   ! syntax.Definitions = syntax.Definitions((of) { of })
@@ -233,7 +233,7 @@ show = () { syntax.show(source()) }
 (syntax = i/syntax)
 @external("test:syntax", "source")
 source: () -> syntax.Syntax
-main = () -> Nil ? syntax.SyntaxError {
+main = () -> Nil ^ syntax.SyntaxError {
   ! syntax.Definitions = syntax.Definitions((s) { s })
   syntax.definition(source())
   Nil
@@ -455,7 +455,7 @@ fn compiler_definition_service_returns_and_aborts_at_the_query() {
         r#"
 (i/fail, syntax = i/syntax)
 @test
-answer = () -> Nil ? syntax.SyntaxError ! Assert {
+answer = () -> Nil ^ syntax.SyntaxError ! Assert {
   ! syntax.Definitions = syntax._definitions()
   answer = syntax.definition(syntax._template(0))
   assert(syntax.show(answer) == "(Box {(Box Int)})")
@@ -615,7 +615,7 @@ fn compiler_items_service_buffers_valid_requests_and_rejects_bad_ones() {
         r#"
 (i/fail, syntax = i/syntax)
 @test
-item = () -> Nil ? syntax.SyntaxError ! Assert {
+item = () -> Nil ^ syntax.SyntaxError ! Assert {
   service = syntax._items()
   collection = syntax._template(0)
   target = syntax._template(1)
@@ -796,13 +796,13 @@ note = () {
   Nil
 }
 @test
-query = () -> Nil ? syntax.SyntaxError {
+query = () -> Nil ^ syntax.SyntaxError {
   ! syntax.Definitions = syntax._definitions()
   syntax.definition(syntax._template(0))
   Nil
 }
 @test
-item = () -> Nil ? syntax.SyntaxError {
+item = () -> Nil ^ syntax.SyntaxError {
   service = syntax._items()
   service.add(syntax._template(1), syntax._template(2), [], syntax._template(2))
   Nil

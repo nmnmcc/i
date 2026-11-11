@@ -292,7 +292,7 @@ fn typ(t: &TypeExpr) -> String {
                     ));
                 }
             }
-            braced("{", "}", parts)
+            braced("(", ")", parts)
         }
         TypeKind::Fn {
             params,
@@ -353,8 +353,8 @@ fn expr(e: &Expr) -> String {
         ExprKind::Name { module, name } => qualified(module, name),
         ExprKind::Record { base, fields } if base.is_none() && fields.is_empty() => "()".into(),
         ExprKind::Record { base, fields } => braced(
-            "{",
-            "}",
+            "(",
+            ")",
             base.iter().flat_map(|b| ["..".into(), expr(b)]).chain(
                 fields
                     .iter()

@@ -1748,7 +1748,7 @@ impl<'a> Formatter<'a> {
     ) -> Doc {
         let mut out = vec![self.ty_in(ret, 1, tail && err.is_none() && env.is_none())];
         if let Some(err) = err {
-            out.push(text(" ? "));
+            out.push(text(" ^ "));
             out.push(self.ty_in(err, 1, tail && env.is_none()));
         }
         if let Some(env) = env {
