@@ -58,7 +58,6 @@ impl ValueSet {
         Self::from_set(false, Set::from_items(items))
     }
 
-    #[cfg(test)]
     pub fn except(items: impl IntoIterator<Item = Arc<str>>) -> Self {
         Self::from_set(true, Set::from_items(items)).unwrap()
     }

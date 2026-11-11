@@ -382,6 +382,14 @@ impl Walk {
             | ExprKind::Name(_)
             | ExprKind::Error => {}
             ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
+            ExprKind::Record { base, fields } => {
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                for (_, value) in fields {
+                    self.expr(value);
+                }
+            }
             ExprKind::List { items, rest } => items
                 .iter()
                 .chain(rest.as_deref())
@@ -1824,6 +1832,19 @@ impl<'a> Lowerer<'a> {
                 )),
                 _ => Err(format!("`key.{function}` is not known")),
             },
+            "ilang:record" => {
+                let name = match function.as_str() {
+                    "get" => "record_get",
+                    "put" => "record_put",
+                    "remove" => "record_remove",
+                    "has" => "record_has",
+                    "keys" => "record_keys",
+                    "size" => "record_size",
+                    "texts" => "record_texts",
+                    _ => return Err(format!("`record.{function}` is not known")),
+                };
+                Ok((Op::Runtime { name, arity }, arity))
+            }
             "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
             "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
@@ -1919,6 +1940,27 @@ impl<'a> Lowerer<'a> {
                 let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)
             }
+            ExprKind::Record { base, fields } => {
+                let base = base.as_ref().map(|b| self.expr(fx, out, b));
+                let fields = fields
+                    .iter()
+                    .map(|(label, value)| {
+                        let index = match self.out.labels.iter().position(|x| x == &label.name) {
+                            Some(index) => index,
+                            None => {
+                                self.out.labels.push(label.name.clone());
+                                self.out.labels.len() - 1
+                            }
+                        };
+                        (LabelConst(index as u32), self.expr(fx, out, value))
+                    })
+                    .collect();
+                let value = match base {
+                    Some(base) => Value::RecWith(base, fields),
+                    None => Value::RecNew(fields),
+                };
+                let_value(fx, out, value, None)
+            }
             ExprKind::List { items, rest } => {
                 let parts: Vec<Atom> = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let mut list = match rest {
@@ -1946,6 +1988,16 @@ impl<'a> Lowerer<'a> {
                 match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Field(list)) => self.field(fx, out, t, list),
                     Some(Access::Part(k)) => let_value(fx, out, Value::Field(t, *k), None),
+                    Some(Access::Label(label)) => {
+                        let index = match self.out.labels.iter().position(|x| x == label) {
+                            Some(index) => index,
+                            None => {
+                                self.out.labels.push(label.clone());
+                                self.out.labels.len() - 1
+                            }
+                        };
+                        let_value(fx, out, Value::RecGet(t, LabelConst(index as u32)), None)
+                    }
                     None => unreachable!("a checked field has an access"),
                 }
             }
@@ -2125,6 +2177,10 @@ impl<'a> Lowerer<'a> {
         t: Atom,
         list: &[(CtorRef, u32)],
     ) -> Atom {
+        if list.is_empty() {
+            out.push(Stmt::Unreachable);
+            return t;
+        }
         let first = list[0].1;
         if list.iter().all(|(_, i)| *i == first) {
             return let_value(fx, out, Value::Field(t, first), None);
@@ -2696,6 +2752,7 @@ impl<'a> Lowerer<'a> {
 
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
+            Head::Record => Cond::IsRec(v),
             Head::Tuple(n) => Cond::Tuple(v, n),
             Head::Fn => Cond::Tag(v, 7),
             Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
@@ -2714,6 +2771,7 @@ impl<'a> Lowerer<'a> {
                     BuiltinType::Request => 17,
                     BuiltinType::Ticket => 18,
                     BuiltinType::Never => u32::MAX,
+                    BuiltinType::Record => unreachable!("Record is normalized to the record head"),
                 },
             ),
             Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {

@@ -664,6 +664,8 @@ dependencies = [
  "num-traits",
  "petgraph",
  "rustc-hash",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
