@@ -276,7 +276,8 @@ pub struct PackageGraph {
 pub struct LoadOptions {
     /// The tests of the compiled package are compiled: its test modules and
     /// its dev-dependencies are loaded, and its dev-dependencies take part
-    /// in minimal version selection (§2.6, §2.7).
+    /// in minimal version selection (§2.6, §2.7). A named entry in a test
+    /// module also loads test modules and dev-dependencies.
     pub tests: bool,
     /// The network may not be used. Something that is not in the cache is
     /// an error ([`code::OFFLINE`]).
@@ -336,7 +337,7 @@ pub fn load(root: &Path) -> (PackageGraph, Vec<Diagnostic>) {
 
 /// Loads the package in `root` and the packages it uses. Test modules and
 /// dev-dependencies are loaded only for that package, and only with
-/// [`LoadOptions::tests`] (§2.1, §2.6). Packages with a location are got
+/// [`LoadOptions::tests`] or an entry in a test module (§2.1, §2.6). Packages with a location are got
 /// with git, chosen by minimal version selection, and checked against
 /// `i.lock`, which is brought up to date (§2.7, §2.8).
 pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagnostic>) {
@@ -363,7 +364,9 @@ pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagn
     if let Some(id) = root_id
         && let Some(dir) = loader.graph.packages[id].dir.clone()
     {
-        let located = locations::resolve(&mut loader, &dir, options);
+        let mut effective = options.clone();
+        effective.tests = loader.tests;
+        let located = locations::resolve(&mut loader, &dir, &effective);
         loader.located = Some(located);
         for p in std::mem::take(&mut loader.pending) {
             let found = loader.located.as_ref().and_then(|l| l.get(&p.key)).cloned();
@@ -491,6 +494,14 @@ impl Loader {
             ..d
         }));
         let manifest = manifest?;
+        if is_root && !self.tests {
+            self.tests = manifest.entries.iter().any(|(_, entry)| {
+                let module = entry.module.replace('.', "/");
+                let source = dir.join("src").join(&module).with_extension("i");
+                let test = dir.join("test").join(module).with_extension("i");
+                !source.is_file() && test.is_file()
+            });
+        }
         let id = self.graph.packages.len();
         self.graph.packages.push(Package {
             name: manifest.name.clone(),
@@ -516,7 +527,7 @@ impl Loader {
         let deps = self.dependencies(id, &manifest, false, &dir, source);
         self.graph.packages[id].dependencies = deps;
         if is_root {
-            let dev = if self.tests || !manifest.entries.is_empty() {
+            let dev = if self.tests {
                 self.dependencies(id, &manifest, true, &dir, source)
             } else {
                 manifest
@@ -528,7 +539,7 @@ impl Loader {
             self.graph.packages[id].dev_dependencies = dev;
         }
         self.stack.pop();
-        let tests = is_root && (self.tests || !manifest.entries.is_empty());
+        let tests = is_root && self.tests;
         let (modules, diags) = modules::collect(self, &manifest.name, &dir, tests, None);
         self.graph.packages[id].modules = modules;
         self.diags.extend(diags);
