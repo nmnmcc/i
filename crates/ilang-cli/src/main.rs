@@ -532,7 +532,11 @@ fn cmd_test(
             }
         }
     }
-    println!("{passed} passed, {failed} failed, {skipped} skipped");
+    if skipped == 0 {
+        println!("{passed} passed, {failed} failed");
+    } else {
+        println!("{passed} passed, {failed} failed, {skipped} skipped");
+    }
     Ok(if failed == 0 {
         ExitCode::SUCCESS
     } else {
