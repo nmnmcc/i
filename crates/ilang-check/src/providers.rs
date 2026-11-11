@@ -276,6 +276,17 @@ fn normalize(p: &Program, t: ShownType) -> ShownType {
             ShownType::Named(r, xs.into_iter().map(|x| normalize(p, x)).collect())
         }
         ShownType::Tuple(xs) => ShownType::Tuple(xs.into_iter().map(|x| normalize(p, x)).collect()),
+        ShownType::Fn(mut f) => {
+            f.params = f
+                .params
+                .into_iter()
+                .map(|(label, ty)| (label, normalize(p, ty)))
+                .collect();
+            f.ret = normalize(p, f.ret);
+            f.err = f.err.map(|ty| normalize(p, ty));
+            f.env = f.env.map(|ty| normalize(p, ty));
+            ShownType::Fn(f)
+        }
         ShownType::Diff(a, xs) => {
             let mut xs: Vec<_> = xs.into_iter().map(|x| normalize(p, x)).collect();
             xs.sort_by_cached_key(|x| canonical(p, x));
@@ -500,6 +511,16 @@ fn substitute(t: &ShownType, vars: &HashMap<String, ShownType>) -> ShownType {
         ShownType::Union(xs) => ShownType::Union(xs.iter().map(|x| substitute(x, vars)).collect()),
         ShownType::Inter(xs) => ShownType::Inter(xs.iter().map(|x| substitute(x, vars)).collect()),
         ShownType::Tuple(xs) => ShownType::Tuple(xs.iter().map(|x| substitute(x, vars)).collect()),
+        ShownType::Fn(f) => ShownType::Fn(Box::new(crate::types::ShownFn {
+            params: f
+                .params
+                .iter()
+                .map(|(label, ty)| (label.clone(), substitute(ty, vars)))
+                .collect(),
+            ret: substitute(&f.ret, vars),
+            err: f.err.as_ref().map(|ty| substitute(ty, vars)),
+            env: f.env.as_ref().map(|ty| substitute(ty, vars)),
+        })),
         ShownType::Diff(a, xs) => ShownType::Diff(
             Box::new(substitute(a, vars)),
             xs.iter().map(|x| substitute(x, vars)).collect(),
@@ -558,6 +579,7 @@ impl Schema {
                             }
                             services.push(s);
                         }
+                        services.sort_by(|a, b| a.name.cmp(&b.name));
                         Ok(services)
                     };
                     let supplies = parse(&a.supplies)?;
