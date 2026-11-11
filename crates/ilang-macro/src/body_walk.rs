@@ -102,26 +102,50 @@ struct Walker<'a, H> {
     locals: Vec<Local>,
     fn_depth: u32,
 }
-// A task contains an address into the module currently borrowed by the entry
-// point. The walker never changes a containing vector or replaces a node while
-// tasks for its children remain. Expansion replaces a node before any children
-// are scheduled. Only the current task is dereferenced; hook methods receive
-// shared references and cannot mutate the tree. Thus these addresses stay
-// valid, and mutable references made from them never overlap.
-enum Task {
-    Expr(*mut Expr, u16),
-    Ty(*mut ast::TypeExpr, u16),
-    Pattern(*mut Pattern, u16),
-    Block(*mut ast::Block, u16),
-    Stmt(*mut Stmt, u16),
-    BindValue(*mut ast::Binding, u16),
-    BindDone(*mut ast::Binding, usize),
-    FunctionEnter(*mut ast::Function, u16),
-    Clause(*mut ast::Clause, u16, bool),
-    ClauseEnter(*mut ast::Clause, u16, bool, usize),
-    BitSegment(*mut ast::Segment<Pattern>, u16),
-    BindPattern(*mut Pattern),
+// Each task owns a disjoint mutable borrow of its tree node. Binders can be
+// gathered before visiting a pattern: the only expansions inside a pattern are
+// type/format expressions, which cannot change that pattern's binder names.
+// They are installed only by the later scope event, in the same order as the
+// recursive traversal. This keeps both the tree and the scope stack safe while
+// allowing arbitrarily deep syntax without the host call stack.
+enum Task<'a> {
+    Expr(&'a mut Expr, u16),
+    Ty(&'a mut ast::TypeExpr, u16),
+    Pattern(&'a mut Pattern, u16),
+    Block(&'a mut ast::Block, u16),
+    Stmt(&'a mut Stmt, u16),
+    BindValue {
+        value: &'a mut Expr,
+        bindings: Vec<Local>,
+        depth: u16,
+    },
+    BindDone {
+        bindings: Vec<Local>,
+        before: usize,
+    },
+    FunctionEnter {
+        body: &'a mut ast::Block,
+        bindings: Vec<Local>,
+        depth: u16,
+    },
+    Clause(&'a mut ast::Clause, u16, bool),
+    ClauseEnter {
+        body: &'a mut Expr,
+        guard: Option<&'a mut Expr>,
+        bindings: Vec<Local>,
+        depth: u16,
+        function: bool,
+        start: usize,
+    },
+    BitSegment(&'a mut ast::Segment<Pattern>, u16),
+    AddBindings(Vec<Local>),
     Restore(usize, u32),
+}
+
+fn collected(pattern: &Pattern) -> Vec<Local> {
+    let mut out = Vec::new();
+    binders(pattern, &mut out, None);
+    out
 }
 
 impl<H: Hook> Walker<'_, H> {
@@ -135,294 +159,300 @@ impl<H: Hook> Walker<'_, H> {
         self.run(Task::Pattern(pattern, depth))
     }
 
-    fn run(&mut self, first: Task) -> Result<(), H::Error> {
+    fn run<'a>(&mut self, first: Task<'a>) -> Result<(), H::Error> {
         let mut tasks = vec![first];
         while let Some(task) = tasks.pop() {
-            // SAFETY: all task pointers obey the tree-borrow and scheduling
-            // invariants documented on Task above. A task is consumed before
-            // a reference is created and no reference escapes this iteration.
-            unsafe {
-                match task {
-                    Task::Expr(ptr, depth) => {
-                        let expr = &mut *ptr;
-                        if self.hook.is_macro(expr, &self.locals, self.fn_depth)? {
-                            if depth == 256 {
-                                return Err(self.hook.depth_error(expr.span));
-                            }
-                            *expr = self.hook.expand(expr, &self.locals, self.fn_depth)?;
-                            tasks.push(Task::Expr(ptr, depth + 1));
-                            continue;
+            match task {
+                Task::Expr(expr, depth) => {
+                    if self.hook.is_macro(expr, &self.locals, self.fn_depth)? {
+                        if depth == 256 {
+                            return Err(self.hook.depth_error(expr.span));
                         }
-                        match &mut expr.kind {
-                            ExprKind::Quote(_)
-                            | ExprKind::Int(_)
-                            | ExprKind::Float(_)
-                            | ExprKind::String(_)
-                            | ExprKind::Name { .. } => {}
-                            ExprKind::Tuple(items) => {
-                                tasks.extend(items.iter_mut().rev().map(|e| Task::Expr(e, depth)));
+                        *expr = self.hook.expand(expr, &self.locals, self.fn_depth)?;
+                        tasks.push(Task::Expr(expr, depth + 1));
+                        continue;
+                    }
+                    match &mut expr.kind {
+                        ExprKind::Quote(_)
+                        | ExprKind::Int(_)
+                        | ExprKind::Float(_)
+                        | ExprKind::String(_)
+                        | ExprKind::Name { .. } => {}
+                        ExprKind::Tuple(items) => {
+                            tasks.extend(items.iter_mut().rev().map(|e| Task::Expr(e, depth)))
+                        }
+                        ExprKind::List { items, rest } => {
+                            if let Some(rest) = rest {
+                                tasks.push(Task::Expr(rest, depth));
                             }
-                            ExprKind::List { items, rest } => {
-                                if let Some(rest) = rest {
-                                    tasks.push(Task::Expr(&mut **rest, depth));
+                            tasks.extend(items.iter_mut().rev().map(|e| Task::Expr(e, depth)));
+                        }
+                        ExprKind::BitArray(segments) => {
+                            for segment in segments.iter_mut().rev() {
+                                if let Some(format) = &mut segment.format
+                                    && let Some(arg) = &mut format.arg
+                                {
+                                    tasks.push(Task::Expr(arg, depth));
                                 }
-                                tasks.extend(items.iter_mut().rev().map(|e| Task::Expr(e, depth)));
+                                tasks.push(Task::Expr(&mut segment.value, depth));
                             }
-                            ExprKind::BitArray(segments) => {
-                                for segment in segments.iter_mut().rev() {
-                                    if let Some(format) = &mut segment.format
-                                        && let Some(arg) = &mut format.arg
-                                    {
-                                        tasks.push(Task::Expr(&mut **arg, depth));
+                        }
+                        ExprKind::Block(block) => tasks.push(Task::Block(block, depth)),
+                        ExprKind::Fn(function) => {
+                            let mut bindings = Vec::new();
+                            for param in &function.params {
+                                match param {
+                                    ast::Param::Pattern(pattern) => {
+                                        binders(pattern, &mut bindings, None)
                                     }
-                                    tasks.push(Task::Expr(&mut segment.value, depth));
+                                    ast::Param::Env { name, .. } => bindings.push(Local {
+                                        name: name.name.clone(),
+                                        span: name.span,
+                                        fn_only: None,
+                                    }),
                                 }
                             }
-                            ExprKind::Block(block) => tasks.push(Task::Block(block, depth)),
-                            ExprKind::Fn(function) => {
-                                tasks.push(Task::FunctionEnter(&mut **function, depth));
-                                if let Some(ret) = &mut function.ret {
-                                    if let Some(env) = &mut ret.env {
-                                        tasks.push(Task::Ty(env, depth));
-                                    }
-                                    if let Some(err) = &mut ret.err {
-                                        tasks.push(Task::Ty(err, depth));
-                                    }
-                                    tasks.push(Task::Ty(&mut ret.value, depth));
+                            tasks.push(Task::FunctionEnter {
+                                body: &mut function.body,
+                                bindings,
+                                depth,
+                            });
+                            if let Some(ret) = &mut function.ret {
+                                if let Some(env) = &mut ret.env {
+                                    tasks.push(Task::Ty(env, depth));
                                 }
-                                for param in function.params.iter_mut().rev() {
-                                    tasks.push(match param {
-                                        ast::Param::Pattern(pattern) => {
-                                            Task::Pattern(pattern, depth)
-                                        }
-                                        ast::Param::Env { ty, .. } => Task::Ty(ty, depth),
-                                    });
+                                if let Some(err) = &mut ret.err {
+                                    tasks.push(Task::Ty(err, depth));
                                 }
+                                tasks.push(Task::Ty(&mut ret.value, depth));
                             }
-                            ExprKind::Case { subject, clauses } => {
-                                tasks.extend(
-                                    clauses
-                                        .iter_mut()
-                                        .rev()
-                                        .map(|c| Task::Clause(c, depth, false)),
-                                );
-                                tasks.push(Task::Expr(&mut **subject, depth));
-                            }
-                            ExprKind::Clauses(clauses) => {
-                                tasks.extend(
-                                    clauses
-                                        .iter_mut()
-                                        .rev()
-                                        .map(|c| Task::Clause(c, depth, true)),
-                                );
-                            }
-                            ExprKind::Call { callee, args } => {
-                                tasks.extend(
-                                    args.iter_mut()
-                                        .rev()
-                                        .map(|a| Task::Expr(&mut a.value, depth)),
-                                );
-                                tasks.push(Task::Expr(&mut **callee, depth));
-                            }
-                            ExprKind::Field { target, .. }
-                            | ExprKind::TupleIndex { target, .. } => {
-                                tasks.push(Task::Expr(&mut **target, depth));
-                            }
-                            ExprKind::RecordUpdate {
-                                constructor,
-                                base,
-                                fields,
-                            } => {
-                                tasks.extend(
-                                    fields
-                                        .iter_mut()
-                                        .rev()
-                                        .map(|(_, value)| Task::Expr(value, depth)),
-                                );
-                                tasks.push(Task::Expr(&mut **base, depth));
-                                tasks.push(Task::Expr(&mut **constructor, depth));
-                            }
-                            ExprKind::Unary { expr, .. } => {
-                                tasks.push(Task::Expr(&mut **expr, depth))
-                            }
-                            ExprKind::Binary { lhs, rhs, .. } => {
-                                tasks.push(Task::Expr(&mut **rhs, depth));
-                                tasks.push(Task::Expr(&mut **lhs, depth));
+                            for param in function.params.iter_mut().rev() {
+                                tasks.push(match param {
+                                    ast::Param::Pattern(pattern) => Task::Pattern(pattern, depth),
+                                    ast::Param::Env { ty, .. } => Task::Ty(ty, depth),
+                                });
                             }
                         }
-                    }
-                    Task::Ty(ptr, depth) => {
-                        let ty = &mut *ptr;
-                        if self.hook.is_type_macro(ty, &self.locals, self.fn_depth)? {
-                            if depth == 256 {
-                                return Err(self.hook.depth_error(ty.span));
-                            }
-                            *ty = self.hook.expand_type(ty, &self.locals, self.fn_depth)?;
-                            tasks.push(Task::Ty(ptr, depth + 1));
-                            continue;
+                        ExprKind::Case { subject, clauses } => {
+                            tasks.extend(
+                                clauses
+                                    .iter_mut()
+                                    .rev()
+                                    .map(|c| Task::Clause(c, depth, false)),
+                            );
+                            tasks.push(Task::Expr(subject, depth));
                         }
-                        match &mut ty.kind {
-                            ast::TypeKind::Named { args, .. }
-                            | ast::TypeKind::Call { args, .. }
-                            | ast::TypeKind::Tuple(args)
-                            | ast::TypeKind::Union(args)
-                            | ast::TypeKind::Inter(args)
-                            | ast::TypeKind::Diff(args) => {
-                                tasks.extend(args.iter_mut().rev().map(|a| Task::Ty(a, depth)));
-                            }
-                            ast::TypeKind::Fn {
-                                params,
-                                ret,
-                                err,
-                                env,
-                            } => {
-                                if let Some(env) = env {
-                                    tasks.push(Task::Ty(&mut **env, depth));
-                                }
-                                if let Some(err) = err {
-                                    tasks.push(Task::Ty(&mut **err, depth));
-                                }
-                                tasks.push(Task::Ty(&mut **ret, depth));
-                                tasks.extend(
-                                    params.iter_mut().rev().map(|p| Task::Ty(&mut p.ty, depth)),
-                                );
-                            }
-                            ast::TypeKind::Lit(_)
-                            | ast::TypeKind::ValueOf { .. }
-                            | ast::TypeKind::Hole => {}
-                        }
-                    }
-                    Task::Pattern(ptr, depth) => {
-                        let pattern = &mut *ptr;
-                        match &mut pattern.kind {
-                            PatternKind::Named { pattern, .. } => {
-                                tasks.push(Task::Pattern(&mut **pattern, depth))
-                            }
-                            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-                                tasks
-                                    .extend(args.iter_mut().rev().map(|p| Task::Pattern(p, depth)));
-                            }
-                            PatternKind::List { items, .. } => {
-                                tasks.extend(
-                                    items.iter_mut().rev().map(|p| Task::Pattern(p, depth)),
-                                );
-                            }
-                            PatternKind::BitArray(segments) => {
-                                tasks.push(Task::Restore(self.locals.len(), self.fn_depth));
-                                tasks.extend(
-                                    segments
-                                        .iter_mut()
-                                        .rev()
-                                        .map(|s| Task::BitSegment(s, depth)),
-                                );
-                            }
-                            PatternKind::Typed { ty, .. } => tasks.push(Task::Ty(ty, depth)),
-                            PatternKind::Quote { captures, .. } => {
-                                tasks.extend(
-                                    captures
-                                        .iter_mut()
-                                        .rev()
-                                        .map(|(_, p)| Task::Pattern(p, depth)),
-                                );
-                            }
-                            PatternKind::Var(_)
-                            | PatternKind::Discard(_)
-                            | PatternKind::Int { .. }
-                            | PatternKind::Float { .. }
-                            | PatternKind::String(_)
-                            | PatternKind::Prefix { .. } => {}
-                        }
-                    }
-                    Task::BitSegment(ptr, depth) => {
-                        let segment = &mut *ptr;
-                        tasks.push(Task::BindPattern(&mut segment.value));
-                        tasks.push(Task::Pattern(&mut segment.value, depth));
-                        if let Some(format) = &mut segment.format
-                            && let Some(arg) = &mut format.arg
-                        {
-                            tasks.push(Task::Expr(&mut **arg, depth));
-                        }
-                    }
-                    Task::BindPattern(ptr) => binders(&*ptr, &mut self.locals, None),
-                    Task::Block(ptr, depth) => {
-                        let block = &mut *ptr;
-                        tasks.push(Task::Restore(self.locals.len(), self.fn_depth));
-                        tasks.extend(block.stmts.iter_mut().rev().map(|s| Task::Stmt(s, depth)));
-                    }
-                    Task::Stmt(ptr, depth) => match &mut *ptr {
-                        Stmt::Bind(binding) => {
-                            tasks.push(Task::BindValue(binding, depth));
-                            tasks.push(Task::Pattern(&mut binding.pattern, depth));
-                        }
-                        Stmt::Env { ty, value, .. } => {
-                            tasks.push(Task::Expr(value, depth));
-                            tasks.push(Task::Ty(ty, depth));
-                        }
-                        Stmt::Expr(value) => tasks.push(Task::Expr(value, depth)),
-                    },
-                    Task::BindValue(ptr, depth) => {
-                        let binding = &mut *ptr;
-                        let before = self.locals.len();
-                        if self
-                            .hook
-                            .is_direct(&binding.value, &self.locals, self.fn_depth)
-                        {
-                            binders(&binding.pattern, &mut self.locals, Some(self.fn_depth));
-                        }
-                        tasks.push(Task::BindDone(ptr, before));
-                        tasks.push(Task::Expr(&mut binding.value, depth));
-                    }
-                    Task::BindDone(ptr, before) => {
-                        self.locals.truncate(before);
-                        binders(&(*ptr).pattern, &mut self.locals, None);
-                    }
-                    Task::FunctionEnter(ptr, depth) => {
-                        let function = &mut *ptr;
-                        tasks.push(Task::Restore(self.locals.len(), self.fn_depth));
-                        self.fn_depth += 1;
-                        for param in &function.params {
-                            match param {
-                                ast::Param::Pattern(pattern) => {
-                                    binders(pattern, &mut self.locals, None)
-                                }
-                                ast::Param::Env { name, .. } => self.locals.push(Local {
-                                    name: name.name.clone(),
-                                    span: name.span,
-                                    fn_only: None,
-                                }),
-                            }
-                        }
-                        tasks.push(Task::Block(&mut function.body, depth));
-                    }
-                    Task::Clause(ptr, depth, function) => {
-                        let clause = &mut *ptr;
-                        tasks.push(Task::ClauseEnter(ptr, depth, function, self.locals.len()));
-                        tasks.extend(
-                            clause
-                                .patterns
+                        ExprKind::Clauses(clauses) => tasks.extend(
+                            clauses
                                 .iter_mut()
                                 .rev()
-                                .map(|p| Task::Pattern(p, depth)),
+                                .map(|c| Task::Clause(c, depth, true)),
+                        ),
+                        ExprKind::Call { callee, args } => {
+                            tasks.extend(
+                                args.iter_mut()
+                                    .rev()
+                                    .map(|a| Task::Expr(&mut a.value, depth)),
+                            );
+                            tasks.push(Task::Expr(callee, depth));
+                        }
+                        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+                            tasks.push(Task::Expr(target, depth))
+                        }
+                        ExprKind::RecordUpdate {
+                            constructor,
+                            base,
+                            fields,
+                        } => {
+                            tasks.extend(
+                                fields
+                                    .iter_mut()
+                                    .rev()
+                                    .map(|(_, value)| Task::Expr(value, depth)),
+                            );
+                            tasks.push(Task::Expr(base, depth));
+                            tasks.push(Task::Expr(constructor, depth));
+                        }
+                        ExprKind::Unary { expr, .. } => tasks.push(Task::Expr(expr, depth)),
+                        ExprKind::Binary { lhs, rhs, .. } => {
+                            tasks.push(Task::Expr(rhs, depth));
+                            tasks.push(Task::Expr(lhs, depth));
+                        }
+                    }
+                }
+                Task::Ty(ty, depth) => {
+                    if self.hook.is_type_macro(ty, &self.locals, self.fn_depth)? {
+                        if depth == 256 {
+                            return Err(self.hook.depth_error(ty.span));
+                        }
+                        *ty = self.hook.expand_type(ty, &self.locals, self.fn_depth)?;
+                        tasks.push(Task::Ty(ty, depth + 1));
+                        continue;
+                    }
+                    match &mut ty.kind {
+                        ast::TypeKind::Named { args, .. }
+                        | ast::TypeKind::Call { args, .. }
+                        | ast::TypeKind::Tuple(args)
+                        | ast::TypeKind::Union(args)
+                        | ast::TypeKind::Inter(args)
+                        | ast::TypeKind::Diff(args) => {
+                            tasks.extend(args.iter_mut().rev().map(|a| Task::Ty(a, depth)))
+                        }
+                        ast::TypeKind::Fn {
+                            params,
+                            ret,
+                            err,
+                            env,
+                        } => {
+                            if let Some(env) = env {
+                                tasks.push(Task::Ty(env, depth));
+                            }
+                            if let Some(err) = err {
+                                tasks.push(Task::Ty(err, depth));
+                            }
+                            tasks.push(Task::Ty(ret, depth));
+                            tasks.extend(
+                                params.iter_mut().rev().map(|p| Task::Ty(&mut p.ty, depth)),
+                            );
+                        }
+                        ast::TypeKind::Lit(_)
+                        | ast::TypeKind::ValueOf { .. }
+                        | ast::TypeKind::Hole => {}
+                    }
+                }
+                Task::Pattern(pattern, depth) => match &mut pattern.kind {
+                    PatternKind::Named { pattern, .. } => tasks.push(Task::Pattern(pattern, depth)),
+                    PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
+                        tasks.extend(args.iter_mut().rev().map(|p| Task::Pattern(p, depth)))
+                    }
+                    PatternKind::List { items, .. } => {
+                        tasks.extend(items.iter_mut().rev().map(|p| Task::Pattern(p, depth)))
+                    }
+                    PatternKind::BitArray(segments) => {
+                        tasks.push(Task::Restore(self.locals.len(), self.fn_depth));
+                        tasks.extend(
+                            segments
+                                .iter_mut()
+                                .rev()
+                                .map(|s| Task::BitSegment(s, depth)),
                         );
                     }
-                    Task::ClauseEnter(ptr, depth, function, start) => {
-                        let clause = &mut *ptr;
-                        tasks.push(Task::Restore(start, self.fn_depth));
-                        if function {
-                            self.fn_depth += 1;
+                    PatternKind::Typed { ty, .. } => tasks.push(Task::Ty(ty, depth)),
+                    PatternKind::Quote { captures, .. } => tasks.extend(
+                        captures
+                            .iter_mut()
+                            .rev()
+                            .map(|(_, p)| Task::Pattern(p, depth)),
+                    ),
+                    PatternKind::Var(_)
+                    | PatternKind::Discard(_)
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_)
+                    | PatternKind::Prefix { .. } => {}
+                },
+                Task::BitSegment(segment, depth) => {
+                    let bindings = collected(&segment.value);
+                    tasks.push(Task::AddBindings(bindings));
+                    tasks.push(Task::Pattern(&mut segment.value, depth));
+                    if let Some(format) = &mut segment.format
+                        && let Some(arg) = &mut format.arg
+                    {
+                        tasks.push(Task::Expr(arg, depth));
+                    }
+                }
+                Task::AddBindings(bindings) => self.locals.extend(bindings),
+                Task::Block(block, depth) => {
+                    tasks.push(Task::Restore(self.locals.len(), self.fn_depth));
+                    tasks.extend(block.stmts.iter_mut().rev().map(|s| Task::Stmt(s, depth)));
+                }
+                Task::Stmt(stmt, depth) => match stmt {
+                    Stmt::Bind(binding) => {
+                        let bindings = collected(&binding.pattern);
+                        tasks.push(Task::BindValue {
+                            value: &mut binding.value,
+                            bindings,
+                            depth,
+                        });
+                        tasks.push(Task::Pattern(&mut binding.pattern, depth));
+                    }
+                    Stmt::Env { ty, value, .. } => {
+                        tasks.push(Task::Expr(value, depth));
+                        tasks.push(Task::Ty(ty, depth));
+                    }
+                    Stmt::Expr(value) => tasks.push(Task::Expr(value, depth)),
+                },
+                Task::BindValue {
+                    value,
+                    mut bindings,
+                    depth,
+                } => {
+                    let before = self.locals.len();
+                    if self.hook.is_direct(value, &self.locals, self.fn_depth) {
+                        for binding in &mut bindings {
+                            binding.fn_only = Some(self.fn_depth);
                         }
-                        if let Some(first) = clause.patterns.first() {
-                            binders(first, &mut self.locals, None);
-                        }
-                        tasks.push(Task::Expr(&mut clause.body, depth));
-                        if let Some(guard) = &mut clause.guard {
-                            tasks.push(Task::Expr(guard, depth));
+                        self.locals.extend(bindings.iter().cloned());
+                        for binding in &mut bindings {
+                            binding.fn_only = None;
                         }
                     }
-                    Task::Restore(len, fn_depth) => {
-                        self.locals.truncate(len);
-                        self.fn_depth = fn_depth;
+                    tasks.push(Task::BindDone { bindings, before });
+                    tasks.push(Task::Expr(value, depth));
+                }
+                Task::BindDone { bindings, before } => {
+                    self.locals.truncate(before);
+                    self.locals.extend(bindings);
+                }
+                Task::FunctionEnter {
+                    body,
+                    bindings,
+                    depth,
+                } => {
+                    tasks.push(Task::Restore(self.locals.len(), self.fn_depth));
+                    self.fn_depth += 1;
+                    self.locals.extend(bindings);
+                    tasks.push(Task::Block(body, depth));
+                }
+                Task::Clause(clause, depth, function) => {
+                    let bindings = clause.patterns.first().map(collected).unwrap_or_default();
+                    tasks.push(Task::ClauseEnter {
+                        body: &mut clause.body,
+                        guard: clause.guard.as_mut(),
+                        bindings,
+                        depth,
+                        function,
+                        start: self.locals.len(),
+                    });
+                    tasks.extend(
+                        clause
+                            .patterns
+                            .iter_mut()
+                            .rev()
+                            .map(|p| Task::Pattern(p, depth)),
+                    );
+                }
+                Task::ClauseEnter {
+                    body,
+                    guard,
+                    bindings,
+                    depth,
+                    function,
+                    start,
+                } => {
+                    tasks.push(Task::Restore(start, self.fn_depth));
+                    if function {
+                        self.fn_depth += 1;
                     }
+                    self.locals.extend(bindings);
+                    tasks.push(Task::Expr(body, depth));
+                    if let Some(guard) = guard {
+                        tasks.push(Task::Expr(guard, depth));
+                    }
+                }
+                Task::Restore(len, fn_depth) => {
+                    self.locals.truncate(len);
+                    self.fn_depth = fn_depth;
                 }
             }
         }

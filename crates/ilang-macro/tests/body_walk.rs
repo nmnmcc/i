@@ -336,3 +336,65 @@ fn macro_result_is_traversed_without_the_host_stack() {
         .join()
         .unwrap();
 }
+
+#[test]
+fn type_macro_result_is_traversed_without_the_host_stack() {
+    use ilang_syntax::ast::{TypeExpr, TypeKind};
+    struct GenerateType(usize);
+    impl Hook for GenerateType {
+        type Error = &'static str;
+        fn is_macro(&mut self, _: &Expr, _: &[Local], _: u32) -> Result<bool, Self::Error> {
+            Ok(false)
+        }
+        fn expand(&mut self, _: &Expr, _: &[Local], _: u32) -> Result<Expr, Self::Error> {
+            unreachable!()
+        }
+        fn is_type_macro(
+            &mut self,
+            ty: &TypeExpr,
+            _: &[Local],
+            _: u32,
+        ) -> Result<bool, Self::Error> {
+            Ok(matches!(&ty.kind, TypeKind::Call { name, .. } if name.name == "deep"))
+        }
+        fn expand_type(
+            &mut self,
+            _: &TypeExpr,
+            _: &[Local],
+            _: u32,
+        ) -> Result<TypeExpr, Self::Error> {
+            self.0 += 1;
+            let span = Span::default();
+            let mut result = TypeExpr {
+                span,
+                kind: TypeKind::Hole,
+            };
+            for _ in 0..10_000 {
+                result = TypeExpr {
+                    span,
+                    kind: TypeKind::Tuple(vec![result]),
+                };
+            }
+            Ok(result)
+        }
+        fn depth_error(&mut self, _: Span) -> Self::Error {
+            "depth"
+        }
+        fn is_direct(&mut self, _: &Expr, _: &[Local], _: u32) -> bool {
+            false
+        }
+    }
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            let (mut module, errors) = ilang_syntax::parse_module("x: deep(Int)");
+            assert!(errors.is_empty(), "{errors:?}");
+            let mut hook = GenerateType(0);
+            body_walk::expressions(&mut module, &mut hook).unwrap();
+            assert_eq!(hook.0, 1);
+            drop(module);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
