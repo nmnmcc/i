@@ -134,3 +134,9 @@ the one JavaScript string classified there is host text. The reviewed empty
 expressions in the record specs use `()` as an empty record; the negative
 `Unit = ()` spec intentionally tests the forbidden type. These decisions
 follow spec sections 3 and 6.4 and do not disable reporting for changed inputs.
+
+The merged baseline and migrated spec WAT captures each contain 1,460 variants;
+all 1,460 are byte-identical. Focused recaptures preserved source line positions
+and selected the declared named entries. The temporarily changed invalid
+attribute fixture produced no WAT once its expected error was restored. The
+manifest-package sweep and longer retries of baseline timeouts remain in progress.
