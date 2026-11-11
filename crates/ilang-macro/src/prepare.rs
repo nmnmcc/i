@@ -230,7 +230,7 @@ _entry = ({parameters}) -> syntax.Syntax {{
   ! Assert = Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }})
   ! syntax.Definitions = syntax._definitions()
 {item_service}  ! syntax.Diagnostics = syntax._diagnostics()
-  body = () -> syntax.Syntax ? syntax.SyntaxError ! Assert | syntax.Definitions{item_row} | syntax.Diagnostics {{ target.{}({arguments}) }}
+  body = () -> syntax.Syntax ^ syntax.SyntaxError ! Assert | syntax.Definitions{item_row} | syntax.Diagnostics {{ target.{}({arguments}) }}
   fail.catch(body) |> {{
     Ok(value) -> value
     Error(syntax.SyntaxError(message, at)) -> syntax._report_error(message, at)
