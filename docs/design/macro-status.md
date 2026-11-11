@@ -27,3 +27,5 @@ step 2 exception for nesting and stack-limit tests:
 - `value_dependency_follows_deep_aliases_and_cycles_on_small_stack`
 - `quote_capture_clone_visitors_and_drop_on_small_stack`
 - `ilang-cli/tests/macro_run.rs::cli_checks_deep_syntax_constructed_by_a_macro` (10,000 nested macro-generated nodes)
+- `ilang-syntax/src/shape.rs::transparent_groups_compare_without_recursive_stack_or_quadratic_copying` (10,000 groups on a 256 KiB stack)
+- `ilang-syntax/tests/lisp_deep.rs::deep_structural_records_clone_compare_normalize_and_drop` (10,000 records on a 256 KiB stack)

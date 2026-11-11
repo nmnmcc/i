@@ -10,7 +10,7 @@ g = {
   _ -> 3
 }
 
-match = hs.{
+match = hs |> {
   (name, _) -> (x) { log(name, x) }
   _ -> (x) { x }
 }
@@ -21,7 +21,7 @@ a = {
 }
 
 b = {
-  go = (n) -> Int ^ String ! Log { step(n) }
+  go = (n) -> Int ? String ! Log { step(n) }
   go(1)
 }
 

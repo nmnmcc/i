@@ -544,7 +544,13 @@ impl<'a> Resolver<'a> {
                 } else if selected {
                     attrs.main = true;
                 }
-                if attrs.main && attrs.test {
+                if attrs.main
+                    && attrs.test
+                    && !item
+                        .attributes
+                        .iter()
+                        .any(|a| a.module.is_none() && a.name.name == "main")
+                {
                     self.error(
                         code::EXPORT_NAME_TWICE,
                         b.pattern.span,

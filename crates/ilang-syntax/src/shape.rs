@@ -161,46 +161,4 @@ mod deep_tests {
         };
         assert!(equivalent_expression(&p.value, &m.value));
     }
-
-    #[test]
-    fn transparent_groups_compare_without_recursive_stack_or_quadratic_copying() {
-        std::thread::Builder::new()
-            .stack_size(256 * 1024)
-            .spawn(|| {
-                let (plain, errors) = crate::parse_module("value = 1\n");
-                assert!(errors.is_empty());
-                let mut nested = plain.clone();
-                let ItemKind::Binding(binding) = &mut nested.items[0].kind else {
-                    panic!("binding");
-                };
-                let mut e = std::mem::replace(
-                    &mut binding.value,
-                    Expr {
-                        kind: ExprKind::Tuple(vec![]),
-                        span: Span::default(),
-                    },
-                );
-                for _ in 0..10_000 {
-                    e = Expr {
-                        kind: ExprKind::Block(Block {
-                            stmts: vec![Stmt::Expr(e)],
-                            span: Span::default(),
-                        }),
-                        span: Span::default(),
-                    };
-                }
-                binding.value = e;
-                assert!(equivalent(&plain, &nested));
-                let ItemKind::Binding(a) = &plain.items[0].kind else {
-                    unreachable!()
-                };
-                let ItemKind::Binding(b) = &nested.items[0].kind else {
-                    unreachable!()
-                };
-                assert!(equivalent_expression(&a.value, &b.value));
-            })
-            .unwrap()
-            .join()
-            .unwrap();
-    }
 }

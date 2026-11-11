@@ -404,7 +404,7 @@ pub(super) fn render_anchored(
                         text!("_");
                     } else {
                         node!(Type, r);
-                        text!(" ^ ");
+                        text!(" ? ");
                         node!(Type, e);
                     }
                 } else if let Some([h, r, e]) = round(d)
@@ -441,13 +441,14 @@ pub(super) fn render_anchored(
                                 text!(")");
                             }
                             [h, a, b] if symbol(h, ".") => {
-                                node!(Target, a);
-                                text!(".");
                                 if let K::Curly(cs) = &b.kind {
-                                    text!("{ ");
+                                    node!(Operand, a);
+                                    text!(" |> { ");
                                     lines!(cs, Clause);
                                     text!(" }");
                                 } else {
+                                    node!(Target, a);
+                                    text!(".");
                                     text!(atom(b).ok_or_else(|| bad(b, "a field"))?);
                                 }
                             }
@@ -488,7 +489,11 @@ pub(super) fn render_anchored(
                             [h, a, b] if is_binop(h) => {
                                 node!(Operand, a);
                                 text!(" ");
-                                text!(show(h));
+                                text!(if symbol(h, "|") {
+                                    "|>".to_owned()
+                                } else {
+                                    show(h)
+                                });
                                 text!(" ");
                                 node!(Operand, b);
                             }

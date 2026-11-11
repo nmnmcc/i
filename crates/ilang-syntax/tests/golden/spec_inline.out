@@ -13,29 +13,29 @@ group = { a + b } * c
 
 names = list.map(users, (u) { u.name })
 
-opt = opt.{
+opt = opt |> {
   Some(u) -> u.name
   None -> ""
 }
 
 inter(A) = (x: A & Int) -> A { x }
 
-user = u.{
+user = u |> {
   User(n = name, ..) -> n
   User(age, name) -> name
 }
 
-test = v.{
+test = v |> {
   True | _: Int -> 1
 }
 
-whole = s.{
+whole = s |> {
   whole = "lit" <> rest -> rest
 }
 
 bits = <<82, 2:u2>>
 
-piped = a | f(b)
+piped = a |> f(b)
 
 labelled: (x: Int) -> Int = (y) { y }
 

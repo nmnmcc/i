@@ -601,14 +601,8 @@ impl Printer {
             ExprKind::Block(b) => self.block(b),
             ExprKind::Fn(f) => self.function(f),
             ExprKind::Case { subject, clauses } => {
-                if matches!(subject.kind, ExprKind::Int(_) | ExprKind::Float(_)) {
-                    self.w("{ ");
-                    self.expr(subject, 0);
-                    self.w(" }");
-                } else {
-                    self.expr(subject, 10);
-                }
-                self.w(".");
+                self.expr(subject, 6);
+                self.w(" |> ");
                 self.clauses(clauses);
             }
             ExprKind::Clauses(clauses) => self.clauses(clauses),
@@ -975,7 +969,7 @@ impl Printer {
     ) {
         self.ty_in(ret, 1, tail && err.is_none() && env.is_none());
         if let Some(err) = err {
-            self.w(" ^ ");
+            self.w(" ? ");
             self.ty_in(err, 1, tail && env.is_none());
         }
         if let Some(env) = env {

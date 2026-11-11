@@ -99,8 +99,8 @@ fn dependency_conventions_and_entry_tables_have_no_effect() {
 }
 
 #[test]
-fn a_boolean_pipe_target_suggests_boolean_or_at_the_pipe() {
-    // Syntax-2 P5 requires evidence from the target's type, not its spelling.
+fn a_bare_bar_is_not_a_pipe() {
+    // A bare `|` is not a pipe; the pipe remains `|>`.
     let source = "main = () { False | True }";
     let dir = project("name = \"app\"\n", &[("src/main.i", source)]);
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -109,14 +109,13 @@ fn a_boolean_pipe_target_suggests_boolean_or_at_the_pipe() {
     let diagnostic = checked
         .diags
         .iter()
-        .find(|d| d.message.contains("use `||`"))
-        .expect("Boolean-or hint");
-    assert_eq!(diagnostic.code, "E0501");
+        .find(|d| d.is_error())
+        .expect("bare pipe error");
     assert_eq!(diagnostic.span.start as usize, source.find('|').unwrap());
     // A function that returns Bool is an ordinary valid pipe target.
     let dir = project(
         "name = \"app\"\n",
-        &[("src/main.i", "main = () { True | (value) { value } }")],
+        &[("src/main.i", "main = () { True |> (value) { value } }")],
     );
     assert!(build(dir.path(), options()).is_ok());
 }
