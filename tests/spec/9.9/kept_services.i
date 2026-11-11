@@ -4,8 +4,8 @@
 // callback uses its invoking task's Scheduler and keeps services on third resume.
 (
 	i/task
-	i/control
 	i/request
+	i/control
 	i/core
 )
 

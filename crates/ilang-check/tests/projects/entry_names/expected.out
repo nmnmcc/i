@@ -1,2 +1,1 @@
 test/both_test.i:2:1: error[E0321]: this function is the program entry and also a test, so their export names would be the same (B.5)
-test/both_test.i:3:1: error[E0321]: a function cannot be both the program entry and a test

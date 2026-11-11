@@ -10,6 +10,7 @@ rust-version.workspace = true
 anyhow.workspace = true
 crossbeam-channel = "0.5"
 ilang-check.workspace = true
+ilang-macro.workspace = true
 ilang-package.workspace = true
 ilang-syntax.workspace = true
 lsp-server = "0.10.0"

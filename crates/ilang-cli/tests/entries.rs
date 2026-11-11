@@ -108,3 +108,25 @@ fn dependency_conventions_and_entry_tables_have_no_effect() {
     std::fs::write(app.join("src/main.i"), "main = () { Nil }\n").unwrap();
     assert_eq!(entry(&app, None).as_deref(), Some("app/main.main"));
 }
+
+#[test]
+fn a_bare_bar_is_not_a_pipe() {
+    // A bare `|` is not a pipe; the pipe remains `|>`.
+    let source = "main = () { False | True }";
+    let dir = project("name = \"app\"\n", &[("src/main.i", source)]);
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty());
+    let checked = ilang_check::check(&graph);
+    let diagnostic = checked
+        .diags
+        .iter()
+        .find(|d| d.is_error())
+        .expect("bare pipe error");
+    assert_eq!(diagnostic.span.start as usize, source.find('|').unwrap());
+    // A function that returns Bool is an ordinary valid pipe target.
+    let dir = project(
+        "name = \"app\"\n",
+        &[("src/main.i", "main = () { True |> (value) { value } }")],
+    );
+    assert!(build(dir.path(), options()).is_ok());
+}

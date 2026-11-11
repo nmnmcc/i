@@ -40,6 +40,12 @@ pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     (module, diags)
 }
 
+/// Parses the first surface for migration tools.
+pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
+    let (module, diags, _) = run(source, true, true);
+    (module, diags)
+}
+
 #[doc(hidden)]
 pub fn parse_stats(source: &str) -> ParseStats {
     run(source, true, false).2
@@ -50,12 +56,6 @@ pub fn parse_stats(source: &str) -> ParseStats {
 pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
     let (module, diags, _) = run(source, false, false);
     (module, diags)
-}
-
-/// The frozen first-surface reader, used only for migration and comparison.
-pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
-    let (module, diagnostics, _) = run(source, true, true);
-    (module, diagnostics)
 }
 
 fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
@@ -902,8 +902,10 @@ impl Parser<'_> {
         let Some(mut pattern) = pats.pop() else {
             return Ok(None);
         };
-        while let Some(outer) = pats.pop() {
-            let PatternKind::Var(name) = outer.kind else {
+        while let Some(mut outer) = pats.pop() {
+            let PatternKind::Var(name) =
+                std::mem::replace(&mut outer.kind, PatternKind::Discard(String::new()))
+            else {
                 unreachable!("only names are chained")
             };
             pattern = Pattern {
@@ -1007,11 +1009,13 @@ impl Parser<'_> {
                 break;
             }
             self.bump();
-            let rhs = self.binary(op.level())?;
+            let mut rhs = self.binary(op.level())?;
             if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
-                let ExprKind::Clauses(clauses) = rhs.kind else {
+                let ExprKind::Clauses(clauses) =
+                    std::mem::replace(&mut rhs.kind, ExprKind::Tuple(Vec::new()))
+                else {
                     unreachable!()
                 };
                 lhs = Expr {

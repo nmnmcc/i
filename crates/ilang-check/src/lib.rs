@@ -4,8 +4,11 @@
 //!
 //! The only authority is `docs/spec.md`; section numbers refer to it.
 
+mod capabilities;
 pub mod hir;
+pub mod hygiene;
 pub mod identity;
+pub mod macro_sandbox;
 pub mod order;
 pub mod query;
 pub mod resolve;
@@ -50,6 +53,7 @@ pub mod code {
     pub const TYPE_VAR_IS_TYPE: &str = "E0231";
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const MACRO_RESERVED: &str = "E0234";
+    pub const MACRO_BINDER: &str = "E0235";
     // E0229, E0233 and E0237 were temporary value-type reservations.
     pub const VALUE_TYPE_CIRCLE: &str = "E0530";
     pub const VALUE_TYPE_PLACE: &str = "E0531";
@@ -79,6 +83,7 @@ pub mod code {
     pub const EXTERNAL_TYPE_VAR: &str = "E0317";
     pub const EXTERNAL_HOST_TYPE: &str = "E0318";
     pub const EXTERNAL_EFFECTS: &str = "E0319";
+    pub const COMPILER_CAPABILITY: &str = "E0322";
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
     pub const DEPRECATED: &str = "W0301";
@@ -122,12 +127,17 @@ pub mod code {
 }
 
 /// A parsed module of the graph.
+#[derive(Clone)]
 pub struct Parsed {
     pub package: PackageId,
     pub path: String,
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
+    /// Origins of names introduced by expansion in this module.
+    pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
+    /// This module was built by the compiler and may call compiler internals.
+    pub compiler_generated: bool,
 }
 
 /// Parses every module of the graph. Syntax errors keep their codes.
@@ -136,7 +146,12 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
-            let (ast, errors) = ilang_syntax::parse_module(&graph.sources.get(m.source).text);
+            let source = graph.sources.get(m.source);
+            let (ast, errors) = if source.display.ends_with(".is") {
+                ilang_syntax::lisp::parse_source(&source.text)
+            } else {
+                ilang_syntax::parse_module(&source.text)
+            };
             diags.extend(
                 errors
                     .into_iter()
@@ -148,6 +163,8 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 source: m.source,
                 kind: m.kind,
                 ast,
+                scoped: None,
+                compiler_generated: false,
             });
         }
     }
@@ -158,14 +175,105 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
-    let (parsed, mut diags) = parse(graph);
+    let (mut parsed, diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
     }
-    let (mut program, more) = resolve::resolve(graph, &parsed);
+    // Direct checking resolves quotes in the same form as the expansion driver.
+    let mut templates = Vec::new();
+    for module in &mut parsed {
+        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+            &mut module.ast,
+            module.source.0,
+            &mut templates,
+        );
+    }
+    let (program, more) = resolve_parsed(graph, &parsed);
+    (program, diags.into_iter().chain(more).collect())
+}
+
+/// Resolve an already parsed module set. The expansion driver uses this entry
+/// point after transforming syntax, keeping source identities and spans intact.
+pub fn resolve_parsed(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+) -> (Option<hir::Program>, Vec<Diagnostic>) {
+    let mut diags = Vec::new();
+    let (mut program, more) = resolve::resolve(graph, parsed);
     diags.extend(more);
     order::order(&mut program, &mut diags);
+    capabilities::check(&program, graph, &mut diags);
     (Some(program), diags)
+}
+
+/// Resolve a compiler-owned program from the exact import closure of a macro
+/// module. The supplied entries are compiler-generated wrappers: they expose
+/// host-compatible Syntax values and install the allowed compiler services.
+/// Ordinary program capability checks do not apply to these wrappers; the
+/// complete dependency closure is checked for foreign externals instead.
+pub fn check_compiler_exports(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    entries: &[(&str, &str)],
+) -> Checked {
+    let (mut program, mut diags) = resolve::resolve(graph, parsed);
+    order::order(&mut program, &mut diags);
+    for module in &mut program.modules {
+        for binding in &mut module.bindings {
+            binding.main = false;
+            binding.test = false;
+        }
+    }
+    program.host_exports.clear();
+    for &(path, name) in entries {
+        let (module, m) = program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path)
+            .expect("compiler export module must be in the selected import closure");
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .expect("compiler export must be a resolved wrapper binding");
+        program.host_exports.push(hir::DefId {
+            module: hir::ModuleId(module as u32),
+            index: index as u32,
+        });
+    }
+    let modules = (0..program.modules.len())
+        .map(|i| hir::ModuleId(i as u32))
+        .collect::<Vec<_>>();
+    for id in
+        macro_sandbox::foreign_externals(&program, graph.library, &modules, &program.host_exports)
+    {
+        let def = program.def(id);
+        diags.push(Diagnostic::error(
+            code::COMPILER_CAPABILITY,
+            Some(program.module(id.module).source),
+            def.span,
+            "a macro program cannot execute an external declaration outside package i (§8)",
+        ));
+    }
+    let mut checked = check_resolved(graph, Some(program), diags);
+    if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
+        for &entry in &program.host_exports {
+            if typed
+                .entry_services
+                .get(&entry)
+                .is_some_and(|services| !services.is_empty())
+            {
+                checked.diags.push(Diagnostic::error(
+                    code::COMPILER_CAPABILITY,
+                    Some(program.module(entry.module).source),
+                    program.def(entry).span,
+                    "a compiler wrapper must install its allowed services and cannot request a host service (§8)",
+                ));
+            }
+        }
+    }
+    checked
 }
 
 /// The result of `check`.
@@ -182,7 +290,36 @@ pub struct Checked {
 /// only inferred when resolution found no errors, so that one mistake is
 /// not reported many times.
 pub fn check(graph: &PackageGraph) -> Checked {
-    let (mut program, mut diags) = resolve_program(graph);
+    let (program, diags) = resolve_program(graph);
+    check_resolved(graph, program, diags)
+}
+
+/// Resolve and type-check the parsed modules after syntax expansion.
+pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (program, diags) = resolve_parsed(graph, parsed);
+    check_resolved(graph, program, diags)
+}
+
+/// Resolve and infer a project for collection discovery, without selecting
+/// configured program entries or host exports as tool execution roots.
+pub fn check_parsed_for_tools(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (mut program, mut diags) = resolve::resolve(graph, parsed);
+    order::order(&mut program, &mut diags);
+    for module in &mut program.modules {
+        for binding in &mut module.bindings {
+            binding.main = false;
+            binding.test = false;
+        }
+    }
+    program.host_exports.clear();
+    check_resolved(graph, Some(program), diags)
+}
+
+fn check_resolved(
+    graph: &PackageGraph,
+    mut program: Option<hir::Program>,
+    mut diags: Vec<Diagnostic>,
+) -> Checked {
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
             let (typed, more) = types::check(p, &graph.sources);
@@ -194,41 +331,114 @@ pub fn check(graph: &PackageGraph) -> Checked {
     if let (Some(p), Some(t)) = (&mut program, &types)
         && !diags.iter().any(Diagnostic::is_error)
     {
-        let mut changed = false;
-        for (entry, services) in &t.entry_services {
-            let tasks = services.iter().any(|id| {
-                let service = p.ty(*id);
-                p.module(service.module).path == "i/task"
-                    && matches!(service.name.as_str(), "Scheduler" | "Runner")
-            });
-            let requests = tasks
-                || services.iter().any(|id| {
-                    let service = p.ty(*id);
-                    service
-                        .host
-                        .as_ref()
-                        .is_some_and(|h| h.is_async || h.is_request)
-                        || p.module(service.module).path == "i/request"
-                });
-            for (path, needed) in [("i/request", requests), ("i/task", tasks)] {
-                if needed && let Some(index) = p.modules.iter().position(|m| m.path == path) {
-                    let dep = hir::ModuleId(index as u32);
-                    if dep != entry.module
-                        && !p.modules[entry.module.0 as usize].imports.contains(&dep)
-                    {
-                        p.modules[entry.module.0 as usize].imports.push(dep);
-                        changed = true;
-                    }
-                }
-            }
-        }
-        if changed {
-            order::order(p, &mut diags);
-        }
+        install_entry_dependencies(p, t, &mut diags);
+    }
+    if let Some(p) = &program {
+        map_expansion_diagnostics(p, &graph.sources, &mut diags);
     }
     Checked {
         program,
         types,
         diags,
     }
+}
+
+fn install_entry_dependencies(p: &mut hir::Program, t: &types::Typed, diags: &mut Vec<Diagnostic>) {
+    let mut changed = false;
+    for (entry, services) in &t.entry_services {
+        let tasks = services.iter().any(|id| {
+            let service = p.ty(*id);
+            p.module(service.module).path == "i/task"
+                && matches!(service.name.as_str(), "Scheduler" | "Runner")
+        });
+        let requests = tasks
+            || services.iter().any(|id| {
+                let service = p.ty(*id);
+                service
+                    .host
+                    .as_ref()
+                    .is_some_and(|h| h.is_async || h.is_request)
+                    || p.module(service.module).path == "i/request"
+            });
+        for (path, needed) in [("i/request", requests), ("i/task", tasks)] {
+            if needed && let Some(index) = p.modules.iter().position(|m| m.path == path) {
+                let dep = hir::ModuleId(index as u32);
+                if dep != entry.module && !p.modules[entry.module.0 as usize].imports.contains(&dep)
+                {
+                    p.modules[entry.module.0 as usize].imports.push(dep);
+                    changed = true;
+                }
+            }
+        }
+    }
+    if changed {
+        order::order(p, diags);
+    }
+}
+
+/// Validate a consumer-selected entry after the project has been checked.
+/// The returned type data includes the selected entry's inferred services.
+pub fn check_selected(
+    graph: &PackageGraph,
+    program: &mut hir::Program,
+    target: hir::DefId,
+    require_nil: bool,
+) -> (types::Typed, Vec<Diagnostic>) {
+    let (typed, mut diags) =
+        types::check_selected(program, &graph.sources, &[(target, require_nil)]);
+    capabilities::check_selected(program, graph, &[target], &mut diags);
+    if !diags.iter().any(Diagnostic::is_error) {
+        install_entry_dependencies(program, &typed, &mut diags);
+    }
+    map_expansion_diagnostics(program, &graph.sources, &mut diags);
+    (typed, diags)
+}
+
+/// Map diagnostics from the checker's virtual expansion text to written
+/// source. Warnings from templates are not emitted (§9).
+pub fn map_expansion_diagnostics(
+    program: &hir::Program,
+    sources: &ilang_package::Sources,
+    diags: &mut Vec<Diagnostic>,
+) {
+    diags.retain_mut(|d| {
+        let Some(source) = d.source else { return true };
+        let Some(index) = program.modules.iter().position(|m| m.source == source) else {
+            return true;
+        };
+        let Some(origin) = program.origin(hir::ModuleId(index as u32), d.span) else {
+            return true;
+        };
+        if origin.template.is_some() && d.severity == ilang_package::Severity::Warning {
+            return false;
+        }
+        if let Some((template_source, template_span)) = origin.template {
+            let virtual_text = &sources.get(source).text;
+            let expanded = virtual_text
+                .get(d.span.start as usize..d.span.end as usize)
+                .expect("diagnostic span is inside expanded source");
+            let name = origin
+                .expansion
+                .call_chain
+                .last()
+                .map_or("macro", |call| call.macro_name.as_str());
+            d.message
+                .push_str(&format!(" (in the expansion of `{name}`: `{expanded}`)"));
+            d.related.push(ilang_package::DiagnosticNote {
+                source: template_source,
+                span: template_span,
+                message: "expanded from this template".into(),
+            });
+            for call in origin.expansion.call_chain.iter().skip(1) {
+                d.related.push(ilang_package::DiagnosticNote {
+                    source: SourceId(call.syntax.scope().module),
+                    span: call.syntax.span(),
+                    message: format!("in the expansion of `{}`", call.macro_name),
+                });
+            }
+        }
+        d.source = Some(origin.source);
+        d.span = origin.span;
+        true
+    });
 }

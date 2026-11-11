@@ -612,10 +612,27 @@ impl<'c> Server<'c> {
                 severity: Some(match d.severity {
                     Severity::Error => lsp::DiagnosticSeverity::ERROR,
                     Severity::Warning => lsp::DiagnosticSeverity::WARNING,
+                    Severity::Note => lsp::DiagnosticSeverity::INFORMATION,
                 }),
                 code: Some(lsp::NumberOrString::String(d.code.to_string())),
                 source: Some("i".to_string()),
                 message: d.message.clone(),
+                related_information: (!d.related.is_empty()).then(|| {
+                    d.related
+                        .iter()
+                        .filter_map(|note| {
+                            let path = a.paths.get(&note.source)?;
+                            let uri = self.uri_of(path)?;
+                            Some(lsp::DiagnosticRelatedInformation {
+                                location: lsp::Location {
+                                    uri,
+                                    range: LineIndex::new(a.text(note.source)).range(note.span),
+                                },
+                                message: note.message.clone(),
+                            })
+                        })
+                        .collect()
+                }),
                 ..Default::default()
             });
         }
@@ -919,7 +936,12 @@ impl<'c> Server<'c> {
             None => std::fs::read_to_string(&path).unwrap_or_default(),
         };
         // `None`: the text has a syntax error, and is left as it is.
-        let edits = format(&text).filter(|f| *f != text).map(|formatted| {
+        let formatted = if path.extension().is_some_and(|e| e == "is") {
+            ilang_syntax::lisp::format(&text).ok()
+        } else {
+            format(&text)
+        };
+        let edits = formatted.filter(|f| *f != text).map(|formatted| {
             let ix = LineIndex::new(&text);
             vec![lsp::TextEdit {
                 range: lsp::Range::new(lsp::Position::new(0, 0), ix.position(text.len() as u32)),

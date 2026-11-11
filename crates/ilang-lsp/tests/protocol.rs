@@ -222,10 +222,7 @@ fn an_editor_session() {
 
     // Opening a correct file clears its problems.
     c.open(&main, MAIN);
-    assert_eq!(
-        c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
-    );
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
 
     // Hover shows the type, with the documentation.
     let (l, ch) = find(MAIN, "add(1", 0);
@@ -314,10 +311,7 @@ fn an_editor_session() {
 
     // Fixed again: the problems are cleared.
     c.change(&main, 4, MAIN);
-    assert_eq!(
-        c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
-    );
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
 
     // Completion after `u.` in an unsaved buffer that does not parse.
     let typing = MAIN.replace("u.name", "u.");
@@ -369,10 +363,7 @@ fn unsaved_changes_in_another_file() {
     let util = file_uri(&dir.path().join("src/util.i"));
     let mut c = Client::start();
     c.open(&main, MAIN);
-    assert_eq!(
-        c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
-    );
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
     // `double` is no longer exported, in the buffer only.
     c.open(&util, &UTIL.replace(" (double)", " "));
     let diags = c.diagnostics(&main);
@@ -385,10 +376,7 @@ fn unsaved_changes_in_another_file() {
     c.notify::<lsp::notification::DidCloseTextDocument>(json!({
         "textDocument": { "uri": util }
     }));
-    assert_eq!(
-        c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
-    );
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
     c.shutdown();
 }
 
@@ -580,10 +568,7 @@ fn answers_from_the_last_check() {
     // Long enough that no check starts by itself during the test.
     let mut c = Client::with_debounce(Duration::from_secs(600));
     c.open(&main, MAIN);
-    assert_eq!(
-        c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
-    );
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
     let started = Instant::now();
     // A line before everything.
     let edited = format!("\n{MAIN}");
@@ -629,7 +614,7 @@ fn completion_after_a_dot_just_written() {
     c.open(&main, &text);
     assert_eq!(
         c.diagnostics(&main),
-        unused_diagnostics(&text, &["greet", "main", "m"])
+        unused_diagnostics(&text, &["greet", "m"])
     );
     let started = Instant::now();
     for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
@@ -656,10 +641,7 @@ fn quick_changes_are_checked_once() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::with_debounce(Duration::from_millis(300));
     c.open(&main, MAIN);
-    assert_eq!(
-        c.diagnostics(&main),
-        unused_diagnostics(MAIN, &["greet", "main"])
-    );
+    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
     for i in 0..10 {
         let text = format!("{MAIN}{}bad = nope\n", "\n".repeat(i));
         c.change(&main, i as i32 + 2, &text);
@@ -699,11 +681,11 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("k ="), "k: (f: (A) -> B ? E ! N, x: A) -> B ? E ! N");
+    assert_eq!(hover("k ="), "k: (f: (A) -> B ^ E ! N, x: A) -> B ^ E ! N");
     assert_eq!(hover("y ="), "y: B");
-    assert_eq!(hover("f, x"), "f: (A) -> B ? E ! N");
-    assert_eq!(hover("g) {"), "g: (B) -> C ? E2 ! N2");
-    assert_eq!(hover("f, g"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("f, x"), "f: (A) -> B ^ E ! N");
+    assert_eq!(hover("g) {"), "g: (B) -> C ^ E2 ! N2");
+    assert_eq!(hover("f, g"), "f: (A) -> B ^ E ! N");
     assert_eq!(hover("x) { g"), "x: A");
     assert_eq!(hover("b) {"), "b: B");
     assert_eq!(hover("a, b"), "a: A");
@@ -743,16 +725,16 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
     assert_eq!(hover("y = x"), "y: A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (x: A, g: (1) -> B ? E ! N, h: C) -> B ? E ! N"
+        "drop2: (x: A, g: (1) -> B ^ E ! N, h: C) -> B ^ E ! N"
     );
     assert_eq!(hover("x, g, h"), "x: A");
     assert_eq!(hover("h) {"), "h: C");
     assert_eq!(hover("y = (x, h)"), "y: (A, C)");
     assert_eq!(
         hover("effonly"),
-        "effonly: (f: (A) -> B ? E ! N, x: A) -> Nil ? E ! N"
+        "effonly: (f: (A) -> B ^ E ! N, x: A) -> Nil ^ E ! N"
     );
-    assert_eq!(hover("f, x) {\n  r"), "f: (A) -> B ? E ! N");
+    assert_eq!(hover("f, x) {\n  r"), "f: (A) -> B ^ E ! N");
     assert_eq!(hover("r = "), "r: B");
     c.shutdown();
 }
@@ -822,4 +804,34 @@ fn disjoint_comparison_is_a_warning_at_the_comparison() {
     );
     assert!(ds[0].message.contains("`1` and `2`"), "{ds:?}");
     assert!(ds[0].message.contains("can never be equal"), "{ds:?}");
+}
+
+#[test]
+fn macro_expansion_preserves_hover_on_user_argument() {
+    let dir = tempfile::tempdir().unwrap();
+    let main_text = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
+    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+    package(
+        dir.path(),
+        &[("src/main.i", main_text), ("src/macros.is", macro_text)],
+    );
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut client = Client::start();
+    client.open(&main, main_text);
+    let diagnostics = client.diagnostics(&main);
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|d| d.severity == Some(lsp::DiagnosticSeverity::ERROR)),
+        "{diagnostics:?}"
+    );
+    let (line, character) = find(main_text, "pass(x)", 0);
+    let hover =
+        client.request::<lsp::request::HoverRequest>(position_params(&main, line, character + 5));
+    assert!(
+        hover["contents"]["value"]
+            .as_str()
+            .is_some_and(|value| value.contains("x: 42")),
+        "{hover:?}"
+    );
 }

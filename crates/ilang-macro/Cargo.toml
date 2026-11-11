@@ -1,0 +1,14 @@
+[package]
+name = "ilang-macro"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+ilang-syntax.workspace = true
+ilang-package.workspace = true
+ilang-check.workspace = true
+ilang-wasm.workspace = true
+ilang-host.workspace = true

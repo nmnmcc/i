@@ -62,7 +62,7 @@ Each decision has its reason. The exact rules follow in parts 3 to 10.
 **D8. Run time: one `$obj` with tag 14, labels and values interleaved.** Field 5 holds `[label0, value0, label1, value1, …]`, sorted by the bytes of the labels.
 *Reason:* the shapes that reach a function are open (width), so one struct type for each shape would need a test for each shape anyway. With this layout the existing generic `$obj` paths of `$value_compare_i32` and `$value_hash_u32` already give the right `==` and `hash`. Only `inspect` needs a branch.
 
-**D9. Syntax.** Records and record types use parentheses. Matching-parenthesis suffix lookahead selects functions before field parsing; otherwise zero items or a first spread/label-colon selects a record. Tuples are positional and nonempty; forms never mix positions and labels. Commas only separate parts. `()` is the empty record value and `Record` is the ordinary shadowable type of all records. Function bodies are always blocks. `{}` is the empty clause block and `{ T }` still groups a type. See §8 and syntax-2 D1–D5/N1–N4.
+**D9. Syntax.** A `{` is a record when it is `{..}`, when `..` follows it, or when its first part is `label :` and either has no top-level `=`, `->`, `?` or `|`, or is followed by a `,`. Otherwise a clause head or a binding wins. The same scan is used for a function body, so `(n) { name: n }` gives a record. `{..}` is the empty record and the type of all records. `{}` stays only the empty clause block.
 *Reason:* one rule for every `{`. No program that is correct today changes, because a block or clause block never starts with `label :` without one of those four tokens, and never has a `,` directly inside its braces. The `,` gives every record a written form, also a record with one field that holds a function with a `->` part. `{..}` reads back as itself, so the text form of the empty record is i source.
 
 **D10. Out of T3:** record patterns, union keys, a record view of custom types, and the Lisp-surface rows (proposed to M1 in part 13). A type test `x: { … }` is in T3: it takes every record, by head.
@@ -491,37 +491,52 @@ name_of(User("bo"))             // E0501
 
 ### 8.1 Expressions
 
-Use the matching-parenthesis lookahead of syntax-2 D1/D2. Header groups,
-calls and patterns keep their own context. In an expression, a matching `)`
-followed by `->` or a same-line body `{` selects a function first (except an
-unbracketed guard arrow). Otherwise zero items, a first `..`, or a label and
-colon selects a record; other nonempty contents select a positional tuple.
-The remaining items must fit that choice. No comma chooses a form.
+A `{` that begins an expression, and the `{` of a function body, are read like this. The parser finds the first part with one scan: it ends at the first `,` or break that is directly inside these braces, or at the matching `}` (found with `close[]`). "Top level" means not inside `( )`, `[ ]`, `{ }` or `<< >>`.
 
-`()` is the empty record. `(f: (x) -> Int { x })` is a one-field record
-without an extra comma. `(n) { (name: n) }` returns a record. A function body
-is always a block. Breaks separate record fields as in other parentheses.
+1. `{}` is the empty clause block (syntax.md §6.12).
+2. `{..}`, and a `{` followed by `..`, is a record.
+3. A `{` whose first part begins with a `name`, an `UpName` or a string literal and then `:`, and either has no top-level `=`, `->`, `?` or `|`, or ends with a `,` (not a break), is a record. An `UpName` label is then the compile error "a label is a name or a string", also when it is the first field: `{ Type: 1, b: 2 }` gives that message, not a parse error of a block. (No block or clause block starts with `UpName :` without one of these tokens either; the test of the `,` claim below covers this too.)
+4. Otherwise, the rule of syntax.md §6.1: a clause block or a block. For a function body, it is always a block.
 
+So:
+
+| Source | Reading |
+|---|---|
+| `{ x: Int -> x }` | clause block (it has `->`) |
+| `{ x: Int = 1 ⏎ x }` | block (it has `=`) |
+| `{ name: "ada", age: 36 }` | record |
+| `{ ..r, age: 37 }` | record |
+| `{ "first-name": "ada" }` | record |
+| `{ Type: 1, b: 2 }` | record, with the error "a label is a name or a string" |
+| `{ f: (x) -> Int { x }, n: 0 }` | record (the first part ends with `,`) |
+| `{ f: (x) -> Int { x }, }` | record with one field |
+| `{ f: (x) -> Int { x } }` | clause block (it has `->` and no `,`) |
+| `{..}` | the empty record |
+| `(n) { name: n }` | a function that gives a record |
+| `(x) { x: Int = 1 ⏎ x }` | a function whose body is a block |
+| `(x) { x: Int -> x }` | a function whose body is a block; that block is a compile error, as today |
+
+- `||` and `|>` are other tokens, so they do not count as `|`.
+- **Why a `,` decides.** A block or a clause block never has a `,` directly inside its braces: statements and clauses are ended by breaks, and on one line by the end of the longest expression (syntax.md §1.7). So a first part that ends with `,` can only be a record field. (T3 checks this claim against the A1 parser with a test that no correct program of the test suite has such a `,`.)
+- **The one misreading.** A record whose first field holds a function with a `->` part, and whose first field is not followed by a `,` on the same line, has a top-level `->` in its first part, so it is read as a clause block. This is `{ f: (x) -> Int { x } }`, or a record over several lines whose first line is such a field. The way out is a `,` after the first field. The error of a clause block whose head is `name: (…)` says this.
+- **The printer.** `format.rs` and `print.rs` write a `,` after the first field whenever its value has a top-level `=`, `->`, `?` or `|`, also in the form with one field per line. So every record has a normal-surface form that reads back as the same record, and `i fmt --to=i` can print every record of the Lisp surface (part 13).
+- Inside a record, a break is a `,`, as inside `( )`. A `,` at the end is allowed. But a break does not decide rule 3; only a written `,` does.
 - Labels in expressions are `name`s or string literals. An `UpName` label is a compile error ("a label is a name or a string"), in the first field (rule 3) as in any other. A string literal used as a label must not have an interpolation (`\(x)`, track STR): a label is fixed when the program is compiled (labels are sorted then, E0540 compares them, and `Ty::Rec` holds them). An interpolated string as a label is a compile error, "a label is a string with no `\( )`". Raw and multi-line string literals with no interpolation are allowed.
 - `.f` reaches only labels that are `name`s. Other labels are read with `record.get`.
 - `C(..v, f: e)` stays the update of a custom value.
 
+Why a function body uses the same scan instead of a forced error: a block never starts with `label :` without `=`, `->`, `?` or `|`, so no block is lost, and `(n) { name: n }` is the natural way to write a function that gives a record. A forced error would only send the user to `(n) { { name: n } }`.
+
 ### 8.2 Types
 
-A matching `)` followed by `->` selects a function type. Otherwise a first
-`..` or label-colon selects a record type; other nonempty contents select a
-positional tuple type. `()` in a type is an error suggesting `Record`.
-`Record` is the ordinary shadowable built-in type of all records. `{ T }`
-remains a type group. `((a: Int)) -> T` has one record parameter;
-`(a: Int) -> T` has one labelled Int parameter. Labels and positions never
-mix in record or tuple data or types; calls and constructor fields may mix.
-
 ```
-RecordType = "(" FPart { "," FPart } [ "," ] ")"
-           | "(" ".." Type { "," RPart } [ "," ] ")" .
-RPart = FPart | "-" Label .
-FPart = Label ":" Type .
-Label = name | string_lit | UpName .
+Prim       = FnType | TupleType | NamedType | "_" | "{" Type "}" | RecordType .
+RecordType = "{" ".." "}"
+           | "{" ".." Type { "," RPart } [ "," ] "}"
+           | "{" FPart { "," FPart } [ "," ] "}" .
+RPart      = Label ":" Type | "-" Label .
+FPart      = Label ":" Type .
+Label      = name | string_lit | UpName .
 ```
 
 `(..R)` means `R & Record`. Label scope, duplicate checking, spread order,
@@ -537,7 +552,7 @@ patterns and constructor exports. Record spreads require a base.
 - `ast::ExprKind::Record { base: Option<Box<Expr>>, fields: Vec<RecordField> }`, with `RecordField { label: LabelName, label_span: Span, value: Expr }` and `LabelName = Name(String) | Str(String)`.
 - `ast::TypeKind::Record { base: Option<Box<TypeExpr>>, parts: Vec<RecordTypePart> }`, with each part a field or a forgotten label.
 - The same nodes in HIR, with type labels resolved to `Name(String)` or `Param(TyVarId)`.
-- `format.rs` and `print.rs`: a record on one line when it fits, `{ name: "ada", age: 36 }`, and else one field per line with no commas. No comma is inserted to distinguish a record from code. The formatter keeps "the same tree after formatting".
+- `format.rs` and `print.rs`: a record on one line when it fits, `{ name: "ada", age: 36 }`, and else one field per line with no commas. The formatter keeps "the same tree after formatting".
 
 ## 9. Run time (WasmGC)
 
@@ -723,14 +738,6 @@ record.get(r, key)                            // E0541
 There is no error code for a spread with a type variable in an input place. Such a spread is checked with the sound rule R-without-right, which may only reject programs, so no extra rule is needed.
 
 ## 12. Spec text, section by section
-
-SYN2 amendment: §8 and D9 replace every concrete delimiter, brace scan and
-comma-based disambiguation instruction in this section and §§13–16.
-Function bodies are forced blocks; a returned record is an expression inside
-the block. Printer tests use `(f: (x) -> Int { x })` without a comma.
-The semantic equations, variance, evaluation order and label rules keep
-their accepted meanings. The source examples below are migrated separately.
-
 
 Nothing is renumbered. New text goes into new subsections. The text is written for the spec after A1, T1 and T2, and is put there after both merged.
 

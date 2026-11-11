@@ -113,11 +113,13 @@ pub(super) fn disjoint(x: &Ty, y: &Ty) -> bool {
 }
 
 /// The type at the top of a pattern, through `x = …`: `x: T`.
-pub(super) fn top_written(q: &Pattern) -> Option<&Type> {
-    match &q.kind {
-        PatternKind::Typed { ty, .. } => Some(ty),
-        PatternKind::Named { pattern, .. } => top_written(pattern),
-        _ => None,
+pub(super) fn top_written(mut q: &Pattern) -> Option<&Type> {
+    loop {
+        match &q.kind {
+            PatternKind::Typed { ty, .. } => return Some(ty),
+            PatternKind::Named { pattern, .. } => q = pattern,
+            _ => return None,
+        }
     }
 }
 
@@ -594,6 +596,7 @@ impl Checker<'_> {
     pub fn member_for(&self, q: &Pattern, b: &Ty) -> Ty {
         let prim = |t| Head::Named(TypeRef::Builtin(t));
         let head = match &q.kind {
+            PatternKind::Quote { syntax, .. } => Head::Named(TypeRef::Custom(*syntax)),
             PatternKind::Var(_) | PatternKind::Discard => return b.clone(),
             PatternKind::Typed { ty, .. } => return self.kconv(ty, &HashMap::new()),
             PatternKind::Named { pattern, .. } => return self.member_for(pattern, b),
@@ -621,6 +624,19 @@ impl Checker<'_> {
     pub fn fit_known(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
         match &q.kind {
+            PatternKind::Quote {
+                syntax, captures, ..
+            } => {
+                let one = Ty::named(TypeRef::Custom(*syntax), Vec::new());
+                for (many, pattern) in captures {
+                    let ty = if *many {
+                        Ty::named(TypeRef::Builtin(BuiltinType::List), vec![one.clone()])
+                    } else {
+                        one.clone()
+                    };
+                    self.fit_known(pattern, &ty, in_case);
+                }
+            }
             PatternKind::Var(x) => self.kbind(x.var, b.clone(), in_case),
             PatternKind::Typed {
                 binder: Some(x),
@@ -711,32 +727,58 @@ impl Checker<'_> {
     /// of a name inside the value of its own binding, and of a top-level
     /// name of the same group. The body of a function is not looked at.
     pub fn written_known(&self, e: &Expr) -> Ty {
-        let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
-        match &e.kind {
-            ExprKind::Int(n) => scalar_literal(BuiltinType::Int, n.to_string()),
-            ExprKind::Float(_) => prim(BuiltinType::Float),
-            ExprKind::String(s) => scalar_literal(BuiltinType::String, s.clone()),
-            ExprKind::BitArray(_) => prim(BuiltinType::BitArray),
-            ExprKind::Unary {
-                op: ilang_syntax::ast::UnOp::Neg,
-                expr,
-            } if neg_literal(expr).is_some() => {
-                scalar_literal(BuiltinType::Int, neg_literal(expr).unwrap())
-            }
-            ExprKind::Unary { op, .. } => prim(match op {
-                ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
-                ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
-            }),
-            ExprKind::Tuple(items) => {
-                Ty::tuple(items.iter().map(|x| self.written_known(x)).collect())
-            }
-            ExprKind::Block(b) => match b.stmts.as_slice() {
-                [Stmt::Expr(x)] => self.written_known(x),
-                _ => Ty::Top,
-            },
-            ExprKind::Fn(f) => self.fn_known(f, &[], Ty::Top),
-            _ => Ty::Top,
+        enum Task<'a> {
+            Visit(&'a Expr),
+            Tuple(usize),
         }
+        let mut todo = vec![Task::Visit(e)];
+        let mut values = Vec::new();
+        while let Some(task) = todo.pop() {
+            match task {
+                Task::Visit(e) => {
+                    let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
+                    match &e.kind {
+                        ExprKind::Int(n) => {
+                            values.push(scalar_literal(BuiltinType::Int, n.to_string()))
+                        }
+                        ExprKind::Float(_) => values.push(prim(BuiltinType::Float)),
+                        ExprKind::String(s) => {
+                            values.push(scalar_literal(BuiltinType::String, s.clone()))
+                        }
+                        ExprKind::BitArray(_) => values.push(prim(BuiltinType::BitArray)),
+                        ExprKind::Unary {
+                            op: ilang_syntax::ast::UnOp::Neg,
+                            expr,
+                        } if neg_literal(expr).is_some() => {
+                            values.push(scalar_literal(
+                                BuiltinType::Int,
+                                neg_literal(expr).expect("negative literal"),
+                            ));
+                        }
+                        ExprKind::Unary { op, .. } => values.push(prim(match op {
+                            ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
+                            ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
+                        })),
+                        ExprKind::Tuple(items) => {
+                            todo.push(Task::Tuple(items.len()));
+                            todo.extend(items.iter().rev().map(Task::Visit));
+                        }
+                        ExprKind::Block(b) => match b.stmts.as_slice() {
+                            [Stmt::Expr(x)] => todo.push(Task::Visit(x)),
+                            _ => values.push(Ty::Top),
+                        },
+                        ExprKind::Fn(f) => values.push(self.fn_known(f, &[], Ty::Top)),
+                        _ => values.push(Ty::Top),
+                    }
+                }
+                Task::Tuple(n) => {
+                    let parts = values.split_off(values.len() - n);
+                    values.push(Ty::tuple(parts));
+                }
+            }
+        }
+        assert_eq!(values.len(), 1, "written known type left multiple results");
+        values.pop().expect("written known type produced no result")
     }
 
     /// The known type of a function expression (§4.8): its labels; for each
@@ -1055,14 +1097,16 @@ fn coverage_literal(q: &Pattern) -> Option<Ty> {
 }
 
 /// Only brace groups around an unsigned literal are transparent to unary minus.
-pub(super) fn neg_literal(e: &Expr) -> Option<String> {
-    match &e.kind {
-        ExprKind::Int(n) => Some(super::lits::int_text(true, n)),
-        ExprKind::Block(b) => match b.stmts.as_slice() {
-            [Stmt::Expr(x)] => neg_literal(x),
-            _ => None,
-        },
-        _ => None,
+pub(super) fn neg_literal(mut e: &Expr) -> Option<String> {
+    loop {
+        match &e.kind {
+            ExprKind::Int(n) => return Some(super::lits::int_text(true, n)),
+            ExprKind::Block(b) => match b.stmts.as_slice() {
+                [Stmt::Expr(inner)] => e = inner,
+                _ => return None,
+            },
+            _ => return None,
+        }
     }
 }
 
