@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use ilang_check::{Parsed, hygiene};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, SourceId};
-use ilang_syntax::ast::{ItemKind, Pattern, PatternKind};
+use ilang_syntax::ast::{ItemKind, Pattern};
 use ilang_syntax::lisp::{
     expansion::{self, MacroDefinition},
     syntax::{Node, Syntax},
@@ -274,37 +274,6 @@ impl Registry {
     }
 }
 
-fn binding_names<'a>(p: &'a Pattern, out: &mut Vec<(&'a str, ilang_syntax::span::Span)>) {
-    match &p.kind {
-        PatternKind::Var(n) => out.push((n, p.span)),
-        PatternKind::Typed { binder, .. } if !binder.discard => {
-            out.push((&binder.name, binder.span))
-        }
-        PatternKind::Named { name, pattern } => {
-            out.push((&name.name, name.span));
-            binding_names(pattern, out);
-        }
-        PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-            for p in args {
-                binding_names(p, out)
-            }
-        }
-        PatternKind::List { items, rest } => {
-            for p in items {
-                binding_names(p, out);
-            }
-            if let Some(Some(b)) = rest
-                && !b.discard
-            {
-                out.push((&b.name, b.span));
-            }
-        }
-        PatternKind::Prefix { rest, .. } if !rest.discard => out.push((&rest.name, rest.span)),
-        PatternKind::BitArray(segments) => {
-            for s in segments {
-                binding_names(&s.value, out);
-            }
-        }
-        _ => {}
-    }
+fn binding_names<'a>(pattern: &'a Pattern, out: &mut Vec<(&'a str, ilang_syntax::span::Span)>) {
+    crate::body_walk::for_each_binder(pattern, |name, span| out.push((name, span)));
 }

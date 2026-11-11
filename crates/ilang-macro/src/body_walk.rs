@@ -351,51 +351,67 @@ impl<H: Hook> Walker<'_, H> {
     }
 }
 
+pub(crate) fn for_each_binder<'a>(
+    pattern: &'a Pattern,
+    mut visit: impl FnMut(&'a str, ilang_syntax::span::Span),
+) {
+    enum Task<'a> {
+        Pattern(&'a Pattern),
+        Binder(&'a str, ilang_syntax::span::Span),
+    }
+    let mut pending = vec![Task::Pattern(pattern)];
+    while let Some(task) = pending.pop() {
+        let pattern = match task {
+            Task::Pattern(pattern) => pattern,
+            Task::Binder(name, span) => {
+                visit(name, span);
+                continue;
+            }
+        };
+        match &pattern.kind {
+            PatternKind::Quote { captures, .. } => pending.extend(
+                captures
+                    .iter()
+                    .rev()
+                    .map(|(_, pattern)| Task::Pattern(pattern)),
+            ),
+            PatternKind::Var(name) => visit(name, pattern.span),
+            PatternKind::Typed { binder, .. } if !binder.discard => {
+                visit(&binder.name, binder.span)
+            }
+            PatternKind::Named { name, pattern } => {
+                visit(&name.name, name.span);
+                pending.push(Task::Pattern(pattern));
+            }
+            PatternKind::Prefix { rest, .. } if !rest.discard => visit(&rest.name, rest.span),
+            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
+                pending.extend(args.iter().rev().map(Task::Pattern))
+            }
+            PatternKind::List { items, rest } => {
+                if let Some(Some(rest)) = rest
+                    && !rest.discard
+                {
+                    pending.push(Task::Binder(&rest.name, rest.span));
+                }
+                pending.extend(items.iter().rev().map(Task::Pattern));
+            }
+            PatternKind::BitArray(segments) => pending.extend(
+                segments
+                    .iter()
+                    .rev()
+                    .map(|segment| Task::Pattern(&segment.value)),
+            ),
+            _ => {}
+        }
+    }
+}
+
 fn binders(pattern: &Pattern, out: &mut Vec<Local>, fn_only: Option<u32>) {
-    let mut push = |name: &str, span| {
+    for_each_binder(pattern, |name, span| {
         out.push(Local {
             name: name.into(),
             span,
             fn_only,
         })
-    };
-    match &pattern.kind {
-        PatternKind::Quote { captures, .. } => {
-            for (_, pattern) in captures {
-                binders(pattern, out, fn_only);
-            }
-        }
-        PatternKind::Var(name) => push(name, pattern.span),
-        PatternKind::Typed { binder, .. } if !binder.discard => push(&binder.name, binder.span),
-        PatternKind::Named { name, pattern } => {
-            push(&name.name, name.span);
-            binders(pattern, out, fn_only);
-        }
-        PatternKind::Prefix { rest, .. } if !rest.discard => push(&rest.name, rest.span),
-        PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-            for arg in args {
-                binders(arg, out, fn_only);
-            }
-        }
-        PatternKind::List { items, rest } => {
-            for item in items {
-                binders(item, out, fn_only);
-            }
-            if let Some(Some(rest)) = rest
-                && !rest.discard
-            {
-                out.push(Local {
-                    name: rest.name.clone(),
-                    span: rest.span,
-                    fn_only,
-                });
-            }
-        }
-        PatternKind::BitArray(segments) => {
-            for segment in segments {
-                binders(&segment.value, out, fn_only);
-            }
-        }
-        _ => {}
-    }
+    });
 }
