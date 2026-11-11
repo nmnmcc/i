@@ -163,6 +163,8 @@ def main():
     parser.add_argument('--use-built-tool', action='store_true', help='reuse an already built migration example')
     args = parser.parse_args()
     os.chdir(ROOT)
+    if not args.check:
+        args.write = True
     if not args.use_built_tool:
         build()
     selected = [str(Path(p)) for p in args.paths]
@@ -228,7 +230,13 @@ def main():
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
     print(json.dumps({key: value if key == 'areas' else len(value) for key, value in report.items()}, indent=2))
-    if report['invalid'] or report['manual'] or args.check and report['changed']:
+    if report['invalid'] or report['manual']:
+        for case in report['invalid'] + report['manual']:
+            print(f"{case['source']}: {case.get('diagnostics', case.get('empty_tuples', case.get('entry')))}", file=sys.stderr)
+        raise SystemExit(1)
+    if args.check and report['changed']:
+        for source in report['changed']:
+            print(source, file=sys.stderr)
         raise SystemExit(1)
 
 
