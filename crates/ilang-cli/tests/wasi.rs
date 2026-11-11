@@ -175,7 +175,7 @@ const LEVELS: [Level; 2] = [Level::O0, Level::O2];
 #[test]
 fn hello_needs_only_wasi() {
     let dir = package(&format!(
-        "{IO}@main\nmain = (io ! Io) {{ io.print(\"Hello from i!\") }}\n"
+        "{IO}\nmain = (io ! Io) {{ io.print(\"Hello from i!\") }}\n"
     ));
     for opt in LEVELS {
         let wasm = wasi(dir.path(), opt);
@@ -255,7 +255,7 @@ lines = (io ! Io, n: Int) {{
   }}
 }}
 
-@main
+
 main = (io ! Io) {{
   io.print(double(\"héllo ✓ \", 14))
   lines(1000)
@@ -303,7 +303,7 @@ fn greeter(linker: &mut Linker<State>) {
 fn greet_program(attribute: &str) -> tempfile::TempDir {
     package(&format!(
         "{IO}{attribute}\nGreet {{ Greet(greet: (name: String) -> String) }}\n\
-         @main\nmain = (io ! Io, g ! Greet) {{ io.print(g.greet(\"i\")) }}\n"
+         \nmain = (io ! Io, g ! Greet) {{ io.print(g.greet(\"i\")) }}\n"
     ))
 }
 
@@ -418,7 +418,7 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
         assert!(e.contains("the runtime imports"), "{name}: {e}");
         let service = format!(
             "@host(\"{wasi_module}\")\nW {{ W({name}: (code: Bool) -> Nil) }}\n\
-             @main\nmain = (w ! W) {{ w.{name}(True) }}\n"
+             \nmain = (w ! W) {{ w.{name}(True) }}\n"
         );
         let e = build_error(&service);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
