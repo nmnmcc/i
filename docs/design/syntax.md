@@ -1,6 +1,6 @@
 # Design: syntax with no keywords
 
-Status: accepted syntax, amended by the six confirmed SYN2 decisions of 2026-11-11. The A1/A2/A3 migration notes below are historical. The normative language text is `docs/spec.md`.
+Status: accepted syntax, amended by the retained SYN2 decisions of 2026-11-11. The A1/A2/A3 migration notes below are historical. The normative language text is `docs/spec.md`.
 
 ## Summary
 

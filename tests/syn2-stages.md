@@ -3,12 +3,12 @@
 Baseline: 2d1cfc56 on lane/syn2. The lane was clean. The study experiments
 under target/syn2 were retained as evidence, not installed as production code.
 The coordinator explicitly resumed the uncommitted stage-1 documents; they
-were kept and the seventh decision was folded into them.
+were kept and the entry decision was folded into them.
 
 ## Sources and interpretations
 
-The six confirmed decisions and coordinator rulings a–i control syntax.
-The seventh decision removes @main and selects the default from src/main.i.
+The retained USER decisions control syntax. The entry decision removes @main
+and selects the default from src/main.i.
 The sentence “each may point at any function in any module of the package”
 permits private functions in [entries]. Keys use ordinary name syntax; the
 values reuse [wasm].exports paths. --entry chooses a named entry; metadata
