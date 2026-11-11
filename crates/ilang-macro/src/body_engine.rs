@@ -55,6 +55,8 @@ pub struct BodyEngine<'a> {
     pub scoped: ScopedSource,
     pub resolver: Arc<DefinitionResolver>,
     pub transactions: Vec<Transaction>,
+    /// Successful type replacements, with unique virtual occurrence spans.
+    pub type_replacements: Vec<(Span, Span, Syntax)>,
     cache: HashMap<(u32, String, u8), Compiled>,
     session: &'a mut Session,
 }
@@ -76,6 +78,7 @@ impl<'a> BodyEngine<'a> {
             scoped,
             resolver,
             transactions: Vec::new(),
+            type_replacements: Vec::new(),
             cache: HashMap::new(),
             session,
         }
@@ -322,6 +325,7 @@ impl Hook for BodyEngine<'_> {
                 syntax: self.ty_syntax(arg),
             })
             .collect();
+        let old_span = ty.span;
         let call = self.ty_syntax(ty);
         let (result, budget, transactions) =
             self.execute(&mac, args, &call, ty.span, MacroPosition::Type)?;
@@ -331,6 +335,7 @@ impl Hook for BodyEngine<'_> {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|error| metered_error(error, &mac.definition.name, &call, ty.span))?;
+        self.type_replacements.push((old_span, ty.span, result));
         self.transactions.extend(transactions);
         Ok(ty)
     }

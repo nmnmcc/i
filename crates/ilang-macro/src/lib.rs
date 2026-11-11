@@ -9,3 +9,4 @@ pub mod call;
 pub mod module_order;
 pub mod registry;
 pub mod validate;
+pub mod diagnostics;

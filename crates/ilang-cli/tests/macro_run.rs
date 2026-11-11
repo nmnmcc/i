@@ -838,7 +838,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
         .items
         .extend(scoped.items(&generated, &exported).unwrap());
     module.scoped = Some(scoped);
-    let registry = Registry::new(&graph, &expanded).unwrap();
+    let registry = ilang_macro::registry::Registry::new(&graph, &expanded).unwrap();
     assert!(registry.resolve(caller, None, &exported, &[]).is_some());
     assert!(
         registry

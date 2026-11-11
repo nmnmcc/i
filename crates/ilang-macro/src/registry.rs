@@ -56,27 +56,30 @@ impl Registry {
             };
             let mut module = Module::default();
             for item in &p.ast.items {
-                if let ItemKind::Binding(binding) = &item.kind {
-                    let mut names = Vec::new();
-                    binding_names(&binding.pattern, &mut names);
-                    for (name, span) in names {
-                        if let Some(origin) =
-                            p.scoped.as_ref().and_then(|scoped| scoped.origin(span))
-                            && !origin.syntax.scope().marks.is_empty()
-                        {
-                            module.generated.push(hygiene::Binding {
-                                text: name.to_owned(),
-                                scope: origin.syntax.scope().clone(),
-                                identity: origin.syntax.scope_identity().cloned(),
-                                target: Value::Other,
-                            });
-                            continue;
-                        }
-                        let exported = p.ast.exports.iter().any(|e| e.name.name == name);
-                        module
-                            .values
-                            .insert(name.to_owned(), (Value::Other, exported));
+                let mut names = Vec::new();
+                match &item.kind {
+                    ItemKind::Binding(binding) => binding_names(&binding.pattern, &mut names),
+                    ItemKind::Declaration { name, .. } => {
+                        names.push((name.name.as_str(), name.span))
                     }
+                    _ => {}
+                }
+                for (name, span) in names {
+                    if let Some(origin) = p.scoped.as_ref().and_then(|scoped| scoped.origin(span))
+                        && !origin.syntax.scope().marks.is_empty()
+                    {
+                        module.generated.push(hygiene::Binding {
+                            text: name.to_owned(),
+                            scope: origin.syntax.scope().clone(),
+                            identity: origin.syntax.scope_identity().cloned(),
+                            target: Value::Other,
+                        });
+                        continue;
+                    }
+                    let exported = p.ast.exports.iter().any(|e| e.name.name == name);
+                    module
+                        .values
+                        .insert(name.to_owned(), (Value::Other, exported));
                 }
             }
             for definition in defs {
