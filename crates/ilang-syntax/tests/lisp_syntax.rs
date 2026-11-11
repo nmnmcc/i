@@ -1417,3 +1417,50 @@ fn show_as_attribute_item_uses_only_required_line_breaks() {
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(module.items[0].attributes.len(), 1);
 }
+
+#[test]
+fn show_as_accepts_expressions_already_written_in_normal_surface() {
+    let scope = Scope {
+        module: 0,
+        marks: BTreeSet::new(),
+    };
+    let leaves = [
+        "x",
+        "1",
+        "(1, 2)",
+        "[x, y]",
+        "f(x)",
+        "x + y",
+        "-{ x + y }",
+        "(x) { x }",
+        "x.{ 1 -> 2 _ -> 3 }",
+        "{ x y }",
+        "<<1, 2>>",
+    ];
+    let mut checked = 0;
+    for leaf in leaves {
+        for source in [
+            format!("value = {leaf}\n"),
+            format!("value = f({leaf})\n"),
+            format!("value = -{{ {leaf} }}\n"),
+            format!("value = [{leaf}]\n"),
+            format!("value = {{ {leaf} }} + z\n"),
+            format!("value = ({leaf}, z)\n"),
+            format!("value = () {{ {leaf} }}\n"),
+        ] {
+            let (module, errors) = ilang_syntax::parse_module(&source);
+            if !errors.is_empty() {
+                continue;
+            }
+            let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[0].kind else {
+                panic!("binding")
+            };
+            let syntax = expression_syntax(&binding.value, &scope, &source);
+            syntax
+                .show_as(Position::Expression)
+                .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
+            checked += 1;
+        }
+    }
+    assert!(checked >= 50, "only {checked} source expressions parsed");
+}
