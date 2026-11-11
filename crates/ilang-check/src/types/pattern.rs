@@ -2,7 +2,6 @@
 //! (§7.3), `case` by places (rule 11), narrowing (rule 12), coverage and
 //! clauses that are never used (§7.4), and known constructors (§7.5).
 
-use super::TyParts;
 use super::coverage::{self, Col, Ctor, Pat};
 use super::infer::{Checker, Scheme};
 use super::known;
@@ -1013,8 +1012,8 @@ impl Checker<'_> {
                 let n = self.p.ty(ctor.ty).params.len();
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
-                let kargs = match known::member(&places[at].known, Some(h)).map(Ty::into_parts) {
-                    Some(TyParts::Con(_, _, xs)) => Some(xs),
+                let kargs = match known::member(&places[at].known, Some(h)) {
+                    Some(Ty::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let mut parts = vec![Pat::Wild(None); fields.len()];
@@ -1064,8 +1063,8 @@ impl Checker<'_> {
                 let n = ps.len() as u32;
                 let h = Head::Tuple(n);
                 let parts = self.shared(places, at, h, ps.len());
-                let kparts = match known::member(&places[at].known, Some(h)).map(Ty::into_parts) {
-                    Some(TyParts::Con(_, _, xs)) => xs,
+                let kparts = match known::member(&places[at].known, Some(h)) {
+                    Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 let mut pats = Vec::new();

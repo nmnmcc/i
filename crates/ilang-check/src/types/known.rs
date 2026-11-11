@@ -8,7 +8,6 @@
 //! schemes, of constructors, and of annotations; it never takes part in
 //! constraints, so they only stand for the parts that matching fills in.
 
-use super::TyParts;
 use super::display;
 use super::infer::Checker;
 use super::lits::ValueSet;
@@ -495,13 +494,13 @@ impl Checker<'_> {
                 }
             }
             Ty::Var(v) => sigma.entry(*v).or_default().push(k.clone()),
-            Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head()).map(Ty::into_parts)) {
-                (Ty::Con(_, _, ps), Some(TyParts::Con(_, _, ks))) if ps.len() == ks.len() => {
+            Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head())) {
+                (Ty::Con(_, _, ps), Some(Ty::Con(_, _, ks))) if ps.len() == ks.len() => {
                     for (x, y) in ps.iter().zip(&ks) {
                         self.match_k(x, y, sigma, depth + 1);
                     }
                 }
-                (Ty::Fn(f), Some(TyParts::Fn(g))) if f.params.len() == g.params.len() => {
+                (Ty::Fn(f), Some(Ty::Fn(g))) if f.params.len() == g.params.len() => {
                     for (x, y) in f.params.iter().zip(&g.params) {
                         self.match_k(&x.1, &y.1, sigma, depth + 1);
                     }
@@ -655,10 +654,8 @@ impl Checker<'_> {
                 self.kbind(x.var, prim(BuiltinType::String), in_case);
             }
             PatternKind::Constructor { ctor, args, spread } => {
-                let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty))))
-                    .map(Ty::into_parts)
-                {
-                    Some(TyParts::Con(_, _, xs)) => Some(xs),
+                let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
+                    Some(Ty::Con(_, _, xs)) => Some(xs),
                     _ => None,
                 };
                 let n = match &self.p.ty(ctor.ty).body {
@@ -687,9 +684,8 @@ impl Checker<'_> {
                 }
             }
             PatternKind::Tuple(ps) => {
-                let parts = match member(b, Some(Head::Tuple(ps.len() as u32))).map(Ty::into_parts)
-                {
-                    Some(TyParts::Con(_, _, xs)) => xs,
+                let parts = match member(b, Some(Head::Tuple(ps.len() as u32))) {
+                    Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
                 for (x, k) in ps.iter().zip(&parts) {

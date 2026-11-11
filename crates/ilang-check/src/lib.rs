@@ -433,5 +433,3 @@ pub fn map_expansion_diagnostics(
         true
     });
 }
-mod hir_tree;
-mod hir_trampoline;
