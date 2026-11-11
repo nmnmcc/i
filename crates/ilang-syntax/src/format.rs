@@ -1418,7 +1418,7 @@ impl<'a> Formatter<'a> {
         cat(out)
     }
 
-    /// `(params) -> A ? E ! N { body }`; the `{` stays on the line of the
+    /// `(params) -> A ^ E ! N { body }`; the `{` stays on the line of the
     /// `)` or of the type before it (§1.7).
     fn function(&mut self, f: &Function, open: u32) -> Doc {
         let close = self.closer(open);
