@@ -517,6 +517,23 @@ fn written_definition_answers_give_parameters_their_own_binder() {
 }
 
 #[test]
+fn definition_preserves_record_label_parameter_identity() {
+    use ilang_syntax::lisp::definitions::source_definition;
+    use ilang_syntax::lisp::syntax::Node;
+    let source = "Box(K) = (K: Int)";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let like = root("x");
+    let answer = source_definition(&module.items[0], source, like.scope(), 23);
+    let Node::Round(item) = answer.node() else { panic!("alias"); };
+    let Node::Round(head) = item[1].node() else { panic!("head"); };
+    let Node::Curly(fields) = item[2].node() else { panic!("record"); };
+    let Node::Round(field) = fields[0].node() else { panic!("field"); };
+    assert_eq!(head[1].scope_identity(), field[1].scope_identity());
+    assert!(head[1].scope_identity().is_some());
+}
+
+#[test]
 fn copied_definition_freshens_its_binders_and_uses_together() {
     use ilang_syntax::lisp::definitions::{builtin_definition, freshen_parameters};
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
