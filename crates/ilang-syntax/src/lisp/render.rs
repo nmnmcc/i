@@ -775,4 +775,24 @@ mod record_tests {
             .join()
             .unwrap();
     }
+    #[test]
+    fn deeply_nested_record_text_parses_and_renders_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut input = String::with_capacity(100_001);
+                for _ in 0..10_000 {
+                    input.push_str("{ (: x ");
+                }
+                input.push('v');
+                for _ in 0..10_000 {
+                    input.push_str(") }");
+                }
+                let expected = format!("{}v{}", "(x: ".repeat(10_000), ")".repeat(10_000));
+                assert_eq!(render_one(&input, P::Expr).unwrap(), expected);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
