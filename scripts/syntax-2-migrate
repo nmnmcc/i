@@ -229,7 +229,7 @@ def main():
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n')
     print(json.dumps({key: value if key == 'areas' else len(value) for key, value in report.items()}, indent=2))
-    if report['manual'] or args.check and report['changed']:
+    if report['invalid'] or report['manual'] or args.check and report['changed']:
         raise SystemExit(1)
 
 

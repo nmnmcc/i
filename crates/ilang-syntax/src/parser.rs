@@ -75,8 +75,7 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
         legacy,
         old_empty: legacy || source.lines().any(|l| l.trim() == "// syntax: syn1"),
         surface2: source.lines().any(|l| l.trim() == "// syntax: syn2")
-            || lexed.tokens.iter().any(|t| t.kind == T::Caret)
-,
+            || lexed.tokens.iter().any(|t| t.kind == T::Caret),
     };
     let module = parser.module();
     let stats = ParseStats {
@@ -2001,7 +2000,10 @@ impl Parser<'_> {
                         && *self.nth(1) == T::Colon
                 {
                     let kind = self.record_type(T::RBrace)?;
-                    return Ok(TypeExpr { kind, span: self.span_from(start) });
+                    return Ok(TypeExpr {
+                        kind,
+                        span: self.span_from(start),
+                    });
                 }
                 let inner = self.nested(Self::ty)?;
                 if self.tok().brk {

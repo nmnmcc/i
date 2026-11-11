@@ -47,8 +47,12 @@ impl<'a> Migrator<'a> {
         match &t.kind {
             TypeKind::Record { base, fields, .. } => {
                 self.record_delimiters(t.span);
-                if let Some(base) = base { self.ty(base); }
-                for (_, field) in fields { self.ty(field); }
+                if let Some(base) = base {
+                    self.ty(base);
+                }
+                for (_, field) in fields {
+                    self.ty(field);
+                }
             }
             TypeKind::Tuple(xs) => {
                 if xs.is_empty() {
@@ -154,8 +158,12 @@ impl<'a> Migrator<'a> {
         match &e.kind {
             ExprKind::Record { base, fields } => {
                 self.record_delimiters(e.span);
-                if let Some(base) = base { self.expr(base); }
-                for (_, field) in fields { self.expr(field); }
+                if let Some(base) = base {
+                    self.expr(base);
+                }
+                for (_, field) in fields {
+                    self.expr(field);
+                }
             }
             ExprKind::Tuple(xs) => {
                 if xs.is_empty() {
@@ -206,7 +214,6 @@ impl<'a> Migrator<'a> {
             ExprKind::Case { subject, clauses } => {
                 self.expr(subject);
                 self.clauses(clauses);
-
             }
             ExprKind::Clauses(cs) => self.clauses(cs),
             ExprKind::Call { callee, args } => {
@@ -341,7 +348,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn preserves_comments_and_tree_and_is_idempotent() {

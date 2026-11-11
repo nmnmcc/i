@@ -103,3 +103,12 @@ No policy, limit, lockfile, global environment or reference tree changed.
 The pipe remains `|>` and a match remains a pipe into a clause block.
 The new error marker is `^`; the default entry is `src/main.i`'s `main`,
 with other entries declared in `[entries]`. Record nodes come from T3.
+
+Integration note: old braced and new parenthesised record forms construct the
+T3 record nodes. The parser uses `// syntax: syn2` or a `^` in a file to
+choose guard interpretation where the old error marker is ambiguous with a
+function-type guard; the migration rewrites error markers before that choice.
+The Go `cmd/gofmt/rewrite.go` comment-map approach motivates retaining source
+between span edits, and Cargo `src/workspace/parser/targets.rs` and Gleam
+`compiler-cli/src/run.rs` distinguish conventional and explicitly selected
+entry modules.
