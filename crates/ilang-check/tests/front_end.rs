@@ -173,7 +173,11 @@ fn kept_form_messages_are_independent_checks() {
         ("Schema(Int) = Int", "E0231", "name of a type"),
         ("f = (x: p.name) { x }", "E0201", "not defined"),
         ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),
-        (/* old-syntax-check: E0301 */ "@main()\nf = () { Nil }", "E0301", "kept for macros"),
+        (
+            /* old-syntax-check: E0301 */ "@main()\nf = () { Nil }",
+            "E0301",
+            "kept for macros",
+        ),
         ("@a.main\nf = () { Nil }", "E0301", "kept for macros"),
         ("f(A): (A) -> String", "E0308", "kept for macros"),
     ] {
