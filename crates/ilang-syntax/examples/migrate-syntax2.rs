@@ -375,6 +375,8 @@ mod tests {
             "result = x // a comment\n |> { 0 -> 1 _ -> 2 }",
             "result = (x) -> Int ? String { x }",
             "result = x |> f",
+            "T = {..}",
+            "result = { name: 1 }",
         ] {
             let result = migrate(source);
             assert_eq!(result["diagnostics"], json!([]), "{result}");
