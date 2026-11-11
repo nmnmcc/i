@@ -1,0 +1,58 @@
+==================
+General attributes documentation and keywordless names
+==================
+//// Module
+/// Item
+@external("env", "now")
+now: () -> Int
+@custom.rule("value")
+@arbitrary
+import = () { // ordinary comment
+  if = 1
+  case = if
+  case
+}
+
+---
+
+(source_file
+  (module_comment)
+  (doc_comment)
+  (attribute
+    (identifier)
+    (arguments
+      (argument
+        (string
+          (string_content)))
+      (argument
+        (string
+          (string_content)))))
+  (declaration
+    (identifier)
+    (function_type
+      (type_parameters_list)
+      (return_type
+        (named_type
+          (type_identifier)))))
+  (attribute
+    (identifier)
+    (identifier)
+    (arguments
+      (argument
+        (string
+          (string_content)))))
+  (attribute
+    (identifier))
+  (binding
+    (identifier)
+    (function
+      (parameters)
+      (block
+        (comment)
+        (binding
+          (identifier)
+          (integer))
+        (binding
+          (identifier)
+          (identifier))
+        (identifier)))))

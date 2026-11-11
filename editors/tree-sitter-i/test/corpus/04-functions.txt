@@ -1,0 +1,63 @@
+==================
+Functions and clauses are ordinary values
+==================
+empty = {}
+add = (x, y: Int) -> Int { x + y }
+main = () {
+  1 |> add(2) |> {
+    0 | 1 -> 10
+    n ? n > 2 -> n
+    _ -> 0
+  }
+}
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (clause_block))
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (identifier)
+        (typed_pattern
+          (identifier)
+          (named_type
+            (type_identifier))))
+      (return_type
+        (named_type
+          (type_identifier)))
+      (block
+        (binary_expression
+          (identifier)
+          (identifier)))))
+  (binding
+    (identifier)
+    (function
+      (parameters)
+      (block
+        (binary_expression
+          (binary_expression
+            (integer)
+            (call
+              (identifier)
+              (arguments
+                (argument
+                  (integer)))))
+          (clause_block
+            (clause
+              (integer)
+              (integer)
+              (integer))
+            (clause
+              (identifier)
+              (guard
+                (binary_expression
+                  (identifier)
+                  (integer)))
+              (identifier))
+            (clause
+              (discard)
+              (integer))))))))
