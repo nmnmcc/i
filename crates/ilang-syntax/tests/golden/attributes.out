@@ -3,13 +3,13 @@
 @external("app:math/v1", "add")
 add: (Int, Int) -> Int
 
-@main
+@custom
 main = () { Nil }
 
 @deprecated("old")
 @host("app:storage/v1", "async")
 Storage {
-  Storage(read: (key: String) -> String ? String)
+  Storage(read: (key: String) -> String ^ String)
 }
 
 @test

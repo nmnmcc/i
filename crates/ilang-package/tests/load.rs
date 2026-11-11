@@ -13,6 +13,71 @@ fn write(dir: &Path, files: &[(&str, &str)]) {
 }
 
 #[test]
+fn source_entries_do_not_load_test_dependencies() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[entries]\nrun = \"app.run\"\n[dev-dependencies]\nmissing = { path = \"missing\" }\n",
+            ),
+            ("src/app.i", "run = () { Nil }\n"),
+            ("test/broken.i", "not i source\n"),
+            ("test/app.i", "also not i source\n"),
+        ],
+    );
+    let options = ilang_package::LoadOptions {
+        tests: false,
+        ..Default::default()
+    };
+    let (graph, diags) = ilang_package::load_with(dir.path(), &options);
+    assert!(diags.is_empty(), "{diags:?}");
+    let root = &graph.packages[graph.root.unwrap()];
+    assert_eq!(
+        root.modules
+            .iter()
+            .map(|m| m.path.as_str())
+            .collect::<Vec<_>>(),
+        ["app/app"]
+    );
+}
+
+#[test]
+fn test_module_entries_load_test_dependencies() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[entries]\nrun = \"worker.run\"\n[dev-dependencies]\ndep = { path = \"dep\" }\n",
+            ),
+            ("test/worker.i", "run = () { Nil }\n"),
+            ("dep/i.toml", "name = \"dep\"\n"),
+            ("dep/src/value.i", "value = 1\n"),
+        ],
+    );
+    let options = ilang_package::LoadOptions {
+        tests: false,
+        ..Default::default()
+    };
+    let (graph, diags) = ilang_package::load_with(dir.path(), &options);
+    assert!(diags.is_empty(), "{diags:?}");
+    let root = &graph.packages[graph.root.unwrap()];
+    assert!(
+        root.modules
+            .iter()
+            .any(|m| m.path == "app/worker" && m.kind == ModuleKind::Test)
+    );
+    assert!(
+        root.dev_dependencies
+            .iter()
+            .any(|(name, id)| name == "dep" && id.is_some())
+    );
+}
+
+#[test]
 fn graph_with_path_dependencies() {
     let dir = tempfile::tempdir().unwrap();
     write(

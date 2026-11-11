@@ -1,14 +1,11 @@
 ==================
-Both record spellings and tuples
+Records and tuples
 ==================
-old = { name: "i", count: 1 }
 new = (name: "i", count: 1)
 copy = (..new, count: 2)
-legacy_copy = { ..old, name: "language" }
 empty = ()
 single = (1)
 pair = (1, 2)
-Old = { name: String, count: Int }
 New = (name: String, count: Int)
 Forget = (..New, -count, name: "i")
 
@@ -28,30 +25,11 @@ Forget = (..New, -count, name: "i")
   (binding
     (identifier)
     (record
-      (record_field
-        (identifier)
-        (string
-          (string_content)))
-      (record_field
-        (identifier)
-        (integer))))
-  (binding
-    (identifier)
-    (record
       (spread
         (identifier))
       (record_field
         (identifier)
         (integer))))
-  (binding
-    (identifier)
-    (record
-      (spread
-        (identifier))
-      (record_field
-        (identifier)
-        (string
-          (string_content)))))
   (binding
     (identifier)
     (record))
@@ -64,17 +42,6 @@ Forget = (..New, -count, name: "i")
     (tuple
       (integer)
       (integer)))
-  (type_definition
-    (type_identifier)
-    (type_record
-      (type_field
-        (identifier)
-        (named_type
-          (type_identifier)))
-      (type_field
-        (identifier)
-        (named_type
-          (type_identifier)))))
   (type_definition
     (type_identifier)
     (type_record

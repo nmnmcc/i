@@ -553,7 +553,7 @@ its lexical scope. It does not union incompatible instantiations into one
 environment; spec §9.2's same-constructor restrictions still apply to each
 actual function environment. This changes no source inference.
 
-A factory for service S has type `(generated arguments) -> S ? Never ! R`,
+A factory for service S has type `(generated arguments) -> S ^ Never ! R`,
 with R its ordinary inferred environment. The selected arguments have these
 exact types and meanings:
 
@@ -596,7 +596,7 @@ An adapter declaration names an accessible ordinary generalized function with
 this checked type (schema notation, R and S are the declared service unions):
 
 ```text
-adapter(A,E,N): (body: () -> A ? E ! N) -> A ? E ! R | N - S
+adapter(A,E,N): (body: () -> A ^ E ! N) -> A ^ E ! R | N - S
 ```
 
 It is generalized over arbitrary A, E and N; no extra result/error restriction
@@ -1057,7 +1057,7 @@ Outcome itself is a private branded object without a then property.
 Public `nil`, `bool`, `int`, `float`, `string`, `bits` convert into Value.
 `to_nil`, `to_bool`, `to_int`, `to_float`, `to_string`, `to_bits` give the
 corresponding i type with error `Mismatch { Mismatch }`. Implement each raw
-extractor with a primitive error, e.g. `(Value) -> Float ? Nil`; validate in
+extractor with a primitive error, e.g. `(Value) -> Float ^ Nil`; validate in
 the JS bridge *before* returning the Float. The ordinary wrapper maps that
 Nil error to Mismatch. This is implementable by §10.3 and avoids using the
 SDK's permissive `ofType` predicate as a conversion test.
@@ -1215,12 +1215,12 @@ wraps it. Root APIs expose operations, not the table.
 
 | Field | Type |
 |---|---|
-| alloc | `(size: Int) -> Int ? String` |
-| free | `(token: Int) -> Nil ? String` |
-| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ? String` |
-| load | `(token: Int, offset: Int, size: Int) -> BitArray ? String` |
-| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ? String` |
-| proc_exit | `(code: Int) -> Nil ? String` |
+| alloc | `(size: Int) -> Int ^ String` |
+| free | `(token: Int) -> Nil ^ String` |
+| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ^ String` |
+| load | `(token: Int, offset: Int, size: Int) -> BitArray ^ String` |
+| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ^ String` |
+| proc_exit | `(code: Int) -> Nil ^ String` |
 
 This deliberately replaces the old four raw-address fields and the promise
 of an unchecked field for every preview-1 function. `Wasi` is an ordinary
@@ -1607,13 +1607,13 @@ F2 originally said “allowing parentheses or a one-expression group around the 
 - Baseline paragraph/row 1976: [ ] Run permission/error/resource/security and concurrency reviews; include unsupported browser/preview-1 behavior and user-supplied host fakes.
 - Baseline paragraph/row 2054: | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 - Baseline paragraph/row 2055: | WASI pure tasks/random; WASI requiring private Fs | Pure calculations work; report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-- Baseline paragraph/row 2056: | @main needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
+- Baseline paragraph/row 2056: | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 - Baseline paragraph/row 2476: Inferred entry-service classification, pure/fake-only synchronous cases, task/host-only async cases, and no host poll for pure or raw-only runnable work.
 
 **docs/design/meta.md**
 
 - Baseline paragraph/row 368: An attribute whose name is one of the built-in attributes (`external`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
-- Baseline paragraph/row 378: The attributes `@external`, `@host`, `@main`, and `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5).
+- Baseline paragraph/row 378: The attributes `@external`, `@host`, `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5).
 - Baseline paragraph/row 494: This is the only case where two items have one name, and the only use of a declaration other than `@external`.
 
 **docs/design/syntax.md**

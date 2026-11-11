@@ -883,23 +883,6 @@ impl<'a> Formatter<'a> {
         let mut out = Vec::new();
         for a in &item.attributes {
             out.push(self.leading(a.span.start));
-            if a.module.is_none() && a.name.name == "main" {
-                let next = match &item.kind {
-                    ItemKind::TypeDef(def) => def.name.span.start,
-                    ItemKind::Binding(b) => b.span.start,
-                    ItemKind::Declaration { name, .. } => name.span.start,
-                    ItemKind::MacroItem { module, name, .. } => {
-                        module.as_ref().unwrap_or(name).span.start
-                    }
-                };
-                if self.peek().is_some_and(|c| {
-                    c.span.start < next && self.trails(a.span.end, c.span.start)
-                }) {
-                    out.push(self.take());
-                    out.push(self.hard());
-                }
-                continue;
-            }
             match &a.module {
                 Some(m) => out.push(text(format!("@{}.{}", m.name, a.name.name))),
                 None => out.push(text(format!("@{}", a.name.name))),
@@ -1417,7 +1400,7 @@ impl<'a> Formatter<'a> {
         cat(out)
     }
 
-    /// `(params) -> A ? E ! N { body }`; the `{` stays on the line of the
+    /// `(params) -> A ^ E ! N { body }`; the `{` stays on the line of the
     /// `)` or of the type before it (§1.7).
     fn function(&mut self, f: &Function, open: u32) -> Doc {
         let close = self.closer(open);
@@ -1765,7 +1748,7 @@ impl<'a> Formatter<'a> {
     ) -> Doc {
         let mut out = vec![self.ty_in(ret, 1, tail && err.is_none() && env.is_none())];
         if let Some(err) = err {
-            out.push(text(" ? "));
+            out.push(text(" ^ "));
             out.push(self.ty_in(err, 1, tail && env.is_none()));
         }
         if let Some(env) = env {

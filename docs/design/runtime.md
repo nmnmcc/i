@@ -247,10 +247,10 @@ is ordinary structural equality. No service or i/task import is needed.
 |---|---|
 | `from_seed` | `(seed: Int) -> Generator` |
 | `word` | `(g: Generator) -> (Int, Generator)` |
-| `int` | `(g: Generator, below: Int) -> (Int, Generator) ? RandomError` |
+| `int` | `(g: Generator, below: Int) -> (Int, Generator) ^ RandomError` |
 | `float` | `(g: Generator) -> (Float, Generator)` |
 | `split` | `(g: Generator) -> (Generator, Generator)` |
-| `at_path` | `(g: Generator, path: List(Int)) -> Generator ? RandomError` |
+| `at_path` | `(g: Generator, path: List(Int)) -> Generator ^ RandomError` |
 
 `RandomError { InvalidBound(Int) InvalidPath(List(Int)) }` is exported with its
 constructors. int requires below > 0, including arbitrarily large bounds;
@@ -351,7 +351,7 @@ RequestState(A) { Waiting Ready(A) Cancelled Taken }
 | `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
 | `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
 | `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-| `within(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
 | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
@@ -490,8 +490,8 @@ Cancelled, and Ready -> Taken or Cancelled; there is no write of another A.
 
 Keep synchronous `@host("ns")` as spec §9.7 defines it. For every namespace:
 
-* `@host("ns", "async")` writes its fields with wire type `(P...) -> A ? E`.
-  Its actual i field type is `(P...) -> A ? E ! Await | Owner`. Conceptually its body
+* `@host("ns", "async")` writes its fields with wire type `(P...) -> A ^ E`.
+  Its actual i field type is `(P...) -> A ^ E ! Await | Owner`. Conceptually its body
   starts Request(Result(A,E)), calls request.await_owned, then fail.from_result.
   With no errors it starts Request(A) and uses the same owning helper. The attribute's type
   expansion happens before ordinary inference and interface display. A user
@@ -633,16 +633,16 @@ Assert and user host services remain in N where the body needs them.
 | Binding | Type |
 |---|---|
 | `top` | `(seed: random.Generator) -> Runner ! Runner` |
-| `run(A,E,N)` | `(body: () -> A ? E ! N) -> A ? E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ? E ! N) -> A ? E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ? E ! N) -> A ? E ! N \| Scheduler` |
+| `run(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ^ E ! N) -> A ^ E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ^ E ! N) -> A ^ E ! N \| Scheduler` |
 | `local_scope(A,E,N)` | Same scheme as scope |
-| `go(A,E,N)` | `(s: Scope(E), body: () -> A ? E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `join(A,E)` | `(t: Task(A,E)) -> A ? E ! Scheduler` |
+| `go(A,E,N)` | `(s: Scope(E), body: () -> A ^ E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `join(A,E)` | `(t: Task(A,E)) -> A ^ E ! Scheduler` |
 | `yield` | `() -> Nil ! Scheduler` |
 | `path` | `() -> List(Int) ! Scheduler` |
 | `random` | `() -> random.Generator ! Scheduler` |
-| `keep(S,A,E,N)` | `(f: (S) -> A ? E ! N) -> { (S) -> A ? E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `keep(S,A,E,N)` | `(f: (S) -> A ^ E ! N) -> { (S) -> A ^ E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `channel(A)` | `() -> Channel(A) ! Scheduler` |
 | `local_channel(A)` | `() -> Channel(A) ! Scheduler` |
 | `send(A)` | `(c: Channel(A), value: A) -> Nil ! Scheduler` |
@@ -653,15 +653,15 @@ Assert and user host services remain in N where the body needs them.
 | `always(A)` | `(value: A) -> Event(A,Never,Never)` |
 | `never` | `() -> Event(Never,Never,Never)` |
 | `choose(A,E,N)` | `(events: List(Event(A,E,N))) -> Event(A,E,N)` |
-| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ? F ! M) -> Event(B,E \| F,N \| M)` |
-| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ? E ! N \| Scheduler` |
+| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ^ F ! M) -> Event(B,E \| F,N \| M)` |
+| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
 | `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
 | `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
 | `ref(A)` | `(value: A) -> Ref(A) ! Scheduler` |
 | `update(A,B)` | `(ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler` |
-| `both(A,B,E,N)` | `(left: () -> A ? E ! N, right: () -> B ? E ! N) -> (A,B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `race(A,E,N)` | `(left: () -> A ? E ! N, right: () -> A ? E ! N) -> A ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `both(A,B,E,N)` | `(left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 
 In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
 for combinators use one common E and N; subtyping admits either child's error
@@ -760,7 +760,7 @@ independently of the outcome. Keep dropped/cancelled records until scope exit.
 A cancelled outcome retains its causing scope and cancellation epoch, so a join
 can apply that cause even before its caller receives a cancel message. Do not
 use only a worker-local “cancel delivered” flag to decide whether to stop.
-join's type remains `(Task(A,E)) -> A ? E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
+join's type remains `(Task(A,E)) -> A ^ E ! Scheduler`. After the run/chain checks, process any applicable scope cancellation
 before observing a target's cancellation outcome. A joiner still cancellable by
 that cancellation is unwound; it never races between this path and a join panic.
 This includes a final executing a fresh scope body that the fresh scope can
@@ -1098,7 +1098,7 @@ Raw fields of Clock:
 | `sleep_ns` | `(duration: Int) -> Request(Result(Nil,String))` |
 
 Wrappers have those parameter/result types without Request/Result and with
-`? ClockError ! Clock | request.Await | request.Owner`. monotonic_ns measures nanoseconds since
+`^ ClockError ! Clock | request.Await | request.Owner`. monotonic_ns measures nanoseconds since
 the instance's clock origin and never decreases; unix_ns counts signed
 nanoseconds since 1970-01-01T00:00:00Z with platform clock adjustments visible.
 sleep_ns requires a nonnegative duration; zero still performs an await/poll
@@ -1128,7 +1128,7 @@ OpenMode { ReadOnly WriteTruncate Append ReadWrite }
 Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 `read_write`; write modes create the file if absent, read_write does not
 truncate. Public read/write/flush/remove/rename/read_file/write_file otherwise
-use File in place of resource Int parameters, with `? FsError`; other success
+use File in place of resource Int parameters, with `^ FsError`; other success
 types stay the same. Unwrap File(number) before each raw call. Public close
 has no errors and is idempotent. A read requires max_bytes > 0, returns up to
 that many bytes, and returns `<<>>` only at EOF. All bytes parameters must have
@@ -1252,7 +1252,7 @@ The fields stay in i/process, but each wrapper requires only its capability's se
 Public args gives List(String); spawn takes `(program: String, args: List(String))`
 and returns Child; wait/terminate/close take Child. Match Child(number)
 to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
-keep raw parameters/success values, with `? ProcessError` except
+keep raw parameters/success values, with `^ ProcessError` except
 close, which has no errors. Program args exclude the interpreter/program name;
 spawn's args exclude argv[0]. `i run -- ...` passes only the arguments after `--` to the program.
 `spawn` inherits cwd, environment and standard streams. `spawn_piped` selects
@@ -1323,7 +1323,7 @@ close = (Child(number), raw ! Process) { request.await_owned(raw.close(number)) 
 | `flush_error` | `() -> Request(Result(Nil,String))` |
 
 Public wrappers use request.await_owned to unwrap those results, giving
-`? StdioError ! Stdio | request.Await | request.Owner`.
+`^ StdioError ! Stdio | request.Await | request.Owner`.
 read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 and stderr are distinct directions; one write per direction may be pending,
 with busy for a competing write. A cancelled write may have written a prefix.
@@ -1708,9 +1708,9 @@ It is host policy, not a reserved library namespace or a new type rule.
 > types the host can take (§10.3), with no environment. Its call completes
 > during the import.
 >
-> In the async form, the written field type is `(P...) -> A ? E`, with no
+> In the async form, the written field type is `(P...) -> A ^ E`, with no
 > written environment. Before inference, its callable type becomes
-> `(P...) -> A ? E ! request.Await | request.Owner`. Parameters, A and E must be types the host
+> `(P...) -> A ^ E ! request.Await | request.Owner`. Parameters, A and E must be types the host
 > can take. A call starts a request, awaits it through the Await service, and
 > returns its value or raises its error. The call therefore waits at its call
 > site; other tasks in the run may proceed meanwhile. Interface display shows
@@ -1786,9 +1786,9 @@ Exclude the discussion of compiler frame/table layout.
 
 **§10.2 full replacement.**
 
-> The program entry is the @main function of the compiled package. It has no
-> ordinary parameters and its value is ignored. More than one is a compile
-> error; dependencies' @main attributes do not add entries. Tests are @test
+> The program entry is `main` in `src/main.i`, or a target selected from the
+> compiled package's `[entries]`. It has no ordinary parameters and its value
+> is ignored. Dependency entries do not affect the program. Tests are @test
 > functions in test/ of the compiled package; each has no ordinary parameters
 > and returns Nil. A test passes by returning Nil and fails on a stop. Each
 > runs in its own freshly started instance. Host exports are the functions
@@ -2113,7 +2113,7 @@ The acceptance server in §9 is a complete module.
 | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 | Missing env variable with supplied Environment; generated browser raw TCP without provider | ProcessError(...,"not_found"); compile error naming Net even inside fail.catch; §7, §8.2 and spec §2.6 |
 | WASI pure tasks/random; WASI requiring private Fs without/with explicit host plan | Pure calculations work; missing Fs compile error / report blocking Int imports requiring a buffer-aware adapter; §8.2/B.7, no fd identity reuse |
-| @main needs user State without/with a target provider | Target-plan compile error / construct ordinary State; source-only check accepts both, async classification follows the complete D5 graph without changing the type |
+| program entry needs user State without/with a target provider | Target-plan compile error / construct ordinary State; source-only check accepts both, async classification follows the complete D5 graph without changing the type |
 | Ready answer returned from within, then take | Original answer, then Taken; closing Owner cancels outstanding work only, not detached Ready answers (§5.1/§5.4) |
 | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 

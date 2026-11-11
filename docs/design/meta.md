@@ -267,7 +267,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 
 ```i
 fact = (n) {
-  n.{
+  n |> {
     0 -> 1
     _ -> n * fact(n - 1)
   }

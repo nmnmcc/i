@@ -5,6 +5,6 @@ f: Int
 /// before
 @deprecated("old")
 /// after
-@main
+@custom
 /// last
 main = () { Nil }

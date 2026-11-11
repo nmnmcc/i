@@ -32,8 +32,8 @@ fn record_values_types_and_source_locations_are_preserved() {
     );
     assert!(parse_type(&empty).is_err());
     assert!(parse_pattern(&empty).is_err());
-    let source = one("{ .. base (: name 1) (: \"x-y\" value) }");
-    let K::Curly(parts) = &source.kind else {
+    let source = one("(.. base (: name 1) (: \"x-y\" value))");
+    let K::Round(parts) = &source.kind else {
         panic!()
     };
     let K::Round(named) = &parts[2].kind else {
@@ -54,7 +54,7 @@ fn record_values_types_and_source_locations_are_preserved() {
         ["name", "x-y"]
     );
     assert_eq!(fields[0].0.span, named[1].span);
-    let ty = parse_type(&one("{ .. R (- K) (: K Int) (: \"x-y\" String) }")).unwrap();
+    let ty = parse_type(&one("(.. R (- K) (: K Int) (: \"x-y\" String))")).unwrap();
     let TypeKind::Record {
         base,
         fields,
@@ -112,12 +112,12 @@ fn record_expression_and_type_handle_ten_thousand_nested_fields_and_spreads() {
             let mut ty_base = d(K::UpName("R".into()), 0);
             for _ in 0..10_000 {
                 expr = d(
-                    K::Curly(vec![sym(".."), expr, field(name("x"), name("v"))]),
+                    K::Round(vec![sym(".."), expr, field(name("x"), name("v"))]),
                     0,
                 );
-                ty = d(K::Curly(vec![field(name("x"), ty)]), 0);
-                expr_field = d(K::Curly(vec![field(name("x"), expr_field)]), 0);
-                ty_base = d(K::Curly(vec![sym(".."), ty_base]), 0);
+                ty = d(K::Round(vec![field(name("x"), ty)]), 0);
+                expr_field = d(K::Round(vec![field(name("x"), expr_field)]), 0);
+                ty_base = d(K::Round(vec![sym(".."), ty_base]), 0);
             }
             let value = parse_expression(&expr).unwrap();
             let mut p = &value;
@@ -188,9 +188,9 @@ fn expanded_record_labels_keep_their_original_syntax_identity() {
         module: 42,
         marks: BTreeSet::from([7]),
     };
-    let source = one("{ (: name value) }");
+    let source = one("((: name value))");
     let root = Syntax::from_datum(&source, &scope);
-    let Node::Curly(items) = root.node() else {
+    let Node::Round(items) = root.node() else {
         panic!()
     };
     let Node::Round(field) = items[0].node() else {
@@ -234,10 +234,7 @@ fn normal_lisp_normal_round_trip_preserves_records() {
 empty = ()
 single = (1)
 Single = (Int)
-old = { name: 1 }
-Old = { name: Int }
 f = (x) -> Int ^ String { x }
-g = (x) -> Int ? String { x }
 first = (name: "Ada", "x-y": 7)
 second = (..first, count: 2)
 choose(K, R) = (key: K, r: (..R, -other, K: Int)) -> (K: Int) { r }
@@ -260,7 +257,7 @@ choose(K, R) = (key: K, r: (..R, -other, K: Int)) -> (K: Int) { r }
 #[test]
 fn malformed_record_field_reports_the_original_label_span() {
     let label = d(K::UpName("NotAValueLabel".into()), 67);
-    let source = d(K::Curly(vec![field(label, name("value"))]), 1);
+    let source = d(K::Round(vec![field(label, name("value"))]), 1);
     let error = parse_expression(&source).unwrap_err();
     assert_eq!(error.span, Span::new(67, 68));
 }

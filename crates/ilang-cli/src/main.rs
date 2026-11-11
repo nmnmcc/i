@@ -61,7 +61,6 @@ enum Command {
         #[arg(long, default_value_t = 2)]
         opt: u8,
         /// Select a function declared in [entries].
-        #[arg(long)]
         entry: Option<String>,
         /// The output file; by default `build/<name>.wasm` in the package.
         #[arg(long)]
@@ -85,12 +84,11 @@ enum Command {
         opt: u8,
         #[arg(long, value_enum, default_value_t = TargetArg::Native)]
         target: TargetArg,
+        /// Select a function declared in [entries].
+        entry: Option<String>,
         /// Arguments passed to the program after --.
         #[arg(last = true)]
         args: Vec<String>,
-        /// Select a function declared in [entries].
-        #[arg(long)]
-        entry: Option<String>,
     },
     /// List checked collection contributions as a JSON manifest.
     Collections {
@@ -293,10 +291,6 @@ fn options(opt: u8, tests: bool, offline: bool) -> anyhow::Result<BuildOptions> 
     })
 }
 
-fn built(project: &Path, options: BuildOptions) -> anyhow::Result<Option<ilang_cli::Built>> {
-    built_entry(project, options, None)
-}
-
 fn built_entry(
     project: &Path,
     options: BuildOptions,
@@ -400,7 +394,7 @@ fn cmd_run(
     let program = b.host_program()?;
     if program.abi().entry.is_none() {
         anyhow::bail!(
-            "the package has no program entry; define `main` in `src/main.i` or select `--entry NAME` (§10.2)"
+            "the package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)"
         );
     }
     let mut options = ilang_host::HostOptions::new(ilang_host::services::stdout_with_args(args));
@@ -470,34 +464,34 @@ fn cmd_test(
     }
     let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
     let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
-    let entries = if let Some(collection) = manifest
+    let collection = manifest
         .get("test")
         .and_then(|t| t.get("collection"))
-        .and_then(|v| v.as_str())
-    {
-        match ilang_cli::collections(project, true, offline) {
-            Ok(manifest) => manifest
-                .entries
-                .into_iter()
-                .filter(|e| e.collection == collection)
-                .collect::<Vec<_>>(),
-            Err(error) => {
-                eprintln!("{error}");
-                return Ok(ExitCode::FAILURE);
-            }
-        }
-    } else {
-        Vec::new()
+        .and_then(|v| v.as_str());
+    let options = BuildOptions {
+        target,
+        ..options(opt, true, offline)?
     };
+    let (b, entries) = match ilang_cli::build_tests(project, options, collection) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("{error}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
+    for warning in &b.warnings {
+        eprintln!("{warning}");
+    }
     let focused = entries
         .iter()
         .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
     let mut seen = std::collections::HashMap::new();
     for entry in &entries {
         if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
-            if let Some(previous) = seen.insert(name, &entry.at) {
+            let qualified = format!("{}.{name}", entry.module);
+            if let Some(previous) = seen.insert(qualified.clone(), &entry.at) {
                 eprintln!(
-                    "duplicate test name {name:?}: {}:{}:{} and {}:{}:{}",
+                    "duplicate test name {qualified:?}: {}:{}:{} and {}:{}:{}",
                     previous.path,
                     previous.line,
                     previous.column,
@@ -509,19 +503,13 @@ fn cmd_test(
             }
         }
     }
-    let options = BuildOptions {
-        target,
-        ..options(opt, true, offline)?
-    };
-    let Some(b) = built(project, options)? else {
-        return Ok(ExitCode::FAILURE);
-    };
     let program = b.host_program()?;
     let tests: Vec<String> = program
         .abi()
         .tests
         .iter()
         .map(|t| t.name.clone())
+        .filter(|n| !n.starts_with("i.tool."))
         .filter(|n| filter.is_none_or(|f| n.contains(f)))
         .collect();
     let mut failed = 0;
@@ -572,7 +560,11 @@ fn cmd_test(
                     .find(|(k, _)| k == key)
                     .map(|(_, v)| v.as_str())
             };
-            let name = get("name").unwrap_or(&entry.target.path);
+            let name = format!(
+                "{}.{}",
+                entry.module,
+                get("name").unwrap_or(&entry.target.path)
+            );
             let mode = get("mode").unwrap_or("test");
             if filter.is_some_and(|f| !name.contains(f)) {
                 continue;
@@ -582,19 +574,25 @@ fn cmd_test(
                 println!("skip {name}");
                 continue;
             }
-            let selected = match ilang_cli::build_collection(
-                project,
-                options,
-                &entry.handle,
-                ilang_cli::CollectionResult::Nil,
-            ) {
-                Ok(selected) => selected,
-                Err(error) => {
-                    eprintln!("{error}");
-                    return Ok(ExitCode::FAILURE);
+            let index = entry
+                .handle
+                .rsplit(':')
+                .next()
+                .expect("collection handle index");
+            let export = format!("i.tool.{index}");
+            let outcome = ilang_host::block_on(async {
+                let mut instance = program.instantiate(b.host_options())?;
+                if program
+                    .abi()
+                    .tests
+                    .iter()
+                    .any(|t| t.name == export && t.is_async)
+                {
+                    instance.run_async(&export).await
+                } else {
+                    instance.run(&export)
                 }
-            };
-            let outcome = selected.run_with(selected.built.host_options());
+            });
             let success = matches!(outcome, Ok(Outcome::Ok(_)));
             if outcome.is_ok() && success != (mode == "fails") {
                 passed += 1;

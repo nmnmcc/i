@@ -10,21 +10,23 @@
 //! ```text
 //! // spec: 6.10
 //! // expect: pass | compile-error <code> | stop "<first line>" | warning <code>
+//! # entry: name                (a package case selects an [entries] target)
+//! # entry-test: name           (same, only when building tests)
 //! // at: spec/case:3:5          (for a stop: each further line of the message)
-//! // output: text               (each text that the `@main` gave to a host function)
+//! // output: text               (each text that the entry gave to a host function)
 //! ```
 //!
 //! The host gives the services and external functions of
 //! `ilang_host::services::testing` under `test:` namespaces, and, as by
 //! default, does not check their answers, so that the module stops for an
-//! answer that is not correct (B.2). With `output` lines, the texts that the `@main` gave to
+//! answer that is not correct (B.2). With `output` lines, the texts that the entry gave to
 //! `test:io/v1` `print` and to the functions of `test:async/v1` are exactly
 //! those, in order.
 //!
-//! - `pass`: the `@main`, when there is one, ends without a stop, and every
+//! - `pass`: the entry, when there is one, ends without a stop, and every
 //!   `@test` passes.
 //! - `warning <code>`: as `pass`, and the compiler gives that warning.
-//! - `stop "…"`: the `@main` stops, and the first line of the stop message is
+//! - `stop "…"`: the entry stops, and the first line of the stop message is
 //!   the text. With `at` lines, the other lines of the message are exactly
 //!   those.
 //! - `compile-error <code>`: the compiler gives that error.
@@ -32,7 +34,7 @@
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
 
-use ilang_cli::{BuildError, BuildOptions, Level, build, run_test_with};
+use ilang_cli::{BuildError, BuildOptions, Level, build_entry, build_tests, run_test_with};
 use ilang_host::services::{Log, testing};
 use ilang_host::{HostOptions, Outcome, Program, TestResult};
 use std::path::{Path, PathBuf};
@@ -43,6 +45,9 @@ mod single_file;
 
 #[path = "common/spec_header.rs"]
 mod spec_header;
+
+#[path = "common/spec_entry.rs"]
+mod spec_entry;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Expect {
@@ -59,7 +64,7 @@ struct Case {
     /// The package directory to build.
     project: PathBuf,
     expect: Expect,
-    /// The texts that the `@main` gives to the host, when they are checked.
+    /// The texts that the entry gives to the host, when they are checked.
     output: Option<Vec<String>>,
     _temp: Option<tempfile::TempDir>,
 }
@@ -162,7 +167,13 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                             }
                         }
                         let dir = tempfile::tempdir().unwrap();
-                        std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+                        let manifest = if text.contains("std/test") {
+                            let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+                            format!("name = \"spec\"\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n", std_path.to_str().unwrap())
+                        } else {
+                            "name = \"spec\"\n".to_string()
+                        };
+                        std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
                         single_file::write(dir.path(), &stem, &text);
                         Case {
                             name,
@@ -190,9 +201,9 @@ enum Outcome2 {
     },
     Ran {
         warnings: Vec<String>,
-        /// `None` when there is no `@main`; else `Ok` or the stop message.
+        /// `None` when there is no entry; else `Ok` or the stop message.
         main: Option<Result<(), String>>,
-        /// What the `@main` gave to the host.
+        /// What the entry gave to the host.
         output: Vec<String>,
         tests: Vec<(String, Result<(), String>)>,
     },
@@ -206,16 +217,27 @@ fn stop_text(stop: &ilang_host::Stop) -> String {
 }
 
 fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
-    let built = match build(
-        project,
-        BuildOptions {
-            tests: true,
-            opt,
-            offline: false,
-            target: Default::default(),
-        },
-    ) {
-        Ok(b) => b,
+    let manifest: toml_edit::DocumentMut = std::fs::read_to_string(project.join("i.toml"))
+        .map_err(|e| e.to_string())?
+        .parse()
+        .map_err(|e: toml_edit::TomlError| e.to_string())?;
+    let collection = manifest
+        .get("test")
+        .and_then(|t| t.get("collection"))
+        .and_then(|v| v.as_str());
+    let options = BuildOptions {
+        tests: true,
+        opt,
+        offline: false,
+        target: Default::default(),
+    };
+    let result = if collection.is_some() {
+        build_tests(project, options, collection)
+    } else {
+        build_entry(project, options, spec_entry::named_entry(project, true).as_deref()).map(|built| (built, Vec::new()))
+    };
+    let (built, entries) = match result {
+        Ok(value) => value,
         Err(BuildError::Program { lines, codes, .. }) => {
             return Ok(Outcome2::CompileError {
                 codes: codes.iter().map(|c| c.to_string()).collect(),
@@ -238,12 +260,45 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
     };
     let mut tests = Vec::new();
     for t in &program.abi().tests {
+        if t.name.starts_with("i.tool.") {
+            continue;
+        }
         let r = match run_test_with(&program, &t.name, options(&Log::default())) {
             TestResult::Passed => Ok(()),
             TestResult::Stopped(stop) => Err(stop_text(&stop)),
             TestResult::Failed(e) => return Err(format!("{}: {e:#}", t.name)),
         };
         tests.push((t.name.clone(), r));
+    }
+    for entry in entries {
+        let index = entry.handle.rsplit(':').next().unwrap();
+        let export = format!("i.tool.{index}");
+        let outcome = ilang_host::block_on(async {
+            let mut instance = program.instantiate(options(&Log::default()))?;
+            if program
+                .abi()
+                .tests
+                .iter()
+                .any(|t| t.name == export && t.is_async)
+            {
+                instance.run_async(&export).await
+            } else {
+                instance.run(&export)
+            }
+        });
+        let result = match outcome {
+            Ok(Outcome::Ok(_)) => Ok(()),
+            Ok(Outcome::Stop(stop)) => Err(stop_text(&stop)),
+            Ok(Outcome::Err(error)) => Err(format!("error {:?}", error.0)),
+            Err(error) => return Err(format!("{error:#}")),
+        };
+        let name = entry
+            .data
+            .iter()
+            .find(|(key, _)| key == "name")
+            .map(|(_, v)| v.as_str())
+            .unwrap();
+        tests.push((format!("{}.{name}", entry.module), result));
     }
     let output = log.lock().unwrap().clone();
     Ok(Outcome2::Ran {
@@ -289,10 +344,10 @@ fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
                 return Err(format!("expected the warning {code}, got {warnings:?}"));
             }
             if let Some(Err(m)) = main {
-                return Err(format!("@main stopped:\n{m}"));
+                return Err(format!("the entry stopped:\n{m}"));
             }
             if main.is_none() && tests.is_empty() {
-                return Err("the case has no @main and no @test".into());
+                return Err("the case has no entry and no @test".into());
             }
             for (name, r) in tests {
                 if let Err(m) = r {
@@ -302,8 +357,8 @@ fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
             Ok(())
         }
         (Expect::Stop(first, at), Outcome2::Ran { main, .. }) => match main {
-            None => Err("a stop case needs a @main".into()),
-            Some(Ok(())) => Err(format!("expected the stop `{first}`, but @main ended")),
+            None => Err("a stop case needs an entry".into()),
+            Some(Ok(())) => Err(format!("expected the stop `{first}`, but the entry ended")),
             Some(Err(m)) => {
                 let mut lines = m.split('\n');
                 let got = lines.next().unwrap_or("");
@@ -322,7 +377,9 @@ fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
 
 fn main() {
     let filter: Option<String> = std::env::args().skip(1).find(|a| !a.starts_with('-'));
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+    let root = std::env::var_os("I_SPEC_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec"));
     let all = cases(&root);
     let mut failures: Vec<String> = Vec::new();
     let mut ready = Vec::new();

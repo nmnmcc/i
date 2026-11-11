@@ -328,7 +328,7 @@
         },
         {
           "name": "keyword.operator.error.i",
-          "match": "\\^|\\?"
+          "match": "\\^"
         },
         {
           "name": "keyword.operator.environment.i",

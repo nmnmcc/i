@@ -222,7 +222,10 @@ fn an_editor_session() {
 
     // Opening a correct file clears its problems.
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet"])
+    );
 
     // Hover shows the type, with the documentation.
     let (l, ch) = find(MAIN, "add(1", 0);
@@ -311,7 +314,10 @@ fn an_editor_session() {
 
     // Fixed again: the problems are cleared.
     c.change(&main, 4, MAIN);
-    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet"])
+    );
 
     // Completion after `u.` in an unsaved buffer that does not parse.
     let typing = MAIN.replace("u.name", "u.");
@@ -363,7 +369,10 @@ fn unsaved_changes_in_another_file() {
     let util = file_uri(&dir.path().join("src/util.i"));
     let mut c = Client::start();
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet"])
+    );
     // `double` is no longer exported, in the buffer only.
     c.open(&util, &UTIL.replace(" (double)", " "));
     let diags = c.diagnostics(&main);
@@ -376,7 +385,10 @@ fn unsaved_changes_in_another_file() {
     c.notify::<lsp::notification::DidCloseTextDocument>(json!({
         "textDocument": { "uri": util }
     }));
-    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet"])
+    );
     c.shutdown();
 }
 
@@ -568,7 +580,10 @@ fn answers_from_the_last_check() {
     // Long enough that no check starts by itself during the test.
     let mut c = Client::with_debounce(Duration::from_secs(600));
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet"])
+    );
     let started = Instant::now();
     // A line before everything.
     let edited = format!("\n{MAIN}");
@@ -641,7 +656,10 @@ fn quick_changes_are_checked_once() {
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::with_debounce(Duration::from_millis(300));
     c.open(&main, MAIN);
-    assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    assert_eq!(
+        c.diagnostics(&main),
+        unused_diagnostics(MAIN, &["greet"])
+    );
     for i in 0..10 {
         let text = format!("{MAIN}{}bad = nope\n", "\n".repeat(i));
         c.change(&main, i as i32 + 2, &text);

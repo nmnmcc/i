@@ -1,3 +1,4 @@
+// old-syntax-check: E0101,E0101,E0101,E0101,E0101,E0101
 // Predictions from the proposed rules; record syntax is not implemented here.
 wrap = (x: Int | String) -> { a: Int | String } { a: x }
 wrap_union = (x: Int | String) -> { a: Int } | { a: String } { a: x }

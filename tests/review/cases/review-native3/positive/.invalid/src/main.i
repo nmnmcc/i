@@ -2,5 +2,5 @@
 import (r = app/resource)
 s = () { ! r.Raw = r.seed()
  r.open() }
-@main
+
 main = () { Nil }

@@ -378,7 +378,7 @@ impl Encoder<'_> {
     }
     fn record_label(&self, n: &Ident) -> Syntax {
         let token = &self.tokens[self.positions[n.span.start as usize]];
-        if matches!(token.kind, TokenKind::Str(_)) {
+        if matches!(token.kind, TokenKind::Str(_)) && crate::print::record_label(&n.name, false).starts_with('"') {
             self.node(Node::Text(n.name.clone()), n.span)
         } else {
             self.name(n)
@@ -623,7 +623,7 @@ impl Encoder<'_> {
                         ));
                     }
                 }
-                self.node(Node::Curly(nodes), t.span)
+                self.node(Node::Round(nodes), t.span)
             }
             TypeKind::Fn {
                 params,
@@ -798,7 +798,7 @@ impl Encoder<'_> {
                         n.span.to(value.span),
                     ));
                 }
-                self.node(Node::Curly(nodes), e.span)
+                self.node(Node::Round(nodes), e.span)
             }
             ExprKind::Tuple(xs) if xs.is_empty() => self.node(Node::Round(Vec::new()), e.span),
             ExprKind::Tuple(xs) => self.form(",", xs.iter().map(|x| self.expr(x)), e.span),

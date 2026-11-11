@@ -260,11 +260,10 @@ have no other differences.
 A function with many suspend points and no annotations, of this shape
 (`s` suspends):
 
-<!-- old-syntax-check: E0101 -->
 ```i
 a1 = { a0 % 3 } |> { 0 -> s(b, a0 + 1)  _ -> a0 + 2 }
 a2 = { a1 % 3 } |> { 0 -> s(b, a1 + 1)  _ -> a1 + 2 }
-...
+// ...
 ```
 
 Each call of `s` gives new type variables for the arguments of the boundary

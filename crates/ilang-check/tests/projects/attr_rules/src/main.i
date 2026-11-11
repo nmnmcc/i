@@ -1,7 +1,7 @@
 @inline
 a = () { Nil }
 
-@main("x")
+
 b = () { Nil }
 
 @external("only")
@@ -18,7 +18,7 @@ d = 1
 @host("app:h/v1")
 e = 1
 
-@main
+
 T {
 	T
 }

@@ -7,7 +7,7 @@ Status: revised design for G2/G3, not an implemented feature. The coordinator ac
 A library should be able to build a value and let its caller name a part of its type:
 
 ```i
-user = object | field("name", string) | field("age", int)
+user = object |> field("name", string) |> field("age", int)
 Schema(User, _) = user
 ```
 
@@ -70,7 +70,7 @@ Fixation is a language rule, equivalent to adding a determined type annotation a
 
 ### 4.1 Names, sites and scope (V)
 
-**V1.** A lowercase `x`, or `m.x` with lowercase final name, in a type and without following `(`, means a **value type**. `{ x }` groups it. `{ x: T }` is a record type after T3. With following `(`, `x(…)` and `m.x(…)` are TypeCalls reserved for macros. Imports never change that classification.
+**V1.** A lowercase `x`, or `m.x` with lowercase final name, in a type and without following `(`, means a **value type**. `{ x }` groups it. `( x: T )` is a record type after T3. With following `(`, `x(…)` and `m.x(…)` are TypeCalls reserved for macros. Imports never change that classification.
 
 **V2.** Resolve `x` as an expression name at that place: locals, the module's own/imported value scope, then built-ins. Built-ins are ordinary prelude definitions (HIR `ValueRef`, `hir.rs:349–355`). A module used alone gives E0205; an unknown name gives E0201. `m.x` is only a module member, with the normal export check. A value named `m` gives E0207; no field projection is available in a type. This does not inspect `x`'s runtime value.
 
@@ -222,7 +222,7 @@ Ordinary annotation parameter/result/error types and type tests are allowed. Rea
 
 ### 4.7 Records and macros (M)
 
-**M1.** The records.md §5.9 builder gives a weak `Codec(D, E)`. Demand only its decode part and the Codec shape. Normalize `Without(R, {age}) & { age: Int }` after closing its dependencies; T3's exact rewrites yield `{ age: Int, name: String }`. Fix that decode part through checked equations. Leave the distinct encode variable unfixed; `user.encode(u)` still constrains it normally. Reading `Codec(_, Enc) = user` with no encode lower bounds is E0534. No case for “schema” or “codec” exists in the algorithm.
+**M1.** The records.md §5.9 builder gives a weak `Codec(D, E)`. Demand only its decode part and the Codec shape. Normalize `Without(R, {age}) & ( age: Int )` after closing its dependencies; T3's exact rewrites yield `( age: Int, name: String )`. Fix that decode part through checked equations. Leave the distinct encode variable unfixed; `user.encode(u)` still constrains it normally. Reading `Codec(_, Enc) = user` with no encode lower bounds is E0534. No case for “schema” or “codec” exists in the algorithm.
 
 T3 must add closure, provenance and inferred-shape arms for records/Without, rerun its L2a/L5 checks on `Of`, and test this builder. T2 itself tests an ordinary nominal Codec with closed scalar decode output. Until T3 adds those forms, unsupported closure is an explicit failure, never a partial type.
 
@@ -233,7 +233,7 @@ T3 must add closure, provenance and inferred-shape arms for records/Without, rer
 ((Schema, object, field, string, int) = json/schema)
 (User, user)
 
-user = object | field("name", string) | field("age", int)
+user = object |> field("name", string) |> field("age", int)
 Schema(User, _) = user
 ```
 
@@ -244,7 +244,7 @@ Schema(User, _) = user
 name = (u: User) { u.name }
 ```
 
-User completes to `{ age: Int, name: String }` in app/users; app/client reads the exported alias, never users.user's partly open type. This is the plan's `Schema(User, _) = user` with an ordinary library across a module boundary and no repeated record annotation. The module paths are illustrative library paths, not compiler-reserved names.
+User completes to `( age: Int, name: String )` in app/users; app/client reads the exported alias, never users.user's partly open type. This is the plan's `Schema(User, _) = user` with an ordinary library across a module boundary and no repeated record annotation. The module paths are illustrative library paths, not compiler-reserved names.
 
 The accepted records.md §5.9 codec follows exactly the same placement, with Codec imported from the ordinary codec module:
 
@@ -253,7 +253,7 @@ The accepted records.md §5.9 codec follows exactly the same placement, with Cod
 ((Codec, object, field, string, int) = json/codec)
 (User, user)
 
-user = object | field("name", string) | field("age", int)
+user = object |> field("name", string) |> field("age", int)
 Codec(User, _) = user
 ```
 
@@ -533,7 +533,7 @@ Required variants:
 - Remove the id wrapper so size's inferred root may be a direct Codec form rather than a weak root. With E still open, remote extraction remains E0534. R7 must not depend on this representation difference.
 - Give size the explicit source annotation `size: Codec(Int, Int) = id(make(…))`, using the same two callbacks. Its whole stored source type is closed, so remote extraction succeeds with RemoteSize = Int and no added source constraint.
 - In app/lib add a normal later binding `use = (value: LocalSize) { value }`: it is accepted using the completed alias. A whole-value annotation using size instead remains E0534 while E is open. A second same-module top-level pattern `Codec(Again, _) = size`, even if written after use, is still an original source-completion demand and yields Again = Int; source order does not create a later-group projection privilege.
-- Use the two-module schema and codec placements of M1a after T3. Both exported User aliases equal `{ age: Int, name: String }`; codec encode calls remain legal. The negative client re-extraction of an open codec gives the same E0534/use-User guidance.
+- Use the two-module schema and codec placements of M1a after T3. Both exported User aliases equal `( age: Int, name: String )`; codec encode calls remain legal. The negative client re-extraction of an open codec gives the same E0534/use-User guidance.
 - Run each variant with reversed independent-group tie breaking and through query recovery. Assert identical alias results/diagnostics and no new source bounds on either a successful closed-source read or a failed open-source read.
 
 The baseline code facts behind the fixture were checked here: calls may return a weak instantiated result (`crates/ilang-check/src/types/infer.rs:1346–1353`), non-direct size keeps its monotype (`:315–325`), and mono display coalesces lower bounds rather than establishing a closed type (`crates/ilang-check/src/types/display.rs:531–555`). The independent reviewer ran an old-syntax checker-only baseline without extraction and reported `size : Codec(Int, Never)`; that run was **not** repeated here and does not test T2. All T2 outcomes above are required implementation results, not reported executions.

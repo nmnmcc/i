@@ -4,7 +4,6 @@
 (main)
 bad = (n) { n |> { 0 -> 10  -1 -> 20  _ -> 30 } }
 
-@main
 main = () {
   assert(bad(-1) == 20)
   Nil

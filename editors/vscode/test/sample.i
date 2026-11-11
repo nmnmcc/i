@@ -34,7 +34,7 @@ numbers = () {
 strings = "tab\t quote\" slash\\ \u{1F600} bad\q
 over two lines"
 
-floats = (x: Float, y) -> Float ? fail.Fail ! Nil {
+floats = (x: Float, y) -> Float ^ fail.Fail ! Nil {
   z = -.x *. y +. 1.5 /. 2.0 -. 0.5
   z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 |> {
     True -> z
@@ -42,7 +42,6 @@ floats = (x: Float, y) -> Float ? fail.Fail ! Nil {
   }
 }
 
-@main
 main = (io ! Console) {
   bits = <<1, 2: u16be, s: utf8, f: f64le, rest: bits>>
   [first, ..rest] = [1, 2, 3]

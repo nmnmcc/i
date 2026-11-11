@@ -333,6 +333,9 @@ pub(super) fn render_anchored(
                 if let Some(s) = atom(d) {
                     text!(s);
                 } else if let Some(xs) = round(d) {
+                    if is_record(xs) {
+                        record!(xs, Type, true);
+                    } else {
                     match xs {
                         [h, a, b] if symbol(h, ".") => {
                             text!(label(a)?);
@@ -380,10 +383,7 @@ pub(super) fn render_anchored(
                         }
                         _ => return Err(bad(d, "a type")),
                     }
-                } else if let K::Curly(xs) = &d.kind
-                    && is_record(xs)
-                {
-                    record!(xs, Type, true);
+                    }
                 } else if let K::Curly(xs) = &d.kind
                     && xs.len() == 1
                 {
@@ -433,6 +433,7 @@ pub(super) fn render_anchored(
                     text!(s);
                 } else {
                     match &d.kind {
+                        K::Round(xs) if is_record(xs) => record!(xs, Expr, false),
                         K::Round(xs) => match xs.as_slice() {
                             [] => text!("()"),
                             [h, rest @ ..] if symbol(h, ",") && !rest.is_empty() => {
@@ -524,7 +525,6 @@ pub(super) fn render_anchored(
                             seq!(xs, Segment, ", ");
                             text!(">>");
                         }
-                        K::Curly(xs) if is_record(xs) => record!(xs, Expr, false),
                         K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
                             text!("{ ");
                             lines!(xs, Clause);
@@ -738,21 +738,21 @@ mod record_tests {
         assert_eq!(render_one("()", P::Expr).unwrap(), "()");
         assert!(render_one("()", P::Pattern).is_err());
         assert_eq!(
-            render_one("{ (: x 1) (: \"y-z\" v) }", P::Expr).unwrap(),
+            render_one("((: x 1) (: \"y-z\" v))", P::Expr).unwrap(),
             "(x: 1, \"y-z\": v)"
         );
         assert_eq!(
-            render_one("{ .. base (: x v) }", P::Expr).unwrap(),
+            render_one("(.. base (: x v))", P::Expr).unwrap(),
             "(..base, x: v)"
         );
         assert_eq!(
-            render_one("{ .. R (- X) (: y T) }", P::Type).unwrap(),
+            render_one("(.. R (- X) (: y T))", P::Type).unwrap(),
             "(..R, -X, y: T)"
         );
         assert_eq!(render_one("{ T }", P::Type).unwrap(), "{ T }");
         assert_eq!(render_one("{ x }", P::Expr).unwrap(), "{ x }");
-        assert!(render_one("{ .. x (- y) }", P::Expr).is_err());
-        assert!(render_one("{ .. }", P::Type).is_err());
+        assert!(render_one("(.. x (- y))", P::Expr).is_err());
+        assert!(render_one("(..)", P::Type).is_err());
     }
 
     #[test]
@@ -767,7 +767,7 @@ mod record_tests {
                 };
                 let mut value = datum(K::Name("v".into()));
                 for _ in 0..10_000 {
-                    value = datum(K::Curly(vec![datum(K::Round(vec![
+                    value = datum(K::Round(vec![datum(K::Round(vec![
                         datum(K::Symbol(":".into())),
                         datum(K::Name("x".into())),
                         value,
@@ -787,11 +787,11 @@ mod record_tests {
             .spawn(|| {
                 let mut input = String::with_capacity(100_001);
                 for _ in 0..10_000 {
-                    input.push_str("{ (: x ");
+                    input.push_str("((: x ");
                 }
                 input.push('v');
                 for _ in 0..10_000 {
-                    input.push_str(") }");
+                    input.push_str("))");
                 }
                 let expected = format!("{}v{}", "(x: ".repeat(10_000), ")".repeat(10_000));
                 assert_eq!(render_one(&input, P::Expr).unwrap(), expected);

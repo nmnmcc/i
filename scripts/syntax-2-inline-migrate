@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Migrate parseable inline record snippets in the repository Markdown."""
+from pathlib import Path
+import json,re,subprocess
+import os
+os.chdir(Path(__file__).resolve().parent.parent)
+readmes=subprocess.check_output(['git','ls-files','--','README*','**/README*'],text=True).splitlines()
+paths=sorted(set([*map(Path,readmes),*Path('docs').rglob('*.md')]))
+quoted=[]
+changes={}
+for p in paths:
+ text=p.read_text()
+ for m in re.finditer(r'(?m)^> ?```i[^\n]*\n((?:^>[^\n]*\n)*?)^> ?```[ \t]*$',text):
+  src=''.join(re.sub(r'^> ?', '', line) for line in m[1].splitlines(keepends=True))
+  quoted.append((p,m.start(1),m.end(1),src))
+if quoted:
+ r=subprocess.run(['target/debug/examples/migrate-syntax2'],input=''.join(json.dumps(x[3],ensure_ascii=False)+'\n' for x in quoted),text=True,capture_output=True,check=True)
+ for (p,a,b,src),line in zip(quoted,r.stdout.splitlines()):
+  result=json.loads(line)
+  if result['diagnostics'] or result['empty'] or any(name != 'main' for name in result['mains']): continue
+  out=result['source']
+  if out!=src:
+   changes.setdefault(p,[]).append((a,b,''.join('> '+line if line.strip() else '>\n' for line in out.splitlines(keepends=True))))
+ for p,edits in changes.items():
+  text=p.read_text()
+  for a,b,out in reversed(edits): text=text[:a]+out+text[b:]
+  p.write_text(text)
+items=[]; forms=[]; error_changes=set()
+for p in paths:
+ text=p.read_text()
+ def errors(m):
+  if '|>' in m[1]: return m[0]
+  return '`'+re.sub(r'\?(?=\s+(?!(?:True|False)\b)[A-Z]\w*)','^',m[1])+'`'
+ migrated=re.sub(r'(?<!`)`([^`\n]+)`(?!`)',errors,text)
+ if migrated != text:
+  p.write_text(migrated)
+  error_changes.add(p)
+  text=migrated
+ for m in re.finditer(r'(?<!`)`([^`\n]+)`(?!`)',text):
+  src=m[1]
+  if not re.search(r'\{\s*(?:\.\.|[a-zA-Z][\w-]*\s*:)',src): continue
+  if '\\|' in src: continue
+  items.append((p,m.start(1),m.end(1),src))
+  forms.extend([src,'v = '+src,'T = '+src])
+r=subprocess.run(['target/debug/examples/migrate-syntax2'],input=''.join(json.dumps(s,ensure_ascii=False)+'\n' for s in forms),text=True,capture_output=True,check=True)
+res=[json.loads(line) for line in r.stdout.splitlines()]; edits={}
+for j,(p,a,b,src) in enumerate(items):
+ for prefix,result in zip(['','v = ','T = '],res[3*j:3*j+3]):
+  if result['diagnostics'] or result['empty'] or result['mains']: continue
+  out=result['source']
+  if not out.startswith(prefix): continue
+  out=out[len(prefix):]
+  if out!=src: edits.setdefault(p,[]).append((a,b,out,src))
+  break
+for p,changes in edits.items():
+ text=p.read_text()
+ for a,b,out,src in reversed(changes): text=text[:a]+out+text[b:]
+ p.write_text(text)
+print('changed',sum(map(len,edits.values())) + sum(map(len,changes.values())) + len(error_changes),
+      'files',len(set(edits) | set(changes) | error_changes))

@@ -8,7 +8,7 @@
 ////
 //// Functions that may find nothing give an `Option` (`first`, `find`,
 //// `at`, …). Functions that take a function as an argument have the errors
-//// and the environment of that function (`? E ! N`), so the argument may
+//// and the environment of that function (`^ E ! N`), so the argument may
 //// itself raise errors or need services.
 
 (

@@ -103,7 +103,8 @@ Node runs the same file with `node:wasi`. On this target:
   module linked in statically. An import with a host reference needs such a
   host too: only the host makes host references, and the program then also
   imports `reference_id` of `ilang:host/v1`.
-- The program needs a `@main`. Tests run only with `i test`, because each test
+- The program needs `main` in `src/main.i` or a named entry in `i.toml`.
+  Tests run only with `i test`, because each test
   needs a new instance.
 - The host chooses how deep the stack may be. Wasmtime allows less than
   `i run`, so deep recursion that is not in tail position stops earlier; give

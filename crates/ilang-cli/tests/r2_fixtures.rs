@@ -1,7 +1,10 @@
 //! Additional JavaScript execution of the hand-authored R2 spec bodies.
 //! R2_FIXTURE_DUMP generates fixtures; ordinary runs check the transformation.
 use ilang_cli::{BuildOptions, Level, build};
-use ilang_syntax::{ast::ItemKind, parse_module};
+use ilang_syntax::{
+    ast::{ItemKind, PatternKind},
+    parse_module,
+};
 use std::{fs, path::PathBuf};
 
 struct Case {
@@ -53,6 +56,12 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
             let mut edits = Vec::new();
             let mut entries = 0;
             for item in &module.items {
+                if let ItemKind::Binding(binding) = &item.kind
+                    && let PatternKind::Var(name) = &binding.pattern.kind
+                    && name == "main"
+                {
+                    entries += 1;
+                }
                 for attribute in &item.attributes {
                     if attribute.module.is_none() && attribute.name.name == "host" {
                         let (namespace, span) = &attribute.args[0];
@@ -60,14 +69,6 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
                             span.start as usize,
                             span.end as usize,
                             format!("{:?}", format!("r2:law:{section}:{stem}:{namespace}")),
-                        ));
-                    }
-                    if attribute.module.is_none() && attribute.name.name == "main" {
-                        entries += 1;
-                        edits.push((
-                            attribute.span.start as usize,
-                            attribute.span.end as usize,
-                            String::new(),
                         ));
                     }
                 }

@@ -4,7 +4,6 @@
 (main)
 @m (left, right) = (1, 2)
 
-@main
 main = () {
   assert(True)
   Nil

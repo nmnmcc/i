@@ -1,3 +1,6 @@
-a = (name: 1)
+a = { name }
+
+b = { p }
 --- errors ---
-E0102 @3:26 expected the function body, a `{` on the same line, found `}`
+E0101 @2:11 expected an expression, found `:`
+E0101 @3:8 expected an expression, found `:`

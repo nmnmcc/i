@@ -253,6 +253,77 @@ pub fn check_for_tools(graph: &mut PackageGraph) -> ProjectChecked {
     check_project(graph, true)
 }
 
+/// Expand and check a package with all targets of one test collection as roots.
+pub fn check_tests(graph: &mut PackageGraph, collection: Option<&str>) -> ProjectChecked {
+    match expand(graph) {
+        Ok(mut expanded) => {
+            expanded.lower_quotes();
+            let (program, mut diags) = ilang_check::resolve_parsed(graph, &expanded.parsed);
+            let mut entries = Vec::new();
+            if let Some(program) = &program
+                && !diags.iter().any(Diagnostic::is_error)
+            {
+                match collections::resolve_with_types(
+                    &expanded.parsed,
+                    program,
+                    None,
+                    &expanded.transactions,
+                ) {
+                    Ok(found) => entries = found,
+                    Err(errors) => diags.extend(errors),
+                }
+            }
+            let roots: Vec<_> = entries
+                .iter()
+                .filter(|e| {
+                    let program = program.as_ref().expect("resolved collection program");
+                    let name = format!(
+                        "{}.{}",
+                        program.module(e.collection.module).path,
+                        program.def(e.collection).name
+                    );
+                    Some(name.as_str()) == collection
+                })
+                .map(|e| (e.target, true))
+                .collect();
+            let mut checked = ilang_check::check_resolved_selected(graph, program, diags, &roots);
+            if let Some(typed) = &checked.types
+                && !checked.diags.iter().any(Diagnostic::is_error)
+            {
+                for entry in &mut entries {
+                    entry.signature = typed
+                        .schemes
+                        .get(&entry.target)
+                        .expect("checked target has a type scheme")
+                        .clone();
+                }
+            }
+            if let Some(program) = &checked.program {
+                ilang_check::map_expansion_diagnostics(
+                    program,
+                    &graph.sources,
+                    &mut expanded.diagnostics,
+                );
+            }
+            expanded.diagnostics.append(&mut checked.diags);
+            ProjectChecked {
+                program: checked.program,
+                types: checked.types,
+                diags: expanded.diagnostics,
+                collections: entries,
+                templates: expanded.templates,
+            }
+        }
+        Err(diagnostics) => ProjectChecked {
+            program: None,
+            types: None,
+            diags: diagnostics,
+            collections: Vec::new(),
+            templates: Vec::new(),
+        },
+    }
+}
+
 fn check_project(graph: &mut PackageGraph, tools: bool) -> ProjectChecked {
     match expand(graph) {
         Ok(mut expanded) => {

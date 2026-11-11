@@ -33,7 +33,7 @@ fn brace_decisions_follow_the_ordered_tests() {
     // Accepted syntax.md §6.1 examples: tests 1-3 and 6 make blocks.
     for expr in [
         "{ go = (n) -> Int { n + 1 }  go(1) }",
-        "{ go = (n) -> Int ? String ! Log { step(n) }  go(1) }",
+        "{ go = (n) -> Int ^ String ! Log { step(n) }  go(1) }",
         "{ k: (Int) -> Int = f  k(1) }",
         "{ go(A) = (x: A) -> A { x }  go(1) }",
         "{ go = (n, log ! Log) -> Int { log.write(n)  n }  go(1) }",
@@ -86,8 +86,9 @@ fn brace_decisions_follow_the_ordered_tests() {
     // §3.5 test 4 and test 5: records vs a clause with a wrong pattern.
     for (src, code) in [
         (
-            /* old-syntax-check: E0114,E0101 */ "a = { p: (Int, Int) -> e }",
-            Code::MissingBody,
+            /* old-syntax-check: E0101 */ /* old-syntax-check: E0101 */
+            "a = { p: (Int, Int) -> e }",
+            Code::Unexpected,
         ),
         (
             /* old-syntax-check: E0108 */ "a = x |> { -y -> 1 }",
@@ -141,7 +142,7 @@ fn header_groups_and_attributes() {
             .iter()
             .any(|d| d.code == Code::Unexpected)
     );
-    let m = module("@main()\nx = 1\n@a.m(1, b: x)\ny = 2");
+    let m = module("@custom()\nx = 1\n@a.m(1, b: x)\ny = 2");
     assert!(m.items[0].attributes[0].call.is_some());
     assert_eq!(m.items[1].attributes[0].module.as_ref().unwrap().name, "a");
 }

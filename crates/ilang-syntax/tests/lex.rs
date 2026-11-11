@@ -21,7 +21,7 @@ fn breaks_need_both_sides() {
     }
     // `-`, `-.`, `..`, `!`, `@`, and all names do.
     for op in [
-        "- f", "-. f", "..f", "! F", "@main", "if", "case", "import", "export",
+        "- f", "-. f", "..f", "! F", "@custom", "if", "case", "import", "export",
     ] {
         assert!(lex(&format!("a\n{op}")).tokens[1].brk, "{op}");
     }

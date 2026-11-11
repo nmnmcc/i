@@ -112,7 +112,7 @@ fn dependency_conventions_and_entry_tables_have_no_effect() {
 #[test]
 fn a_bare_bar_is_not_a_pipe() {
     // A bare `|` is not a pipe; the pipe remains `|>`.
-    let source = "main = () { False | True }";
+    let source = /* old-syntax-check: E0101 */ "main = () { False | True }";
     let dir = project("name = \"app\"\n", &[("src/main.i", source)]);
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
@@ -129,4 +129,66 @@ fn a_bare_bar_is_not_a_pipe() {
         &[("src/main.i", "main = () { True |> (value) { value } }")],
     );
     assert!(build(dir.path(), options()).is_ok());
+}
+
+#[test]
+fn cli_selects_entries_and_passes_arguments() {
+    let dir = project(
+        "name = \"app\"\n[entries]\ntool = \"tools.work\"\nother = \"tools.plain\"\n",
+        &[
+            (
+                "src/main.i",
+                "(\n (Io) = i/io\n)\nmain = (io ! Io) { io.print(\"default ok\") }\n",
+            ),
+            (
+                "src/tools.i",
+                "(\n (Io) = i/io\n i/process\n)\nwork = (io ! Io) {\n assert(process.args() == [\"alpha\", \"--beta\"])\n io.print(\"tool ok\")\n}\nplain = (io ! Io) { io.print(\"plain ok\") }\n",
+            ),
+        ],
+    );
+    let run = |args: &[&str]| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .current_dir(dir.path())
+            .args(args)
+            .output()
+            .unwrap()
+    };
+    let default = run(&["run", "--opt", "0"]);
+    assert!(
+        default.status.success(),
+        "{}",
+        String::from_utf8_lossy(&default.stderr)
+    );
+    assert_eq!(default.stdout, b"default ok\n");
+    assert!(default.stderr.is_empty(), "{}", String::from_utf8_lossy(&default.stderr));
+    let plain = run(&["run", "--opt", "0", "other"]);
+    assert!(plain.status.success(), "{}", String::from_utf8_lossy(&plain.stderr));
+    assert_eq!(plain.stdout, b"plain ok\n");
+    assert!(plain.stderr.is_empty(), "{}", String::from_utf8_lossy(&plain.stderr));
+    let named = run(&["run", "--opt", "0", "tool", "--", "alpha", "--beta"]);
+    assert!(
+        named.status.success(),
+        "{}",
+        String::from_utf8_lossy(&named.stderr)
+    );
+    assert_eq!(named.stdout, b"tool ok\n");
+    for name in ["missing", "tools.i", "src/tools.i"] {
+        let unknown = run(&["run", name]);
+        let error = String::from_utf8_lossy(&unknown.stderr);
+        assert!(!unknown.status.success());
+        assert!(
+            error.contains("unknown entry") && error.contains("tool") && error.contains("other"),
+            "{error}"
+        );
+    }
+    let old_option = run(&["run", "--entry", "tool"]);
+    assert!(!old_option.status.success());
+    assert!(String::from_utf8_lossy(&old_option.stderr).contains("unexpected argument '--entry'"));
+    let build = run(&["build", "--opt", "0", "tool"]);
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert!(dir.path().join("build/app.wasm").exists());
 }

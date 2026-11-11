@@ -111,7 +111,7 @@ fn several_parameters_and_nested_services() {
     // Rules 4, 5 and 7 apply equally inside nested constructors and with
     // independent value/error/environment parameters. Rule 3 permits
     // independent closed instances of the resulting scheme.
-    for annotation in ["", "-> A ? E ! N | Outer(A, E, N)"] {
+    for annotation in ["", "-> A ^ E ! N | Outer(A, E, N)"] {
         let source = "Inner(A, E, N) { Inner((A) -> A ^ E ! N, (N) -> Nil) }
 Outer(A, E, N) { Outer(Inner(A, E, N)) }
 use(A, E, N) = (x: A, s ! Outer(A, E, N)) -> A ^ E ! N | Outer(A, E, N) {
@@ -127,7 +127,7 @@ boolean = () {
   ! Outer(Bool, Never, Never) = Outer(Inner((x: Bool) { x }, (_: Never) { Nil }))
   run(() { use(True) })
 }"
-        .replace("-> A ? E ! N | Outer(A, E, N)", annotation);
+        .replace("-> A ^ E ! N | Outer(A, E, N)", annotation);
         accepts(&source, "integer", "() -> Int", &["integer", "boolean"]);
         accepts(&source, "boolean", "() -> Bool", &["integer", "boolean"]);
         accepts(
@@ -167,7 +167,7 @@ example = () {
 fn logging_example() {
     // Std-2 §7: E=String, N=Never. fail.catch reifies the error (§9.3),
     // and rule 9 removes Sink(String, Never).
-    for annotation in ["", "-> Nil ? E ! N | Sink(E, N)"] {
+    for annotation in ["", "-> Nil ^ E ! N | Sink(E, N)"] {
         accepts(
             &"(i/fail)
 Entry { Entry(message: String) }
@@ -183,7 +183,7 @@ example = () {
   ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
   fail.catch(() { write(Entry(\"seen\")) })
 }"
-            .replace("-> Nil ? E ! N | Sink(E, N)", annotation),
+            .replace("-> Nil ^ E ! N | Sink(E, N)", annotation),
             "example",
             "() -> Result(Nil, String)",
             &["example"],

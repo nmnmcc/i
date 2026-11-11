@@ -160,7 +160,7 @@ fn externals_are_imports() {
     let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (x: Float) -> Float\n";
     for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
         let bytes = wasm(&format!(
-            "{external}f = () {{ sqrt(2.0) }}\n@main\n{main}\n"
+            "{external}f = () {{ sqrt(2.0) }}\n\n{main}\n"
         ))
         .unwrap();
         let mut imports = Vec::new();
@@ -213,7 +213,10 @@ fn calls_that_may_suspend_are_split() {
     let uses = function(&text, "app/main.uses");
     assert_eq!(uses.matches("(catch_ref $capture").count(), 1, "{uses}");
     // `assertion.catch` is i code now.
-    assert!(wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False) })\n  Nil\n}\n").is_ok());
+    assert!(
+        wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False) })\n  Nil\n}\n")
+            .is_ok()
+    );
 }
 
 #[test]
@@ -278,7 +281,7 @@ fn many_points(n: usize) -> String {
         ));
     }
     s.push_str(&format!(
-        "  a{n}\n}}\n@main\nmain = () {{ control.boundary((b) {{ f(b, 0) }})  Nil }}\n"
+        "  a{n}\n}}\n\nmain = () {{ control.boundary((b) {{ f(b, 0) }})  Nil }}\n"
     ));
     assert!(ilang_syntax::parse_module(&s).1.is_empty());
     s

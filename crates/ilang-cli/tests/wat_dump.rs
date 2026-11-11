@@ -12,13 +12,17 @@ use std::path::{Path, PathBuf};
 #[path = "common/single_file.rs"]
 mod single_file;
 
+#[path = "common/spec_entry.rs"]
+mod spec_entry;
+
 fn dump(project: &Path, name: &str, out: &Path) {
     for (target, tag) in [
         (ilang_wasm::Target::Native, "ilang"),
         (ilang_wasm::Target::Wasi, "wasi"),
     ] {
         for tests in [true, false] {
-            let (graph, _) = ilang_cli::load(project, tests, true);
+            let (mut graph, _) = ilang_cli::load(project, tests, true);
+            graph.entry = spec_entry::named_entry(project, tests);
             let checked = ilang_check::check(&graph);
             let (Some(p), Some(t)) = (&checked.program, &checked.types) else {
                 continue;
@@ -46,8 +50,11 @@ fn wat_dump() {
     let out = PathBuf::from(out);
     std::fs::create_dir_all(&out).unwrap();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let filter = std::env::var("WAT_FILTER").ok();
     for p in ["std", "bench", "examples/hello"] {
-        dump(&root.join(p), p, &out);
+        if filter.as_ref().is_none_or(|f| p.contains(f)) {
+            dump(&root.join(p), p, &out);
+        }
     }
     let spec = root.join("tests/spec");
     let mut sections: Vec<_> = std::fs::read_dir(&spec)
@@ -67,6 +74,9 @@ fn wat_dump() {
                 .unwrap()
                 .to_string_lossy()
                 .into_owned();
+            if filter.as_ref().is_some_and(|f| !name.contains(f)) {
+                continue;
+            }
             if path.is_dir() {
                 dump(&path, &name, &out);
             } else if path.extension().is_some_and(|e| e == "i") {

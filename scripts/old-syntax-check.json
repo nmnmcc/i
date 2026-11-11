@@ -177,9 +177,6 @@
   "crates/ilang-cli/tests/package_commands.rs:2364dc3e3b8f6ec3": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-cli/tests/package_commands.rs:68cc7f477cc8607b": {
-    "not_source": "Template output substring assertion"
-  },
   "crates/ilang-cli/tests/package_commands.rs:a478aaac268b7a92": {
     "not_source": "Template output substring assertion"
   },
@@ -602,96 +599,12 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:2a30957b95861f94": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:15f1d66a28413329": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:6702dd1150dd0866": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-cli/tests/wasi.rs:6d488eb17aafdb21": {
     "suffix": "\nGreet { Greet(greet: (String) -> String) }\n",
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-cli/tests/wasi.rs:11e79c35bb505860": {
     "suffix": "\nGreet { Greet(greet: (String) -> String) }\n",
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:2ae2910a330aa980": {
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-lsp/tests/protocol.rs:0e39ade54c6a0756": {
@@ -720,47 +633,8 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-wasm/tests/codegen.rs:9bfad9f58fa94913": {
-    "substitutions": [
-      [
-        "{external}",
-        "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (Float) -> Float\n"
-      ],
-      [
-        "{main}",
-        "main = () { Nil }"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-wasm/tests/codegen.rs:3dd263a2c3165ae5": {
     "suffix": "\n  a0\n}\n",
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-wasm/tests/codegen.rs:753885a181781e36": {
-    "prefix": "(i/control)\nf = (b, x) { a1 = x\n",
-    "substitutions": [
-      [
-        "{n}",
-        "1"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "bindings/javascript/ilang.mjs:5bd8740e429648b4": {
@@ -819,10 +693,6 @@
   },
   "crates/ilang-syntax/src/lib.rs:bbfcd4160a1e8674": {
     "not_source": "Token name compared by the diagnostic hint scanner"
-  },
-  "crates/ilang-syntax/tests/lex.rs:68cc7f477cc8607b": {
-    "suffix": "\nf = () { Nil }\n",
-    "reason": "An annotation token tested by the lexer, with its item"
   },
   "crates/ilang-syntax/tests/lex.rs:bbfcd4160a1e8674": {
     "prefix": "x = ",
@@ -911,16 +781,6 @@
       "E0110: an argument by position may not come after an argument by label"
     ]
   },
-  "crates/ilang-syntax/tests/golden/err_arrow_tail.i:4e93942fc2bb1de0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `?`: it already has one, or `!` came first; put the inner function type in `{ }`"
-    ]
-  },
   "crates/ilang-syntax/tests/golden/err_attr_same_line.i:ba368ee323f45dc2": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
@@ -970,10 +830,10 @@
     ]
   },
   "crates/ilang-syntax/tests/golden/err_clause_tuple_type.i:a69e2e3ad4d5098a": {
-    "reason": "Existing deliberately invalid syntax fixture",
+    "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
+      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
+      "E0101: expected an expression, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_discard.i:ff3954a6a2381ebc": {
@@ -1048,12 +908,10 @@
     ]
   },
   "crates/ilang-syntax/tests/golden/err_record.i:fb0701e8893b9a62": {
-    "reason": "Existing deliberately invalid syntax fixture",
+    "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
+      "E0101: expected an expression, found `:`",
+      "E0101: expected an expression, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_recover.i:d6cdf02d84cb49fc": {
@@ -1124,10 +982,9 @@
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:61e1e25bf9a2a4dc": {
-    "reason": "Existing deliberately invalid syntax fixture",
+    "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
+      "E0101: expected an expression, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:e79adbe2811820c8": {
@@ -1194,197 +1051,6 @@
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
       "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "docs/design/types-joint.md:b245d53d5268a254": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
-  "docs/design/types-joint.md:6a60ece737defbcd": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `,`"
-    ]
-  },
-  "docs/design/types-joint.md:b71782d0b40c77f3": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
-  "docs/design/types-joint.md:65232f2f371821c5": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
-  "docs/design/types-joint.md:814c7c7dbfcfab93": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`"
-    ]
-  },
-  "docs/design/types-joint.md:1248077d6a41ccce": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `,` or `)`, found `{`"
-    ]
-  },
-  "docs/design/types-joint.md:4d5a1e4bef57576e": {
-    "track": "T3",
-    "reason": "T1 literals and T2 value types parse; records need T3.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/performance.md:8e227b17f1c348e4": {
-    "reason": "Illustrative source fragment with an ellipsis, not a complete module",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `..`"
-    ]
-  },
-  "editors/vscode/test/sample.i:9622caf46ec9f392": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/spec/1.7/a1_same_line_negative.i:cd6051bd45bfd1c6": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a pattern, found `->`"
-    ]
-  },
-  "tests/spec/1.7/a1_same_line_tuple.i:34d0be6581f5ff62": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
-    ]
-  },
-  "tests/spec/2.2/a1_empty_header.i:26d6b0216882d0ff": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
-  "tests/spec/2.2/a1_header_order.i:d11c8e7f22ea90ad": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "tests/spec/2.2/a1_macro_attribute_same_line.i:264336c888d46fe4": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
-  "tests/spec/6/a1_record_kept.i:4f6ad9983634e7e8": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
-  "tests/spec/6/a1_wrong_pattern.i:679b3b40cb77cd83": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "crates/ilang-cli/src/commands/package.rs:46654f2cc796a909": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-cli/tests/wasi.rs:366905c8d8bd01da": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-cli/tests/wasi.rs:a772aee9d40841c8": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-cli/tests/wasi.rs:ada2fc4ec2d17fce": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ad4393882ff472b2": {
@@ -1618,63 +1284,6 @@
       "E0101: expected an integer literal after `-` in a type, found `-`"
     ]
   },
-  "docs/design/records.md:da22dc22a623392c": {
-    "track": "T3",
-    "reason": "Exact-record substitution witness in accepted records §20.1; remove when record types parse",
-    "diagnostics": [
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:9d4021269e557daf": {
-    "track": "T3",
-    "reason": "Closed record-union input probe in accepted records §20.3; remove when record types parse",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0101: expected `}`, found `:`"
-    ]
-  },
-  "docs/design/records.md:e8ba7f2daf2dcd5e": {
-    "track": "T3",
-    "reason": "Record bound-proof probe in accepted records §20.3; remove when record types parse",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:ed1b31d1aa6d82e0": {
-    "track": "T3",
-    "reason": "Branch-derived schema input probe in accepted records §20.3; remove when records parse",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "docs/design/records.md:10b07e7a040f4565": {
-    "track": "T3",
-    "reason": "Record-union annotation probe in accepted records §20.3; remove when records parse",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
-  "docs/design/records.md:55d79debb3e6c47d": {
-    "track": "T3",
-    "reason": "Fixed-schema field mapping in accepted records §20.5; remove when record literals parse",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "docs/design/records.md:129c4789b2b41f04": {
-    "track": "T3",
-    "reason": "Shared scheme-binder record probe in accepted records §21.5; remove when record literals parse",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
   "crates/ilang-check/tests/value_types.rs:d46aee08cc49f6d1": {
     "not_source": "Diagnostic message substring, not i source"
   },
@@ -1709,12 +1318,6 @@
       "E0115: a file with nothing to import or export leaves the group out"
     ]
   },
-  "tests/review/cases/review-a1/_loose/cases/09_attr_tuple_same_line/original/.invalid/src/main.i:107c7a7cad072cad": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/cases/11_attributed_header/original/.invalid/src/main.i:b5e2e8844dc75630": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
@@ -1746,10 +1349,9 @@
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i:964f0e757bb34246": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
+    "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `if`; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i:6fae0c21e165c75b": {
@@ -1789,24 +1391,10 @@
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/cases/62_new_record_reserved/original/.invalid/src/main.i:a7b0fb2e4af41106": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i:47b7331c670212b3": {
@@ -1815,24 +1403,10 @@
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i:47b7331c670212b3": {
@@ -1847,91 +1421,10 @@
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:61350a6d6fb1b94d": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:410a94ef7c0d830b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:410a94ef7c0d830b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:410a94ef7c0d830b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:410a94ef7c0d830b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:0ea583b279d075e4": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:d3342c4bf974a7f1": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:60ba47edf6175dda": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:6097e81d346de1ab": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:23823fdfc5b3a649": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `if`; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:7afc9e29afa2369e": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:576bd12dc0cd6e56": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:12c9c8ce6cbfb2c7": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/capture/.invalid/src/types.i:47b7331c670212b3": {
@@ -1950,12 +1443,6 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
-  "tests/review/cases/review-a1/cases/09_attr_tuple_same_line/.invalid/src/main.i:107c7a7cad072cad": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
   "tests/review/cases/review-a1/cases/11_attributed_header/.invalid/src/main.i:b5e2e8844dc75630": {
@@ -2000,13 +1487,6 @@
       "E0106: a discard binds nothing, so it may not be used as a value"
     ]
   },
-  "tests/review/cases/review-a1/cases/62_new_record_reserved/.invalid/src/main.i:a7b0fb2e4af41106": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`"
-    ]
-  },
   "tests/review/cases/review-a1/confirmed/capture-from-old/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
@@ -2025,18 +1505,6 @@
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:d3342c4bf974a7f1": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:6097e81d346de1ab": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
@@ -2053,72 +1521,6 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0105: a block ends with an expression"
-    ]
-  },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:1e3adef4d558270c": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `{` or `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
-    ]
-  },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:3309fab275f3e94d": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `{` or `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
     ]
   },
   "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:36b001eec0ad49d6": {
@@ -2140,64 +1542,10 @@
       "E0101: expected an expression, found `!`"
     ]
   },
-  "tests/review/cases/review-native3/alias/.invalid/src/main.i:99202954a39fb9f4": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/direct/.invalid/src/main.i:317c40877294e409": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/external/.invalid/src/main.i:a7678ccd6b3bba52": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/field/.invalid/src/main.i:e6a2b33a8ff88ecd": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:afd55319505d72c1": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "tests/review/cases/review-native3/injection_control/.invalid/src/resource.i:681a205b48798d32": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:ee71313076a655d6": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/positive/.invalid/src/main.i:843c29762d098b1b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:65364e04cfc80e91": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/update/.invalid/src/main.i:fd1a50946bb7ce16": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i:21150877805e373b": {
@@ -2278,174 +1626,28 @@
   "tests/review/cases/review-std1/stream/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
-  },
-  "docs/spec.md:dbcd5f90d5646f68": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "docs/spec.md:f0e9c5f7a5c49935": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0001: unexpected character `^`",
-      "E0101: expected `,` or `)`, found `E`",
-      "E0001: unexpected character `^`"
-    ]
-  },
-  "docs/spec.md:fe5d28b787d9a2d5": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "docs/spec.md:fae9e842735f6604": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "docs/spec.md:de40583d8347af91": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0001: unexpected character `^`",
-      "E0101: expected `,` or `)`, found `String`"
-    ]
-  },
-  "docs/design/syntax.md:dbcd5f90d5646f68": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "docs/design/records.md:f4121b619045d123": {
-    "track": "T3",
-    "reason": "Literal Prim now consumes scalar annotations; record syntax remains reserved, with exact current recovery diagnostics.",
-    "diagnostics": [
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `,`"
-    ]
-  },
-  "docs/design/records.md:1e9aaf16d29fec1f": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:ef56114733b560fb": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:61f831ce134441a4": {
-    "track": "T3",
-    "reason": "Literal Prim now consumes scalar annotations; record syntax remains reserved, with exact current recovery diagnostics.",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `x`"
-    ]
-  },
-  "docs/design/records.md:1af788292194cc41": {
-    "track": "T3",
-    "reason": "Literal Prim now consumes scalar annotations; record syntax remains reserved, with exact current recovery diagnostics.",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `.`",
-      "E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `.`"
-    ]
-  },
-  "docs/design/records.md:93f6d8ae4bb53ece": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`"
-    ]
-  },
-  "docs/design/records.md:e7bc9ebe407250fd": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:80c21b82845da030": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:2cddf30de70544f9": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "docs/design/records.md:66bf5ec21408a345": {
-    "track": "T3",
-    "reason": "Accepted later-track language example; remove this entry when its parser support lands",
-    "diagnostics": [
-      "E0101: expected `}`, found `:`"
-    ]
-  },
-  "docs/design/value-types.md:cd793efc6bbea663": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "docs/design/value-types.md:2a891253712a65e9": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "docs/design/value-types.md:7a05cba0bf09561a": {
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "docs/design/literal-types.md:a9d63960e6d34c18": {
-    "prefix": "example = () {\n",
-    "suffix": "\n}\n",
-    "reason": "The note mixes bindings with expression statements; parse the entire example in a function body.",
-    "track": "SYN2",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`",
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "crates/ilang-package/tests/manifest.rs:ef830fe8a6451ed0": {
-    "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
   },
   "tests/browser/r2-laws.mjs:e3c0158bcdafc3f6": {
     "not_source": "JavaScript diagnostic text about case/export coverage, not an i case expression"
@@ -2453,11 +1655,1276 @@
   "crates/ilang-cli/tests/r2_fixtures.rs:7d393432eb121ee8": {
     "not_source": "TOML manifest assembled for the R2 conformance bundle, not i code"
   },
-  "crates/ilang-package/tests/manifest.rs:f09186ea668f8c28": {
-    "not_source": "TOML manifest for the future JP provider plan; R2 explicitly rejects it"
-  },
   "crates/ilang-cli/tests/r2_performance.rs:2dbd953bfd83802f": {
     "not_source": true,
     "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
+  },
+  "crates/ilang-cli/tests/wasi.rs:853ccab837669e73": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:2c63fcbf8e502a36": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:1d250e2cb1aa2c23": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:a2d39b7f18996a7f": {
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:882f2779164e0247": {
+    "reason": "Materialize the source template rather than parse doubled Rust format braces",
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "proc_exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/wasi.rs:99e1343aed5932cb": {
+    "reason": "Materialize the source template rather than parse doubled Rust format braces",
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "proc_exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/wasi.rs:b6f06d4f92a45093": {
+    "reason": "Materialize the source template rather than parse doubled Rust format braces",
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "proc_exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ]
+  },
+  "crates/ilang-wasm/tests/codegen.rs:0521135b5af7674d": {
+    "prefix": "(i/control)\nf = (b, x) { a1 = x\n",
+    "substitutions": [
+      [
+        "{n}",
+        "1"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/common/single_file.rs:1569de767872d82e": {
+    "substitutions": [
+      [
+        "{name}",
+        "test_name"
+      ],
+      [
+        "{alias}",
+        "source"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Materialize the generated test wrapper before parsing it."
+  },
+  "crates/ilang-cli/tests/entries.rs:c6011128210874b0": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/entries.rs:ec7f73fcb53109f2": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/entries.rs:025673da88acd224": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/entries.rs:41a8b6c35fcc6353": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/package_commands.rs:63b8eb2dbb020e7c": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:e545c6b927783df9": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:db459d917142bf8d": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-cli/tests/tls.rs:020da3c5bde29e24": {
+    "substitutions": [
+      [
+        "{server:?}",
+        "\"server\""
+      ],
+      [
+        "{key:?}",
+        "\"key\""
+      ],
+      [
+        "{ca:?}",
+        "\"ca\""
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Materialize the Rust format template before parsing its i program."
+  },
+  "crates/ilang-package/tests/load.rs:29b81ce310a5da19": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-package/tests/load.rs:df2134b9528390ec": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-package/tests/manifest.rs:ec7f73fcb53109f2": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-package/tests/manifest.rs:4125b806dfd4b9c8": {
+    "not_source": true,
+    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
+  },
+  "crates/ilang-syntax/tests/syn2.rs:a8f52cf6f8aec263": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected a field name or a decimal after `.`, found `{`"
+    ]
+  },
+  "crates/ilang-syntax/tests/syn2.rs:f34407eab7e7e309": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
+    ]
+  },
+  "crates/ilang-syntax/tests/syn2.rs:9ae72ee3455756b6": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "crates/ilang-syntax/tests/syn2.rs:8acdab015f1921c9": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
+    ]
+  },
+  "crates/ilang-syntax/tests/syn2.rs:df058adca6eccda0": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected a name, found `2`"
+    ]
+  },
+  "editors/vscode/test/sample.i:e58bed8a30762048": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:2eeb5a5afc1cebae": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:112761caa62e7257": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:112761caa62e7257": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:112761caa62e7257": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:112761caa62e7257": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:6100ddd868490a15": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:3be21bd923ed7025": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:f48e6269c5294ec8": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:eb2f2775666edf45": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:b40bf9426d491496": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:25e81878720e617c": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:ea9bf08abd8374b6": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:1de15bf30cc2d4ba": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:f48e6269c5294ec8": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `{`"
+    ]
+  },
+  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:677bf7e20bf770ff": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `*`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `{` or `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:3184611861f533da": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an expression, found `*`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `{` or `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
+    ]
+  },
+  "tests/review/cases/review-native3/alias/.invalid/src/main.i:f71902283bf0e419": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/direct/.invalid/src/main.i:54a84c4e326b9f0a": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/external/.invalid/src/main.i:cf77c54bb0020029": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/field/.invalid/src/main.i:9cca1d56794833b3": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:abb9cd95ff009b02": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:8cc5e6ebb1e74381": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/positive/.invalid/src/main.i:05223b2c9df25096": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:58efcc7552f5fa83": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/review/cases/review-native3/update/.invalid/src/main.i:ce5ff1a67fbb1ae9": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "tests/spec/1.7/a1_same_line_negative.i:13c31898de80a63a": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected a pattern, found `->`"
+    ]
+  },
+  "tests/spec/1.7/a1_same_line_tuple.i:ad30ee59732b5c6a": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0106: a discard binds nothing, so it may not be used as a value"
+    ]
+  },
+  "tests/spec/2.2/a1_empty_header.i:1e1dadc9eac538e0": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0115: a file with nothing to import or export leaves the group out"
+    ]
+  },
+  "tests/spec/2.2/a1_header_order.i:6b727ececa1a4d55": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0115: the imports come before the exports"
+    ]
+  },
+  "tests/spec/2.2/a1_macro_attribute_same_line.i:468afe62335bfdb0": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
+    ]
+  },
+  "tests/spec/6/a1_wrong_pattern.i:b85b9d281734af03": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
+    ]
+  },
+  "tests/spec/6/syn2_empty_tuple_type.i:4dfd264ad80b24c8": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "tests/spec/6/syn2_mixed_tuple.i:4434f59aa351dc4c": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
+    ]
+  },
+  "crates/ilang-wasm/tests/control_lazy.rs:7111383378a50a4c": {
+    "not_source": true,
+    "reason": "Delimiter used to split a generated program, not an i module."
+  },
+  "crates/ilang-cli/tests/http.rs:3597d8fd08de24af": {
+    "not_source": true,
+    "reason": "Rust format string generates a TOML manifest."
+  },
+  "crates/ilang-cli/tests/http.rs:8e812e356e161441": {
+    "not_source": true,
+    "reason": "Rust format string generates a TOML manifest."
+  },
+  "crates/ilang-cli/tests/http.rs:81cdcb5c5b4e27d6": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render Rust format string with a representative port."
+  },
+  "crates/ilang-cli/tests/http.rs:53c514ae54f0dcfe": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render Rust format string with a representative port."
+  },
+  "crates/ilang-cli/tests/http.rs:86571961a0f21442": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render Rust format string with a representative port."
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:d162de7b30d5d39d": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:04a3d99efcbda47b": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0102: expected the function body, a `{` on the same line, found `?`"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:eb648ea1f46a27c1": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:d29dbdfffc876b3c": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`"
+    ]
+  },
+  "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
+      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`"
+    ]
+  },
+  "tests/spec/3/syn2_old_empty_record_type.i:8e197a393e555c9d": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected a type, found `..`"
+    ]
+  },
+  "tests/spec/3/syn2_old_error_marker.i:ca4056111dd3ad33": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0102: expected the function body, a `{` on the same line, found `?`"
+    ]
+  },
+  "tests/spec/3/syn2_old_record_type.i:4924b8a028d3910d": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected `}`, found `:`"
+    ]
+  },
+  "tests/spec/6/syn2_old_brace_record.i:abc6c48ae03110ce": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: expected an expression, found `:`"
+    ]
+  },
+  "tests/spec/6/syn2_old_mixed_tuple.i:6d95780125acbe2f": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
+    ]
+  },
+  "tests/spec/7/syn2_old_empty_tuple_pattern.i:e2dca65404826320": {
+    "reason": "Intentional legacy migration or rejection fixture.",
+    "diagnostics": [
+      "E0108: the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record"
+    ]
+  },
+  "crates/ilang-check/tests/front_end.rs:1b999808f689275a": {
+    "reason": "Checker rejects the removed attribute.",
+    "diagnostics": [
+      "E0301: removed @main attribute"
+    ]
+  },
+  "tests/spec/2.2/syn2_old_main.i:2a545dca87420d92": {
+    "reason": "Spec case rejects the removed attribute.",
+    "diagnostics": [
+      "E0301: removed @main attribute"
+    ]
+  },
+  "crates/ilang-syntax/examples/parse-snippets.rs:10ebe51ffe24e008": {
+    "reason": "Diagnostic message text, not i source.",
+    "not_source": true
+  },
+  "crates/ilang-syntax/tests/lex.rs:ddde3fac3dd9ded9": {
+    "suffix": "\nf = () { Nil }\n",
+    "reason": "An annotation token tested by the lexer, with its item"
+  },
+  "crates/ilang-check/tests/expansion_origins.rs:180e6929bae4a332": {
+    "not_source": "Source-position search fragment"
+  },
+  "crates/ilang-check/tests/macro_names.rs:b9a5c2ac5caa2929": {
+    "not_source": "Attribute name used in a diagnostic assertion"
+  },
+  "crates/ilang-cli/src/main.rs:9072ee0af7b301bf": {
+    "not_source": "Test runner output format"
+  },
+  "crates/ilang-cli/tests/compile_time_tests.rs:214210542efaddfa": {
+    "not_source": "TOML manifest"
+  },
+  "crates/ilang-cli/tests/entries.rs:e030cd5ab195b536": {
+    "diagnostics": [
+      "E0101: expected an expression, found `|`"
+    ],
+    "reason": "Intentional invalid bare pipe"
+  },
+  "crates/ilang-cli/tests/macro_budget.rs:080eb357b7982bd5": {
+    "not_source": "TOML manifest"
+  },
+  "crates/ilang-cli/tests/macro_budget.rs:0e972437a34e4ebb": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{parameters}",
+        "_: Int"
+      ],
+      [
+        "{arguments}",
+        "n"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/macro_run.rs:7f5fb3e68a8a2beb": {
+    "not_source": "TOML manifest"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:18b880a4cf8d992c": {
+    "not_source": "TOML manifest"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:0a257ca4f66ad2b4": {
+    "not_source": "TOML manifest"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:86cfdeed213d03b2": {
+    "substitutions": [
+      [
+        "{}",
+        "Example"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/macro_run.rs:4ea0b706eac614e2": {
+    "substitutions": [
+      [
+        "{}",
+        "Example"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/macro_run.rs:3fdf90e883654898": {
+    "substitutions": [
+      [
+        "{suffix}",
+        ""
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/many_tests.rs:a7153630dd023a42": {
+    "not_source": "TOML manifest template"
+  },
+  "crates/ilang-cli/tests/spec.rs:7372e79824e15040": {
+    "not_source": "TOML manifest template"
+  },
+  "crates/ilang-cli/tests/syntax_runtime.rs:7f5fb3e68a8a2beb": {
+    "not_source": "TOML manifest"
+  },
+  "crates/ilang-cli/tests/syntax_runtime.rs:9da18667a9d7066a": {
+    "not_source": "Diagnostic message format"
+  },
+  "crates/ilang-host/src/syntax/items.rs:7cdc5133cd75ed43": {
+    "not_source": "Invariant message"
+  },
+  "crates/ilang-macro/src/collections.rs:bae179e14f19c77e": {
+    "not_source": "Invariant message"
+  },
+  "crates/ilang-macro/src/definition_world.rs:134ce6db26ee8173": {
+    "not_source": "Invariant message"
+  },
+  "crates/ilang-macro/src/prepare.rs:cd20ee4ea6d72c1a": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{}",
+        "app/macros"
+      ],
+      [
+        "{parameters}",
+        "arg0: syntax.Syntax"
+      ],
+      [
+        "{item_service}",
+        ""
+      ],
+      [
+        "{item_row}",
+        ""
+      ],
+      [
+        "target.app/macros",
+        "target.expand"
+      ],
+      [
+        "{arguments}",
+        "arg0"
+      ]
+    ]
+  },
+  "crates/ilang-syntax/src/lisp/to_ast.rs:0e503166f27db3d3": {
+    "not_source": "Lisp conversion diagnostic message"
+  },
+  "crates/ilang-syntax/src/lisp/to_source.rs:1ba075eafd01e22b": {
+    "not_source": "Expected output format for a deep expression"
+  },
+  "crates/ilang-syntax/src/lisp/to_source.rs:2978a91b44b951af": {
+    "not_source": "Source-position search fragment"
+  },
+  "crates/ilang-syntax/tests/lisp_datum.rs:b6c61e91aef1e786": {
+    "not_source": "Source-position search fragment"
+  },
+  "crates/ilang-syntax/tests/lisp_encode_deep.rs:5d670fc264ba0466": {
+    "not_source": "Source construction prefix"
+  },
+  "crates/ilang-wasm/src/budget.rs:d46aee08cc49f6d1": {
+    "not_source": "WebAssembly text instruction name"
+  },
+  "crates/ilang-cli/tests/entries.rs:5f416e6f7e039dd4": {
+    "not_source": true,
+    "reason": "i.toml manifest text in a test, not an i module."
+  },
+  "bindings/javascript/test/providers.test.mjs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "bindings/javascript/test/providers.test.mjs:e973fd792f5b2fd6": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "bindings/javascript/test/providers.test.mjs:da44a6505ea7c74e": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/src/types/coverage.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/src/types/pattern.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:9b34f8167d98a7ed": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:7a545db432374e21": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:8e421be750c5cdd2": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:c43f79d22fe1f96a": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:dfd96d376f036cc8": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:3d1870bace740834": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:f547aec37b3ee9e9": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:5082eb01833bc1e0": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:f849be7e40f1f2e2": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:1b3640e74217694a": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:e271816853ee73df": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:62cdf8d6209f4e1e": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:cba73be5a4368b00": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:776b620cbbafc56e": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:a9130e4b6c2a2e37": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:f11c355d675c5832": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:7f0ca2fc1e7f3bd4": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:e12cd85b900ed66d": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/provider_graph.rs:e85c9eeb742d4bf3": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/unused.rs:457d83ee5c71dce9": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/unused_audit.rs:85ab6ac1cb862bc6": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-check/tests/value_types.rs:85ab6ac1cb862bc6": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/src/commands/package.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/src/lib.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/collections.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/collections.rs:3217c18163fcdf28": {
+    "prefix": "",
+    "suffix": "app/macros)\n",
+    "reason": "Import header fragment used as a replacement in the collection fixture."
+  },
+  "crates/ilang-cli/tests/collections.rs:50181c3a3e4d4456": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/compile_time_tests.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/entries.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/entries.rs:8db2da95784fa101": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/expansion_sites.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/lisp.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/macro_budget.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/macro_run.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:9b34f8167d98a7ed": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:7a545db432374e21": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:f2d856ebb30faf16": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:ad26e4fbf6515cd9": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:9e22d36dfd5011ee": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:3d8ec62e3e0a9ac2": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:6053383389c03e33": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:f8dc182ba69ff198": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/providers.rs:06469e1421509ed3": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/syntax_runtime.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/tls.rs:5dd0b9222349f905": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/unused.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/value_type_performance.rs:acb7f090421fb4e4": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-cli/tests/value_types.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-lsp/src/analysis.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/src/library.rs:3ed222fdc68eeb85": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/load.rs:720334f508f898b3": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/load.rs:ff579490685289ed": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/load.rs:3241f94db5246626": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/manifest.rs:a211dc23a80624ad": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:ac5f24e966f243b0": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:85349c4c2736cc57": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:76adc2a34851f360": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:e89e1163d0eb5a27": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:f4f8423ca7b62f80": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:1849c7b63fb5f336": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:26fadda7e4cb57a6": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:49e0e5a6aac99c83": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:f739db9bd84aa748": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:354fd41ad0851832": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:e1b80e37aad8da53": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:81ad7388d995d280": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:db3c955e8cd1ef14": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:3b51ba08e9411bfe": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:b7c10f5ae66e6480": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:731fdaa0a2faa25f": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:113ca1aed3104fe7": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:55d3602acc90b9b9": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:201391c98865e241": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:0e3fce29bbb5be99": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:ad92d8886ea73c55": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:4caac6474d214fdc": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:8bb1ac7422ab61cf": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:d5827f7f73353d45": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:76824d7351eed44d": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:908ec661ee906674": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:ad6cb1050a83b47a": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:476c95722304bc2f": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:d2b71c91d1091578": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:4ec3f306d13666d7": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:d61f7d1a8a336cfe": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:16df78a9ccb5584a": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:695fafbeb0bd2f62": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:0e0635026eca6ff2": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-package/tests/providers.rs:0f5edf0bf4377f9c": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-wasm/tests/control_lazy.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
+  },
+  "crates/ilang-wasm/tests/expansion_sites.rs:dbceb65de7aa8500": {
+    "not_source": true,
+    "reason": "TOML provider/entry manifest data or its host format template."
   }
 }

@@ -1,1 +1,0 @@
-test/both_test.i:2:1: error[E0321]: this function is the program entry and also a test, so their export names would be the same (B.5)

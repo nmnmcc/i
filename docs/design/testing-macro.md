@@ -39,3 +39,21 @@ Prior art: ExUnit's `case.ex` defines a function and registers its metadata;
 Rust's `library/test` executes a collected descriptor list; Effect Vitest's
 `internal/internal.ts` composes enclosing layers for nested suites; Julia's
 `Test.jl` collects results under test sets.
+
+## Migration
+
+Run `scripts/test-macro-migrate <dir>...` on package directories or individual
+`.i` files. The tool uses parser spans, keeps the original body and comments,
+and adds the collection and a `std` dependency where needed. It preserves a
+function when its name is referenced or exported. Re-running it is idempotent.
+
+The tool reports files needing manual work and exits non-zero for unsupported
+attributes, conflicting imports or collection settings, parse errors in files
+with tests, and source files without a package manifest (except standalone spec
+fixtures). In particular, a fixture testing the validity of `@test` itself
+cannot be converted without changing the subject of that fixture.
+
+On a copy of `std`, 1,845 tests passed at `--opt 0` both before and after
+migration. The copied spec corpus contains 239 migrated test functions; all 83 cases
+passed at `--opt 0` and `--opt 2`. One fixture retains its invalid
+`@main`/`@test` combination for manual review.

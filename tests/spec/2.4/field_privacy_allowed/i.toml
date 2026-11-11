@@ -1,3 +1,7 @@
 # spec: 2.4, 6.7; private fields remain usable in their defining module, and T(..) exports field access and update.
 # expect: pass
+# entry: legacy
 name = "app"
+
+[entries]
+legacy = "main.allowed"

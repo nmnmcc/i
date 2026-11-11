@@ -192,7 +192,7 @@
 ")"  punctuation.brackets.round.i
 "->"  keyword.operator.arrow.i
 "Float"  support.type.builtin.i
-"?"  keyword.operator.error.i
+"^"  keyword.operator.error.i
 "fail"  variable.other.i
 "."  punctuation.accessor.i
 "Fail"  entity.name.type.i
@@ -236,8 +236,6 @@
 "0.0"  constant.numeric.float.i
 "}"  punctuation.brackets.curly.i
 "}"  punctuation.brackets.curly.i
-"@"  storage.type.annotation.i punctuation.definition.annotation.i
-"main"  storage.type.annotation.i
 "main"  entity.name.function.definition.i
 "="  keyword.operator.assignment.i
 "("  punctuation.brackets.round.i

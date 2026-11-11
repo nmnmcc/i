@@ -6,6 +6,7 @@
 	i/core
 )
 
+// Program entry.
 main = () {
 	dir = fs.temp_dir() <>
 		"/i-io-fs-example-" <>

@@ -101,8 +101,8 @@ main(E, N) = () { run(() -> Nil ^ E ! N | S(E, N) { use() }) }",
     ] {
         entry(&format!("{base}\n{body}"));
         let inferred = body
-            .replace(": () -> Nil ? E ! N | S(E, N)", "")
-            .replace("() -> Nil ? E ! N | S(E, N) {", "() {");
+            .replace(": () -> Nil ^ E ! N | S(E, N)", "")
+            .replace("() -> Nil ^ E ! N | S(E, N) {", "() {");
         entry(&format!("{base}\n{inferred}"));
     }
 }

@@ -6,5 +6,5 @@ f(x)
 a.m(x)
 @a.m(1)
 annotated = 1
-@main()
+@custom
 entry = () { Nil }

@@ -2827,7 +2827,7 @@ impl<'a> Checker<'a> {
                     }
                 }
                 Stmt::Env { ty, value, span } => {
-                    // `! T = e1` and the rest `r`: `A ? E ! N1 | M - T`.
+                    // `! T = e1` and the rest `r`: `A ^ E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {

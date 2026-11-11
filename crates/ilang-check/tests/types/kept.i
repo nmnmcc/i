@@ -6,7 +6,7 @@ f(1)
 x = 1
 @a.main
 x2 = 2
-@main()
+
 x3 = () { Nil }
 @external("env" <> "", "f")
 ext: () -> Int

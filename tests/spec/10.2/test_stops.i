@@ -3,4 +3,5 @@
 // at: spec/main:6:13
 
 
+
 main = () { panic("the entry stops") }

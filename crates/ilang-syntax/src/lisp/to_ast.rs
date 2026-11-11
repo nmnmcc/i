@@ -139,8 +139,8 @@ async fn type_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<TypeExpr> {
         K::Int(n) => TypeKind::Lit(LitValue::Int(BigInt::from_biguint(Sign::Plus, n.clone()))),
         K::String(x) => TypeKind::Lit(LitValue::Str(x.clone())),
         K::Name(_) | K::UpName(_) => named_type(s, d, &[]).await?,
-        K::Curly(xs) if record_start(xs) => record_type(s, d, xs).await?,
         K::Curly(xs) if xs.len() == 1 => return type_child(s, &xs[0]).await,
+        K::Round(xs) if record_start(xs) => record_type(s, d, xs).await?,
         K::Round(xs) => match xs.as_slice() {
             [h, n] if symbol(h, "-") && matches!(n.kind, K::Int(_)) => {
                 let K::Int(n) = &n.kind else { unreachable!() };
@@ -528,11 +528,11 @@ async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
             }
             ExprKind::BitArray(out)
         }
-        K::Curly(xs) if record_start(xs) => record_expression(s, d, xs).await?,
         K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
             ExprKind::Clauses(clauses(s, xs).await?)
         }
         K::Curly(_) => ExprKind::Block(block_inner(s, d).await?),
+        K::Round(xs) if record_start(xs) => record_expression(s, d, xs).await?,
         K::Round(xs) => match xs.as_slice() {
             [] => ExprKind::Record {
                 base: None,

@@ -318,11 +318,24 @@ pub fn check_parsed_for_tools(graph: &PackageGraph, parsed: &[Parsed]) -> Checke
 fn check_resolved(
     graph: &PackageGraph,
     program: Option<hir::Program>,
-    mut diags: Vec<Diagnostic>,
+    diags: Vec<Diagnostic>,
 ) -> Checked {
+    check_resolved_selected(graph, program, diags, &[])
+}
+
+pub fn check_resolved_selected(
+    graph: &PackageGraph,
+    program: Option<hir::Program>,
+    mut diags: Vec<Diagnostic>,
+    selected: &[(hir::DefId, bool)],
+) -> Checked {
+    if let Some(p) = &program {
+        let targets: Vec<_> = selected.iter().map(|(target, _)| *target).collect();
+        capabilities::check_selected(p, graph, &targets, &mut diags);
+    }
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
-            let (typed, more) = types::check(p, &graph.sources);
+            let (typed, more) = types::check_selected(p, &graph.sources, selected);
             diags.extend(more);
             Some(typed)
         }
@@ -346,9 +359,17 @@ pub fn check_selected(
     target: hir::DefId,
     require_nil: bool,
 ) -> (types::Typed, Vec<Diagnostic>) {
-    let (typed, mut diags) =
-        types::check_selected(program, &graph.sources, &[(target, require_nil)]);
-    capabilities::check_selected(program, graph, &[target], &mut diags);
+    check_selected_many(graph, program, &[(target, require_nil)])
+}
+
+pub fn check_selected_many(
+    graph: &PackageGraph,
+    program: &mut hir::Program,
+    selected: &[(hir::DefId, bool)],
+) -> (types::Typed, Vec<Diagnostic>) {
+    let (typed, mut diags) = types::check_selected(program, &graph.sources, selected);
+    let targets: Vec<_> = selected.iter().map(|(target, _)| *target).collect();
+    capabilities::check_selected(program, graph, &targets, &mut diags);
     map_expansion_diagnostics(program, &graph.sources, &mut diags);
     (typed, diags)
 }

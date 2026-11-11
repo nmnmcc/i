@@ -1,7 +1,7 @@
 //! Type inference (§4.7, §4.8) with effects (§9.2–§9.6): algebraic
 //! subtyping in the style of Simple-sub (Parreaux, ICFP 2020; the theory is
 //! MLsub, Dolan and Mycroft, POPL 2017), with the unions, intersections,
-//! and differences of §4.4, the variance of §4.5, and the `? E ! N` parts of
+//! and differences of §4.4, the variance of §4.5, and the `^ E ! N` parts of
 //! function types.
 //!
 //! - `solve.rs`: type variables with levels and bounds, `constrain`, and the

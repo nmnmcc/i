@@ -90,6 +90,23 @@ fn add_provider_section(wasm: &mut Vec<u8>, bindings: &[serde_json::Value]) {
     );
 }
 
+/// Compile ordinary tests and collected test roots into one artifact.
+pub fn compile_tests_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    tests: &[(hir::DefId, String)],
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    let (ir, bindings) = lower::lower_tests_with_bindings(graph, program, typed, options, tests)
+        .map_err(Error::Diagnostics)?;
+    let mut wasm = wat::parse_str(emit::wat(&ir)).map_err(|e| Error::Internal(e.to_string()))?;
+    emit::add_abi_section(&mut wasm, &ir.abi_json);
+    add_provider_section(&mut wasm, &bindings);
+    validate(&wasm).map_err(Error::Internal)?;
+    Ok((wasm, bindings))
+}
+
 /// Compile one selected collection target without adding it to the ordinary
 /// entry, test, or host-export tables. The export handle is owned by the tool.
 pub fn compile_selected_with_bindings(

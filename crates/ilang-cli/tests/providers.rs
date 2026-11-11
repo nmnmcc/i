@@ -264,3 +264,46 @@ fn http_client_graph_environment_provisions_net_and_tls() {
         );
     }
 }
+
+#[test]
+fn named_entry_and_collected_tests_use_transitive_provider_plans() {
+    let dir = project(
+        r#"(i/clock, i/fail, test = std/test)
+S { S(value: Int) }
+make = () { fail.catch(() { clock.sleep_ns(1000) }) |> { Ok(_) -> S(42) Error(_) -> panic("clock failed") } }
+main = () { panic("unselected main") }
+worker = (s ! S) { assert(s.value == 42) }
+test.test("configured", () { worker() })
+"#,
+        &(row("S", "make")
+            + "[entries]\ntool = \"main.worker\"\n[test]\ncollection = \"std/test.tests\"\n"),
+    );
+    let std = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let mut manifest = std::fs::read_to_string(dir.path().join("i.toml")).unwrap();
+    manifest.push_str(&format!("[dependencies]\nstd = {{path = {:?}}}\n", std));
+    std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
+    for level in ["0", "2"] {
+        let run = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["run", "tool", "--offline", "--opt", level, "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            run.status.success(),
+            "{}",
+            String::from_utf8_lossy(&run.stderr)
+        );
+        let tests = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["test", "--offline", "--opt", level, "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            tests.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&tests.stdout),
+            String::from_utf8_lossy(&tests.stderr)
+        );
+        assert!(String::from_utf8_lossy(&tests.stdout).contains("1 passed, 0 failed"));
+    }
+}

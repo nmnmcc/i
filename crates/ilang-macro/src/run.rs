@@ -13,6 +13,7 @@ pub struct MacroProgram {
     binding_plan: ilang_host::bindings::BindingPlan,
     trusted_package: String,
     metered: bool,
+    program: std::sync::OnceLock<ilang_host::Program>,
 }
 
 impl MacroProgram {
@@ -26,10 +27,16 @@ impl MacroProgram {
             binding_plan,
             trusted_package,
             metered: false,
+            program: std::sync::OnceLock::new(),
         }
     }
-    fn host_program(&self) -> Result<ilang_host::Program> {
-        ilang_host::Program::from_bytes(&self.wasm)?.with_binding_plan(self.binding_plan.clone())
+    fn host_program(&self) -> Result<&ilang_host::Program> {
+        if let Some(program) = self.program.get() {
+            return Ok(program);
+        }
+        let program = ilang_host::Program::from_bytes(&self.wasm)?
+            .with_binding_plan(self.binding_plan.clone())?;
+        Ok(self.program.get_or_init(|| program))
     }
 }
 

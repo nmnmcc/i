@@ -65,7 +65,7 @@ case_lines =  x |> {
 
 // `?` at the start of a line goes on; `{` of the body on the same line.
 typed = (x) -> Int
-  ? String {
+  ^ String {
   x
 }
 
@@ -77,5 +77,5 @@ negative =  n |> {
 }
 
 // Attributes are part of the item after them.
-@main
+@custom
 main = () { Nil }

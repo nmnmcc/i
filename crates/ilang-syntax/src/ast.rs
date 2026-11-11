@@ -315,7 +315,7 @@ pub struct Clause {
     pub span: Span,
 }
 
-/// `(params) -> A ? E ! N { body }` (§6.8).
+/// `(params) -> A ^ E ! N { body }` (§6.8).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function {
     pub params: Vec<Param>,

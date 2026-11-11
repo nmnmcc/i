@@ -115,7 +115,7 @@ fn generic_value_use_and_public_constructor_fields_keep_their_types() {
             include_str!("../../../tests/spec/2.4/field_privacy_allowed/src/main.i"),
         ),
     ]);
-    assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));
+    common::expect_unused(&diags, &["allowed"]);
     let checked = ilang_check::check(&graph);
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();

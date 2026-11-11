@@ -37,7 +37,7 @@ Facts checked by reading code:
 
 | Code region | Evidence and consequence |
 |---|---|
-| `std/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `? E ! N`; folds run left to right. Keep these conventions. |
+| `std/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `^ E ! N`; folds run left to right. Keep these conventions. |
 | `std/src/dict.i:24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
 | `std/src/string.i:4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
 | `std/src/option.i:1–6`, `:27–31`, `:54–59`; `std/src/result.i:1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |
@@ -151,26 +151,26 @@ Step(A, E, N) {
 new(A, N): () -> Stream(A, Never, N)
 wrap(A, N): (item: A) -> Stream(A, Never, N)
 from_list(A, N): (items: List(A)) -> Stream(A, Never, N)
-make(A, E, N): (step: () -> Step(A, E, N) ? E ! N) -> Stream(A, E, N)
-defer(A, E, N): (body: () -> Stream(A, E, N) ? E ! N) -> Stream(A, E, N)
-unfold(S, A, E, N): (from: S, with: (S) -> Option((A, S)) ? E ! N) -> Stream(A, E, N)
-pull(A, E, N): (stream: Stream(A, E, N)) -> Step(A, E, N) ? E ! N
-map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ? F ! N) -> Stream(B, E | F, N)
-filter(A, E, F, N): (over: Stream(A, E, N), keeping: (A) -> Bool ? F ! N) -> Stream(A, E | F, N)
-filter_map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> Option(B) ? F ! N) -> Stream(B, E | F, N)
-flat_map(A, B, E, F, G, N): (over: Stream(A, E, N), with: (A) -> Stream(B, F, N) ? G ! N) -> Stream(B, E | F | G, N)
+make(A, E, N): (step: () -> Step(A, E, N) ^ E ! N) -> Stream(A, E, N)
+defer(A, E, N): (body: () -> Stream(A, E, N) ^ E ! N) -> Stream(A, E, N)
+unfold(S, A, E, N): (from: S, with: (S) -> Option((A, S)) ^ E ! N) -> Stream(A, E, N)
+pull(A, E, N): (stream: Stream(A, E, N)) -> Step(A, E, N) ^ E ! N
+map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ^ F ! N) -> Stream(B, E | F, N)
+filter(A, E, F, N): (over: Stream(A, E, N), keeping: (A) -> Bool ^ F ! N) -> Stream(A, E | F, N)
+filter_map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> Option(B) ^ F ! N) -> Stream(B, E | F, N)
+flat_map(A, B, E, F, G, N): (over: Stream(A, E, N), with: (A) -> Stream(B, F, N) ^ G ! N) -> Stream(B, E | F | G, N)
 append(A, E, F, N): (first: Stream(A, E, N), second: Stream(A, F, N)) -> Stream(A, E | F, N)
 zip(A, B, E, F, N): (first: Stream(A, E, N), second: Stream(B, F, N)) -> Stream((A, B), E | F, N)
 take(A, E, N): (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N)
 drop(A, E, N): (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N)
-take_while(A, E, F, N): (from: Stream(A, E, N), keeping: (A) -> Bool ? F ! N) -> Stream(A, E | F, N)
-fold(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> Acc ? F ! N) -> Acc ? E | F ! N
-fold_until(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> list.ContinueOrStop(Acc) ? F ! N) -> Acc ? E | F ! N
-each(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ? F ! N) -> Nil ? E | F ! N
-to_list(A, E, N): (stream: Stream(A, E, N)) -> List(A) ? E ! N
+take_while(A, E, F, N): (from: Stream(A, E, N), keeping: (A) -> Bool ^ F ! N) -> Stream(A, E | F, N)
+fold(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> Acc ^ F ! N) -> Acc ^ E | F ! N
+fold_until(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> list.ContinueOrStop(Acc) ^ F ! N) -> Acc ^ E | F ! N
+each(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ^ F ! N) -> Nil ^ E | F ! N
+to_list(A, E, N): (stream: Stream(A, E, N)) -> List(A) ^ E ! N
 from_results(A, E, N): (items: List(Result(A, E))) -> Stream(A, E, N)
 attempt(A, E, N): (stream: Stream(A, E, N)) -> Stream(Result(A, E), Never, N)
-map_environment(A, E, N, M): (stream: Stream(A, E, N), run: { (body: () -> Step(A, E, N) ? E ! N) -> Step(A, E, N) ? E ! M }) -> Stream(A, E, M)
+map_environment(A, E, N, M): (stream: Stream(A, E, N), run: { (body: () -> Step(A, E, N) ^ E ! N) -> Step(A, E, N) ^ E ! M }) -> Stream(A, E, M)
 ```
 
 A/E are covariant; N is invariant. The second private Stream field is an unused
@@ -403,9 +403,9 @@ split(A): (sequence: Sequence(A), at: Int) -> (Sequence(A), Sequence(A))
 take(A): (from: Sequence(A), up_to: Int) -> Sequence(A)
 drop(A): (from: Sequence(A), up_to: Int) -> Sequence(A)
 reverse(A): (sequence: Sequence(A)) -> Sequence(A)
-map(A, B, E, N): (over: Sequence(A), with: (A) -> B ? E ! N) -> Sequence(B) ? E ! N
-fold(A, Acc, E, N): (over: Sequence(A), from: Acc, with: (Acc, A) -> Acc ? E ! N) -> Acc ? E ! N
-each(A, B, E, N): (over: Sequence(A), with: (A) -> B ? E ! N) -> Nil ? E ! N
+map(A, B, E, N): (over: Sequence(A), with: (A) -> B ^ E ! N) -> Sequence(B) ^ E ! N
+fold(A, Acc, E, N): (over: Sequence(A), from: Acc, with: (Acc, A) -> Acc ^ E ! N) -> Acc ^ E ! N
+each(A, B, E, N): (over: Sequence(A), with: (A) -> B ^ E ! N) -> Nil ^ E ! N
 equal(A): (first: Sequence(A), second: Sequence(A)) -> Bool
 ```
 

@@ -538,7 +538,7 @@ fn async_entry_points_and_needed_services() {
 #[test]
 fn the_compiled_fixture_is_current() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/browser/fixtures");
-    let built = build(
+    let built = ilang_cli::build_entry(
         &fixtures.join("compiled"),
         BuildOptions {
             tests: false,
@@ -546,6 +546,7 @@ fn the_compiled_fixture_is_current() {
             offline: false,
             target: Default::default(),
         },
+        Some("legacy"),
     )
     .unwrap();
     let fresh = ilang_host::Abi::from_wasm(&built.wasm).unwrap().unwrap();

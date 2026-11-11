@@ -4,7 +4,6 @@
 ()
 (main)
 
-@main
 main = () {
   assert(True)
   Nil

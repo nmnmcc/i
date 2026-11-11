@@ -28,7 +28,7 @@ fn tls_round_trip_and_certificate_validation() {
  i/task
  i/fail
 )
-@main
+
 main = () {{
  listener = net.listen("127.0.0.1", 0)
  port = net.local_port(listener)

@@ -1,3 +1,4 @@
+// old-syntax-check: E0101,E0101,E0101
 // Proposed T3 plus landed T2. A plain user-defined type and constructor.
 Schema(A) { Schema(decode: () -> A) }
 make = (c: Bool) {

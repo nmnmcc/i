@@ -2,9 +2,9 @@
   "artifact_digest": "sha256-135da31f241bd6d5007d2523e30d1b82ee4829f4ff9b6df1f3ad925c16a24fa6",
   "declarations": [
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/app",
-      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "module_digest": "sha256-085a9f7a5be5e8e051d664e2bc69df3423f61a53b43c67f277e855949a26b7a6",
       "declaration": "hypot",
       "namespace": "app:math/v1",
       "name": "hypot",
@@ -20,7 +20,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "get_a",
@@ -35,7 +35,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "get_b",
@@ -50,7 +50,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "echo_a",
@@ -67,7 +67,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "echo_b",
@@ -84,9 +84,9 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/app",
-      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "module_digest": "sha256-085a9f7a5be5e8e051d664e2bc69df3423f61a53b43c67f277e855949a26b7a6",
       "declaration": "Console.print",
       "namespace": "app:console/v1",
       "name": "print",
@@ -101,9 +101,9 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/app",
-      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "module_digest": "sha256-085a9f7a5be5e8e051d664e2bc69df3423f61a53b43c67f277e855949a26b7a6",
       "declaration": "Storage.read",
       "namespace": "app:storage/v1",
       "name": "read",
@@ -120,9 +120,9 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/app",
-      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "module_digest": "sha256-085a9f7a5be5e8e051d664e2bc69df3423f61a53b43c67f277e855949a26b7a6",
       "declaration": "Clock.later",
       "namespace": "app:clock/v1",
       "name": "later",
@@ -139,9 +139,9 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/app",
-      "module_digest": "sha256-272c7cfba07b02b216b6c7675ca028a013162bbcc529ff4b38a2ec3b22c59871",
+      "module_digest": "sha256-085a9f7a5be5e8e051d664e2bc69df3423f61a53b43c67f277e855949a26b7a6",
       "declaration": "Clock.tick",
       "namespace": "app:clock/v1",
       "name": "tick",
@@ -156,7 +156,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "SyncA.get_a",
@@ -171,7 +171,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "SyncB.get_b",
@@ -186,7 +186,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "AsyncA.get_a",
@@ -201,7 +201,7 @@
       }
     },
     {
-      "package": "sha256-274e817c96f1b46dff5b8e2077c0158f7eb675414ef592394e2e1e48dbdf4fdf",
+      "package": "sha256-5c36bf2b09b21a4b2576993ce7804b9ae38b1e723af47033cc3db5705ff31a2b",
       "module": "app/opaque",
       "module_digest": "sha256-037688e0f0d0f0b8fa9358effcbcbf34c180530fb6db8e449804bc8d6d8bccdf",
       "declaration": "AsyncB.get_b",

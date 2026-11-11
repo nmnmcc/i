@@ -69,12 +69,14 @@ pub struct Program {
     pub types: Vec<TypeDef>,
     /// The module of the built-in names (§12), in the package `i`.
     pub prelude: Option<ModuleId>,
-    /// The package that is compiled: its `@main` and `@test` bindings are
+    /// The package that is compiled: its entry and `@test` bindings are
     /// entry points (§10.2).
     pub root: Option<PackageId>,
     /// The host exports (§10.2): the names in `[wasm].exports` of the
     /// compiled package that are exported functions of a module.
     pub host_exports: Vec<DefId>,
+    /// Default and declared program entries, including unselected entries.
+    pub declared_entries: Vec<DefId>,
     /// The number of `VarId`s and `TyVarId`s given out.
     pub var_count: u32,
     pub ty_var_count: u32,
@@ -206,7 +208,7 @@ pub struct TopBinding {
     pub binding: Binding,
     /// The names it binds, in pattern order.
     pub defs: Vec<DefId>,
-    /// `@main` (§10.2).
+    /// Program entry (§10.2).
     pub main: bool,
     /// `@test` (§10.2).
     pub test: bool,
@@ -519,7 +521,7 @@ pub struct Clause {
     pub span: Span,
 }
 
-/// `(params) -> A ? E ! N { body }` (§6.8).
+/// `(params) -> A ^ E ! N { body }` (§6.8).
 #[derive(Clone, Debug)]
 pub struct Function {
     pub params: Vec<Param>,

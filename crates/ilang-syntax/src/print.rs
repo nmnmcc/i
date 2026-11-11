@@ -559,6 +559,7 @@ impl Printer {
                 self.w(&name.name);
             }
             ExprKind::Tuple(items) => {
+                assert!(!items.is_empty(), "tuple expressions must have a part");
                 self.w("(");
                 self.list(items, |p, e| p.expr(e, 0));
                 self.w(")");
@@ -794,6 +795,7 @@ impl Printer {
                 }
             }
             PatternKind::Tuple(items) => {
+                assert!(!items.is_empty(), "tuple patterns must have a part");
                 self.w("(");
                 self.list(items, |p, a| p.pattern(a, false));
                 self.w(")");
@@ -908,6 +910,7 @@ impl Printer {
             TypeKind::Lit(v) => return self.w(&v.text()),
             TypeKind::Hole => return self.w("_"),
             TypeKind::Tuple(items) => {
+                assert!(!items.is_empty(), "tuple types must have a part");
                 self.w("(");
                 self.list(items, |p, a| p.ty(a));
                 return self.w(")");
@@ -977,7 +980,7 @@ impl Printer {
     ) {
         self.ty_in(ret, 1, tail && err.is_none() && env.is_none());
         if let Some(err) = err {
-            self.w(" ? ");
+            self.w(" ^ ");
             self.ty_in(err, 1, tail && env.is_none());
         }
         if let Some(env) = env {

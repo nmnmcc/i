@@ -622,6 +622,16 @@ pub fn lower_with_bindings(
     typed: &Typed,
     options: Options,
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
+    lower_tests_with_bindings(graph, program, typed, options, &[])
+}
+
+pub fn lower_tests_with_bindings(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    tests: &[(DefId, String)],
+) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     if !typed.coalescing_errors().is_empty() {
         return Err(typed.coalescing_errors().to_vec());
     }
@@ -653,6 +663,7 @@ pub fn lower_with_bindings(
     }
     let mut l = Lowerer::new(graph, program, typed, options, None);
     l.install_plans(plans);
+    l.extra_tests = tests.to_vec();
     l.run();
     if l.diags.is_empty() {
         crate::control::split(&mut l.out);
@@ -710,6 +721,7 @@ struct Lowerer<'a> {
     options: Options,
     selected: Option<(DefId, String)>,
     selected_async: bool,
+    extra_tests: Vec<(DefId, String)>,
     packages: HashSet<PackageId>,
     ctors: HashMap<CtorRef, CtorInfo>,
     types: HashMap<TypeId, TypeRepr>,
@@ -754,6 +766,7 @@ impl<'a> Lowerer<'a> {
             options,
             selected,
             selected_async: false,
+            extra_tests: Vec::new(),
             packages: HashSet::new(),
             ctors: HashMap::new(),
             types: HashMap::new(),
@@ -1198,6 +1211,21 @@ impl<'a> Lowerer<'a> {
                     tests.push((name, is_async));
                 }
             }
+        }
+        for (d, name) in self.extra_tests.clone() {
+            let callee = self.entry_callee(d, 0);
+            let fx = Fx::new(d.module, false);
+            let site = self.site(&fx, program.def(d).span.start);
+            let is_async = self.plans[&d].is_async;
+            let async_body = is_async.then(|| self.async_body(&callee, 0));
+            self.out.exports.push(Export {
+                name: name.clone(),
+                callee,
+                abi: None,
+                site,
+                async_body,
+            });
+            tests.push((name, is_async));
         }
         let mut exports = Vec::new();
         for &d in &program.host_exports {

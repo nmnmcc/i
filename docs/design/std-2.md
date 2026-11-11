@@ -78,7 +78,7 @@ functions with their stated error and environment types.
    or historical jurisdiction rules: these require versioned external data and
    ambiguity policy. A later ordinary package can provide both. UTC here uses
    the Unix timeline; leap seconds have no distinct representation.
-4. **Use Result for pure validation; expose effects as `? E ! N`.** Reason:
+4. **Use Result for pure validation; expose effects as `^ E ! N`.** Reason:
    std option/result style above and spec §9.3. A parser error is stored data;
    callers choose fail.from_result to raise it. No expected bad input asserts.
 5. **Compose typed CLI decoders with fixed metadata.** Reason: spec §4.7;
@@ -148,7 +148,7 @@ Phase two adds exactly these IO wrappers (clock = i/clock, request = i/request):
 ```text
 now: () -> Instant ? clock.ClockError ! clock.Clock | request.Await | request.Owner
 sleep: (duration: Duration) -> Nil ? clock.ClockError ! clock.Clock | request.Await | request.Owner
-measure(A, E, N): (body: () -> A ? E ! N) -> (A, Duration) ? E | clock.ClockError ! N | clock.Clock | request.Await | request.Owner
+measure(A, E, N): (body: () -> A ^ E ! N) -> (A, Duration) ^ E | clock.ClockError ! N | clock.Clock | request.Await | request.Owner
 ```
 
 ### 3.3 Rules and laws
@@ -586,13 +586,13 @@ Sink(E, N) {
 ```
 
 ```text
-make(E, N): (accept: (Level) -> Bool, send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+make(E, N): (accept: (Level) -> Bool, send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)
 silent(N): () -> Sink(Never, N)
 filter(E, N): (sink: Sink(E, N), accept: (Level) -> Bool) -> Sink(E, N)
 minimum(E, N): (sink: Sink(E, N), level: Level) -> Sink(E, N)
 enabled(E, N): (level: Level) -> Bool ! Sink(E, N)
-write(E, N): (entry: Entry) -> Nil ? E ! N | Sink(E, N)
-lazy(E, F, N): (level: Level, message: () -> String ? F ! N) -> Nil ? E | F ! N | Sink(E, N)
+write(E, N): (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
+lazy(E, F, N): (level: Level, message: () -> String ^ F ! N) -> Nil ^ E | F ! N | Sink(E, N)
 format: (entry: Entry) -> String
 ```
 
@@ -709,7 +709,7 @@ write(E, N) = (entry: Entry, sink ! Sink(E, N)) {
   Sink(send, _) = sink
   send(entry)
 }
-// Shown: (entry: Entry) -> Nil ? E ! N | Sink(E, N)
+// Shown: (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
 
 example = () {
   ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
@@ -1102,13 +1102,13 @@ std/cli.integer : (text: String) -> Result(Int, String)
 std/cli.parse : (parser: Parser(A), args: List(String)) -> Result(A, CliError)
 std/cli.help : (parser: Parser(A), program: String) -> Result(String, DefinitionError)
 
-std/log.make : (accept: (Level) -> Bool, send: (Entry) -> Nil ? E ! N) -> Sink(E, N)
+std/log.make : (accept: (Level) -> Bool, send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)
 std/log.silent : () -> Sink(Never, A)
 std/log.filter : (sink: Sink(A, B), accept: (Level) -> Bool) -> Sink(A, B)
 std/log.minimum : (sink: Sink(A, B), level: Level) -> Sink(A, B)
 std/log.enabled : (level: Level) -> Bool ! Sink(A, B)
-std/log.write : (entry: Entry) -> Nil ? E ! N | Sink(E, N)
-std/log.lazy : (level: Level, message: () -> String ? E ! N) -> Nil ? E | E2 ! N | Sink(E2, N)
+std/log.write : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
+std/log.lazy : (level: Level, message: () -> String ^ E ! N) -> Nil ^ E | E2 ! N | Sink(E2, N)
 std/log.format : (entry: Entry) -> String
 ```
 

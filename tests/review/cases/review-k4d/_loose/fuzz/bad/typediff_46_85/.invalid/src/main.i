@@ -31,7 +31,7 @@ h1 = () {
   x6 = 1 + call(Cb(() { ask() }, (_) { Nil }))
   run(() { ask() })
 }
-@main
+
 main = () {
   p6 = pick(() { with_int(() { run(() { ask() + 1 }) }) + call(Cb(() { get() }, (_: Dep) { Nil })) + 1 }, () { with_int(() { ask() }) })
   ! Dep = Dep(1)

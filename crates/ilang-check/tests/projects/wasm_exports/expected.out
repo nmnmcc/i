@@ -1,5 +1,4 @@
 i.toml:4:28: error[E0313]: the host export `app/math.hidden` is not a function in the exports of a module `app/math`
 i.toml:4:47: error[E0313]: the host export `app/math.nothing` is not a function in the exports of a module `app/math`
 i.toml:4:67: error[E0313]: the host export `app/nomodule.f` is not a function in the exports of a module `app/nomodule`
-i.toml:4:85: error[E0314]: `app/math.main` is a host export and also the program entry or a test, so their export names would be the same
 i.toml:4:102: error[E0321]: `app/math.add` is named more than once in `[wasm].exports`, so their export names would be the same (B.5)

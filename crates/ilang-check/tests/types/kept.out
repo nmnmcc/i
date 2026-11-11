@@ -1,7 +1,6 @@
 4:1: error[E0234]: a call at the top level is kept for macros
-5:1: error[E0301]: the attribute `@custom` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
-7:1: error[E0301]: the attribute `@a.main` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
-9:1: error[E0302]: `@main` takes no arguments and is written with no `( )`
+5:1: error[E0301]: the attribute `@custom` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`
+7:1: error[E0301]: the attribute `@a.main` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`
 11:1: error[E0302]: the arguments of `@external` are string literals given by position: `@external("module", "function")`
 13:1: error[E0302]: the arguments of `@external` are string literals given by position: `@external("module", "function")`
 15:1: error[E0303]: `@external` may only be on a declaration `name: Type`

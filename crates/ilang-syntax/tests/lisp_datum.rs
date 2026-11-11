@@ -483,6 +483,6 @@ fn record_type_printing_keeps_field_and_removal_order() {
     let text = print_module(&module);
     assert_eq!(
         text,
-        "(= (Thing R) {.. R (: first Int) (- old) (: second String) (- gone)})\n"
+        "(= (Thing R) (.. R (: first Int) (- old) (: second String) (- gone)))\n"
     );
 }

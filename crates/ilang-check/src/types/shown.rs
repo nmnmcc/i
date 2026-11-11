@@ -16,7 +16,7 @@ pub enum ShownType {
     Named(TypeRef, Vec<ShownType>),
     /// `(A, B)`.
     Tuple(Vec<ShownType>),
-    /// `(label: A, B) -> R ? E ! N`.
+    /// `(label: A, B) -> R ^ E ! N`.
     Fn(Box<ShownFn>),
     /// A type variable, by its shown name. The variables of one shown type
     /// have different names.
@@ -35,7 +35,7 @@ pub enum ShownType {
 }
 
 /// A function type: its parameters with their labels, its value, and its
-/// `? E` and `! N` parts, which are `None` when they are not written.
+/// `^ E` and `! N` parts, which are `None` when they are not written.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ShownFn {
     pub params: Vec<(Option<String>, ShownType)>,

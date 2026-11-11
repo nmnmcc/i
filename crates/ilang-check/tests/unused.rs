@@ -70,10 +70,7 @@ fn entries_tests_and_ordinary_exports_retain_their_helpers() {
     // Rules 1–2: no warning on public API, entries, tests, or their uses.
     assert!(
         names(&[
-            (
-                "src/main.i",
-                " main = () { helper() }\nhelper = () { Nil }"
-            ),
+            ("src/main.i", " main = () { helper() }\nhelper = () { Nil }"),
             ("src/api.i", "(api)\napi = () { hidden }\nhidden = 1"),
             (
                 "test/check.i",

@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
+  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.ask : () -> A ! Svc(A)\napp/main.askc : () -> A ! Cov(B & A)\napp/main.call : (c: Cb(A)) -> Int ! A\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.twice : (body: () -> Int ! N) -> Int ! N\napp/main.with_int : (body: () -> A ? E ! N) -> A ? E ! N - Svc(Int)\napp/main.with_dep : (body: () -> A ? E ! N) -> A ? E ! N - Dep\napp/main.with_cov : (body: () -> A ? E ! N, v: B) -> A ? E ! N - Cov(B)\napp/main.pick : (a: A, b: A) -> List(A)\napp/main.h0 : () -> Int\napp/main.h1 : () -> Int ! Dep\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () -> Int ! Dep\napp/main.ask : () -> A ! Svc(A)\napp/main.askc : () -> A ! Cov(B & A)\napp/main.call : (c: Cb(A)) -> Int ! A\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.twice : (body: () -> Int ! N) -> Int ! N\napp/main.with_int : (body: () -> A ^ E ! N) -> A ^ E ! N - Svc(Int)\napp/main.with_dep : (body: () -> A ^ E ! N) -> A ^ E ! N - Dep\napp/main.with_cov : (body: () -> A ^ E ! N, v: B) -> A ^ E ! N - Cov(B)\napp/main.pick : (a: A, b: A) -> List(A)\napp/main.h0 : () -> Int\napp/main.h1 : () -> Int ! Dep\napp/main.main : () -> Nil\n",
       "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `call` is not used\nsrc/main.i:22:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:26:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:27:1: warning[W0504]: top-level binding `h0` is not used\n"
     },
     "test0": {

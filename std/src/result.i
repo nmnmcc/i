@@ -1,7 +1,7 @@
 //// Functions for the built-in type `Result(A, E) { Ok(A) Error(E) }`.
 ////
 //// A `Result` is an error kept as a value. i also has errors as effects
-//// (`? E` in a function type, `i/fail`): `to_error` and `catch` go from one
+//// (`^ E` in a function type, `i/fail`): `to_error` and `catch` go from one
 //// form to the other.
 
 (

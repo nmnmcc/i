@@ -7,7 +7,7 @@ object = Schema(decode: () { () })
 field(R, K, V) = (s: Schema(R), key: K, value: Schema(V)) -> Schema((..R, K: V)) {
   Schema(decode: () { record.put(s.decode(), key, value.decode()) })
 }
-@main
+
 main = () {
   name = Schema(decode: () { "Ada" })
   age = Schema(decode: () { 36 })
