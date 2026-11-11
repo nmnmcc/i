@@ -1,5 +1,13 @@
 //// Structural record operations (§4.9).
-(get, put, remove, has, keys, size, texts)
+(
+	get
+	put
+	remove
+	has
+	keys
+	size
+	texts
+)
 
 /// Read a field identified by one known key.
 @external("ilang:record", "get")

@@ -172,8 +172,10 @@ stream_number = (Stream(number)) { number }
 
 /// A transport-independent set of byte stream operations.
 byte_stream = (stream) {
-	(read: (max) { read(stream, max) },
-	  write: (bytes) { write(stream, bytes) },
-	  shutdown_write: () { shutdown_write(stream) },
-	  close: () { close_stream(stream) })
+	(
+		read: (max) { read(stream, max) }
+		write: (bytes) { write(stream, bytes) }
+		shutdown_write: () { shutdown_write(stream) }
+		close: () { close_stream(stream) }
+	)
 }
