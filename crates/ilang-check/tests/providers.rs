@@ -195,89 +195,135 @@ fn malformed_path_is_rejected() {
 #[test]
 fn empty_binding_name_is_invalid() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main."), Err(ilang_check::providers::PathError::InvalidPath));
+    assert_eq!(
+        ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main."),
+        Err(ilang_check::providers::PathError::InvalidPath)
+    );
 }
 
 #[test]
 fn empty_module_path_is_invalid() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/.Public"), Err(ilang_check::providers::PathError::InvalidPath));
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/.Public"),
+        Err(ilang_check::providers::PathError::InvalidPath)
+    );
 }
 
 #[test]
 fn missing_module_separator_is_invalid() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app.Public"), Err(ilang_check::providers::PathError::InvalidPath));
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app.Public"),
+        Err(ilang_check::providers::PathError::InvalidPath)
+    );
 }
 
 #[test]
 fn service_path_does_not_resolve_factory() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.public"), Err(ilang_check::providers::PathError::UnknownName));
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.public"),
+        Err(ilang_check::providers::PathError::UnknownName)
+    );
 }
 
 #[test]
 fn factory_path_does_not_resolve_service() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.Public"), Err(ilang_check::providers::PathError::UnknownName));
+    assert_eq!(
+        ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.Public"),
+        Err(ilang_check::providers::PathError::UnknownName)
+    );
 }
 
 #[test]
 fn dependency_alias_selects_nominal_service() {
     let (g, p) = path_fixture();
-    let own = ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.Public").unwrap();
-    let dependency = ilang_check::providers::resolve_service(&g, &p, g.library, "dep/main.Public").unwrap();
+    let own = ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.Public")
+        .unwrap();
+    let dependency =
+        ilang_check::providers::resolve_service(&g, &p, g.library, "dep/main.Public").unwrap();
     assert_eq!(own, dependency);
 }
 
 #[test]
 fn dependency_alias_selects_nominal_factory() {
     let (g, p) = path_fixture();
-    let own = ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.public").unwrap();
-    let dependency = ilang_check::providers::resolve_binding(&g, &p, g.library, "dep/main.public").unwrap();
+    let own = ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.public")
+        .unwrap();
+    let dependency =
+        ilang_check::providers::resolve_binding(&g, &p, g.library, "dep/main.public").unwrap();
     assert_eq!(own, dependency);
 }
 
 #[test]
 fn dependency_alias_does_not_grant_private_service_access() {
     let (g, p) = path_fixture();
-    assert!(ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.Private").is_ok());
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.library, "dep/main.Private"), Err(ilang_check::providers::PathError::Private));
+    assert!(
+        ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.Private")
+            .is_ok()
+    );
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.library, "dep/main.Private"),
+        Err(ilang_check::providers::PathError::Private)
+    );
 }
 
 #[test]
 fn dependency_alias_does_not_grant_private_factory_access() {
     let (g, p) = path_fixture();
-    assert!(ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.private").is_ok());
-    assert_eq!(ilang_check::providers::resolve_binding(&g, &p, g.library, "dep/main.private"), Err(ilang_check::providers::PathError::Private));
+    assert!(
+        ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.private")
+            .is_ok()
+    );
+    assert_eq!(
+        ilang_check::providers::resolve_binding(&g, &p, g.library, "dep/main.private"),
+        Err(ilang_check::providers::PathError::Private)
+    );
 }
 
 #[test]
 fn missing_dependency_module_is_rejected() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.library, "dep/missing.Public"), Err(ilang_check::providers::PathError::UnknownModule));
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.library, "dep/missing.Public"),
+        Err(ilang_check::providers::PathError::UnknownModule)
+    );
 }
 
 #[test]
 fn missing_dependency_service_is_rejected() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.library, "dep/main.Missing"), Err(ilang_check::providers::PathError::UnknownName));
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.library, "dep/main.Missing"),
+        Err(ilang_check::providers::PathError::UnknownName)
+    );
 }
 
 #[test]
 fn missing_dependency_binding_is_rejected() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_binding(&g, &p, g.library, "dep/main.missing"), Err(ilang_check::providers::PathError::UnknownName));
+    assert_eq!(
+        ilang_check::providers::resolve_binding(&g, &p, g.library, "dep/main.missing"),
+        Err(ilang_check::providers::PathError::UnknownName)
+    );
 }
 
 #[test]
 fn service_name_is_case_sensitive() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.public"), Err(ilang_check::providers::PathError::UnknownName));
+    assert_eq!(
+        ilang_check::providers::resolve_service(&g, &p, g.root.unwrap(), "app/main.PUBLIC"),
+        Err(ilang_check::providers::PathError::UnknownName)
+    );
 }
 
 #[test]
 fn binding_name_is_case_sensitive() {
     let (g, p) = path_fixture();
-    assert_eq!(ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.Public"), Err(ilang_check::providers::PathError::UnknownName));
+    assert_eq!(
+        ilang_check::providers::resolve_binding(&g, &p, g.root.unwrap(), "app/main.PUBLIC"),
+        Err(ilang_check::providers::PathError::UnknownName)
+    );
 }
