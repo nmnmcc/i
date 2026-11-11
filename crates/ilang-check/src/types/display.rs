@@ -424,27 +424,11 @@ fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
 
 /// The variables of a type, with repeats.
 fn ty_vars(t: &Ty, out: &mut Vec<V>) {
-    match t {
-        Ty::Var(v) => out.push(*v),
-        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
-            xs.iter().for_each(|x| ty_vars(x, out))
+    super::tree::visit(t, |part| {
+        if let Ty::Var(v) = part {
+            out.push(*v);
         }
-        Ty::Fn(f) => {
-            f.params.iter().for_each(|p| ty_vars(&p.1, out));
-            [&f.ret, &f.err, &f.env]
-                .into_iter()
-                .for_each(|x| ty_vars(x, out));
-        }
-        Ty::Diff(a, h) => {
-            ty_vars(a, out);
-            h.iter().for_each(|x| ty_vars(x, out));
-        }
-        Ty::Both(a, b) => {
-            ty_vars(a, out);
-            ty_vars(b, out);
-        }
-        Ty::Never | Ty::Top => {}
-    }
+    });
 }
 
 /// The strongly connected components of a graph, as a number for each node
@@ -1294,45 +1278,37 @@ fn mentions(t: &Ty, v: V) -> bool {
 }
 
 fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
-    f(t);
-    match t {
-        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
-        Ty::Fn(g) => {
-            g.params.iter().for_each(|p| visit(&p.1, f));
-            [&g.ret, &g.err, &g.env]
-                .into_iter()
-                .for_each(|x| visit(x, f));
-        }
-        Ty::Diff(a, h) => {
-            visit(a, f);
-            h.iter().for_each(|x| visit(x, f));
-        }
-        Ty::Both(a, b) => {
-            visit(a, f);
-            visit(b, f);
-        }
-        _ => {}
-    }
+    super::tree::visit(t, f);
 }
 
 /// `t` with the variable `v` replaced by `by`.
 fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
-    let r = |x: &Ty| replace(x, v, by);
-    match t {
-        Ty::Var(x) if *x == v => by.clone(),
-        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
-        Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
-        Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
-            ret: r(&f.ret),
-            err: r(&f.err),
-            env: r(&f.env),
-        })),
-        Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
-        Ty::Both(a, b) => Ty::Both(Box::new(r(a)), Box::new(r(b))),
-        t => t.clone(),
+    let mut result = t.clone();
+    let mut pending = vec![&mut result];
+    while let Some(part) = pending.pop() {
+        match part {
+            Ty::Var(x) if *x == v => *part = by.clone(),
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+                pending.extend(xs.iter_mut().rev())
+            }
+            Ty::Fn(f) => {
+                pending.push(&mut f.env);
+                pending.push(&mut f.err);
+                pending.push(&mut f.ret);
+                pending.extend(f.params.iter_mut().rev().map(|p| &mut p.1));
+            }
+            Ty::Diff(a, hs) => {
+                pending.extend(hs.iter_mut().rev());
+                pending.push(a);
+            }
+            Ty::Both(a, b) => {
+                pending.push(b);
+                pending.push(a);
+            }
+            Ty::Var(_) | Ty::Never | Ty::Top => {}
+        }
     }
+    result
 }
 
 // ---- Names and text ----
@@ -1463,29 +1439,32 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
 /// The variables in the order they are written, each with the part of a
 /// function type it is first a member of.
 fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
-    match t {
-        Ty::Var(v) => {
-            if !out.iter().any(|x| x.0 == *v) {
-                out.push((*v, role));
+    let mut pending = vec![(t, role)];
+    while let Some((t, role)) = pending.pop() {
+        match t {
+            Ty::Var(v) => {
+                if !out.iter().any(|x| x.0 == *v) {
+                    out.push((*v, role));
+                }
             }
+            Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs.iter().rev().map(|x| (x, role))),
+            Ty::Con(_, _, xs) => pending.extend(xs.iter().rev().map(|x| (x, Role::Value))),
+            Ty::Diff(a, hs) => {
+                pending.extend(hs.iter().rev().map(|x| (x, Role::Value)));
+                pending.push((a, role));
+            }
+            Ty::Fn(f) => {
+                pending.push((&f.env, Role::Env));
+                pending.push((&f.err, Role::Err));
+                pending.push((&f.ret, Role::Value));
+                pending.extend(f.params.iter().rev().map(|p| (&p.1, Role::Value)));
+            }
+            Ty::Both(a, b) => {
+                pending.push((b, role));
+                pending.push((a, role));
+            }
+            Ty::Never | Ty::Top => {}
         }
-        Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| roles(x, role, out)),
-        Ty::Diff(a, h) => {
-            roles(a, role, out);
-            h.iter().for_each(|x| roles(x, Role::Value, out));
-        }
-        Ty::Con(_, _, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
-        Ty::Fn(f) => {
-            f.params.iter().for_each(|p| roles(&p.1, Role::Value, out));
-            roles(&f.ret, Role::Value, out);
-            roles(&f.err, Role::Err, out);
-            roles(&f.env, Role::Env, out);
-        }
-        Ty::Both(a, b) => {
-            roles(a, role, out);
-            roles(b, role, out);
-        }
-        Ty::Never | Ty::Top => {}
     }
 }
 
@@ -1578,25 +1557,24 @@ fn holes(t: &Ty) -> Ty {
 }
 
 fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
-    match t {
-        Ty::Var(v) => {
-            out.insert(*v);
+    let mut pending = vec![t];
+    while let Some(t) = pending.pop() {
+        match t {
+            Ty::Var(v) => {
+                out.insert(*v);
+            }
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs.iter().rev()),
+            Ty::Fn(f) => {
+                pending.extend([&f.env, &f.err, &f.ret]);
+                pending.extend(f.params.iter().rev().map(|p| &p.1));
+            }
+            Ty::Diff(a, _) => pending.push(a),
+            Ty::Both(a, b) => {
+                pending.push(b);
+                pending.push(a);
+            }
+            Ty::Never | Ty::Top => {}
         }
-        Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
-            xs.iter().for_each(|x| outer_vars(x, out))
-        }
-        Ty::Fn(f) => {
-            f.params.iter().for_each(|p| outer_vars(&p.1, out));
-            [&f.ret, &f.err, &f.env]
-                .into_iter()
-                .for_each(|x| outer_vars(x, out));
-        }
-        Ty::Diff(a, _) => outer_vars(a, out),
-        Ty::Both(a, b) => {
-            outer_vars(a, out);
-            outer_vars(b, out);
-        }
-        Ty::Never | Ty::Top => {}
     }
 }
 
@@ -1794,5 +1772,40 @@ mod literal_display_tests {
         assert_eq!(tree.text(&[]).matches('|').count(), 39);
         assert!(tree.text_limited(&[], 12).ends_with("… (30 more)"));
         assert!(!tree.text(&[]).contains('…'));
+    }
+}
+
+#[cfg(test)]
+mod deep_walk_tests {
+    use super::*;
+
+    #[test]
+    fn display_walks_preserve_difference_visibility_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut t = Ty::Var(V(0));
+                for _ in 0..10_000 {
+                    t = Ty::Diff(Box::new(t), vec![Ty::Var(V(1))]);
+                }
+                let mut vars = Vec::new();
+                ty_vars(&t, &mut vars);
+                assert_eq!(vars.len(), 10_001);
+                assert_eq!(vars[0], V(0));
+                assert!(vars[1..].iter().all(|v| *v == V(1)));
+                let mut outer = HashSet::default();
+                outer_vars(&t, &mut outer);
+                assert_eq!(outer, HashSet::from_iter([V(0)]));
+                assert!(mentions(&t, V(1)));
+                let mut named_roles = Vec::new();
+                roles(&t, Role::Err, &mut named_roles);
+                assert!(named_roles == [(V(0), Role::Err), (V(1), Role::Value)]);
+                let replaced = replace(&t, V(0), &Ty::Var(V(2)));
+                assert!(mentions(&replaced, V(2)));
+                assert!(!mentions(&replaced, V(0)));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }
