@@ -2234,5 +2234,9 @@
     "diagnostics": [
       "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
     ]
+  },
+  "crates/ilang-wasm/tests/control_lazy.rs:7111383378a50a4c": {
+    "not_source": true,
+    "reason": "Delimiter used to split a generated program, not an i module."
   }
 }

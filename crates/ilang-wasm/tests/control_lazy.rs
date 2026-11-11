@@ -1089,7 +1089,7 @@ fn nested_resume_stack() {
 
 fn recursion_source(paused: bool) -> String {
     let source = bench_source(50_000, 1, false);
-    let source = source.split(concat!("\n@", "main")).next().unwrap();
+    let (source, _) = source.split_once("\nmain =").expect("benchmark entry");
     let recurse = "rec = (n, body) { n |> { 0 -> body()  _ -> rec(n - 1, body) + 1 } }";
     let main = if paused {
         "done = { Done(n) -> n  _ -> panic(\"not done\") }\n\
