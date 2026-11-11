@@ -383,3 +383,71 @@ fn deep_pipe_followed_by_function_binding() {
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
     });
 }
+
+#[test]
+fn deep_record_fields_and_spreads_parse_and_drop() {
+    small_stack(|| {
+        let n = 10_000;
+        for (prefix, suffix) in [("(field: ", ")"), ("(..", ")"), ("C(..", ")")] {
+            let source = format!("value = {}x{}", prefix.repeat(n), suffix.repeat(n));
+            let (module, diagnostics) = parse_module(&source);
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            let ItemKind::Binding(binding) = &module.items[0].kind else {
+                panic!("binding")
+            };
+            let mut node = &binding.value;
+            for _ in 0..n {
+                node = match &node.kind {
+                    ExprKind::Record {
+                        base: Some(base), ..
+                    } => base,
+                    ExprKind::Record { base: None, fields } => &fields[0].1,
+                    ExprKind::RecordUpdate { base, .. } => base,
+                    _ => panic!("expected nested record"),
+                };
+            }
+            assert!(matches!(node.kind, ExprKind::Name { .. }));
+        }
+    });
+}
+
+#[test]
+fn deep_record_type_fields_and_spreads_parse_and_drop() {
+    small_stack(|| {
+        let n = 10_000;
+        for prefix in ["(field: ", "(.."] {
+            let source = format!(
+                "f = (x: {}Record{}) {{ x }}",
+                prefix.repeat(n),
+                ")".repeat(n)
+            );
+            let (module, diagnostics) = parse_module(&source);
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            let ItemKind::Binding(binding) = &module.items[0].kind else {
+                panic!("binding")
+            };
+            let ExprKind::Fn(function) = &binding.value.kind else {
+                panic!("function")
+            };
+            let ilang_syntax::ast::Param::Pattern(pattern) = &function.params[0] else {
+                panic!("parameter")
+            };
+            let PatternKind::Typed { ty, .. } = &pattern.kind else {
+                panic!("typed parameter")
+            };
+            let mut node = ty.as_ref();
+            for _ in 0..n {
+                node = match &node.kind {
+                    TypeKind::Record {
+                        base: Some(base), ..
+                    } => base,
+                    TypeKind::Record {
+                        base: None, fields, ..
+                    } => &fields[0].1,
+                    _ => panic!("expected nested record type"),
+                };
+            }
+            assert!(matches!(node.kind, TypeKind::Named { .. }));
+        }
+    });
+}

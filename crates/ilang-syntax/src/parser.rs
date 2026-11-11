@@ -353,6 +353,18 @@ impl Parser<'_> {
         }
     }
 
+    fn record_value_label(&mut self) -> PResult<Ident> {
+        if let T::Str(value) = self.kind() {
+            let name = value.clone();
+            Ok(Ident {
+                name,
+                span: self.bump(),
+            })
+        } else {
+            self.name()
+        }
+    }
+
     fn up_name(&mut self) -> PResult<Ident> {
         match self.kind() {
             T::UpName(n) => {
@@ -1586,41 +1598,7 @@ impl Parser<'_> {
                 .error("`Record` for all records, or `Nil` for a unit type; `()` is not a type");
         }
         if self.at(&T::DotDot) || self.label_start() {
-            let at = self.tok().span;
-            let spread = self.eat(&T::DotDot);
-            if spread {
-                unsafe { __s.call(|__child| self.ty(__child)) }.await?;
-            }
-            if !(spread && self.eat(&T::RParen)) {
-                if spread && !self.eat(&T::Comma) && !self.tok().brk {
-                    return self.error("a record type separator");
-                }
-                self.seq(
-                    T::RParen,
-                    true,
-                    |p, __s| {
-                        Box::pin(async move {
-                            if spread && p.eat(&T::Minus) {
-                                if matches!(p.kind(), T::Name(_) | T::UpName(_) | T::Str(_)) {
-                                    p.bump();
-                                    return Ok(());
-                                }
-                                return p.error("a forgotten record label");
-                            }
-                            p.record_label(true)?;
-                            unsafe { __s.call(|__child| p.ty(__child)) }.await?;
-                            Ok(())
-                        })
-                    },
-                    __s.clone(),
-                )
-                .await?;
-            }
-            return Err(Diagnostic::new(
-                Code::RecordReserved,
-                at,
-                "parenthesised record types are kept for T3",
-            ));
+            return self.record_type(__s.clone()).await;
         }
         Ok(TypeKind::Tuple(
             self.seq(
@@ -1649,6 +1627,21 @@ impl Parser<'_> {
         self.bump();
         let kind = if is_fn {
             ExprKind::Fn(Box::new(self.function(__s.clone()).await?))
+        } else if self.eat(&T::RParen) {
+            if self.old_empty {
+                return Ok(Expr {
+                    kind: ExprKind::Tuple(Vec::new()),
+                    span: self.span_from(start),
+                });
+            }
+            ExprKind::Record {
+                base: None,
+                fields: Vec::new(),
+            }
+        } else if self.at(&T::DotDot)
+            || matches!(self.kind(), T::Name(_) | T::Str(_)) && *self.nth(1) == T::Colon
+        {
+            self.record_expr(__s.clone()).await?
         } else {
             self.datum(__s.clone()).await?
         };
@@ -1656,6 +1649,40 @@ impl Parser<'_> {
             kind,
             span: self.span_from(start),
         })
+    }
+
+    async fn record_expr(&mut self, __s: trampoline::Scheduler) -> PResult<ExprKind> {
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let base = if p.eat(&T::DotDot) {
+                        Some(Box::new(unsafe { __s.call(|child| p.expr(child)) }.await?))
+                    } else {
+                        None
+                    };
+                    let mut fields = Vec::new();
+                    while !p.eat(&T::RParen) {
+                        if base.is_some() || !fields.is_empty() {
+                            if !p.eat(&T::Comma) && !p.tok().brk {
+                                return p.error("`,` or `)`");
+                            }
+                            if p.eat(&T::RParen) {
+                                break;
+                            }
+                        }
+                        if !matches!(p.kind(), T::Name(_) | T::Str(_)) {
+                            return Err(p.mixed());
+                        }
+                        let label = p.record_value_label()?;
+                        p.expect(&T::Colon)?;
+                        fields.push((label, unsafe { __s.call(|child| p.expr(child)) }.await?));
+                    }
+                    Ok(ExprKind::Record { base, fields })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 
     /// After the `(` of a function (§6.8).
@@ -2508,5 +2535,55 @@ impl Parser<'_> {
             kind,
             span: self.span_from(start),
         })
+    }
+
+    async fn record_type(&mut self, __s: trampoline::Scheduler) -> PResult<TypeKind> {
+        self.nested(
+            |p, __s| {
+                Box::pin(async move {
+                    let base = if p.eat(&T::DotDot) {
+                        Some(Box::new(unsafe { __s.call(|child| p.ty(child)) }.await?))
+                    } else {
+                        None
+                    };
+                    let mut fields = Vec::new();
+                    let mut removed = Vec::new();
+                    while !p.eat(&T::RParen) {
+                        if base.is_some() || !fields.is_empty() || !removed.is_empty() {
+                            if !p.eat(&T::Comma) && !p.tok().brk {
+                                return p.error("`,` or `)`");
+                            }
+                            if p.eat(&T::RParen) {
+                                break;
+                            }
+                        }
+                        let remove = p.eat(&T::Minus);
+                        if remove && base.is_none() {
+                            return p.error("a spread before a removed label");
+                        }
+                        let parameter = matches!(p.kind(), T::UpName(_));
+                        let ident = if parameter {
+                            p.up_name()?
+                        } else {
+                            p.record_value_label()?
+                        };
+                        let label = RecordLabel { ident, parameter };
+                        if remove {
+                            removed.push(label);
+                        } else {
+                            p.expect(&T::Colon)?;
+                            fields.push((label, unsafe { __s.call(|child| p.ty(child)) }.await?));
+                        }
+                    }
+                    Ok(TypeKind::Record {
+                        base,
+                        fields,
+                        removed,
+                    })
+                })
+            },
+            __s.clone(),
+        )
+        .await
     }
 }
