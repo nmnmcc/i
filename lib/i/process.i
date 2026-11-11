@@ -15,6 +15,9 @@
 	Child
 	Stdio(..)
 	spawn_piped
+	spawn_config
+	EnvironmentMode(..)
+	Directory(..)
 	read_stdout
 	read_stderr
 	write_stdin
@@ -38,6 +41,16 @@ Stdio {
 	Inherit
 	Null
 	Piped
+}
+
+EnvironmentMode {
+	InheritEnvironment(List(String))
+	ReplaceEnvironment(List(String))
+}
+
+Directory {
+	InheritDirectory
+	Directory(String)
 }
 
 Child {
@@ -74,6 +87,18 @@ Process {
 			output:  String
 			errors:  String
 		) -> Request(Result(Int, String))
+		spawn_config: (
+			program:   String
+			args:      BitArray
+			input:     String
+			output:    String
+			errors:    String
+			env_mode:  String
+			env:       BitArray
+			directory: String
+			cwd_mode:  String
+		) -> Request(Result(Int, String))
+		own:         (child: Int) -> Request(Nil)
 		read_stdout: (child: Int, max: Int) -> Request(Result(BitArray, String))
 		read_stderr: (child: Int, max: Int) -> Request(Result(BitArray, String))
 		write_stdin: (child: Int, bytes: BitArray) -> Request(
@@ -186,6 +211,7 @@ spawn = (program, values, raw ! Process) {
 		}
 		request.cancel(request.ticket(r))
 	})
+	raw.own(number)
 	Child(number)
 }
 
@@ -233,6 +259,54 @@ spawn_piped = (program, values, input, output, errors, raw ! Process) {
 		}
 		request.cancel(request.ticket(r))
 	})
+	raw.own(number)
+	Child(number)
+}
+
+/// Spawn with inherited or replacement environment entries and a working directory.
+/// Entries NAME=value set variables; NAME removes a variable.
+spawn_config = (
+	program
+	values
+	input
+	output
+	errors
+	environment
+	directory
+	raw ! Process
+) {
+	(env_mode, entries) = environment |> {
+		InheritEnvironment(entries) -> ("inherit", entries)
+		ReplaceEnvironment(entries) -> ("replace", entries)
+	}
+	(cwd_mode, path) = directory |> {
+		InheritDirectory -> ("inherit", "")
+		Directory(path)  -> ("set", path)
+	}
+	r = raw.spawn_config(
+		program
+		encode_args(values)
+		stdio_mode(input)
+		stdio_mode(output)
+		stdio_mode(errors)
+		env_mode
+		encode_args(entries)
+		path
+		cwd_mode
+	)
+	number = resource.ensure(() {
+		request.await(r) |> {
+			Ok(value)   -> value
+			Error(code) -> fail.raise(ProcessError("spawn", code))
+		}
+	}, () {
+		request.state(r) |> {
+			request.Ready(Ok(value)) -> request.await_owned(raw.close(value))
+			_                        -> Nil
+		}
+		request.cancel(request.ticket(r))
+	})
+	raw.own(number)
 	Child(number)
 }
 

@@ -63,6 +63,9 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
+        /// Arguments passed to the program after --.
+        #[arg(last = true)]
+        args: Vec<String>,
     },
     /// Build and run the tests of a package.
     Test {
@@ -116,7 +119,8 @@ fn main() -> ExitCode {
             project,
             offline,
             opt,
-        } => cmd_run(&project, opt, offline),
+            args,
+        } => cmd_run(&project, opt, offline, args),
         Command::Test {
             project,
             offline,
@@ -232,7 +236,7 @@ fn cmd_build(
     Ok(ExitCode::SUCCESS)
 }
 
-fn cmd_run(project: &Path, opt: u8, offline: bool) -> anyhow::Result<ExitCode> {
+fn cmd_run(project: &Path, opt: u8, offline: bool, args: Vec<String>) -> anyhow::Result<ExitCode> {
     let Some(b) = built(project, options(opt, false, offline)?)? else {
         return Ok(ExitCode::FAILURE);
     };
@@ -240,7 +244,11 @@ fn cmd_run(project: &Path, opt: u8, offline: bool) -> anyhow::Result<ExitCode> {
     if program.abi().entry.is_none() {
         anyhow::bail!("the package has no `@main` (§10.2)");
     }
-    match program.run_entry(b.host_options())? {
+    let mut options = ilang_host::HostOptions::new(ilang_host::services::stdout_with_args(args));
+    options
+        .imports
+        .grant_package(&b.binding_plan, &b.trusted_package);
+    match program.run_entry(options)? {
         Outcome::Ok(_) => Ok(ExitCode::SUCCESS),
         Outcome::Stop(stop) => {
             eprintln!("{stop}");
