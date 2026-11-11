@@ -55,6 +55,20 @@ and guest use the same invocation budget; cloning the handle does not reset it.
 Host identities use a per-instance balanced map, so a lookup and an insertion
 have a deterministic size-based charge before comparison, allocation or sweep.
 
+Each Syntax call starts with one work unit and eight wrapper words. A tree
+traversal charges one work unit and 16 words per node (80 words when a formatted
+output is built), plus one work unit and eight words per child edge. Atom text
+charges one work unit per byte. Formatting charges 12 work units per atom byte
+and four words plus the resulting upper-bound bytes rounded to words. Formatting
+an arbitrary precision integer also charges the square of its 32-bit limb count
+for decimal conversion before formatting. Creating
+a text atom charges 16 work units and 16 words per byte plus 16 words for the
+lexer and its tokens. Copying existing text or an integer charges its bytes and
+four words plus those bytes rounded to words. Building a list from linked nodes
+charges three work units and one word per element before the exact-sized vector
+is allocated. These charges cover the accounting traversal's own explicit
+stack and its geometric capacity growth.
+
 Tail calls leave the caller's frame before the callee enters. Error handlers
 restore the saved frame depth, and resumed continuations restore their own
 source frame. A genuine machine stack or heap exhaustion remains a compiler
