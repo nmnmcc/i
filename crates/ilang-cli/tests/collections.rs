@@ -18,6 +18,24 @@ fn project(path: &Path) {
     std::fs::write(path.join("src/main.i"), "(m = app/macros\nsyntax = i/syntax\ntask = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing: () -> Nil\nanchor = Nil\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
 }
 
+fn run_javascript(dir: &Path, built: &ilang_cli::BuiltCollection) {
+    let path = dir.join("collection.wasm");
+    std::fs::write(&path, &built.built.wasm).unwrap();
+    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../bindings/javascript/test/collection-runner.mjs");
+    let result = std::process::Command::new("node")
+        .arg(script)
+        .arg(path)
+        .arg(&built.selected.handle)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "JavaScript host: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
 #[test]
 fn generated_contributions_are_selected_independently() {
     let dir = tempfile::tempdir().unwrap();
@@ -43,6 +61,7 @@ fn generated_contributions_are_selected_independently() {
             CollectionResult::Nil,
         )
         .unwrap();
+        run_javascript(dir.path(), &good);
         let artifact = ilang_cli::CollectionArtifact::from_wasm(&good.built.wasm)
             .unwrap()
             .unwrap();
@@ -72,6 +91,7 @@ fn generated_contributions_are_selected_independently() {
             CollectionResult::Nil,
         )
         .unwrap();
+        run_javascript(dir.path(), &concurrent);
         assert!(concurrent.is_async);
         assert!(matches!(
             concurrent
