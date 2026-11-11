@@ -75,6 +75,23 @@ async fn fmt<'a>(s: &Scheduler<'a>, f: &'a Option<Format>) -> Option<Format> {
 }
 async fn pattern<'a>(s: Scheduler<'a>, p: &'a Pattern) -> Pattern {
     let kind = match &p.kind {
+        PatternKind::Quote {
+            template,
+            syntax,
+            functions,
+            captures,
+        } => {
+            let mut out = Vec::with_capacity(captures.len());
+            for (splice, p) in captures {
+                out.push((*splice, s.call(|s| pattern(s, p)).await));
+            }
+            PatternKind::Quote {
+                template: *template,
+                syntax: *syntax,
+                functions: *functions,
+                captures: out,
+            }
+        }
         PatternKind::Var(b) => PatternKind::Var(b.clone()),
         PatternKind::Discard => PatternKind::Discard,
         PatternKind::Typed { binder, ty: t } => PatternKind::Typed {
@@ -436,6 +453,11 @@ fn drain(mut work: Vec<Part>) {
                 | ExprKind::Error => {}
             },
             Part::Pattern(mut k) => match &mut k {
+                PatternKind::Quote { captures, .. } => {
+                    for (_, p) in captures {
+                        take_pat(p, &mut work);
+                    }
+                }
                 PatternKind::Typed { ty, .. } => take_ty(ty, &mut work),
                 PatternKind::Named { pattern, .. } => take_pat(pattern, &mut work),
                 PatternKind::Constructor { args, .. }

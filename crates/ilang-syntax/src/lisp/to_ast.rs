@@ -209,8 +209,12 @@ async fn patterns<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<Pattern>
 async fn pattern_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Pattern> {
     let kind = match &d.kind {
         K::Quote(_) => {
-            check_quote(s, d, true).await?;
-            PatternKind::Quote(Box::new(d.clone()))
+            let captures = check_quote(s, d, true).await?;
+            PatternKind::Quote {
+                datum: Box::new(d.clone()),
+                template: None,
+                captures,
+            }
         }
         K::Name(n) => PatternKind::Var(n.clone()),
         K::Discard(n) => PatternKind::Discard(n.clone()),
@@ -567,16 +571,21 @@ fn is_clause(d: &Datum) -> bool {
     matches!(round(d), Some([h, _, _]) if symbol(h, "->"))
 }
 
-async fn check_quote<'a>(s: &Scheduler<'a>, d: &'a Datum, pattern: bool) -> Result<()> {
+async fn check_quote<'a>(
+    s: &Scheduler<'a>,
+    d: &'a Datum,
+    pattern: bool,
+) -> Result<Vec<(bool, Pattern)>> {
     let K::Quote(body) = &d.kind else {
         unreachable!("quote check requires a quote")
     };
     let mut work = vec![(&**body, false, true)];
+    let mut captures = Vec::new();
     while let Some((d, in_sequence, last)) = work.pop() {
         match &d.kind {
             K::Unquote(inner) => {
                 if pattern {
-                    pattern_child(s, inner).await?;
+                    captures.push((false, pattern_child(s, inner).await?));
                 } else {
                     expression_child(s, inner).await?;
                 }
@@ -586,7 +595,7 @@ async fn check_quote<'a>(s: &Scheduler<'a>, d: &'a Datum, pattern: bool) -> Resu
                     return Err(bad(d, "a splice in this position"));
                 }
                 if pattern {
-                    pattern_child(s, inner).await?;
+                    captures.push((true, pattern_child(s, inner).await?));
                 } else {
                     expression_child(s, inner).await?;
                 }
@@ -603,7 +612,7 @@ async fn check_quote<'a>(s: &Scheduler<'a>, d: &'a Datum, pattern: bool) -> Resu
             _ => {}
         }
     }
-    Ok(())
+    Ok(captures)
 }
 async fn clauses<'a>(s: &Scheduler<'a>, ds: &'a [Datum]) -> Result<Vec<Clause>> {
     let mut out = Vec::with_capacity(ds.len());

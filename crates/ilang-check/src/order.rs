@@ -98,6 +98,14 @@ pub fn references(pattern: &Pattern, value: &Expr) -> Vec<(DefId, bool)> {
                 }
             },
             Node::Pattern(p, inside) => match &p.kind {
+                PatternKind::Quote {
+                    functions,
+                    captures,
+                    ..
+                } => {
+                    out.extend(functions.iter().map(|f| (*f, inside)));
+                    work.extend(captures.iter().rev().map(|(_, p)| Node::Pattern(p, inside)));
+                }
                 PatternKind::Named { pattern, .. } => work.push(Node::Pattern(pattern, inside)),
                 PatternKind::Constructor { args, .. }
                 | PatternKind::Tuple(args)
