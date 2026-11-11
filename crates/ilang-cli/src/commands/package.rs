@@ -2276,4 +2276,17 @@ mod value_type_interfaces {
         let new = interface("(a, b)\nmake = (f) { f }\na = make((x) { x })\nb = make((x) { x })\n");
         assert!(!Diff::new(&old, &new).unwrap().changed.is_empty());
     }
+
+    #[test]
+    fn union_instantiation_covers_correlated_and_independent_parameters() {
+        let old = interface(
+            "(pick)\npick(A) = (flag: Bool, x: A, y: A) -> (value: A) { (value: flag |> { True -> x  False -> y }) }",
+        );
+        let new = interface(
+            "(pick)\npick(A,B) = (flag: Bool, x: A, y: B) -> (value: A | B) { (value: flag |> { True -> x  False -> y }) }",
+        );
+        let diff = Diff::new(&old, &new).unwrap();
+        assert!(diff.changed.is_empty());
+        assert!(diff.representation.is_empty());
+    }
 }
