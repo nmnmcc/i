@@ -122,7 +122,7 @@ fn deep_alternating_pattern_and_format_expression() {
             kind: ExprKind::Int(0u32.into()),
             span,
         };
-        expr = match depth % 3 {
+        expr = match depth % 5 {
             0 => Expr {
                 kind: ExprKind::Fn(Box::new(ast::Function {
                     params: vec![ast::Param::Pattern(pattern)],
@@ -146,16 +146,25 @@ fn deep_alternating_pattern_and_format_expression() {
                 }),
                 span,
             },
-            _ => Expr {
+            2 | 3 => Expr {
                 kind: ExprKind::Case {
                     subject: Box::new(literal()),
                     clauses: vec![ast::Clause {
                         patterns: vec![pattern],
-                        guard: Some(literal()),
+                        guard: (depth % 5 == 2).then(literal),
                         body: literal(),
                         span,
                     }],
                 },
+                span,
+            },
+            _ => Expr {
+                kind: ExprKind::Clauses(vec![ast::Clause {
+                    patterns: vec![pattern],
+                    guard: None,
+                    body: literal(),
+                    span,
+                }]),
                 span,
             },
         };
