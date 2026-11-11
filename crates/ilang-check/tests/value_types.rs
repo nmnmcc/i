@@ -558,7 +558,7 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
     let normal = c.types.unwrap();
     assert_eq!(normal.schemes, reversed.schemes);
     assert_eq!(normal.scheme_types, reversed.scheme_types);
-    assert!(reversed.alias_types.is_empty());
+    assert_eq!(normal.alias_types, reversed.alias_types);
 }
 
 #[test]
