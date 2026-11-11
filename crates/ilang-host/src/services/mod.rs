@@ -62,6 +62,8 @@ pub fn standard(print: impl Fn(&str) + Send + Sync + 'static) -> HostImports {
             Ok(Ok(Value::Nil))
         })
         .expect("a new set of imports");
+    clock::register(&mut imports);
+    stdio::register(&mut imports);
     imports
 }
 
