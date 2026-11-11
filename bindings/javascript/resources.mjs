@@ -122,6 +122,14 @@ export class ResourceContext {
       },
     });
   }
+  /** Transfer an idle resource to another owner without running cleanup. */
+  takeIdle(id, kind) {
+    const entry = this.#entries.get(id);
+    if (!this.#live || !entry || entry.kind !== kind) throw new ResourceError("closed");
+    if (entry.leases.size) throw new ResourceError("busy");
+    this.#entries.delete(id);
+    return entry.value;
+  }
   // Publish removal and the receipt without calling any embedding code.
   #remove(id, entry) {
     this.#entries.delete(id);
