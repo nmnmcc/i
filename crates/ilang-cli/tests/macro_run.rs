@@ -1368,6 +1368,240 @@ fn item_phase_retries_definition_after_a_later_item() {
 }
 
 #[test]
+fn item_phase_reports_each_unresolved_waiter_and_restores_the_module() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{
+        body_engine::BodyEngine,
+        definition_world::DefinitionWorld,
+        item_phase::{PhaseError, expand_items},
+        registry::Registry,
+    };
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, ask)
+(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.ask(A)\nm.ask(B)\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let source = parsed.iter().find(|p| p.path == "app/main").unwrap().source;
+    let mut ast = parsed
+        .iter()
+        .find(|p| p.source == source)
+        .unwrap()
+        .ast
+        .clone();
+    let original = ast.clone();
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected query".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    let world = Arc::new(DefinitionWorld::new(&graph, &parsed));
+    let error = expand_items(&mut engine, &mut ast, world)
+        .err()
+        .expect("both runs must wait");
+    let PhaseError::Waiting(waiting) = error else {
+        panic!("unexpected {error:?}")
+    };
+    assert_eq!(waiting.len(), 2);
+    assert!(matches!(waiting[0].node(), ilang_syntax::lisp::syntax::Node::Up(name) if name == "A"));
+    assert!(matches!(waiting[1].node(), ilang_syntax::lisp::syntax::Node::Up(name) if name == "B"));
+    assert_eq!(ast, original);
+    assert_eq!(engine.scoped.text(), graph.sources.get(source).text);
+}
+
+#[test]
+fn item_phase_rechecks_an_early_builtin_answer() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{
+        body_engine::BodyEngine,
+        definition_world::DefinitionWorld,
+        item_phase::{PhaseError, expand_items},
+        registry::Registry,
+    };
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, replace)
+(@ macro (= replace (-> () _ { (= d ((. syntax definition) `Result)) `(= Result Int)})))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.replace()\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let source = parsed.iter().find(|p| p.path == "app/main").unwrap().source;
+    let mut ast = parsed
+        .iter()
+        .find(|p| p.source == source)
+        .unwrap()
+        .ast
+        .clone();
+    let original = ast.clone();
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+        DefinitionReply::CompileError {
+            message: "unexpected query".into(),
+            at: at.clone(),
+        }
+    });
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    let world = Arc::new(DefinitionWorld::new(&graph, &parsed));
+    assert!(matches!(
+        expand_items(&mut engine, &mut ast, world),
+        Err(PhaseError::Changed { .. })
+    ));
+    assert_eq!(ast, original);
+}
+
+#[test]
+fn item_phase_queries_the_expanded_generated_type() {
+    use ilang_host::{macro_budget::MacroBudget, syntax::DefinitionReply};
+    use ilang_macro::{
+        body_engine::BodyEngine,
+        definition_world::DefinitionWorld,
+        item_phase::{Definitions, Resolution, Snapshot, expand_items},
+        registry::Registry,
+    };
+    use ilang_syntax::lisp::{definition_schedule::Mode, scoped::ScopedSource};
+    use std::sync::{Arc, Mutex};
+    struct Recording {
+        world: DefinitionWorld,
+        answers: Mutex<Vec<Syntax>>,
+    }
+    impl Definitions for Recording {
+        fn fresh_answer(&self) -> u64 {
+            self.world.fresh_answer()
+        }
+        fn prepare(&self, snapshot: &Snapshot) {
+            self.world.prepare(snapshot);
+        }
+        fn resolve(
+            &self,
+            snapshot: &Snapshot,
+            in_run: &Syntax,
+            result: &Syntax,
+            mode: Mode,
+            mark: u64,
+            budget: &MacroBudget,
+        ) -> Resolution {
+            let resolution = self
+                .world
+                .resolve(snapshot, in_run, result, mode, mark, budget);
+            if let DefinitionReply::Answer(answer) = &resolution.reply {
+                self.answers.lock().unwrap().push(answer.clone());
+            }
+            resolution
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, ask make)
+(@ macro (= typ (-> () _ `Int)))
+(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))
+(@ macro (= make (-> (x) _ `(= ~x (typ)))))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.make(T)\nm.ask(T)\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let registry = Registry::new(&graph, &parsed).unwrap();
+    let source = parsed.iter().find(|p| p.path == "app/main").unwrap().source;
+    let mut ast = parsed
+        .iter()
+        .find(|p| p.source == source)
+        .unwrap()
+        .ast
+        .clone();
+    let scoped = ScopedSource::new(graph.sources.get(source).text.clone());
+    let resolver = Arc::new(
+        |at: &Syntax, _: &MacroBudget| DefinitionReply::CompileError {
+            message: "unexpected query".into(),
+            at: at.clone(),
+        },
+    );
+    let mut session = ilang_macro::session::Session::default();
+    let mut engine = BodyEngine::new(
+        &graph,
+        &parsed,
+        &registry,
+        source,
+        scoped,
+        resolver,
+        &mut session,
+    );
+    let world = Arc::new(Recording {
+        world: DefinitionWorld::new(&graph, &parsed),
+        answers: Mutex::new(Vec::new()),
+    });
+    expand_items(&mut engine, &mut ast, world.clone()).unwrap();
+    let answers = world.answers.lock().unwrap();
+    assert_eq!(answers.len(), 1);
+    let shown = ilang_syntax::lisp::show(&answers[0].to_datum());
+    assert!(shown.contains("Int") && !shown.contains("typ"), "{shown}");
+}
+
+#[test]
 fn project_expands_imported_macro_and_runs_generated_program() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(

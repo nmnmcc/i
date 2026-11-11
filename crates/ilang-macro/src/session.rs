@@ -15,7 +15,17 @@ use crate::run::{MacroProgram, RunOutcome};
 pub struct Transaction {
     pub notes: Vec<String>,
     pub requests: Vec<ItemRequest>,
+    /// Filled by the item driver after the entire result validates.
+    pub item_origin: Option<ItemOrigin>,
+    /// Unique invocation mark, used to discard only a run invalidated by audit.
+    pub mark: u64,
     pub location: Option<(ilang_package::SourceId, ilang_syntax::span::Span)>,
+}
+#[derive(Clone, Debug)]
+pub struct ItemOrigin {
+    pub source: u32,
+    pub call: ilang_syntax::span::Span,
+    pub path: Vec<u32>,
 }
 
 pub struct Expanded {
@@ -149,6 +159,8 @@ impl Session {
                 Transaction {
                     notes,
                     requests,
+                    item_origin: None,
+                    mark,
                     location: None,
                 },
             );

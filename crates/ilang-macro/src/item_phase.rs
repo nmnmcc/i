@@ -76,17 +76,26 @@ fn item_names(item: &Item) -> Vec<String> {
 }
 
 impl BodyEngine<'_> {
-    fn item_syntax(&self, item: &Item) -> Syntax {
+    fn item_root(&self, item: &Item) -> (Syntax, Span) {
+        if let Some(root) = self.item_overrides.get(&item.span) {
+            return root.clone();
+        }
         if let Some(origin) = self.scoped.origin(item.span) {
-            return origin.syntax.clone();
+            return (origin.syntax.clone(), item.span);
         }
         let file = self.graph.sources.get(self.source);
-        source_item_syntax(
-            item,
-            &self.scope(),
-            &file.text,
-            file.display.ends_with(".is"),
+        (
+            source_item_syntax(
+                item,
+                &self.scope(),
+                &file.text,
+                file.display.ends_with(".is"),
+            ),
+            item.span,
         )
+    }
+    fn item_syntax(&self, item: &Item) -> Syntax {
+        self.item_root(item).0
     }
 
     fn attribute_arguments(&self, attribute: &Attribute) -> Vec<MacroArgument> {
@@ -118,7 +127,11 @@ impl BodyEngine<'_> {
 
     /// Expand one outer item call, or one outer attribute call. A written type
     /// stays in the module; other attributed items are replaced by the result.
-    pub fn item_step(&mut self, mut item: Item) -> Result<Step, Error> {
+    pub fn item_step(
+        &mut self,
+        mut item: Item,
+        definitions: &dyn Definitions,
+    ) -> Result<Step, Error> {
         for (index, attribute) in item.attributes.iter().enumerate() {
             if builtin(attribute) {
                 continue;
@@ -153,15 +166,12 @@ impl BodyEngine<'_> {
                 let original_names = item_names(&item);
                 let is_type = matches!(item.kind, ItemKind::TypeDef(_));
                 let (result, budget, transactions) = self.execute(
-                    &mac,
-                    args,
-                    &call,
-                    attribute.span,
-                    Some(inner),
-                    MacroPosition::Item,
+                    &mac, args, &call, attribute.span, Some(inner.clone()), MacroPosition::Item,
                 )?;
-                let start =
-                    u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
+                ilang_host::syntax::charge_tree(&budget, &result, true)
+                    .map_err(|error| Error::Resource { error: error.into(), macro_name: mac.definition.name.clone(), call: call.clone(), invocation_span: attribute.span })?;
+                let result = ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || definitions.fresh_answer());
+                let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let mut items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
@@ -194,6 +204,9 @@ impl BodyEngine<'_> {
                     }
                 }
                 let retained = if is_type {
+                    let root_span = self.item_root(&item).1;
+                    let inner_span = self.scoped.child_span(root_span, 2).unwrap_or(inner.span());
+                    self.item_overrides.insert(item.span, (inner, inner_span));
                     item.attributes.remove(index);
                     Some(item)
                 } else {
@@ -218,8 +231,10 @@ impl BodyEngine<'_> {
                 let call = self.item_syntax(&item);
                 let (result, budget, transactions) =
                     self.execute(&mac, args, &call, item.span, None, MacroPosition::Item)?;
-                let start =
-                    u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
+                ilang_host::syntax::charge_tree(&budget, &result, true)
+                    .map_err(|error| Error::Resource { error: error.into(), macro_name: mac.definition.name.clone(), call: call.clone(), invocation_span: item.span })?;
+                let result = ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || definitions.fresh_answer());
+                let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
@@ -251,8 +266,35 @@ impl BodyEngine<'_> {
                 "an item call must name a macro".into(),
             ));
         }
-        if let ItemKind::TypeDef(definition) = &mut item.kind {
+        if matches!(item.kind, ItemKind::TypeDef(_)) {
+            let (root, root_span) = self.item_root(&item);
+            let start = self.item_replacements.len();
+            let ItemKind::TypeDef(definition) = &mut item.kind else {
+                unreachable!()
+            };
             body_walk::type_definition(definition, self)?;
+            if self.item_replacements.len() != start {
+                let replacements = &self.item_replacements[start..];
+                for (_, target, budget) in replacements {
+                    ilang_host::syntax::charge_tree(budget, &root, true)
+                        .map_err(|error| Error::Resource { error: error.into(), macro_name: "type macro".into(), call: root.clone(), invocation_span: item.span })?;
+                    let output = &self
+                        .scoped
+                        .origin(*target)
+                        .expect("expanded type has an origin")
+                        .syntax;
+                    ilang_host::syntax::charge_tree(budget, output, true)
+                        .map_err(|error| Error::Resource { error: error.into(), macro_name: "type macro".into(), call: root.clone(), invocation_span: item.span })?;
+                }
+                let spans = replacements
+                    .iter()
+                    .map(|(old, new, _)| (*old, *new))
+                    .collect::<Vec<_>>();
+                let rewritten = self.scoped.rewrite_occurrences(&root, root_span, &spans);
+                self.item_overrides
+                    .insert(item.span, (rewritten, root_span));
+                self.item_replacements.truncate(start);
+            }
         }
         Ok(Step::Finished(item))
     }
@@ -304,6 +346,7 @@ pub struct Snapshot {
     pub other_runs: bool,
     pub active: Option<usize>,
     pub epoch: u64,
+    pub item_overrides: std::collections::HashMap<Span, (Syntax, Span)>,
 }
 
 pub struct Resolution {
@@ -316,6 +359,7 @@ pub struct Resolution {
 /// both the query while the invocation mark is present and the query after
 /// that mark is flipped. It must use the same budget as the macro run.
 pub trait Definitions: Send + Sync {
+    fn fresh_answer(&self) -> u64;
     fn prepare(&self, _snapshot: &Snapshot) {}
     fn resolve(
         &self,
@@ -344,6 +388,15 @@ struct Slot {
     item: Item,
     ready: bool,
     depth: u16,
+    root: Span,
+    path: Vec<u32>,
+}
+/// Notes of successful item runs before a later phase failure.
+#[derive(Clone, Debug)]
+pub struct PhaseNote {
+    pub mark: u64,
+    pub origin: crate::session::ItemOrigin,
+    pub message: String,
 }
 struct Audit {
     in_run: Syntax,
@@ -360,14 +413,24 @@ pub fn expand_items(
     module: &mut Module,
     definitions: Arc<dyn Definitions>,
 ) -> Result<Vec<Transaction>, PhaseError> {
+    engine.clear_failure_source();
+    engine.phase_notes.clear();
     let original_source = engine.scoped.clone();
     let original_resolver = engine.resolver.clone();
     let original_transactions = engine.transactions.len();
+    let original_overrides = engine.item_overrides.clone();
+    let original_replacements = engine.item_replacements.clone();
     let result = expand_items_inner(engine, module, definitions);
     engine.resolver = original_resolver;
+    if result.is_ok() { engine.phase_notes.clear(); }
     if result.is_err() {
+        if engine.failure_scoped().is_none() {
+            engine.save_failure_source();
+        }
         engine.scoped = original_source;
         engine.transactions.truncate(original_transactions);
+        engine.item_overrides = original_overrides;
+        engine.item_replacements = original_replacements;
     }
     result
 }
@@ -384,6 +447,8 @@ fn expand_items_inner(
         .enumerate()
         .map(|(id, item)| Slot {
             id: id as u64,
+            root: item.span,
+            path: vec![id as u32],
             item,
             ready: false,
             depth: 0,
@@ -423,6 +488,7 @@ fn expand_items_inner(
             other_runs: !pending.is_empty(),
             active: Some(index),
             epoch,
+            item_overrides: engine.item_overrides.clone(),
         };
         epoch = epoch.checked_add(1).expect("item snapshot epoch exhausted");
         definitions.prepare(&snapshot);
@@ -446,9 +512,14 @@ fn expand_items_inner(
             }
             resolution.reply
         });
+        let original_origin = crate::session::ItemOrigin {
+            source: engine.source.0,
+            call: slots[index].root,
+            path: slots[index].path.clone(),
+        };
         let old_scoped = engine.scoped.clone();
         let old_transactions = engine.transactions.len();
-        let attempt = engine.item_step(slots[index].item.clone());
+        let attempt = engine.item_step(slots[index].item.clone(), definitions.as_ref());
         match attempt {
             Ok(step) => {
                 waits.retain(|(waiting, _)| *waiting != id);
@@ -478,6 +549,8 @@ fn expand_items_inner(
                             return Err(PhaseError::Step(Error::Depth(slots[index].item.span)));
                         }
                         let mut replacements = Vec::new();
+                        let root = slots[index].root;
+                        let parent_path = slots[index].path.clone();
                         if let Some(item) = retained {
                             let ready = type_ready(engine, &item)?;
                             replacements.push(Slot {
@@ -485,6 +558,12 @@ fn expand_items_inner(
                                 item,
                                 ready,
                                 depth,
+                                root,
+                                path: {
+                                    let mut path = parent_path.clone();
+                                    path.push(replacements.len() as u32);
+                                    path
+                                },
                             });
                             next_id += 1;
                         }
@@ -495,6 +574,12 @@ fn expand_items_inner(
                                 item,
                                 ready,
                                 depth,
+                                root,
+                                path: {
+                                    let mut path = parent_path.clone();
+                                    path.push(replacements.len() as u32);
+                                    path
+                                },
                             });
                             next_id += 1;
                         }
@@ -503,10 +588,19 @@ fn expand_items_inner(
                         for id in new_ids.into_iter().rev() {
                             pending.push_front(id);
                         }
-                        transactions.extend(effects);
+                        transactions.extend(effects.into_iter().map(|mut transaction| {
+                            let origin = crate::session::ItemOrigin { source: engine.source.0, call: root, path: parent_path.clone() };
+                            engine.phase_notes.extend(transaction.notes.iter().map(|message| PhaseNote { mark: transaction.mark, origin: origin.clone(), message: message.clone() }));
+                            transaction.item_origin = Some(origin);
+                            transaction
+                        }));
                     }
                 }
-                transactions.extend(engine.transactions.drain(old_transactions..));
+                for mut transaction in engine.transactions.drain(old_transactions..) {
+                    engine.phase_notes.extend(transaction.notes.iter().map(|message| PhaseNote { mark: transaction.mark, origin: original_origin.clone(), message: message.clone() }));
+                    transaction.item_origin = Some(original_origin.clone());
+                    transactions.push(transaction);
+                }
             }
             Err(Error::Run {
                 failure: crate::session::Failure::Aborted(DefinitionAbort::Deferred { at }),
@@ -540,6 +634,7 @@ fn expand_items_inner(
                 }
             }
             Err(error) => {
+                engine.save_failure_source();
                 engine.scoped = old_scoped;
                 engine.transactions.truncate(old_transactions);
                 return Err(PhaseError::Step(error));
@@ -562,6 +657,7 @@ fn expand_items_inner(
         other_runs: false,
         active: None,
         epoch,
+        item_overrides: engine.item_overrides.clone(),
     };
     definitions.prepare(&snapshot);
     for audit in audits {
@@ -577,6 +673,7 @@ fn expand_items_inner(
             )
             .audit;
         if after.as_ref() != Some(&audit.identity) {
+            engine.phase_notes.retain(|note| note.mark != audit.mark);
             return Err(PhaseError::Changed {
                 query: audit.result,
                 before: audit.identity,
@@ -687,6 +784,7 @@ impl BodyEngine<'_> {
             other_runs: false,
             active: None,
             epoch: u64::MAX,
+            item_overrides: self.item_overrides.clone(),
         };
         definitions.prepare(&snapshot);
         let mark_source = self.run_mark.clone();
