@@ -123,3 +123,5 @@ The `i/record.All` capture-free source form described above is not installed:
 `Record` for legacy `{..}`. A module that shadows `Record` therefore needs a
 manual migration before this rewrite can be relied on. The per-file syntax
 marker is also still needed for a function-type guard in a file with no `^`.
+The formatter preserves legacy `@main` attributes; removing or relocating an
+entry currently requires `scripts/syntax-2-migrate` rather than `i fmt`.
