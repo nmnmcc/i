@@ -155,3 +155,9 @@ The longer baseline retry also timed out at 120 seconds for
 reproduction. `wide_generic_512`, `stress_wide_open_512`, `chain4000`,
 `mutual50`, and `runchain4000` have passed the longer paired comparison with
 byte-identical WAT.
+
+The review alias-pattern fixture's former entry lived in an intentionally
+invalid test module. It cannot be run when that module is loaded, and the
+old default build did not load it, so the migrated fixture leaves its `main`
+as an ordinary test-module binding. This follows §2.6's root entry selection
+and preserves the fixture's default build and negative test behavior.
