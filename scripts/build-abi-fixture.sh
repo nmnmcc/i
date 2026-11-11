@@ -44,9 +44,9 @@ grep -q "atob(\"$probe\")" "$sdk" || { echo "could not update the feature probe 
 
 # The module built by the compiler (`I` can point at another `i` executable).
 if [ -n "${I:-}" ]; then
-  "$I" build --project "$fixture_dir/compiled" --entry legacy --out "$fixture_dir/compiled.wasm"
+  "$I" build --project "$fixture_dir/compiled" legacy --out "$fixture_dir/compiled.wasm"
 else
-  cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/compiled" --entry legacy --out "$fixture_dir/compiled.wasm"
+  cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/compiled" legacy --out "$fixture_dir/compiled.wasm"
 fi
 "$wasm_tools" validate "$fixture_dir/compiled.wasm"
 

@@ -11,7 +11,7 @@ The retained USER decisions control syntax. The entry decision removes @main
 and selects the default from src/main.i.
 The sentence “each may point at any function in any module of the package”
 permits private functions in [entries]. Keys use ordinary name syntax; the
-values use dotted package-relative module paths. --entry chooses a named entry; metadata
+values use dotted package-relative module paths. a positional name chooses a named entry; metadata
 keeps the selected function path so ABI v3 and both hosts need no new shape.
 The sentence “main functions and [entries] of dependency packages have no
 effect” restricts all discovery and declaration checking to the root package.

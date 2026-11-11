@@ -42,7 +42,6 @@ enum Command {
         #[arg(long, default_value_t = 2)]
         opt: u8,
         /// Select a function declared in [entries].
-        #[arg(long)]
         entry: Option<String>,
         /// The output file; by default `build/<name>.wasm` in the package.
         #[arg(long)]
@@ -66,12 +65,11 @@ enum Command {
         /// Optimization level: 0, 2, or 3.
         #[arg(long, default_value_t = 2)]
         opt: u8,
+        /// Select a function declared in [entries].
+        entry: Option<String>,
         /// Arguments passed to the program after --.
         #[arg(last = true)]
         args: Vec<String>,
-        /// Select a function declared in [entries].
-        #[arg(long)]
-        entry: Option<String>,
     },
     /// List checked collection contributions as a JSON manifest.
     Collections {
@@ -325,7 +323,7 @@ fn cmd_run(
     let program = b.host_program()?;
     if program.abi().entry.is_none() {
         anyhow::bail!(
-            "the package has no program entry; define `main` in `src/main.i` or select `--entry NAME` (§10.2)"
+            "the package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)"
         );
     }
     let mut options = ilang_host::HostOptions::new(ilang_host::services::stdout_with_args(args));

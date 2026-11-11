@@ -232,7 +232,7 @@ def main():
         if declaration:
             path, target = declaration
             name = add_entry(path, target) if args.write else '(pending)'
-            report['entries'].append({'manifest': str(path), 'name': name, 'target': target, 'command': '--entry ' + name})
+            report['entries'].append({'manifest': str(path), 'name': name, 'target': target, 'command': name})
         area = item['path'].split('/')[0]
         counts = report['areas'].setdefault(area, [0, 0, 0, 0])
         for i, count in enumerate(result['counts']):

@@ -3981,9 +3981,18 @@ impl<'a> Resolver<'a> {
             if let Some(name) = &self.graph.entry
                 && !pkg.entries.iter().any(|(n, _)| n == name)
             {
+                let names = pkg
+                    .entries
+                    .iter()
+                    .map(|(name, _)| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 bad.push((
                     Span::default(),
-                    format!("unknown entry `{name}`; declare it in `[entries]`"),
+                    format!(
+                        "unknown entry `{name}`; declared entries: {}",
+                        if names.is_empty() { "(none)" } else { &names }
+                    ),
                 ));
             }
             for (span, message) in bad {

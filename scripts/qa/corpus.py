@@ -277,7 +277,7 @@ def observe_in(binary, case, bound, runtime):
             if has_main or named_entry:
                 command = ['run', '--opt', str(opt)]
                 if named_entry:
-                    command += ['--entry', named_entry]
+                    command += [named_entry]
                 run, _ = invoke(binary, project, command, bound)
                 result['run' + str(opt)] = run
     return result, elapsed

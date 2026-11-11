@@ -317,7 +317,7 @@ not replace it. A package without that function has no default entry.
 Entry declarations and main functions in dependencies have no effect.
 
 `i run` and `i build` select the default entry when no entry is named.
-`--entry NAME` selects a key of `[entries]`; an unknown key is an error.
+`i run NAME` and `i build NAME` select a key of `[entries]`; an unknown key is an error listing the declared names. Program arguments to `i run` follow `--`.
 Entry selection changes only the program entry, not module visibility or
 host exports. The selected function uses the existing entry checking,
 provider, error, and calling rules of §10.2. An unused-binding warning must
@@ -2344,7 +2344,7 @@ The generated artifact and loader metadata are specified in §B.6.1. Host export
 
 These functions are **entry points**:
 
-- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `--entry NAME`, use that `[entries]` target instead. It has no value parameters and its result is unused. A missing default means no program entry. Duplicate top-level names and duplicate TOML keys already reject duplicate declarations; there is no package-wide count of attributes.
+- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. It has no value parameters and its result is unused. A missing default means no program entry. Duplicate top-level names and duplicate TOML keys already reject duplicate declarations; there is no package-wide count of attributes.
 - **Tests**: the functions marked `@test` in the modules under `test/` of the package that is compiled. Each has no parameters and gives `Nil`. A test **passes** when it gives `Nil`. It **fails** when it stops (§11.7). Tests run one at a time, each in a new instance of the module that has been started (§B.1), so one test cannot change another.
 - **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. Their parameters, value, and errors must be types that the host can take (§10.3).
 
