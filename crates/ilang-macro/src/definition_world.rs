@@ -299,18 +299,13 @@ impl DefinitionWorld {
 }
 
 fn pattern_binders(ty: &TypeExpr, output: &mut Vec<ilang_syntax::ast::Ident>) {
-    match &ty.kind {
-        TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } if args.is_empty() => output.push(name.clone()),
-        TypeKind::Named { args, .. } | TypeKind::Tuple(args) => {
-            for arg in args {
-                pattern_binders(arg, output);
-            }
+    let mut pending = vec![ty];
+    while let Some(ty) = pending.pop() {
+        match &ty.kind {
+            TypeKind::Named { module: None, name, args } if args.is_empty() => output.push(name.clone()),
+            TypeKind::Named { args, .. } | TypeKind::Tuple(args) => pending.extend(args.iter().rev()),
+            _ => {}
         }
-        _ => {}
     }
 }
 fn text(s: &Syntax) -> &str {
