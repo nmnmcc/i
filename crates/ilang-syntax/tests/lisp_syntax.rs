@@ -946,6 +946,13 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
 }
 
 #[test]
+fn definition_answer_preserves_a_single_field_record_type() {
+    let definition = root("(= (Box A) { (: x A) })");
+    let answer = ilang_syntax::lisp::definitions::expanded_definition(&definition, 91).unwrap();
+    assert_eq!(answer.show(), "(= (Box A) {(: x A)})");
+}
+
+#[test]
 fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
     use ilang_syntax::ast::ExprKind;
     use ilang_syntax::lisp::scoped::ScopedSource;
