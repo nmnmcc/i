@@ -207,7 +207,7 @@ prescription for entry bootstrap:
 
 
 ```i
-go(A, E, N) = (body: () -> A ? E ! N | Scheduler, s ! Scheduler) -> Task(A, E) ! N | Scheduler {
+go(A, E, N) = (body: () -> A ^ E ! N | Scheduler, s ! Scheduler) -> Task(A, E) ! N | Scheduler {
   start = {
     ! Scheduler = scheduler.detached
     control.keep_env((own: Scheduler) {

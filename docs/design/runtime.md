@@ -1451,7 +1451,7 @@ qualified here; no new syntax or polymorphic service field is needed):
 await_resource(A, E, N) = (
   r: Request(Result(A, E))
   release: (A) -> Nil ! N
-) -> A ? E ! N | request.Await {
+) -> A ^ E ! N | request.Await {
   resource.ensure(
     () { fail.from_result(request.await(r)) }
     () {
@@ -1571,7 +1571,7 @@ serve_next = (scope, listener) {
   )
 }
 
-@main
+
 main = () {
   resource.acquire(
     () { net.listen("127.0.0.1", 8080) }
@@ -2423,7 +2423,7 @@ Await/Owner/Root alone do not make such an entry async. These are D5/§6.4 tests
 @host("review:work", "request")
 Work { Work(finish: () -> Request(Nil)) }
 
-@main
+
 main = (w ! Work) {
   request.within(() {
     r = w.finish()

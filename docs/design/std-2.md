@@ -581,7 +581,7 @@ Entry {
   Entry(level: Level, message: String, fields: List((String, String)), at: Option(time.Instant))
 }
 Sink(E, N) {
-  Sink((Level) -> Bool, (Entry) -> Nil ? E ! N, (N) -> Nil)
+  Sink((Level) -> Bool, (Entry) -> Nil ^ E ! N, (N) -> Nil)
 }
 ```
 
@@ -699,9 +699,9 @@ same failure was reproduced with the complete four-field Entry of §6.
 (i/fail)
 
 Entry { Entry(message: String) }
-Sink(E, N) { Sink((Entry) -> Nil ? E ! N, (N) -> Nil) }
+Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
 
-make(E, N) = (send: (Entry) -> Nil ? E ! N) -> Sink(E, N) {
+make(E, N) = (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N) {
   Sink(send, (_: N) { Nil })
 }
 
@@ -731,7 +731,7 @@ checker, though it is still not a build of this exact baseline.
 An explicit closed instantiation works with the inferred implementation:
 
 ```i
-send: (Entry) -> Nil ? String ! Sink(String, Never) = write
+send: (Entry) -> Nil ^ String ! Sink(String, Never) = write
 
 working = () {
   ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })

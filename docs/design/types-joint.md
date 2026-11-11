@@ -134,7 +134,7 @@ T2 K1 says: “Of reads inferred schemes/monotypes, never a narrower flow fact.�
 ```i
 copy = (s: String) {
   x = "a" = s
-  r = { value: x }
+  r = ( value: x )
   y: x = "b"
   (r.value, y)
 }
@@ -467,7 +467,7 @@ These are implementation acceptance tests, not claims that this pre-A1 compiler 
 **T-A: literal alias through a record (J1, T2 R2, T3 width).**
 
 ```i
-r = { method: "GET", port: 8080 }
+r = ( method: "GET", port: 8080 )
 Config = r
 use = (c: Config) { c.port }
 value = use(r)
@@ -485,7 +485,7 @@ read = (s: String) {
     other: String - "a" -> 0
     key -> {
       same: key = "a"
-      record.get({ a: 7 }, same)
+      record.get(( a: 7 ), same)
     }
   }
 }
@@ -496,10 +496,10 @@ It gives 7 for `read("a")` and 0 for `read("b")`; key/same have singleton type `
 **T-D: keys remain identities (J1/J3).**
 
 ```i
-forward(K) = (r: { K: Int }, key: K) -> Int {
+forward(K) = (r: ( K: Int ), key: K) -> Int {
   record.get(r, key)
 }
-answer = forward({ a: 7 }, "a")
+answer = forward(( a: 7 ), "a")
 ```
 
 Value 7. Changing the body to `copy = key` then `record.get(r, copy)` is E0541. Adding `x: key = "a"` in the body is E0543. `Get = record.get` is E0542. Two parameters of the same K passed distinct fixed strings or distinct outer keys give E0541. A singleton expression that records an effect before returning `"a"` runs that effect exactly once, in written argument order, when used as a key; test both a labelled call and a pipe.
@@ -524,7 +524,7 @@ Cell(A) { Cell(run: (A) -> A) }
 make = () { Cell((x) { x }) }
 int_cell: Cell(Int) = make()
 string_cell: Cell(String) = make()
-nested = () { { cell: Cell((x) { x }) } }
+nested = () { ( cell: Cell((x) { x }) ) }
 ```
 
 Both calls are accepted with distinct instances. `nested` keeps a general variable in the invariant child of its covariant record field. `Same = make` is E0533, not a closed alias to `Cell(Never)`. `wrong = (c: Cell(Int)) -> Cell(Never) { c }` fails invariant checking. Also run K1’s service-equality, contravariant, bivariant and stream fixtures after migration to the accepted syntax; do not replace them with a check only of printed variable names.
@@ -546,7 +546,7 @@ Read fixes the demanded invariant argument to 1 if the completion batch succeeds
 **T-I: exact forgetting (J8).**
 
 ```i
-Gone(A) = { ..{ a: A, b: Int }, -a }
+Gone(A) = ( ..( a: A, b: Int ), -a )
 empty = (x: Gone(Never)) { x |> {} }
 ```
 

@@ -440,7 +440,7 @@ From this:
 ## 6. Asking for definitions
 
 ```i
-Definitions { Definitions(definition: (of: Syntax) -> Syntax ? SyntaxError) }
+Definitions { Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError) }
 
 definition = (of: Syntax, d ! Definitions) { d.definition(of) }
 // type: (of: Syntax) -> Syntax ? SyntaxError ! Definitions
@@ -537,10 +537,10 @@ Truth { Yes  No  NotKnown }
 
 Types {
   Types(
-    type_of: (Syntax) -> Syntax ? SyntaxError,
+    type_of: (Syntax) -> Syntax ^ SyntaxError,
     signature: () -> Syntax,
-    subtype: (Syntax, Syntax) -> Truth ? SyntaxError,
-    members: (Syntax) -> List(Syntax) ? SyntaxError,
+    subtype: (Syntax, Syntax) -> Truth ^ SyntaxError,
+    members: (Syntax) -> List(Syntax) ^ SyntaxError,
   )
 }
 ```

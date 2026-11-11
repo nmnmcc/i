@@ -11,7 +11,7 @@ The examples use the new syntax of `docs/design/syntax.md`.
 i needs records with fields that are not declared in advance:
 
 ```i
-ada = { name: "ada", age: 36 }          // { age: 36, name: "ada" }
+ada = ( name: "ada", age: 36 )          // { age: 36, name: "ada" }
 name_of = (r) { r.name }                 // (r: { name: A }) -> A
 name_of(ada)                             // "ada"
 ```
@@ -240,9 +240,9 @@ Expect changes in the `.out` files of schemes: `(u) { u.name }` used to be an er
 ### 5.1 The library types
 
 ```i
-get(K, V): (r: { K: V }, key: K) -> V
-put(R, K, V): (r: R & {..}, key: K, value: V) -> { ..R, K: V }
-remove(R, K): (r: R & {..}, key: K) -> { ..R, -K }
+get(K, V): (r: ( K: V ), key: K) -> V
+put(R, K, V): (r: R & Record, key: K, value: V) -> ( ..R, K: V )
+remove(R, K): (r: R & Record, key: K) -> ( ..R, -K )
 ```
 
 ### 5.2 The rules
@@ -314,7 +314,7 @@ remove(R, K): (r: R & {..}, key: K) -> { ..R, -K }
 So a body that writes `K` and then `J` is checked against "they may be equal":
 
 ```i
-both(K, J) = (r: {..}, k: K, j: J) -> { K: Int, J: String } {
+both(K, J) = (r: Record, k: K, j: J) -> ( K: Int, J: String ) {
   r |> record.put(k, 1) |> record.put(j, "s")
 }
 ```
@@ -375,7 +375,7 @@ The `->` part is needed: it is what makes `K` a label parameter (L1). Without it
 The result type of `twist` keeps `Without({ a: Int }, {K})` as a form (E4 does not apply, because `a` may be `K`), so each call works it out exactly after `K` is fixed. Inside the body, reading `.a` after the `put` is E0544, "the key `K` may be `a`":
 
 ```i
-peek(K) = (r: { a: Int }, k: K) -> ({ K: "s" }, Int) {
+peek(K) = (r: ( a: Int ), k: K) -> (( K: "s" ), Int) {
   x = record.put(r, k, "s")
   (x, x.a)                    // E0544 at .a
 }
@@ -650,31 +650,31 @@ A `.f` on a record is a binary search with `ref.eq` and string compares: slower 
 
 /// The field `key` of `r`.
 @external("ilang:record", "get")
-get(K, V): (r: { K: V }, key: K) -> V
+get(K, V): (r: ( K: V ), key: K) -> V
 
 /// `r` with the field `key` set to `value`: added, or put in place of the field that is there.
 @external("ilang:record", "put")
-put(R, K, V): (r: R & {..}, key: K, value: V) -> { ..R, K: V }
+put(R, K, V): (r: R & Record, key: K, value: V) -> ( ..R, K: V )
 
 /// `r` without the field `key`, if it has one.
 @external("ilang:record", "remove")
-remove(R, K): (r: R & {..}, key: K) -> { ..R, -K }
+remove(R, K): (r: R & Record, key: K) -> ( ..R, -K )
 
 /// Whether `r` has a field `key`. It may have more fields than its type shows.
 @external("ilang:record", "has")
-has: (r: {..}, key: String) -> Bool
+has: (r: Record, key: String) -> Bool
 
 /// The labels of `r`, in the order of their bytes.
 @external("ilang:record", "keys")
-keys: (r: {..}) -> List(String)
+keys: (r: Record) -> List(String)
 
 /// The number of fields of `r`.
 @external("ilang:record", "size")
-size: (r: {..}) -> Int
+size: (r: Record) -> Int
 
 /// Each label of `r`, in the order of its bytes, with the text form of its value (§11.8).
 @external("ilang:record", "texts")
-texts: (r: {..}) -> List((String, String))
+texts: (r: Record) -> List((String, String))
 ```
 
 - `r |> record.put("age", 37)` works because `|>` is a call.
@@ -685,7 +685,7 @@ texts: (r: {..}) -> List((String, String))
 - An `update` is plain i:
 
 ```i
-update(R, K, A, B) = (r: R & { K: A }, key: K, f: (A) -> B) -> { ..R, K: B } {
+update(R, K, A, B) = (r: R & ( K: A ), key: K, f: (A) -> B) -> ( ..R, K: B ) {
   record.put(r, key, f(record.get(r, key)))
 }
 ```
@@ -1171,8 +1171,8 @@ claim to repair the existing nominal/function algebra.
 ### 20.1 Root cause and choice
 
 ```i
-Gone(A) = { ..{ a: Never } | { ..A, b: Never }, -a }
-Empty = Gone({..})
+Gone(A) = ( ..( a: Never ) | ( ..A, b: Never ), -a )
+Empty = Gone(Record)
 impossible = (x: Empty) { x |> {} }
 ```
 
@@ -1400,9 +1400,9 @@ runtime.
 The recommended written version is:
 
 ```i
-choose_written(R) = (c: Bool, r: R & {..}) -> { ..R, a: 1 } | { b: 2 } {
-  updated: { ..R, a: 1 } = record.put(r, "a", 1)
-  c |> { True -> updated  False -> { b: 2 } }
+choose_written(R) = (c: Bool, r: R & Record) -> ( ..R, a: 1 ) | ( b: 2 ) {
+  updated: ( ..R, a: 1 ) = record.put(r, "a", 1)
+  c |> { True -> updated  False -> ( b: 2 ) }
 }
 ```
 
@@ -1446,8 +1446,8 @@ whole upper bound on x does not select an alternative. Calling it with a
 closed `{ a: 1 }` passes. In contrast:
 
 ```i
-select(A, B) = (x) -> { a: A } | { a: B } { x }
-bad = select({ a: 1 })
+select(A, B) = (x) -> ( a: A ) | ( a: B ) { x }
+bad = select(( a: 1 ))
 ```
 
 The function declaration may retain its whole union constraint, but this call
@@ -2203,7 +2203,7 @@ shape is:
 
 ```i
 shared(A) = (c: Cell(A), f: (A) -> A, flag: Bool) {
-  flag |> { True -> { cell: c }  False -> { use: f } }
+  flag |> { True -> ( cell: c )  False -> ( use: f ) }
 }
 ```
 

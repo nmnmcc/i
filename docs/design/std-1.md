@@ -139,7 +139,7 @@ functions below. `Step` is data; its `Next` tail describes later calls.
 
 ```i
 Stream(A, E, N) {
-  Stream(() -> Step(A, E, N) ? E ! N, (N) -> Nil)
+  Stream(() -> Step(A, E, N) ^ E ! N, (N) -> Nil)
 }
 Step(A, E, N) {
   Done
@@ -254,16 +254,16 @@ common environment in their constructors; this is a deliberate ergonomic cost.
 Implementation witnesses, using ordinary constructors and calls:
 
 ```i
-make(A, E, N) = (step: () -> Step(A, E, N) ? E ! N) -> Stream(A, E, N) {
+make(A, E, N) = (step: () -> Step(A, E, N) ^ E ! N) -> Stream(A, E, N) {
   Stream(step, (_: N) { Nil })
 }
-pull(A, E, N) = (stream: Stream(A, E, N)) -> Step(A, E, N) ? E ! N {
+pull(A, E, N) = (stream: Stream(A, E, N)) -> Step(A, E, N) ^ E ! N {
   Stream(step, _) = stream
   step()
 }
 map_environment(A, E, N, M) = (
   stream: Stream(A, E, N),
-  run: { (body: () -> Step(A, E, N) ? E ! N) -> Step(A, E, N) ? E ! M }
+  run: { (body: () -> Step(A, E, N) ^ E ! N) -> Step(A, E, N) ^ E ! M }
 ) -> Stream(A, E, M) {
   make(() {
     run(() { pull(stream) }) |> {
@@ -1033,7 +1033,7 @@ cannot be erased by an intermediate combinator.
 
 ```i
 Sink(A) { Sink(put: (A) -> Nil) }
-PlainStream(E, N) { PlainStream(() -> Nil ? E ! N) }
+PlainStream(E, N) { PlainStream(() -> Nil ^ E ! N) }
 need_int = (s ! Sink(Int)) { s.put(1) }
 coerce = (source: PlainStream(Never, Sink(Int))) -> PlainStream(Never, Sink(Never)) {
   source

@@ -913,7 +913,7 @@ f = (x: Float) -> Float {
   unused = x *. x
   0.0
 }
-@main
+
 main = () { f(1.0e308) }
 ```
 
@@ -1006,7 +1006,7 @@ h = (b, x: Float) -> Float {
  y = f(b, x)
  y +. 0.5
 }
-@main
+
 main = () {
  control.boundary((b) { h(b, 1.0e308) })
  Nil
