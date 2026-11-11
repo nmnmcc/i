@@ -192,7 +192,10 @@ fn wat_inner(p: &Program, metered: bool) -> String {
             );
         }
     }
-    m.push_str(runtime::wat_for_host_references(references));
+    m.push_str(runtime::wat_for_expansion_sites(
+        references,
+        p.site_notes.iter().any(Option::is_some),
+    ));
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
     m.push_str(host::EFFECTS);
@@ -836,6 +839,21 @@ impl<'p> Emitter<'p> {
             names.len(),
             names.join(" ")
         );
+        if self.p.site_notes.iter().any(Option::is_some) {
+            assert_eq!(self.p.site_notes.len(), self.p.sites.len());
+            let notes: Vec<String> = self
+                .p
+                .site_notes
+                .iter()
+                .map(|note| self.string(note.as_deref().unwrap_or("")))
+                .collect();
+            let _ = writeln!(
+                self.out,
+                "(call $site_notes_install (array.new_fixed $values {} {}))",
+                notes.len(),
+                notes.join(" ")
+            );
+        }
         // The root environment: the `Assert` of the runtime (§9.6), and
         // no other service yet.
         let _ = writeln!(

@@ -694,7 +694,7 @@ impl Printer {
     /// comes after it.
     fn pattern(&mut self, p: &Pattern, clause: bool) {
         match &p.kind {
-            PatternKind::Quote(_) => panic!("quote pattern has no normal-surface spelling"),
+            PatternKind::Quote { .. } => panic!("quote pattern has no normal-surface spelling"),
             PatternKind::Var(n) | PatternKind::Discard(n) => self.w(n),
             PatternKind::Typed { binder, ty } => {
                 self.w(&format!("{}: ", binder.name));

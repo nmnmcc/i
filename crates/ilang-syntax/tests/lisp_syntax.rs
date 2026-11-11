@@ -938,6 +938,7 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
     let Node::Round(head) = core[0].node() else {
         panic!("head")
     };
+    assert_eq!(core[0].definition_head(), Some(90));
     assert!(matches!(
         head[1].scope_identity(),
         Some(ScopeIdentity::DefinitionParameter { answer: 90, .. })
@@ -960,7 +961,7 @@ fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
     let call = root("call");
     let mut source = ScopedSource::new("original source".into());
     let expr = source.expression(&result, &call).unwrap();
-    let ExprKind::Binary { lhs, rhs, .. } = expr.kind else {
+    let ExprKind::Binary { lhs, rhs, .. } = &expr.kind else {
         panic!("binary")
     };
     assert_ne!(lhs.span, rhs.span);
@@ -1033,7 +1034,7 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
     let syntax = root("(f \"你好\")");
     let mut source = ScopedSource::new("// 原文件".into());
     let expr = source.expression(&syntax, &call).unwrap();
-    let ExprKind::Call { args, .. } = expr.kind else {
+    let ExprKind::Call { args, .. } = &expr.kind else {
         panic!("call")
     };
     let span = args[0].value.span;
@@ -1204,6 +1205,14 @@ fn deeply_nested_syntax_marks_and_drops_without_host_stack_growth() {
             for _ in 0..20_000 {
                 syntax = Syntax::make(Node::Round(vec![syntax.clone()]), &syntax).unwrap();
             }
+            let datum = syntax.to_datum();
+            let rebuilt = Syntax::from_datum(&datum, syntax.scope());
+            assert!(syntax.same_code(&rebuilt));
+            drop(datum);
+            let quote = Syntax::make(Node::Quote(syntax.clone()), &syntax).unwrap();
+            assert!(quote.match_quote(&rebuilt).unwrap().is_some());
+            drop(quote);
+            drop(rebuilt);
             let marked = syntax.flip_mark(7);
             assert!(marked.scope().marks.contains(&7));
             ilang_syntax::lisp::syntax::validate_expansion(&marked, &[]).unwrap();

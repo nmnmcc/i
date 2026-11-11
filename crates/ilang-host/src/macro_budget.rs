@@ -251,4 +251,18 @@ mod tests {
         c.set_macro_budget(MacroBudget::default());
         assert!(a.merge(c).is_err());
     }
+
+    #[test]
+    fn accounting_imports_cannot_skip_static_precharge() {
+        let wasm = wat::parse_str(
+            r#"(module (import "ilang:macro/budget/v1" "charge"
+            (func (param i64 i64))))"#,
+        )
+        .unwrap();
+        let error = match crate::Program::from_bytes(&wasm) {
+            Ok(_) => panic!("accepted accounting hooks without a static budget section"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("static budget section"));
+    }
 }

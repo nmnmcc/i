@@ -6,8 +6,10 @@ pub mod session;
 
 pub mod body_engine;
 pub mod call;
-pub mod registry;
-
-pub mod item_phase;
-
 pub mod definition_world;
+pub mod diagnostics;
+pub mod item_phase;
+pub mod module_order;
+pub mod project;
+pub mod registry;
+pub mod validate;

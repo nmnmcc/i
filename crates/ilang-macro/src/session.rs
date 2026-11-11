@@ -19,6 +19,7 @@ pub struct Transaction {
     pub item_origin: Option<ItemOrigin>,
     /// Unique invocation mark, used to discard only a run invalidated by audit.
     pub mark: u64,
+    pub location: Option<(ilang_package::SourceId, ilang_syntax::span::Span)>,
 }
 #[derive(Clone, Debug)]
 pub struct ItemOrigin {
@@ -81,17 +82,28 @@ impl Session {
                 span: call.span(),
             }));
         }
+        let budget = ilang_host::macro_budget::MacroBudget::default();
         let arguments = definition
             .arguments(arguments, item, call)
             .map_err(Failure::Syntax)?;
         let mark = self.next_mark;
         self.next_mark = mark.checked_add(1).expect("macro mark space exhausted");
+        for argument in &arguments {
+            ilang_host::syntax::charge_tree(&budget, argument, true).map_err(Failure::Host)?;
+        }
         let marked = flip_mark_all(&arguments, mark);
-        let budget = ilang_host::macro_budget::MacroBudget::default();
         let resolver_budget = budget.clone();
         let context = Arc::new(DefinitionContext::new(move |query| {
             match resolver(query, &resolver_budget) {
-                DefinitionReply::Answer(answer) => DefinitionReply::Answer(answer.flip_mark(mark)),
+                DefinitionReply::Answer(answer) => {
+                    if ilang_host::syntax::charge_tree(&resolver_budget, &answer, true).is_err() {
+                        return DefinitionReply::CompileError {
+                            message: "macro resource limit exceeded".into(),
+                            at: query.clone(),
+                        };
+                    }
+                    DefinitionReply::Answer(answer.flip_mark(mark))
+                }
                 other => other,
             }
         }));
@@ -114,10 +126,30 @@ impl Session {
                 RunOutcome::Aborted(abort) => return Err(Failure::Aborted(abort)),
                 RunOutcome::Stopped(stop) => return Err(Failure::Stopped(stop)),
             };
+            ilang_host::syntax::charge_tree(&budget, &syntax, true).map_err(Failure::Host)?;
             validate_expansion(&syntax, &marked).map_err(Failure::Syntax)?;
             let requests = items
                 .as_ref()
                 .map_or_else(Vec::new, |items| items.take_requests());
+            for request in &requests {
+                match request {
+                    ItemRequest::Add {
+                        collection,
+                        target,
+                        at,
+                        ..
+                    } => {
+                        for tree in [collection, target, at] {
+                            ilang_host::syntax::charge_tree(&budget, tree, true)
+                                .map_err(Failure::Host)?;
+                        }
+                    }
+                    ItemRequest::Expose { name } => {
+                        ilang_host::syntax::charge_tree(&budget, name, true)
+                            .map_err(Failure::Host)?;
+                    }
+                }
+            }
             let (syntax, requests) =
                 ilang_host::syntax::flip_output_and_requests(&syntax, &requests, mark);
             let notes = context.take_notes();
@@ -129,6 +161,7 @@ impl Session {
                     requests,
                     item_origin: None,
                     mark,
+                    location: None,
                 },
             );
             Ok(expanded)

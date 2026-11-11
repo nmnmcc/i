@@ -1,7 +1,7 @@
 //! Lower expression quotes to ordinary calls into the compiler syntax service.
 use std::collections::BTreeSet;
 
-use crate::ast::{Arg, Expr, ExprKind, Ident, ImportItem, Module};
+use crate::ast::{Arg, Expr, ExprKind, Ident, ImportItem, Module, Pattern, PatternKind};
 use crate::span::Span;
 use crate::walk::{Visitor, Walk};
 
@@ -102,6 +102,22 @@ impl Lower<'_> {
     }
 }
 impl Visitor for Lower<'_> {
+    fn pattern(&mut self, pattern: &mut Pattern) {
+        if let PatternKind::Quote {
+            datum, template, ..
+        } = &mut pattern.kind
+        {
+            self.found = true;
+            *template = Some(
+                self.templates
+                    .len()
+                    .try_into()
+                    .expect("too many quote templates"),
+            );
+            self.templates.push(Syntax::from_datum(datum, &self.scope));
+        }
+    }
+
     fn expr(&mut self, expr: &mut Expr, enter: bool) {
         if !enter {
             return;

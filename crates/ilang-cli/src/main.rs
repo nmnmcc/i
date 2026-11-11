@@ -243,7 +243,7 @@ fn cmd_build(
     if wat {
         let (mut graph, _) = ilang_cli::load(project, false, offline);
         graph.entry = entry.map(str::to_owned);
-        let checked = ilang_check::check(&graph);
+        let checked = ilang_macro::project::check(&mut graph);
         if let (Some(p), Some(t)) = (&checked.program, &checked.types)
             && let Ok(text) = ilang_wasm::compile_wat(
                 &graph,
@@ -364,9 +364,9 @@ fn cpu_seconds() -> Option<f64> {
 /// top-level name of the package's modules, in source order. The tests are
 /// checked too.
 fn check(project: &Path, offline: bool, types: bool) -> ExitCode {
-    let (graph, mut diags) = ilang_cli::load(project, true, offline);
+    let (mut graph, mut diags) = ilang_cli::load(project, true, offline);
     if graph.root.is_some() {
-        let checked = ilang_check::check(&graph);
+        let checked = ilang_macro::project::check(&mut graph);
         diags.extend(checked.diags);
         if types && let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
             for (i, m) in program.modules.iter().enumerate() {

@@ -279,7 +279,13 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
             Ok(result(Syntax::make(Node::Float(*value), get(like)?)))
         }
         ("make_list", [kind, list, like]) => {
-            let mut values = Vec::new();
+            let mut count = 0;
+            let mut link = get::<List>(list)?.0.as_deref();
+            while let Some(current) = link {
+                count += 1;
+                link = current.previous.as_deref();
+            }
+            let mut values = Vec::with_capacity(count);
             let mut link = get::<List>(list)?.0.as_deref();
             while let Some(current) = link {
                 values.push(current.value.clone());
@@ -376,22 +382,32 @@ pub fn charge_tree(budget: &MacroBudget, root: &Syntax, output: bool) -> Result<
             continue;
         };
         budget.enter_frame(1)?;
-        budget.charge(1, 1)?;
+        budget.charge(1, if output { 80 } else { 16 })?;
         pending.push(Visit::Leave);
         let bytes = match s.node() {
             Node::Name(x) | Node::Discard(x) | Node::Up(x) | Node::Symbol(x) | Node::Text(x) => {
                 x.len() as u64
             }
-            Node::Int(x) => x.bits().div_ceil(8),
+            Node::Int(x) => {
+                let bytes = x.bits().div_ceil(8);
+                if output {
+                    // Decimal conversion of an arbitrary precision value can
+                    // require quadratic limb work; charge its upper bound
+                    // before calling the formatter.
+                    let limbs = bytes.div_ceil(4);
+                    budget.charge(limbs.saturating_mul(limbs), 0)?;
+                }
+                bytes
+            }
             Node::Float(_) => 8,
             Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
                 // Charge before the traversal stack may grow.
-                budget.charge(xs.len() as u64, 4 + xs.len() as u64)?;
+                budget.charge(xs.len() as u64, 4 + (xs.len() as u64).saturating_mul(8))?;
                 pending.extend(xs.iter().rev().map(Visit::Node));
                 0
             }
             Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => {
-                budget.charge(1, 1)?;
+                budget.charge(1, 8)?;
                 pending.push(Visit::Node(x));
                 0
             }
@@ -432,7 +448,8 @@ fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
     match (name, args) {
         ("make_text", [_, Value::String(s), _]) => {
             let n = s.len() as u64;
-            budget.charge(n, 4 + n.div_ceil(8))?;
+            // Lexing even an invalid atom may construct one token per byte.
+            budget.charge(n.saturating_mul(16), 16 + n.saturating_mul(16))?;
         }
         ("make_int", [Value::Int(n), _]) => {
             let bytes = n.bits().div_ceil(8);
@@ -441,7 +458,7 @@ fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
         ("make_list", [_, list, _]) | ("rebuild", [_, list]) => {
             let mut link = get::<List>(list)?.0.as_deref();
             while let Some(current) = link {
-                budget.charge(1, 1)?;
+                budget.charge(3, 1)?;
                 link = current.previous.as_deref();
             }
         }
@@ -449,18 +466,12 @@ fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
             charge_tree(budget, get(pattern)?, false)?;
             charge_tree(budget, get(value)?, false)?;
         }
-        ("text", [value]) => {
-            let syntax = get::<Syntax>(value)?;
-            if let Node::Name(s)
-            | Node::Discard(s)
-            | Node::Up(s)
-            | Node::Symbol(s)
-            | Node::Text(s) = syntax.node()
-            {
-                let bytes = s.len() as u64;
-                budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+        ("text", [value]) => match get::<Syntax>(value)?.node() {
+            Node::Name(s) | Node::Discard(s) | Node::Up(s) | Node::Symbol(s) | Node::Text(s) => {
+                charge_text(budget, s)?
             }
-        }
+            _ => {}
+        },
         ("int", [value]) => {
             if let Node::Int(n) = get::<Syntax>(value)?.node() {
                 let bytes = n.bits().div_ceil(8);
@@ -477,21 +488,19 @@ fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
             budget.charge(bytes, 4 + bytes.div_ceil(8))?;
         }
         ("syntax_error", [value]) => {
-            let message = get::<SyntaxResult>(value)?
-                .0
-                .as_ref()
-                .expect_err("syntax result must be an error");
-            let bytes = message.len() as u64;
-            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+            if let Err(s) = &get::<SyntaxResult>(value)?.0 {
+                charge_text(budget, s)?;
+            }
+        }
+        ("text_value", [value]) => {
+            if let Ok(s) = &get::<TextResult>(value)?.0 {
+                charge_text(budget, s)?;
+            }
         }
         ("text_error", [value]) => {
-            let message = &get::<TextResult>(value)?
-                .0
-                .as_ref()
-                .expect_err("text result must be an error")
-                .0;
-            let bytes = message.len() as u64;
-            budget.charge(bytes, 4 + bytes.div_ceil(8))?;
+            if let Err((s, _)) = &get::<TextResult>(value)?.0 {
+                charge_text(budget, s)?;
+            }
         }
         ("show" | "show_as", [value, ..]) => charge_tree(budget, get(value)?, true)?,
         ("same_code", [left, right]) => {
@@ -500,6 +509,12 @@ fn charge_call(budget: &MacroBudget, name: &str, args: &[Value]) -> Result<()> {
         }
         _ => {}
     }
+    Ok(())
+}
+
+fn charge_text(budget: &MacroBudget, text: &str) -> Result<()> {
+    let bytes = text.len() as u64;
+    budget.charge(bytes, 4 + bytes.div_ceil(8))?;
     Ok(())
 }
 
@@ -742,6 +757,54 @@ mod tests {
         });
         assert!(charge_call(&small, "show", std::slice::from_ref(&value)).is_err());
         assert_eq!(small.exceeded(), Some(Limit::Allocation));
+
+        let large = parse(&"a".repeat(512)).unwrap();
+        let atom = opaque(Syntax::from_datum(
+            &large[0],
+            &Scope {
+                module: 0,
+                marks: BTreeSet::new(),
+            },
+        ));
+        let small = MacroBudget::new(Limits {
+            work: 1000,
+            allocation: 12,
+            frames: 100,
+        });
+        assert!(charge_call(&small, "text", std::slice::from_ref(&atom)).is_err());
+        assert_eq!(small.exceeded(), Some(Limit::Allocation));
+        let small = MacroBudget::new(Limits {
+            work: 100,
+            allocation: 10000,
+            frames: 100,
+        });
+        assert!(
+            charge_call(
+                &small,
+                "make_text",
+                &[Value::Int(0.into()), Value::String("a".repeat(512)), atom]
+            )
+            .is_err()
+        );
+        assert_eq!(small.exceeded(), Some(Limit::Work));
+    }
+
+    #[test]
+    fn formatting_large_syntax_integers_charges_limb_work() {
+        let work = |digits: usize| {
+            let parsed = parse(&"9".repeat(digits)).unwrap();
+            let value = opaque(Syntax::from_datum(
+                &parsed[0],
+                &Scope {
+                    module: 0,
+                    marks: BTreeSet::new(),
+                },
+            ));
+            let budget = MacroBudget::default();
+            charge_call(&budget, "show", &[value]).unwrap();
+            budget.usage().work
+        };
+        assert!(work(2400) > 3 * work(1200));
     }
 
     #[test]

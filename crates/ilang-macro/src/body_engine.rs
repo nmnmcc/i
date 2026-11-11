@@ -13,7 +13,7 @@ use ilang_syntax::ast::{self, Expr, ExprKind, Ident, Stmt, TypeExpr};
 use ilang_syntax::lisp::{
     Datum, DatumKind,
     expansion::MacroArgument,
-    scoped::{ScopedError, ScopedSource},
+    scoped::{MeteredError, ScopedError, ScopedSource},
     source_syntax::{source_expression_syntax, source_type_syntax},
     syntax::{Scope, Syntax},
 };
@@ -23,11 +23,21 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum Error {
-    Compile(run::CompileError),
+    Compile(Vec<ilang_package::Diagnostic>),
     Preparation(Vec<ilang_package::Diagnostic>),
-    Run(Failure),
+    Run {
+        failure: Failure,
+        macro_name: String,
+        call: Syntax,
+        invocation_span: Span,
+    },
     Conversion(ScopedError),
-    Metered(ilang_syntax::lisp::scoped::MeteredError),
+    Resource {
+        error: Box<dyn std::error::Error + Send + Sync>,
+        macro_name: String,
+        call: Syntax,
+        invocation_span: Span,
+    },
     SameModule(Span),
     Depth(Span),
     InvalidItem(Span, String),
@@ -48,10 +58,12 @@ pub struct BodyEngine<'a> {
     pub(crate) phase_notes: Vec<crate::item_phase::PhaseNote>,
     pub resolver: Arc<DefinitionResolver>,
     pub transactions: Vec<Transaction>,
+    /// Successful type replacements, with unique virtual occurrence spans.
+    pub type_replacements: Vec<(Span, Span, Syntax)>,
     cache: HashMap<(u32, String, u8), Compiled>,
     pub(crate) item_locals: Vec<Local>,
     pub(crate) item_overrides: HashMap<Span, (Syntax, Span)>,
-    pub(crate) type_replacements: Vec<(Span, Span, ilang_host::macro_budget::MacroBudget)>,
+    pub(crate) item_replacements: Vec<(Span, Span, ilang_host::macro_budget::MacroBudget)>,
     pub(crate) run_mark: Arc<std::sync::atomic::AtomicU64>,
     session: &'a mut Session,
 }
@@ -75,10 +87,11 @@ impl<'a> BodyEngine<'a> {
             phase_notes: Vec::new(),
             resolver,
             transactions: Vec::new(),
+            type_replacements: Vec::new(),
             cache: HashMap::new(),
             item_locals: Vec::new(),
             item_overrides: HashMap::new(),
-            type_replacements: Vec::new(),
+            item_replacements: Vec::new(),
             run_mark: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             session,
         }
@@ -162,6 +175,7 @@ impl<'a> BodyEngine<'a> {
         mac: &Macro,
         args: Vec<MacroArgument>,
         call: &Syntax,
+        invocation_span: Span,
         item: Option<Syntax>,
         position: MacroPosition,
     ) -> Result<
@@ -173,7 +187,7 @@ impl<'a> BodyEngine<'a> {
         Error,
     > {
         if mac.source == self.source {
-            return Err(Error::SameModule(call.span()));
+            return Err(Error::SameModule(invocation_span));
         }
         let phase = match position {
             MacroPosition::Item => 0,
@@ -197,8 +211,31 @@ impl<'a> BodyEngine<'a> {
                 .find(|b| b.module == module.path && b.name == mac.definition.name)
                 .expect("registered macro must be prepared");
             let (path, name) = prepare::add_wrapper(&mut graph, &mut parsed, binding, position);
-            let program =
-                run::compile(&graph, &parsed, &[(&path, &name)]).map_err(Error::Compile)?;
+            let wrapper_source = parsed.last().expect("wrapper module was added").source;
+            let definition_span = module.ast.items[mac.definition.item].span;
+            let program = run::compile(&graph, &parsed, &[(&path, &name)]).map_err(|error| {
+                let mut diagnostics = match error {
+                    run::CompileError::Program(diagnostics) => diagnostics,
+                    run::CompileError::Internal(message) => vec![ilang_package::Diagnostic::error(
+                        ilang_check::code::MACRO_RESERVED,
+                        Some(mac.source),
+                        definition_span,
+                        format!(
+                            "compiler error while compiling macro `{}`: {message}",
+                            mac.definition.name
+                        ),
+                    )],
+                };
+                for diagnostic in &mut diagnostics {
+                    if diagnostic.source == Some(wrapper_source) {
+                        diagnostic.source = Some(mac.source);
+                        diagnostic.span = definition_span;
+                        diagnostic.message =
+                            format!("macro `{}`: {}", mac.definition.name, diagnostic.message);
+                    }
+                }
+                Error::Compile(diagnostics)
+            })?;
             self.cache.insert(
                 key.clone(),
                 Compiled {
@@ -213,7 +250,7 @@ impl<'a> BodyEngine<'a> {
             self.session.next_mark(),
             std::sync::atomic::Ordering::Relaxed,
         );
-        let mut result_budget = None;
+        let mut output_budget = None;
         let result = self
             .session
             .run(
@@ -227,18 +264,27 @@ impl<'a> BodyEngine<'a> {
                 compiled.templates.clone(),
                 self.resolver.clone(),
                 |_, syntax, budget| {
-                    result_budget = Some(budget.clone());
+                    output_budget = Some(budget.clone());
                     Ok(Expanded {
                         syntax,
                         transactions: Vec::new(),
                     })
                 },
             )
-            .map_err(Error::Run)?;
+            .map_err(|failure| Error::Run {
+                failure,
+                macro_name: mac.definition.name.clone(),
+                call: call.clone(),
+                invocation_span,
+            })?;
+        let mut transactions = result.transactions;
+        for transaction in &mut transactions {
+            transaction.location = Some((self.source, invocation_span));
+        }
         Ok((
             result.syntax,
-            result_budget.expect("successful run retains its budget"),
-            result.transactions,
+            output_budget.expect("successful run supplies its budget"),
+            transactions,
         ))
     }
 }
@@ -267,16 +313,30 @@ impl Hook for BodyEngine<'_> {
             syntax: self.expr_syntax(&arg.value),
         }));
         let call = self.expr_syntax(expression);
-        let (result, budget, transactions) =
-            self.execute(&mac, args, &call, None, MacroPosition::Expression)?;
-        let output = self
+        let (result, budget, transactions) = self.execute(
+            &mac,
+            args,
+            &call,
+            expression.span,
+            None,
+            MacroPosition::Expression,
+        )?;
+        let invocation_span = expression.span;
+        let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
+        let expression = self
             .scoped
             .expression_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
-            .map_err(Error::Metered)?;
+            .map_err(|error| metered_error(error, &mac.definition.name, &call, expression.span))?;
+        let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+        self.scoped.inherit_call_chain(
+            Span::new(start, end),
+            invocation_span,
+            &mac.definition.name,
+        );
         self.transactions.extend(transactions);
-        Ok(output)
+        Ok(expression)
     }
     fn is_type_macro(
         &mut self,
@@ -307,18 +367,24 @@ impl Hook for BodyEngine<'_> {
                 syntax: self.ty_syntax(arg),
             })
             .collect();
+        let old_span = ty.span;
         let call = self.ty_syntax(ty);
         let (result, budget, transactions) =
-            self.execute(&mac, args, &call, None, MacroPosition::Type)?;
-        let output = self
+            self.execute(&mac, args, &call, ty.span, None, MacroPosition::Type)?;
+        let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
+        let ty = self
             .scoped
             .ty_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
-            .map_err(Error::Metered)?;
+            .map_err(|error| metered_error(error, &mac.definition.name, &call, ty.span))?;
+        let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+        self.scoped
+            .inherit_call_chain(Span::new(start, end), old_span, &mac.definition.name);
+        self.type_replacements.push((old_span, ty.span, result));
         self.transactions.extend(transactions);
-        self.type_replacements.push((ty.span, output.span, budget));
-        Ok(output)
+        self.item_replacements.push((old_span, ty.span, budget));
+        Ok(ty)
     }
     fn depth_error(&mut self, span: Span) -> Error {
         Error::Depth(span)
@@ -381,5 +447,22 @@ impl Hook for BodyEngine<'_> {
             }
             _ => false,
         }
+    }
+}
+
+pub(crate) fn metered_error(
+    error: MeteredError,
+    macro_name: &str,
+    call: &Syntax,
+    invocation_span: Span,
+) -> Error {
+    match error {
+        MeteredError::Syntax(error) => Error::Conversion(error),
+        MeteredError::Resource(error) => Error::Resource {
+            error,
+            macro_name: macro_name.to_owned(),
+            call: call.clone(),
+            invocation_span,
+        },
     }
 }

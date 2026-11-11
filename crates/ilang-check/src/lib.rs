@@ -297,9 +297,61 @@ fn check_resolved(
         }
         _ => None,
     };
+    if let Some(p) = &program {
+        map_expansion_diagnostics(p, &graph.sources, &mut diags);
+    }
     Checked {
         program,
         types,
         diags,
     }
+}
+
+/// Map diagnostics from the checker's virtual expansion text to written
+/// source. Warnings from templates are not emitted (§9).
+pub fn map_expansion_diagnostics(
+    program: &hir::Program,
+    sources: &ilang_package::Sources,
+    diags: &mut Vec<Diagnostic>,
+) {
+    diags.retain_mut(|d| {
+        let Some(source) = d.source else { return true };
+        let Some(index) = program.modules.iter().position(|m| m.source == source) else {
+            return true;
+        };
+        let Some(origin) = program.origin(hir::ModuleId(index as u32), d.span) else {
+            return true;
+        };
+        if origin.template.is_some() && d.severity == ilang_package::Severity::Warning {
+            return false;
+        }
+        if let Some((template_source, template_span)) = origin.template {
+            let virtual_text = &sources.get(source).text;
+            let expanded = virtual_text
+                .get(d.span.start as usize..d.span.end as usize)
+                .expect("diagnostic span is inside expanded source");
+            let name = origin
+                .expansion
+                .call_chain
+                .last()
+                .map_or("macro", |call| call.macro_name.as_str());
+            d.message
+                .push_str(&format!(" (in the expansion of `{name}`: `{expanded}`)"));
+            d.related.push(ilang_package::DiagnosticNote {
+                source: template_source,
+                span: template_span,
+                message: "expanded from this template".into(),
+            });
+            for call in origin.expansion.call_chain.iter().skip(1) {
+                d.related.push(ilang_package::DiagnosticNote {
+                    source: SourceId(call.syntax.scope().module),
+                    span: call.syntax.span(),
+                    message: format!("in the expansion of `{}`", call.macro_name),
+                });
+            }
+        }
+        d.source = Some(origin.source);
+        d.span = origin.span;
+        true
+    });
 }

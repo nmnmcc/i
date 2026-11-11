@@ -43,7 +43,14 @@ impl Analysis {
     }
 
     pub fn text(&self, source: SourceId) -> &str {
-        &self.graph.sources.get(source).text
+        let text = &self.graph.sources.get(source).text;
+        let original_len = self.checked.program.as_ref().and_then(|p| {
+            p.modules
+                .iter()
+                .find(|m| m.source == source)
+                .and_then(|m| m.scoped.as_ref().map(|s| s.original_len() as usize))
+        });
+        original_len.map_or(text.as_str(), |len| &text[..len])
     }
 }
 
@@ -183,7 +190,18 @@ fn analyze(job: &Job) -> (Analysis, bool) {
         }
     }
     let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        query::check_for_queries(&graph)
+        let original_graph = graph.clone();
+        match ilang_macro::project::expand(&mut graph) {
+            Ok(expanded) => {
+                query::check_parsed_for_queries(&graph, &expanded.parsed, expanded.diagnostics)
+            }
+            Err(diagnostics) => {
+                graph = original_graph;
+                let mut checked = query::check_for_queries(&graph);
+                checked.diags = diagnostics;
+                checked
+            }
+        }
     }));
     let ok = checked.is_ok();
     let checked = checked.unwrap_or_else(|_| Checked {
@@ -249,5 +267,77 @@ fn add_new_documents(
             });
             paths.insert(source, path.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod expansion_source_tests {
+    use super::*;
+    use ilang_syntax::lisp::{
+        Datum, DatumKind,
+        scoped::ScopedSource,
+        syntax::{Scope, Syntax},
+    };
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn editor_text_excludes_the_expansion_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        let source = "main = () { fake() }\n";
+        std::fs::write(dir.path().join("src/main.i"), source).unwrap();
+        let (mut graph, _) = ilang_package::load(dir.path());
+        let (mut parsed, _) = ilang_check::parse(&graph);
+        let module = parsed.iter_mut().find(|m| m.path == "app/main").unwrap();
+        let id = module.source;
+        let ast = &mut module.ast.items[0];
+        let ilang_syntax::ast::ItemKind::Binding(binding) = &mut ast.kind else {
+            panic!()
+        };
+        let ilang_syntax::ast::ExprKind::Fn(function) = &mut binding.value.kind else {
+            panic!()
+        };
+        let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
+            panic!()
+        };
+        let call = Syntax::from_datum(
+            &Datum {
+                kind: DatumKind::Name("fake".into()),
+                span: last.span,
+                docs: vec![],
+            },
+            &Scope {
+                module: id.0,
+                marks: BTreeSet::new(),
+            },
+        );
+        let result = Syntax::from_datum(
+            &Datum {
+                kind: DatumKind::UpName("Nil".into()),
+                span: last.span,
+                docs: vec![],
+            },
+            &Scope {
+                module: id.0,
+                marks: BTreeSet::new(),
+            },
+        );
+        let mut scoped = ScopedSource::new(source.into());
+        let expanded = scoped.expression(&result, &call).unwrap();
+        scoped.inherit_call_chain(expanded.span, last.span, "fake");
+        *last = expanded;
+        graph.sources.set_text(id, scoped.text().into());
+        module.scoped = Some(scoped);
+        let checked = query::check_parsed_for_queries(&graph, &parsed, vec![]);
+        let analysis = Analysis {
+            graph,
+            checked,
+            load_diags: vec![],
+            paths: HashMap::new(),
+            unsaved_manifests: HashSet::new(),
+        };
+        assert_eq!(analysis.text(id), source);
+        assert!(analysis.graph.sources.get(id).text.len() > source.len());
     }
 }

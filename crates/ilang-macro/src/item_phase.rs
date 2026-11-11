@@ -165,20 +165,32 @@ impl BodyEngine<'_> {
                 let call = self.atom(&attribute.name);
                 let original_names = item_names(&item);
                 let is_type = matches!(item.kind, ItemKind::TypeDef(_));
-                let (result, budget, transactions) =
-                    self.execute(&mac, args, &call, Some(inner.clone()), MacroPosition::Item)?;
+                let (result, budget, transactions) = self.execute(
+                    &mac, args, &call, attribute.span, Some(inner.clone()), MacroPosition::Item,
+                )?;
                 ilang_host::syntax::charge_tree(&budget, &result, true)
-                    .map_err(|e| Error::Run(crate::session::Failure::Host(e)))?;
-                let result =
-                    ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || {
-                        definitions.fresh_answer()
-                    });
+                    .map_err(|error| Error::Resource { error: error.into(), macro_name: mac.definition.name.clone(), call: call.clone(), invocation_span: attribute.span })?;
+                let result = ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || definitions.fresh_answer());
+                let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let mut items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
-                    .map_err(Error::Metered)?;
+                    .map_err(|error| {
+                        crate::body_engine::metered_error(
+                            error,
+                            &mac.definition.name,
+                            &call,
+                            attribute.span,
+                        )
+                    })?;
+                let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+                self.scoped.inherit_call_chain(
+                    Span::new(start, end),
+                    attribute.span,
+                    &mac.definition.name,
+                );
                 reject_macro_definitions(&items)?;
                 if !is_type && !item.doc.is_empty() {
                     if let Some(first) = items.iter_mut().find(|out| {
@@ -218,19 +230,30 @@ impl BodyEngine<'_> {
                     .collect();
                 let call = self.item_syntax(&item);
                 let (result, budget, transactions) =
-                    self.execute(&mac, args, &call, None, MacroPosition::Item)?;
+                    self.execute(&mac, args, &call, item.span, None, MacroPosition::Item)?;
                 ilang_host::syntax::charge_tree(&budget, &result, true)
-                    .map_err(|e| Error::Run(crate::session::Failure::Host(e)))?;
-                let result =
-                    ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || {
-                        definitions.fresh_answer()
-                    });
+                    .map_err(|error| Error::Resource { error: error.into(), macro_name: mac.definition.name.clone(), call: call.clone(), invocation_span: item.span })?;
+                let result = ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || definitions.fresh_answer());
+                let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
-                    .map_err(Error::Metered)?;
+                    .map_err(|error| {
+                        crate::body_engine::metered_error(
+                            error,
+                            &mac.definition.name,
+                            &call,
+                            item.span,
+                        )
+                    })?;
+                let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
+                self.scoped.inherit_call_chain(
+                    Span::new(start, end),
+                    item.span,
+                    &mac.definition.name,
+                );
                 reject_macro_definitions(&items)?;
                 return Ok(Step::Expanded {
                     retained: None,
@@ -245,23 +268,23 @@ impl BodyEngine<'_> {
         }
         if matches!(item.kind, ItemKind::TypeDef(_)) {
             let (root, root_span) = self.item_root(&item);
-            let start = self.type_replacements.len();
+            let start = self.item_replacements.len();
             let ItemKind::TypeDef(definition) = &mut item.kind else {
                 unreachable!()
             };
             body_walk::type_definition(definition, self)?;
-            if self.type_replacements.len() != start {
-                let replacements = &self.type_replacements[start..];
+            if self.item_replacements.len() != start {
+                let replacements = &self.item_replacements[start..];
                 for (_, target, budget) in replacements {
                     ilang_host::syntax::charge_tree(budget, &root, true)
-                        .map_err(|e| Error::Run(crate::session::Failure::Host(e)))?;
+                        .map_err(|error| Error::Resource { error: error.into(), macro_name: "type macro".into(), call: root.clone(), invocation_span: item.span })?;
                     let output = &self
                         .scoped
                         .origin(*target)
                         .expect("expanded type has an origin")
                         .syntax;
                     ilang_host::syntax::charge_tree(budget, output, true)
-                        .map_err(|e| Error::Run(crate::session::Failure::Host(e)))?;
+                        .map_err(|error| Error::Resource { error: error.into(), macro_name: "type macro".into(), call: root.clone(), invocation_span: item.span })?;
                 }
                 let spans = replacements
                     .iter()
@@ -270,7 +293,7 @@ impl BodyEngine<'_> {
                 let rewritten = self.scoped.rewrite_occurrences(&root, root_span, &spans);
                 self.item_overrides
                     .insert(item.span, (rewritten, root_span));
-                self.type_replacements.truncate(start);
+                self.item_replacements.truncate(start);
             }
         }
         Ok(Step::Finished(item))
@@ -396,7 +419,7 @@ pub fn expand_items(
     let original_resolver = engine.resolver.clone();
     let original_transactions = engine.transactions.len();
     let original_overrides = engine.item_overrides.clone();
-    let original_replacements = engine.type_replacements.clone();
+    let original_replacements = engine.item_replacements.clone();
     let result = expand_items_inner(engine, module, definitions);
     engine.resolver = original_resolver;
     if result.is_ok() { engine.phase_notes.clear(); }
@@ -407,7 +430,7 @@ pub fn expand_items(
         engine.scoped = original_source;
         engine.transactions.truncate(original_transactions);
         engine.item_overrides = original_overrides;
-        engine.type_replacements = original_replacements;
+        engine.item_replacements = original_replacements;
     }
     result
 }
@@ -579,7 +602,10 @@ fn expand_items_inner(
                     transactions.push(transaction);
                 }
             }
-            Err(Error::Run(crate::session::Failure::Aborted(DefinitionAbort::Deferred { at }))) => {
+            Err(Error::Run {
+                failure: crate::session::Failure::Aborted(DefinitionAbort::Deferred { at }),
+                ..
+            }) => {
                 engine.scoped = old_scoped;
                 engine.transactions.truncate(old_transactions);
                 waits.retain(|(waiting, _)| *waiting != id);

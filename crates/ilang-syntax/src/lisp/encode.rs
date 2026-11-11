@@ -38,9 +38,10 @@ impl Encoder<'_> {
         self.node(Node::Symbol(s.into()), span)
     }
     fn token_span(&self, range: Span, matches: impl Fn(&TokenKind) -> bool) -> Span {
-        self.tokens
+        self.tokens[self.tokens.partition_point(|t| t.span.start < range.start)..]
             .iter()
-            .find(|t| range.start <= t.span.start && t.span.end <= range.end && matches(&t.kind))
+            .take_while(|t| t.span.start <= range.end)
+            .find(|t| t.span.end <= range.end && matches(&t.kind))
             .unwrap_or_else(|| panic!("parsed syntax has no expected token in {range:?}"))
             .span
     }
@@ -53,11 +54,14 @@ impl Encoder<'_> {
         self.symbol(spelling, span)
     }
     fn bracket(&self, range: Span, kind: TokenKind) -> Span {
+        let start = self.tokens.partition_point(|t| t.span.start < range.start);
         let (i, token) = self
             .tokens
             .iter()
             .enumerate()
-            .find(|(_, t)| range.start <= t.span.start && t.span.end <= range.end && t.kind == kind)
+            .skip(start)
+            .take_while(|(_, t)| t.span.start <= range.end)
+            .find(|(_, t)| t.span.end <= range.end && t.kind == kind)
             .unwrap_or_else(|| panic!("parsed syntax has no expected bracket in {range:?}"));
         let close = self.close[i].expect("parsed syntax has an unmatched bracket") as usize;
         token.span.to(self.tokens[close].span)
@@ -524,7 +528,7 @@ impl Encoder<'_> {
     }
     fn pattern(&self, p: &Pattern) -> Syntax {
         match &p.kind {
-            PatternKind::Quote(d) => Syntax::from_datum(d, self.scope),
+            PatternKind::Quote { datum, .. } => Syntax::from_datum(datum, self.scope),
             PatternKind::Var(n) => self.node(Node::Name(n.clone()), p.span),
             PatternKind::Discard(n) => self.node(Node::Discard(n.clone()), p.span),
             PatternKind::Typed { binder, ty } => self.form_token(

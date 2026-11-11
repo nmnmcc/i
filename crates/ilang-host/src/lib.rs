@@ -764,7 +764,7 @@ impl HostOptions {
 struct State {
     resources: ResourceContext,
     macro_budget: Option<macro_budget::MacroBudget>,
-    references: HashMap<usize, (Weak<dyn Any + Send + Sync>, i64)>,
+    references: BTreeMap<usize, (Weak<dyn Any + Send + Sync>, i64)>,
     next_reference: i64,
     /// The message of the `panic` import, or of a host value that is not correct.
     stop_message: Option<String>,
@@ -833,6 +833,13 @@ impl Program {
         let module = Module::new(&engine, bytes)
             .map_err(anyhow::Error::from)
             .context("compiling the i WebAssembly module")?;
+        let has_macro_hooks = module
+            .imports()
+            .any(|import| import.module() == "ilang:macro/budget/v1");
+        ensure!(
+            has_macro_hooks == macro_static_cost.is_some(),
+            "macro accounting hooks and static budget section must occur together"
+        );
         Ok(Self {
             engine,
             module,
@@ -960,7 +967,7 @@ impl Program {
             State {
                 resources: initialization.clone(),
                 macro_budget: options.imports.macro_budget.clone(),
-                references: HashMap::new(),
+                references: BTreeMap::new(),
                 next_reference: 1,
                 stop_message: None,
                 failure: None,
@@ -1933,17 +1940,31 @@ fn reference_id(
             .clone();
         let address = Arc::as_ptr(&value.0) as *const () as usize;
         let state = caller.data_mut();
+        let count = u64::try_from(state.references.len()).expect("reference count exceeds u64");
+        let levels = u64::from(64 - (count + 1).leading_zeros());
+        if let Some(budget) = &state.macro_budget {
+            // A balanced map has bounded lookup and split costs. Charge a
+            // deterministic upper bound before either the lookup or a node
+            // allocation, independent of addresses and allocator choices.
+            budget.charge(16 * (levels + 1), 0)?;
+        }
         if let Some((weak, id)) = state.references.get(&address)
             && let Some(existing) = weak.upgrade()
             && Arc::ptr_eq(&existing, &value.0)
         {
             return Ok(*id);
         }
+        if let Some(budget) = &state.macro_budget {
+            budget.charge(16 * (levels + 1), 64 * (levels + 1))?;
+        }
         let id = state.next_reference;
         state.next_reference = id
             .checked_add(1)
             .context("host reference identity space exhausted")?;
         if id % 256 == 0 {
+            if let Some(budget) = &state.macro_budget {
+                budget.charge(count, 0)?;
+            }
             state
                 .references
                 .retain(|_, (weak, _)| weak.strong_count() != 0);
@@ -1953,7 +1974,7 @@ fn reference_id(
             .insert(address, (Arc::downgrade(&value.0), id));
         Ok(id)
     })()
-    .map_err(wasmtime::Error::from_anyhow)
+    .map_err(|error| host_failure(caller, error))
 }
 
 fn define_import(
