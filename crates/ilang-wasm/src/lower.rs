@@ -277,6 +277,12 @@ fn pending_values<'a>(values: impl IntoIterator<Item = &'a Expr>) -> usize {
 
 fn pattern_values(p: &Pattern) -> usize {
     match &p.kind {
+        PatternKind::Quote { captures, .. } => {
+            1 + captures
+                .iter()
+                .map(|(_, pattern)| pattern_values(pattern))
+                .sum::<usize>()
+        }
         PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
         PatternKind::Constructor { args, .. }
         | PatternKind::Tuple(args)
