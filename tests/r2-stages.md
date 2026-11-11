@@ -1251,3 +1251,17 @@ only and rethrows them unchanged after cleanup. An unhandled cancellation
 retires the primitive registry directly at the entry stop boundary, preserving
 its source frames and avoiding an extra i finalizer. The targeted rerun passed
 all 17 WASI tests and all 14 provider execution tests.
+
+An external function is also an ordinary provider factory. The initial lowering
+looked such definitions up as initialized i globals, causing an illegal-cast
+trap before the host callback ran. Provider calls now reuse the checked external
+calling convention. The minimal reproduction declares `Token { }`, an external
+`make: () -> Token`, and `main = (token ! Token) { Nil }`, then selects make as
+Token's provider. All 15 provider execution tests and all 17 WASI tests pass;
+the same external-factory reproduction executes exactly one callback on Node.
+
+The subsequent workspace pass exposed seven stale LSP protocol expectations
+from before the already-landed syntax/default-entry decisions. The ledger's
+2026-11-11 USER confirmations require `^` for displayed error types and make
+`src/main.i`'s main an entry, exempting it from unused-binding warnings. Only
+test expectations changed; the scoped LSP protocol rerun passes all 15 tests.

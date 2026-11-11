@@ -1898,10 +1898,19 @@ impl<'a> Lowerer<'a> {
     }
 
     fn def_callee(&mut self, d: DefId) -> Callee {
-        if self.known.contains_key(&d) {
-            Callee::Direct(self.def_func(d))
-        } else {
-            Callee::Value(Atom::Global(self.global(d)))
+        match self.program.def(d).kind {
+            DefKind::External { .. } if self.is_library(d.module) => {
+                let (op, arity) = self.external_op(d).expect("checked library operation");
+                Callee::Direct(self.op_func(op, arity))
+            }
+            DefKind::External { .. } => Callee::Direct(
+                self.external_func(d)
+                    .expect("entry imports were checked before plan application"),
+            ),
+            DefKind::Binding { .. } if self.known.contains_key(&d) => {
+                Callee::Direct(self.def_func(d))
+            }
+            DefKind::Binding { .. } => Callee::Value(Atom::Global(self.global(d))),
         }
     }
 

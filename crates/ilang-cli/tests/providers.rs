@@ -223,3 +223,30 @@ fn factory_request_dependencies_classify_and_suspend_the_entry() {
         Outcome::Ok(_)
     ));
 }
+
+#[test]
+fn external_function_factory_uses_its_checked_calling_convention() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let dir = project(
+        "Token { }\n@external(\"custom\", \"make\")\nmake: () -> Token\nmain = (token ! Token) { Nil }",
+        &row("Token", "make"),
+    );
+    let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = calls.clone();
+    let mut host = b.host_options();
+    host.imports
+        .external("custom", "make", move |_| {
+            count.fetch_add(1, Ordering::Relaxed);
+            Ok(Value::NullExternref)
+        })
+        .unwrap();
+    assert!(matches!(
+        b.host_program().unwrap().run_entry(host).unwrap(),
+        Outcome::Ok(_)
+    ));
+    assert_eq!(calls.load(Ordering::Relaxed), 1);
+}
