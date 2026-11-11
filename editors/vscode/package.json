@@ -20,6 +20,7 @@
   "main": "./extension.js",
   "activationEvents": [
     "onLanguage:i",
+    "onLanguage:i-lisp",
     "workspaceContains:**/i.toml"
   ],
   "contributes": {
@@ -33,6 +34,12 @@
         "extensions": [
           ".i"
         ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "i-lisp",
+        "aliases": ["i Lisp"],
+        "extensions": [".is"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -69,6 +76,11 @@
         "language": "i",
         "scopeName": "source.i",
         "path": "./syntaxes/i.tmLanguage.json"
+      },
+      {
+        "language": "i-lisp",
+        "scopeName": "source.i-lisp",
+        "path": "./syntaxes/is.tmLanguage.json"
       }
     ]
   },
