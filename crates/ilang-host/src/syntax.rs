@@ -433,6 +433,63 @@ pub fn charge_definition(
         ilang_syntax::lisp::definition_table::DefinitionCost::Syntax(syntax) => {
             charge_tree(budget, syntax, true)
         }
+        ilang_syntax::lisp::definition_table::DefinitionCost::Datum(root) => {
+            use ilang_syntax::lisp::DatumKind;
+            enum Visit<'a> {
+                Node(&'a ilang_syntax::lisp::Datum),
+                Leave,
+            }
+            let mut pending = vec![Visit::Node(root)];
+            while let Some(visit) = pending.pop() {
+                let Visit::Node(datum) = visit else {
+                    budget.leave_frame();
+                    continue;
+                };
+                budget.enter_frame(1)?;
+                budget.charge(1, 80)?;
+                pending.push(Visit::Leave);
+                let bytes = match &datum.kind {
+                    DatumKind::Name(s)
+                    | DatumKind::Discard(s)
+                    | DatumKind::UpName(s)
+                    | DatumKind::Symbol(s)
+                    | DatumKind::String(s) => s.len() as u64,
+                    DatumKind::Int(n) => {
+                        let bytes = n.bits().div_ceil(8);
+                        let limbs = bytes.div_ceil(4);
+                        budget.charge(limbs.saturating_mul(limbs), 0)?;
+                        bytes
+                    }
+                    DatumKind::Float(_) => 8,
+                    DatumKind::Round(xs)
+                    | DatumKind::Square(xs)
+                    | DatumKind::Curly(xs)
+                    | DatumKind::Bits(xs) => {
+                        budget.charge(xs.len() as u64, 4 + (xs.len() as u64).saturating_mul(8))?;
+                        pending.extend(xs.iter().rev().map(Visit::Node));
+                        0
+                    }
+                    DatumKind::Quote(x) | DatumKind::Unquote(x) | DatumKind::Splice(x) => {
+                        budget.charge(1, 8)?;
+                        pending.push(Visit::Node(x));
+                        0
+                    }
+                };
+                let work = bytes.saturating_mul(12);
+                budget.charge(work, 4 + work.div_ceil(8))?;
+            }
+            Ok(())
+        }
+        ilang_syntax::lisp::definition_table::DefinitionCost::Event(event) => {
+            match event {
+                ilang_syntax::lisp::SyntaxCharge::EnterFrame(size) => budget.enter_frame(size)?,
+                ilang_syntax::lisp::SyntaxCharge::Charge { work, words } => {
+                    budget.charge(work, words)?
+                }
+                ilang_syntax::lisp::SyntaxCharge::LeaveFrame => budget.leave_frame(),
+            }
+            Ok(())
+        }
         // All five synthesized builtins fit this fixed bound, including the
         // lexer, answer nodes, parameter identities and temporary strings.
         ilang_syntax::lisp::definition_table::DefinitionCost::Builtin(_) => {
@@ -899,5 +956,23 @@ mod tests {
         ));
         let at = invoke("text_error_at", &[result]).unwrap();
         assert!(matches!(invoke("show", &[at]).unwrap(), Value::String(s) if s == "(,)"));
+    }
+    #[test]
+    fn lisp_datum_cost_matches_constructed_syntax_cost() {
+        let document = parse("(= (T A) (| Int (Box A) \"text\" 12345))").unwrap();
+        let scope = Scope {
+            module: 0,
+            marks: BTreeSet::new(),
+        };
+        let syntax = Syntax::from_datum(&document[0], &scope);
+        let datum_budget = MacroBudget::default();
+        let syntax_budget = MacroBudget::default();
+        charge_definition(
+            &datum_budget,
+            ilang_syntax::lisp::definition_table::DefinitionCost::Datum(&document[0]),
+        )
+        .unwrap();
+        charge_tree(&syntax_budget, &syntax, true).unwrap();
+        assert_eq!(datum_budget.usage(), syntax_budget.usage());
     }
 }

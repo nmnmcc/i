@@ -1,7 +1,7 @@
 //! Definition-query answers with caller-supplied hygienic name resolution.
 use super::definition_schedule::Mode;
 use super::definitions::{
-    TypeQuery, builtin_definition, freshen_parameters, source_definition, type_query,
+    TypeQuery, builtin_definition, freshen_parameters, source_definition_from_syntax, type_query,
 };
 use super::syntax::{Scope, Syntax};
 use crate::ast::{Item, ItemKind};
@@ -67,33 +67,48 @@ pub enum QueryResult<Key> {
 pub enum DefinitionCost<'a> {
     Syntax(&'a Syntax),
     Builtin(&'a str),
+    /// One streamed charge for a written definition's encoded shape.
+    Event(super::SyntaxCharge),
+    /// Already parsed Lisp item, without constructing Syntax nodes.
+    Datum(&'a super::Datum),
 }
 
 const TEMPLATE_ANSWER: u64 = u64::MAX;
 struct Entry {
     definition: Definition,
-    template: Option<Syntax>,
+    lisp_document: Option<Vec<super::Datum>>,
+    source_encoder: Option<super::SourceEncoder>,
 }
 impl Entry {
     fn new(definition: Definition) -> Self {
-        let template = match &definition {
-            Definition::Written {
-                item,
-                source,
-                scope,
-                ..
-            } => {
-                assert!(
-                    matches!(item.kind, ItemKind::TypeDef(_)),
-                    "definition table accepts type definitions only"
-                );
-                Some(source_definition(item, source, scope, TEMPLATE_ANSWER))
+        if let Definition::Written { item, .. } = &definition {
+            assert!(
+                matches!(item.kind, ItemKind::TypeDef(_)),
+                "definition table accepts type definitions only"
+            );
+        }
+        let lisp_document = match &definition {
+            Definition::Written { item, source, .. }
+                if source[item.span.start as usize..item.span.end as usize].starts_with('(') =>
+            {
+                Some(
+                    super::parse(source)
+                        .expect("parsed Lisp source remains valid")
+                        .datums,
+                )
+            }
+            _ => None,
+        };
+        let source_encoder = match &definition {
+            Definition::Written { source, scope, .. } if lisp_document.is_none() => {
+                Some(super::SourceEncoder::new(scope, source))
             }
             _ => None,
         };
         Self {
             definition,
-            template,
+            lisp_document,
+            source_encoder,
         }
     }
 }
@@ -230,13 +245,30 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                     at: parsed.name.clone(),
                 });
             }
-            Definition::Written { ready: true, .. } => {
-                let template = definition
-                    .template
-                    .as_ref()
-                    .expect("written definition has a template");
-                preflight(DefinitionCost::Syntax(template))?;
-                freshen_parameters(template, TEMPLATE_ANSWER, answer)
+            Definition::Written {
+                item,
+                scope,
+                ready: true,
+                ..
+            } => {
+                if let Some(document) = &definition.lisp_document {
+                    let datum = document
+                        .iter()
+                        .find(|datum| datum.span == item.span)
+                        .expect("written Lisp type has its source datum");
+                    preflight(DefinitionCost::Datum(datum))?;
+                    let syntax = Syntax::from_datum(datum, scope);
+                    super::definitions::expanded_definition(&syntax, answer)
+                        .expect("written Lisp type remains valid")
+                } else {
+                    let encoder = definition
+                        .source_encoder
+                        .as_ref()
+                        .expect("written source has a lexical index");
+                    encoder
+                        .visit_item_charge(item, |event| preflight(DefinitionCost::Event(event)))?;
+                    source_definition_from_syntax(item, &encoder.item(item), answer)
+                }
             }
             Definition::Expanded {
                 syntax,
