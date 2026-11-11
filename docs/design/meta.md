@@ -443,7 +443,7 @@ From this:
 Definitions { Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError) }
 
 definition = (of: Syntax, d ! Definitions) { d.definition(of) }
-// type: (of: Syntax) -> Syntax ? SyntaxError ! Definitions
+// type: (of: Syntax) -> Syntax ^ SyntaxError ! Definitions
 ```
 
 `Definitions` is a service type exported by `i/syntax`. The compiler gives the service when it runs a macro. A test may give its own with an environment statement.

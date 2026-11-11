@@ -155,18 +155,18 @@ make(A, E, N): (step: () -> Step(A, E, N) ^ E ! N) -> Stream(A, E, N)
 defer(A, E, N): (body: () -> Stream(A, E, N) ^ E ! N) -> Stream(A, E, N)
 unfold(S, A, E, N): (from: S, with: (S) -> Option((A, S)) ^ E ! N) -> Stream(A, E, N)
 pull(A, E, N): (stream: Stream(A, E, N)) -> Step(A, E, N) ^ E ! N
-map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ? F ! N) -> Stream(B, E | F, N)
-filter(A, E, F, N): (over: Stream(A, E, N), keeping: (A) -> Bool ? F ! N) -> Stream(A, E | F, N)
-filter_map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> Option(B) ? F ! N) -> Stream(B, E | F, N)
-flat_map(A, B, E, F, G, N): (over: Stream(A, E, N), with: (A) -> Stream(B, F, N) ? G ! N) -> Stream(B, E | F | G, N)
+map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ^ F ! N) -> Stream(B, E | F, N)
+filter(A, E, F, N): (over: Stream(A, E, N), keeping: (A) -> Bool ^ F ! N) -> Stream(A, E | F, N)
+filter_map(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> Option(B) ^ F ! N) -> Stream(B, E | F, N)
+flat_map(A, B, E, F, G, N): (over: Stream(A, E, N), with: (A) -> Stream(B, F, N) ^ G ! N) -> Stream(B, E | F | G, N)
 append(A, E, F, N): (first: Stream(A, E, N), second: Stream(A, F, N)) -> Stream(A, E | F, N)
 zip(A, B, E, F, N): (first: Stream(A, E, N), second: Stream(B, F, N)) -> Stream((A, B), E | F, N)
 take(A, E, N): (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N)
 drop(A, E, N): (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N)
-take_while(A, E, F, N): (from: Stream(A, E, N), keeping: (A) -> Bool ? F ! N) -> Stream(A, E | F, N)
-fold(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> Acc ? F ! N) -> Acc ^ E | F ! N
-fold_until(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> list.ContinueOrStop(Acc) ? F ! N) -> Acc ^ E | F ! N
-each(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ? F ! N) -> Nil ^ E | F ! N
+take_while(A, E, F, N): (from: Stream(A, E, N), keeping: (A) -> Bool ^ F ! N) -> Stream(A, E | F, N)
+fold(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> Acc ^ F ! N) -> Acc ^ E | F ! N
+fold_until(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> list.ContinueOrStop(Acc) ^ F ! N) -> Acc ^ E | F ! N
+each(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ^ F ! N) -> Nil ^ E | F ! N
 to_list(A, E, N): (stream: Stream(A, E, N)) -> List(A) ^ E ! N
 from_results(A, E, N): (items: List(Result(A, E))) -> Stream(A, E, N)
 attempt(A, E, N): (stream: Stream(A, E, N)) -> Stream(Result(A, E), Never, N)
