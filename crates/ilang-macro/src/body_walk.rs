@@ -335,8 +335,12 @@ impl<H: Hook> Walker<'_, H> {
                 self.locals.truncate(start);
             }
             PatternKind::Typed { ty, .. } => self.ty(ty, depth)?,
-            PatternKind::Quote(_)
-            | PatternKind::Var(_)
+            PatternKind::Quote { captures, .. } => {
+                for (_, pattern) in captures {
+                    self.pattern(pattern, depth)?;
+                }
+            }
+            PatternKind::Var(_)
             | PatternKind::Discard(_)
             | PatternKind::Int { .. }
             | PatternKind::Float { .. }
@@ -356,6 +360,11 @@ fn binders(pattern: &Pattern, out: &mut Vec<Local>, fn_only: Option<u32>) {
         })
     };
     match &pattern.kind {
+        PatternKind::Quote { captures, .. } => {
+            for (_, pattern) in captures {
+                binders(pattern, out, fn_only);
+            }
+        }
         PatternKind::Var(name) => push(name, pattern.span),
         PatternKind::Typed { binder, .. } if !binder.discard => push(&binder.name, binder.span),
         PatternKind::Named { name, pattern } => {

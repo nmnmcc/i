@@ -122,6 +122,14 @@ impl Walker<'_> {
     /// Patterns only use names in bit array lengths.
     fn pattern(&mut self, p: &Pattern, inside: bool) {
         match &p.kind {
+            PatternKind::Quote {
+                functions,
+                captures,
+                ..
+            } => {
+                self.out.extend(functions.iter().map(|f| (*f, inside)));
+                captures.iter().for_each(|(_, p)| self.pattern(p, inside));
+            }
             PatternKind::Named { pattern, .. } => self.pattern(pattern, inside),
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)

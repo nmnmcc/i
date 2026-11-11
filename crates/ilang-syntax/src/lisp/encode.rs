@@ -524,7 +524,7 @@ impl Encoder<'_> {
     }
     fn pattern(&self, p: &Pattern) -> Syntax {
         match &p.kind {
-            PatternKind::Quote(d) => Syntax::from_datum(d, self.scope),
+            PatternKind::Quote { datum, .. } => Syntax::from_datum(datum, self.scope),
             PatternKind::Var(n) => self.node(Node::Name(n.clone()), p.span),
             PatternKind::Discard(n) => self.node(Node::Discard(n.clone()), p.span),
             PatternKind::Typed { binder, ty } => self.form_token(

@@ -499,6 +499,15 @@ pub struct Binder {
 
 #[derive(Clone, Debug)]
 pub enum PatternKind {
+    /// A compiler-generated view over a syntax value. The five ordinary
+    /// service functions build the template, match it, test success and
+    /// project one or many captured values, respectively.
+    Quote {
+        template: u32,
+        syntax: TypeId,
+        functions: [DefId; 5],
+        captures: Vec<(bool, Pattern)>,
+    },
     Var(Binder),
     Discard,
     /// `x: T` or `_: T`.
@@ -736,6 +745,7 @@ pub fn summarize_aliases(p: &mut Program) {
 pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
     fn pattern(p: &Pattern, f: &mut impl FnMut(&Type)) {
         match &p.kind {
+            PatternKind::Quote { captures, .. } => captures.iter().for_each(|(_, p)| pattern(p, f)),
             PatternKind::Typed { ty, .. } => f(ty),
             PatternKind::Named { pattern: p, .. } => pattern(p, f),
             PatternKind::Constructor { args, .. }
