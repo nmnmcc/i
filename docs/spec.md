@@ -2941,7 +2941,11 @@ result, with the same mark transformation as that result. Deferred or failed
 runs contribute nothing. Collection does not evaluate a target, grant foreign
 authority, change imports, or alter configured entries; tools select checked
 targets before provider planning. Diagnostics and collected entries retain
-source and expansion locations.
+source and expansion locations. A tool-selected build carries its checked manifest,
+selected opaque handle, execution export and async status in an `ilang.collections`
+Wasm custom section. The selected export is an independent execution root, not a
+program entry, test or host export. Hosts run it through the ordinary entry
+boundary, including its selected provider plan and async scheduling.
 
 Macro programs run in the compiler with `Definitions`, `Diagnostics`,
 `Assert`, and, for item calls, `Items`. They receive no clock, file, network,
