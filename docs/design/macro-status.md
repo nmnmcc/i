@@ -28,3 +28,23 @@ an audit after the merge compiles.
 Required gates: `cargo build -p ilang-cli`, `cargo test -p ilang-macro -p
 ilang-syntax -p ilang-check -p ilang-wasm`, and `cargo test -p ilang-cli --test
 spec`, using the shared heavy wrapper.
+
+## Merge blockers
+
+The current branch does **not** build. Reproduce with `cargo build -p
+ilang-cli`: the checker has lost the driver's `TyParts`, `order::references`,
+selected checking, scoped HIR and quote-pattern interfaces while other merged
+modules still call them; `hir_tree` also conflicts with derived HIR clones.
+These need a semantic merge with the T3 record representations, not another
+whole-file side selection. `cargo test -p ilang-macro -p ilang-syntax -p
+ilang-check -p ilang-wasm` additionally fails to compile the syntax migration
+example because `parse_module_legacy` is missing. Restore the legacy parser
+behavior alongside the T3 parser before using that example.
+
+All optional heads were trial-merged and aborted after conflicts: `macro-test`,
+`macro-items`, `macro-entry`, `macro-walk`, `macro-ir`, `macro-ast`,
+`macro-ty`, and `macro-infer`. The first five conflicted in one file each, the
+last three in two each. They have not been validated against a passing base.
+The current recursive AST walk is a single implementation, but it has not been
+verified against the deep tests; no deep test was removed. The broader dead-code
+and duplicate-code audit is unfinished.
