@@ -1707,23 +1707,32 @@ impl Diff {
                             (Some(_), Some(_)) => false,
                             (Some(_), None) | (None, Some(_)) => false,
                             (None, None) => match (&v.alias, &n.alias) {
-                                (Some((left, left_names)), Some((right, right_names))) => left
-                                    .equivalent(
-                                        right,
-                                        &mut |t| match t {
-                                            TypeRef::Builtin(b) => b.name().into(),
-                                            TypeRef::Custom(id) => {
-                                                left_names[id.0 as usize].clone()
-                                            }
-                                        },
-                                        &mut |t| match t {
-                                            TypeRef::Builtin(b) => b.name().into(),
-                                            TypeRef::Custom(id) => {
-                                                right_names[id.0 as usize].clone()
-                                            }
-                                        },
-                                    )
-                                    .map_err(|e| anyhow!("cannot compare {k}: {e}"))?,
+                                (Some((left, left_names)), Some((right, right_names))) => {
+                                    match left
+                                        .equivalent(
+                                            right,
+                                            &mut |t| match t {
+                                                TypeRef::Builtin(b) => b.name().into(),
+                                                TypeRef::Custom(id) => {
+                                                    left_names[id.0 as usize].clone()
+                                                }
+                                            },
+                                            &mut |t| match t {
+                                                TypeRef::Builtin(b) => b.name().into(),
+                                                TypeRef::Custom(id) => {
+                                                    right_names[id.0 as usize].clone()
+                                                }
+                                            },
+                                        )
+                                        .map_err(|e| anyhow!("cannot compare {k}: {e}"))?
+                                    {
+                                        Some(equal) => equal,
+                                        None => {
+                                            representation = true;
+                                            false
+                                        }
+                                    }
+                                }
                                 _ => n.canonical == v.canonical,
                             },
                         }

@@ -1825,17 +1825,19 @@ impl AliasArtifact {
 
     /// Compare denoted sets with the same rigid formal positions. The name
     /// callbacks identify nominal types independently of each program's IDs.
+    /// `None` means the representation can be reported as changed without
+    /// claiming that the denoted sets differ.
     pub fn equivalent(
         &self,
         other: &Self,
         left_name: &mut impl FnMut(TypeRef) -> String,
         right_name: &mut impl FnMut(TypeRef) -> String,
-    ) -> Result<bool, String> {
+    ) -> Result<Option<bool>, String> {
         if self.template.params != other.template.params
             || self.template.slots != other.template.slots
             || self.modes != other.modes
         {
-            return Ok(false);
+            return Ok(Some(false));
         }
         let left = self.solver.lock().expect("alias snapshot").clone();
         let right = other.solver.lock().expect("alias snapshot").clone();
@@ -1945,6 +1947,9 @@ impl AliasArtifact {
         };
         let a = graph_a.map_nodes(false, &mut tag);
         let b = graph_b.map_nodes(false, &mut tag);
+        if a == b {
+            return Ok(Some(true));
+        }
         let prove = |a: &Ty, b: &Ty| {
             records::prove(
                 &solver,
@@ -1954,8 +1959,8 @@ impl AliasArtifact {
             )
         };
         match (prove(&a, &b), prove(&b, &a)) {
-            (records::Verdict::Proven, records::Verdict::Proven) => Ok(true),
-            (records::Verdict::Refuted, _) | (_, records::Verdict::Refuted) => Ok(false),
+            (records::Verdict::Proven, records::Verdict::Proven) => Ok(Some(true)),
+            (records::Verdict::Refuted, _) | (_, records::Verdict::Refuted) => Ok(Some(false)),
             (records::Verdict::ResourceLimit, _) | (_, records::Verdict::ResourceLimit) => {
                 Err("alias equivalence exceeded the proof limit".into())
             }
@@ -1980,12 +1985,12 @@ impl AliasArtifact {
                     if matches!(prove(&a, &b), records::Verdict::Refuted)
                         || matches!(prove(&b, &a), records::Verdict::Refuted)
                     {
-                        return Ok(false);
+                        return Ok(Some(false));
                     }
                 }
-                Err("alias equivalence could not be proven".into())
+                Ok(None)
             }
-            _ => Err("alias equivalence could not be proven".into()),
+            _ => Ok(None),
         }
     }
 }
