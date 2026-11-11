@@ -73,7 +73,7 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
         tuple_type: false,
         cache,
         legacy,
-        old_empty: legacy || source.lines().any(|l| l.trim() == "// syntax: syn1"),
+        old_empty: legacy,
         clause_head: false,
     };
     let module = parser.module();

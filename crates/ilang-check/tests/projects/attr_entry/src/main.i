@@ -1,4 +1,3 @@
-// syntax: syn1
 @main
 main = 1
 
