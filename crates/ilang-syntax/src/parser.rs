@@ -74,8 +74,7 @@ fn run(source: &str, cache: bool, legacy: bool) -> (Module, Vec<Diagnostic>, Par
         cache,
         legacy,
         old_empty: legacy || source.lines().any(|l| l.trim() == "// syntax: syn1"),
-        surface2: source.lines().any(|l| l.trim() == "// syntax: syn2")
-            || lexed.tokens.iter().any(|t| t.kind == T::Caret),
+        clause_head: false,
     };
     let module = parser.module();
     let stats = ParseStats {
@@ -121,7 +120,7 @@ struct Parser<'a> {
     cache: bool,
     legacy: bool,
     old_empty: bool,
-    surface2: bool,
+    clause_head: bool,
 }
 
 fn binop(kind: &T) -> Option<BinOp> {
@@ -323,9 +322,12 @@ impl Parser<'_> {
     /// Runs `f` inside brackets, where the guard restriction does not hold.
     fn nested<X>(&mut self, f: impl FnOnce(&mut Self) -> PResult<X>) -> PResult<X> {
         let saved = self.guard;
+        let saved_head = self.clause_head;
         self.guard = false;
+        self.clause_head = false;
         let result = f(self);
         self.guard = saved;
+        self.clause_head = saved_head;
         result
     }
 
@@ -1397,7 +1399,9 @@ impl Parser<'_> {
     fn clause(&mut self) -> PResult<Clause> {
         let start = self.start();
         self.tuple_type = false;
+        self.clause_head = true;
         let patterns = self.clause_patterns();
+        self.clause_head = false;
         let note = self.tuple_type;
         let noted = |mut d: Diagnostic| {
             if note {
@@ -1789,7 +1793,7 @@ impl Parser<'_> {
     #[allow(clippy::type_complexity)]
     fn arrow_tail(&mut self) -> PResult<(TypeExpr, Option<TypeExpr>, Option<TypeExpr>)> {
         let value = self.ty()?;
-        let err = if self.eat(&T::Caret) || (!self.surface2 && self.eat(&T::Question)) {
+        let err = if self.eat(&T::Caret) || (!self.clause_head && self.eat(&T::Question)) {
             Some(self.ty()?)
         } else {
             None
@@ -1802,7 +1806,7 @@ impl Parser<'_> {
         };
         // §3: this `->` is the nearest one, and it has taken what it can.
         if self.at(&T::Caret)
-            || (!self.surface2 && self.at(&T::Question))
+            || (!self.clause_head && self.at(&T::Question))
             || self.at_joined(&T::Bang)
         {
             let msg = format!(

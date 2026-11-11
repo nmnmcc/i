@@ -45,7 +45,7 @@ fn records_tuples_and_guard_are_distinct() {
         "answer = (name: 1)",
         "answer = (1, 2)",
         "answer = (x) -> Int ^ String { x }",
-        "// syntax: syn2\nanswer = x |> { f: (Int) -> Int ? ready -> f(1) _ -> 0 }",
+        "answer = x |> { f: (Int) -> Int ? ready -> f(1) _ -> 0 }",
     ] {
         let (_, diagnostics) = parse_module(source);
         assert!(diagnostics.is_empty(), "{source}: {diagnostics:?}");

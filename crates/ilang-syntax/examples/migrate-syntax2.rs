@@ -265,11 +265,7 @@ impl<'a> Migrator<'a> {
     }
 }
 fn migrate(src: &str) -> Value {
-    let (legacy, diags) = if src.lines().any(|line| line.trim() == "// syntax: syn2") {
-        ilang_syntax::parse_module(src)
-    } else {
-        parse_module_legacy(src)
-    };
+    let (legacy, diags) = parse_module_legacy(src);
     let m = if diags.is_empty() {
         legacy
     } else {
@@ -373,8 +369,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn explicit_new_surface_keeps_empty_records() {
-        let source = "// syntax: syn2\nresult = ()";
+    fn new_surface_keeps_records() {
+        let source = "result = (name: 1)";
         let result = migrate(source);
         assert_eq!(result["diagnostics"], json!([]));
         assert_eq!(result["empty"], json!([]));
