@@ -534,157 +534,243 @@ impl Coalescer<'_> {
     /// are compared as equal (§4.5 rule 4), so they are both outputs and
     /// inputs.
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
-        let env = env || self.s.is_row(t);
-        match t {
-            Ty::Var(v) => {
-                let v = self.rep.get(v).copied().unwrap_or(*v);
-                if rigid(self.s, self.keep, v) {
-                    return Ty::Var(v);
-                }
-                let mono = self.mono && self.s.vars[v.0 as usize].level == 0;
-                if let Some(&d) = self.stack.get(&v) {
-                    if depth > d {
-                        self.occurs = true;
-                    }
-                    return if mono { Ty::Never } else { Ty::Var(v) };
-                }
-                let empty = |m: V| {
-                    let st = &self.s.vars[m.0 as usize];
-                    if mono {
-                        st.lower.is_empty() && st.from.is_empty()
-                    } else if pos {
-                        st.lower.is_empty()
-                    } else {
-                        st.upper.is_empty()
-                    }
-                };
-                if self
-                    .members
-                    .get(&v)
-                    .map_or_else(|| empty(v), |ms| ms.iter().copied().all(empty))
-                {
-                    return if mono { Ty::Never } else { Ty::Var(v) };
-                }
-                if let Some(t) = self.memo.get(&(v, pos, env)) {
-                    return t.clone();
-                }
-                self.stack.insert(v, depth);
-                let mut parts = Vec::new();
-                let solver = self.s;
-                if mono {
-                    // Not generalized: the types that come to it (§4.7).
-                    for m in self.members(v) {
-                        let st = &solver.vars[m.0 as usize];
-                        for b in &st.lower {
-                            parts.push(self.go(b, true, depth, env));
-                        }
-                        for w in &st.from {
-                            parts.push(self.go(&Ty::Var(*w), true, depth, env));
-                        }
-                    }
-                } else {
-                    parts.push(Ty::Var(v));
-                    for m in self.members(v) {
-                        let st = &solver.vars[m.0 as usize];
-                        let bounds = if pos { &st.lower } else { &st.upper };
-                        for b in bounds {
-                            parts.push(self.go(b, pos, depth, env));
-                        }
-                    }
-                }
-                self.stack.remove(&v);
-                let positive = pos || mono;
-                if parts.len() <= 2
-                    && !parts.iter().any(|t| {
-                        matches!(t, Ty::Union(_) if positive)
-                            || matches!(t, Ty::Inter(_) if !positive)
-                    })
-                {
-                    if parts.len() == 2 && parts[0] == parts[1] {
-                        parts.pop();
-                    }
-                    let t = if parts.len() == 1 {
-                        parts.pop().unwrap()
-                    } else if positive {
-                        Ty::Union(parts)
-                    } else {
-                        Ty::Inter(parts)
-                    };
-                    if !self.occurs {
-                        self.memo.insert((v, pos, env), t.clone());
-                    }
-                    return t;
-                }
-                let mut flat = Vec::new();
-                let mut todo: Vec<_> = parts.into_iter().rev().collect();
-                let mut seen = HashSet::default();
-                while let Some(t) = todo.pop() {
-                    match t.into_parts() {
-                        TyParts::Union(ms) if positive => todo.extend(ms.into_iter().rev()),
-                        TyParts::Inter(ms) if !positive => todo.extend(ms.into_iter().rev()),
-                        t => {
-                            let t: Ty = t.into();
-                            if seen.insert(t.clone()) {
-                                flat.push(t);
+        enum Task<'a> {
+            Visit(&'a Ty, bool, u32, bool),
+            Var(V, bool, u32, bool),
+            FinishVar(V, bool, bool, bool, usize),
+            Con(Head, super::lits::ValueSet, usize),
+            Fn(Vec<Option<String>>),
+            Union(usize),
+            Inter(usize),
+            Diff(usize),
+            Both,
+        }
+        let solver = self.s;
+        let mut tasks = vec![Task::Visit(t, pos, depth, env)];
+        let mut results = Vec::new();
+        while let Some(task) = tasks.pop() {
+            match task {
+                Task::Visit(t, pos, depth, env) => {
+                    let env = env || solver.is_row(t);
+                    match t {
+                        Ty::Var(v) => tasks.push(Task::Var(*v, pos, depth, env)),
+                        Ty::Never | Ty::Top => results.push(t.clone()),
+                        Ty::Con(h, values, args) => {
+                            let children: Vec<_> = args
+                                .iter()
+                                .zip(solver.variances(*h, args.len()))
+                                .zip(solver.rows(*h, args.len()))
+                                .collect();
+                            tasks.push(Task::Con(*h, values.clone(), args.len()));
+                            for ((a, variance), row) in children.into_iter().rev() {
+                                if env || variance == Variance::Inv {
+                                    tasks.push(Task::Both);
+                                    tasks.push(Task::Visit(
+                                        a,
+                                        false,
+                                        depth + 1,
+                                        row != Mode::Value,
+                                    ));
+                                    tasks.push(Task::Visit(a, true, depth + 1, row != Mode::Value));
+                                } else {
+                                    let child_pos = if variance == Variance::Contra {
+                                        !pos
+                                    } else {
+                                        pos
+                                    };
+                                    tasks.push(Task::Visit(
+                                        a,
+                                        child_pos,
+                                        depth + 1,
+                                        row != Mode::Value,
+                                    ));
+                                }
                             }
                         }
+                        Ty::Fn(f) => {
+                            tasks.push(Task::Fn(f.params.iter().map(|(n, _)| n.clone()).collect()));
+                            tasks.push(Task::Visit(&f.env, pos, depth + 1, true));
+                            tasks.push(Task::Visit(&f.err, pos, depth + 1, true));
+                            tasks.push(Task::Visit(&f.ret, pos, depth + 1, false));
+                            tasks.extend(
+                                f.params
+                                    .iter()
+                                    .rev()
+                                    .map(|(_, p)| Task::Visit(p, !pos, depth + 1, false)),
+                            );
+                        }
+                        Ty::Union(xs) => {
+                            tasks.push(Task::Union(xs.len()));
+                            tasks.extend(xs.iter().rev().map(|x| Task::Visit(x, pos, depth, env)));
+                        }
+                        Ty::Inter(xs) => {
+                            tasks.push(Task::Inter(xs.len()));
+                            tasks.extend(xs.iter().rev().map(|x| Task::Visit(x, pos, depth, env)));
+                        }
+                        Ty::Diff(a, hs) => {
+                            tasks.push(Task::Diff(hs.len()));
+                            tasks.extend(hs.iter().rev().map(|h| Task::Visit(h, pos, depth, env)));
+                            tasks.push(Task::Visit(a, pos, depth, env));
+                        }
+                        Ty::Both(a, b) => {
+                            tasks.push(Task::Both);
+                            tasks.push(Task::Visit(b, false, depth, env));
+                            tasks.push(Task::Visit(a, true, depth, env));
+                        }
                     }
                 }
-                let t = if positive {
-                    Ty::Union(flat)
-                } else {
-                    Ty::Inter(flat)
-                };
-                if !self.occurs {
-                    self.memo.insert((v, pos, env), t.clone());
-                }
-                t
-            }
-            Ty::Con(h, values, args) => {
-                let vs = self.s.variances(*h, args.len());
-                let args = args
-                    .iter()
-                    .zip(vs)
-                    .zip(self.s.rows(*h, args.len()))
-                    .map(|((a, v), row)| match v {
-                        _ if env => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1, row != Mode::Value)),
-                            Box::new(self.go(a, false, depth + 1, row != Mode::Value)),
-                        ),
-                        Variance::Co | Variance::Bi => {
-                            self.go(a, pos, depth + 1, row != Mode::Value)
+                Task::Var(v, pos, depth, env) => {
+                    let v = self.rep.get(&v).copied().unwrap_or(v);
+                    if rigid(solver, self.keep, v) {
+                        results.push(Ty::Var(v));
+                        continue;
+                    }
+                    let mono = self.mono && solver.vars[v.0 as usize].level == 0;
+                    if let Some(&d) = self.stack.get(&v) {
+                        if depth > d {
+                            self.occurs = true;
                         }
-                        Variance::Contra => self.go(a, !pos, depth + 1, row != Mode::Value),
-                        Variance::Inv => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1, row != Mode::Value)),
-                            Box::new(self.go(a, false, depth + 1, row != Mode::Value)),
-                        ),
-                    })
-                    .collect();
-                Ty::Con(*h, values.clone(), args)
+                        results.push(if mono { Ty::Never } else { Ty::Var(v) });
+                        continue;
+                    }
+                    let empty = |m: V| {
+                        let st = &solver.vars[m.0 as usize];
+                        if mono {
+                            st.lower.is_empty() && st.from.is_empty()
+                        } else if pos {
+                            st.lower.is_empty()
+                        } else {
+                            st.upper.is_empty()
+                        }
+                    };
+                    if self
+                        .members
+                        .get(&v)
+                        .map_or_else(|| empty(v), |ms| ms.iter().copied().all(empty))
+                    {
+                        results.push(if mono { Ty::Never } else { Ty::Var(v) });
+                        continue;
+                    }
+                    if let Some(t) = self.memo.get(&(v, pos, env)) {
+                        results.push(t.clone());
+                        continue;
+                    }
+                    self.stack.insert(v, depth);
+                    let mut children = Vec::new();
+                    if !mono {
+                        results.push(Ty::Var(v));
+                    }
+                    for m in self.members(v) {
+                        let st = &solver.vars[m.0 as usize];
+                        if mono {
+                            children
+                                .extend(st.lower.iter().map(|b| Task::Visit(b, true, depth, env)));
+                            children.extend(st.from.iter().map(|w| {
+                                Task::Var(*w, true, depth, env || solver.is_row(&Ty::Var(*w)))
+                            }));
+                        } else {
+                            let bounds = if pos { &st.lower } else { &st.upper };
+                            children.extend(bounds.iter().map(|b| Task::Visit(b, pos, depth, env)));
+                        }
+                    }
+                    tasks.push(Task::FinishVar(
+                        v,
+                        pos,
+                        env,
+                        mono,
+                        children.len() + usize::from(!mono),
+                    ));
+                    tasks.extend(children.into_iter().rev());
+                }
+                Task::FinishVar(v, pos, env, mono, n) => {
+                    self.stack.remove(&v);
+                    let mut parts = results.split_off(results.len() - n);
+                    let positive = pos || mono;
+                    let result = if parts.len() <= 2
+                        && !parts.iter().any(|t| {
+                            matches!(t, Ty::Union(_) if positive)
+                                || matches!(t, Ty::Inter(_) if !positive)
+                        }) {
+                        if parts.len() == 2 && parts[0] == parts[1] {
+                            parts.pop();
+                        }
+                        if parts.len() == 1 {
+                            parts.pop().unwrap()
+                        } else if positive {
+                            Ty::Union(parts)
+                        } else {
+                            Ty::Inter(parts)
+                        }
+                    } else {
+                        let mut flat = Vec::new();
+                        let mut todo: Vec<_> = parts.into_iter().rev().collect();
+                        let mut seen = HashSet::default();
+                        while let Some(t) = todo.pop() {
+                            match t.into_parts() {
+                                TyParts::Union(ms) if positive => todo.extend(ms.into_iter().rev()),
+                                TyParts::Inter(ms) if !positive => {
+                                    todo.extend(ms.into_iter().rev())
+                                }
+                                t => {
+                                    let t: Ty = t.into();
+                                    if seen.insert(t.clone()) {
+                                        flat.push(t);
+                                    }
+                                }
+                            }
+                        }
+                        if positive {
+                            Ty::Union(flat)
+                        } else {
+                            Ty::Inter(flat)
+                        }
+                    };
+                    if !self.occurs {
+                        self.memo.insert((v, pos, env), result.clone());
+                    }
+                    results.push(result);
+                }
+                Task::Con(h, values, n) => {
+                    let xs = results.split_off(results.len() - n);
+                    results.push(Ty::Con(h, values, xs));
+                }
+                Task::Fn(names) => {
+                    let mut xs = results
+                        .split_off(results.len() - names.len() - 3)
+                        .into_iter();
+                    let params = names
+                        .into_iter()
+                        .map(|n| (n, xs.next().expect("coalesced parameter")))
+                        .collect();
+                    results.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: xs.next().expect("coalesced return"),
+                        err: xs.next().expect("coalesced error"),
+                        env: xs.next().expect("coalesced environment"),
+                    })));
+                }
+                Task::Union(n) => {
+                    let xs = results.split_off(results.len() - n);
+                    results.push(Ty::Union(xs));
+                }
+                Task::Inter(n) => {
+                    let xs = results.split_off(results.len() - n);
+                    results.push(Ty::Inter(xs));
+                }
+                Task::Diff(n) => {
+                    let mut xs = results.split_off(results.len() - n - 1).into_iter();
+                    let a = xs.next().expect("coalesced difference subject");
+                    results.push(Ty::Diff(Box::new(a), xs.collect()));
+                }
+                Task::Both => {
+                    let b = results.pop().expect("coalesced negative side");
+                    let a = results.pop().expect("coalesced positive side");
+                    results.push(Ty::Both(Box::new(a), Box::new(b)));
+                }
             }
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1, false)))
-                    .collect(),
-                ret: self.go(&f.ret, pos, depth + 1, false),
-                err: self.go(&f.err, pos, depth + 1, true),
-                env: self.go(&f.env, pos, depth + 1, true),
-            })),
-            Ty::Union(ms) => Ty::Union(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
-            Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
-            Ty::Diff(a, h) => Ty::Diff(
-                Box::new(self.go(a, pos, depth, env)),
-                h.iter().map(|m| self.go(m, pos, depth, env)).collect(),
-            ),
-            Ty::Both(a, b) => Ty::Both(
-                Box::new(self.go(a, true, depth, env)),
-                Box::new(self.go(b, false, depth, env)),
-            ),
-            Ty::Never | Ty::Top => t.clone(),
         }
+        assert_eq!(results.len(), 1, "coalesced type result stack");
+        results.pop().unwrap()
     }
 }
 
@@ -2054,18 +2140,29 @@ mod deep_walk_tests {
                     sides = Ty::Both(Box::new(sides), Box::new(Ty::Top));
                 }
                 assert_eq!(both(&sides), Ty::Var(V(4)));
-                let s = Solver::new(Default::default(), Vec::new());
+                let mut s = Solver::new(Default::default(), Vec::new());
+                let mut nested = s.fresh();
                 let norm = Norm {
                     s: &s,
                     keep: None,
                     written: false,
                 };
-                let mut nested = Ty::Var(V(0));
                 for _ in 0..10_000 {
                     nested = Ty::tuple(vec![nested]);
                 }
                 let expected = nested.clone();
                 assert_eq!(norm.norm(nested), expected);
+                let mut coalescer = Coalescer {
+                    s: &s,
+                    keep: None,
+                    mono: false,
+                    stack: HashMap::default(),
+                    memo: HashMap::default(),
+                    occurs: false,
+                    rep: HashMap::default(),
+                    members: HashMap::default(),
+                };
+                assert_eq!(coalescer.go(&expected, true, 0, false), expected);
                 let shown = tree(&expected, &mut |v| format!("V{}", v.0));
                 assert!(shown.text(&[]).contains("V0"));
                 let copied = shown.clone();
