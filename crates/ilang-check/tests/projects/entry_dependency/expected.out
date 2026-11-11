@@ -1,1 +1,0 @@
-u/src/y.i:6:1: error[E0304]: `@main` is on a binding whose value is a function expression

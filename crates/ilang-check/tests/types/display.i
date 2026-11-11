@@ -29,7 +29,7 @@ make_any = (x) { Ref(() { x }, (y) { Nil }) }
 // Written variables on one side only are taken out.
 one_side(A) = (x: A) -> Int { x }
 
-errors_only(E) = () -> Int ? E { fail.raise(1) }
+errors_only(E) = () -> Int ^ E { fail.raise(1) }
 
 empty_list = () {
 	y(A): List(A) = []

@@ -2,3 +2,6 @@ name = "textlib"
 
 [dev-dependencies]
 nothere = { path = "nothere" }
+
+[entries]
+legacy = "text.main"

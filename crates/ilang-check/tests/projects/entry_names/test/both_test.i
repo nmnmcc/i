@@ -1,4 +1,4 @@
-@main
+
 @test
 both = () { Nil }
 

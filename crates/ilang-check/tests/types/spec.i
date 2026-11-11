@@ -6,7 +6,7 @@
 )
 
 // §9.1
-retry(A, E, N) = (times: Int, body: () -> A ? E ! N) -> A ? E ! N {
+retry(A, E, N) = (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N {
 	fail.catch(body) |> {
 		Ok(value) -> value
 		Error(error) -> { times > 1 } |> {
@@ -16,7 +16,7 @@ retry(A, E, N) = (times: Int, body: () -> A ? E ! N) -> A ? E ! N {
 	}
 }
 
-load_user = (id: String) -> String ? Int { fail.raise(404) }
+load_user = (id: String) -> String ^ Int { fail.raise(404) }
 
 user = () { retry(3, () { load_user("1") }) }
 

@@ -32,7 +32,7 @@ inter_arg(A) = (x: A & Int) -> A { x }
 
 list_union: List(Int) | List(String) = [1]
 
-result_written(A, E) = (r: Result(A, E)) -> A ? E {
+result_written(A, E) = (r: Result(A, E)) -> A ^ E {
 	r |> {
 		Ok(v)    -> v
 		Error(e) -> fail.raise(e)

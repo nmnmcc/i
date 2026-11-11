@@ -34,7 +34,7 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
         .join("\n");
     let arg = if expected.starts_with("()") { "" } else { "1" };
     missing.push_str(
-        &"\n@main\nmain = () { call(argument) }\n"
+        &"\n\nmain = () { call(argument) }\n"
             .replace("call", name)
             .replace("argument", arg),
     );
@@ -112,13 +112,13 @@ fn several_parameters_and_nested_services() {
     // independent value/error/environment parameters. Rule 3 permits
     // independent closed instances of the resulting scheme.
     for annotation in ["", "-> A ? E ! N | Outer(A, E, N)"] {
-        let source = "Inner(A, E, N) { Inner((A) -> A ? E ! N, (N) -> Nil) }
+        let source = "Inner(A, E, N) { Inner((A) -> A ^ E ! N, (N) -> Nil) }
 Outer(A, E, N) { Outer(Inner(A, E, N)) }
-use(A, E, N) = (x: A, s ! Outer(A, E, N)) -> A ? E ! N | Outer(A, E, N) {
+use(A, E, N) = (x: A, s ! Outer(A, E, N)) -> A ^ E ! N | Outer(A, E, N) {
   Outer(Inner(f, _)) = s
   f(x)
 }
-run(A, E, N) = (body: () -> A ? E ! N) { body() }
+run(A, E, N) = (body: () -> A ^ E ! N) { body() }
 integer = () {
   ! Outer(Int, Never, Never) = Outer(Inner((x: Int) { x }, (_: Never) { Nil }))
   run(() { use(1) })
@@ -171,11 +171,11 @@ fn logging_example() {
         accepts(
             &"(i/fail)
 Entry { Entry(message: String) }
-Sink(E, N) { Sink((Entry) -> Nil ? E ! N, (N) -> Nil) }
-make(E, N) = (send: (Entry) -> Nil ? E ! N) -> Sink(E, N) {
+Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
+make(E, N) = (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N) {
   Sink(send, (_: N) { Nil })
 }
-write(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ? E ! N | Sink(E, N) {
+write(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ^ E ! N | Sink(E, N) {
   Sink(send, _) = sink
   send(entry)
 }
@@ -226,7 +226,7 @@ fn incompatible_service_arguments_still_fail() {
     // Consumer's parameter is contravariant.
     rejects(
         "Entry { Entry }
-Sink(E, N) { Sink((Entry) -> Nil ? E ! N, (N) -> Nil) }
+Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
 Consumer(A) { Consumer((A) -> Nil) }
 bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }",
         "E0515",
@@ -234,7 +234,7 @@ bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }",
     // §9.2: forms of one service in a row must have equal arguments,
     // including the error argument, regardless of its ordinary variance.
     rejects(
-        "Sink(E, N) { Sink(() -> Nil ? E ! N, (N) -> Nil) }
+        "Sink(E, N) { Sink(() -> Nil ^ E ! N, (N) -> Nil) }
 one = (s ! Sink(String, Never)) { Nil }
 two = (s ! Sink(Int, Never)) { Nil }
 bad = () { one() two() }",
@@ -243,7 +243,7 @@ bad = () { one() two() }",
     // The same restriction holds when a service is hidden behind the
     // helper's inferred environment row.
     rejects(
-        "Sink(E, N) { Sink(() -> Nil ? E ! N, (N) -> Nil) }
+        "Sink(E, N) { Sink(() -> Nil ^ E ! N, (N) -> Nil) }
 one = (s ! Sink(String, Never)) { Nil }
 two = (s ! Sink(Int, Never)) { Nil }
 run(N) = (body: () -> Nil ! N) { body() }

@@ -1,1 +1,4 @@
 name = "app"
+
+[entries]
+legacy = "other.other"

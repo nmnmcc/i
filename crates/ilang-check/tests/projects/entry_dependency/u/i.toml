@@ -1,1 +1,4 @@
 name = "u"
+
+[entries]
+legacy = "x.main"

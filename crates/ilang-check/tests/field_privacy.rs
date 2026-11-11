@@ -129,7 +129,7 @@ fn generic_value_use_and_public_constructor_fields_keep_their_types() {
             "app/main.id : (value: A) -> A",
             "app/main.pass : (value: secret.Secret(A)) -> secret.Secret(A)",
             "app/main.public : (value: secret.Open) -> Int",
-            "app/main.allowed : () -> Nil ! Assert",
+            "app/main.main : () -> Nil ! Assert",
         ]
     );
 }
