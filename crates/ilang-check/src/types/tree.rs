@@ -17,7 +17,9 @@ impl std::fmt::Debug for Ty {
         fn list<'a>(stack: &mut Vec<Part<'a>>, xs: &'a [Ty]) {
             for (i, x) in xs.iter().enumerate().rev() {
                 stack.push(Part::Type(x));
-                if i != 0 { stack.push(Part::Text(", ")); }
+                if i != 0 {
+                    stack.push(Part::Text(", "));
+                }
             }
         }
         let mut pending = vec![Part::Type(self)];
@@ -49,11 +51,17 @@ impl std::fmt::Debug for Ty {
                             pending.push(Part::Text(", "));
                             pending.push(Part::Label(label));
                             pending.push(Part::Text("("));
-                            if i != 0 { pending.push(Part::Text(", ")); }
+                            if i != 0 {
+                                pending.push(Part::Text(", "));
+                            }
                         }
                     }
                     Ty::Union(xs) | Ty::Inter(xs) => {
-                        f.write_str(if matches!(t, Ty::Union(_)) { "Union([" } else { "Inter([" })?;
+                        f.write_str(if matches!(t, Ty::Union(_)) {
+                            "Union(["
+                        } else {
+                            "Inter(["
+                        })?;
                         pending.push(Part::Text("])"));
                         list(&mut pending, xs);
                     }
@@ -410,8 +418,8 @@ mod tests {
                 assert_eq!(hash(&t), hash(&copied));
                 let different = deep(10_000, Ty::Var(V(1)));
                 assert!(t != different);
-            let text = format!("{t:?}");
-            assert!(text.starts_with("Inter([") && text.contains("Var(V(0))"));
+                let text = format!("{t:?}");
+                assert!(text.starts_with("Inter([") && text.contains("Var(V(0))"));
                 let mut visited = 0;
                 visit(&t, |_| visited += 1);
                 assert!(visited > 10_000);
@@ -430,7 +438,10 @@ mod tests {
             err: Ty::Never,
             env: Ty::Never,
         }));
-        assert_eq!(format!("{t:?}"), "Fn(FnTy { params: [(Some(\"p\"), Var(V(0)))], ret: Never, err: Never, env: Never })");
+        assert_eq!(
+            format!("{t:?}"),
+            "Fn(FnTy { params: [(Some(\"p\"), Var(V(0)))], ret: Never, err: Never, env: Never })"
+        );
     }
 
     #[test]

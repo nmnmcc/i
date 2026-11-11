@@ -2069,16 +2069,30 @@ impl Solver {
                             let modes = self.rows(h, args.len());
                             tasks.push(Task::Con(h, values, args.len()));
                             let children: Vec<_> = args.into_iter().zip(modes).collect();
-                            tasks.extend(children.into_iter().rev().map(|(t, m)| Task::Visit(t, m)));
+                            tasks
+                                .extend(children.into_iter().rev().map(|(t, m)| Task::Visit(t, m)));
                         }
                         TyParts::Fn(f) => {
-                            let FnTy { params, ret, err, env } = *f;
+                            let FnTy {
+                                params,
+                                ret,
+                                err,
+                                env,
+                            } = *f;
                             let mut names = Vec::with_capacity(params.len());
                             let mut children = Vec::with_capacity(params.len() + 3);
-                            for (n, t) in params { names.push(n); children.push((t, Mode::Value)); }
-                            children.extend([(ret, Mode::Value), (err, Mode::Row), (env, Mode::Env)]);
+                            for (n, t) in params {
+                                names.push(n);
+                                children.push((t, Mode::Value));
+                            }
+                            children.extend([
+                                (ret, Mode::Value),
+                                (err, Mode::Row),
+                                (env, Mode::Env),
+                            ]);
                             tasks.push(Task::Fn(names));
-                            tasks.extend(children.into_iter().rev().map(|(t, m)| Task::Visit(t, m)));
+                            tasks
+                                .extend(children.into_iter().rev().map(|(t, m)| Task::Visit(t, m)));
                         }
                         TyParts::Union(ms) => {
                             tasks.push(Task::Union(ms.len(), mode));
@@ -2106,9 +2120,19 @@ impl Solver {
                     results.push(Ty::Con(h, values, args));
                 }
                 Task::Fn(names) => {
-                    let mut children = results.split_off(results.len() - names.len() - 3).into_iter();
-                    let params = names.into_iter().map(|n| (n, children.next().expect("normalized parameter"))).collect();
-                    results.push(Ty::Fn(Box::new(FnTy { params, ret: children.next().expect("normalized return"), err: children.next().expect("normalized error"), env: children.next().expect("normalized environment") })));
+                    let mut children = results
+                        .split_off(results.len() - names.len() - 3)
+                        .into_iter();
+                    let params = names
+                        .into_iter()
+                        .map(|n| (n, children.next().expect("normalized parameter")))
+                        .collect();
+                    results.push(Ty::Fn(Box::new(FnTy {
+                        params,
+                        ret: children.next().expect("normalized return"),
+                        err: children.next().expect("normalized error"),
+                        env: children.next().expect("normalized environment"),
+                    })));
                 }
                 Task::Union(n, mode) => {
                     let ms = results.split_off(results.len() - n);
@@ -2117,7 +2141,9 @@ impl Solver {
                 Task::Inter(n, mode) => {
                     let ms = results.split_off(results.len() - n);
                     let scalar = ms.iter().any(|t| t.scalar().is_some());
-                    results.push(self.inter_in(ms, mode != Mode::Value && !(mode == Mode::Row && scalar)));
+                    results.push(
+                        self.inter_in(ms, mode != Mode::Value && !(mode == Mode::Row && scalar)),
+                    );
                 }
                 Task::Diff(n, mode) => {
                     let mut values = results.split_off(results.len() - n - 1).into_iter();
@@ -3063,17 +3089,32 @@ mod handler_proof_tests {
 mod deep_tree_tests {
     use super::*;
 
-    fn recursive_vars(s: &Solver, t: &Ty, pos: bool, con: bool, env: bool, out: &mut Vec<(V, bool, bool)>) {
+    fn recursive_vars(
+        s: &Solver,
+        t: &Ty,
+        pos: bool,
+        con: bool,
+        env: bool,
+        out: &mut Vec<(V, bool, bool)>,
+    ) {
         if env {
             match t {
-                Ty::Con(_, _, args) => for a in args {
-                    recursive_vars(s, a, true, true, false, out);
-                    recursive_vars(s, a, false, true, false, out);
-                },
-                Ty::Union(ms) | Ty::Inter(ms) => for a in ms { recursive_vars(s, a, pos, con, true, out); },
+                Ty::Con(_, _, args) => {
+                    for a in args {
+                        recursive_vars(s, a, true, true, false, out);
+                        recursive_vars(s, a, false, true, false, out);
+                    }
+                }
+                Ty::Union(ms) | Ty::Inter(ms) => {
+                    for a in ms {
+                        recursive_vars(s, a, pos, con, true, out);
+                    }
+                }
                 Ty::Diff(a, hs) => {
                     recursive_vars(s, a, pos, con, true, out);
-                    for h in hs { recursive_vars(s, h, pos, true, false, out); }
+                    for h in hs {
+                        recursive_vars(s, h, pos, true, false, out);
+                    }
                 }
                 _ => recursive_vars(s, t, pos, con, false, out),
             }
@@ -3082,8 +3123,15 @@ mod deep_tree_tests {
         match t {
             Ty::Var(v) => out.push((*v, pos, con)),
             Ty::Con(h, _, args) => {
-                for ((a, variance), row) in args.iter().zip(s.variances(*h, args.len())).zip(s.rows(*h, args.len())) {
-                    if row != Mode::Value { recursive_vars(s, a, pos, true, true, out); continue; }
+                for ((a, variance), row) in args
+                    .iter()
+                    .zip(s.variances(*h, args.len()))
+                    .zip(s.rows(*h, args.len()))
+                {
+                    if row != Mode::Value {
+                        recursive_vars(s, a, pos, true, true, out);
+                        continue;
+                    }
                     match variance {
                         Variance::Co | Variance::Bi => recursive_vars(s, a, pos, true, false, out),
                         Variance::Contra => recursive_vars(s, a, !pos, true, false, out),
@@ -3095,15 +3143,23 @@ mod deep_tree_tests {
                 }
             }
             Ty::Fn(f) => {
-                for (_, p) in &f.params { recursive_vars(s, p, !pos, true, false, out); }
+                for (_, p) in &f.params {
+                    recursive_vars(s, p, !pos, true, false, out);
+                }
                 recursive_vars(s, &f.ret, pos, true, false, out);
                 recursive_vars(s, &f.err, pos, true, true, out);
                 recursive_vars(s, &f.env, pos, true, true, out);
             }
-            Ty::Union(ms) | Ty::Inter(ms) => for a in ms { recursive_vars(s, a, pos, con, false, out); },
+            Ty::Union(ms) | Ty::Inter(ms) => {
+                for a in ms {
+                    recursive_vars(s, a, pos, con, false, out);
+                }
+            }
             Ty::Diff(a, hs) => {
                 recursive_vars(s, a, pos, con, false, out);
-                for h in hs { recursive_vars(s, h, pos, con, false, out); }
+                for h in hs {
+                    recursive_vars(s, h, pos, con, false, out);
+                }
             }
             Ty::Both(a, b) => {
                 recursive_vars(s, a, true, con, false, out);
@@ -3116,9 +3172,18 @@ mod deep_tree_tests {
     #[test]
     fn iterative_bound_walk_preserves_recursive_order_and_polarity() {
         let s = Solver::new(StdHashMap::new(), Vec::new());
-        let boundary = Ty::named(TypeRef::Builtin(BuiltinType::Boundary), vec![Ty::Var(V(0)), Ty::Var(V(1)), Ty::Var(V(2))]);
+        let boundary = Ty::named(
+            TypeRef::Builtin(BuiltinType::Boundary),
+            vec![Ty::Var(V(0)), Ty::Var(V(1)), Ty::Var(V(2))],
+        );
         let t = Ty::Fn(Box::new(FnTy {
-            params: vec![(None, boundary.clone()), (None, Ty::Both(Box::new(Ty::Var(V(3))), Box::new(Ty::Var(V(4)))) )],
+            params: vec![
+                (None, boundary.clone()),
+                (
+                    None,
+                    Ty::Both(Box::new(Ty::Var(V(3))), Box::new(Ty::Var(V(4)))),
+                ),
+            ],
             ret: Ty::Diff(Box::new(Ty::Var(V(5))), vec![Ty::Var(V(6))]),
             err: Ty::Union(vec![boundary.clone(), Ty::Var(V(7))]),
             env: Ty::Diff(Box::new(boundary), vec![Ty::Var(V(8))]),
@@ -3145,27 +3210,50 @@ mod deep_tree_tests {
     ) -> Ty {
         let env = env.max(s.mode(t));
         s.observe_type(t);
-        if s.level_of(t) <= level { return t.clone(); }
+        if s.level_of(t) <= level {
+            return t.clone();
+        }
         match t {
             Ty::Var(v) => {
-                if let Some(nv) = cache.get(&(*v, pol, env)) { return Ty::Var(*nv); }
+                if let Some(nv) = cache.get(&(*v, pol, env)) {
+                    return Ty::Var(*nv);
+                }
                 let nv = s.fresh_at(level);
                 s.vars[nv.0 as usize].input = s.var(*v).input;
                 s.vars[nv.0 as usize].row = s.var(*v).row;
                 s.vars[nv.0 as usize].difference = s.var(*v).difference;
                 cache.insert((*v, pol, env), nv);
-                let handled = s.var(*v).handled.clone().iter().map(|h| recursive_extrude(s, h, Pol::Both, level, Mode::Value, cache)).collect();
+                let handled = s
+                    .var(*v)
+                    .handled
+                    .clone()
+                    .iter()
+                    .map(|h| recursive_extrude(s, h, Pol::Both, level, Mode::Value, cache))
+                    .collect();
                 s.var_mut(nv).handled = handled;
                 if pol != Pol::Neg {
                     s.var_mut(*v).upper.push(Ty::Var(nv));
                     s.var_mut(nv).from.push(*v);
-                    let lower = s.var(*v).lower.clone().iter().map(|b| recursive_extrude(s, b, Pol::Pos, level, env, cache)).collect();
+                    let lower = s
+                        .var(*v)
+                        .lower
+                        .clone()
+                        .iter()
+                        .map(|b| recursive_extrude(s, b, Pol::Pos, level, env, cache))
+                        .collect();
                     s.set_lower(nv, lower);
                 }
                 if pol != Pol::Pos {
                     s.var_mut(*v).lower.push(Ty::Var(nv));
                     s.var_mut(nv).into.push(*v);
-                    let upper = s.var(*v).upper.clone().iter().filter(|b| **b != Ty::Var(nv)).map(|b| recursive_extrude(s, b, Pol::Neg, level, env, cache)).collect();
+                    let upper = s
+                        .var(*v)
+                        .upper
+                        .clone()
+                        .iter()
+                        .filter(|b| **b != Ty::Var(nv))
+                        .map(|b| recursive_extrude(s, b, Pol::Neg, level, env, cache))
+                        .collect();
                     s.set_upper(nv, upper);
                 }
                 Ty::Var(nv)
@@ -3173,20 +3261,55 @@ mod deep_tree_tests {
             Ty::Con(h, values, args) => {
                 let variance = s.variances(*h, args.len());
                 let rows = s.rows(*h, args.len());
-                Ty::Con(*h, values.clone(), args.iter().zip(variance).zip(rows).map(|((a, v), row)| recursive_extrude(s, a, if env != Mode::Value { Pol::Both } else { pol.by(v) }, level, row, cache)).collect())
+                Ty::Con(
+                    *h,
+                    values.clone(),
+                    args.iter()
+                        .zip(variance)
+                        .zip(rows)
+                        .map(|((a, v), row)| {
+                            recursive_extrude(
+                                s,
+                                a,
+                                if env != Mode::Value {
+                                    Pol::Both
+                                } else {
+                                    pol.by(v)
+                                },
+                                level,
+                                row,
+                                cache,
+                            )
+                        })
+                        .collect(),
+                )
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f.params.iter().map(|(label, p)| (label.clone(), recursive_extrude(s, p, pol.flip(), level, Mode::Value, cache))).collect(),
+                params: f
+                    .params
+                    .iter()
+                    .map(|(label, p)| {
+                        (
+                            label.clone(),
+                            recursive_extrude(s, p, pol.flip(), level, Mode::Value, cache),
+                        )
+                    })
+                    .collect(),
                 ret: recursive_extrude(s, &f.ret, pol, level, Mode::Value, cache),
                 err: recursive_extrude(s, &f.err, pol, level, Mode::Row, cache),
                 env: recursive_extrude(s, &f.env, pol, level, Mode::Env, cache),
             })),
             Ty::Union(ms) if env != Mode::Value || s.is_row(t) => {
                 let mode = env.max(s.mode(t));
-                let ms = ms.iter().map(|m| recursive_extrude(s, m, pol, level, mode, cache)).collect();
+                let ms = ms
+                    .iter()
+                    .map(|m| recursive_extrude(s, m, pol, level, mode, cache))
+                    .collect();
                 s.union_mode(ms, mode)
             }
-            _ => s.map_children(t, pol, &mut |s, x, p| recursive_extrude(s, x, p, level, env, cache)),
+            _ => s.map_children(t, pol, &mut |s, x, p| {
+                recursive_extrude(s, x, p, level, env, cache)
+            }),
         }
     }
 
@@ -3200,7 +3323,9 @@ mod deep_tree_tests {
         base.var_mut(a).difference = true;
         base.var_mut(a).handled.push(Ty::Var(b));
         base.var_mut(b).handled.push(Ty::Var(a));
-        base.var_mut(a).lower.push(Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()));
+        base.var_mut(a)
+            .lower
+            .push(Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()));
         base.var_mut(b).upper.push(Ty::Var(weak));
         let t = Ty::Fn(Box::new(FnTy {
             params: vec![(Some("x".into()), Ty::Var(a)), (None, Ty::Var(weak))],
@@ -3378,48 +3503,68 @@ mod deep_tree_tests {
     }
     #[test]
     fn deep_bound_and_union_walks_are_iterative() {
-        std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
-            let mut s = Solver::new(StdHashMap::new(), Vec::new());
-            let v = s.fresh_at(0);
-            let mut t = Ty::Var(v);
-            for _ in 0..10_000 {
-                t = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
-            }
-            let mut vars = Vec::new();
-            bound_vars(&s, &t, true, false, &mut vars);
-            assert_eq!(vars, vec![(v, true, true)]);
-            let mut u = Ty::Var(v);
-            for _ in 0..10_000 { u = Ty::Union(vec![u]); }
-            let mut flat = Vec::new();
-            flatten_union(&[u], &mut flat);
-            assert!(flat == vec![Ty::Var(v)]);
-        }).unwrap().join().unwrap();
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let v = s.fresh_at(0);
+                let mut t = Ty::Var(v);
+                for _ in 0..10_000 {
+                    t = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t]);
+                }
+                let mut vars = Vec::new();
+                bound_vars(&s, &t, true, false, &mut vars);
+                assert_eq!(vars, vec![(v, true, true)]);
+                let mut u = Ty::Var(v);
+                for _ in 0..10_000 {
+                    u = Ty::Union(vec![u]);
+                }
+                let mut flat = Vec::new();
+                flatten_union(&[u], &mut flat);
+                assert!(flat == vec![Ty::Var(v)]);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[test]
     fn deep_normalization_preserves_type() {
-        std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
-            let mut s = Solver::new(StdHashMap::new(), Vec::new());
-            let mut t = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
-            for i in 0..10_000 {
-                t = if i % 2 == 0 {
-                    Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t])
-                } else {
-                    Ty::Fn(Box::new(FnTy { params: Vec::new(), ret: t, err: Ty::Never, env: Ty::Never }))
-                };
-            }
-            let expected = t.clone();
-            assert_eq!(s.normalize_mode(t, Mode::Value), expected);
-            let mut top = Ty::Top;
-            for _ in 0..10_000 { top = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![top]); }
-            let replaced = s.no_top(&top, 0);
-            let mut end = &replaced;
-            for _ in 0..10_000 {
-                let Ty::Con(_, _, args) = end else { panic!("expected list") };
-                end = &args[0];
-            }
-            assert!(matches!(end, Ty::Var(_)));
-        }).unwrap().join().unwrap();
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut s = Solver::new(StdHashMap::new(), Vec::new());
+                let mut t = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+                for i in 0..10_000 {
+                    t = if i % 2 == 0 {
+                        Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t])
+                    } else {
+                        Ty::Fn(Box::new(FnTy {
+                            params: Vec::new(),
+                            ret: t,
+                            err: Ty::Never,
+                            env: Ty::Never,
+                        }))
+                    };
+                }
+                let expected = t.clone();
+                assert_eq!(s.normalize_mode(t, Mode::Value), expected);
+                let mut top = Ty::Top;
+                for _ in 0..10_000 {
+                    top = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![top]);
+                }
+                let replaced = s.no_top(&top, 0);
+                let mut end = &replaced;
+                for _ in 0..10_000 {
+                    let Ty::Con(_, _, args) = end else {
+                        panic!("expected list")
+                    };
+                    end = &args[0];
+                }
+                assert!(matches!(end, Ty::Var(_)));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
-
 }
