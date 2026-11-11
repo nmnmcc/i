@@ -605,5 +605,76 @@
     "empty": [
       "empty tuple expression at byte 131"
     ]
+  },
+  "crates/ilang-check/tests/front_end.rs:1b999808f689275a": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-check/tests/projects/attr_entry/src/main.i:11b662ea129c5be4": {
+    "empty": [
+      "empty tuple expression at byte 23",
+      "empty tuple expression at byte 27"
+    ]
+  },
+  "crates/ilang-check/tests/types/basics.i:c6fa989311d84008": {
+    "empty": [
+      "empty tuple expression at byte 128"
+    ]
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:04a3d99efcbda47b": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:eb648ea1f46a27c1": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/examples/migrate-syntax2.rs:d29dbdfffc876b3c": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/format.rs:92f8a398dc7d921e": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/golden/fn_vs_tuple.i:1e5d05a86f044a55": {
+    "empty": [
+      "empty tuple expression at byte 74"
+    ]
+  },
+  "crates/ilang-syntax/tests/parse.rs:2073d2cf329485cf": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/syn2.rs:9b7118417cc3a605": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/syn2.rs:1f0c8a5b71fd3979": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/syn2.rs:eb648ea1f46a27c1": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/syn2.rs:4e49c2e4e10ca250": {
+    "legacy_test": true,
+    "reason": "Explicit legacy parser or formatter compatibility test."
+  },
+  "crates/ilang-syntax/tests/syn2.rs:9f19b72f7989bc1e": {
+    "empty": [
+      "empty tuple expression at byte 9"
+    ]
+  },
+  "crates/ilang-syntax/tests/syn2.rs:9ae72ee3455756b6": {
+    "empty": [
+      "empty tuple type at byte 4"
+    ]
+  },
+  "docs/spec.md:b1b0319d2bc0a891": {
+    "empty": [
+      "empty tuple expression at byte 67"
+    ]
   }
 }

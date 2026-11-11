@@ -192,6 +192,9 @@ def main():
     for item, result in zip(items, results):
         label = f"{item['path']}:{item['line']}"
         decision = reviewed.get(EXTRACT.identity(item['path'], item['source']), {})
+        if decision.get('legacy_test'):
+            report['reviewed'].append(label + ': legacy compatibility test')
+            continue
         if result.get('diagnostics'):
             if result['diagnostics'] == decision.get('diagnostics'):
                 report['reviewed'].append(label)
