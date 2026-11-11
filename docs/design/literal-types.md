@@ -494,7 +494,7 @@ Replace "`T` may be a union: `[1, "a"]` has the type `List(Int | String)`." with
 
 Replace "a literal, also with `-` or `-.` before it" with:
 
-> a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`)
+> a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `- |> {1.5}`)
 
 So `-1` and `-{1}`, which differ only in a group and so are the same code (`meta.md` §1), are both direct values: in `pair = (-{1}, f)` with `f = () { pair.0 }`, `f`'s body may use `pair`, as it may with `-1`, and the two have the same needs (§2.5) and are generalized in the same way (§4.7).
 

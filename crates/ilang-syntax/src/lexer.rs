@@ -248,6 +248,7 @@ impl Lexer<'_> {
             (b'-', b'.', _) => (T::MinusDot, 2),
             (b'-', _, _) => (T::Minus, 1),
             (b'?', _, _) => (T::Question, 1),
+            (b'^', _, _) => (T::Caret, 1),
             (b'!', b'=', _) => (T::NotEq, 2),
             (b'!', _, _) => (T::Bang, 1),
             (b'|', b'>', _) => (T::PipeGt, 2),

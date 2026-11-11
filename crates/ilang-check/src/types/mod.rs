@@ -400,6 +400,8 @@ pub enum Access {
 /// node in the HIR, which is unique among the nodes of one kind.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
+    /// Spans of empty record expressions reached by type inference.
+    pub empty_records: std::collections::HashSet<(ModuleId, Span)>,
     /// Diagnostics retained when coalescing could not produce a finite
     /// type. IDEs may use the partial result; lowering must reject it.
     pub(crate) coalescing_errors: Vec<Diagnostic>,

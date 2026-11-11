@@ -34,5 +34,6 @@ parse tests/spec/1.7/a1_same_line_tuple.i
 parse tests/spec/2.2/a1_empty_header.i
 parse tests/spec/2.2/a1_header_order.i
 parse tests/spec/2.2/a1_macro_attribute_same_line.i
-parse tests/spec/6/a1_record_kept.i
 parse tests/spec/6/a1_wrong_pattern.i
+parse tests/spec/6/syn2_empty_tuple_type.i
+parse tests/spec/6/syn2_mixed_tuple.i

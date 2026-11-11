@@ -13,6 +13,7 @@ pub struct Manifest {
     pub dependencies: Vec<Dependency>,
     pub dev_dependencies: Vec<Dependency>,
     pub wasm_exports: Vec<WasmExport>,
+    pub entries: Vec<(String, WasmExport)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -111,6 +112,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut deps = Vec::new();
     let mut dev_deps = Vec::new();
     let mut wasm_exports = Vec::new();
+    let mut entries = Vec::new();
     for (key, value) in doc.get_ref().iter() {
         match key.get_ref().as_ref() {
             "providers" | "provider_adapters" => diags.push(err(
@@ -130,6 +132,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
             "dev-dependencies" if compiled => {
                 dev_deps = dependencies("dev-dependencies", value, &mut diags)
             }
+            "entries" if compiled => entries = entry_table(value, &mut diags),
             "wasm" if compiled => wasm_exports = wasm(value, &mut diags),
             _ => {}
         }
@@ -185,6 +188,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
         dependencies,
         dev_dependencies,
         wasm_exports,
+        entries,
     };
     (Some(manifest), diags)
 }
@@ -319,6 +323,50 @@ fn wasm(value: &Spanned<DeValue>, diags: &mut Vec<Diagnostic>) -> Vec<WasmExport
         }
     }
     out
+}
+
+fn entry_table(value: &Spanned<DeValue>, diags: &mut Vec<Diagnostic>) -> Vec<(String, WasmExport)> {
+    let DeValue::Table(table) = value.get_ref() else {
+        diags.push(err(
+            code::MANIFEST_SHAPE,
+            span(value.span()),
+            "`entries` must be a table of names to function paths",
+        ));
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (key, value) in table.iter() {
+        let name = key.get_ref().to_string();
+        let parsed = match value.get_ref() {
+            DeValue::String(s) => parse_entry(s),
+            _ => None,
+        };
+        if is_name(&name)
+            && let Some((module, function)) = parsed
+        {
+            out.push((
+                name,
+                WasmExport {
+                    module,
+                    function,
+                    span: span(value.span()),
+                },
+            ));
+        } else {
+            diags.push(err(
+                code::MANIFEST_SHAPE,
+                span(value.span()),
+                "an entry is `name = \"module.path.function\"` in `[entries]`",
+            ));
+        }
+    }
+    out
+}
+
+fn parse_entry(s: &str) -> Option<(String, String)> {
+    let (module, function) = s.rsplit_once('.')?;
+    (module.split('.').all(is_name) && is_name(function))
+        .then(|| (module.to_string(), function.to_string()))
 }
 
 /// `app/math.add` into `("app/math", "add")`.

@@ -87,7 +87,7 @@ fn brace_decisions_follow_the_ordered_tests() {
     for (src, code) in [
         (
             /* old-syntax-check: E0114,E0101 */ "a = { p: (Int, Int) -> e }",
-            Code::RecordReserved,
+            Code::MissingBody,
         ),
         (
             /* old-syntax-check: E0108 */ "a = x |> { -y -> 1 }",

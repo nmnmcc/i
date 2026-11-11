@@ -864,6 +864,7 @@ name = "ilang-syntax"
 version = "0.1.0"
 dependencies = [
  "num-bigint 0.5.1",
+ "serde_json",
  "thiserror",
 ]
 

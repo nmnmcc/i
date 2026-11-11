@@ -1,0 +1,6 @@
+# spec: 2.6, 10.2
+# expect: pass
+name = "spec"
+
+[entries]
+worker = "tools.jobs.work"

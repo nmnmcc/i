@@ -30,7 +30,7 @@ f = (x) {
 }
 
 T = // after an equals sign in a type
-	(Int) -> Int ? // after a question mark
+	(Int) -> Int ^ // after a question mark
 		String
 
 g = (x) {
