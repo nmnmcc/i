@@ -1556,3 +1556,26 @@ fn a_later_macro_failure_keeps_an_earlier_committed_note() {
         checked.diags
     );
 }
+
+#[test]
+fn cli_retries_definition_queries_after_later_item_macros() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask make)\n(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))\n(@ macro (= make (-> (x) _ `(= ~x Int))))\n").unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.ask(T)\nm.make(T)\nmain = () { 1 }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
