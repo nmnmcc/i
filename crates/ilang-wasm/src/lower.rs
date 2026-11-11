@@ -329,9 +329,11 @@ fn expression_values(e: &Expr) -> usize {
         | ExprKind::Error
         | ExprKind::Fn(_) => 1,
         ExprKind::Tuple(items) => pending_values(items),
-        ExprKind::Record { base, fields } => {
-            pending_values(base.iter().map(Box::as_ref).chain(fields.iter().map(|(_, value)| value)))
-        }
+        ExprKind::Record { base, fields } => pending_values(
+            base.iter()
+                .map(Box::as_ref)
+                .chain(fields.iter().map(|(_, value)| value)),
+        ),
         ExprKind::List { items, rest } => pending_values(items.iter().chain(rest.as_deref())),
         ExprKind::BitArray(segments) => pending_values(segments.iter().flat_map(|s| {
             std::iter::once(&s.value).chain(s.format.as_ref().and_then(|f| f.arg.as_deref()))
