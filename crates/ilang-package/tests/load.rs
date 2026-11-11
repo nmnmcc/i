@@ -163,7 +163,7 @@ fn standard_library_modules() {
 }
 
 #[test]
-fn provider_root_cell_overrides_inherited_cell_with_authority() {
+fn provider_dependency_cells_do_not_supply_root_entries() {
     use ilang_package::providers::{Cell, Target};
     let dir = tempfile::tempdir().unwrap();
     write(
@@ -182,11 +182,10 @@ fn provider_root_cell_overrides_inherited_cell_with_authority() {
     let (graph, diags) = load(&dir.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");
     let root = graph.root.unwrap();
-    let dep = graph.packages[root].dependencies[0].1.unwrap();
     let rows = graph.selected_provider_rows();
     let row = rows.iter().find(|r| r.row.service == "dep/main.S").unwrap();
-    assert_eq!(row.package, dep);
-    assert_eq!(row.cells[&Target::Js].package, dep);
+    assert_eq!(row.package, root);
+    assert!(!row.cells.contains_key(&Target::Js));
     assert_eq!(row.cells[&Target::Host].package, root);
     assert!(
         matches!(row.cells[&Target::Host].cell, Cell::Factory { factory, .. } if factory == "app/main.fake")

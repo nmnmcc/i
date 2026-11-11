@@ -392,11 +392,7 @@ impl crate::PackageGraph {
     /// nominal identities and access checking belongs to the provider checker.
     pub fn selected_provider_rows(&self) -> Vec<SelectedRow<'_>> {
         let mut rows: Vec<SelectedRow<'_>> = Vec::new();
-        let packages = std::iter::once(self.library)
-            .chain(
-                (0..self.packages.len()).filter(|id| *id != self.library && Some(*id) != self.root),
-            )
-            .chain(self.root);
+        let packages = std::iter::once(self.library).chain(self.root);
         for id in packages {
             for row in &self.packages[id].provider_plan.rows {
                 if let Some(existing) = rows.iter_mut().find(|r| r.row.service == row.service) {
