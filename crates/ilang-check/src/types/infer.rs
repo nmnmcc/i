@@ -418,6 +418,7 @@ impl<'a> Checker<'a> {
                         .scheme_hovers
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
+                    typed.provider_scheme_types.insert(id, shown.clone());
                     if d.exported || opts.written {
                         let catalog = artifact_catalog.get_or_insert_with(|| {
                             std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
