@@ -31,5 +31,4 @@ segment beginning with `:` captures that segment by name.
 
 The present transport closes connections after each request. Server handlers
 receive a buffered body. `send_timeout` works with a fake provider, but the
-network provider currently fails the effect check when passed to it. DNS
-failures from `net.connect` are currently reported as connect errors.
+network provider currently fails the effect check when passed to it.

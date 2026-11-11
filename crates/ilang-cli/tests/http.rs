@@ -80,3 +80,126 @@ fn http_server() {
     );
     worker.join().unwrap();
 }
+
+fn run_http_program(source: &str) {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir(project.path().join("src")).unwrap();
+    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    std::fs::write(
+        project.path().join("i.toml"),
+        format!(
+            "name = \"http_test\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
+            std_path.to_str().unwrap()
+        ),
+    )
+    .unwrap();
+    std::fs::write(project.path().join("src/main.i"), source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--opt", "0", "--project"])
+        .arg(project.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn http_timeout() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || {
+        let (_stream, _) = listener.accept().unwrap();
+        thread::sleep(Duration::from_secs(2));
+    });
+    run_http_program(&format!(
+        r#"
+(
+ i/fail
+ i/task
+ std/http
+)
+@main
+main = () {{
+ task.run(() {{
+  result = fail.catch(() {{ http.send_timeout(http.client(), http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
+  result |> {{ Error(http.Timeout) -> Nil _ -> panic("expected timeout") }}
+ }})
+}}
+"#
+    ));
+    server.join().unwrap();
+}
+
+#[test]
+fn http_dns() {
+    run_http_program(
+        r#"
+(
+ i/fail
+ std/http
+)
+@main
+main = () {
+ result = fail.catch(() { http.get("http://name.invalid/") })
+ result |> { Error(http.Dns(_)) -> Nil _ -> panic("expected DNS error") }
+}
+"#,
+    );
+}
+
+#[test]
+fn http_redirect_methods() {
+    for status in [301, 302, 303, 307, 308] {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = thread::spawn(move || {
+            for hop in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut first = String::new();
+                reader.read_line(&mut first).unwrap();
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse().unwrap();
+                    }
+                }
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                if hop == 0 {
+                    assert!(first.starts_with("POST /start "));
+                    write!(stream, "HTTP/1.1 {status} Redirect\r\nLocation: /finish\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                } else {
+                    if status == 307 || status == 308 {
+                        assert!(first.starts_with("POST /finish "));
+                        assert_eq!(body, b"hello");
+                    } else {
+                        assert!(first.starts_with("GET /finish "));
+                        assert!(body.is_empty());
+                    }
+                    stream
+                        .write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                        )
+                        .unwrap();
+                }
+            }
+        });
+        run_http_program(&format!(
+            r#"
+(std/http)
+@main
+main = () {{ assert(http.post("http://127.0.0.1:{port}/start", <<"hello":utf8>>).status == http.Status(200)) }}
+"#
+        ));
+        server.join().unwrap();
+    }
+}

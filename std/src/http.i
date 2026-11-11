@@ -1004,15 +1004,25 @@ follow = (req: Request, count: Int) {
 						Error(_)  -> fail.raise(Protocol("invalid redirect"))
 					}
 					Method(method) = req.method
-					change = c == 303 && method != "HEAD" ||
-						{ c == 301 || c == 302 } && method == "POST"
+					change = method != "HEAD" && method != "GET" && {
+						c == 301 || c == 302 || c == 303
+					}
 					change |> {
-						True -> follow(request(Method("GET"), url), count + 1)
+						True -> follow(
+							Request(
+								Method("GET")
+								url
+								redirect_headers(req.headers, base, next, True)
+								<<>>
+								Headers([])
+							)
+							count + 1
+						)
 						False -> follow(
 							Request(
 								req.method
 								url
-								req.headers
+								redirect_headers(req.headers, base, next, False)
 								req.body
 								req.trailers
 							)
@@ -1024,6 +1034,35 @@ follow = (req: Request, count: Int) {
 			}
 		}
 	}
+}
+
+redirect_headers = (hs: Headers, base, next, drop_body: Bool) -> Headers {
+	resolved = uri.resolve(base, next) |> {
+		Ok(value) -> value
+		Error(_)  -> panic("http: invalid resolved redirect")
+	}
+	changed = uri.parts(base).authority != uri.parts(resolved).authority
+	RawHeaders(list.filter(raw_pairs(hs), (pair) {
+		(name, _) = pair
+		name = lowercase(name)
+		{
+			changed && {
+				name == "authorization" ||
+					name == "cookie" ||
+					name == "proxy-authorization" ||
+					name == "host"
+			}
+		} ==
+			False &&
+			{
+				drop_body && {
+					name == "content-length" ||
+						name == "content-type" ||
+						name == "transfer-encoding"
+				}
+			} ==
+				False
+	}))
 }
 
 send_once = (req: Request) {
@@ -1075,6 +1114,10 @@ send_once = (req: Request) {
 	wire = serialize_request(
 		Request(req.method, target, hs, req.body, req.trailers)
 	)
+	fail.catch(() { net.resolve(hostname) }) |> {
+		Ok(_)                                          -> Nil
+		Error(net.NetError(operation, endpoint, code)) -> fail.raise(Dns(code))
+	}
 	stream = fail.catch(() { net.connect(hostname, port) }) |> {
 		Ok(value) -> value
 		Error(net.NetError(operation, endpoint, code)) -> fail.raise(
