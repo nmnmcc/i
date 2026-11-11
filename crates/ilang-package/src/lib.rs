@@ -73,6 +73,15 @@ pub struct Diagnostic {
     /// The file. `None` when the problem has no file.
     pub source: Option<SourceId>,
     pub span: Span,
+    /// Additional source locations explaining the diagnostic.
+    pub related: Vec<DiagnosticNote>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiagnosticNote {
+    pub source: SourceId,
+    pub span: Span,
+    pub message: String,
 }
 
 impl Diagnostic {
@@ -88,6 +97,7 @@ impl Diagnostic {
             message: message.into(),
             source,
             span,
+            related: Vec::new(),
         }
     }
 
@@ -153,6 +163,15 @@ impl Sources {
             Severity::Warning => "warning",
         };
         let _ = write!(out, "{kind}[{}]: {}", d.code, d.message);
+        for note in &d.related {
+            let file = self.get(note.source);
+            let (line, col) = LineIndex::new(&file.text).line_col(note.span.start);
+            let _ = write!(
+                out,
+                "\n  {}:{line}:{col}: note: {}",
+                file.display, note.message
+            );
+        }
         out
     }
 

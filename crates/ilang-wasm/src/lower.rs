@@ -607,7 +607,9 @@ pub fn lower_with_bindings(
     options: Options,
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     if !typed.coalescing_errors().is_empty() {
-        return Err(typed.coalescing_errors().to_vec());
+        let mut diags = typed.coalescing_errors().to_vec();
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut diags);
+        return Err(diags);
     }
     let mut l = Lowerer::new(graph, program, typed, options);
     l.run();
@@ -615,6 +617,7 @@ pub fn lower_with_bindings(
         crate::control::split(&mut l.out);
         Ok((l.out, l.bindings))
     } else {
+        ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
         Err(l.diags)
     }
 }
@@ -639,7 +642,7 @@ struct Lowerer<'a> {
     op_funcs: HashMap<String, FuncId>,
     work: Vec<(FuncId, DefId)>,
     constants: BTreeSet<FuncId>,
-    site_map: HashMap<SitePos, Site>,
+    site_map: HashMap<(SitePos, Option<String>), Site>,
     module_index: HashMap<ModuleId, u32>,
     lines: HashMap<ModuleId, LineIndex<'a>>,
     /// The service id of each service type constructor (§9.2).
@@ -1550,36 +1553,86 @@ impl<'a> Lowerer<'a> {
         }
         let program = self.program;
         let graph = self.graph;
-        let module = program.module(fx.module);
-        let index = match self.module_index.get(&fx.module) {
+        let mapped = program.origin(fx.module, Span::new(offset, offset));
+        let source = mapped
+            .as_ref()
+            .map_or(program.module(fx.module).source, |o| o.source);
+        let actual = mapped.as_ref().map_or(offset, |o| o.span.start);
+        let module_id = if mapped.is_some() {
+            program
+                .modules
+                .iter()
+                .position(|m| m.source == source)
+                .map(|i| ModuleId(i as u32))
+                .expect("site source has a module")
+        } else {
+            fx.module
+        };
+        let module = program.module(module_id);
+        let base_path = format!(
+            "{}{}",
+            graph.packages[module.package].position_prefix(),
+            module.path
+        );
+        let note = mapped.as_ref().and_then(|o| {
+            o.template.map(|(source, span)| {
+                let template_module = program
+                    .modules
+                    .iter()
+                    .find(|m| m.source == source)
+                    .expect("template source has a module");
+                let (line, column) =
+                    LineIndex::new(&graph.sources.get(source).text).line_col(span.start);
+                let mut note = format!(
+                    "\n  expanded from {}{}:{line}:{column}",
+                    graph.packages[template_module.package].position_prefix(),
+                    template_module.path
+                );
+                for call in o.expansion.call_chain.iter().skip(1).rev() {
+                    let source = ilang_package::SourceId(call.syntax.scope().module);
+                    let m = program
+                        .modules
+                        .iter()
+                        .find(|m| m.source == source)
+                        .expect("macro call source has a module");
+                    let (line, column) = LineIndex::new(&graph.sources.get(source).text)
+                        .line_col(call.syntax.span().start);
+                    note.push_str(&format!(
+                        "\n  in expansion of `{}` at {}{}:{line}:{column}",
+                        call.macro_name,
+                        graph.packages[m.package].position_prefix(),
+                        m.path
+                    ));
+                }
+                note
+            })
+        });
+        let index = match self.module_index.get(&module_id) {
             Some(&i) => i,
             None => {
                 let i = self.out.site_modules.len() as u32;
-                // A package with a location puts `location@major ` first
-                // (§11.7).
-                self.out.site_modules.push(format!(
-                    "{}{}",
-                    graph.packages[module.package].position_prefix(),
-                    module.path
-                ));
-                self.module_index.insert(fx.module, i);
+                self.out.site_modules.push(base_path);
+                self.module_index.insert(module_id, i);
                 i
             }
         };
         let lines = self
             .lines
-            .entry(fx.module)
+            .entry(module_id)
             .or_insert_with(|| LineIndex::new(&graph.sources.get(module.source).text));
-        let (line, column) = lines.line_col(offset);
+        let (line, column) = lines.line_col(actual);
         let pos = SitePos {
             module: index,
             line,
             column,
         };
-        Some(*self.site_map.entry(pos).or_insert_with(|| {
-            self.out.sites.push(pos);
-            self.out.sites.len() as Site - 1
-        }))
+        Some(
+            *self.site_map.entry((pos, note.clone())).or_insert_with(|| {
+                self.out.sites.push(pos);
+                self.out.site_notes.push(note);
+                self.out.sites.len() as Site - 1
+            }),
+        )
     }
 
     // ---- Names ----
