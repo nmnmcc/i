@@ -1790,3 +1790,76 @@ fn a_later_macro_failure_keeps_an_earlier_committed_note() {
         checked.diags
     );
 }
+
+#[test]
+fn checked_collection_validates_targets_and_duplicates() {
+    use ilang_host::syntax::ItemRequest;
+    use ilang_macro::{
+        collections,
+        session::{ItemOrigin, Transaction},
+    };
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x: Int) { x }\nalias = good\n",
+    )
+    .unwrap();
+    let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, diagnostics) = ilang_check::parse(&graph);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    assert!(
+        checked.diags.iter().all(|d| !d.is_error()),
+        "{:?}",
+        checked.diags
+    );
+    let source = parsed.iter().find(|p| p.path == "app/main").unwrap().source;
+    let atom = |name: &str| {
+        Syntax::from_datum(
+            &parse(name).unwrap()[0],
+            &Scope {
+                module: source.0,
+                marks: BTreeSet::new(),
+            },
+        )
+    };
+    let request = |target: &str| ItemRequest::Add {
+        collection: atom("anchor"),
+        target: atom(target),
+        data: vec![("name".into(), "example".into())],
+        at: atom("good"),
+    };
+    let transaction = |requests| Transaction {
+        notes: vec![],
+        requests,
+        item_origin: Some(ItemOrigin {
+            source: source.0,
+            call: ilang_syntax::span::Span::new(0, 1),
+            path: vec![0],
+        }),
+        mark: 0,
+        location: None,
+    };
+    let program = checked.program.as_ref().unwrap();
+    let typed = checked.types.as_ref().unwrap();
+    let good = collections::resolve(
+        &parsed,
+        program,
+        typed,
+        &[transaction(vec![request("good")])],
+    )
+    .unwrap();
+    assert_eq!(good.len(), 1);
+    assert_eq!(program.def(good[0].target).name, "good");
+    assert_eq!(good[0].data[0].1, "example");
+    for requests in [
+        vec![request("bad")],
+        vec![request("alias")],
+        vec![request("good"), request("good")],
+    ] {
+        assert!(collections::resolve(&parsed, program, typed, &[transaction(requests)]).is_err());
+    }
+}

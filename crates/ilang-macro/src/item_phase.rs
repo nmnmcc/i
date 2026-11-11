@@ -166,12 +166,27 @@ impl BodyEngine<'_> {
                 let original_names = item_names(&item);
                 let is_type = matches!(item.kind, ItemKind::TypeDef(_));
                 let (result, budget, transactions) = self.execute(
-                    &mac, args, &call, attribute.span, Some(inner.clone()), MacroPosition::Item,
+                    &mac,
+                    args,
+                    &call,
+                    attribute.span,
+                    Some(inner.clone()),
+                    MacroPosition::Item,
                 )?;
-                ilang_host::syntax::charge_tree(&budget, &result, true)
-                    .map_err(|error| Error::Resource { error: error.into(), macro_name: mac.definition.name.clone(), call: call.clone(), invocation_span: attribute.span })?;
-                let result = ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || definitions.fresh_answer());
-                let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
+                ilang_host::syntax::charge_tree(&budget, &result, true).map_err(|error| {
+                    Error::Resource {
+                        error: error.into(),
+                        macro_name: mac.definition.name.clone(),
+                        call: call.clone(),
+                        invocation_span: attribute.span,
+                    }
+                })?;
+                let result =
+                    ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || {
+                        definitions.fresh_answer()
+                    });
+                let start =
+                    u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let mut items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
@@ -231,10 +246,20 @@ impl BodyEngine<'_> {
                 let call = self.item_syntax(&item);
                 let (result, budget, transactions) =
                     self.execute(&mac, args, &call, item.span, None, MacroPosition::Item)?;
-                ilang_host::syntax::charge_tree(&budget, &result, true)
-                    .map_err(|error| Error::Resource { error: error.into(), macro_name: mac.definition.name.clone(), call: call.clone(), invocation_span: item.span })?;
-                let result = ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || definitions.fresh_answer());
-                let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
+                ilang_host::syntax::charge_tree(&budget, &result, true).map_err(|error| {
+                    Error::Resource {
+                        error: error.into(),
+                        macro_name: mac.definition.name.clone(),
+                        call: call.clone(),
+                        invocation_span: item.span,
+                    }
+                })?;
+                let result =
+                    ilang_syntax::lisp::definitions::freshen_duplicate_heads(&result, || {
+                        definitions.fresh_answer()
+                    });
+                let start =
+                    u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let items = self
                     .scoped
                     .items_metered(&result, &call, |work, words| {
@@ -276,15 +301,27 @@ impl BodyEngine<'_> {
             if self.item_replacements.len() != start {
                 let replacements = &self.item_replacements[start..];
                 for (_, target, budget) in replacements {
-                    ilang_host::syntax::charge_tree(budget, &root, true)
-                        .map_err(|error| Error::Resource { error: error.into(), macro_name: "type macro".into(), call: root.clone(), invocation_span: item.span })?;
+                    ilang_host::syntax::charge_tree(budget, &root, true).map_err(|error| {
+                        Error::Resource {
+                            error: error.into(),
+                            macro_name: "type macro".into(),
+                            call: root.clone(),
+                            invocation_span: item.span,
+                        }
+                    })?;
                     let output = &self
                         .scoped
                         .origin(*target)
                         .expect("expanded type has an origin")
                         .syntax;
-                    ilang_host::syntax::charge_tree(budget, output, true)
-                        .map_err(|error| Error::Resource { error: error.into(), macro_name: "type macro".into(), call: root.clone(), invocation_span: item.span })?;
+                    ilang_host::syntax::charge_tree(budget, output, true).map_err(|error| {
+                        Error::Resource {
+                            error: error.into(),
+                            macro_name: "type macro".into(),
+                            call: root.clone(),
+                            invocation_span: item.span,
+                        }
+                    })?;
                 }
                 let spans = replacements
                     .iter()
@@ -422,7 +459,9 @@ pub fn expand_items(
     let original_replacements = engine.item_replacements.clone();
     let result = expand_items_inner(engine, module, definitions);
     engine.resolver = original_resolver;
-    if result.is_ok() { engine.phase_notes.clear(); }
+    if result.is_ok() {
+        engine.phase_notes.clear();
+    }
     if result.is_err() {
         if engine.failure_scoped().is_none() {
             engine.save_failure_source();
@@ -519,6 +558,8 @@ fn expand_items_inner(
         };
         let old_scoped = engine.scoped.clone();
         let old_transactions = engine.transactions.len();
+        let old_overrides = engine.item_overrides.clone();
+        let old_replacements = engine.item_replacements.clone();
         let attempt = engine.item_step(slots[index].item.clone(), definitions.as_ref());
         match attempt {
             Ok(step) => {
@@ -589,15 +630,31 @@ fn expand_items_inner(
                             pending.push_front(id);
                         }
                         transactions.extend(effects.into_iter().map(|mut transaction| {
-                            let origin = crate::session::ItemOrigin { source: engine.source.0, call: root, path: parent_path.clone() };
-                            engine.phase_notes.extend(transaction.notes.iter().map(|message| PhaseNote { mark: transaction.mark, origin: origin.clone(), message: message.clone() }));
+                            let origin = crate::session::ItemOrigin {
+                                source: engine.source.0,
+                                call: root,
+                                path: parent_path.clone(),
+                            };
+                            engine
+                                .phase_notes
+                                .extend(transaction.notes.iter().map(|message| PhaseNote {
+                                    mark: transaction.mark,
+                                    origin: origin.clone(),
+                                    message: message.clone(),
+                                }));
                             transaction.item_origin = Some(origin);
                             transaction
                         }));
                     }
                 }
                 for mut transaction in engine.transactions.drain(old_transactions..) {
-                    engine.phase_notes.extend(transaction.notes.iter().map(|message| PhaseNote { mark: transaction.mark, origin: original_origin.clone(), message: message.clone() }));
+                    engine
+                        .phase_notes
+                        .extend(transaction.notes.iter().map(|message| PhaseNote {
+                            mark: transaction.mark,
+                            origin: original_origin.clone(),
+                            message: message.clone(),
+                        }));
                     transaction.item_origin = Some(original_origin.clone());
                     transactions.push(transaction);
                 }
@@ -607,6 +664,8 @@ fn expand_items_inner(
                 ..
             }) => {
                 engine.scoped = old_scoped;
+                engine.item_overrides = old_overrides;
+                engine.item_replacements = old_replacements;
                 engine.transactions.truncate(old_transactions);
                 waits.retain(|(waiting, _)| *waiting != id);
                 waits.push((id, at));
@@ -636,6 +695,8 @@ fn expand_items_inner(
             Err(error) => {
                 engine.save_failure_source();
                 engine.scoped = old_scoped;
+                engine.item_overrides = old_overrides;
+                engine.item_replacements = old_replacements;
                 engine.transactions.truncate(old_transactions);
                 return Err(PhaseError::Step(error));
             }
