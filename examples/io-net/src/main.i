@@ -4,6 +4,7 @@
 	i/stdio
 )
 
+// Program entry.
 main = () {
 	listener = net.listen("127.0.0.1", 0)
 	port = net.local_port(listener)
