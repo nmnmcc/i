@@ -1285,10 +1285,12 @@ mod tests {
             let mut solver = Solver::new(HashMap::new(), Vec::new());
             let a = solver.fresh_at(1);
             let b = if two { solver.fresh_at(1) } else { a };
+            let c = if two { solver.fresh_at(1) } else { a };
             let fun = Ty::Fn(Box::new(FnTy {
                 params: vec![
                     (Some("a".into()), Ty::Var(a)),
                     (Some("b".into()), Ty::Var(b)),
+                    (Some("c".into()), Ty::Var(c)),
                 ],
                 ret: Ty::Top,
                 err: Ty::Never,
@@ -3500,6 +3502,21 @@ fn find_cover(
                 if !candidates.contains(&candidate) {
                     candidates.push(candidate);
                 }
+            }
+        }
+    }
+    let subject_vars: Vec<_> = atoms
+        .iter()
+        .filter(|ty| matches!(ty, Ty::Var(_)))
+        .cloned()
+        .collect();
+    if subject_vars.len() > 2 {
+        for candidate in [
+            subject.records.union(&subject_vars),
+            subject.records.inter(&subject_vars),
+        ] {
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
             }
         }
     }

@@ -918,13 +918,7 @@ fn compare_with(
         Some(Ok(old)) => {
             let diff = Diff::new(old, now)?;
             diff.print(&tag);
-            if !diff.removed.is_empty() || !diff.changed.is_empty() {
-                (Step::Major, "something was removed or changed")
-            } else if !diff.added.is_empty() {
-                (Step::Minor, "something was added")
-            } else {
-                (Step::Patch, "nothing changed")
-            }
+            diff.version_step()
         }
     };
     if step < needed {
@@ -1564,24 +1558,96 @@ impl<'a> TypeShow<'a> {
 struct Diff {
     removed: Vec<(String, Entry)>,
     changed: Vec<(String, Entry, Entry)>,
+    representation: Vec<(String, Entry, Entry)>,
     added: Vec<(String, Entry)>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum InterfaceComparison {
+    Equal,
+    Different,
+    Representation,
+}
+
+fn classify_scheme_comparison(
+    comparison: ilang_check::types::SchemeComparison,
+    correspondences: &mut Vec<Vec<Vec<(usize, usize)>>>,
+) -> Result<InterfaceComparison> {
+    use ilang_check::types::SchemeComparison;
+    Ok(match comparison {
+        SchemeComparison::Equivalent(options) => {
+            correspondences.push(options);
+            InterfaceComparison::Equal
+        }
+        SchemeComparison::Different => InterfaceComparison::Different,
+        SchemeComparison::Unknown => InterfaceComparison::Representation,
+        SchemeComparison::ResourceLimit => bail!("the interface proof budget was exhausted"),
+    })
+}
+
+fn unchanged_scheme_representation(
+    result: &ilang_check::types::SchemeComparison,
+    same: bool,
+) -> bool {
+    same && matches!(result, ilang_check::types::SchemeComparison::Unknown)
+}
+
+fn same_scheme_representation(
+    left: &(
+        ilang_check::types::SchemeArtifact,
+        std::sync::Arc<Vec<String>>,
+        String,
+    ),
+    right: &(
+        ilang_check::types::SchemeArtifact,
+        std::sync::Arc<Vec<String>>,
+        String,
+    ),
+) -> bool {
+    let text = |(scheme, names, _): &(
+        ilang_check::types::SchemeArtifact,
+        std::sync::Arc<Vec<String>>,
+        String,
+    )| {
+        scheme.text_with(&mut |t| match t {
+            TypeRef::Builtin(b) => b.name().into(),
+            TypeRef::Custom(id) => names[id.0 as usize].clone(),
+        })
+    };
+    text(left) == text(right)
+}
+
 impl Diff {
+    fn version_step(&self) -> (Step, &'static str) {
+        if !self.removed.is_empty() || !self.changed.is_empty() {
+            (Step::Major, "something was removed or changed")
+        } else if !self.representation.is_empty() {
+            (Step::Major, "an interface representation changed")
+        } else if !self.added.is_empty() {
+            (Step::Minor, "something was added")
+        } else {
+            (Step::Patch, "nothing changed")
+        }
+    }
+
     fn new(old: &Interface, new: &Interface) -> Result<Diff> {
         let mut d = Diff {
             removed: Vec::new(),
             changed: Vec::new(),
+            representation: Vec::new(),
             added: Vec::new(),
         };
         let mut correspondences: Vec<Vec<Vec<(usize, usize)>>> = Vec::new();
+        let mut correspondence_keys = Vec::new();
         let grouped = shared_scheme_groups(old, new)?;
         for (k, v) in old {
             match new.get(k) {
                 None => d.removed.push((k.clone(), v.clone())),
                 Some(n) => {
-                    let equal = if let Some(equal) = grouped.get(k) {
-                        *equal
+                    let mut representation = false;
+                    let equal = if let Some(comparison) = grouped.get(k) {
+                        representation = *comparison == InterfaceComparison::Representation;
+                        *comparison == InterfaceComparison::Equal
                     } else {
                         match (&v.scheme, &n.scheme) {
                             (
@@ -1593,8 +1659,7 @@ impl Diff {
                                     || !left.external_ids_used().is_empty()
                                     || !right.external_ids_used().is_empty()) =>
                             {
-                                use ilang_check::types::SchemeComparison;
-                                match left
+                                let mut result = left
                                     .compare(
                                         right,
                                         &mut |t| match t {
@@ -1610,20 +1675,29 @@ impl Diff {
                                             }
                                         },
                                     )
-                                    .map_err(|e| anyhow!("cannot compare {k}: {e}"))?
-                                {
-                                    SchemeComparison::Equivalent(options) => {
-                                        correspondences.push(options);
-                                        true
-                                    }
-                                    SchemeComparison::Different => false,
-                                    SchemeComparison::Unknown => bail!(
-                                        "could not prove whether the complete scheme of {k} changed"
+                                    .map_err(|e| anyhow!("cannot compare {k}: {e}"))?;
+                                if unchanged_scheme_representation(
+                                    &result,
+                                    same_scheme_representation(
+                                        v.scheme.as_ref().expect("left scheme"),
+                                        n.scheme.as_ref().expect("right scheme"),
                                     ),
-                                    SchemeComparison::ResourceLimit => {
-                                        bail!("the proof budget was exhausted while comparing {k}")
-                                    }
+                                ) {
+                                    result =
+                                        ilang_check::types::SchemeComparison::Equivalent(vec![
+                                            left.external_ids_used()
+                                                .into_iter()
+                                                .map(|id| (id, id))
+                                                .collect(),
+                                        ]);
                                 }
+                                let comparison =
+                                    classify_scheme_comparison(result, &mut correspondences)?;
+                                if comparison == InterfaceComparison::Equal {
+                                    correspondence_keys.push(k.clone());
+                                }
+                                representation = comparison == InterfaceComparison::Representation;
+                                comparison == InterfaceComparison::Equal
                             }
                             (Some((_, _, left_import)), Some((_, _, right_import)))
                                 if left_import == right_import =>
@@ -1654,7 +1728,9 @@ impl Diff {
                             },
                         }
                     };
-                    if !equal {
+                    if representation {
+                        d.representation.push((k.clone(), v.clone(), n.clone()))
+                    } else if !equal {
                         d.changed.push((k.clone(), v.clone(), n.clone()))
                     }
                 }
@@ -1666,15 +1742,20 @@ impl Diff {
             }
         }
         if !consistent_external_mapping(&correspondences)? {
-            bail!(
-                "could not prove the shared nongeneralized-variable relationship between interfaces"
-            );
+            for key in correspondence_keys {
+                d.representation
+                    .push((key.clone(), old[&key].clone(), new[&key].clone()));
+            }
         }
         Ok(d)
     }
 
     fn print(&self, tag: &str) {
-        if self.removed.is_empty() && self.changed.is_empty() && self.added.is_empty() {
+        if self.removed.is_empty()
+            && self.changed.is_empty()
+            && self.representation.is_empty()
+            && self.added.is_empty()
+        {
             println!("the public interface is the same as in {tag}");
             return;
         }
@@ -1693,13 +1774,20 @@ impl Diff {
             println!("  changed {k}: {old}");
             println!("       to {k}: {new}");
         }
+        for (k, old, new) in &self.representation {
+            println!("  changed representation of {k}: {}", old.shown);
+            println!("                     to {k}: {}", new.shown);
+        }
         for (k, v) in &self.added {
             println!("  added {k}: {}", v.shown);
         }
     }
 }
 
-fn shared_scheme_groups(old: &Interface, new: &Interface) -> Result<BTreeMap<String, bool>> {
+fn shared_scheme_groups(
+    old: &Interface,
+    new: &Interface,
+) -> Result<BTreeMap<String, InterfaceComparison>> {
     let common: Vec<_> = old
         .iter()
         .filter_map(|(key, entry)| {
@@ -1740,11 +1828,10 @@ fn shared_scheme_groups(old: &Interface, new: &Interface) -> Result<BTreeMap<Str
         let left_names = &common[members[0]].1.1;
         let right_names = &common[members[0]].2.1;
         let same_imports = members.iter().all(|&i| common[i].1.2 == common[i].2.2);
-        let equal = if !same_imports {
-            false
+        let comparison = if !same_imports {
+            InterfaceComparison::Different
         } else {
-            use ilang_check::types::SchemeComparison;
-            match ilang_check::types::compare_scheme_group(
+            let result = ilang_check::types::compare_scheme_group(
                 &left,
                 &right,
                 &mut |t| match t {
@@ -1756,20 +1843,20 @@ fn shared_scheme_groups(old: &Interface, new: &Interface) -> Result<BTreeMap<Str
                     TypeRef::Custom(id) => right_names[id.0 as usize].clone(),
                 },
             )
-            .map_err(|e| anyhow!("cannot compare shared exported schemes: {e}"))?
-            {
-                SchemeComparison::Equivalent(_) => true,
-                SchemeComparison::Different => false,
-                SchemeComparison::Unknown => {
-                    bail!("could not prove whether shared exported schemes changed")
-                }
-                SchemeComparison::ResourceLimit => {
-                    bail!("the proof budget was exhausted while comparing shared exported schemes")
-                }
+            .map_err(|e| anyhow!("cannot compare shared exported schemes: {e}"))?;
+            if unchanged_scheme_representation(
+                &result,
+                members
+                    .iter()
+                    .all(|&i| same_scheme_representation(common[i].1, common[i].2)),
+            ) {
+                InterfaceComparison::Equal
+            } else {
+                classify_scheme_comparison(result, &mut Vec::new())?
             }
         };
         for &i in members {
-            result.insert(common[i].0.clone(), equal);
+            result.insert(common[i].0.clone(), comparison);
         }
     }
     Ok(result)
@@ -1920,6 +2007,52 @@ mod value_type_interfaces {
             .into_iter()
             .map(|(key, entry)| (key, entry.canonical))
             .collect()
+    }
+    #[test]
+    fn representation_changes_require_a_major_version_without_claiming_type_inequality() {
+        let old = interface("(f)\nf = (x) { (field: x) }");
+        let entry = old.values().next().unwrap().clone();
+        let diff = Diff {
+            removed: vec![],
+            changed: vec![],
+            representation: vec![("value api.f".into(), entry.clone(), entry)],
+            added: vec![],
+        };
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+        assert!(diff.changed.is_empty());
+        let mut correspondences = Vec::new();
+        use ilang_check::types::SchemeComparison;
+        assert!(unchanged_scheme_representation(
+            &SchemeComparison::Unknown,
+            true
+        ));
+        assert!(!unchanged_scheme_representation(
+            &SchemeComparison::Unknown,
+            false
+        ));
+        assert_eq!(
+            classify_scheme_comparison(SchemeComparison::Unknown, &mut correspondences).unwrap(),
+            InterfaceComparison::Representation
+        );
+        assert_eq!(
+            classify_scheme_comparison(SchemeComparison::Different, &mut correspondences).unwrap(),
+            InterfaceComparison::Different
+        );
+        assert_eq!(
+            classify_scheme_comparison(
+                SchemeComparison::Equivalent(vec![vec![]]),
+                &mut correspondences
+            )
+            .unwrap(),
+            InterfaceComparison::Equal
+        );
+        assert!(
+            classify_scheme_comparison(SchemeComparison::ResourceLimit, &mut correspondences)
+                .is_err()
+        );
     }
     #[test]
     fn exported_alias_uses_completed_body_not_private_source_spelling() {
