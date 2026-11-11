@@ -1,5 +1,5 @@
 (i/task, i/resource, i/fail, i/request, i/control, i/core, rng = i/random, (Io) = i/io)
-deep = (n: Int) -> Nil ! task.Scheduler { { n == 0 } |> { True -> task.yield()
+deep = (n: Int) -> Nil ! task.Scheduler | request.Root | request.Owner { { n == 0 } |> { True -> task.yield()
  False -> task.scope((s) { task.go(s, () { Nil })
  deep(n - 1) }) } }
 
