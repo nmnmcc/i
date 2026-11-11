@@ -333,7 +333,11 @@ impl Walk for TypeKind {
             }
             Self::Hole => {}
             Self::Tuple(ts) | Self::Union(ts) | Self::Inter(ts) | Self::Diff(ts) => push(ts, work),
-            Self::Record { base, fields, removed } => {
+            Self::Record {
+                base,
+                fields,
+                removed,
+            } => {
                 push(base, work);
                 push(fields, work);
                 push(removed, work);

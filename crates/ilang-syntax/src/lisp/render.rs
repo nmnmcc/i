@@ -128,6 +128,51 @@ pub(super) fn render_anchored(
                 }
             }};
         }
+        macro_rules! record {
+            ($xs:expr, $kind:ident, $type_record:expr) => {{
+                let xs = $xs;
+                text!("(");
+                let mut i = 0;
+                let mut first = true;
+                let has_base = xs.first().is_some_and(|x| symbol(x, ".."));
+                if has_base {
+                    if xs.len() < 2 {
+                        return Err(bad(d, "a record spread"));
+                    }
+                    text!("..");
+                    node!($kind, &xs[1]);
+                    i = 2;
+                    first = false;
+                }
+                while i < xs.len() {
+                    if !first {
+                        text!(", ");
+                    }
+                    first = false;
+                    match round(&xs[i]) {
+                        Some([h, n, v]) if symbol(h, ":") => {
+                            match &n.kind {
+                                K::Name(_) | K::String(_) => text!(show(n)),
+                                K::UpName(_) if $type_record => text!(show(n)),
+                                _ => return Err(bad(n, "a record label")),
+                            }
+                            text!(": ");
+                            node!($kind, v);
+                        }
+                        Some([h, n]) if $type_record && has_base && symbol(h, "-") => {
+                            text!("-");
+                            match &n.kind {
+                                K::Name(_) | K::UpName(_) | K::String(_) => text!(show(n)),
+                                _ => return Err(bad(n, "a record label")),
+                            }
+                        }
+                        _ => return Err(bad(&xs[i], "a record field")),
+                    }
+                    i += 1;
+                }
+                text!(")");
+            }};
+        }
         match p {
             P::Import => {
                 let xs = round(d).ok_or_else(|| bad(d, "an import"))?;
@@ -336,6 +381,10 @@ pub(super) fn render_anchored(
                         _ => return Err(bad(d, "a type")),
                     }
                 } else if let K::Curly(xs) = &d.kind
+                    && is_record(xs)
+                {
+                    record!(xs, Type, true);
+                } else if let K::Curly(xs) = &d.kind
                     && xs.len() == 1
                 {
                     text!("{ ");
@@ -470,6 +519,7 @@ pub(super) fn render_anchored(
                             seq!(xs, Segment, ", ");
                             text!(">>");
                         }
+                        K::Curly(xs) if is_record(xs) => record!(xs, Expr, false),
                         K::Curly(xs) if xs.is_empty() || xs.first().is_some_and(is_clause) => {
                             text!("{ ");
                             lines!(xs, Clause);
@@ -598,7 +648,7 @@ pub(super) fn render_anchored(
                 } else {
                     match &d.kind {
                         K::Round(xs) => match xs.as_slice() {
-                            [] => text!("()"),
+                            [] => return Err(bad(d, "a pattern")),
                             [h, n, t] if symbol(h, ":") => {
                                 text!(atom(n).ok_or_else(|| bad(n, "a binder"))?);
                                 text!(": ");
@@ -660,4 +710,64 @@ pub(super) fn render_anchored(
         stack.extend(tasks.into_iter().rev());
     }
     Ok((out, anchors))
+}
+
+fn is_record(xs: &[Datum]) -> bool {
+    xs.first().is_some_and(|first| {
+        symbol(first, "..") || matches!(round(first), Some([h, _, _]) if symbol(h, ":"))
+    })
+}
+
+#[cfg(test)]
+mod record_tests {
+    use super::*;
+    use crate::lisp::parse;
+
+    fn render_one(input: &str, p: P) -> Result<String> {
+        let document = parse(input).unwrap();
+        render(&document[0], p)
+    }
+
+    #[test]
+    fn records_keep_spreads_fields_labels_and_grouping() {
+        assert_eq!(render_one("()", P::Expr).unwrap(), "()");
+        assert!(render_one("()", P::Pattern).is_err());
+        assert_eq!(
+            render_one("{ (: x 1) (: \"y-z\" v) }", P::Expr).unwrap(),
+            "(x: 1, \"y-z\": v)"
+        );
+        assert_eq!(
+            render_one("{ .. base (: x v) }", P::Expr).unwrap(),
+            "(..base, x: v)"
+        );
+        assert_eq!(
+            render_one("{ .. R (- X) (: y T) }", P::Type).unwrap(),
+            "(..R, -X, y: T)"
+        );
+        assert_eq!(render_one("{ T }", P::Type).unwrap(), "{ T }");
+        assert_eq!(render_one("{ x }", P::Expr).unwrap(), "{ x }");
+        assert!(render_one("{ .. x (- y) }", P::Expr).is_err());
+        assert!(render_one("{ .. }", P::Type).is_err());
+    }
+
+    #[test]
+    fn deeply_nested_record_fields_render_on_small_stack() {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let mut input = String::with_capacity(100_001);
+                for _ in 0..10_000 {
+                    input.push_str("{ (: x ");
+                }
+                input.push('v');
+                for _ in 0..10_000 {
+                    input.push_str(") }");
+                }
+                let expected = format!("{}v{}", "(x: ".repeat(10_000), ")".repeat(10_000));
+                assert_eq!(render_one(&input, P::Expr).unwrap(), expected);
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
 }
