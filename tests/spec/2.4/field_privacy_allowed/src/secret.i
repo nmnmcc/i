@@ -1,8 +1,12 @@
 (
 	Secret
 	Choice
+	Left
+	Right
 	Raw
-	Open(..)
+	Open
+	OpenCase(..)
+	Other(..)
 	make
 	read
 	local_update
@@ -17,8 +21,13 @@ Secret(A) {
 	Pack(value: A, parts: (A, Int), read: () -> A)
 }
 
-Choice {
+Choice = Left | Right
+
+Left {
 	Left(value: Int)
+}
+
+Right {
 	Right(value: Int)
 }
 
@@ -26,8 +35,13 @@ Raw {
 	Raw(read: () -> Int)
 }
 
-Open {
+Open = OpenCase | Other
+
+OpenCase {
 	Open(value: Int)
+}
+
+Other {
 	Other(value: Int)
 }
 
@@ -45,4 +59,4 @@ callback(A) = (value: Secret(A)) { value.read }
 
 raw = Raw(read: () { 42 })
 
-open = Open(value: 11)
+open: Open = Open(value: 11)

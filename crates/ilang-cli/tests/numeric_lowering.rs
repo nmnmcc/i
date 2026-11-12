@@ -498,7 +498,9 @@ bounded_float = (x: Float) -> Float {
   { x <=. 1.0 } |> { False -> x True -> { a = x *. 0.5 +. 0.25 a *. 0.5 -. 0.125 } }
  } }
 }
-Pair { Left(x: Float, y: Float) Right(y: Float, x: Float) }
+Pair = Left | Right
+Left { Left(x: Float, y: Float) }
+Right { Right(y: Float, x: Float) }
 relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ -> relay(f, n - 1, x) } }
 numeric_pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
 step_float = (x: Float) -> Float { x *. 0.5 +. 0.25 }

@@ -3,9 +3,17 @@
 	std/int
 )
 
-Expr {
+Expr = Num | Add | Mul
+
+Num {
 	Num(Int)
+}
+
+Add {
 	Add(Expr, Expr)
+}
+
+Mul {
 	Mul(Expr, Expr)
 }
 

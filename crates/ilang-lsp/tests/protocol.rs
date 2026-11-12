@@ -936,9 +936,9 @@ fn typed_macro_hover_and_definition_through_call() {
 
 // ---- Features over a package with modules, tests, and a dependency ----
 
-const LIB_TEXT: &str = "(shout, Tone(..))\n\n/// A tone of voice.\nTone {\n\tLoud\n\tQuiet\n}\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
+const LIB_TEXT: &str = "(shout, Tone, Loud(..), Quiet(..))\n\n/// A tone of voice.\nTone = Loud | Quiet\n\nLoud {\n\tLoud\n}\n\nQuiet {\n\tQuiet\n}\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
 
-const SHAPES: &str = "(Shape(..), area, origin, Clock(..), Box(..))\n\n/// A shape in the plane.\nShape {\n\tCircle(radius: Int)\n\tRect(width: Int, height: Int)\n}\n\n/// A box of a value.\nBox(A) { Box(item: A) }\n\n/// A clock service.\nClock { Clock(now: () -> Int) }\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |> {\n\t\tCircle(radius) -> radius * radius * 3\n\t\tRect(width, height) -> width * height\n\t}\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
+const SHAPES: &str = "(Shape, Circle(..), Rect(..), area, origin, Clock(..), Box(..))\n\n/// A shape in the plane.\nShape = Circle | Rect\n\nCircle {\n\tCircle(radius: Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\n/// A box of a value.\nBox(A) { Box(item: A) }\n\n/// A clock service.\nClock { Clock(now: () -> Int) }\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |> {\n\t\tCircle(radius) -> radius * radius * 3\n\t\tRect(width, height) -> width * height\n\t}\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
 
 const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(main)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius: 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
 
@@ -1809,7 +1809,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Shape {\n\tCircle(Int)\n\tRect(width: Int, height: Int)\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t\t\n\t}\n}\n";
+    let text = "Shape = Circle | Rect | Dot\n\nCircle {\n\tCircle(Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\nDot {\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t\t\n\t}\n}\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2281,7 +2281,7 @@ fn lsp_code_action_removes_an_unused_import() {
 #[test]
 fn lsp_code_action_adds_the_missing_clauses() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Shape {\n\tCircle(Int)\n\tRect(width: Int, height: Int)\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
+    let text = "Shape = Circle | Rect | Dot\n\nCircle {\n\tCircle(Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\nDot {\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -3016,7 +3016,7 @@ fn lsp_capabilities_are_advertised() {
     c.shutdown();
 }
 
-const MATCH: &str = "Shape {\n\tCircle(Int)\n\tRect(width: Int, height: Int)\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
+const MATCH: &str = "Shape = Circle | Rect | Dot\n\nCircle {\n\tCircle(Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\nDot {\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
 
 #[test]
 fn lsp_code_action_missing_clauses_lisp_surface() {

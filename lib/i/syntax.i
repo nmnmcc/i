@@ -20,7 +20,24 @@
 	Unquote(..)
 	Splice(..)
 	TypeHandle
-	Position(..)
+	Position
+	ImportItem(..)
+	ExportItem(..)
+	Item(..)
+	Attribute(..)
+	Constructor(..)
+	Field(..)
+	Type(..)
+	FunctionResult(..)
+	Parameter(..)
+	Expression(..)
+	Statement(..)
+	CallArgument(..)
+	Clause(..)
+	ClauseHead(..)
+	Pattern(..)
+	Segment(..)
+	Format(..)
 	SyntaxError(..)
 	Definitions(..)
 	definition
@@ -32,7 +49,10 @@
 	Items(..)
 	Diagnostics(..)
 	Types(..)
-	Truth(..)
+	Truth
+	Yes(..)
+	No(..)
+	NotKnown(..)
 	type_of
 	signature
 	subtype
@@ -118,23 +138,73 @@ Splice {
 	Splice(Syntax)
 }
 
-Position {
+Position = ImportItem | ExportItem | Item | Attribute | Constructor | Field | Type | FunctionResult | Parameter | Expression | Statement | CallArgument | Clause | ClauseHead | Pattern | Segment | Format
+
+ImportItem {
 	ImportItem
+}
+
+ExportItem {
 	ExportItem
+}
+
+Item {
 	Item
+}
+
+Attribute {
 	Attribute
+}
+
+Constructor {
 	Constructor
+}
+
+Field {
 	Field
+}
+
+Type {
 	Type
+}
+
+FunctionResult {
 	FunctionResult
+}
+
+Parameter {
 	Parameter
+}
+
+Expression {
 	Expression
+}
+
+Statement {
 	Statement
+}
+
+CallArgument {
 	CallArgument
+}
+
+Clause {
 	Clause
+}
+
+ClauseHead {
 	ClauseHead
+}
+
+Pattern {
 	Pattern
+}
+
+Segment {
 	Segment
+}
+
+Format {
 	Format
 }
 
@@ -555,9 +625,17 @@ show_as = (syntax: Syntax, position: Position) -> String ^ SyntaxError {
 }
 
 /// Frozen type observations supplied only to typed macro implementations.
-Truth {
+Truth = Yes | No | NotKnown
+
+Yes {
 	Yes
+}
+
+No {
 	No
+}
+
+NotKnown {
 	NotKnown
 }
 

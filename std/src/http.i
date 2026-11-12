@@ -22,17 +22,32 @@
 (
 	Client(..)
 	Transport(..)
-	ResponseStream
+	ResponseStream(..)
+	ClientFunctions(..)
+	BodyReader(..)
 	native_client
 	fetch_client
 	send_stream
 	Method(..)
 	Status(..)
-	Headers(..)
+	Headers
+	HeadersCase(..)
+	RawHeaders(..)
 	Request(..)
 	Response(..)
-	HttpError(..)
-	Progress(..)
+	HttpError
+	NeedMore(..)
+	BadMessage(..)
+	Dns(..)
+	Connect(..)
+	Tls(..)
+	Protocol(..)
+	Timeout(..)
+	StatusError(..)
+	Progress
+	More(..)
+	Complete(..)
+	Invalid(..)
 	request
 	response
 	feed_request
@@ -57,7 +72,10 @@
 	body_text
 	body_json
 	body_decode
-	BodyError(..)
+	BodyError
+	InvalidText(..)
+	InvalidJson(..)
+	InvalidSchema(..)
 	send_with
 	send_timeout
 	route
@@ -86,8 +104,13 @@ Status {
 	Status(Int)
 }
 
-Headers {
+Headers = HeadersCase | RawHeaders
+
+HeadersCase {
 	Headers(List((String, String)))
+}
+
+RawHeaders {
 	RawHeaders(List((String, BitArray)))
 }
 
@@ -111,20 +134,51 @@ Response {
 	)
 }
 
-HttpError {
+HttpError = NeedMore | BadMessage | Dns | Connect | Tls | Protocol | Timeout | StatusError
+
+NeedMore {
 	NeedMore
+}
+
+BadMessage {
 	BadMessage(String)
+}
+
+Dns {
 	Dns(String)
+}
+
+Connect {
 	Connect(String)
+}
+
+Tls {
 	Tls(String)
+}
+
+Protocol {
 	Protocol(String)
+}
+
+Timeout {
 	Timeout
+}
+
+StatusError {
 	StatusError(Int)
 }
 
-Progress(A) {
+Progress(A) = More | Complete(A) | Invalid
+
+More {
 	More(BitArray)
+}
+
+Complete(A) {
 	Complete(A, BitArray)
+}
+
+Invalid {
 	Invalid(String)
 }
 
@@ -927,7 +981,7 @@ lowercase = (s: String) -> String {
 /// Buffered request handler, built on the incremental body reader.
 serve = (listener, handler) {
 	serve_stream(listener, (req: Request, reader) {
-		body = collect_body(reader, [])
+		body = collect_body((read: reader.read), [])
 		handler(Request(..req, body: body, trailers: reader.trailers()))
 	})
 }
@@ -981,7 +1035,7 @@ connection_loop = (stream, handler, buffer) {
 							trailers: Headers([])
 						)
 					)
-					reader = (
+					reader = BodyReader(
 						read: (max: Int) {
 							read_request_piece(stream, cursor, max)
 						}
@@ -1003,7 +1057,7 @@ connection_loop = (stream, handler, buffer) {
 						Error(BadMessage(why)) -> fail.raise(BadMessage(why))
 						Error(_)               -> response(Status(500))
 					}
-					drain_body(reader)
+					drain_body((read: reader.read))
 					tail = task.update(cursor, (state) {
 						(state, state.buffer)
 					})
@@ -1061,12 +1115,29 @@ write_server_reply = (stream, res: Response, closing: Bool) {
 	)
 }
 
-BodyFraming {
+BodyFraming = Remaining | ChunkSize | ChunkData | ChunkEnd | ChunkTrailers | BodyDone
+
+Remaining {
 	Remaining(Int)
+}
+
+ChunkSize {
 	ChunkSize
+}
+
+ChunkData {
 	ChunkData(Int)
+}
+
+ChunkEnd {
 	ChunkEnd
+}
+
+ChunkTrailers {
 	ChunkTrailers
+}
+
+BodyDone {
 	BodyDone
 }
 
@@ -1212,23 +1283,34 @@ drain_body = (reader) {
 }
 
 // Target providers capture transport services; callers retain one principal type.
-ResponseStream = (
-	head: Response
-	read: (
-		Int
-	) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-)
+ResponseStream {
+	ResponseStream(
+		head: Response
+		read: (
+			Int
+		) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	)
+}
 
-ClientFunctions = (
-	stream: (
-		Request
-	) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	send: (
-		Request
-	) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-)
+/// The body of a request that a handler reads (a custom type: records whose
+/// function fields give a large error union do not check, see
+/// docs/design/syn3-stage3-report.md).
+BodyReader(E, N, M) {
+	BodyReader(read: (Int) -> BitArray ^ E ! N, trailers: () -> Headers ! M)
+}
+
+ClientFunctions {
+	ClientFunctions(
+		stream: (
+			Request
+		) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		send: (
+			Request
+		) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	)
+}
 
 Transport {
 	Transport(
@@ -1256,7 +1338,7 @@ native_client = (n ! net.Net, t ! tls.Tls) {
 			! tls.Tls = t
 			res = provider.send(req)
 			cursor = task.ref(res.body)
-			(head: res, read: (max) {
+			ResponseStream(head: res, read: (max) {
 				{ max <= 0 } |> {
 					True  -> fail.raise(Protocol("invalid read size"))
 					False -> Nil
@@ -1292,7 +1374,7 @@ client = (
 	c ! Client
 ) -> ClientFunctions ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
 	t = c.make()
-	(stream: t.stream, send: t.send, close: t.close)
+	ClientFunctions(stream: t.stream, send: t.send, close: t.close)
 }
 
 send = (
@@ -1350,7 +1432,7 @@ fetch_stream = (req: Request, f ! fetch.Fetch) {
 	status = fetch_reply(() { fetch.status(id) })
 	encoded = fetch_reply(() { fetch.headers(id) })
 	hs = Headers(fetch_headers(string.split(encoded, "\u{0}")))
-	(
+	ResponseStream(
 		head: Response(
 			status:   Status(status)
 			reason:   reason(status)
@@ -1385,7 +1467,7 @@ fetch_client = (f ! fetch.Fetch) {
 					status:   h.status
 					reason:   h.reason
 					headers:  h.headers
-					body:     collect_body(reader, [])
+					body:     collect_body((read: reader.read), [])
 					trailers: h.trailers
 				)
 			}, reader.close)
@@ -1406,8 +1488,13 @@ network_client = () {
 	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
 }
 
-Connection {
+Connection = Plain | Secure
+
+Plain {
 	Plain(net.Stream)
+}
+
+Secure {
 	Secure(tls.Stream)
 }
 
@@ -1796,9 +1883,17 @@ read_progress = (transport, method, buffer, eof) {
 	}
 }
 
-BodyError {
+BodyError = InvalidText | InvalidJson | InvalidSchema
+
+InvalidText {
 	InvalidText
+}
+
+InvalidJson {
 	InvalidJson(json.JsonError)
+}
+
+InvalidSchema {
 	InvalidSchema(schema.SchemaError)
 }
 

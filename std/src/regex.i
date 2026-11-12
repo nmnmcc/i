@@ -43,24 +43,67 @@ Flags {
 	Flags(insensitive: Bool, multiline: Bool, dotall: Bool)
 }
 
-Class {
+Class = Literal | Range | Digit | Space | Word | Any | Union | Negate
+
+Literal {
 	Literal(Int)
+}
+
+Range {
 	Range(Int, Int)
+}
+
+Digit {
 	Digit
+}
+
+Space {
 	Space
+}
+
+Word {
 	Word
+}
+
+Any {
 	Any(Bool)
+}
+
+Union {
 	Union(List(Class))
+}
+
+Negate {
 	Negate(Class)
 }
 
-Ast {
+Ast = Empty | Atom | Look | Sequence | Alternate | Repeat | Capture
+
+Empty {
 	Empty
+}
+
+Atom {
 	Atom(Class, Bool)
+}
+
+Look {
 	Look(Int)
+}
+
+Sequence {
 	Sequence(List(Ast))
+}
+
+Alternate {
 	Alternate(Ast, Ast)
+}
+
+Repeat {
 	Repeat(Ast, Int, Int, Bool)
+}
+
+Capture {
 	Capture(Int, Ast)
 }
 
@@ -484,11 +527,25 @@ parse_repeat = (a: Ast, p: Parser) -> (Ast, Parser) ^ RegexError {
 	}
 }
 
-Inst {
+Inst = Accept | Eat | Fork | Save | Check
+
+Accept {
 	Accept
+}
+
+Eat {
 	Eat(Class, Bool, Int)
+}
+
+Fork {
 	Fork(Int, Int)
+}
+
+Save {
 	Save(Int, Int)
+}
+
+Check {
 	Check(Int, Int)
 }
 

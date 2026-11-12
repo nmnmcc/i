@@ -13,7 +13,10 @@
 )
 
 (
-	CryptoError(..)
+	CryptoError
+	InvalidLength(..)
+	InvalidIterations(..)
+	UnalignedInput(..)
 	sha256
 	sha512
 	hmac_sha256
@@ -29,9 +32,17 @@
 	random_bytes
 )
 
-CryptoError {
+CryptoError = InvalidLength | InvalidIterations | UnalignedInput
+
+InvalidLength {
 	InvalidLength
+}
+
+InvalidIterations {
 	InvalidIterations
+}
+
+UnalignedInput {
 	UnalignedInput
 }
 

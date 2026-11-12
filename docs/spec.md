@@ -4487,17 +4487,129 @@ The module `i/syntax` exports these types:
 Syntax {}
 
 Node {
-  TypeView(TypeHandle)
-  Name(String)  Discard(String)  Up(String)  Symbol(String)
-  Int(Int)  Float(Float)  Text(String)
-  Round(List(Syntax))  Square(List(Syntax))  Curly(List(Syntax))  Bits(List(Syntax))
-  Quote(Syntax)  Unquote(Syntax)  Splice(Syntax)
+  Node(TypeView | Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)
 }
 
-Position {
-  ImportItem  ExportItem  Item  Attribute  Constructor  Field  Type  FunctionResult
-  Parameter  Expression  Statement  CallArgument  Clause  ClauseHead  Pattern
-  Segment  Format
+TypeView {
+  TypeView(TypeHandle)
+}
+
+Name {
+  Name(String)
+}
+
+Discard {
+  Discard(String)
+}
+
+Up {
+  Up(String)
+}
+
+Symbol {
+  Symbol(String)
+}
+
+Text {
+  Text(String)
+}
+
+Round {
+  Round(List(Syntax))
+}
+
+Square {
+  Square(List(Syntax))
+}
+
+Curly {
+  Curly(List(Syntax))
+}
+
+Bits {
+  Bits(List(Syntax))
+}
+
+Quote {
+  Quote(Syntax)
+}
+
+Unquote {
+  Unquote(Syntax)
+}
+
+Splice {
+  Splice(Syntax)
+}
+
+Position = ImportItem | ExportItem | Item | Attribute | Constructor | Field | Type | FunctionResult | Parameter | Expression | Statement | CallArgument | Clause | ClauseHead | Pattern | Segment | Format
+
+ImportItem {
+  ImportItem
+}
+
+ExportItem {
+  ExportItem
+}
+
+Item {
+  Item
+}
+
+Attribute {
+  Attribute
+}
+
+Constructor {
+  Constructor
+}
+
+Field {
+  Field
+}
+
+Type {
+  Type
+}
+
+FunctionResult {
+  FunctionResult
+}
+
+Parameter {
+  Parameter
+}
+
+Expression {
+  Expression
+}
+
+Statement {
+  Statement
+}
+
+CallArgument {
+  CallArgument
+}
+
+Clause {
+  Clause
+}
+
+ClauseHead {
+  ClauseHead
+}
+
+Pattern {
+  Pattern
+}
+
+Segment {
+  Segment
+}
+
+Format {
+  Format
 }
 
 SyntaxError { SyntaxError(message: String, at: Syntax) }
@@ -4594,7 +4706,10 @@ For type checking, a call of a typed macro is a call of a function with the sign
 **Expansion.** A binding group is inferred once, with each typed call standing for its signature; when the group has an error, none of its typed calls is expanded. Its types are kept as a snapshot that every typed call of the group sees, and outer calls are expanded before inner ones. A type variable of the caller is **closed** when it is local to the group, not generalized, and reachable from no published scheme, declared type parameter, generalized variable or non-generalized top-level value; every other variable is **fixed**. For the queries only, a closed variable that occurs only in output places of the instantiated signature is given as the union of its lower bounds (`Never` when there are none), one that occurs only in input places and has upper bounds as their intersection, and any other as one opaque variable; one variable gets the same answer in every query of a run. The result is checked apart from the caller: no variable of the snapshot gains a bound, only new variables of the result do, and an obligation on a variable of the snapshot must be proved from the bounds it already has, or the expansion is rejected. An argument that the result keeps whole keeps its type and the definitions its names resolve to; a binder of the result may not capture a free name of an argument. A new value reference in the result must be to the group itself, to a group it depends on, or to an imported module; a new direct read of a value type is a compile error; and the result may not contribute items, exports or collection entries. An argument that the result drops is still diagnosed from the first check, and no warning is given twice.
 
 ```i
-Truth { Yes  No  NotKnown }
+Truth = Yes | No | NotKnown
+Yes { Yes }
+No { No }
+NotKnown { NotKnown }
 
 Types {
   Types(

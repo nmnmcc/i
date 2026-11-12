@@ -56,8 +56,13 @@ Address {
 	Address(task: Int, index: Int)
 }
 
-Witness {
+Witness = Portable | Local
+
+Portable {
 	Portable
+}
+
+Local {
 	Local(Boundary(Turn, Never, Never))
 }
 
@@ -97,9 +102,17 @@ ScheduleError {
 	NotRunnable(path: List(Int))
 }
 
-StepAnswer {
+StepAnswer = Proceed | CancelStep | ForwardStep
+
+Proceed {
 	Proceed(Keyed)
+}
+
+CancelStep {
 	CancelStep(() -> Never)
+}
+
+ForwardStep {
 	ForwardStep(
 		ForeignNotice
 		Keyed
@@ -108,14 +121,27 @@ StepAnswer {
 	)
 }
 
-Completion {
+Completion = Succeeded | Failed | Abandoned
+
+Succeeded {
 	Succeeded(Keyed)
+}
+
+Failed {
 	Failed(Keyed, Keyed)
+}
+
+Abandoned {
 	Abandoned
 }
 
-Turn {
+Turn = Switched | Finished
+
+Switched {
 	Switched(Int, Command, Continuation(StepAnswer, Turn, Never, Never))
+}
+
+Finished {
 	Finished(Int, Completion)
 }
 
@@ -123,13 +149,28 @@ Start {
 	Start(body: (Scheduler) -> Completion)
 }
 
-Policy {
+Policy = Fifo | Script
+
+Fifo {
 	Fifo
+}
+
+Script {
 	Script(List(List(Int)))
 }
 
+/// The runner service: detached until a run installs one.
 Runner {
+	RunnerService(state: RunnerState)
+}
+
+RunnerState = DetachedRunner | RunnerCase
+
+DetachedRunner {
 	DetachedRunner
+}
+
+RunnerCase {
 	Runner(
 		seed:     rng.Generator
 		context:  request.Root
@@ -142,8 +183,18 @@ Runner {
 	)
 }
 
+/// The scheduler service: detached outside a run.
 Scheduler {
+	SchedulerService(state: SchedulerState)
+}
+
+SchedulerState = DetachedScheduler | SchedulerCase
+
+DetachedScheduler {
 	DetachedScheduler
+}
+
+SchedulerCase {
 	Scheduler(
 		run:     Key(Nil)
 		root:    request.Root
@@ -156,26 +207,55 @@ Scheduler {
 	)
 }
 
-Maybe(A) {
+Maybe(A) = Absent | Present(A)
+
+Absent {
 	Absent
+}
+
+Present(A) {
 	Present(A)
 }
 
-Mode {
+Mode = Ordinary | Racing
+
+Ordinary {
 	Ordinary
+}
+
+Racing {
 	Racing
 }
 
-BodyMark {
+BodyMark = BodyOpen | BodyOk | BodyError | BodyCancelled
+
+BodyOpen {
 	BodyOpen
+}
+
+BodyOk {
 	BodyOk
+}
+
+BodyError {
 	BodyError
+}
+
+BodyCancelled {
 	BodyCancelled
 }
 
-ScopeReply {
+ScopeReply = ScopeOk | ScopeError | ScopeWinner
+
+ScopeOk {
 	ScopeOk
+}
+
+ScopeError {
 	ScopeError(Keyed)
+}
+
+ScopeWinner {
 	ScopeWinner(Keyed)
 }
 
@@ -205,24 +285,58 @@ Cause {
 	Cause(run: Key(Nil), scope: Maybe(Address), epoch: Int)
 }
 
-Outcome {
+Outcome = Pending | Success | Failure | Cancelled
+
+Pending {
 	Pending
+}
+
+Success {
 	Success(Keyed)
+}
+
+Failure {
 	Failure(Keyed)
+}
+
+Cancelled {
 	Cancelled(Cause)
 }
 
-Status {
+Status = Dormant | Runnable | WaitingTicket | WaitingScope | WaitingEvent | WaitingDrain | Running | Ended
+
+Dormant {
 	Dormant(Start)
+}
+
+Runnable {
 	Runnable(Continuation(StepAnswer, Turn, Never, Never), StepAnswer)
+}
+
+WaitingTicket {
 	WaitingTicket(Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+}
+
+WaitingScope {
 	WaitingScope(Continuation(StepAnswer, Turn, Never, Never), Address)
+}
+
+WaitingEvent {
 	WaitingEvent(
 		Continuation(StepAnswer, Turn, Never, Never)
 		Request(Registration)
 	)
+}
+
+WaitingDrain {
 	WaitingDrain(Continuation(StepAnswer, Turn, Never, Never))
+}
+
+Running {
 	Running
+}
+
+Ended {
 	Ended
 }
 
@@ -292,10 +406,21 @@ ShareState {
 	ShareState(id: Address, owner: Maybe(Address), value: Keyed)
 }
 
-Leaf {
+Leaf = SendLeaf | ReceiveLeaf | JoinLeaf | AlwaysLeaf
+
+SendLeaf {
 	SendLeaf(ChannelInfo, Keyed)
+}
+
+ReceiveLeaf {
 	ReceiveLeaf(ChannelInfo)
+}
+
+JoinLeaf {
 	JoinLeaf(TaskInfo)
+}
+
+AlwaysLeaf {
 	AlwaysLeaf(Keyed)
 }
 
@@ -307,8 +432,13 @@ Event(A, E, N) {
 	Event(identity: Key(Nil), branches: List(Branch(A, E, N)))
 }
 
-Selection {
+Selection = Selected | SelectedCancelled
+
+Selected {
 	Selected(Int, Keyed)
+}
+
+SelectedCancelled {
 	SelectedCancelled
 }
 
@@ -381,7 +511,9 @@ State {
 	)
 }
 
-Command {
+Command = Register | ExternalCancel | Relay | FinishScope | NewScope | EndScope | Spawn | NextRun | Yield | Wait | NestedActive | NestedWait | ForwardWait | ForgetWait | NewChannel | SendNow | Select | NewShare | GetShare | NewRef | UpdateRef | Drain
+
+Register {
 	Register(
 		Maybe(Address)
 		() -> Never
@@ -389,43 +521,127 @@ Command {
 		(ForeignNotice, Keyed, Bool) -> Keyed
 		(Continuation(StepAnswer, Turn, Never, Never)) -> Bool
 	)
+}
+
+ExternalCancel {
 	ExternalCancel
+}
+
+Relay {
 	Relay(ForeignNotice, Keyed, Bool)
+}
+
+FinishScope {
 	FinishScope(ScopeInfo)
+}
+
+NewScope {
 	NewScope(Witness, Mode)
+}
+
+EndScope {
 	EndScope(ScopeInfo, Completion)
+}
+
+Spawn {
 	Spawn(ScopeInfo, Start)
+}
+
+NextRun {
 	NextRun
+}
+
+Yield {
 	Yield
+}
+
+Wait {
 	Wait(List(Ticket))
+}
+
+NestedActive {
 	NestedActive(Key(Nil), Active)
+}
+
+NestedWait {
 	NestedWait(Key(Nil), List(Ticket))
+}
+
+ForwardWait {
 	ForwardWait(Key(Nil), List(Ticket))
+}
+
+ForgetWait {
 	ForgetWait(Key(Nil))
+}
+
+NewChannel {
 	NewChannel(Witness)
+}
+
+SendNow {
 	SendNow(ChannelInfo, Keyed)
+}
+
+Select {
 	Select(List(Leaf))
+}
+
+NewShare {
 	NewShare(ScopeInfo, Keyed)
+}
+
+GetShare {
 	GetShare(Key(Nil), Keyed, Keyed)
+}
+
+NewRef {
 	NewRef(Keyed)
+}
+
+UpdateRef {
 	UpdateRef(Key(Nil), Keyed, (Keyed) -> (Keyed, Keyed))
+}
+
+Drain {
 	Drain
 }
 
-RunReply {
+RunReply = RunOk | RunError | RunCancelled
+
+RunOk {
 	RunOk(Keyed)
+}
+
+RunError {
 	RunError(List(Int))
+}
+
+RunCancelled {
 	RunCancelled(() -> Never)
 }
 
-RunControl {
+RunControl = ContinueRun | ParentCancel | ForwardRun
+
+ContinueRun {
 	ContinueRun
+}
+
+ParentCancel {
 	ParentCancel(() -> Never)
+}
+
+ForwardRun {
 	ForwardRun(ForeignNotice)
 }
 
-ScopeResult(A) {
+ScopeResult(A) = BodyValue(A) | WinnerValue
+
+BodyValue(A) {
 	BodyValue(A)
+}
+
+WinnerValue {
 	WinnerValue(Keyed)
 }
 
@@ -485,9 +701,9 @@ answer = (reply: StepAnswer) {
 }
 
 ask = (own: Scheduler, command: Command) -> Keyed {
-	own |> {
-		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> answer(own.step(command))
+	own.state |> {
+		DetachedScheduler        -> panic("task: no scheduler")
+		attached = Scheduler(..) -> answer(attached.step(command))
 	}
 }
 
@@ -539,8 +755,13 @@ without(A) = (xs: List(A), value: A) -> List(A) {
 // Persistent AVL storage gives retained results logarithmic lookup without
 // scanning them at every scheduling point. Active and unfinished-cleanup
 // indexes use creation serials, preserving cancellation and delivery order.
-TaskTree(A) {
+TaskTree(A) = NoTasks | TaskNode(A)
+
+NoTasks {
 	NoTasks
+}
+
+TaskNode(A) {
 	TaskNode(Int, Int, A, TaskTree(A), TaskTree(A))
 }
 
@@ -1121,16 +1342,16 @@ make_start(A, E, N) = (
 	errors: Key(E)
 	check: Bool
 ) -> Start ! N - Scheduler - Runner - request.Await {
-	! Scheduler = DetachedScheduler
-	! Runner = DetachedRunner
+	! Scheduler = SchedulerService(state: DetachedScheduler)
+	! Runner = RunnerService(state: DetachedRunner)
 	! request.Await = request.Await(wait: (_) { panic("task: no scheduler") })
 	kept = control.keep_env((own: Scheduler) {
-		own |> {
+		own.state |> {
 			DetachedScheduler -> panic("task: no scheduler")
-			Scheduler(..) -> {
+			attached = Scheduler(..) -> {
 				! Scheduler = own
-				! Runner = own.runner
-				! request.Await = own.waiter
+				! Runner = attached.runner
+				! request.Await = attached.waiter
 				local = control.keep_env((_: Nil) {
 					fail.catch(body) |> {
 						Ok(value) -> {
@@ -1160,16 +1381,16 @@ make_start(A, E, N) = (
 }
 
 path = (own ! Scheduler) {
-	own |> {
-		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> read(path_key, own.path)
+	own.state |> {
+		DetachedScheduler        -> panic("task: no scheduler")
+		attached = Scheduler(..) -> read(path_key, attached.path)
 	}
 }
 
 random = (own ! Scheduler) {
-	own |> {
-		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> own.seed()
+	own.state |> {
+		DetachedScheduler        -> panic("task: no scheduler")
+		attached = Scheduler(..) -> attached.seed()
 	}
 }
 
@@ -1179,9 +1400,11 @@ yield = (own ! Scheduler) {
 }
 
 top = (seed: rng.Generator, current ! Runner) -> Runner ! Runner {
-	current |> {
+	current.state |> {
 		DetachedRunner -> panic("task: no scheduler")
-		Runner(..)     -> Runner(..current, seed: seed)
+		attached = Runner(..) -> RunnerService(
+			state: Runner(..attached, seed: seed)
+		)
 	}
 }
 
@@ -1218,15 +1441,17 @@ root_forget = (_run: Key(Nil)) { Nil }
 root_allocate = () -> List(Int) { [] }
 
 initial = (root: request.Root) -> Runner {
-	Runner(
-		seed:     rng.from_seed(0)
-		context:  root
-		policy:   Fifo
-		allocate: root_allocate
-		active:   root_active
-		wait:     wait_root
-		poll:     root_poll
-		forget:   root_forget
+	RunnerService(
+		state: Runner(
+			seed:     rng.from_seed(0)
+			context:  root
+			policy:   Fifo
+			allocate: root_allocate
+			active:   root_active
+			wait:     wait_root
+			poll:     root_poll
+			forget:   root_forget
+		)
 	)
 }
 
@@ -1246,59 +1471,65 @@ make_scheduler = (
 	root: request.Root
 	upstream: Runner
 ) -> Scheduler {
-	upstream |> {
+	upstream.state |> {
 		DetachedRunner -> panic("task: no scheduler")
-		Runner(..) -> {
+		attached = Runner(..) -> {
 			route = (command: Command) {
 				control.suspend(b, (k) { Switched(id, command, k) })
 			}
-			policy = upstream.policy |> {
+			policy = attached.policy |> {
 				Fifo      -> Fifo
 				Script(_) -> Script([])
 			}
-			runner = Runner(
-				seed:     upstream.seed
-				context:  upstream.context
-				policy:   policy
-				allocate: () { read(path_key, answer(route(NextRun))) }
-				active: (id: Key(Nil), active: Active) {
-					run_control(route(NestedActive(id, active)))
-				}
-				wait: (
-					id: Key(Nil)
-					root: request.Root
-					tickets: List(Ticket)
-				) {
-					{ request.count_root(root) > 0 } |> {
-						False -> run_control(route(NestedWait(id, tickets)))
-						True -> {
-							changed = observe_change(root.key)
-							resource.ensure(
-								() {
-									run_control(
-										route(
-											NestedWait(
-												id
-												[
-													request.ticket(changed)
-													..tickets
-												]
+			runner = RunnerService(
+				state: Runner(
+					seed:     attached.seed
+					context:  attached.context
+					policy:   policy
+					allocate: () { read(path_key, answer(route(NextRun))) }
+					active: (id: Key(Nil), active: Active) {
+						run_control(route(NestedActive(id, active)))
+					}
+					wait: (
+						id: Key(Nil)
+						root: request.Root
+						tickets: List(Ticket)
+					) {
+						{ request.count_root(root) > 0 } |> {
+							False -> run_control(route(NestedWait(id, tickets)))
+							True -> {
+								changed = observe_change(root.key)
+								resource.ensure(
+									() {
+										run_control(
+											route(
+												NestedWait(
+													id
+													[
+														request.ticket(changed)
+														..tickets
+													]
+												)
 											)
 										)
-									)
-								}
-								() { request.cancel(request.ticket(changed)) }
-							)
+									}
+									() {
+										request.cancel(request.ticket(changed))
+									}
+								)
+							}
 						}
 					}
-				}
-				poll: (id: Key(Nil), tickets: List(Ticket), _runnable: Bool) {
-					run_control(route(ForwardWait(id, tickets)))
-				}
-				forget: (id: Key(Nil)) {
-					answer(route(ForgetWait(id)))
-					Nil
-				}
+					poll: (
+						id: Key(Nil)
+						tickets: List(Ticket)
+						_runnable: Bool
+					) { run_control(route(ForwardWait(id, tickets))) }
+					forget: (id: Key(Nil)) {
+						answer(route(ForgetWait(id)))
+						Nil
+					}
+				)
 			)
 			waiter = request.Await(wait: (ticket) {
 				answer(route(Wait([ticket])))
@@ -1306,22 +1537,24 @@ make_scheduler = (
 			})
 			// Derive only when random() is read. Task paths/seed are immutable;
 			// starting an empty child does not need any of the generator's words.
-			seed = upstream.seed
+			seed = attached.seed
 			generator = () {
 				fail.catch(() { rng.at_path(seed, task_path) }) |> {
 					Ok(g)    -> g
 					Error(_) -> panic("task: invalid task path")
 				}
 			}
-			Scheduler(
-				run:     run
-				root:    root
-				path:    key.wrap(path_key, task_path)
-				seed:    generator
-				witness: Local(b)
-				step:    route
-				runner:  runner
-				waiter:  waiter
+			SchedulerService(
+				state: Scheduler(
+					run:     run
+					root:    root
+					path:    key.wrap(path_key, task_path)
+					seed:    generator
+					witness: Local(b)
+					step:    route
+					runner:  runner
+					waiter:  waiter
+				)
 			)
 		}
 	}
@@ -3023,9 +3256,9 @@ loop = (state: State) -> RunReply {
 		True -> run_reply(s)
 		False -> {
 			runner = s.runner
-			runner |> {
+			runner.state |> {
 				DetachedRunner -> panic("task: no scheduler")
-				Runner(..) -> {
+				attached = Runner(..) -> {
 					work = interests(s)
 					{ s.scripted && any(work, has_work) } |> {
 						True  -> panic("task: test needs fake IO")
@@ -3035,7 +3268,7 @@ loop = (state: State) -> RunReply {
 						Present(_) ? work == [] -> s
 						_ -> apply_run_control(
 							s
-							runner.poll(
+							attached.poll(
 								s.run
 								work
 								s.current != Absent || has_ready(s)
@@ -3060,7 +3293,7 @@ loop = (state: State) -> RunReply {
 					prepared.current |> {
 						Present(p) -> {
 							t = find_task(prepared.tasks, p)
-							runner.active(
+							attached.active(
 								prepared.run
 								effective_active(prepared, t)
 							) |> {
@@ -3144,7 +3377,7 @@ loop = (state: State) -> RunReply {
 											loop(
 												apply_run_control(
 													prepared
-													runner.wait(
+													attached.wait(
 														prepared.run
 														prepared.root
 														tickets
@@ -3224,9 +3457,14 @@ local_scope(A, E, N) = (
 	body: (Scope(E)) -> A ^ E ! N
 	own ! Scheduler
 ) -> A ^ E ! N | Scheduler {
-	own |> {
+	own.state |> {
 		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..) -> scope_call(body, own.witness, Ordinary, own) |> {
+		attached = Scheduler(..) -> scope_call(
+			body
+			attached.witness
+			Ordinary
+			own
+		) |> {
 			BodyValue(value) -> value
 			WinnerValue(_)   -> panic("task: invalid scope winner")
 		}
@@ -3337,10 +3575,10 @@ channel(A) = (own ! Scheduler) -> Channel(A) ! Scheduler {
 }
 
 local_channel(A) = (own ! Scheduler) -> Channel(A) ! Scheduler {
-	own |> {
+	own.state |> {
 		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..) -> Channel(
-			info:   read(channel_key, ask(own, NewChannel(own.witness)))
+		attached = Scheduler(..) -> Channel(
+			info:   read(channel_key, ask(own, NewChannel(attached.witness)))
 			values: key.new()
 		)
 	}
@@ -3396,17 +3634,17 @@ keep(S, A, E, N) = (
 	f: (S) -> A ^ E ! N
 	_own ! Scheduler
 ) -> { (S) -> A ^ E ! Scheduler } ! Scheduler | N - Scheduler - Runner - request.Await {
-	! Scheduler = DetachedScheduler
-	! Runner = DetachedRunner
+	! Scheduler = SchedulerService(state: DetachedScheduler)
+	! Runner = RunnerService(state: DetachedRunner)
 	! request.Await = request.Await(wait: (_) { panic("task: no scheduler") })
 	kept = control.keep_env((input: (S, Scheduler)) {
 		(value, own) = input
-		own |> {
+		own.state |> {
 			DetachedScheduler -> panic("task: no scheduler")
-			Scheduler(..) -> {
+			attached = Scheduler(..) -> {
 				! Scheduler = own
-				! Runner = own.runner
-				! request.Await = own.waiter
+				! Runner = attached.runner
+				! request.Await = attached.waiter
 				retain(f(value))
 			}
 		}
@@ -3419,9 +3657,13 @@ keep(S, A, E, N) = (
 ref(A) = (value: A, own ! Scheduler) -> Ref(A) ! Scheduler {
 	values: Key(A) = key.new()
 	id = ask(own, NewRef(key.wrap(values, value)))
-	own |> {
+	own.state |> {
 		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..)     -> Ref(run: own.run, id: id, values: values)
+		attached = Scheduler(..) -> Ref(
+			run:    attached.run
+			id:     id
+			values: values
+		)
 	}
 }
 
@@ -3502,14 +3744,14 @@ execute_body(A, E, N) = (
 	seed: rng.Generator
 	policy: Policy
 ) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root {
-	runner |> {
+	runner.state |> {
 		DetachedRunner -> panic("task: no scheduler")
-		Runner(..) -> {
-			prefix = runner.allocate()
+		attached = Runner(..) -> {
+			prefix = attached.allocate()
 			run_id: Key(Nil) = key.new()
 			results: Key(Result(A, E)) = key.new()
 			errors: Key(E) = key.new()
-			! request.Root = runner.context
+			! request.Root = attached.context
 			control_root = request.open_root()
 			root = request.open_root()
 			owner = {
@@ -3552,7 +3794,9 @@ execute_body(A, E, N) = (
 				Fifo          -> ([], False)
 				Script(paths) -> (paths, True)
 			}
-			routing = Runner(..runner, seed: seed, policy: policy)
+			routing = RunnerService(
+				state: Runner(..attached, seed: seed, policy: policy)
+			)
 			state = State(
 				run:    run_id
 				runner: routing
@@ -3593,7 +3837,7 @@ execute_body(A, E, N) = (
 				registration:    0
 			)
 			ended = retain(resource.ensure(() { loop(state) }, () {
-				runner.forget(run_id)
+				attached.forget(run_id)
 				request.close_owner(control_owner)
 				request.close_root(control_root)
 				request.close_root(root)
@@ -3611,9 +3855,14 @@ run(A, E, N) = (
 	body: () -> A ^ E ! N
 	runner ! Runner
 ) -> A ^ E ! Runner | N - Scheduler - Runner - request.Await - request.Owner - request.Root {
-	runner |> {
+	runner.state |> {
 		DetachedRunner -> panic("task: no scheduler")
-		Runner(..) -> execute(body, runner, runner.seed, runner.policy) |> {
+		attached = Runner(..) -> execute(
+			body
+			runner
+			attached.seed
+			attached.policy
+		) |> {
 			Ok(result) -> fail.from_result(result)
 			Error(_)   -> panic("task: invalid inherited schedule")
 		}
@@ -3646,11 +3895,11 @@ scope_call(A, E, N) = (
 	mode: Mode
 	own: Scheduler
 ) -> ScopeResult(A) ^ E ! N {
-	own |> {
+	own.state |> {
 		DetachedScheduler -> panic("task: no scheduler")
-		Scheduler(..) -> {
+		attached = Scheduler(..) -> {
 			owner = {
-				! request.Root = own.root
+				! request.Root = attached.root
 				retain(request.open_owner())
 			}
 			kept = control.keep_env((_: Nil) {
@@ -4017,8 +4266,13 @@ ForeignGuard {
 	ForeignGuard(token: Key(Nil), anchor: Maybe(Address))
 }
 
-ForeignNotice {
+ForeignNotice = BeginForeign | EndForeign
+
+BeginForeign {
 	BeginForeign(List(Hop), Key(Nil), () -> Never, Cause)
+}
+
+EndForeign {
 	EndForeign(List(Hop), Key(Nil))
 }
 

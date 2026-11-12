@@ -648,7 +648,7 @@ fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
 
 // ---- The queries for references, rename, navigation and code actions ----
 
-const SHAPES_Q: &str = "(Shape(..), area)\n\nShape {\n  Circle(radius: Int)\n  Dot\n}\n\narea = (s: Shape) -> Int {\n  s |> {\n    Circle(radius) -> radius * 3\n    Dot -> 0\n  }\n}\n";
+const SHAPES_Q: &str = "(Shape, Circle(..), Dot(..), area)\n\nShape = Circle | Dot\n\nCircle {\n  Circle(radius: Int)\n}\n\nDot {\n  Dot\n}\n\narea = (s: Shape) -> Int {\n  s |> {\n    Circle(radius) -> radius * 3\n    Dot -> 0\n  }\n}\n";
 const MAIN_Q: &str = "(\n  (Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n  c = Circle(radius: 2)\n  area(c) + area(Circle(radius: 1))\n}\n";
 
 fn shapes_fixture() -> Fixture {
@@ -726,7 +726,7 @@ fn query_rename_checks_kind_and_scope() {
 
 #[test]
 fn query_missing_clauses_of_a_match() {
-    let text = "Shape {\n  Circle(Int)\n  Dot\n  Line\n}\n\nf = (s: Shape) {\n  s |> {\n    Dot -> 0\n    Circle(1) -> 1\n  }\n}\n";
+    let text = "Shape = Circle | Dot | Line\n\nCircle {\n  Circle(Int)\n}\n\nDot {\n  Dot\n}\n\nLine {\n  Line\n}\n\nf = (s: Shape) {\n  s |> {\n    Dot -> 0\n    Circle(1) -> 1\n  }\n}\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");
