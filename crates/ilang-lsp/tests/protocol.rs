@@ -3036,3 +3036,16 @@ fn formats_lisp_documents_with_the_source_formatter() {
     assert!(edits.is_null());
     client.shutdown();
 }
+
+#[test]
+fn core_builtin_type_hover_and_definition() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = "(core = i/core)\nf = (x: core.Int) -> Int { x }\nmain = () { Nil }\n";
+    package(dir.path(), &[("src/main.i", text)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    let _ = c.request::<lsp::request::HoverRequest>(position_params(&main, 1, 14));
+    let _ = c.request::<lsp::request::GotoDefinition>(position_params(&main, 1, 14));
+    c.shutdown();
+}
