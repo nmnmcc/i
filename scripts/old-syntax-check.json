@@ -2984,20 +2984,10 @@
       "E0002: this string is not closed"
     ]
   },
-  "docs/spec.md:a12d9a52fd631114": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
   "docs/spec.md:f644ea0d31f307b2": {
     "track": "SYN3",
     "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
     "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
       "E0101: expected `,` or `)`, found `=`",
       "E0101: expected `,` or `)`, found `=`",
       "E0101: expected `,` or `)`, found `=`"
@@ -3126,9 +3116,7 @@
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`",
       "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+      "E0101: expected `,` or `)`, found `=`"
     ]
   },
   "docs/spec.md:f1593542964fc4e8": {
@@ -3137,10 +3125,7 @@
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`",
       "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+      "E0101: expected `,` or `)`, found `=`"
     ]
   },
   "docs/spec.md:e90707beeb178a90": {
@@ -3176,9 +3161,6 @@
     "track": "SYN3",
     "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
     "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
       "E0101: expected `,` or `)`, found `=`"
     ]
   },
