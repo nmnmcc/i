@@ -73,6 +73,7 @@ fn is_simple(e: &Expr) -> bool {
 }
 
 /// A match `e |> { … }` (§6.12).
+#[cfg(feature = "legacy")]
 pub(crate) fn is_match(e: &Expr) -> bool {
     matches!(e.kind, ExprKind::Case { .. })
 }
