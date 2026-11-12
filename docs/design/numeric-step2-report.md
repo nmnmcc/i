@@ -52,3 +52,25 @@ N2 first paired measurement (five batch medians, ns; not a quiet timing claim):
 N2 differential corpus, exact transitive-suspension acceptance and changed-crate
 Clippy pass. Earlier measurement showed unreachable workers behind generic
 recursive entries; reference adapters corrected that call-selection gap.
+
+N3 replaces up to four tuple, nominal-record or structural-record fields,
+including compatible joins. Actual constructor/type/label metadata governs
+projection and test folding. Every observing use materializes original fields;
+unused field arithmetic retains its checks. Dominated semantic list and record
+reads are commoned across calls; branch joins discard uncertain provenance.
+Environment, closure-patch, request, host and bigint scratch arrays are excluded.
+
+N3 paired batch medians (ns), compared with N2:
+
+| Kernel | N2 baseline | N3 | N3 allocations including wrapper |
+|---|---|---|---:|
+| fast | [4296, 4175, 4155, 4227, 4247] | [4315, 4316, 4076, 4156, 4266] | 51 |
+| horner | [60, 72, 60, 60, 50] | [70, 71, 60, 50, 51] | 13 |
+| dot | [2163, 2003, 2002, 2001, 2004] | [2112, 2063, 1993, 2031, 2084] | 13 |
+| integer | [1072, 1131, 1150, 1112, 1072] | [1053, 1082, 1143, 1131, 1111] | 14 |
+| tuples | [50, 40, 59, 60, 50] | [49, 49, 49, 40, 50] | 13 |
+| closures | [1792, 1723, 1723, 1793, 1753] | [1733, 1743, 1823, 1812, 1744] | 16 |
+
+The tuple allocation target is met: 13 raw allocations, one after subtracting
+the wrapper, with no tuple/backing-array allocation. The sine survivor still
+crosses larger record-returning helpers; out-of-line multivalue is deferred by R5.

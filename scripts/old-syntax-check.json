@@ -3008,5 +3008,11 @@
   },
   "crates/ilang-cli/tests/providers.rs:94ebdef83b17a3a3": {
     "not_source": "TOML provider manifest or manifest template; i source is checked separately"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:3ba0d395ea48a08e": {
+    "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:e47b61baf95042a0": {
+    "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
   }
 }

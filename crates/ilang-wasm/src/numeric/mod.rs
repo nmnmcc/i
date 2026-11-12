@@ -3,6 +3,7 @@
 use crate::ir::*;
 use ilang_check::types::NumericFact;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+mod aggregate;
 pub(crate) mod rewrite;
 
 #[derive(Clone, Debug)]
@@ -507,6 +508,15 @@ pub fn run(p: &mut Program) {
         }
         p.numeric_locals.insert(FuncId(i as u32), facts);
         p.funcs[i] = FuncKind::Code(f);
+    }
+    for (i, function) in p.funcs.iter_mut().enumerate() {
+        if let FuncKind::Code(f) = function
+            && p.numeric_locals
+                .get(&FuncId(i as u32))
+                .is_some_and(|facts| !facts.is_empty())
+        {
+            aggregate::run(f);
+        }
     }
     // Select workers after inlining; tail conventions must agree exactly.
     for (i, function) in p.funcs.iter_mut().enumerate() {

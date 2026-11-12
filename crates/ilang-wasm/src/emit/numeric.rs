@@ -133,6 +133,25 @@ impl Plan {
         loop {
             let before = plan.locals.len();
             for (&local, definitions) in &definitions {
+                if definitions.len() > 1
+                    && definitions.iter().all(|v| match v {
+                        Value::Atom(Atom::Float(_)) => true,
+                        Value::Atom(Atom::Local(source)) => {
+                            plan.locals.get(source) == Some(&Repr::Float)
+                        }
+                        Value::Op(
+                            Op::FloatAdd
+                            | Op::FloatSub
+                            | Op::FloatMul
+                            | Op::FloatDiv
+                            | Op::FloatNeg,
+                            _,
+                        ) => true,
+                        _ => false,
+                    })
+                {
+                    plan.locals.insert(local, Repr::Float);
+                }
                 if definitions.len() != 1
                     || local < f.arity
                     || f.locals[local as usize] != LocalType::Value

@@ -217,6 +217,24 @@ fn corpus() -> Vec<Case> {
         events: vec!["before".into()],
     });
     cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    // N3: cross-call pairs, structural and nominal numeric records, including
+    // joins and repeated projections. Shapes carry actual labels/constructors.
+    for n in 0..24 {
+        let x = n as f64 * 0.125 - 1.5;
+        cases.push(float_case("{ p = Left(x, 0.25) p.x +. p.x }", x, x + x));
+        cases.push(float_case("{ p = Right(0.25, x) p.x +. p.x }", x, x + x));
+        cases.push(float_case(
+            "{ (a, b) = numeric_pair(x) a +. b }",
+            x,
+            (x + 0.25) + x * 0.5,
+        ));
+        cases.push(float_case(
+            "{ r = (a: x, b: x *. 0.5) r.a +. r.a +. r.b }",
+            x,
+            (x + x) + x * 0.5,
+        ));
+        cases.push(float_case("{ r = { x <. 0.0 } |> { True -> (a: x, b: 0.5) False -> (a: x, b: 0.25) } r.a +. r.b }", x, x + if x < 0.0 { 0.5 } else { 0.25 }));
+    }
     // N2: cross-call scalar chains and closures with different captures share
     // code without sharing identity or the capture values.
     for n in 0..32 {
@@ -238,7 +256,7 @@ fn corpus() -> Vec<Case> {
 #[test]
 fn numeric_corpus_agrees_at_o0_o2_o3() {
     let cases = corpus();
-    assert!(cases.len() >= 60);
+    assert!(cases.len() >= 200);
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     let exports = (0..cases.len())
@@ -254,7 +272,9 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
 (i/core, i/control, i/resource)
 @external("numeric:events", "record")
 record: (String) -> Nil
+Pair { Left(x: Float, y: Float) Right(y: Float, x: Float) }
 relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ -> relay(f, n - 1, x) } }
+numeric_pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
 step_float = (x: Float) -> Float { x *. 0.5 +. 0.25 }
 apply = (f: (Float) -> Float, x: Float) -> Float { f(x) }
 loop_int = (n: Int, sum: Int) -> Int { n |> { 0 -> sum _ -> loop_int(n - 1, sum + n) } }
