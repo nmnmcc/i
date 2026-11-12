@@ -90,7 +90,7 @@ module.exports = grammar({
     // `T(A) = type`; `T = Opaque` is a named type.
     type_definition: $ => prec(20, seq(field('name', $.type_identifier), optional($.type_head), '=', $._type)),
     type_head: $ => seq('(', list($._type, $._separator), ')'),
-    binding: $ => prec.right(seq(field('pattern', $._atom), '=', field('value', $._expression))),
+    binding: $ => prec.right(seq(field('pattern', $._atom), repeat(seq('=', $._atom)), '=', field('value', $._expression))),
     declaration: $ => seq(field('name', $.identifier), ':', $._type),
 
     // ---- Expressions (§3.3) ----

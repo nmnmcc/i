@@ -17,8 +17,12 @@ can be followed by a statement starter, looking across comments. The grammar
 uses the break as a separator in data and parameter lists. An operator at the
 end of a line or a continuing token at the beginning does not introduce a break.
 
-The grammar handles the dual syntax currently accepted by `ilang-syntax`:
-records in braces and parentheses, error types with `?` and `^`. Semantic
+The grammar is syntax three (docs/design/syntax-3.md §3): data `( )` with
+`name = value` items, branches `(p) { e } | (q) { e }`, matches `e |> …`,
+service patterns and needs with `<-`, provide `e <- (s)`, and `<A, …>` type
+parameters on function literals and types. A binding's pattern is atoms joined
+by `=` (`a = (x, y) = e`); the last `=` begins the value. Known gap: a type
+that begins with `{ … }` and is followed by an operator (`{ 1 | 2 } - 2`). Semantic
 constraints (such as repeated labels and type/name resolution) belong to `i lsp`.
 No identifiers are classified as reserved keywords. The approach follows
 `tree-sitter-gleam/grammar.js` for postfix expressions, operator precedence,
