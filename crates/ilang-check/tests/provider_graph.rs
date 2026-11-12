@@ -629,7 +629,7 @@ fn discriminant_constructor_aliases_resolve_before_validation() {
 #[test]
 fn literal_service_arguments_use_i_string_escapes() {
     let (g, c) = package(
-        "Cell(A) { Cell(A) }\nmake(A) = () -> Cell(A) { panic(\"no\") }\n\nmain = (c ! Cell(\"\\u{0}\" | \"x\")) { Nil }",
+        "Cell(A) = (A)\nmake = <A>() -> Cell(A) { panic(\"no\") }\n\nmain = () <- (c: Cell(\"\\u{0}\" | \"x\")) { Nil }",
         &row("Cell", "make"),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
