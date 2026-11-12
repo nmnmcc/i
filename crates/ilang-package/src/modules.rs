@@ -1,4 +1,4 @@
-//! The modules of a package: the `.i` files under `src/` and `test/` (§2.1).
+//! The modules of a package: the `.i` files under `src/` and `test/`.
 
 use crate::{Diagnostic, Loader, ModuleKind, ModuleSource, code, is_name};
 use ilang_syntax::span::Span;

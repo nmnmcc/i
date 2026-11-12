@@ -1,11 +1,11 @@
-//! Packages (§2.1, §2.6): the package file, the modules of a package, the
-//! library package `i`, and the graph of packages that a program uses.
+//! Package loading: the package file, the modules of a package, the library
+//! package `i`, and the graph of packages that a program uses.
 //!
-//! Packages with a location are got with git (§2.7, [`git`]), their versions
-//! are chosen by minimal version selection ([`mvs`]), and they are checked
-//! against the lock file `i.lock` ([`lock`]).
-//!
-//! The only authority is `docs/spec.md`; section numbers refer to it.
+//! A package is a directory with an `i.toml` file; every `.i` file under its
+//! `src/` or `test/` directory is a module of it. Packages with a location
+//! are got with git ([`git`]), their versions are chosen by minimal version
+//! selection ([`mvs`]), and they are checked against the lock file `i.lock`
+//! ([`lock`]).
 
 pub mod git;
 pub mod library;
@@ -35,7 +35,7 @@ pub mod code {
     pub const BAD_VERSION: &str = "E0608";
     pub const PATH_DEPENDENCY: &str = "E0609";
     pub const WASM_EXPORT: &str = "E0610";
-    // "E0620" was "getting packages by location is not supported yet".
+    // The code "E0620" is not assigned.
     pub const NO_PACKAGE: &str = "E0621";
     pub const PACKAGE_CIRCLE: &str = "E0622";
     pub const MODULE_PATH_NAME: &str = "E0623";
@@ -43,9 +43,9 @@ pub mod code {
     pub const UNREADABLE: &str = "E0625";
     /// `git` could not be run, or a repository could not be fetched.
     pub const GIT: &str = "E0630";
-    /// A repository has no tag for a version that is reached (§2.7).
+    /// A repository has no tag for a version that is reached.
     pub const NO_VERSION: &str = "E0631";
-    /// The commit or the hash of a version is not the one in `i.lock` (§2.8).
+    /// The commit or the hash of a version is not the one in `i.lock`.
     pub const LOCK_MISMATCH: &str = "E0632";
     /// `i.lock` is not correct.
     pub const LOCK_SYNTAX: &str = "E0633";
@@ -200,7 +200,7 @@ impl Sources {
     }
 }
 
-/// `[ "_" ] lower { lower | digit | "_" }` (§1.3, §1.4).
+/// Reports whether `s` is a name: `[ "_" ] lower { lower | digit | "_" }`.
 pub fn is_name(s: &str) -> bool {
     let rest = s.strip_prefix('_').unwrap_or(s);
     let mut chars = rest.chars();
@@ -214,16 +214,16 @@ pub type PackageId = usize;
 pub enum ModuleKind {
     /// Under `src/`.
     Src,
-    /// Under `test/` (§2.1).
+    /// Under `test/`.
     Test,
-    /// The built-in names (§12), written in i. It is in the package `i`, but
+    /// The built-in names, written in i. It is in the package `i`, but
     /// it may not be imported.
     Prelude,
 }
 
 #[derive(Clone, Debug)]
 pub struct ModuleSource {
-    /// The module path, as its own package names it (§2.1).
+    /// The module path, as its own package names it.
     pub path: String,
     pub source: SourceId,
     pub kind: ModuleKind,
@@ -239,7 +239,7 @@ pub struct Package {
     /// Dependency names and their packages. A package is `None` when it
     /// could not be loaded; the problem has been reported.
     pub dependencies: Vec<(String, Option<PackageId>)>,
-    /// Only for the compiled package (§2.6). When its tests are not
+    /// Only for the compiled package. When its tests are not
     /// compiled ([`LoadOptions::tests`]), the names are here, but their
     /// packages are `None` and are not loaded.
     pub dev_dependencies: Vec<(String, Option<PackageId>)>,
@@ -248,12 +248,12 @@ pub struct Package {
     pub wasm_synchronous: Vec<WasmExport>,
     pub provider_plan: providers::ProviderPlan,
     pub entries: Vec<(String, WasmExport)>,
-    /// For a package got by location: its location and version (§2.7).
+    /// For a package got by location: its location and version.
     pub location: Option<PackageLocation>,
 }
 
 impl Package {
-    /// What comes before the module path in a source position (§11.7):
+    /// Returns what comes before the module path in a source position:
     /// `location@major ` for a package with a location, and nothing
     /// otherwise.
     pub fn position_prefix(&self) -> String {
@@ -266,22 +266,23 @@ impl Package {
 /// The version of a package with a location that a program uses.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackageLocation {
-    /// The location, with its `//dir` (§2.6).
+    /// The location, with its `//dir`.
     pub location: String,
     pub version: Version,
-    /// The git commit of the tag (§2.8).
+    /// The git commit of the tag.
     pub commit: String,
-    /// The hash of the files (§2.8).
+    /// The hash of the files, as in `i.lock`.
     pub hash: String,
 }
 
 impl PackageLocation {
-    /// The package (§2.7): the location and the major version.
+    /// Returns the package: the location and the major version.
     pub fn key(&self) -> PackageKey {
         PackageKey::new(self.location.clone(), self.version)
     }
 
-    /// `location@major ` (§11.7), with the space.
+    /// Returns `location@major `, with the space, the prefix of a source
+    /// position.
     pub fn position_prefix(&self) -> String {
         format!("{}@{} ", self.location, self.version.major)
     }
@@ -307,7 +308,7 @@ pub struct PackageGraph {
 pub struct LoadOptions {
     /// The tests of the compiled package are compiled: its test modules and
     /// its dev-dependencies are loaded, and its dev-dependencies take part
-    /// in minimal version selection (§2.6, §2.7). A named entry in a test
+    /// in minimal version selection. A named entry in a test
     /// module also loads test modules and dev-dependencies.
     pub tests: bool,
     /// The network may not be used. Something that is not in the cache is
@@ -319,7 +320,7 @@ pub struct LoadOptions {
     /// Rewrites from a prefix of a repository to a prefix of a URL (see
     /// [`git`]).
     pub git_urls: Vec<(String, String)>,
-    /// `i.lock` is written when its lines change (§2.8).
+    /// `i.lock` is written when its lines change.
     pub write_lock: bool,
 }
 
@@ -368,9 +369,9 @@ pub fn load(root: &Path) -> (PackageGraph, Vec<Diagnostic>) {
 
 /// Loads the package in `root` and the packages it uses. Test modules and
 /// dev-dependencies are loaded only for that package, and only with
-/// [`LoadOptions::tests`] or an entry in a test module (§2.1, §2.6). Packages with a location are got
-/// with git, chosen by minimal version selection, and checked against
-/// `i.lock`, which is brought up to date (§2.7, §2.8).
+/// [`LoadOptions::tests`] or an entry in a test module. Packages with a
+/// location are got with git, chosen by minimal version selection, and
+/// checked against `i.lock`, which is brought up to date.
 pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagnostic>) {
     let mut loader = Loader {
         graph: PackageGraph {
@@ -638,7 +639,7 @@ impl Loader {
             location: Some(loc.clone()),
         });
         self.by_key.insert(key.clone(), id);
-        // §2.6: a package got by location may not have path dependencies.
+        // A package got by location may not have path dependencies.
         for d in manifest.check_path_dependencies(true) {
             self.diags.push(Diagnostic {
                 source: Some(source),

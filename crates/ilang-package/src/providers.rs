@@ -1,4 +1,4 @@
-//! Manifest representation of target provider plans (§2.6.1).
+//! The representation of target provider plans in the package file.
 use crate::{Diagnostic, code, is_name};
 use ilang_syntax::span::Span;
 use std::collections::BTreeMap;
