@@ -17,7 +17,7 @@ serde_json.workspace = true
 sha2.workspace = true
 tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "io-util", "io-std", "sync", "fs", "net", "process"] }
 wasmparser.workspace = true
-wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-copying", "gc-drc", "gc-null", "runtime", "std", "backtrace", "parallel-compilation"] }
+wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-copying", "gc-drc", "gc-null", "runtime", "std", "backtrace", "parallel-compilation", "incremental-cache"] }
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 rustls-native-certs = "0.8.5"
 rustls-pemfile = "2.2.0"

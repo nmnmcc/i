@@ -353,6 +353,19 @@ def run_corpus(args):
     requirements = json.loads((CORPUS / 'requirements.json').read_text())
     binary_digest = sha(args.binary.read_bytes())
     revision = git('rev-parse', 'HEAD')
+    if args.compile_cache:
+        # Machine code compiled by one `i` process is reused by the next
+        # (ilang-host keys every entry by the Wasm bytes, the engine settings
+        # and the executable). The directory keeps the entries of one binary.
+        cache = Path(args.compile_cache).resolve()
+        stamp = cache / 'binary.sha256'
+        if cache.exists() and (not stamp.is_file() or stamp.read_text() != binary_digest):
+            shutil.rmtree(cache)
+        cache.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(binary_digest)
+        os.environ['ILANG_COMPILE_CACHE'] = str(cache)
+    else:
+        os.environ.pop('ILANG_COMPILE_CACHE', None)
     def comparable(outcome):
         # A killed child has no complete diagnostic/output to compare. Preserve
         # its raw partial output, but compare only its censored outcome.
@@ -720,6 +733,8 @@ def main():
     run.add_argument('--missing-only', action='store_true')
     run.add_argument('--keep-bounds', action='store_true', help='retain each saved observation budget during UPDATE=1')
     run.add_argument('--jobs', type=int, default=1)
+    run.add_argument('--compile-cache', default=str(ROOT / 'target/corpus-compile-cache'),
+                     help='directory of compiled code shared by the i processes; an empty value turns it off')
     run.add_argument('--shard', type=shard, help='K/N: run only the cases whose index in ID order is K-1 modulo N')
     run.add_argument('--list', action='store_true', help='print the selected case IDs and run nothing')
     sub.add_parser('parse-register')
