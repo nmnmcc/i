@@ -21,10 +21,7 @@ const SPIN: &str = "spin = (n: Int, x: Int) -> Int {
 ";
 
 fn project(name: &str, source: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ilang-multicore-{name}-{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("ilang-multicore-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("src")).unwrap();
     std::fs::write(dir.join("i.toml"), format!("name = {name:?}\n")).unwrap();
@@ -119,8 +116,14 @@ fn agree(name: &str, source: &str) -> (Run, Run, Trace) {
     let one = run(&dir, 1);
     let eight = run(&dir, 8);
     assert_eq!(one.stdout, eight.stdout, "{}", eight.stderr);
-    assert!(one.trace().is_none(), "one worker publishes nothing: {}", one.stderr);
-    let trace = eight.trace().unwrap_or_else(|| panic!("no trace: {}", eight.stderr));
+    assert!(
+        one.trace().is_none(),
+        "one worker publishes nothing: {}",
+        one.stderr
+    );
+    let trace = eight
+        .trace()
+        .unwrap_or_else(|| panic!("no trace: {}", eight.stderr));
     eprintln!(
         "multicore {name}: 1 worker {:.2}s, 8 workers {:.2}s, started {:?}, load {}",
         one.seconds,
@@ -139,7 +142,10 @@ fn started_once(trace: &Trace) {
 /// Eight pure tasks: the same results, paths and random draws.
 #[test]
 fn cpu_bound_tasks_agree_across_worker_counts() {
-    let (_, _, trace) = agree("cpu", &format!("(
+    let (_, _, trace) = agree(
+        "cpu",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -154,7 +160,9 @@ main = () {{
 	}})
 	stdio.print(core.inspect(results))
 }}
-"));
+"
+        ),
+    );
     assert_eq!(trace.published, 8);
     started_once(&trace);
     assert!(trace.workers_that_started() > 1);
@@ -163,7 +171,10 @@ main = () {{
 /// Acceptance 1: compute, then yield and a channel send, then compute.
 #[test]
 fn tasks_keep_running_on_their_worker_across_steps() {
-    let (_, _, trace) = agree("steps", &format!("(
+    let (_, _, trace) = agree(
+        "steps",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -192,17 +203,26 @@ main = () {{
 	stdio.print(core.inspect(results))
 	stdio.print(core.inspect(total))
 }}
-"));
+"
+        ),
+    );
     started_once(&trace);
     assert!(trace.workers_that_started() > 1, "{:?}", trace.started);
     // A remote task took its steps on its own worker.
-    assert!(trace.steps.iter().skip(1).any(|n| *n >= 4), "{:?}", trace.steps);
+    assert!(
+        trace.steps.iter().skip(1).any(|n| *n >= 4),
+        "{:?}",
+        trace.steps
+    );
 }
 
 /// Acceptance 2: a task on a worker spawns eight children.
 #[test]
 fn nested_go_is_parallel() {
-    let (_, _, trace) = agree("nested", &format!("(
+    let (_, _, trace) = agree(
+        "nested",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -218,7 +238,9 @@ main = () {{
 	}})
 	stdio.print(core.inspect(results))
 }}
-"));
+"
+        ),
+    );
     assert_eq!(trace.published, 9);
     started_once(&trace);
     assert!(trace.workers_that_started() > 1, "{:?}", trace.started);
@@ -306,7 +328,10 @@ main = () {{
 /// one-minute sleep on other workers; the run ends at once.
 #[test]
 fn cancel_reaches_blocked_tasks_on_other_workers() {
-    let (_, eight, trace) = agree("cancelio", &format!("(
+    let (_, eight, trace) = agree(
+        "cancelio",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -332,11 +357,20 @@ main = () {{
 	}})
 	stdio.print(core.inspect(outcome))
 }}
-"));
+"
+        ),
+    );
     assert_eq!(eight.stdout.trim(), "Error(\"stop\")");
     assert!(eight.seconds < 50.0, "the sleepers were cancelled");
-    assert!(trace.started.iter().skip(1).sum::<u64>() >= 1, "{:?}", trace.started);
-    let (_, eight, trace) = agree("cancelrecv", &format!("(
+    assert!(
+        trace.started.iter().skip(1).sum::<u64>() >= 1,
+        "{:?}",
+        trace.started
+    );
+    let (_, eight, trace) = agree(
+        "cancelrecv",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -360,16 +394,25 @@ main = () {{
 	}})
 	stdio.print(core.inspect(outcome))
 }}
-"));
+"
+        ),
+    );
     assert_eq!(eight.stdout.trim(), "Error(\"stop\")");
-    assert!(trace.started.iter().skip(1).sum::<u64>() >= 1, "{:?}", trace.started);
+    assert!(
+        trace.started.iter().skip(1).sum::<u64>() >= 1,
+        "{:?}",
+        trace.started
+    );
 }
 
 /// Acceptance 6: records that hold a boundary or a local channel stay on
 /// their maker and the result does not change.
 #[test]
 fn non_portable_records_stay_home() {
-    let dir = project("pinned", &format!("(
+    let dir = project(
+        "pinned",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -391,17 +434,26 @@ main = () {{
 	}})
 	stdio.print(core.inspect(local))
 }}
-"));
+"
+        ),
+    );
     let one = run(&dir, 1);
     let eight = run(&dir, 8);
     assert_eq!(one.stdout, eight.stdout);
-    assert!(eight.trace().is_none(), "no record was published: {}", eight.stderr);
+    assert!(
+        eight.trace().is_none(),
+        "no record was published: {}",
+        eight.stderr
+    );
 }
 
 /// `scope.share` values read on other workers.
 #[test]
 fn shared_values_are_read_on_other_workers() {
-    let (_, _, trace) = agree("share", &format!("(
+    let (_, _, trace) = agree(
+        "share",
+        &format!(
+            "(
 	i/task
 	i/stdio
 	i/core
@@ -431,7 +483,9 @@ main = () {{
 	}})
 	stdio.print(core.inspect(results))
 }}
-"));
+"
+        ),
+    );
     assert_eq!(trace.published, 8);
     started_once(&trace);
 }
@@ -494,7 +548,13 @@ fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> Stri
     let _ = server.0.kill();
     let _ = server.0.wait();
     let mut stderr = String::new();
-    server.0.stderr.take().unwrap().read_to_string(&mut stderr).unwrap();
+    server
+        .0
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .unwrap();
     stderr
 }
 
@@ -502,7 +562,10 @@ fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> Stri
 /// connections, handled on more than one worker (with their own IO).
 #[test]
 fn echo_connections_are_served_on_several_workers() {
-    let dir = project("echo8", &format!("(
+    let dir = project(
+        "echo8",
+        &format!(
+            "(
 	i/net
 	i/task
 	i/stdio
@@ -535,7 +598,9 @@ main = () {{
 	stdio.print(\"listening \" <> core.inspect(net.local_port(listener)))
 	task.scope((scope) {{ serve(listener, scope) }})
 }}
-"));
+"
+        ),
+    );
     let stderr = serve_clients(&dir, Some(8), 8);
     let mut workers: Vec<&str> = stderr
         .lines()

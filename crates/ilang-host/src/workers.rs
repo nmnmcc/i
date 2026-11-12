@@ -60,7 +60,9 @@ const WORKER_MEMORY: u64 = 1 << 30;
 /// `MemAvailable` of Linux, in bytes.
 fn available_memory() -> Option<u64> {
     let text = std::fs::read_to_string("/proc/meminfo").ok()?;
-    let line = text.lines().find(|line| line.starts_with("MemAvailable:"))?;
+    let line = text
+        .lines()
+        .find(|line| line.starts_with("MemAvailable:"))?;
     let kib: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
     Some(kib * 1024)
 }
@@ -305,7 +307,10 @@ impl Pool {
             return Ok(0);
         };
         let away = state.away.get_mut(&id).expect("an inbox record is away");
-        let message = away.messages.pop_front().expect("an inbox record has a message");
+        let message = away
+            .messages
+            .pop_front()
+            .expect("an inbox record has a message");
         let serial = away.serial.expect("an inbox record is adopted");
         if !away.messages.is_empty() {
             state.inbox.push_back(id);
@@ -319,7 +324,10 @@ impl Pool {
     }
 
     pub(crate) fn message(&self) -> Vec<u8> {
-        self.lock().current.take().expect("mc_message after mc_inbox")
+        self.lock()
+            .current
+            .take()
+            .expect("mc_message after mc_inbox")
     }
 
     /// Whether a task runs on another worker: worker 0 then waits for its
@@ -400,12 +408,7 @@ impl Pool {
         for thread in threads {
             let _ = thread.join();
         }
-        if let Some(ticker) = self
-            .ticker
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .take()
-        {
+        if let Some(ticker) = self.ticker.lock().unwrap_or_else(|e| e.into_inner()).take() {
             let _ = ticker.join();
         }
     }
@@ -488,14 +491,19 @@ impl Pool {
                     match picked {
                         None => continue,
                         Some(done) => {
-                            let Some((slot_id, request, reply)) = done else { continue };
+                            let Some((slot_id, request, reply)) = done else {
+                                continue;
+                            };
                             let woken = worker.settle(slot_id, &request, reply);
                             match woken {
                                 Ok(woken) => {
                                     let mut state = self.lock();
                                     for (slot, message) in woken {
                                         let id = slots[&slot];
-                                        let away = state.away.get_mut(&id).expect("a waiting task is away");
+                                        let away = state
+                                            .away
+                                            .get_mut(&id)
+                                            .expect("a waiting task is away");
                                         away.messages.push_back(message);
                                         if away.serial.is_some() && away.messages.len() == 1 {
                                             state.inbox.push_back(id);
@@ -516,8 +524,15 @@ impl Pool {
                 let (id, outcome) = match job {
                     Job::Begin(id, bytes) => (id, worker.begin(&bytes)),
                     Job::Resume(id, bytes) => {
-                        let slot = self.lock().away[&id].slot.expect("a started task has a slot");
-                        (id, worker.resume(slot, &bytes).map(|(ended, message)| (slot, ended, message)))
+                        let slot = self.lock().away[&id]
+                            .slot
+                            .expect("a started task has a slot");
+                        (
+                            id,
+                            worker
+                                .resume(slot, &bytes)
+                                .map(|(ended, message)| (slot, ended, message)),
+                        )
                     }
                 };
                 match outcome {
@@ -602,7 +617,12 @@ impl Worker {
         }
         linker.define_unknown_imports_as_traps(&pool.module)?;
         let mut state = State::worker();
-        if let Some(resources) = pool.resources.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+        if let Some(resources) = pool
+            .resources
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+        {
             state.resources = resources;
         }
         let mut store = Store::new(&pool.engine, state);
@@ -658,7 +678,10 @@ impl Worker {
         let ptr = get(store, "ilang_mc_out_ptr")?;
         let len = get(store, "ilang_mc_out_len")?;
         let cap = get(store, "ilang_mc_out_cap")?;
-        let memory = self.instance.get_memory(&mut *store, "memory").context("memory")?;
+        let memory = self
+            .instance
+            .get_memory(&mut *store, "memory")
+            .context("memory")?;
         let message = memory
             .data(&*store)
             .get(ptr as usize..ptr as usize + len as usize)
@@ -686,7 +709,14 @@ impl Worker {
         let mut values = vec![wasmtime::Val::I32(id as i32)];
         let checked = self.checked;
         ensure!(
-            crate::lower_reply(&mut self.store, bridge, &request.signature, answer, &mut values, checked)?,
+            crate::lower_reply(
+                &mut self.store,
+                bridge,
+                &request.signature,
+                answer,
+                &mut values,
+                checked
+            )?,
             "the host gave a value that is not correct"
         );
         crate::run::in_wasm(|| settle.call(&mut self.store, &values, &mut []))?;
@@ -733,30 +763,56 @@ impl Worker {
 /// The runtime imports of a worker other than 0.
 fn define_remote(linker: &mut Linker<State>, pool: std::sync::Weak<Pool>) -> Result<()> {
     fn refuse() -> wasmtime::Error {
-        wasmtime::Error::from_anyhow(anyhow!("a scheduler operation of worker 0 ran on another worker"))
+        wasmtime::Error::from_anyhow(anyhow!(
+            "a scheduler operation of worker 0 ran on another worker"
+        ))
     }
-    linker.func_wrap(HOST_MODULE, "mc_publish", |_: Caller<'_, State>, _: i32, _: i32, _: i32| -> wasmtime::Result<i64> {
-        Ok(0)
-    })?;
-    linker.func_wrap(HOST_MODULE, "mc_claim", |_: Caller<'_, State>, _: i64| -> wasmtime::Result<i32> {
-        Err(refuse())
-    })?;
-    linker.func_wrap(HOST_MODULE, "mc_adopt", |_: Caller<'_, State>, _: i64, _: i64| -> wasmtime::Result<()> {
-        Err(refuse())
-    })?;
-    linker.func_wrap(HOST_MODULE, "mc_send", |_: Caller<'_, State>, _: i64, _: i32, _: i32| -> wasmtime::Result<()> {
-        Err(refuse())
-    })?;
-    linker.func_wrap(HOST_MODULE, "mc_inbox", |_: Caller<'_, State>| -> wasmtime::Result<i64> { Ok(0) })?;
-    linker.func_wrap(HOST_MODULE, "mc_message", |_: Caller<'_, State>| -> wasmtime::Result<i64> {
-        Err(refuse())
-    })?;
-    linker.func_wrap(HOST_MODULE, "mc_pending", |_: Caller<'_, State>| -> wasmtime::Result<i32> { Ok(0) })?;
-    linker.func_wrap(HOST_MODULE, "mc_wait", |_: Caller<'_, State>| -> wasmtime::Result<()> { Ok(()) })?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_publish",
+        |_: Caller<'_, State>, _: i32, _: i32, _: i32| -> wasmtime::Result<i64> { Ok(0) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_claim",
+        |_: Caller<'_, State>, _: i64| -> wasmtime::Result<i32> { Err(refuse()) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_adopt",
+        |_: Caller<'_, State>, _: i64, _: i64| -> wasmtime::Result<()> { Err(refuse()) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_send",
+        |_: Caller<'_, State>, _: i64, _: i32, _: i32| -> wasmtime::Result<()> { Err(refuse()) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_inbox",
+        |_: Caller<'_, State>| -> wasmtime::Result<i64> { Ok(0) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_message",
+        |_: Caller<'_, State>| -> wasmtime::Result<i64> { Err(refuse()) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_pending",
+        |_: Caller<'_, State>| -> wasmtime::Result<i32> { Ok(0) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_wait",
+        |_: Caller<'_, State>| -> wasmtime::Result<()> { Ok(()) },
+    )?;
     linker.func_wrap(
         HOST_MODULE,
         "mc_share_put",
-        |_: Caller<'_, State>, _: i64, _: i64, _: i64, _: i32, _: i32| -> wasmtime::Result<()> { Ok(()) },
+        |_: Caller<'_, State>, _: i64, _: i64, _: i64, _: i32, _: i32| -> wasmtime::Result<()> {
+            Ok(())
+        },
     )?;
     linker.func_wrap(
         HOST_MODULE,
@@ -766,8 +822,15 @@ fn define_remote(linker: &mut Linker<State>, pool: std::sync::Weak<Pool>) -> Res
     linker.func_wrap(
         HOST_MODULE,
         "mc_share_get",
-        move |mut caller: Caller<'_, State>, run: i64, task: i64, at: i64| -> wasmtime::Result<i64> {
-            let Some(bytes) = pool.upgrade().and_then(|pool| pool.share_get((run, task, at))) else {
+        move |mut caller: Caller<'_, State>,
+              run: i64,
+              task: i64,
+              at: i64|
+              -> wasmtime::Result<i64> {
+            let Some(bytes) = pool
+                .upgrade()
+                .and_then(|pool| pool.share_get((run, task, at)))
+            else {
                 return Ok(0);
             };
             let bridge = Bridge::from_caller(&mut caller);
@@ -793,8 +856,14 @@ pub(crate) fn define_home(linker: &mut Linker<State>) -> Result<()> {
     linker.func_wrap(
         HOST_MODULE,
         "mc_publish",
-        |mut caller: Caller<'_, State>, ptr: i32, len: i32, affinity: i32| -> wasmtime::Result<i64> {
-            let Some(pool) = pool(&caller) else { return Ok(0) };
+        |mut caller: Caller<'_, State>,
+         ptr: i32,
+         len: i32,
+         affinity: i32|
+         -> wasmtime::Result<i64> {
+            let Some(pool) = pool(&caller) else {
+                return Ok(0);
+            };
             let bridge = Bridge::from_caller(&mut caller);
             let bytes = bridge
                 .read(&caller, ptr as u32, len as u32)
@@ -814,7 +883,9 @@ pub(crate) fn define_home(linker: &mut Linker<State>) -> Result<()> {
         HOST_MODULE,
         "mc_adopt",
         |caller: Caller<'_, State>, id: i64, serial: i64| -> wasmtime::Result<()> {
-            pool(&caller).expect("mc_adopt with workers").adopt(id as u64, serial);
+            pool(&caller)
+                .expect("mc_adopt with workers")
+                .adopt(id as u64, serial);
             Ok(())
         },
     )?;
@@ -835,7 +906,9 @@ pub(crate) fn define_home(linker: &mut Linker<State>) -> Result<()> {
         HOST_MODULE,
         "mc_inbox",
         |mut caller: Caller<'_, State>| -> wasmtime::Result<i64> {
-            let Some(pool) = pool(&caller) else { return Ok(0) };
+            let Some(pool) = pool(&caller) else {
+                return Ok(0);
+            };
             pool.inbox().map_err(|message| stop(&mut caller, message))
         },
     )?;
@@ -856,23 +929,37 @@ pub(crate) fn define_home(linker: &mut Linker<State>) -> Result<()> {
         HOST_MODULE,
         "mc_pending",
         |mut caller: Caller<'_, State>| -> wasmtime::Result<i32> {
-            let Some(pool) = pool(&caller) else { return Ok(0) };
+            let Some(pool) = pool(&caller) else {
+                return Ok(0);
+            };
             pool.pending()
                 .map(i32::from)
                 .map_err(|message| stop(&mut caller, message))
         },
     )?;
-    linker.func_wrap(HOST_MODULE, "mc_wait", |caller: Caller<'_, State>| -> wasmtime::Result<()> {
-        if let Some(pool) = pool(&caller) {
-            pool.wait();
-        }
-        Ok(())
-    })?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_wait",
+        |caller: Caller<'_, State>| -> wasmtime::Result<()> {
+            if let Some(pool) = pool(&caller) {
+                pool.wait();
+            }
+            Ok(())
+        },
+    )?;
     linker.func_wrap(
         HOST_MODULE,
         "mc_share_put",
-        |mut caller: Caller<'_, State>, run: i64, task: i64, at: i64, ptr: i32, len: i32| -> wasmtime::Result<()> {
-            let Some(pool) = pool(&caller) else { return Ok(()) };
+        |mut caller: Caller<'_, State>,
+         run: i64,
+         task: i64,
+         at: i64,
+         ptr: i32,
+         len: i32|
+         -> wasmtime::Result<()> {
+            let Some(pool) = pool(&caller) else {
+                return Ok(());
+            };
             let bridge = Bridge::from_caller(&mut caller);
             let bytes = bridge
                 .read(&caller, ptr as u32, len as u32)
