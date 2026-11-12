@@ -376,8 +376,10 @@ fn dots_and_spreads_are_separate_datums() {
 #[test]
 fn core_forms_convert_between_surfaces() {
     let source = r#"
-(x, Option(..))
-Option(A) { Some(A) None }
+(x, Option, Some(..), None(..))
+Option(A) = Some(A) | None
+Some(A) { Some(A) }
+None { None }
 value: (Int) -> Int
 value = (x) -> Int { x + 1 }
 choose = (x) { x |> { 0 -> "zero" _ -> "other" } }

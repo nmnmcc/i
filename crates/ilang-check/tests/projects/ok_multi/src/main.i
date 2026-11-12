@@ -10,14 +10,21 @@
 	main
 	Pair(..)
 	Kind
+	Big
+	Small
 )
 
 Pair(A, B) {
 	Pair(left: A, right: B)
 }
 
-Kind {
+Kind = Big | Small
+
+Big {
 	Big
+}
+
+Small {
 	Small
 }
 

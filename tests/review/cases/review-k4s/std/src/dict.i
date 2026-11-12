@@ -52,10 +52,21 @@ Dict(K, V) {
 	Dict(Int, Node(K, V))
 }
 
-Node(K, V) {
+Node(K, V) = Empty | One(K, V) | Many(K, V) | Branch(K, V)
+
+Empty {
 	Empty
+}
+
+One(K, V) {
 	One(Int, K, V)
+}
+
+Many(K, V) {
 	Many(Int, List((K, V)))
+}
+
+Branch(K, V) {
 	Branch(Node(K, V), Node(K, V), Node(K, V), Node(K, V))
 }
 

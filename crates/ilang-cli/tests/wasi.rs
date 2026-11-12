@@ -468,8 +468,12 @@ const CANCEL_OUT: &str = r#"(i/control, i/fail, i/resource)
 // Hands k2 out of the cancel, to the boundary `b0` around it.
 Out { Out(put: (k2: Inner) -> Nil) }
 Inner { Inner(Continuation(Nil, Int, Never, Out)) }
-Outer { Paused(Continuation(Nil, Outer, Never, Out))  Done }
-Handed { Handed(Inner)  Lost }
+Outer = Paused | Done
+Paused { Paused(Continuation(Nil, Outer, Never, Out)) }
+Done { Done }
+Handed = HandedCase | Lost
+HandedCase { Handed(Inner) }
+Lost { Lost }
 
 put = (k2, o ! Out) { o.put(k2) }
 
@@ -560,7 +564,9 @@ main = () {
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
 const THIRD: &str = r#"
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
-Third { Third(Continuation(Nil, Third, Never, Out))  Over }
+Third = ThirdCase | Over
+ThirdCase { Third(Continuation(Nil, Third, Never, Out)) }
+Over { Over }
 
 keep = (t) {
   t |> {
@@ -615,7 +621,9 @@ main = () {
 const ENV_TAIL_RESUME: &str = r#"(i/control)
 
 Name { Name(text: String) }
-Paused { Paused(Continuation(Nil, Paused, Never, Name))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Name)) }
+Done { Done }
 
 name = (n ! Name) { n.text }
 
@@ -651,7 +659,9 @@ main = () {
 const ENV_TAIL_CANCEL: &str = r#"(i/control, i/resource)
 
 Name { Name(text: String) }
-Paused { Paused(Continuation(Nil, Paused, Never, Name))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Name)) }
+Done { Done }
 
 name = (n ! Name) { n.text }
 
@@ -688,7 +698,9 @@ main = () {
 /// Test 16: the value of `f` of `inner` goes on into the cancelled code.
 const CANCEL_INNER: &str = r#"(i/control, i/resource, (Io) = i/io)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Io))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Io)) }
+Done { Done }
 
 say = (text, io ! Io) { io.print(text) }
 
@@ -730,8 +742,12 @@ main = (io ! Io) {
 /// This is checked against eager, rather than made a conformance rule.
 const ERROR_THROUGH_FINAL: &str = r#"(i/control, i/core, i/fail, i/resource, (Io) = i/io)
 
-Paused { Paused(Continuation(Nil, Paused, Int, Never))  Done }
-Held { Held(Continuation(Nil, Held, Never, Never))  Over }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Int, Never)) }
+Done { Done }
+Held = HeldCase | Over
+HeldCase { Held(Continuation(Nil, Held, Never, Never)) }
+Over { Over }
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).

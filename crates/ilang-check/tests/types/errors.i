@@ -42,8 +42,13 @@ field = (u) { u.name }
 part = (t) { t.0 }
 
 // E0512: a field that not every constructor has.
-Shape {
+Shape = Circle | Square
+
+Circle {
 	Circle(radius: Float)
+}
+
+Square {
 	Square(side: Float)
 }
 

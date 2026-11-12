@@ -212,13 +212,27 @@ file under run/test, rather than silently selecting the host fallback.
 ```i
 (js = i/js, wasi = i/wasi)
 
-(Target(..))
+(Target, Js(..), NodeJS(..), Wasi(..), Native(..), Host(..))
 
-Target {
+Target = Js | NodeJS | Wasi | Native | Host
+
+Js {
   Js(js: js.Js)
+}
+
+NodeJS {
   NodeJS(js: js.Js)
+}
+
+Wasi {
   Wasi(wasi: wasi.Wasi)
+}
+
+Native {
   Native
+}
+
+Host {
   Host
 }
 ```
@@ -1860,13 +1874,15 @@ for cancellation/cleanup, not sleep timing. Run availability tests at O0/O2/O3.
 The shared-constructor package is complete ordinary source plus the new map:
 
 ```i
-(Family(..))
+(Family, Web(..), NonWeb(..))
 
 Foreign {}
 @js("(() => { throw Error('must initialize'); })()")
 foreign: Foreign
 
-Family { Web NonWeb }
+Family = Web | NonWeb
+Web { Web }
+NonWeb { NonWeb }
 
 
 main = (f ! Family) {

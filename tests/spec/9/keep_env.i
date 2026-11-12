@@ -5,7 +5,9 @@
 (i/control, i/core, i/resource)
 
 Name { Name(text: String) }
-Hop { Paused(Continuation(Nil, Hop, Never, Never)) Done(String) }
+Hop = Paused | Done
+Paused { Paused(Continuation(Nil, Hop, Never, Never)) }
+Done { Done(String) }
 name = (value ! Name) { value.text }
 
 walk = (b, n) {

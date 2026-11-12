@@ -18,7 +18,24 @@
 	Quote(..)
 	Unquote(..)
 	Splice(..)
-	Position(..)
+	Position
+	ImportItem(..)
+	ExportItem(..)
+	Item(..)
+	Attribute(..)
+	Constructor(..)
+	Field(..)
+	Type(..)
+	FunctionResult(..)
+	Parameter(..)
+	Expression(..)
+	Statement(..)
+	CallArgument(..)
+	Clause(..)
+	ClauseHead(..)
+	Pattern(..)
+	Segment(..)
+	Format(..)
 	SyntaxError(..)
 	Definitions(..)
 	definition
@@ -102,23 +119,73 @@ Splice {
 	Splice(Syntax)
 }
 
-Position {
+Position = ImportItem | ExportItem | Item | Attribute | Constructor | Field | Type | FunctionResult | Parameter | Expression | Statement | CallArgument | Clause | ClauseHead | Pattern | Segment | Format
+
+ImportItem {
 	ImportItem
+}
+
+ExportItem {
 	ExportItem
+}
+
+Item {
 	Item
+}
+
+Attribute {
 	Attribute
+}
+
+Constructor {
 	Constructor
+}
+
+Field {
 	Field
+}
+
+Type {
 	Type
+}
+
+FunctionResult {
 	FunctionResult
+}
+
+Parameter {
 	Parameter
+}
+
+Expression {
 	Expression
+}
+
+Statement {
 	Statement
+}
+
+CallArgument {
 	CallArgument
+}
+
+Clause {
 	Clause
+}
+
+ClauseHead {
 	ClauseHead
+}
+
+Pattern {
 	Pattern
+}
+
+Segment {
 	Segment
+}
+
+Format {
 	Format
 }
 

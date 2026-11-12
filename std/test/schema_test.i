@@ -18,8 +18,13 @@ Address {
 	Address(city: String)
 }
 
-Role {
+Role = Admin | Member
+
+Admin {
 	Admin
+}
+
+Member {
 	Member
 }
 

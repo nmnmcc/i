@@ -652,9 +652,13 @@ These types may be used in every module:
 These built-in types are normal custom types and names of their unions (§4.3), with these definitions:
 
 ```i
-Bool { True False }
+Bool = True | False
+True { True }
+False { False }
 Nil { Nil }
-Result(A, E) { Ok(A) Error(E) }
+Result(A, E) = Ok(A) | Error(E)
+Ok(A) { Ok(A) }
+Error(E) { Error(E) }
 ```
 
 The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4. The types `Key` and `Keyed` are in §9.8. Request(A) and Ticket are built-in types, with operations in i/request (§9.11). Request(A) contains request handles whose answer belongs to A. Ticket is an answer-erased handle. Neither has public constructors.
@@ -1436,12 +1440,26 @@ The ordinary module `i/target` exports this nominal service and its constructors
 
 ```i
 (js = i/js, wasi = i/wasi)
-(Target(..))
-Target {
+(Target, Js(..), NodeJS(..), Wasi(..), Native(..), Host(..))
+Target = Js | NodeJS | Wasi | Native | Host
+
+Js {
   Js(js: js.Js)
+}
+
+NodeJS {
   NodeJS(js: js.Js)
+}
+
+Wasi {
   Wasi(wasi: wasi.Wasi)
+}
+
+Native {
   Native
+}
+
+Host {
   Host
 }
 ```
@@ -1861,7 +1879,9 @@ constructor hidden, the error type below with its constructors, and these
 functions. The signatures describe bindings with bodies.
 
 ```i
-RandomError { InvalidBound(Int) InvalidPath(List(Int)) }
+RandomError = InvalidBound | InvalidPath
+InvalidBound { InvalidBound(Int) }
+InvalidPath { InvalidPath(List(Int)) }
 ```
 
 | Name | Type |
@@ -1939,7 +1959,11 @@ functions; it does not redeclare or re-export the primitive types.
 Await { Await(wait: (ticket: Ticket) -> Nil) }
 Root { Root(key: Key(Nil)) }
 Owner { Owner(key: Key(Nil), root: Root) }
-RequestState(A) { Waiting Ready(A) Cancelled Taken }
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
+Waiting { Waiting }
+Ready(A) { Ready(A) }
+Cancelled { Cancelled }
+Taken { Taken }
 ```
 
 | Function | Type | Rule |

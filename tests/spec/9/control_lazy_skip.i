@@ -17,13 +17,23 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused {
+Paused = PausedCase | Done
+
+PausedCase {
 	Paused(Continuation(Nil, Paused, Never, Never))
+}
+
+Done {
 	Done
 }
 
-Held {
+Held = HeldCase | Over
+
+HeldCase {
 	Held(Continuation(Nil, Held, Never, Never))
+}
+
+Over {
 	Over
 }
 

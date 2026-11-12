@@ -1,4 +1,6 @@
-Target { Web Native }
+Target = Web | Native
+Web { Web }
+Native { Native }
 read = (t ! Target) { t |> { Web -> 1 Native -> 2 } }
 probe = (t ! Target) {
   alias = t

@@ -79,8 +79,19 @@
 (
 	Parser
 	Names(..)
-	DefinitionError(..)
-	CliError(..)
+	DefinitionError
+	InvalidName(..)
+	DuplicateName(..)
+	MisplacedRest(..)
+	CliError
+	BadDefinition(..)
+	UnknownOption(..)
+	MissingValue(..)
+	UnexpectedValue(..)
+	RepeatedOption(..)
+	MissingArgument(..)
+	InvalidArgument(..)
+	ExtraArgument(..)
 	pure
 	flag
 	option
@@ -102,20 +113,51 @@ Names {
 	Names(long: String, short: Option(String))
 }
 
-DefinitionError {
+DefinitionError = InvalidName | DuplicateName | MisplacedRest
+
+InvalidName {
 	InvalidName(String)
+}
+
+DuplicateName {
 	DuplicateName(String)
+}
+
+MisplacedRest {
 	MisplacedRest
 }
 
-CliError {
+CliError = BadDefinition | UnknownOption | MissingValue | UnexpectedValue | RepeatedOption | MissingArgument | InvalidArgument | ExtraArgument
+
+BadDefinition {
 	BadDefinition(DefinitionError)
+}
+
+UnknownOption {
 	UnknownOption(index: Int, token: String)
+}
+
+MissingValue {
 	MissingValue(index: Int, name: String)
+}
+
+UnexpectedValue {
 	UnexpectedValue(index: Int, name: String)
+}
+
+RepeatedOption {
 	RepeatedOption(index: Int, name: String)
+}
+
+MissingArgument {
 	MissingArgument(name: String)
+}
+
+InvalidArgument {
 	InvalidArgument(index: Int, name: String, text: String, reason: String)
+}
+
+ExtraArgument {
 	ExtraArgument(index: Int, token: String)
 }
 
@@ -123,12 +165,29 @@ Token {
 	Token(index: Int, text: String)
 }
 
-Kind {
+Kind = Flag | Required | Optional | Repeated | Positional | Remaining
+
+Flag {
 	Flag
+}
+
+Required {
 	Required
+}
+
+Optional {
 	Optional
+}
+
+Repeated {
 	Repeated
+}
+
+Positional {
 	Positional
+}
+
+Remaining {
 	Remaining
 }
 

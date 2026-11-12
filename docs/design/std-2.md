@@ -221,8 +221,23 @@ Date { Date(Int, Int, Int) }
 TimeOfDay { TimeOfDay(Int, Int, Int, Int) }
 Offset { Offset(Int) }
 Civil { Civil(date: Date, time: TimeOfDay) }
-Weekday { Monday Tuesday Wednesday Thursday Friday Saturday Sunday }
-CalendarError { BadMonth BadDay BadHour BadMinute BadSecond BadNanosecond BadOffset BadText }
+Weekday = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+Monday { Monday }
+Tuesday { Tuesday }
+Wednesday { Wednesday }
+Thursday { Thursday }
+Friday { Friday }
+Saturday { Saturday }
+Sunday { Sunday }
+CalendarError = BadMonth | BadDay | BadHour | BadMinute | BadSecond | BadNanosecond | BadOffset | BadText
+BadMonth { BadMonth }
+BadDay { BadDay }
+BadHour { BadHour }
+BadMinute { BadMinute }
+BadSecond { BadSecond }
+BadNanosecond { BadNanosecond }
+BadOffset { BadOffset }
+BadText { BadText }
 ```
 
 ```text
@@ -357,15 +372,41 @@ provided the callbacks terminate and obey their own contracts.
 
 ```i
 Names { Names(long: String, short: Option(String)) }
-DefinitionError { InvalidName(String) DuplicateName(String) MisplacedRest }
-CliError {
+DefinitionError = InvalidName | DuplicateName | MisplacedRest
+InvalidName { InvalidName(String) }
+DuplicateName { DuplicateName(String) }
+MisplacedRest { MisplacedRest }
+CliError = BadDefinition | UnknownOption | MissingValue | UnexpectedValue | RepeatedOption | MissingArgument | InvalidArgument | ExtraArgument
+
+BadDefinition {
   BadDefinition(DefinitionError)
+}
+
+UnknownOption {
   UnknownOption(index: Int, token: String)
+}
+
+MissingValue {
   MissingValue(index: Int, name: String)
+}
+
+UnexpectedValue {
   UnexpectedValue(index: Int, name: String)
+}
+
+RepeatedOption {
   RepeatedOption(index: Int, name: String)
+}
+
+MissingArgument {
   MissingArgument(name: String)
+}
+
+InvalidArgument {
   InvalidArgument(index: Int, name: String, text: String, reason: String)
+}
+
+ExtraArgument {
   ExtraArgument(index: Int, token: String)
 }
 ```
@@ -502,7 +543,13 @@ This is a representable choice, not a new public type facility:
 
 ```i
 Token { Token(index: Int, text: String) }
-Kind { Flag Required Optional Repeated Positional Remaining }
+Kind = Flag | Required | Optional | Repeated | Positional | Remaining
+Flag { Flag }
+Required { Required }
+Optional { Optional }
+Repeated { Repeated }
+Positional { Positional }
+Remaining { Remaining }
 Field { Field(name: String, short: Option(String), help: String, kind: Kind) }
 Parser(A) {
   Parser(List(Field), (List(List(Token))) -> Result((A, List(List(Token))), CliError))
@@ -576,7 +623,11 @@ is the public factory. `time` is std/time. Field pairs are ordered and may repea
 Failure is the error severity; it avoids collision with built-in Error.
 
 ```i
-Level { Debug Info Warning Failure }
+Level = Debug | Info | Warning | Failure
+Debug { Debug }
+Info { Info }
+Warning { Warning }
+Failure { Failure }
 Entry {
   Entry(level: Level, message: String, fields: List((String, String)), at: Option(time.Instant))
 }

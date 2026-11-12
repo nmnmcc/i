@@ -27,8 +27,13 @@ Bad {
 	Bad(Int)
 }
 
-Paused {
+Paused = PausedCase | Done
+
+PausedCase {
 	Paused(Continuation(Nil, Paused, Never, Name))
+}
+
+Done {
 	Done(String)
 }
 

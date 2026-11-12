@@ -1,6 +1,13 @@
 (i/task, (Io) = i/io)
-Tree { Leaf
- Node(Tree, Tree) }
+Tree = Leaf | Node
+
+Leaf {
+Leaf
+}
+
+Node {
+Node(Tree, Tree)
+}
 make = (n: Int) -> Tree { n |> { 0 -> Leaf
  _ -> { x = make(n - 1)
  Node(x, x) } } }

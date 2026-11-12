@@ -18,7 +18,9 @@
 )
 
 (
-	ContinueOrStop(..)
+	ContinueOrStop
+	Continue(..)
+	Stop(..)
 	length
 	count
 	reverse
@@ -90,8 +92,13 @@
 
 /// What `fold_until` does next: go on with the new accumulator, or stop
 /// with it.
-ContinueOrStop(A) {
+ContinueOrStop(A) = Continue(A) | Stop(A)
+
+Continue(A) {
 	Continue(A)
+}
+
+Stop(A) {
 	Stop(A)
 }
 

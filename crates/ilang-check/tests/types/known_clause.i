@@ -2,8 +2,13 @@
 // made by `C`. `.f` and a record update read the value through the pattern
 // type of the clause (rule 11), so the type of `v` is not changed outside
 // the clause: it keeps the values of the other clauses.
-T {
+T = A | B
+
+A {
 	A(f: Int, g: String)
+}
+
+B {
 	B(h: Int)
 }
 
@@ -50,8 +55,13 @@ update_open = (v) {
 use_update = () { update_open(1) }
 
 // With a type parameter: the field has the argument of the pattern type.
-Box(A) {
+Box(A) = Full(A) | Empty
+
+Full(A) {
 	Full(item: A)
+}
+
+Empty {
 	Empty
 }
 

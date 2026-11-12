@@ -59,9 +59,17 @@ test("new_to_list_test", () {
 	Nil
 })
 
-Key {
+Key = A | B | C
+
+A {
 	A
+}
+
+B {
 	B
+}
+
+C {
 	C
 }
 
@@ -603,8 +611,13 @@ test("combine_with_no_overlapping_keys_test", () {
 //
 // Object.keys() returns [] for variants without fields, so the hash always
 // stays on it's initial value.
-CollidingKey {
+CollidingKey = CollidingKey1 | CollidingKey2
+
+CollidingKey1 {
 	CollidingKey1
+}
+
+CollidingKey2 {
 	CollidingKey2
 }
 
@@ -684,9 +697,17 @@ test("hash_collision_after_delete_get_second_test", () {
 	Nil
 })
 
-Colour {
+Colour = Red | Green | Blue
+
+Red {
 	Red
+}
+
+Green {
 	Green
+}
+
+Blue {
 	Blue
 }
 

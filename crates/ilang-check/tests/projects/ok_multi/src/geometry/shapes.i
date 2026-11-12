@@ -1,10 +1,17 @@
 (
-	Shape(..)
+	Shape
+	Circle(..)
+	Square(..)
 	area
 )
 
-Shape {
+Shape = Circle | Square
+
+Circle {
 	Circle(radius: Float)
+}
+
+Square {
 	Square(side: Float)
 }
 

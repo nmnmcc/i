@@ -8,7 +8,9 @@
 // at: spec/main:43:18
 (i/control)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Never)) }
+Done { Done }
 
 // Three frames that wait.
 f1 = (b) {

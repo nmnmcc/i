@@ -6,7 +6,9 @@
 //// `int.parse`, gives a `Result`.
 
 (
-	Option(..)
+	Option
+	Some(..)
+	None(..)
 	is_some
 	is_none
 	map
@@ -25,8 +27,13 @@
 )
 
 /// A value that may be there (`Some`) or not (`None`).
-Option(A) {
+Option(A) = Some(A) | None
+
+Some(A) {
 	Some(A)
+}
+
+None {
 	None
 }
 

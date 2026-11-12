@@ -16,8 +16,13 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Gen {
+Gen = More | End
+
+More {
 	More(Continuation(Nil, Gen, Never, Never))
+}
+
+End {
 	End
 }
 
@@ -52,8 +57,13 @@ test("cancel_long_pending", () {
 	check(show(drive(control.boundary((b) { g(b, 0) }), 10000)), "Nil")
 })
 
-Step {
+Step = StepCase | Fin
+
+StepCase {
 	Step(Continuation(Nil, Step, Int, Never))
+}
+
+Fin {
 	Fin
 }
 

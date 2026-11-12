@@ -12,7 +12,9 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused(B) { Paused(Continuation(Nil, Paused(B), Never, Never), B)  Done }
+Paused(B) = PausedCase(B) | Done
+PausedCase(B) { Paused(Continuation(Nil, Paused(B), Never, Never), B) }
+Done { Done }
 
 
 main = () {

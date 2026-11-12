@@ -54,7 +54,11 @@
 )
 
 (
-	Level(..)
+	Level
+	Debug(..)
+	Info(..)
+	Warning(..)
+	Failure(..)
 	Entry(..)
 	Sink
 	make
@@ -67,10 +71,21 @@
 	format
 )
 
-Level {
+Level = Debug | Info | Warning | Failure
+
+Debug {
 	Debug
+}
+
+Info {
 	Info
+}
+
+Warning {
 	Warning
+}
+
+Failure {
 	Failure
 }
 

@@ -1,5 +1,10 @@
-User {
+User = UserCase | Guest
+
+UserCase {
   User(name: String, age: Int, email_address: String, is_administrator: Bool, created: Int)
+}
+
+Guest {
   Guest
 }
 

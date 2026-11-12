@@ -1,7 +1,9 @@
 // spec: 4.8, 6.12
 // expect: pass
 (main)
-Result(A, E) { Ok(A) Error(E) }
+Result(A, E) = Ok(A) | Error(E)
+Ok(A) { Ok(A) }
+Error(E) { Error(E) }
 unwrap = (r: Result(Int, Int)) { r |> { Ok(v) | Error(v) -> v } }
 
 

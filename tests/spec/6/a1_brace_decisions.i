@@ -1,7 +1,9 @@
 // spec: 6.1
 // expect: pass
 (main)
-Result(A, E) { Ok(A) Error(E) }
+Result(A, E) = Ok(A) | Error(E)
+Ok(A) { Ok(A) }
+Error(E) { Error(E) }
 identity = (n) { n }
 take_tuple = { t = (0, _) -> t  _ -> (0, 0) }
 take_result = { r = Ok(v) -> v  _ -> 0 }

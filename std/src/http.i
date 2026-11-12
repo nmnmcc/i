@@ -28,11 +28,24 @@
 	send_stream
 	Method(..)
 	Status(..)
-	Headers(..)
+	Headers
+	HeadersCase(..)
+	RawHeaders(..)
 	Request(..)
 	Response(..)
-	HttpError(..)
-	Progress(..)
+	HttpError
+	NeedMore(..)
+	BadMessage(..)
+	Dns(..)
+	Connect(..)
+	Tls(..)
+	Protocol(..)
+	Timeout(..)
+	StatusError(..)
+	Progress
+	More(..)
+	Complete(..)
+	Invalid(..)
 	request
 	response
 	feed_request
@@ -57,7 +70,10 @@
 	body_text
 	body_json
 	body_decode
-	BodyError(..)
+	BodyError
+	InvalidText(..)
+	InvalidJson(..)
+	InvalidSchema(..)
 	send_with
 	send_timeout
 	route
@@ -86,8 +102,13 @@ Status {
 	Status(Int)
 }
 
-Headers {
+Headers = HeadersCase | RawHeaders
+
+HeadersCase {
 	Headers(List((String, String)))
+}
+
+RawHeaders {
 	RawHeaders(List((String, BitArray)))
 }
 
@@ -111,20 +132,51 @@ Response {
 	)
 }
 
-HttpError {
+HttpError = NeedMore | BadMessage | Dns | Connect | Tls | Protocol | Timeout | StatusError
+
+NeedMore {
 	NeedMore
+}
+
+BadMessage {
 	BadMessage(String)
+}
+
+Dns {
 	Dns(String)
+}
+
+Connect {
 	Connect(String)
+}
+
+Tls {
 	Tls(String)
+}
+
+Protocol {
 	Protocol(String)
+}
+
+Timeout {
 	Timeout
+}
+
+StatusError {
 	StatusError(Int)
 }
 
-Progress(A) {
+Progress(A) = More | Complete(A) | Invalid
+
+More {
 	More(BitArray)
+}
+
+Complete(A) {
 	Complete(A, BitArray)
+}
+
+Invalid {
 	Invalid(String)
 }
 
@@ -1025,12 +1077,29 @@ write_server_reply = (stream, res: Response, closing: Bool) {
 	)
 }
 
-BodyFraming {
+BodyFraming = Remaining | ChunkSize | ChunkData | ChunkEnd | ChunkTrailers | BodyDone
+
+Remaining {
 	Remaining(Int)
+}
+
+ChunkSize {
 	ChunkSize
+}
+
+ChunkData {
 	ChunkData(Int)
+}
+
+ChunkEnd {
 	ChunkEnd
+}
+
+ChunkTrailers {
 	ChunkTrailers
+}
+
+BodyDone {
 	BodyDone
 }
 
@@ -1357,8 +1426,13 @@ network_client = () {
 	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
 }
 
-Connection {
+Connection = Plain | Secure
+
+Plain {
 	Plain(net.Stream)
+}
+
+Secure {
 	Secure(tls.Stream)
 }
 
@@ -1721,9 +1795,17 @@ read_progress = (transport, method, buffer, eof) {
 	}
 }
 
-BodyError {
+BodyError = InvalidText | InvalidJson | InvalidSchema
+
+InvalidText {
 	InvalidText
+}
+
+InvalidJson {
 	InvalidJson(json.JsonError)
+}
+
+InvalidSchema {
 	InvalidSchema(schema.SchemaError)
 }
 

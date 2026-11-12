@@ -8,8 +8,13 @@
 	(Some, None) = std/option
 )
 
-Event {
+Event = Sent | Message
+
+Sent {
 	Sent(log.Entry)
+}
+
+Message {
 	Message
 }
 

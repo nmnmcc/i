@@ -67,8 +67,23 @@
 	TimeOfDay
 	Offset
 	Civil(..)
-	Weekday(..)
-	CalendarError(..)
+	Weekday
+	Monday(..)
+	Tuesday(..)
+	Wednesday(..)
+	Thursday(..)
+	Friday(..)
+	Saturday(..)
+	Sunday(..)
+	CalendarError
+	BadMonth(..)
+	BadDay(..)
+	BadHour(..)
+	BadMinute(..)
+	BadSecond(..)
+	BadNanosecond(..)
+	BadOffset(..)
+	BadText(..)
 	date
 	time_of_day
 	offset
@@ -107,24 +122,67 @@ Civil {
 	Civil(date: Date, time: TimeOfDay)
 }
 
-Weekday {
+Weekday = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+
+Monday {
 	Monday
+}
+
+Tuesday {
 	Tuesday
+}
+
+Wednesday {
 	Wednesday
+}
+
+Thursday {
 	Thursday
+}
+
+Friday {
 	Friday
+}
+
+Saturday {
 	Saturday
+}
+
+Sunday {
 	Sunday
 }
 
-CalendarError {
+CalendarError = BadMonth | BadDay | BadHour | BadMinute | BadSecond | BadNanosecond | BadOffset | BadText
+
+BadMonth {
 	BadMonth
+}
+
+BadDay {
 	BadDay
+}
+
+BadHour {
 	BadHour
+}
+
+BadMinute {
 	BadMinute
+}
+
+BadSecond {
 	BadSecond
+}
+
+BadNanosecond {
 	BadNanosecond
+}
+
+BadOffset {
 	BadOffset
+}
+
+BadText {
 	BadText
 }
 

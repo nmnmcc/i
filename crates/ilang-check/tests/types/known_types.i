@@ -239,8 +239,13 @@ not_general = () {
 
 // The examples of §4.8: a parameter with no type has no known type, but a
 // name in a clause pattern gets the known part type.
-Option(A) {
+Option(A) = Some(A) | None
+
+Some(A) {
 	Some(A)
+}
+
+None {
 	None
 }
 

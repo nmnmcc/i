@@ -22,8 +22,13 @@ Point {
 	Point(Int, Int, label: String)
 }
 
-Option(A) {
+Option(A) = Some(A) | None
+
+Some(A) {
 	Some(A)
+}
+
+None {
 	None
 }
 

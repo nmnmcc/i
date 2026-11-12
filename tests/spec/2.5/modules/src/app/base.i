@@ -1,12 +1,23 @@
 (
 	start
-	Color(..)
+	Color
+	Red(..)
+	Green(..)
+	Blue(..)
 	describe
 )
 
-Color {
+Color = Red | Green | Blue
+
+Red {
 	Red
+}
+
+Green {
 	Green
+}
+
+Blue {
 	Blue(level: Int)
 }
 

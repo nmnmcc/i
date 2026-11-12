@@ -2,7 +2,9 @@
 // expect: pass
 (main)
 User { User(name: String) }
-Option(A) { Some(A) None }
+Option(A) = Some(A) | None
+Some(A) { Some(A) }
+None { None }
 get = (opt: Option(User)) { opt |> { Some(u) -> u.name } }
 single: (Int) -> Int ! Assert = { 0 -> 7 }
 

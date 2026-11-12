@@ -8,7 +8,11 @@
 	Await(..)
 	Root(..)
 	Owner(..)
-	RequestState(..)
+	RequestState
+	Waiting(..)
+	Ready(..)
+	Cancelled(..)
+	Taken(..)
 	open_root
 	close_root
 	open_owner
@@ -46,10 +50,21 @@ Owner {
 	Owner(key: Key(Nil), root: Root)
 }
 
-RequestState(A) {
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
+
+Waiting {
 	Waiting
+}
+
+Ready(A) {
 	Ready(A)
+}
+
+Cancelled {
 	Cancelled
+}
+
+Taken {
 	Taken
 }
 

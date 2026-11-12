@@ -12,13 +12,23 @@ StepAnswer {
 	Proceed(Keyed)
 }
 
-Command {
+Command = Send | Receive
+
+Send {
 	Send(Keyed)
+}
+
+Receive {
 	Receive
 }
 
-Turn {
+Turn = Step | Done
+
+Step {
 	Step(Command, Continuation(StepAnswer, Turn, Never, Never))
+}
+
+Done {
 	Done(Keyed)
 }
 

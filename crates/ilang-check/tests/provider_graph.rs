@@ -543,7 +543,7 @@ fn adapter_types_are_checked_even_without_reached_roles() {
 }
 #[test]
 fn discriminant_constructor_fields_are_dependency_edges() {
-    let source = "Bundle { On(Part)\nOff }\nPart { Part }\npart = () { Part }\n\nmain = (b ! Bundle) { Nil }";
+    let source = "Bundle = On | Off\n\nOn {\nOn(Part)\n}\n\nOff {\nOff\n}\nPart { Part }\npart = () { Part }\n\nmain = (b ! Bundle) { Nil }";
     let plan = format!(
         "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.On\",native=\"app/main.On\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
         row("Part", "part")
@@ -615,7 +615,7 @@ fn adapter_service_list_order_does_not_change_its_type() {
 
 #[test]
 fn discriminant_constructor_aliases_resolve_before_validation() {
-    let source = "Bundle { On(Part)\nOff }\nPart { Part }\npart = () { Part }\nselected = On\nalias = selected\n\nmain = (b ! Bundle) { Nil }";
+    let source = "Bundle = On | Off\n\nOn {\nOn(Part)\n}\n\nOff {\nOff\n}\nPart { Part }\npart = () { Part }\nselected = On\nalias = selected\n\nmain = (b ! Bundle) { Nil }";
     let plan = format!(
         "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.alias\",native=\"app/main.alias\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
         row("Part", "part")

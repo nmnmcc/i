@@ -8,7 +8,9 @@
 )
 
 (
-	RelativeError(..)
+	RelativeError
+	DifferentRoots(..)
+	UnknownParent(..)
 	clean
 	join
 	split
@@ -20,8 +22,13 @@
 )
 
 /// Why a lexical relative path cannot be found.
-RelativeError {
+RelativeError = DifferentRoots | UnknownParent
+
+DifferentRoots {
 	DifferentRoots
+}
+
+UnknownParent {
 	UnknownParent
 }
 

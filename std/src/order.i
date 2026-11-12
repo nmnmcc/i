@@ -4,7 +4,10 @@
 //// `int.compare` and `string.compare`. `list.sort` takes such a function.
 
 (
-	Order(..)
+	Order
+	Less(..)
+	Equal(..)
+	Greater(..)
 	negate
 	reverse
 	to_int
@@ -20,9 +23,17 @@
 
 /// The result of a comparison: the first value is `Less` than, `Equal` to,
 /// or `Greater` than the second.
-Order {
+Order = Less | Equal | Greater
+
+Less {
 	Less
+}
+
+Equal {
 	Equal
+}
+
+Greater {
 	Greater
 }
 

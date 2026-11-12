@@ -18,9 +18,17 @@ User {
 	User(name: String, age: Int)
 }
 
-Shape {
+Shape = Circle | Rect | Square
+
+Circle {
 	Circle(radius: Float)
+}
+
+Rect {
 	Rect(width: Float, height: Float)
+}
+
+Square {
 	Square(width: Float)
 }
 
@@ -70,8 +78,13 @@ test("custom", () {
 	check(show(Point(..p, label: "q")), "Point(1, 2, \"q\")")
 })
 
-Box {
+Box = Wide | Thin
+
+Wide {
 	Wide(width: Float, depth: Float)
+}
+
+Thin {
 	Thin(width: Float)
 }
 
@@ -87,8 +100,13 @@ test("fields_on_unions", () {
 	}
 })
 
-Sized {
+Sized = Small | Big
+
+Small {
 	Small(size: Int)
+}
+
+Big {
 	Big(name: String, size: Int)
 }
 

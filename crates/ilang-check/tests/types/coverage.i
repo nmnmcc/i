@@ -1,8 +1,16 @@
 // §7.4: the clauses of a match must cover every value of the type of the
 // subject. A missing pattern is shown.
-Shape {
+Shape = Circle | Square | Point
+
+Circle {
 	Circle(radius: Float)
+}
+
+Square {
 	Square(side: Float)
+}
+
+Point {
 	Point
 }
 

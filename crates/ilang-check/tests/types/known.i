@@ -1,6 +1,11 @@
 // §7.5: known constructors, used by `.f` and record updates (§6.7).
-Shape {
+Shape = Circle | Square
+
+Circle {
 	Circle(radius: Float, label: String)
+}
+
+Square {
 	Square(side: Float, label: String)
 }
 

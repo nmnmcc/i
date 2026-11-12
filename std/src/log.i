@@ -60,7 +60,11 @@
 )
 
 (
-	Level(..)
+	Level
+	Debug(..)
+	Info(..)
+	Warning(..)
+	Failure(..)
 	Entry(..)
 	Sink
 	make
@@ -77,10 +81,21 @@
 	timestamped
 )
 
-Level {
+Level = Debug | Info | Warning | Failure
+
+Debug {
 	Debug
+}
+
+Info {
 	Info
+}
+
+Warning {
 	Warning
+}
+
+Failure {
 	Failure
 }
 

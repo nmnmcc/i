@@ -1,6 +1,8 @@
 // A1 §3.9 and §6.2: labels, direct values, fitting, and expected types.
 User { User(name: String) }
-Option(A) { Some(A) None }
+Option(A) = Some(A) | None
+Some(A) { Some(A) }
+None { None }
 Done { Done }
 one = { n -> n }
 many = { 0 -> 1  _ -> 2 }

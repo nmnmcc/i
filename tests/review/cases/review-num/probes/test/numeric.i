@@ -47,8 +47,13 @@ test("integers", () {
 	check(core.shift_right(-3, 1) == -2)
 })
 
-ResultStep {
+ResultStep = End | More
+
+End {
 	End(Float, Int, Float)
+}
+
+More {
 	More(Continuation(Float, ResultStep, Never, Never))
 }
 

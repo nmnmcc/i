@@ -21,8 +21,13 @@ Text {
 	Text(value: String)
 }
 
-Shape {
+Shape = Circle | Square
+
+Circle {
 	Circle(radius: Float, label: String)
+}
+
+Square {
 	Square(side: Float, label: String)
 }
 

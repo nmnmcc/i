@@ -290,30 +290,138 @@ The library module `i/syntax` exports these types:
 ```i
 Syntax {}
 
-Node {
+Node = Name | Discard | Up | Symbol | IntCase | FloatCase | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice | TypeView
+
+Name {
   Name(String)
+}
+
+Discard {
   Discard(String)
+}
+
+Up {
   Up(String)
+}
+
+Symbol {
   Symbol(String)
+}
+
+IntCase {
   Int(Int)
+}
+
+FloatCase {
   Float(Float)
+}
+
+Text {
   Text(String)
+}
+
+Round {
   Round(List(Syntax))
+}
+
+Square {
   Square(List(Syntax))
+}
+
+Curly {
   Curly(List(Syntax))
+}
+
+Bits {
   Bits(List(Syntax))
+}
+
+Quote {
   Quote(Syntax)
+}
+
+Unquote {
   Unquote(Syntax)
+}
+
+Splice {
   Splice(Syntax)
+}
+
+TypeView {
   TypeView(TypeHandle)
 }
 
 TypeHandle {}
 
-Position {
-  ImportItem  ExportItem  Item  Attribute  Constructor  Field  Type  FunctionResult
-  Parameter  Expression  Statement  CallArgument  Clause  ClauseHead  Pattern
-  Segment  Format
+Position = ImportItem | ExportItem | Item | Attribute | Constructor | Field | Type | FunctionResult | Parameter | Expression | Statement | CallArgument | Clause | ClauseHead | Pattern | Segment | Format
+
+ImportItem {
+  ImportItem
+}
+
+ExportItem {
+  ExportItem
+}
+
+Item {
+  Item
+}
+
+Attribute {
+  Attribute
+}
+
+Constructor {
+  Constructor
+}
+
+Field {
+  Field
+}
+
+Type {
+  Type
+}
+
+FunctionResult {
+  FunctionResult
+}
+
+Parameter {
+  Parameter
+}
+
+Expression {
+  Expression
+}
+
+Statement {
+  Statement
+}
+
+CallArgument {
+  CallArgument
+}
+
+Clause {
+  Clause
+}
+
+ClauseHead {
+  ClauseHead
+}
+
+Pattern {
+  Pattern
+}
+
+Segment {
+  Segment
+}
+
+Format {
+  Format
 }
 
 SyntaxError { SyntaxError(message: String, at: Syntax) }
@@ -795,7 +903,10 @@ from the validated output; never re-infer the caller from its expansion.
 ### 7.4 Asking for types
 
 ```i
-Truth { Yes  No  NotKnown }
+Truth = Yes | No | NotKnown
+Yes { Yes }
+No { No }
+NotKnown { NotKnown }
 
 Types {
   Types(

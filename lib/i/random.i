@@ -9,7 +9,9 @@
 
 (
 	Generator
-	RandomError(..)
+	RandomError
+	InvalidBound(..)
+	InvalidPath(..)
 	from_seed
 	word
 	int
@@ -19,8 +21,13 @@
 )
 
 // History is stored newest first. Each step keeps the preceding draw index.
-Step {
+Step = Split | Path
+
+Split {
 	Split(Int, Int)
+}
+
+Path {
 	Path(Int, Int)
 }
 
@@ -32,8 +39,13 @@ Generator {
 	Generator(Int, State, List(Step), Int)
 }
 
-RandomError {
+RandomError = InvalidBound | InvalidPath
+
+InvalidBound {
 	InvalidBound(Int)
+}
+
+InvalidPath {
 	InvalidPath(List(Int))
 }
 

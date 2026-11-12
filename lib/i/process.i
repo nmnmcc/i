@@ -13,11 +13,18 @@
 	Entropy(..)
 	Process
 	Child
-	Stdio(..)
+	Stdio
+	Inherit(..)
+	Null(..)
+	Piped(..)
 	spawn_piped
 	spawn_config
-	EnvironmentMode(..)
-	Directory(..)
+	EnvironmentMode
+	InheritEnvironment(..)
+	ReplaceEnvironment(..)
+	Directory
+	InheritDirectory(..)
+	DirectoryCase(..)
 	read_stdout
 	read_stderr
 	write_stdin
@@ -37,19 +44,37 @@ ProcessError {
 	ProcessError(operation: String, code: String)
 }
 
-Stdio {
+Stdio = Inherit | Null | Piped
+
+Inherit {
 	Inherit
+}
+
+Null {
 	Null
+}
+
+Piped {
 	Piped
 }
 
-EnvironmentMode {
+EnvironmentMode = InheritEnvironment | ReplaceEnvironment
+
+InheritEnvironment {
 	InheritEnvironment(List(String))
+}
+
+ReplaceEnvironment {
 	ReplaceEnvironment(List(String))
 }
 
-Directory {
+Directory = InheritDirectory | DirectoryCase
+
+InheritDirectory {
 	InheritDirectory
+}
+
+DirectoryCase {
 	Directory(String)
 }
 

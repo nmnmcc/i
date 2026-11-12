@@ -13,7 +13,9 @@
 // at: spec/main:73:3
 (i/control)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Never)) }
+Done { Done }
 
 // Two frames that wait in the first computation.
 a1 = (b) {

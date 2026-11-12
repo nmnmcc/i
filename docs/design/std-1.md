@@ -141,8 +141,13 @@ functions below. `Step` is data; its `Next` tail describes later calls.
 Stream(A, E, N) {
   Stream(() -> Step(A, E, N) ^ E ! N, (N) -> Nil)
 }
-Step(A, E, N) {
+Step(A, E, N) = Done | Next(A, E, N)
+
+Done {
   Done
+}
+
+Next(A, E, N) {
   Next(A, Stream(A, E, N))
 }
 ```
@@ -430,20 +435,47 @@ One implementable private layout is:
 
 ```i
 Sequence(A) { Sequence(Tree(A)) }
-Node(A) {
+Node(A) = Leaf(A) | Branch2(A) | Branch3(A)
+
+Leaf(A) {
   Leaf(A)
+}
+
+Branch2(A) {
   Branch2(Int, Node(A), Node(A))
+}
+
+Branch3(A) {
   Branch3(Int, Node(A), Node(A), Node(A))
 }
-Digit(A) {
+Digit(A) = One(A) | Two(A) | Three(A) | Four(A)
+
+One(A) {
   One(Node(A))
+}
+
+Two(A) {
   Two(Node(A), Node(A))
+}
+
+Three(A) {
   Three(Node(A), Node(A), Node(A))
+}
+
+Four(A) {
   Four(Node(A), Node(A), Node(A), Node(A))
 }
-Tree(A) {
+Tree(A) = EmptyTree | Single(A) | Deep(A)
+
+EmptyTree {
   EmptyTree
+}
+
+Single(A) {
   Single(Node(A))
+}
+
+Deep(A) {
   Deep(Int, Digit(A), Tree(A), Digit(A))
 }
 ```
@@ -546,7 +578,9 @@ and exactly these functions. Unicode and NUL are ordinary path characters in
 this lexical module. An IO boundary may reject a path for its own reasons.
 
 ```i
-RelativeError { DifferentRoots UnknownParent }
+RelativeError = DifferentRoots | UnknownParent
+DifferentRoots { DifferentRoots }
+UnknownParent { UnknownParent }
 ```
 
 ```text
@@ -641,36 +675,101 @@ Parts {
 Authority {
   Authority(userinfo: Option(String), host: Host, port: Option(String))
 }
-Host {
+Host = RegName | IpLiteral
+
+RegName {
   RegName(String)
+}
+
+IpLiteral {
   IpLiteral(String)
 }
-UriPart {
+UriPart = WholePart | SchemePart | AuthorityPart | UserInfoPart | HostPart | PortPart | PathPart | QueryPart | FragmentPart
+
+WholePart {
   WholePart
+}
+
+SchemePart {
   SchemePart
+}
+
+AuthorityPart {
   AuthorityPart
+}
+
+UserInfoPart {
   UserInfoPart
+}
+
+HostPart {
   HostPart
+}
+
+PortPart {
   PortPart
+}
+
+PathPart {
   PathPart
+}
+
+QueryPart {
   QueryPart
+}
+
+FragmentPart {
   FragmentPart
 }
-UriProblem {
+UriProblem = BadCharacter | BadPercent | BadScheme | BadAuthority | BadHost | BadPort | BadPath | RelativeBase
+
+BadCharacter {
   BadCharacter
+}
+
+BadPercent {
   BadPercent
+}
+
+BadScheme {
   BadScheme
+}
+
+BadAuthority {
   BadAuthority
+}
+
+BadHost {
   BadHost
+}
+
+BadPort {
   BadPort
+}
+
+BadPath {
   BadPath
+}
+
+RelativeBase {
   RelativeBase
 }
 UriError { UriError(part: UriPart, offset: Int, problem: UriProblem) }
-CodecError {
+CodecError = BadEscape | NonAscii | InvalidUtf8 | UnalignedBits
+
+BadEscape {
   BadEscape(offset: Int)
+}
+
+NonAscii {
   NonAscii(offset: Int)
+}
+
+InvalidUtf8 {
   InvalidUtf8
+}
+
+UnalignedBits {
   UnalignedBits
 }
 ```
@@ -998,7 +1097,9 @@ nonexistent modules. Names use qualified modules unless imported explicitly.
 and helper are:
 
 ```i
-BadTree(A) { BadEmpty BadDeep(List(A), BadTree(BadNode(A))) }
+BadTree(A) = BadEmpty | BadDeep(A)
+BadEmpty { BadEmpty }
+BadDeep(A) { BadDeep(List(A), BadTree(BadNode(A))) }
 BadNode(A) { BadNode(A, A) }
 depth(A) = (tree: BadTree(A)) -> Int {
   tree |> {

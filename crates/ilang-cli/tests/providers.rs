@@ -203,7 +203,7 @@ fn target_schema_is_checked_without_an_entry() {
 #[test]
 fn generated_discriminant_provisions_constructor_fields() {
     passes(
-        "Part { Part(value: Int) }\nBundle { On(Part) Off }\npart = () { Part(42) }\nmain = (b ! Bundle) { b |> { On(p) -> assert(p.value == 42) Off -> panic(\"wrong target\") } }",
+        "Part { Part(value: Int) }\nBundle = On | Off\nOn { On(Part) }\nOff { Off }\npart = () { Part(42) }\nmain = (b ! Bundle) { b |> { On(p) -> assert(p.value == 42) Off -> panic(\"wrong target\") } }",
         &(row("Part", "part")
             + "[providers.\"app/main.Bundle\"]\ndiscriminant = {js=\"app/main.Off\", nodejs=\"app/main.On\", native=\"app/main.On\", wasi=\"app/main.Off\", host=\"app/main.Off\"}\n"),
     );

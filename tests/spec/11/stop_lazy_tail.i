@@ -7,7 +7,9 @@
 // at: spec/main:43:11
 (i/control)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Never)) }
+Done { Done }
 
 w1 = (b) {
   x = w2(b)

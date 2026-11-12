@@ -10,7 +10,11 @@
 	Fs
 	File
 	FsError(..)
-	OpenMode(..)
+	OpenMode
+	ReadOnly(..)
+	WriteTruncate(..)
+	Append(..)
+	ReadWrite(..)
 	open
 	read
 	write
@@ -36,10 +40,21 @@ FsError {
 	FsError(operation: String, path: String, code: String)
 }
 
-OpenMode {
+OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
+
+ReadOnly {
 	ReadOnly
+}
+
+WriteTruncate {
 	WriteTruncate
+}
+
+Append {
 	Append
+}
+
+ReadWrite {
 	ReadWrite
 }
 

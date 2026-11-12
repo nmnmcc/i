@@ -20,8 +20,13 @@ User {
 	User(name: String, age: Int)
 }
 
-Option(A) {
+Option(A) = Some(A) | None
+
+Some(A) {
 	Some(A)
+}
+
+None {
 	None
 }
 

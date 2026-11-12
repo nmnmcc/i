@@ -1,6 +1,11 @@
 @host("app:a/v1")
-Two {
+Two = One | Other
+
+One {
 	One(f: () -> Nil)
+}
+
+Other {
 	Other(g: () -> Nil)
 }
 

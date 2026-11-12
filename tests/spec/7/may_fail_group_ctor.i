@@ -2,8 +2,13 @@
 // expect: stop "panic: caught group ctor"
 
 // literal-types §5.3: deferred fitted failure in its own effect frame.
-Choice {
+Choice = No | Yes
+
+No {
 	No
+}
+
+Yes {
 	Yes(Int)
 }
 

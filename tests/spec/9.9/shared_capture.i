@@ -7,8 +7,13 @@
 	i/core
 )
 
-Tree(A) {
+Tree(A) = Tip(A) | Node(A)
+
+Tip(A) {
 	Tip(A)
+}
+
+Node(A) {
 	Node(Tree(A), Tree(A))
 }
 

@@ -125,16 +125,33 @@ Tree(A) { Tree(value: A, children: () -> List(Tree(A))) }
 Config {
   Config(seed: Int, cases: Int, max_size: Int, max_discards: Int, max_shrinks: Int)
 }
-BuildError { InvalidRange(Int, Int) InvalidLength(Int, Int) EmptyChoice }
-Verdict { Pass Fail(String) Discard }
+BuildError = InvalidRange | InvalidLength | EmptyChoice
+InvalidRange { InvalidRange(Int, Int) }
+InvalidLength { InvalidLength(Int, Int) }
+EmptyChoice { EmptyChoice }
+Verdict = Pass | Fail | Discard
+Pass { Pass }
+Fail { Fail(String) }
+Discard { Discard }
 Failure(A) {
   Failure(seed: Int, attempt: Int, size: Int, original: A, smallest: A,
     reason: String, path: List(Int), checked: Int, limited: Bool)
 }
-Report(A) {
+Report(A) = Passed | GaveUp | Falsified(A) | InvalidConfig
+
+Passed {
   Passed(successes: Int, discards: Int)
+}
+
+GaveUp {
   GaveUp(successes: Int, discards: Int)
+}
+
+Falsified(A) {
   Falsified(Failure(A))
+}
+
+InvalidConfig {
   InvalidConfig(String)
 }
 ```

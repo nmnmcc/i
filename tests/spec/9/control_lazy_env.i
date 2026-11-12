@@ -21,8 +21,13 @@ Name {
 
 name = (n ! Name) { n.text }
 
-Paused {
+Paused = PausedCase | Done
+
+PausedCase {
 	Paused(Continuation(Nil, Paused, Never, Name))
+}
+
+Done {
 	Done(String)
 }
 

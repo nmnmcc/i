@@ -6,8 +6,13 @@ x = 2
 
 z = 3
 
-T {
+T = A | BCase
+
+A {
 	A
+}
+
+BCase {
 	B
 }
 

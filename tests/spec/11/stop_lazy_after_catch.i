@@ -14,7 +14,9 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Never)) }
+Done { Done }
 
 // The call of `fail.raise` is not a tail call, so the frame of `inner` is
 // still on the shadow stack when the error goes out of it.

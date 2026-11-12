@@ -4,8 +4,13 @@ Stream(A, E, N) {
 	Stream(() -> Step(A, E, N) ^ E ! N, (N) -> Nil)
 }
 
-Step(A, E, N) {
+Step(A, E, N) = Done | Next(A, E, N)
+
+Done {
 	Done
+}
+
+Next(A, E, N) {
 	Next(A, Stream(A, E, N))
 }
 

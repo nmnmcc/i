@@ -2,7 +2,9 @@
 // expect: pass
 (main)
 User { User(name: String) }
-Option(A) { Some(A) None }
+Option(A) = Some(A) | None
+Some(A) { Some(A) }
+None { None }
 list_map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
   xs |> {
     [] -> []

@@ -1,4 +1,6 @@
-Option(A) { Some(A) None }
+Option(A) = Some(A) | None
+Some(A) { Some(A) }
+None { None }
 id(A) = (x: A) { x }
 typed(A): (A) -> A = (x) { x }
 inspect(A): (A) -> String

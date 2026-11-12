@@ -1288,7 +1288,9 @@ mod shared_place_tests {
             root.path().join("src/main.i"),
             r#"
 Pair(A) { Pair(A, A) }
-Event(A) { Start(A) Stop(A) }
+Event(A) = Start(A) | Stop(A)
+Start(A) { Start(A) }
+Stop(A) { Stop(A) }
 Two(A) = (A, A)
 Wrapped(A) { Wrapped(Two(A)) }
 Solo(A) { Solo(A, Int) }

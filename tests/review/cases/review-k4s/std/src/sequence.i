@@ -210,17 +210,33 @@ equal(A) = (first: Sequence(A), second: Sequence(A)) -> Bool {
 	length(first) == length(second) && to_list(first) == to_list(second)
 }
 
-Node(A) {
+Node(A) = Leaf(A) | Branch2(A) | Branch3(A)
+
+Leaf(A) {
 	Leaf(A)
+}
+
+Branch2(A) {
 	Branch2(Int, Node(A), Node(A))
+}
+
+Branch3(A) {
 	Branch3(Int, Node(A), Node(A), Node(A))
 }
 
 // Digits are lists of one to four nodes of the same rank. The middle holds
 // nodes one rank higher. Uniform Node/Tree types avoid polymorphic recursion.
-Tree(A) {
+Tree(A) = EmptyTree | Single(A) | Deep(A)
+
+EmptyTree {
 	EmptyTree
+}
+
+Single(A) {
 	Single(Node(A))
+}
+
+Deep(A) {
 	Deep(Int, List(Node(A)), Tree(A), List(Node(A)))
 }
 

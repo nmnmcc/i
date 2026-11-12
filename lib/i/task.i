@@ -12,7 +12,11 @@
 
 (
 	Scheduler
+	DetachedScheduler
+	SchedulerCase
 	Runner
+	DetachedRunner
+	RunnerCase
 	Scope
 	Task
 	Channel
@@ -56,8 +60,13 @@ Address {
 	Address(task: Int, index: Int)
 }
 
-Witness {
+Witness = Portable | Local
+
+Portable {
 	Portable
+}
+
+Local {
 	Local(Boundary(Turn, Never, Never))
 }
 
@@ -97,9 +106,17 @@ ScheduleError {
 	NotRunnable(path: List(Int))
 }
 
-StepAnswer {
+StepAnswer = Proceed | CancelStep | ForwardStep
+
+Proceed {
 	Proceed(Keyed)
+}
+
+CancelStep {
 	CancelStep(() -> Never)
+}
+
+ForwardStep {
 	ForwardStep(
 		ForeignNotice
 		Keyed
@@ -108,14 +125,27 @@ StepAnswer {
 	)
 }
 
-Completion {
+Completion = Succeeded | Failed | Abandoned
+
+Succeeded {
 	Succeeded(Keyed)
+}
+
+Failed {
 	Failed(Keyed, Keyed)
+}
+
+Abandoned {
 	Abandoned
 }
 
-Turn {
+Turn = Switched | Finished
+
+Switched {
 	Switched(Int, Command, Continuation(StepAnswer, Turn, Never, Never))
+}
+
+Finished {
 	Finished(Int, Completion)
 }
 
@@ -123,13 +153,23 @@ Start {
 	Start(body: (Scheduler) -> Completion)
 }
 
-Policy {
+Policy = Fifo | Script
+
+Fifo {
 	Fifo
+}
+
+Script {
 	Script(List(List(Int)))
 }
 
-Runner {
+Runner = DetachedRunner | RunnerCase
+
+DetachedRunner {
 	DetachedRunner
+}
+
+RunnerCase {
 	Runner(
 		seed:     rng.Generator
 		context:  request.Root
@@ -142,8 +182,13 @@ Runner {
 	)
 }
 
-Scheduler {
+Scheduler = DetachedScheduler | SchedulerCase
+
+DetachedScheduler {
 	DetachedScheduler
+}
+
+SchedulerCase {
 	Scheduler(
 		run:     Key(Nil)
 		root:    request.Root
@@ -156,26 +201,55 @@ Scheduler {
 	)
 }
 
-Maybe(A) {
+Maybe(A) = Absent | Present(A)
+
+Absent {
 	Absent
+}
+
+Present(A) {
 	Present(A)
 }
 
-Mode {
+Mode = Ordinary | Racing
+
+Ordinary {
 	Ordinary
+}
+
+Racing {
 	Racing
 }
 
-BodyMark {
+BodyMark = BodyOpen | BodyOk | BodyError | BodyCancelled
+
+BodyOpen {
 	BodyOpen
+}
+
+BodyOk {
 	BodyOk
+}
+
+BodyError {
 	BodyError
+}
+
+BodyCancelled {
 	BodyCancelled
 }
 
-ScopeReply {
+ScopeReply = ScopeOk | ScopeError | ScopeWinner
+
+ScopeOk {
 	ScopeOk
+}
+
+ScopeError {
 	ScopeError(Keyed)
+}
+
+ScopeWinner {
 	ScopeWinner(Keyed)
 }
 
@@ -205,24 +279,58 @@ Cause {
 	Cause(run: Key(Nil), scope: Maybe(Address), epoch: Int)
 }
 
-Outcome {
+Outcome = Pending | Success | Failure | Cancelled
+
+Pending {
 	Pending
+}
+
+Success {
 	Success(Keyed)
+}
+
+Failure {
 	Failure(Keyed)
+}
+
+Cancelled {
 	Cancelled(Cause)
 }
 
-Status {
+Status = Dormant | Runnable | WaitingTicket | WaitingScope | WaitingEvent | WaitingDrain | Running | Ended
+
+Dormant {
 	Dormant(Start)
+}
+
+Runnable {
 	Runnable(Continuation(StepAnswer, Turn, Never, Never), StepAnswer)
+}
+
+WaitingTicket {
 	WaitingTicket(Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+}
+
+WaitingScope {
 	WaitingScope(Continuation(StepAnswer, Turn, Never, Never), Address)
+}
+
+WaitingEvent {
 	WaitingEvent(
 		Continuation(StepAnswer, Turn, Never, Never)
 		Request(Registration)
 	)
+}
+
+WaitingDrain {
 	WaitingDrain(Continuation(StepAnswer, Turn, Never, Never))
+}
+
+Running {
 	Running
+}
+
+Ended {
 	Ended
 }
 
@@ -292,10 +400,21 @@ ShareState {
 	ShareState(id: Address, owner: Maybe(Address), value: Keyed)
 }
 
-Leaf {
+Leaf = SendLeaf | ReceiveLeaf | JoinLeaf | AlwaysLeaf
+
+SendLeaf {
 	SendLeaf(ChannelInfo, Keyed)
+}
+
+ReceiveLeaf {
 	ReceiveLeaf(ChannelInfo)
+}
+
+JoinLeaf {
 	JoinLeaf(TaskInfo)
+}
+
+AlwaysLeaf {
 	AlwaysLeaf(Keyed)
 }
 
@@ -307,8 +426,13 @@ Event(A, E, N) {
 	Event(identity: Key(Nil), branches: List(Branch(A, E, N)))
 }
 
-Selection {
+Selection = Selected | SelectedCancelled
+
+Selected {
 	Selected(Int, Keyed)
+}
+
+SelectedCancelled {
 	SelectedCancelled
 }
 
@@ -381,7 +505,9 @@ State {
 	)
 }
 
-Command {
+Command = Register | ExternalCancel | Relay | FinishScope | NewScope | EndScope | Spawn | NextRun | Yield | Wait | NestedActive | NestedWait | ForwardWait | ForgetWait | NewChannel | SendNow | Select | NewShare | GetShare | NewRef | UpdateRef | Drain
+
+Register {
 	Register(
 		Maybe(Address)
 		() -> Never
@@ -389,43 +515,127 @@ Command {
 		(ForeignNotice, Keyed, Bool) -> Keyed
 		(Continuation(StepAnswer, Turn, Never, Never)) -> Bool
 	)
+}
+
+ExternalCancel {
 	ExternalCancel
+}
+
+Relay {
 	Relay(ForeignNotice, Keyed, Bool)
+}
+
+FinishScope {
 	FinishScope(ScopeInfo)
+}
+
+NewScope {
 	NewScope(Witness, Mode)
+}
+
+EndScope {
 	EndScope(ScopeInfo, Completion)
+}
+
+Spawn {
 	Spawn(ScopeInfo, Start)
+}
+
+NextRun {
 	NextRun
+}
+
+Yield {
 	Yield
+}
+
+Wait {
 	Wait(List(Ticket))
+}
+
+NestedActive {
 	NestedActive(Key(Nil), Active)
+}
+
+NestedWait {
 	NestedWait(Key(Nil), List(Ticket))
+}
+
+ForwardWait {
 	ForwardWait(Key(Nil), List(Ticket))
+}
+
+ForgetWait {
 	ForgetWait(Key(Nil))
+}
+
+NewChannel {
 	NewChannel(Witness)
+}
+
+SendNow {
 	SendNow(ChannelInfo, Keyed)
+}
+
+Select {
 	Select(List(Leaf))
+}
+
+NewShare {
 	NewShare(ScopeInfo, Keyed)
+}
+
+GetShare {
 	GetShare(Key(Nil), Keyed, Keyed)
+}
+
+NewRef {
 	NewRef(Keyed)
+}
+
+UpdateRef {
 	UpdateRef(Key(Nil), Keyed, (Keyed) -> (Keyed, Keyed))
+}
+
+Drain {
 	Drain
 }
 
-RunReply {
+RunReply = RunOk | RunError | RunCancelled
+
+RunOk {
 	RunOk(Keyed)
+}
+
+RunError {
 	RunError(List(Int))
+}
+
+RunCancelled {
 	RunCancelled(() -> Never)
 }
 
-RunControl {
+RunControl = ContinueRun | ParentCancel | ForwardRun
+
+ContinueRun {
 	ContinueRun
+}
+
+ParentCancel {
 	ParentCancel(() -> Never)
+}
+
+ForwardRun {
 	ForwardRun(ForeignNotice)
 }
 
-ScopeResult(A) {
+ScopeResult(A) = BodyValue(A) | WinnerValue
+
+BodyValue(A) {
 	BodyValue(A)
+}
+
+WinnerValue {
 	WinnerValue(Keyed)
 }
 
@@ -539,8 +749,13 @@ without(A) = (xs: List(A), value: A) -> List(A) {
 // Persistent AVL storage gives retained results logarithmic lookup without
 // scanning them at every scheduling point. Active and unfinished-cleanup
 // indexes use creation serials, preserving cancellation and delivery order.
-TaskTree(A) {
+TaskTree(A) = NoTasks | TaskNode(A)
+
+NoTasks {
 	NoTasks
+}
+
+TaskNode(A) {
 	TaskNode(Int, Int, A, TaskTree(A), TaskTree(A))
 }
 
@@ -3911,8 +4126,13 @@ ForeignGuard {
 	ForeignGuard(token: Key(Nil), anchor: Maybe(Address))
 }
 
-ForeignNotice {
+ForeignNotice = BeginForeign | EndForeign
+
+BeginForeign {
 	BeginForeign(List(Hop), Key(Nil), () -> Never, Cause)
+}
+
+EndForeign {
 	EndForeign(List(Hop), Key(Nil))
 }
 

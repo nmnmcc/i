@@ -645,7 +645,9 @@ rounds = 100_000
 
 // What the paused computation gives: each number, and at the end the
 // number of frames it went back through.
-Step { Done(Int)  More(Int, Continuation(Nil, Step, Never, Never)) }
+Step = Done | More
+Done { Done(Int) }
+More { More(Int, Continuation(Nil, Step, Never, Never)) }
 
 check = (ok: Bool, what: String) -> Nil {
   ok |> {

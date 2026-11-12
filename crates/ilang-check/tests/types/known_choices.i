@@ -2,8 +2,13 @@
 // binds `x` through `x = C(…)`. A choice that binds `x` as a catch-all, as
 // `x: T`, or as `x = _` may give it a value made by another constructor, so
 // every `.f` and record update below is a compile error (§6.7).
-T {
+T = A | B
+
+A {
 	A(f: Int)
+}
+
+B {
 	B(g: String)
 }
 
@@ -65,8 +70,13 @@ both = (r: Result(T, T)) {
 	}
 }
 
-U {
+U = P | Q
+
+P {
 	P(Int, f: Int)
+}
+
+Q {
 	Q(g: String)
 }
 

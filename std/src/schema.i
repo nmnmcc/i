@@ -9,8 +9,12 @@
 (
 	Schema(..)
 	SchemaError(..)
-	Path(..)
-	ParseError(..)
+	Path
+	Field(..)
+	Index(..)
+	ParseError
+	Syntax(..)
+	Decode(..)
 	decode
 	encode
 	parse
@@ -42,8 +46,13 @@ Schema(A, E) {
 	Schema(read: (json.Json) -> Result(A, E), write: (A) -> json.Json)
 }
 
-Path {
+Path = Field | Index
+
+Field {
 	Field(String)
+}
+
+Index {
 	Index(Int)
 }
 
@@ -51,8 +60,13 @@ SchemaError {
 	SchemaError(path: List(Path), expected: String)
 }
 
-ParseError {
+ParseError = Syntax | Decode
+
+Syntax {
 	Syntax(json.JsonError)
+}
+
+Decode {
 	Decode(SchemaError)
 }
 

@@ -20,8 +20,13 @@ B = List(A)
 
 C = C
 
-Rec {
+Rec = Cons | End
+
+Cons {
 	Cons(Int, Rec)
+}
+
+End {
 	End
 }
 

@@ -955,9 +955,17 @@ test("capitalise_unicode_test", () {
 	Nil
 })
 
-InspectType(A, B) {
+InspectType(A, B) = InspectTypeZero | InspectTypeOne(A) | InspectTypeTwo(A, B)
+
+InspectTypeZero {
 	InspectTypeZero
+}
+
+InspectTypeOne(A) {
 	InspectTypeOne(A)
+}
+
+InspectTypeTwo(A, B) {
 	InspectTypeTwo(A, B)
 }
 

@@ -25,10 +25,20 @@
 	Gen
 	Tree(..)
 	Config(..)
-	BuildError(..)
-	Verdict(..)
+	BuildError
+	InvalidRange(..)
+	InvalidLength(..)
+	EmptyChoice(..)
+	Verdict
+	Pass(..)
+	Fail(..)
+	Discard(..)
 	Failure(..)
-	Report(..)
+	Report
+	Passed(..)
+	GaveUp(..)
+	Falsified(..)
+	InvalidConfig(..)
 	defaults
 	make
 	sample
@@ -71,15 +81,31 @@ Config {
 	)
 }
 
-BuildError {
+BuildError = InvalidRange | InvalidLength | EmptyChoice
+
+InvalidRange {
 	InvalidRange(Int, Int)
+}
+
+InvalidLength {
 	InvalidLength(Int, Int)
+}
+
+EmptyChoice {
 	EmptyChoice
 }
 
-Verdict {
+Verdict = Pass | Fail | Discard
+
+Pass {
 	Pass
+}
+
+Fail {
 	Fail(String)
+}
+
+Discard {
 	Discard
 }
 
@@ -97,10 +123,21 @@ Failure(A) {
 	)
 }
 
-Report(A) {
+Report(A) = Passed | GaveUp | Falsified(A) | InvalidConfig
+
+Passed {
 	Passed(successes: Int, discards: Int)
+}
+
+GaveUp {
 	GaveUp(successes: Int, discards: Int)
+}
+
+Falsified(A) {
 	Falsified(Failure(A))
+}
+
+InvalidConfig {
 	InvalidConfig(String)
 }
 

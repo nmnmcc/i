@@ -4,10 +4,20 @@
 
 /// The documentation of a type.
 /// It has two lines.
-Shape {
-  Circle(radius: Float) // round
-  Square(side: Float)   // four sides
-  // A shape with no area.
+Shape = Circle | Square | Point
+
+Circle {
+  Circle(radius: Float)
+}
+
+// round
+Square {
+  Square(side: Float)
+}
+
+// four sides
+// A shape with no area.
+Point {
   Point
 }
 

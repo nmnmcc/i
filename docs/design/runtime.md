@@ -334,7 +334,11 @@ functions; it does not redeclare or re-export the primitive types.
 Await { Await(wait: (ticket: Ticket) -> Nil) }
 Root { Root(key: Key(Nil)) }
 Owner { Owner(key: Key(Nil), root: Root) }
-RequestState(A) { Waiting Ready(A) Cancelled Taken }
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
+Waiting { Waiting }
+Ready(A) { Ready(A) }
+Cancelled { Cancelled }
+Taken { Taken }
 ```
 
 | Function | Type | Rule |
@@ -811,7 +815,9 @@ cancellation, not destruction of a trapped instance by its host.
 A feasible monomorphic internal protocol is:
 
 ```i
-StepAnswer { Proceed(value: Keyed) Cancel }
+StepAnswer = Proceed | Cancel
+Proceed { Proceed(value: Keyed) }
+Cancel { Cancel }
 Scheduler { Scheduler(step: (command: Keyed) -> StepAnswer) }
 ```
 
@@ -1110,7 +1116,11 @@ request.ready. Calendar/time conversion is Std-2's job.
 ### 7.2 Files
 
 ```i
-OpenMode { ReadOnly WriteTruncate Append ReadWrite }
+OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
+ReadOnly { ReadOnly }
+WriteTruncate { WriteTruncate }
+Append { Append }
+ReadWrite { ReadWrite }
 ```
 
 | Raw Fs field | Type |

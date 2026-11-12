@@ -20,7 +20,10 @@ Opaque {}
 Pair(A, B) {
   Pair(first: A, second: B)
 }
-Shape { Circle(Float) Rect(w: Float, h: Float) Dot }
+Shape = Circle | Rect | Dot
+Circle { Circle(Float) }
+Rect { Rect(w: Float, h: Float) }
+Dot { Dot }
 Gen(A) { Yield(emit: (value: A) -> Nil) }
 
 @external("m", "f")

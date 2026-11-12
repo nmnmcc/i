@@ -245,7 +245,9 @@ These are source arguments and proposed tests, **not executed tests**. Fragments
 ### A. Shared graph: a cost hidden in “small capture”
 
 ```i
-D { End Fork(D, D) }
+D = End | Fork
+End { End }
+Fork { Fork(D, D) }
 
 shared = (n: Int) -> D {
   n |> {

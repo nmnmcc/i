@@ -17,11 +17,34 @@
 	Uri
 	Parts(..)
 	Authority(..)
-	Host(..)
-	UriPart(..)
-	UriProblem(..)
+	Host
+	RegName(..)
+	IpLiteral(..)
+	UriPart
+	WholePart(..)
+	SchemePart(..)
+	AuthorityPart(..)
+	UserInfoPart(..)
+	HostPart(..)
+	PortPart(..)
+	PathPart(..)
+	QueryPart(..)
+	FragmentPart(..)
+	UriProblem
+	BadCharacter(..)
+	BadPercent(..)
+	BadScheme(..)
+	BadAuthority(..)
+	BadHost(..)
+	BadPort(..)
+	BadPath(..)
+	RelativeBase(..)
 	UriError(..)
-	CodecError(..)
+	CodecError
+	BadEscape(..)
+	NonAscii(..)
+	InvalidUtf8(..)
+	UnalignedBits(..)
 	parse
 	build
 	parts
@@ -54,31 +77,85 @@ Authority {
 	Authority(userinfo: Option(String), host: Host, port: Option(String))
 }
 
-Host {
+Host = RegName | IpLiteral
+
+RegName {
 	RegName(String)
+}
+
+IpLiteral {
 	IpLiteral(String)
 }
 
-UriPart {
+UriPart = WholePart | SchemePart | AuthorityPart | UserInfoPart | HostPart | PortPart | PathPart | QueryPart | FragmentPart
+
+WholePart {
 	WholePart
+}
+
+SchemePart {
 	SchemePart
+}
+
+AuthorityPart {
 	AuthorityPart
+}
+
+UserInfoPart {
 	UserInfoPart
+}
+
+HostPart {
 	HostPart
+}
+
+PortPart {
 	PortPart
+}
+
+PathPart {
 	PathPart
+}
+
+QueryPart {
 	QueryPart
+}
+
+FragmentPart {
 	FragmentPart
 }
 
-UriProblem {
+UriProblem = BadCharacter | BadPercent | BadScheme | BadAuthority | BadHost | BadPort | BadPath | RelativeBase
+
+BadCharacter {
 	BadCharacter
+}
+
+BadPercent {
 	BadPercent
+}
+
+BadScheme {
 	BadScheme
+}
+
+BadAuthority {
 	BadAuthority
+}
+
+BadHost {
 	BadHost
+}
+
+BadPort {
 	BadPort
+}
+
+BadPath {
 	BadPath
+}
+
+RelativeBase {
 	RelativeBase
 }
 
@@ -86,10 +163,21 @@ UriError {
 	UriError(part: UriPart, offset: Int, problem: UriProblem)
 }
 
-CodecError {
+CodecError = BadEscape | NonAscii | InvalidUtf8 | UnalignedBits
+
+BadEscape {
 	BadEscape(offset: Int)
+}
+
+NonAscii {
 	NonAscii(offset: Int)
+}
+
+InvalidUtf8 {
 	InvalidUtf8
+}
+
+UnalignedBits {
 	UnalignedBits
 }
 

@@ -8,7 +8,9 @@
 // at: spec/main:42:11
 (i/control)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+Paused = PausedCase | Done
+PausedCase { Paused(Continuation(Nil, Paused, Never, Never)) }
+Done { Done }
 
 // A frame that waits inside `inner`, and one that waits outside it.
 in1 = (outer, inner) {

@@ -11,7 +11,14 @@
 )
 
 (
-	Json(..)
+	Json
+	Null(..)
+	Boolean(..)
+	Integer(..)
+	Number(..)
+	Text(..)
+	Array(..)
+	Object(..)
 	JsonError(..)
 	parse
 	print
@@ -26,13 +33,33 @@
 	as_object
 )
 
-Json {
+Json = Null | Boolean | Integer | Number | Text | Array | Object
+
+Null {
 	Null
+}
+
+Boolean {
 	Boolean(Bool)
+}
+
+Integer {
 	Integer(Int)
+}
+
+Number {
 	Number(Float)
+}
+
+Text {
 	Text(String)
+}
+
+Array {
 	Array(List(Json))
+}
+
+Object {
 	Object(List((String, Json)))
 }
 

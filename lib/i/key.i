@@ -4,11 +4,18 @@
 	new
 	wrap
 	unwrap
-	Lookup(..)
+	Lookup
+	Found(..)
+	Missing(..)
 )
 
-Lookup(A) {
+Lookup(A) = Found(A) | Missing
+
+Found(A) {
 	Found(A)
+}
+
+Missing {
 	Missing
 }
 

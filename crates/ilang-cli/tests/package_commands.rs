@@ -582,7 +582,7 @@ fn tags(dir: &Path) -> String {
     git(dir, &["tag", "--list"])
 }
 
-const API_1: &str = " (one, add, Shape(..), Box)\n\none = 1\n\nadd = (a: Int, b: Int) { a + b }\n\nShape { Circle(r: Float) Square(side: Float) }\n\nBox(A) { Box(A) }\n";
+const API_1: &str = " (one, add, Shape, Circle(..), Square(..), Box)\n\none = 1\n\nadd = (a: Int, b: Int) { a + b }\n\nShape = Circle | Square\nCircle { Circle(r: Float) }\nSquare { Square(side: Float) }\n\nBox(A) { Box(A) }\n";
 
 #[test]
 fn publish_tags_a_first_version() {

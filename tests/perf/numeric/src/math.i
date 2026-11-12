@@ -1683,15 +1683,41 @@ fast_units = (x: Float, factor: Double) -> Option(Float) {
 }
 
 // Operation codes are private ordinary values, shared by the refinement loop.
-Math {
+Math = Sine | Cosine | Tangent | Arcsine | Arccosine | Arctangent | Angle | UnitsIn | UnitsOut
+
+Sine {
 	Sine
+}
+
+Cosine {
 	Cosine
+}
+
+Tangent {
 	Tangent
+}
+
+Arcsine {
 	Arcsine
+}
+
+Arccosine {
 	Arccosine
+}
+
+Arctangent {
 	Arctangent
+}
+
+Angle {
 	Angle
+}
+
+UnitsIn {
 	UnitsIn
+}
+
+UnitsOut {
 	UnitsOut
 }
 

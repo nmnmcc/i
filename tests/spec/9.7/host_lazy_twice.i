@@ -8,7 +8,9 @@
 @host("test:async/v1", "async")
 Later { Later(double: (n: Int) -> Int ^ String) }
 
-Step { Paused(Continuation(Nil, Step, String, Later | request.Await | request.Owner))  Done(Int) }
+Step = Paused | Done
+Paused { Paused(Continuation(Nil, Step, String, Later | request.Await | request.Owner)) }
+Done { Done(Int) }
 
 check = (ok) { ok |> { True -> Nil  False -> panic("async resume") } }
 

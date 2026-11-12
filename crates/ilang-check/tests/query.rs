@@ -137,7 +137,9 @@ first = (o) {
   }
 }
 
-Option(A) { Some(A) None }
+Option(A) = Some(A) | None
+Some(A) { Some(A) }
+None { None }
 
 total = util.double(add(1, 2))
 "#;
