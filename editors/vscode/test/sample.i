@@ -52,7 +52,7 @@ main = (io ! Console) {
     n ? n > 10 -> n % 3
     _ -> __ignored
   }
-  1 |> plus(2) == 3 != False
+  { 1 |> plus(2) } == 3 != False
   opt.map(Some(1), (x) { x * 2 })
 }
 

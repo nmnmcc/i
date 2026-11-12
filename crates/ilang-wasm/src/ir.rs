@@ -6,10 +6,10 @@
 //! Control flow is structured, as in Wasm: blocks that a `Break` leaves, `If`,
 //! and statements that end a function (`Return`, `TailCall`, `Unreachable`).
 //!
-//! Semantic values and every call boundary use `eqref` (see `runtime/mod.rs`).
-//! At O2/O3, `emit::numeric` selects per-definition f64 and guarded i31 local
-//! encodings, with explicit materialization at reference uses. Functions with
-//! saved frames keep canonical values throughout. A few internal locals hold
+//! Semantic values and generic call boundaries use `eqref` (see `runtime/mod.rs`).
+//! At O2/O3, numeric workers use separate f64 signatures; source closures keep
+//! the generic entry. `emit::numeric` selects per-definition scalar encodings
+//! and materializes canonical values at escapes and on actual capture. A few internal locals hold
 //! i64 or i32 positions and widths in bit array patterns.
 //!
 //! # Calling convention
@@ -140,6 +140,8 @@ pub enum Env {
 /// than once.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Atom {
+    /// Original closure forwarded by a reference-entry worker adapter.
+    CurrentClosure,
     Local(Local),
     /// A top-level value that is worked out in `ilang_start`.
     Global(GlobalId),
@@ -284,6 +286,8 @@ impl Op {
 pub enum Callee {
     /// A known function, called with `call`.
     Direct(FuncId),
+    /// Known code with the original closure and the current call-site environment.
+    Known { func: FuncId, closure: Atom },
     /// A closure value, called with `call_ref` after a cast to `$clo_n`.
     Value(Atom),
 }
@@ -300,6 +304,8 @@ pub enum Value {
         env: Env,
     },
     Op(Op, Vec<Atom>),
+    /// This exact Float operation has an outward finite-result proof.
+    Finite(Op, Vec<Atom>),
     /// An operation that calls i code with this environment.
     OpEnv(Op, Vec<Atom>, Env),
     /// The service with this id in the environment (§9.2).
@@ -412,6 +418,14 @@ pub enum NumValue {
     WidthOf(Atom, u32),
 }
 
+/// Eager logical frame actions for non-suspending inline expansions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Logical {
+    Enter(Option<Site>),
+    Leave,
+    Tail(Option<Site>),
+}
+
 /// A test, as an `i32`.
 #[derive(Debug)]
 pub enum Cond {
@@ -455,6 +469,7 @@ pub enum Cond {
 
 #[derive(Debug)]
 pub enum Stmt {
+    Logical(Logical),
     /// `dst = value`. With a site, the site is put on the shadow stack first.
     Let {
         dst: Local,
@@ -796,6 +811,10 @@ pub struct Program {
         FuncId,
         std::collections::HashMap<Local, ilang_check::types::NumericFact>,
     >,
+    /// Internal worker signatures, never stored in a source closure.
+    pub workers: std::collections::BTreeMap<FuncId, crate::numeric::Worker>,
+    /// Stable eligibility/budget decisions for internal dumps.
+    pub numeric_log: Vec<String>,
     /// Label bytes, by LabelConst. Labels are numbered, never WAT names.
     pub labels: Vec<String>,
     pub funcs: Vec<FuncKind>,

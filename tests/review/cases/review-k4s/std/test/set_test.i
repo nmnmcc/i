@@ -13,17 +13,20 @@ test("size_empty_test", () {
 })
 
 test("size_with_elements_test", () {
-	assert(set.new() |> set.insert(1) |> set.insert(2) |> set.size == 2)
+	assert({ set.new() |> set.insert(1) |> set.insert(2) |> set.size } == 2)
 	Nil
 })
 
 test("size_with_duplicates_test", () {
 	assert(
-		set.new()
-			|> set.insert(1)
-			|> set.insert(1)
-			|> set.insert(2)
-			|> set.size == 2
+		{
+			set.new()
+				|> set.insert(1)
+				|> set.insert(1)
+				|> set.insert(2)
+				|> set.size
+		} ==
+			2
 	)
 	Nil
 })
@@ -62,84 +65,90 @@ test("delete_test", () {
 
 test("to_list_test", () {
 	assert(
-		set.new()
-			|> set.insert(2)
-			|> set.insert(3)
-			|> set.insert(4)
-			|> set.to_list
-			|> list.sort(by: int.compare) == [2, 3, 4]
+		{
+			set.new()
+				|> set.insert(2)
+				|> set.insert(3)
+				|> set.insert(4)
+				|> set.to_list
+				|> list.sort(by: int.compare)
+		} ==
+			[2, 3, 4]
 	)
 	Nil
 })
 
 test("from_list_test", () {
 	assert(
-		[1, 1, 2, 4, 3, 2]
-			|> set.from_list
-			|> set.to_list
-			|> list.sort(by: int.compare) == [1, 2, 3, 4]
+		{
+			[1, 1, 2, 4, 3, 2]
+				|> set.from_list
+				|> set.to_list
+				|> list.sort(by: int.compare)
+		} ==
+			[1, 2, 3, 4]
 	)
 	Nil
 })
 
 test("fold_test", () {
 	assert(
-		[1, 3, 9] |> set.from_list |> set.fold(from: 0, with: (m, a) {
-			m + a
-		}) == 13
+		{
+			[1, 3, 9] |> set.from_list |> set.fold(from: 0, with: (m, a) {
+				m + a
+			})
+		} ==
+			13
 	)
 	Nil
 })
 
 test("map_test", () {
 	assert(
-		[1, 2, 3, 4]
-			|> set.from_list
-			|> set.map(with: int.to_string) == set.from_list([
-				"1"
-				"2"
-				"3"
-				"4"
-			])
+		{ [1, 2, 3, 4] |> set.from_list |> set.map(with: int.to_string) } ==
+			set.from_list(["1", "2", "3", "4"])
 	)
 	Nil
 })
 
 test("filter_test", () {
 	assert(
-		[1, 4, 6, 3, 675, 44, 67]
-			|> set.from_list()
-			|> set.filter(keeping: int.is_even)
-			|> set.to_list
-			|> list.sort(int.compare) == [4, 6, 44]
+		{
+			[1, 4, 6, 3, 675, 44, 67]
+				|> set.from_list()
+				|> set.filter(keeping: int.is_even)
+				|> set.to_list
+				|> list.sort(int.compare)
+		} ==
+			[4, 6, 44]
 	)
 	Nil
 })
 
 test("take_test", () {
 	assert(
-		[1, 2, 3] |> set.from_list |> set.take([1, 3, 5]) == set.from_list([
-				1
-				3
-			])
+		{ [1, 2, 3] |> set.from_list |> set.take([1, 3, 5]) } ==
+			set.from_list([1, 3])
 	)
 	Nil
 })
 
 test("drop_test", () {
 	assert(
-		["a", "b", "c"]
-			|> set.from_list
-			|> set.drop(["a", "b", "d"]) == set.from_list(["c"])
+		{ ["a", "b", "c"] |> set.from_list |> set.drop(["a", "b", "d"]) } ==
+			set.from_list(["c"])
 	)
 	Nil
 })
 
 test("union_test", () {
 	assert(
-		set.union(set.from_list([1, 2]), set.from_list([2, 3]))
-			|> set.to_list
-			|> list.sort(int.compare) == [1, 2, 3]
+		{
+			set.union(set.from_list([1, 2]), set.from_list([2, 3]))
+				|> set.to_list
+				|> list.sort(int.compare)
+		} ==
+			[1, 2, 3]
 	)
 	Nil
 })
@@ -220,12 +229,14 @@ test("symmetric_difference_test", () {
 })
 
 test("each_test", () {
-	assert([1, 2, 3] |> set.from_list |> set.each((member) {
-		member |> {
-			1 | 2 | 3 -> Nil
-			_         -> panic("unexpected value")
-		}
-	}) == Nil)
+	assert({
+		[1, 2, 3] |> set.from_list |> set.each((member) {
+			member |> {
+				1 | 2 | 3 -> Nil
+				_         -> panic("unexpected value")
+			}
+		})
+	} == Nil)
 	Nil
 })
 

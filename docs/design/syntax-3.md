@@ -158,7 +158,7 @@ one of them, it is marked **[R4]**.
 - Q13 (owner, O21): `Node = (Name | Int | Float | Text …)` with the outer
   parentheses, a new labelled type holding one item of union type; the `Int`
   and `Float` wrappers are removed; nothing is renamed (§2.8, §7.3).
-- No qualified names for built-in types are added (§2.8).
+- Built-in types are exported by `i/core` and may be named through it (§2.8).
 - Q14: `x: T` in a one-branch group of a multi-group chain is an annotation.
 - Q15: the need (errors included, as `Fail`) is shared by the branches of a
   chain (R6).
@@ -708,10 +708,9 @@ the data by spec §4.5 rule 6.
   module are an error (spec §2.2). A top-level type covers a built-in type of
   the same name in its module (spec §5), so `Int = (Int)` is a labelled type
   whose data contains itself, not a wrapper of the built-in `Int`.
-- **No qualified names for built-in types [R4].** There is no spelling such as
-  `i.Int` for a built-in type. So a module that defines a type `Int` cannot
-  name the built-in `Int` anywhere in that module; it can only use a name for
-  it that another module defines and exports (`Integer = Int` there).
+- **Qualified built-in types.** `i/core` exports the built-in types. After
+  `(core = i/core)`, `core.Int` names the built-in even when a local type
+  named `Int` shadows the unqualified name.
 - **Sums whose members are not constructors (O21).** A member of a sum need
   not be a labelled type made for it: built-in types (`Int`, `Float`,
   `String`, `List(A)`, …), data types and labelled types of other sums may be
@@ -2027,8 +2026,8 @@ Grammar as §3.2. Then:
   union type. Its members may be any types, labelled or not, also built-in
   types; values are told apart by type tests and constructor patterns, so
   every two members must have different type constructors (§4.4, §7.1).
-- There is no qualified name for a built-in type. A module that defines a
-  type with the name of a built-in type cannot name the built-in type.
+- Built-in types are exported by `i/core`; `core.Int` names the built-in
+  even where a module definition shadows `Int`.
 - Blocks have no type definitions.
 
 ```text

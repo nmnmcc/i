@@ -1,4 +1,4 @@
-//// TCP networking and name resolution.
+//// TCP streams, UDP datagrams and name resolution.
 (
 	i/request
 	i/resource
@@ -10,6 +10,12 @@
 	Net
 	Listener
 	Stream
+	Datagram
+	bind
+	send_to
+	receive_from
+	local_address
+	close_datagram
 	NetError(..)
 	listen
 	local_port
@@ -33,6 +39,10 @@ Stream {
 	Stream(Int)
 }
 
+Datagram {
+	Datagram(Int)
+}
+
 NetError {
 	NetError(operation: String, endpoint: String, code: String)
 }
@@ -40,6 +50,19 @@ NetError {
 @host("i:net/v1", "request")
 Net {
 	Net(
+		bind: (address: String, port: Int) -> Request(Result(Int, String))
+		send_to: (
+			socket:  Int
+			address: String
+			port:    Int
+			bytes:   BitArray
+		) -> Request(Result(Nil, String))
+		receive_from: (socket: Int, max_bytes: Int) -> Request(
+			Result(BitArray, String)
+		)
+		local_address:  (socket: Int) -> Request(Result(String, String))
+		datagram_port:  (socket: Int) -> Request(Result(Int, String))
+		close_datagram: (socket: Int) -> Request(Nil)
 		listen:         (address: String, port: Int) -> Request(Result(Int, String))
 		local_port:     (listener: Int) -> Request(Result(Int, String))
 		accept:         (listener: Int) -> Request(Result(Int, String))
@@ -110,8 +133,12 @@ accept = (Listener(number), raw ! Net) {
 	Stream(number)
 }
 
-local_port = (Listener(number), raw ! Net) {
-	request.await_owned(raw.local_port(number)) |> {
+local_port = (socket, raw ! Net) {
+	r = socket |> {
+		Listener(number) -> raw.local_port(number)
+		Datagram(number) -> raw.datagram_port(number)
+	}
+	request.await_owned(r) |> {
 		Ok(value)   -> value
 		Error(code) -> fail.raise(NetError("local_port", "", code))
 	}
@@ -178,4 +205,64 @@ byte_stream = (stream) {
 		shutdown_write: () { shutdown_write(stream) }
 		close: () { close_stream(stream) }
 	)
+}
+
+/// Bind a UDP socket; port zero asks the OS to allocate a port.
+bind = (address, port, raw ! Net) {
+	r = raw.bind(address, port)
+	number = resource.ensure(() {
+		request.await(r) |> {
+			Ok(value)   -> value
+			Error(code) -> fail.raise(NetError("bind", address, code))
+		}
+	}, () {
+		request.state(r) |> {
+			request.Ready(Ok(value)) -> request.await_owned(
+				raw.close_datagram(value)
+			)
+			_ -> Nil
+		}
+		request.cancel(request.ticket(r))
+	})
+	Datagram(number)
+}
+
+send_to = (Datagram(number), address, port, bytes, raw ! Net) {
+	request.await_owned(raw.send_to(number, address, port, bytes)) |> {
+		Ok(value)   -> value
+		Error(code) -> fail.raise(NetError("send_to", address, code))
+	}
+}
+
+/// Receive one datagram, discarding bytes beyond max_bytes.
+receive_from = (Datagram(number), max_bytes, raw ! Net) {
+	request.await_owned(raw.receive_from(number, max_bytes)) |> {
+		Ok(value)   -> decode_datagram(value)
+		Error(code) -> fail.raise(NetError("receive_from", "", code))
+	}
+}
+
+decode_datagram = {
+	<<lo, hi, size, rest:bytes>> -> rest |> {
+		<<address:bytes(size), data:bytes>> -> {
+			text = core.bit_array_to_string(address) |> {
+				Ok(value) -> value
+				Error(_)  -> panic("net: invalid datagram address")
+			}
+			(data: data, address: text, port: lo + hi * 256)
+		}
+		_ -> panic("net: invalid datagram reply")
+	}
+	_ -> panic("net: invalid datagram reply")
+}
+
+local_address = (Datagram(number), raw ! Net) {
+	request.await_owned(raw.local_address(number)) |> {
+		Ok(value)   -> value
+		Error(code) -> fail.raise(NetError("local_address", "", code))
+	}
+}
+
+close_datagram = (Datagram(number), raw ! Net) {
+	request.await_owned(raw.close_datagram(number))
 }

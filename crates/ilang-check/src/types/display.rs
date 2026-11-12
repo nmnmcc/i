@@ -30,7 +30,7 @@ pub(crate) struct Opts {
 /// through a type variable (§4.7).
 pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<ShownType, ()> {
     let t = simplify_with(s, t, None, opts)?;
-    Ok(Namer::new(s).show(&t))
+    Ok(Namer::new(s).show(s, &t))
 }
 
 /// The shown type of `t`, simplified together with the types in `context`:
@@ -53,7 +53,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     let mut parts = context.to_vec();
     parts.push(t.clone());
     let traced = trace(s, &Ty::tuple(parts), opts)?;
-    let (whole, origin) = traced.prepare();
+    let (whole, origin) = traced.prepare(s);
     let Ty::Con(_, _, parts) = whole else {
         return Err(());
     };
@@ -104,7 +104,7 @@ fn scheme_names(s: &Solver, t: &Ty) -> Result<SchemeNames, ()> {
         written: false,
     };
     let traced = trace(s, t, opts)?;
-    let (shown, origin) = traced.prepare();
+    let (shown, origin) = traced.prepare(s);
     let mut namer = Namer::new(s);
     namer.assign(&shown);
     let mut order = Vec::new();
@@ -147,8 +147,9 @@ fn simplify_with(s: &Solver, t: &Ty, keep: Option<u32>, opts: Opts) -> Result<Ty
 struct Steps {
     /// The coalesced type, before the steps.
     start: Ty,
-    /// Each variable replaced, and what it is replaced by.
-    steps: Vec<(V, Ty)>,
+    /// Each variable replaced, and what it is replaced by, in groups that
+    /// are replaced together.
+    steps: Vec<Vec<(V, Ty)>>,
     /// The variables of each cycle, by the variable that stands for them.
     members: HashMap<V, Vec<V>>,
 }
@@ -200,15 +201,15 @@ fn simplify_steps(
         r.start = t.clone();
         r.members = std::mem::take(&mut c.members);
     }
-    for _ in 0..64 {
-        match n.step(&t) {
-            Some((v, by)) => {
-                t = n.norm(replace(&t, v, &by));
-                if let Some(r) = record.as_deref_mut() {
-                    r.steps.push((v, by));
-                }
-            }
-            None => break,
+    // Each step takes a variable out of the type, so the steps end.
+    loop {
+        let steps = n.steps(&t);
+        if steps.is_empty() {
+            break;
+        }
+        t = n.norm(replace_all(&t, &steps));
+        if let Some(r) = record.as_deref_mut() {
+            r.steps.push(steps);
         }
     }
     Ok(t)
@@ -287,11 +288,11 @@ impl Traced {
     /// The shown type as the names are given to it (`Namer::assign`), with
     /// the variable of each `Top` that stands for a variable on one side
     /// only.
-    fn prepare(&self) -> (Ty, HashMap<V, V>) {
-        let shown = prepare(&self.shown, &mut HashMap::default());
+    fn prepare(&self, s: &Solver) -> (Ty, HashMap<V, V>) {
+        let shown = prepare(s, &self.shown, &mut HashMap::default());
         let mut origin = HashMap::default();
         if let Some(m) = &self.marked
-            && prepare(m, &mut origin) == shown
+            && prepare(s, m, &mut origin) == shown
         {
             return (shown, origin);
         }
@@ -316,21 +317,27 @@ fn trace(s: &Solver, t: &Ty, opts: Opts) -> Result<Traced, ()> {
         ms.retain(|m| m != rep);
     }
     let mut u = r.start;
-    for (v, by) in r.steps {
-        let by = match by {
-            Ty::Top => Ty::Var(mark(v)),
-            Ty::Var(w) => {
-                let mut moved = classes.remove(&v).unwrap_or_default();
-                moved.push(v);
-                classes.entry(w).or_default().extend(moved);
-                Ty::Var(w)
-            }
-            by => {
-                classes.remove(&v);
-                by
-            }
-        };
-        u = n.norm(replace(&u, v, &by));
+    for steps in r.steps {
+        let steps: Vec<(V, Ty)> = steps
+            .into_iter()
+            .map(|(v, by)| {
+                let by = match by {
+                    Ty::Top => Ty::Var(mark(v)),
+                    Ty::Var(w) => {
+                        let mut moved = classes.remove(&v).unwrap_or_default();
+                        moved.push(v);
+                        classes.entry(w).or_default().extend(moved);
+                        Ty::Var(w)
+                    }
+                    by => {
+                        classes.remove(&v);
+                        by
+                    }
+                };
+                (v, by)
+            })
+            .collect();
+        u = n.norm(replace_all(&u, &steps));
     }
     let marked = same_unmarked(&u, &shown).then_some(u);
     Ok(Traced {
@@ -348,7 +355,11 @@ fn rigid(s: &Solver, keep: Option<u32>, v: V) -> bool {
 
 /// A type as it is in the solver, for messages: variables are `_`.
 pub(crate) fn show(s: &Solver, t: &Ty) -> String {
-    render(&both(t), &mut |_| "_".to_string(), &s.type_names)
+    render(
+        &fold_aliases(s, &both(t)),
+        &mut |_| "_".to_string(),
+        &s.type_names,
+    )
 }
 
 /// The variables that are equal because they are in a cycle of bounds that
@@ -876,8 +887,56 @@ struct Norm<'s> {
 struct Occ<'a> {
     pos: usize,
     neg: usize,
-    pos_with: Option<Vec<&'a Ty>>,
-    neg_with: Option<Vec<&'a Ty>>,
+    pos_with: With<'a>,
+    neg_with: With<'a>,
+}
+
+/// The groups of the occurrences of a variable on one side, each with the
+/// place of the variable in it. The members it always comes with are found
+/// only when a step asks for them: most variables are decided by their
+/// numbers of occurrences alone, and a group can be large.
+#[derive(Default)]
+struct With<'a> {
+    groups: Vec<(&'a [Ty], usize)>,
+    /// An occurrence comes with no member.
+    alone: bool,
+    any: bool,
+}
+
+impl<'a> With<'a> {
+    /// The members of every group but the variable's own place, in the
+    /// order of the first group; `None` with no occurrence.
+    fn members(&self) -> Option<Vec<&'a Ty>> {
+        if !self.any {
+            return None;
+        }
+        if self.alone {
+            return Some(Vec::new());
+        }
+        let mut groups = self.groups.iter();
+        let (first, i) = groups.next().expect("an occurrence has a group");
+        let mut out: Vec<&Ty> = first
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| j != i)
+            .map(|(_, x)| x)
+            .collect();
+        for (group, i) in groups {
+            if out.is_empty() {
+                break;
+            }
+            // Graph keys hash their immutable pool identity and node ID.
+            #[allow(clippy::mutable_key_type)]
+            let set: HashSet<&Ty> = group
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| j != i)
+                .map(|(_, x)| x)
+                .collect();
+            out.retain(|x| set.contains(x));
+        }
+        Some(out)
+    }
 }
 
 impl Norm<'_> {
@@ -1209,15 +1268,25 @@ impl Norm<'_> {
         }
         let flat: Vec<Ty> = rest.into_iter().chain(unions).collect();
         let mut out: Vec<Ty> = Vec::new();
+        // At most one member has a head; the others are kept in `others`
+        // too, so that a member is found again without a pass over all.
+        let mut headed: Option<usize> = None;
+        // Graph keys hash their immutable pool identity and node ID.
+        #[allow(clippy::mutable_key_type)]
+        let mut others: HashSet<Ty> = HashSet::default();
         for m in flat {
-            if is_top(&m) || out.contains(&m) {
+            let again = match m.head() {
+                Some(_) => headed.is_some_and(|i| out[i] == m),
+                None => others.contains(&m),
+            };
+            if is_top(&m) || again {
                 continue;
             }
             if m == Ty::Never {
                 return Ty::Never;
             }
             match m.head() {
-                Some(h) => match out.iter().position(|o| o.head().is_some()) {
+                Some(h) => match headed {
                     Some(i) if out[i].head() == Some(h) => {
                         let old = std::mem::replace(&mut out[i], Ty::Never);
                         out[i] = self.merge(old, m, false);
@@ -1226,9 +1295,15 @@ impl Norm<'_> {
                         }
                     }
                     Some(_) => return Ty::Never,
-                    None => out.push(m),
+                    None => {
+                        headed = Some(out.len());
+                        out.push(m);
+                    }
                 },
-                None => out.push(m),
+                None => {
+                    others.insert(m.clone());
+                    out.push(m);
+                }
             }
         }
         // `a & { a | T }` is `a`.
@@ -1350,13 +1425,22 @@ impl Norm<'_> {
         }
     }
 
-    /// The next variable to replace, and what it is replaced by.
-    fn step(&self, t: &Ty) -> Option<(V, Ty)> {
+    /// The next variables to replace, and what each is replaced by: the
+    /// first variable that a rule takes out of the type, in the order the
+    /// variables are written. After a variable that is only dropped from
+    /// the groups it is in (a union or intersection that keeps at least two
+    /// members), the decisions for the variables after it are unchanged:
+    /// their numbers of occurrences stay, and only the dropped variable
+    /// leaves the members they come with. Those decisions are taken in the
+    /// same pass, while each is such a drop; else a variable that comes with
+    /// many others (as in a recursive match over many constructors) would
+    /// need a pass over the whole type for each of them.
+    fn steps(&self, t: &Ty) -> Vec<(V, Ty)> {
         let mut occ: HashMap<V, Occ> = HashMap::default();
         let mut order = Vec::new();
         self.walk(t, true, &mut occ, &mut order, false);
         if order.is_empty() {
-            return None;
+            return Vec::new();
         }
         // A handler's arguments constrain input variables even when a
         // result annotation hides that relation. Do not turn an otherwise
@@ -1378,51 +1462,94 @@ impl Norm<'_> {
             }
         });
         for v in handler_inputs {
-            record(&mut occ, &mut order, v, true, Vec::new());
+            record(&mut occ, &mut order, v, true, None);
         }
+        let mut out = Vec::new();
+        // Graph keys hash their immutable pool identity and node ID.
+        #[allow(clippy::mutable_key_type)]
+        let mut dropped: HashSet<Ty> = HashSet::default();
+        // The members dropped from each group, by its address.
+        let mut shrunk: HashMap<usize, usize> = HashMap::default();
         for v in &order {
-            if rigid(self.s, self.keep, *v) {
+            let Some((v, by)) = self.decide(*v, &occ[v], &dropped) else {
                 continue;
-            }
-            let o = &occ[v];
-            let named = self.named(*v);
-            if !named && o.neg == 0 {
-                return Some((*v, Ty::Never));
-            }
-            if !named && o.pos == 0 {
-                return Some((*v, Ty::Top));
-            }
-            if o.pos == 0 || o.neg == 0 {
-                // A written variable on one side only has no effect; when it
-                // always comes with a variable that is not written, that
-                // variable takes its name.
-                let with = if o.pos == 0 { &o.neg_with } else { &o.pos_with };
-                if let Some(Ty::Var(w)) = with
-                    .iter()
-                    .flatten()
-                    .find(|w| matches!(w, Ty::Var(x) if !self.named(*x)))
-                {
-                    return Some((*w, Ty::Var(*v)));
+            };
+            let o = &occ[&v];
+            let with = match by {
+                Ty::Top if o.pos == 0 => Some(&o.neg_with),
+                Ty::Never if o.neg == 0 => Some(&o.pos_with),
+                _ => None,
+            };
+            let drop = with.is_some_and(|w| {
+                !w.alone
+                    && w.groups.iter().all(|(g, _)| {
+                        g.len() - shrunk.get(&(g.as_ptr() as usize)).copied().unwrap_or(0) > 2
+                    })
+            });
+            if !drop {
+                if out.is_empty() {
+                    out.push((v, by));
                 }
-                // §4.7: a variable on one side only has no effect, also a
-                // written one, but not in a declared type.
-                if !self.written {
-                    return Some((*v, if o.neg == 0 { Ty::Never } else { Ty::Top }));
-                }
-                continue;
+                break;
             }
-            let (pw, nw) = (
-                o.pos_with.as_deref().unwrap_or_default(),
-                o.neg_with.as_deref().unwrap_or_default(),
-            );
-            for w in pw.iter().filter(|w| nw.contains(w)) {
-                match w {
-                    Ty::Var(x) if x == v => {}
-                    Ty::Var(x) if named && !self.named(*x) => return Some((*x, Ty::Var(*v))),
-                    Ty::Var(_) => return Some((*v, (**w).clone())),
-                    _ if !mentions(w, *v) => return Some((*v, (**w).clone())),
-                    _ => {}
-                }
+            for (g, _) in &with.expect("a dropped variable").groups {
+                *shrunk.entry(g.as_ptr() as usize).or_default() += 1;
+            }
+            dropped.insert(Ty::Var(v));
+            out.push((v, by));
+        }
+        out
+    }
+
+    /// The step of a rule for `v`, whose occurrences are `o`; the variables
+    /// of `dropped` are taken out of the members it comes with.
+    #[allow(clippy::mutable_key_type)]
+    fn decide(&self, v: V, o: &Occ, dropped: &HashSet<Ty>) -> Option<(V, Ty)> {
+        #[allow(clippy::mutable_key_type)]
+        fn kept<'a>(w: &With<'a>, dropped: &HashSet<Ty>) -> Option<Vec<&'a Ty>> {
+            w.members()
+                .map(|ms| ms.into_iter().filter(|m| !dropped.contains(*m)).collect())
+        }
+        if rigid(self.s, self.keep, v) {
+            return None;
+        }
+        let named = self.named(v);
+        if !named && o.neg == 0 {
+            return Some((v, Ty::Never));
+        }
+        if !named && o.pos == 0 {
+            return Some((v, Ty::Top));
+        }
+        if o.pos == 0 || o.neg == 0 {
+            // A written variable on one side only has no effect; when it
+            // always comes with a variable that is not written, that
+            // variable takes its name.
+            let with = if o.pos == 0 { &o.neg_with } else { &o.pos_with };
+            if let Some(Ty::Var(w)) = kept(with, dropped)
+                .into_iter()
+                .flatten()
+                .find(|w| matches!(w, Ty::Var(x) if !self.named(*x)))
+            {
+                return Some((*w, Ty::Var(v)));
+            }
+            // §4.7: a variable on one side only has no effect, also a
+            // written one, but not in a declared type.
+            if !self.written {
+                return Some((v, if o.neg == 0 { Ty::Never } else { Ty::Top }));
+            }
+            return None;
+        }
+        let (pw, nw) = (
+            kept(&o.pos_with, dropped).unwrap_or_default(),
+            kept(&o.neg_with, dropped).unwrap_or_default(),
+        );
+        for w in pw.iter().filter(|w| nw.contains(w)) {
+            match w {
+                Ty::Var(x) if *x == v => {}
+                Ty::Var(x) if named && !self.named(*x) => return Some((*x, Ty::Var(v))),
+                Ty::Var(_) => return Some((v, (**w).clone())),
+                _ if !mentions(w, v) => return Some((v, (**w).clone())),
+                _ => {}
             }
         }
         None
@@ -1465,31 +1592,21 @@ impl Norm<'_> {
                         g.variable_sites(self.s, if pos { Pol::Pos } else { Pol::Neg }, false, env)
                     {
                         if pol != Pol::Neg {
-                            record(occ, order, v, true, Vec::new());
+                            record(occ, order, v, true, None);
                         }
                         if pol != Pol::Pos {
-                            record(occ, order, v, false, Vec::new());
+                            record(occ, order, v, false, None);
                         }
                     }
                 }
                 Ty::Var(v) => {
-                    let with: Vec<&Ty> = if together {
-                        group
-                            .iter()
-                            .enumerate()
-                            .filter(|(j, _)| *j != i)
-                            .map(|(_, x)| x)
-                            .collect()
-                    } else {
-                        Vec::new()
-                    };
-                    record(occ, order, *v, pos, with);
+                    record(occ, order, *v, pos, together.then_some((group, i)));
                 }
                 Ty::Union(_) | Ty::Inter(_) => self.walk(m, pos, occ, order, env),
                 // Only the type constructors of `H` matter in `A - H`
                 // (§4.4), so the variables in `H` are not counted.
                 Ty::Diff(a, _) => match &**a {
-                    Ty::Var(v) => record(occ, order, *v, pos, Vec::new()),
+                    Ty::Var(v) => record(occ, order, *v, pos, None),
                     a => self.walk(a, pos, occ, order, env),
                 },
                 Ty::Con(h, _, args) => {
@@ -1528,22 +1645,23 @@ fn record<'a>(
     order: &mut Vec<V>,
     v: V,
     pos: bool,
-    with: Vec<&'a Ty>,
+    group: Option<(&'a [Ty], usize)>,
 ) {
     let o = occ.entry(v).or_insert_with(|| {
         order.push(v);
         Occ::default()
     });
-    let (n, set) = if pos {
+    let (n, with) = if pos {
         (&mut o.pos, &mut o.pos_with)
     } else {
         (&mut o.neg, &mut o.neg_with)
     };
     *n += 1;
-    *set = Some(match set.take() {
-        None => with,
-        Some(old) => old.into_iter().filter(|x| with.contains(x)).collect(),
-    });
+    with.any = true;
+    match group {
+        Some(g) => with.groups.push(g),
+        None => with.alone = true,
+    }
 }
 
 fn mentions(t: &Ty, v: V) -> bool {
@@ -1576,6 +1694,37 @@ fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
             visit(b, f);
         }
         _ => {}
+    }
+}
+
+/// `t` with each variable of `steps` replaced by its type.
+fn replace_all(t: &Ty, steps: &[(V, Ty)]) -> Ty {
+    match steps {
+        [(v, by)] => replace(t, *v, by),
+        _ => {
+            let map: HashMap<V, &Ty> = steps.iter().map(|(v, by)| (*v, by)).collect();
+            replace_map(t, &map)
+        }
+    }
+}
+
+fn replace_map(t: &Ty, map: &HashMap<V, &Ty>) -> Ty {
+    let r = |x: &Ty| replace_map(x, map);
+    match t {
+        Ty::Graph(g) => g.map_vars(&mut |x| map.get(&x).map_or(Ty::Var(x), |by| (*by).clone())),
+        Ty::Var(x) => map.get(x).map_or_else(|| t.clone(), |by| (*by).clone()),
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
+            ret: r(&f.ret),
+            err: r(&f.err),
+            env: r(&f.env),
+        })),
+        Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
+        Ty::Both(a, b) => Ty::Both(Box::new(r(a)), Box::new(r(b))),
+        t => t.clone(),
     }
 }
 
@@ -1645,8 +1794,8 @@ impl Namer {
         }
     }
 
-    fn show(mut self, t: &Ty) -> ShownType {
-        let t = prepare(t, &mut HashMap::default());
+    fn show(mut self, s: &Solver, t: &Ty) -> ShownType {
+        let t = prepare(s, t, &mut HashMap::default());
         self.assign(&t);
         self.tree(&t)
     }
@@ -1707,9 +1856,153 @@ impl Namer {
 /// `t` as its variables are named: `Top` is a variable that has no effect,
 /// and each gets its own variable, so its own name. The variable of a mark
 /// (which is `Top`) is in `origin` with the variable that the mark is of.
-fn prepare(t: &Ty, origin: &mut HashMap<V, V>) -> Ty {
+fn prepare(s: &Solver, t: &Ty, origin: &mut HashMap<V, V>) -> Ty {
     let mut next = u32::MAX;
-    tops(&holes(&both(t)), &mut next, origin)
+    fold_aliases(s, &tops(&holes(&both(t)), &mut next, origin))
+}
+
+/// A declared alias whose expansion is a union of members with distinct
+/// type constructors (`Option(A) = Some(A) | None`). A shown union that is
+/// exactly such an expansion is shown by the alias's name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AliasFold {
+    id: crate::hir::TypeId,
+    params: usize,
+    /// The members, with the parameters as the variables `V(0)`, `V(1)`, ….
+    members: Vec<Ty>,
+}
+
+impl AliasFold {
+    pub(super) fn new(
+        id: crate::hir::TypeId,
+        template: &super::alias::Template,
+    ) -> Option<AliasFold> {
+        if template.slots != template.params {
+            return None;
+        }
+        let Ty::Union(ms) = &template.ty else {
+            return None;
+        };
+        let mut members = Vec::new();
+        super::solve::flatten_union(ms, &mut members);
+        if members.len() < 2 {
+            return None;
+        }
+        let mut heads = HashSet::default();
+        for m in &members {
+            if !matches!(m, Ty::Con(..)) || !heads.insert(m.head()) {
+                return None;
+            }
+        }
+        let mut used = HashSet::default();
+        for m in &members {
+            visit(m, &mut |t| {
+                if let Ty::Var(v) = t {
+                    used.insert(*v);
+                }
+            });
+        }
+        (0..template.params)
+            .all(|i| used.contains(&V(i as u32)))
+            .then_some(AliasFold {
+                id,
+                params: template.params,
+                members,
+            })
+    }
+
+    /// The arguments of the alias when `ms` is exactly its expansion.
+    fn fit(&self, ms: &[Ty]) -> Option<Vec<Ty>> {
+        if ms.len() != self.members.len() {
+            return None;
+        }
+        let mut args = vec![None; self.params];
+        for p in &self.members {
+            let m = ms.iter().find(|m| m.head() == p.head())?;
+            if !fit_pattern(p, m, &mut args) {
+                return None;
+            }
+        }
+        args.into_iter().collect()
+    }
+}
+
+/// Matches a member of an alias expansion, whose variables are the
+/// alias's parameters, with a shown member.
+fn fit_pattern(p: &Ty, t: &Ty, args: &mut [Option<Ty>]) -> bool {
+    match (p, t) {
+        (Ty::Var(v), _) => match &args[v.0 as usize] {
+            Some(old) => old == t,
+            None => {
+                args[v.0 as usize] = Some(t.clone());
+                true
+            }
+        },
+        (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) => {
+            h == g
+                && a == b
+                && xs.len() == ys.len()
+                && xs.iter().zip(ys).all(|(x, y)| fit_pattern(x, y, args))
+        }
+        (Ty::Fn(f), Ty::Fn(g)) => {
+            f.params.len() == g.params.len()
+                && f.params
+                    .iter()
+                    .zip(&g.params)
+                    .all(|(x, y)| x.0 == y.0 && fit_pattern(&x.1, &y.1, args))
+                && fit_pattern(&f.ret, &g.ret, args)
+                && fit_pattern(&f.err, &g.err, args)
+                && fit_pattern(&f.env, &g.env, args)
+        }
+        _ => {
+            let mut has_var = false;
+            visit(p, &mut |x| has_var |= matches!(x, Ty::Var(_)));
+            !has_var && p == t
+        }
+    }
+}
+
+/// `t` with each union that is exactly the expansion of a declared alias
+/// in scope shown by the alias's name. When several aliases fit, the one
+/// whose name needs no module comes first, then the shortest name.
+fn fold_aliases(s: &Solver, t: &Ty) -> Ty {
+    if s.alias_folds.is_empty() {
+        return t.clone();
+    }
+    fold_in(s, t)
+}
+
+fn fold_in(s: &Solver, t: &Ty) -> Ty {
+    let go = |x: &Ty| fold_in(s, x);
+    match t {
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            ret: go(&f.ret),
+            err: go(&f.err),
+            env: go(&f.env),
+        })),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
+        Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.clone()),
+        Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
+        Ty::Union(xs) => {
+            let xs: Vec<Ty> = xs.iter().map(go).collect();
+            let name =
+                |id: crate::hir::TypeId| s.type_names.get(id.0 as usize).map_or("", String::as_str);
+            let best = s
+                .alias_folds
+                .iter()
+                // A name with a module path is not in scope.
+                .filter(|f| !name(f.id).is_empty() && !name(f.id).contains('/'))
+                .filter_map(|f| f.fit(&xs).map(|args| (f.id, args)))
+                .min_by_key(|(id, _)| (name(*id).contains('.'), name(*id).len(), id.0));
+            match best {
+                Some((id, args)) => Ty::named(crate::hir::TypeRef::Custom(id), args),
+                None => Ty::Union(xs),
+            }
+        }
+        Ty::Graph(_) | Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
+    }
 }
 
 fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {

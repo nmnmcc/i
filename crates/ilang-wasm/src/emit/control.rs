@@ -846,6 +846,7 @@ impl<'p> Emitter<'p> {
              {v})))\n\
              (call $capture_rethrow {record}) (unreachable)))"
         );
+        out.push_str(&self.restore_scalar(dst));
     }
 
     /// Goes on with the segment of the point `q` (§9.4).
@@ -855,7 +856,7 @@ impl<'p> Emitter<'p> {
         let args: String = point
             .params
             .iter()
-            .map(|l| format!(" (local.get $l{l})"))
+            .map(|l| format!(" {}", self.atom(&Atom::Local(*l))))
             .collect();
         let _ = writeln!(
             out,
@@ -870,7 +871,7 @@ impl<'p> Emitter<'p> {
         let args: String = program.joins[j as usize]
             .params
             .iter()
-            .map(|l| format!(" (local.get $l{l})"))
+            .map(|l| format!(" {}", self.atom(&Atom::Local(*l))))
             .collect();
         let _ = writeln!(out, "(return_call $j{j} (local.get $env){args})");
     }
@@ -890,7 +891,7 @@ impl<'p> Emitter<'p> {
     /// kind, and, for kind 1, the pairs `[service, value]` of the
     /// environment statements between the function's environment and the
     /// environment of the call, outermost first (`Point::delta`).
-    pub(super) fn record(&self, p: PointId) -> String {
+    pub(super) fn record(&mut self, p: PointId) -> String {
         let program: &'p Program = self.p;
         let point = &program.points[p as usize];
         let f = self.func_of(point);
@@ -899,7 +900,7 @@ impl<'p> Emitter<'p> {
         let mut items = Vec::new();
         for l in point.saved(locals) {
             items.push(match locals[l as usize] {
-                LocalType::Value => format!("(local.get $l{l})"),
+                LocalType::Value => self.atom(&Atom::Local(l)),
                 LocalType::I64 => format!("(struct.new $box (local.get $l{l}))"),
                 LocalType::I32 => format!("(struct.new $box (i64.extend_i32_u (local.get $l{l})))"),
                 LocalType::Env => unreachable!("environments are rebuilt"),
@@ -952,15 +953,24 @@ impl<'p> Emitter<'p> {
 
     /// A function that goes on with the rest of the function `f`: a
     /// segment of a point, with the value of its call `dst`, or a join.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn rest_func(
         &mut self,
         name: &str,
+        id: FuncId,
         f: &Func,
         params: &[Local],
         dst: Option<Local>,
         locals: &[Local],
         code: &[Stmt],
     ) {
+        self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
+            numeric::Plan::for_func(f, self.p.numeric_locals.get(&id), self.p.workers.get(&id))
+        } else {
+            numeric::Plan::default()
+        };
+        self.numeric_enabled =
+            self.p.numeric != crate::Numeric::Reference && numeric::has_float(&f.body);
         let ty = |l: Local| local_type(f.locals[l as usize]);
         let _ = write!(
             self.out,
@@ -990,16 +1000,27 @@ impl<'p> Emitter<'p> {
             let _ = write!(self.out, " (local $l{l} {})", ty(l));
         }
         self.out.push('\n');
+        self.out.push_str(&self.numeric_plan.declarations());
+        if self.numeric_enabled {
+            self.out.push_str(
+                " (local $numeric_a f64) (local $numeric_b f64) (local $numeric_result f64)\n",
+            );
+        }
         for (j, &l) in params.iter().enumerate() {
             let _ = writeln!(self.out, "(local.set $l{l} (local.get $a{j}))");
         }
         if let Some(dst) = dst {
             let _ = writeln!(self.out, "(local.set $l{dst} (local.get $res))");
         }
+        for &l in params.iter().chain(dst.iter()) {
+            self.out.push_str(&self.restore_scalar(l));
+        }
         let mut body = String::new();
         self.stmts(&mut body, code, f.frame);
         self.out.push_str(&body);
         self.out.push_str("(unreachable))\n");
+        self.numeric_plan = numeric::Plan::default();
+        self.numeric_enabled = false;
     }
 
     /// The function `$j…` of a join (§9.4).
@@ -1011,6 +1032,7 @@ impl<'p> Emitter<'p> {
         };
         self.rest_func(
             &format!("j{j}"),
+            join.func,
             f,
             &join.params,
             None,
@@ -1030,6 +1052,7 @@ impl<'p> Emitter<'p> {
         // of the call.
         self.rest_func(
             &format!("s{p}"),
+            point.func,
             f,
             &point.params,
             Some(point.dst),
@@ -1093,7 +1116,7 @@ impl<'p> Emitter<'p> {
         let args: String = point
             .params
             .iter()
-            .map(|l| format!(" (local.get $l{l})"))
+            .map(|l| format!(" {}", self.atom(&Atom::Local(*l))))
             .collect();
         let _ = writeln!(
             self.out,

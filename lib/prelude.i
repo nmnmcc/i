@@ -1,6 +1,6 @@
 //// The built-in names of §12 that are custom types or functions. Every
 //// module may use them without an import, and other names may cover them.
-//// This module is part of the package `i`, but it may not be imported.
+//// This module may also be imported as `i/prelude`.
 //// `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`,
 //// `Boundary`, and `Continuation` are built into the compiler.
 

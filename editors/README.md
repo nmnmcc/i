@@ -48,3 +48,39 @@ References: [Zed extension development](https://zed.dev/docs/extensions/developi
 [Zed languages](https://zed.dev/docs/extensions/languages),
 [VS Code extension debugging](https://code.visualstudio.com/api/get-started/your-first-extension),
 [VS Code extension installation](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace).
+
+## Language server
+
+`i lsp` speaks the Language Server Protocol over standard input and output. It
+checks each package with an open document as a whole, with the text of the open
+documents in place of the files, and answers from that check. Every feature
+works on both surfaces, `.i` and the Lisp surface `.is`, and on documents with
+syntax errors (from the parser's recovered tree).
+
+| Feature | Request | Notes |
+|---|---|---|
+| Diagnostics | `publishDiagnostics` | With related information, `data` for the quick fixes, and the `unnecessary` tag on unused bindings. Several packages at once; a change re-checks only the packages that have the file. Problems of closed new documents and deleted files are cleared. |
+| Hover | `textDocument/hover` | The inferred type and the documentation comment; the value of a literal constant, the declared type of an annotated name, the errors and the environment of a function, and for a macro call the macro and its expansion. |
+| Go to definition | `textDocument/definition` | Through imported names, import paths, module names, macro calls (to the macro), into dependencies and the library `i` (written to a private directory). |
+| Go to type definition | `textDocument/typeDefinition` | The custom types of the known type of a value, of a constructor or a field. |
+| Go to implementation | `textDocument/implementation` | Of a type: its constructors, and the environment statements `! T = e` that give a service. |
+| Find references | `textDocument/references` | Top-level names, constructors, types, type parameters, field labels (also in calls and constructor patterns), modules, and local names, in all modules and tests of the package. |
+| Document highlights | `textDocument/documentHighlight` | The same, in the document; the definition is a write. |
+| Rename | `textDocument/prepareRename`, `textDocument/rename` | The same names, in every file of the package. Refused for names of dependencies, of the library `i`, built-in types, and names made by macros; a new name of the wrong kind, or one that would cover or be covered by another name, is refused with a message. Renaming a module name renames its import. |
+| Completion | `textDocument/completion`, `completionItem/resolve` | By place: module members after `m.`, fields after `v.`, constructor patterns in a match (snippets), labels in a call, module paths and their exported names in the imports, services after `!`, types in a type. Each item has its type as detail; documentation is resolved. Names of modules that are not imported come with the edit that imports them. |
+| Signature help | `textDocument/signatureHelp` | Functions and constructors, with labels and the active parameter (by place or label). |
+| Code actions | `textDocument/codeAction` | Import a missing name or module; remove an unused binding or import; add the missing clauses of a match; add a type annotation from the inferred type (`.i` only). Converting between the surfaces is `i fmt --to`, not a code action. |
+| Inlay hints | `textDocument/inlayHint` | The inferred types of unannotated bindings and parameters, not of literals. |
+| Folding, selection | `textDocument/foldingRange`, `textDocument/selectionRange` | Imports, items, blocks, matches; the nested nodes of the resolved tree. |
+| Symbols | `textDocument/documentSymbol`, `workspace/symbol` | Top-level definitions; the workspace search covers the checked packages, not their dependencies. |
+| Document links | `textDocument/documentLink` | Each import path links to its module. |
+| Semantic tokens, formatting | `textDocument/semanticTokens/full`, `textDocument/formatting` | As `i fmt`. |
+
+A request that waits for a check is answered when the check is done; a newer
+request of the same kind for the same document supersedes it (`ContentModified`),
+and `$/cancelRequest` cancels it.
+
+The VS Code client watches `i.toml`, `*.i` and `*.is` files and needs no other
+setting; inlay hints follow `editor.inlayHints.enabled`. The Zed settings of this
+repository turn on inlay hints for i, which Zed leaves off by default. Zed has no
+language for `.is` files yet, so its server runs for `.i` documents only.

@@ -159,18 +159,21 @@ test("group_test", () {
 			Ok(_)    -> "Successful"
 			Error(_) -> "Failed"
 		}
-	}) == dict.new() |> dict.insert("Failed", [Error("Wrong")]) |> dict.insert("Successful", [Ok(10), Ok(200), Ok(1)]))
+	}) == {
+		dict.new()
+			|> dict.insert("Failed", [Error("Wrong")])
+			|> dict.insert("Successful", [Ok(10), Ok(200), Ok(1)])
+	})
 	Nil
 })
 
 test("group_modulo_test", () {
-	assert(
-		list.group([1, 2, 3, 4, 5], (i) { i - i / 3 * 3 }) ==
-			dict.new()
-				|> dict.insert(0, [3])
-				|> dict.insert(1, [1, 4])
-				|> dict.insert(2, [2, 5])
-	)
+	assert(list.group([1, 2, 3, 4, 5], (i) { i - i / 3 * 3 }) == {
+		dict.new()
+			|> dict.insert(0, [3])
+			|> dict.insert(1, [1, 4])
+			|> dict.insert(2, [2, 5])
+	})
 	Nil
 })
 
@@ -910,9 +913,12 @@ test("sort_stability_test", () {
 		(2, 3)
 	]
 	assert(
-		shuffled_cards
-			|> list.sort((a, b) { int.compare(a.0, b.0) })
-			|> list.sort((a, b) { int.compare(a.1, b.1) }) == sorted_cards
+		{
+			shuffled_cards
+				|> list.sort((a, b) { int.compare(a.0, b.0) })
+				|> list.sort((a, b) { int.compare(a.1, b.1) })
+		} ==
+			sorted_cards
 	)
 	Nil
 })
