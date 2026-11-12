@@ -16,6 +16,7 @@ pub mod definitions;
 mod encode;
 mod encode_charge;
 pub mod expansion;
+mod format;
 mod from_ast;
 pub mod quote_lower;
 mod render;
@@ -262,11 +263,11 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 
 /// Format a Lisp module without discarding its ordinary comments.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
-    let (module, diagnostics) = parse_source(source);
+    let (_, diagnostics) = parse_source(source);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
-    Ok(from_ast::format_with_comments(source, &module))
+    format::format(source)
 }
 
 struct Parser<'a> {

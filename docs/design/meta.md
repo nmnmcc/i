@@ -140,6 +140,22 @@ Symbol  = (* a symbol of spec §1.5 that is not a bracket *) .
 - An `Unquote` or a `Splice` may only be inside a `Quote`. A `Quote` may be inside a `Quote` only when an `Unquote` or a `Splice` of the outer quote is around it, as in `` `(f ~..(map xs (-> (x) _ `(g ~x)))) ``.
 - The **head** of a `Round` is its first part.
 
+`i fmt` uses the same 80-column document layout and one-tab indentation as
+for the normal surface. A datum that fits stays on one line. A longer round
+form keeps its head and distinguished first part (`=` name, `->` parameters
+or clause head, `|` subject, `@` attribute) together, then puts the remaining
+parts on separate lines one level in; a call keeps its callee first. Indentation stops at 19 tabs
+so that delimiters still have room within the width. A large
+distinguished part can itself break. Blocks and clause lists with multiple
+parts put one statement or clause on each line. Lists, tuples and bit arrays
+stay together when they fit, otherwise their parts go one per line. Closing
+brackets of broken forms get their own line. Quote, unquote and splice
+prefixes stay attached to their datum. At most one existing blank line is
+kept between top-level items. Literal spellings and strings are kept without
+splitting; comments, including documentation, stay between the same datums,
+and trailing comments stay after their datum. A single indivisible atom,
+string or comment can exceed the width.
+
 The parser changes datums into the core tree with the tables of §2.3. The tables are read by **position**. The position of a datum says which rows may be used, and each row says which positions its parts are in. The positions are: import item, export item, item, attribute, constructor, field, type, function result, parameter, expression, statement, call argument, clause, clause head, pattern, bit array segment, and format. A datum that fits no row of its position is a compile error.
 
 ### 2.3 How each core form is written
@@ -879,7 +895,7 @@ A type is given to a macro as scoped Syntax, using the written-type rows when po
 - An error in expanded code has the span of the code. Code from an argument has the span of the caller's source. Code from a template is reported at the macro call, as "in the expansion of `m`", with the span of the template as a note and the expanded code shown.
 - Warnings are given only for code with a span in the source of the module that is compiled, so not for code from a template.
 - When a program stops (spec §11.7) in code from a template, the message gives the position of the macro call and the position in the template.
-- `i fmt` formats a file in its own surface, and does not expand macros. `i fmt --to=is` and `i fmt --to=i` write the file of the other surface and remove the old one (§1). The new file is the same code. Documentation comments are kept. A normal comment is kept when it is before an item or a statement, and the tool reports each comment that it cannot keep. The spelling of literals and empty lines are not kept. The layout of the Lisp surface is defined with the formatter.
+- `i fmt` formats a file in its own surface, and does not expand macros. `i fmt --to=is` and `i fmt --to=i` write the file of the other surface and remove the old one (§1). The new file is the same code. During conversion, documentation comments are kept; a normal comment is kept when it is before an item or a statement, and the tool reports each comment that it cannot keep. Conversion does not keep literal spellings or empty lines. The Lisp layout follows §2.2. Formatting in place preserves all comments, literal spellings and at most one existing blank line between top-level items; the conversion restrictions above apply only when changing surfaces. Both `.i` and `.is` are included by default under `src/` and `test/`, and in given files or directories, including with `--check`. The LSP uses the same printer. `syntax.show` remains the one-line representation of §3.2.
 - `i expand` is a new command. It writes a module after all expanding, in the surface that is asked for. The text is for reading (§5), and a module with quotes can only be shown in the Lisp surface. `i expand --trace` also writes each run: the macro, its arguments, and its result.
 - `i check` and the language server must run macros, so they compile and run macro programs. They keep the results of runs (§8). While a macro module has errors, its macro calls are reported as not expanded and the rest of the module is checked without them.
 - The language server shows the expansion of a macro call, goes from a name in expanded code to its definition by its span, and marks macro calls with a semantic token, so that an editor may show them in another colour.

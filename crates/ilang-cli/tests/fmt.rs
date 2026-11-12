@@ -105,3 +105,52 @@ fn files_with_errors_are_left_as_they_are() {
     assert_eq!(read(dir.path(), "src/bad.i"), bad);
     assert_eq!(read(dir.path(), "src/good.i"), PRETTY);
 }
+
+#[test]
+fn lisp_files_are_formatted_in_default_roots_and_given_paths() {
+    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (+ first second)}))\n";
+    let pretty = ilang_syntax::lisp::format(source).unwrap();
+    assert!(pretty.lines().count() >= 6, "{pretty}");
+    let dir = package(&[
+        ("i.toml", "name = \"app\"\n"),
+        ("src/main.is", source),
+        ("test/deep/main_test.is", source),
+        ("other/main.is", source),
+    ]);
+    let out = fmt(&["--check"], dir.path());
+    assert_eq!(out.status.code(), Some(1));
+    let listed = String::from_utf8_lossy(&out.stdout);
+    assert!(listed.contains("src/main.is") && listed.contains("test/deep/main_test.is"));
+    assert!(!listed.contains("other"));
+    assert_eq!(read(dir.path(), "src/main.is"), source);
+    assert!(fmt(&[], dir.path()).status.success());
+    assert_eq!(read(dir.path(), "src/main.is"), pretty);
+    assert_eq!(read(dir.path(), "test/deep/main_test.is"), pretty);
+    assert_eq!(read(dir.path(), "other/main.is"), source);
+    assert!(fmt(&["--check"], dir.path()).status.success());
+    for path in [dir.path().join("other"), dir.path().join("other/main.is")] {
+        std::fs::write(dir.path().join("other/main.is"), source).unwrap();
+        assert!(fmt(&[path.to_str().unwrap()], dir.path()).status.success());
+        assert_eq!(read(dir.path(), "other/main.is"), pretty);
+    }
+}
+
+#[test]
+fn conversion_to_lisp_uses_pretty_layout() {
+    let source = "// keep\nmain = () {\n first = 1\n second = 2\n first + second\n}\n";
+    let dir = package(&[("src/main.i", source)]);
+    let out = fmt(&["--to", "is"], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!dir.path().join("src/main.i").exists());
+    let converted = read(dir.path(), "src/main.is");
+    assert!(
+        converted.lines().count() >= 6 && converted.contains("// keep"),
+        "{converted}"
+    );
+    assert_eq!(ilang_syntax::lisp::format(&converted).unwrap(), converted);
+    assert!(fmt(&["--check"], dir.path()).status.success());
+}

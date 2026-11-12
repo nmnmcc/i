@@ -132,6 +132,18 @@ From this rule:
 
 One rule does not depend on lines: in the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `^`, `!`, `|`, `&`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
 
+`i fmt` formats `.i` and `.is` source files in their own surface, including
+both extensions by default in `src/`, `test/` and given directories;
+`--check` reports files that would change. Both surfaces use 80 columns and
+one tab per indentation level. The Lisp surface keeps a datum on one line
+when it fits, otherwise breaks its parts at datum boundaries, retaining the
+head and distinguished first parts together and indenting the remaining
+parts once. Blocks and clause lists put their statements or clauses one per
+line; lists and tuples break one part per line when needed. Reader prefixes
+stay attached, strings are not split, comments keep their place, and at most
+one existing blank line separates top-level items. A single indivisible atom,
+string or comment may exceed the width. `i fmt --to is` uses that same layout.
+
 ## 2. Modules
 
 ### 2.1 Packages and modules
