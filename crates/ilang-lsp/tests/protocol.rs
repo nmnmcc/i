@@ -548,6 +548,33 @@ fn completion_after_an_expression() {
     c.shutdown();
 }
 
+/// Completion inside a typed macro argument comes from the signature check,
+/// also when the macro itself fails to expand.
+#[test]
+fn typed_macro_argument_completion_without_expansion() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = "(m = app/macros)\nPoint { Point(x: Int, y: Int) }\nmain = () {\n  p = Point(1, 2)\n  m.broken(p.x)\n}\n";
+    let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: (broken A) (-> ((: value A)) A)))\n(@ macro (= broken (-> (value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
+    package(
+        dir.path(),
+        &[("src/main.i", text), ("src/macros.is", macros)],
+    );
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    let ds = c.diagnostics(&main);
+    assert!(
+        ds.iter().any(|d| d.message.contains("never expands")),
+        "{ds:?}"
+    );
+    let typing = text.replace("p.x)", "p.)");
+    c.change(&main, 2, &typing);
+    let (l, ch) = find(&typing, "p.)", 0);
+    let r = c.request::<lsp::request::Completion>(position_params(&main, l, ch + 2));
+    assert_eq!(labels(&r), vec!["x", "y"]);
+    c.shutdown();
+}
+
 fn labels(r: &Value) -> Vec<&str> {
     r.as_array()
         .unwrap()
