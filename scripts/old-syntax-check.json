@@ -457,24 +457,10 @@
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-cli/src/commands/package.rs:c25077c955934689": {
-    "suffix": "\nService { Service(run: () -> Nil) }\n",
-    "substitutions": [
-      [
-        "{}",
-        "app:service/v1"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+    "not_source": "a format string that builds a type name or an attribute head, not i source"
   },
   "crates/ilang-cli/src/commands/package.rs:f3ee3a2799336d70": {
-    "suffix": "\nService { Service(run: () -> Nil) }\n",
-    "substitutions": [
-      [
-        "{}",
-        "app:service/v1"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+    "not_source": "a format string that builds a type name or an attribute head, not i source"
   },
   "crates/ilang-cli/tests/package_commands.rs:1e07dcbdc6708e98": {
     "substitutions": [
@@ -2647,5 +2633,32 @@
       ]
     ],
     "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
+  },
+  "crates/ilang-check/src/query/actions.rs:de6c531222bb730f": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{pattern}",
+        "x"
+      ],
+      [
+        "{body}",
+        "0"
+      ]
+    ],
+    "reason": "Render the source template of the Lisp-branch helper"
+  },
+  "crates/ilang-check/src/types/records/codec.rs:217fe1a139ac8e12": {
+    "not_source": "a format string that builds a type name or an attribute head, not i source"
+  },
+  "crates/ilang-check/src/types/shown.rs:ccfaa87f19759eaf": {
+    "not_source": "a format string that builds a type name or an attribute head, not i source"
   }
 }
