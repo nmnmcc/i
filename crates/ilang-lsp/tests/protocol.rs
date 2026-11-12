@@ -264,7 +264,7 @@ fn an_editor_session() {
     let (l, ch) = find(MAIN, "User)", 0);
     let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
     assert_eq!(d["uri"], main);
-    let (dl, dch) = find(MAIN, "User {", 0);
+    let (dl, dch) = find(MAIN, "User =", 0);
     assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
 
     // Document symbols.
@@ -1380,15 +1380,15 @@ fn lsp_rename_constructor_and_type() {
     );
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
-        shapes.contains("\tDisk(radius: Int)") && shapes.contains("\t\tDisk(radius) ->"),
+        shapes.contains("Disk = (radius = Int)") && shapes.contains("(Disk(radius = radius)) {"),
         "{shapes}"
     );
-    assert!(apply(APP_TEST, &edit, &ws.test).contains("shapes.Disk(radius: 1)"));
+    assert!(apply(APP_TEST, &edit, &ws.test).contains("shapes.Disk(radius = 1)"));
     let edit = rename(&mut c, &ws.main, &ws.main_text, "Shape) ->", 0, 0, "Figure").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
         shapes.contains("(Figure(..), area")
-            && shapes.contains("Figure {")
+            && shapes.contains("Figure = Circle | Rect")
             && shapes.contains("(s: Figure)"),
         "{shapes}"
     );
@@ -3060,7 +3060,7 @@ fn lsp_completion_constructors_lisp_surface() {
     c.open(&main, &text);
     c.diagnostics(&main);
     // Before the `}` that ends the clauses.
-    let close = text.find("1)}").unwrap_or_else(|| panic!("{text}")) + 2;
+    let close = text.find("_ 1)").unwrap_or_else(|| panic!("{text}")) + 4;
     let ix = ilang_lsp::position::LineIndex::new(&text);
     let p = ix.position(close as u32);
     let r = c.request::<lsp::request::Completion>(position_params(&main, p.line, p.character));

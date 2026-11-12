@@ -391,13 +391,9 @@ impl Query<'_> {
         if patterns.is_empty() {
             return None;
         }
-        // After the last branch of the match; in the Lisp surface before the
-        // `)` that ends its chain.
-        let close = if lisp {
-            text[..case.span.end as usize].rfind(')')? as u32
-        } else {
-            case.span.end
-        };
+        // After the last branch of the match: in the Lisp surface the span
+        // of the match ends with its last branch, inside the `)` of its chain.
+        let close = case.span.end;
         let indent = clauses
             .last()
             .map(|c| {
