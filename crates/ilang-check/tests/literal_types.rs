@@ -146,7 +146,7 @@ fn shared_fields_do_not_infer_an_empty_parameter() {
     assert_eq!(ds.iter().filter(|d| d.0 == "E0516").count(), 1, "{ds:?}");
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     assert!(
-        lines.iter().any(|l| l.contains("(p: Pair(String))")),
+        lines.iter().any(|l| l.contains("(p = Pair(String))")),
         "{lines:?}"
     );
 }
@@ -210,7 +210,7 @@ fn empty_optional_accumulator_requires_a_written_tuple_shape() {
     .unwrap();
     let (ds, _) = check(&source);
     assert_eq!(ds,vec![("E0506".into(),"`.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`".into())]);
-    let (ds, _) = check(&source.replace("Some(p) ->", "Some(p: (Int, Int)) ->"));
+    let (ds, _) = check(&source.replace("(Some(p))", "(Some(p: (Int, Int)))"));
     assert!(ds.is_empty(), "{ds:?}");
 }
 
@@ -357,7 +357,7 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
             "String - \"a\""
         };
         let source = format!(
-            "g = (s: {need}) {{ 1 }}\nf = (v: {annotation}, c: Bool) {{ v |> {{\n {pattern} -> 0\n {catch} -> g(t)\n _ -> 2\n}} }}\n"
+            "g = (s: {need}) {{ 1 }}\nf = (v: {annotation}, c: Bool) {{ v |> ({pattern}) {{ 0 }} | ({catch}) {{ g(t) }} | (_) {{ 2 }} }}\n"
         );
         let (ds, _) = check(&source);
         let errors: Vec<_> = ds.iter().filter(|d| d.0.starts_with('E')).collect();
@@ -378,7 +378,7 @@ fn prefix_after_complement_does_not_erase_other_columns() {
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     // The last wildcard is redundant: the two preceding rows cover String.
     // Without it, neither remaining clause may be called never used.
-    let (covered, _) = check(&source.replace(" _ -> 2\n", ""));
+    let (covered, _) = check(&source.replace(" | (_) { 2 }", ""));
     assert!(covered.is_empty(), "{covered:?}");
     let (ds, _) = check(&source.replace("(n: Int)", "(n: String)"));
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
@@ -403,7 +403,7 @@ fn host_directions_expand_aliases_and_same_scalar_unions() {
         ));
         assert!(ds.iter().any(|d| d.0 == "E0318"), "{ty}: {ds:?}");
         let (ds, _) = check(&format!(
-            "@host(\"test:state\")\nState {{ State(get: () -> {ty}) }}\n"
+            "@host(\"test:state\")\nState = (get = () -> {ty})\n"
         ));
         assert!(ds.iter().any(|d| d.0 == "E0320"), "{ty}: {ds:?}");
     }
@@ -467,7 +467,9 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         let (ds, _) = check(&"Whole = BoundaryType\n@external(\"app\", \"read\")\nread: () -> Whole\n@host(\"app\")\nSvc = (get = () <- (Fail(Whole | Nil)) -> Whole)\n".replace("BoundaryType", ty));
         assert!(ds.is_empty(), "{ty}: {ds:?}");
     }
-    for env in ["Never", "Int - Int", "String - String"] {
+    // The old environments `! Int - Int` and `! String - String` cannot be
+    // written: a need list holds named service types only (syntax-3 §3.1).
+    for env in ["Never"] {
         let (ds, _) = check(
             &"@host(\"app\")\nSvc = (get = () <- (BoundaryType) -> String)\n"
                 .replace("BoundaryType", env),
@@ -529,7 +531,7 @@ fn literal_values_use_numeric_and_decoded_scalar_identity() {
         assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     }
     let (ds, _) =
-        check("f = (m: \"\\u{0}\" | \"a\" | \"b\") { m |> { \"a\" -> 1  \"b\" -> 2 } }\n");
+        check("f = (m: \"\\u{0}\" | \"a\" | \"b\") { m |> (\"a\") { 1 } | (\"b\") { 2 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert!(ds[0].1.contains("matches `\"\\u{0000}\"`"), "{ds:?}");
 }

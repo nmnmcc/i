@@ -60,7 +60,7 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
     );
     bad("v=\"GET\"\nx:v=\"POST\"", code::TYPE_MISMATCH);
     bad(
-        "Box(A) = { (A) }\nv = Box(1)\nBox(Item) = v\nx: Item = 2",
+        "Box(A) = (A)\nv = Box(1)\nBox(Item) = v\nx: Item = 2",
         code::TYPE_MISMATCH,
     );
     bad(
@@ -80,15 +80,15 @@ fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
     );
     good("apply = <A, B>(x: A, f: (A) -> B) { f(x) }\nf = () {\n\tapply(\"a\", (x) {\n\t\ty: x = \"b\"\n\t\ty\n\t})\n}");
     bad(
-        "Sink(A){Sink(put:(A)->Nil)}\nsink:Sink(\"GET\"|\"POST\")=Sink((x:\"GET\"|\"POST\"){Nil})\nbad=(){sink.put(\"DELETE\")}",
+        "Sink(A) = (put = (A) -> Nil)\nsink: Sink(\"GET\" | \"POST\") = Sink(put = (x: \"GET\" | \"POST\") { Nil })\nbad = () { sink.put(\"DELETE\") }",
         code::TYPE_MISMATCH,
     );
 }
 
 #[test]
 fn j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not() {
-    good("read=(s:String){s |> {other:String-\"a\" -> 0 key -> {same:key=\"a\" 1}}}");
-    let source = "read=(s:String){s |> {other:String-\"a\" -> 0 key -> {same:key=\"a\" 1}}}";
+    let source = "read = (s: String) {\n\ts |> (other: String - \"a\") { 0 } | (key) {\n\t\tsame: key = \"a\"\n\t\t1\n\t}\n}";
+    good(source);
     let (g, _) = good(source);
     let c = query::check_for_queries(&g);
     let p = c.program.as_ref().unwrap();
@@ -96,28 +96,28 @@ fn j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not() {
     assert!(
         q.type_at(
             common::module(p, "app/main"),
-            source.find("key=\"a\"").unwrap() as u32
+            source.find("key = \"a\"").unwrap() as u32
         )
         .unwrap()
         .code
         .ends_with("\"a\"")
     );
     bad(
-        "only=(x:\"a\")->\"a\"{x}\nread=(s:String){s |> {other:String-\"a\" -> 0 key -> {v=only(key) same:v=\"b\" 1}}}",
+        "only = (x: \"a\") -> \"a\" { x }\nread = (s: String) {\n\ts |> (other: String - \"a\") { 0 } | (key) {\n\t\tv = only(key)\n\t\tsame: v = \"b\"\n\t\t1\n\t}\n}",
         code::TYPE_MISMATCH,
     );
-    good("read=(s:String){s |> {other:String-\"a\" -> 0 key -> {same:s=\"b\" 1}}}");
+    good("read = (s: String) {\n\ts |> (other: String - \"a\") { 0 } | (key) {\n\t\tsame: s = \"b\"\n\t\t1\n\t}\n}");
 }
 
 #[test]
 fn j4_literal_fixation_orders_completion_and_rejects_later_widening() {
-    let source = "Cell(A){Cell(get:()->A,set:(A)->Nil)}\nmake(A)=(x:A){Cell(get:(){x},set:(y:A){Nil})}\nr=make(1)\nRead=r\nlater=(){r.set(2)}";
+    let source = "Cell(A) = (get = () -> A, set = (A) -> Nil)\nmake = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }\nr=make(1)\nRead=r\nlater=(){r.set(2)}";
     bad(source, code::TYPE_MISMATCH);
     good(&source.replace("r=make(1)", "r:Cell(Int)=make(1)"));
     // The earlier annotation-demand ruling still applies; T1's literal is now 1.
     good("id=(x){x}\nv=id(1)\nx:v=1");
     bad("id=(x){x}\nv=id(1)\nx:v=2", code::TYPE_MISMATCH);
-    let source = "Box(A){Box(A)}\nid=(x){x}\nx:Both=(1,2)\nBoth=(First,Second)\nBox(Second)=b\nb=id(Box(2))\nFirst=a\na=id(1)";
+    let source = "Box(A) = (A)\nid=(x){x}\nx:Both=(1,2)\nBoth={(First,Second)}\nBox(Second)=b\nb=id(Box(2))\nFirst=a\na=id(1)";
     let (g, c) = good(source);
     assert_eq!(alias(&c, "Both"), "(1, 2)");
     let (p, ds) = ilang_check::resolve_program(&g);
@@ -133,7 +133,7 @@ fn j4_literal_fixation_orders_completion_and_rejects_later_widening() {
 
 #[test]
 fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
-    let source = "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Int|String){x |> {m:Methods -> 1 _ -> 0}}";
+    let source = "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Int|String){ x |> (m: Methods) { 1 } | (_) { 0 } }";
     let (_, c) = good(source);
     let p = c.program.as_ref().unwrap();
     let module = common::module(p, "app/main");
@@ -157,7 +157,7 @@ fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
         ])
     );
     bad(
-        "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Methods){x |> {\"GET\" ? True -> 1}}",
+        "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Methods){ x |> (\"GET\" ? True) { 1 } }",
         code::CASE_NOT_COVERED,
     );
 }
@@ -168,40 +168,40 @@ fn j6_early_context_provenance_wins_over_literal_boundary_checks() {
         "v=1\nA=v\n@external(\"env\",\"f\")\nf:()->A",
         code::VALUE_TYPE_PLACE,
     );
-    bad("v = 1\nA = v\nT = { (A) }", code::VALUE_TYPE_PLACE);
-    bad("v=1\nA=v\nf:()->Nil!A=(){Nil}", code::VALUE_TYPE_PLACE);
+    bad("v = 1\nA = v\nT = (A)", code::VALUE_TYPE_PLACE);
+    bad("v=1\nA=v\nf: () <- (A) -> Nil = () { Nil }", code::VALUE_TYPE_PLACE);
     // A scheme that already needs an environment can still be read normally.
-    good("Env{Env}\nf=(e!Env){e}\ng:f=(e!Env){e}");
+    good("Env = (value = Int)\nf = () <- (e: Env) { e }\ng: f = () <- (e: Env) { e }");
 }
 
 #[test]
 fn j7_invariant_scheme_reads_keep_fresh_instances_and_weak_sharing() {
     good(
-        "Cell(A){Cell(run:(A)->A)}\nmake=(){Cell((x){x})}\nf:make=(){Cell((x:Int){x})}\ng:make=(){Cell((x:String){x})}\na:Cell(Int)=make()\nb:Cell(String)=make()",
+        "Cell(A) = (run = (A) -> A)\nmake = () { Cell(run = (x) { x }) }\nf: make = () { Cell(run = (x: Int) { x }) }\ng: make = () { Cell(run = (x: String) { x }) }\na:Cell(Int)=make()\nb:Cell(String)=make()",
     );
     bad(
-        "Cell(A){Cell(run:(A)->A)}\nmake=(){Cell((x){x})}\nSame=make",
+        "Cell(A) = (run = (A) -> A)\nmake = () { Cell(run = (x) { x }) }\nSame = make",
         code::VALUE_TYPE_OPEN,
     );
     bad(
-        "Cell(A){Cell(run:(A)->A)}\nwrong=(c:Cell(Int))->Cell(Never){c}",
+        "Cell(A) = (run = (A) -> A)\nwrong=(c:Cell(Int))->Cell(Never){c}",
         code::TYPE_MISMATCH,
     );
 }
 
 #[test]
 fn joint_queries_keep_full_literal_aliases_and_nested_head_targets() {
-    let source = "Box(A) = { (A) }\nv = Box(\"GET\")\nBox(Method) = v\nx: Method = \"GET\"";
+    let source = "Box(A) = (A)\nv = Box(\"GET\")\nBox(Method) = v\nx: Method = \"GET\"";
     let (g, c) = good(source);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");
     let q = query::Query::new(&g, p, c.types.as_ref());
-    let pos = source.find("Method)=v").unwrap() as u32;
+    let pos = source.find("Method) = v").unwrap() as u32;
     assert!(q.type_at(m, pos).unwrap().code.contains("\"GET\""));
-    let pos = source.find("x:Method").unwrap() as u32 + 2;
+    let pos = source.find("x: Method").unwrap() as u32 + 3;
     assert_eq!(
         q.definition_at(m, pos).unwrap().span.start as usize,
-        source.find("Method)=v").unwrap()
+        source.find("Method) = v").unwrap()
     );
 }
 

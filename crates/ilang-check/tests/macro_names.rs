@@ -12,7 +12,7 @@ fn errors(files: &[(&str, &str)]) -> Vec<String> {
     errors.into_iter().map(|d| d.message.clone()).collect()
 }
 
-const MACRO: &str = "(, expand)\n(@ macro (= expand (-> (x) _ `(f ~x))))\n";
+const MACRO: &str = "(, expand)\n(@ macro (= expand (-> (, x) _ `(f ~x))))\n";
 
 #[test]
 fn source_macros_are_exportable_and_importable_without_checking_their_bodies() {
@@ -43,7 +43,7 @@ fn a_macro_is_not_a_runtime_value_even_when_imported() {
 fn local_macro_is_not_a_runtime_value() {
     let diags = errors(&[(
         "src/main.is",
-        "(, value)\n(@ macro (= expand (-> (x) _ `(f ~x))))\n(= value expand)\n",
+        "(, value)\n(@ macro (= expand (-> (, x) _ `(f ~x))))\n(= value expand)\n",
     )]);
     assert!(
         diags
@@ -56,7 +56,7 @@ fn local_macro_is_not_a_runtime_value() {
 #[test]
 fn private_macros_and_collisions_obey_ordinary_value_rules() {
     let diags = errors(&[
-        ("src/macros.is", "(@ macro (= expand (-> (x) _ x)))\n"),
+        ("src/macros.is", "(@ macro (= expand (-> (, x) _ x)))\n"),
         ("src/main.i", "((expand) = app/macros)\n"),
     ]);
     assert!(
@@ -65,7 +65,7 @@ fn private_macros_and_collisions_obey_ordinary_value_rules() {
     );
     let diags = errors(&[(
         "src/main.is",
-        "(@ macro (= expand (-> (x) _ x)))\n(= expand 1)\n",
+        "(@ macro (= expand (-> (, x) _ x)))\n(= expand 1)\n",
     )]);
     assert!(
         diags.iter().any(|e| e.contains("defined more than once")),
@@ -79,11 +79,11 @@ fn invalid_macro_definitions_are_reported() {
         assert!(!errors(&[("src/main.i", source)]).is_empty());
     }
     assert!(!errors(&[("src/main.is", "(@ macro (= expand 1))")]).is_empty());
-    let diags = errors(&[("src/main.is", "(@ main (@ macro (= expand (-> () _ `x))))")]);
+    let diags = errors(&[("src/main.is", "(@ main (@ macro (= expand (-> (,) _ `x))))")]);
     assert!(
         diags.iter().any(|e| e.contains("cannot be put on a macro")),
         "{diags:?}"
     );
-    let diags = errors(&[("src/main.is", "(@ bogus (@ macro (= expand (-> () _ `x))))")]);
+    let diags = errors(&[("src/main.is", "(@ bogus (@ macro (= expand (-> (,) _ `x))))")]);
     assert!(diags.iter().any(|e| e.contains("@bogus")), "{diags:?}");
 }

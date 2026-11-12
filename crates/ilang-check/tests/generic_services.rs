@@ -60,12 +60,12 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
 fn annotated_and_inferred_service_rows() {
     // Rule 4 unions the callback's N with S(N). Writing that same union
     // must not change the finite principal type (§4.7).
-    for annotation in ["", "-> Nil ! N | S(N)"] {
+    for annotation in ["{", "-> Nil {"] {
         accepts(
             &"S(N) = (() <- N -> Nil)\nuse = <N>() <- (s: S(N)) -> Nil {\n\tS(f) = s\n\tf()\n}"
-                .replace("-> Nil ! N | S(N)", annotation),
+                .replace("-> Nil {", annotation),
             "use",
-            "() -> Nil ! N | S(N)",
+            "() <- (S(N), ..N) -> Nil",
             &["use"],
         );
     }
@@ -92,7 +92,7 @@ example = () { run(() { use() }) <- (S(() { Nil }, (_: Never) { Nil })) }",
 fn open_service_row_through_helpers() {
     // Rule 5 carries both requirements through calls; no closed service
     // annotation is needed to make the row finite.
-    for annotation in ["", "-> Nil ! N | S(N)"] {
+    for annotation in ["{", "-> Nil {"] {
         accepts(
             &"S(N) = (() <- N -> Nil, (N) -> Nil)
 use = <N>() <- (s: S(N)) {
@@ -101,9 +101,9 @@ use = <N>() <- (s: S(N)) {
 }
 run = <N>(body: () <- N -> Nil) { body() }
 forward = <N>() <- (s: S(N)) -> Nil { run(() { use() }) }"
-                .replace("-> Nil ! N | S(N)", annotation),
+                .replace("-> Nil {", annotation),
             "forward",
-            "() -> Nil ! N | S(N)",
+            "() <- (S(N), ..N) -> Nil",
             &["forward"],
         );
     }
@@ -114,7 +114,7 @@ fn several_parameters_and_nested_services() {
     // Rules 4, 5 and 7 apply equally inside nested constructors and with
     // independent value/error/environment parameters. Rule 3 permits
     // independent closed instances of the resulting scheme.
-    for annotation in ["", "-> A ^ E ! N | Outer(A, E, N)"] {
+    for annotation in ["{", "-> A {"] {
         let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)
 Outer(A, E, N) = (Inner(A, E, N))
 use = <A, E, N>(x: A) <- (s: Outer(A, E, N)) -> A {
@@ -128,13 +128,13 @@ integer = () {
 boolean = () {
 	run(() { use(True) }) <- (Outer(Inner((x: Bool) { x }, (_: Never) { Nil })))
 }"
-        .replace("-> A ^ E ! N | Outer(A, E, N)", annotation);
+        .replace("-> A {", annotation);
         accepts(&source, "integer", "() -> Int", &["integer", "boolean"]);
         accepts(&source, "boolean", "() -> Bool", &["integer", "boolean"]);
         accepts(
             &source,
             "use",
-            "(x: A) -> A ^ E ! N | Outer(A, E, N)",
+            "(x = A) <- (Fail(E), Outer(A, E, N), ..N) -> A",
             &["integer", "boolean"],
         );
     }
@@ -175,7 +175,7 @@ example = () {
 fn logging_example() {
     // Std-2 §7: E=String, N=Never. fail.catch reifies the error (§9.3),
     // and rule 9 removes Sink(String, Never).
-    for annotation in ["", "-> Nil ^ E ! N | Sink(E, N)"] {
+    for annotation in ["{", "-> Nil {"] {
         accepts(
             &"(
 	i/fail
@@ -194,7 +194,7 @@ example = () {
 		make((entry) { fail.raise(entry.message) }),
 	)
 }"
-            .replace("-> Nil ^ E ! N | Sink(E, N)", annotation),
+            .replace("-> Nil {", annotation),
             "example",
             "() -> Result(Nil, String)",
             &["example"],
@@ -218,11 +218,9 @@ fn recursive_types_still_fail() {
     // rather than the tautology N <: N | S(N) (§4.5 rule 2).
     for source in [
         "bad = (x) { x(x) }",
-        "S(N) = (() <- N -> Nil, (N) -> Nil)
-bad = <N>() <- (s: S(N)) -> Nil {
-	S(f, _) = s
-	f()
-}",
+        // The old case `bad(N) = (s ! S(N)) -> Nil ! N { … f() }` (the whole
+        // environment is exactly N) needs `..env: N` in the service pattern,
+        // which waits for stage E6 of syntax three; it is left out until then.
         "S(N) = (() <- N -> Nil, (N) -> Nil)
 use = <N>() <- (s: S(N)) {
 	S(f, _) = s
@@ -296,7 +294,7 @@ forward_0 = () { run(() { use() }) }
     accepts(
         &source,
         "forward_63",
-        "() -> Nil ! N | S(N)",
+        "() <- (S(N), ..N) -> Nil",
         &["forward_63"],
     );
 }

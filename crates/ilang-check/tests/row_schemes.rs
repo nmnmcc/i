@@ -181,8 +181,9 @@ Alias(N) = T(N)
         for written in [
             format!("T({row})"),
             format!("Alias({row})"),
-            format!("() -> Nil ! {row}"),
-            format!("() -> Nil ^ {row}"),
+            // The old `() -> Nil ! {row}` has no syntax-three form: a need
+            // list holds named service types only (syntax-3 §3.1).
+            format!("() <- (Fail({row})) -> Nil"),
         ] {
             let source = format!(
                 "{head}use = (x: {written}) {{ x }}
@@ -249,7 +250,7 @@ main = () {
         graph.sources.render_all(&checked.diags)
     );
     let same = types(&source.replace("String", "Int"));
-    assert_eq!(same["app/main.merge"], "(a: T(A), b: T(B)) -> T(A | B)");
+    assert_eq!(same["app/main.merge"], "(a = T(A), b = T(B)) -> T(A | B)");
 }
 
 #[test]

@@ -399,11 +399,30 @@ i/syntax.children : (syntax = Syntax, index = Int, end = Int, result = List(Synt
 i/syntax.node : (syntax = Syntax) -> Node
 i/syntax.build_list : (items = List(Syntax), result = SyntaxList) -> SyntaxList
 i/syntax._rebuild : (template = Syntax, children = List(Syntax)) -> Syntax
+i/syntax.raw_type_handle : (Syntax) -> TypeHandle
 i/syntax.make : (node = Node, like = Syntax) <- (Fail(SyntaxError)) -> Syntax
 i/syntax.same_code : (a = Syntax, b = Syntax) -> Bool
 i/syntax.show : (syntax = Syntax) -> String
 i/syntax.position_id : (position = Position) -> Int
 i/syntax.show_as : (syntax = Syntax, position = Position) <- (Fail(SyntaxError)) -> String
+i/syntax.raw_type_of : (Syntax) -> TypeResult
+i/syntax.raw_signature : () -> TypeResult
+i/syntax.raw_subtype : (Syntax, Syntax) -> TypeResult
+i/syntax.raw_members : (Syntax) -> TypeResult
+i/syntax.raw_type_ok : (TypeResult) -> Bool
+i/syntax.raw_type_value : (TypeResult) -> Syntax
+i/syntax.raw_type_truth : (TypeResult) -> Int
+i/syntax.raw_type_len : (TypeResult) -> Int
+i/syntax.raw_type_child : (TypeResult, Int) -> Syntax
+i/syntax.raw_type_message : (TypeResult) -> String
+i/syntax.raw_type_at : (TypeResult) -> Syntax
+i/syntax.type_result : (r = TypeResult) <- (Fail(SyntaxError)) -> Syntax
+i/syntax.type_members : (r = TypeResult, index = Int, count = Int) -> List(Syntax)
+i/syntax._types : () -> Types
+i/syntax.type_of : (s = Syntax) <- (Fail(SyntaxError), Types) -> Syntax
+i/syntax.signature : () <- (Types) -> Syntax
+i/syntax.subtype : (a = Syntax, b = Syntax) <- (Fail(SyntaxError), Types) -> Truth
+i/syntax.members : (s = Syntax) <- (Fail(SyntaxError), Types) -> List(Syntax)
 i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
 i/fs.open : (path = String, mode = OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
 i/fs.read : (File, max_bytes = Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray

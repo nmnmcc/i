@@ -12,46 +12,41 @@ use std::collections::HashMap;
 use std::fs;
 
 const SOURCE: &str = r#"
- (i/fail)
+(
+	i/fail
+)
 
- (div, Handle)
+(
+	div
+	Handle
+)
 
-Cat { Cat(lives: Int, name: String) }
-Dog { Dog(name: String) }
-Clock { Clock(now: () -> Int) }
+Cat = (lives = Int, name = String)
+Dog = (name = String)
+Clock = (now = () -> Int)
 Watch = Clock
 
 name = (p: Cat | Dog) { p.name }
 second = (t: (Int, String)) { t.1 }
 minus = (a: Int, b: Int) { a - b }
-by_label = minus(b: 1, a: 2)
-piped = 5 |> minus(b: 1)
-tests = (x) {
-   x |> {
-    _: Int | String -> 1
-    _: { (Int, Int) } -> 2
-    _ -> 3
-  }
-}
-env = (c ! Watch) {
-  ! Clock = c
-  c.now()
-}
+by_label = minus(b = 1, a = 2)
+piped = 5 |> minus(b = 1)
+tests = (x) { x |> (_: Int | String) { 1 } | (_: (Int, Int)) { 2 } | (_) { 3 } }
+env = () <- (c: Watch) { c.now() <- (c) }
 mono = minus(1, 2)
-age = (Cat(name, l = lives)) { l }
+age = (Cat(name = name, lives = l)) { l }
 first = (r) {
-  Ok(v) = r
-  v
+	Ok(v) = r
+	v
 }
 pair = ((a, b)) { a }
-Handle {}
+Handle = Opaque
 div = (a: Int, h: Handle) {
-   a |> {
-    0 -> fail.raise("zero")
-    1 -> fail.raise(a)
-    2 -> fail.raise(Nil)
-    _ -> a
-  }
+	a |>
+		(0) { fail.raise("zero") }
+		| (1) { fail.raise(a) }
+		| (2) { fail.raise(Nil) }
+		| (_) { a }
 }
 "#;
 
@@ -101,8 +96,8 @@ fn codegen_data() {
     assert_eq!(fields[0].0.index, 0);
     assert_eq!(by_text(&typed.access, m, "t.1"), &Access::Part(1));
     // The argument that goes to each parameter.
-    assert_eq!(by_text(&typed.args, m, "minus(b: 1, a: 2)"), &vec![1, 0]);
-    assert_eq!(by_text(&typed.args, m, "5 |> minus(b: 1)"), &vec![0, 1]);
+    assert_eq!(by_text(&typed.args, m, "minus(b = 1, a = 2)"), &vec![1, 0]);
+    assert_eq!(by_text(&typed.args, m, "5 |> minus(b = 1)"), &vec![0, 1]);
     assert_eq!(by_text(&typed.args, m, "minus(1, 2)"), &vec![0, 1]);
     // Whole-head tests have All values (types-joint §2.2).
     let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
@@ -121,15 +116,23 @@ fn codegen_data() {
         ]
     );
     assert_eq!(
-        by_text(&typed.type_tests, m, "_: { (Int, Int) }"),
+        by_text(&typed.type_tests, m, "_: (Int, Int)"),
         &vec![TestMember {
             head: Head::Tuple(2),
             values: TestValues::All
         }]
     );
     // Services, through an alias.
-    let clock = *by_text(&typed.services, m, "c");
-    assert_eq!(by_text(&typed.services, m, "! Clock = c"), &clock);
+    // The service pattern `c: Watch` and the provided `(c)` both name Clock.
+    let services: Vec<TypeRef> = typed
+        .services
+        .iter()
+        .filter(|((mm, s), _)| *mm == m && &SOURCE[s.start as usize..s.end as usize] == "c")
+        .map(|(_, v)| *v)
+        .collect();
+    assert_eq!(services.len(), 2);
+    let clock = services[0];
+    assert_eq!(services[1], clock);
     assert!(matches!(clock, TypeRef::Custom(_)));
     // Generalized top-level bindings.
     let generalized: Vec<bool> = {
@@ -154,13 +157,13 @@ fn codegen_data() {
     // has a label, so the parts go by label: `name` is field 1 and `lives`
     // field 0.
     assert_eq!(
-        by_text(&typed.pattern_fields, m, "Cat(name, l = lives)"),
+        by_text(&typed.pattern_fields, m, "Cat(name = name, lives = l)"),
         &vec![1, 0]
     );
     // Which patterns of bindings and parameters may fail (§7.3).
     assert_eq!(by_text(&typed.may_fail, m, "Ok(v)"), &true);
     assert_eq!(by_text(&typed.may_fail, m, "(a, b)"), &false);
-    assert_eq!(by_text(&typed.may_fail, m, "Cat(name, l = lives)"), &false);
+    assert_eq!(by_text(&typed.may_fail, m, "Cat(name = name, lives = l)"), &false);
     // A host export, with its errors in the canonical order (B.2).
     let sigs: Vec<(&DefId, &HostSignature)> = typed.host_exports.iter().collect();
     assert_eq!(sigs.len(), 1);

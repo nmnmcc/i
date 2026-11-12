@@ -63,8 +63,9 @@ fn declared_external_variables_are_general_in_library_declarations() {
         .sources
         .get(source)
         .text
-        .replace("inspect: (a) -> String", "inspect(A): (A) -> String");
-    assert!(text.contains("inspect(A)"));
+        .clone();
+    // The library already declares `inspect: <A>(A) -> String` (§2.16).
+    assert!(text.contains("inspect: <A>(A) -> String"));
     graph.sources.set_text(source, text);
     let c = ilang_check::check(&graph);
     common::expect_unused(&c.diags, &["f"]);
@@ -170,17 +171,18 @@ fn kept_form_messages_are_independent_checks() {
     // expected output defines them.
     for (src, code, message) in [
         ("f = <A>(x: A(Int)) { x }", "E0230", "takes no arguments"),
-        ("f = <A, A>(x: A) { x }", "E0226", "declared more than once"),
-        ("f = <Int>(x: Int) { x }", "E0231", "name of a type"),
+        ("f = <A, A>() { 1 }", "E0226", "declared more than once"),
+        ("f = <Int>() { 1 }", "E0231", "name of a type"),
         ("f = <A>(x: a) { x }", "E0201", "not defined"),
         (
             "f = (x: Missing) { x }",
             "E0202",
             "declare it after the name",
         ),
-        ("T = { (Missing) }", "E0202", "declare it in the head"),
-        ("Box(Int) = { (Int) }", "E0231", "name of a type"),
-        ("Box(a, B) = ()", "E0232", "an `UpName`"),
+        ("T = (Missing)", "E0202", "declare it in the head"),
+        ("Box(Int) = (Int)", "E0231", "name of a type"),
+        // Syntax three checks the head by its kind (§3.2): E0101, not E0232.
+        ("Box(a, B) = ()", "E0101", "only type parameters"),
         ("Schema(Int) = Int", "E0231", "name of a type"),
         ("f = (x: p.name) { x }", "E0201", "not defined"),
         ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),
@@ -190,7 +192,8 @@ fn kept_form_messages_are_independent_checks() {
             "kept for macros",
         ),
         ("@a.main\nf = () { Nil }", "E0301", "kept for macros"),
-        ("f(A): (A) -> String", "E0308", "kept for macros"),
+        // Syntax three removed the head with type parameters (§3.2).
+        ("f(A): (A) -> String", "E0101", "written on the function"),
     ] {
         let (g, _, diags) = common::check_files(&[("src/main.i", src)]);
         assert!(
