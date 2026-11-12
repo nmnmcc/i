@@ -3,7 +3,7 @@
 //! A datum carries its source span even when nested. The following layer maps
 //! the datum to the core AST in a specific syntactic position.
 
-use crate::lexer::{DocComment, lex_lisp};
+use crate::lexer::DocComment;
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
@@ -232,7 +232,7 @@ pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
 /// Read all datums with the rows before syntax three (the migrator).
 #[cfg(feature = "legacy")]
 pub fn parse_legacy(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    parse_lexed(lex_lisp(source))
+    parse_lexed(crate::lexer::lex_lisp(source))
 }
 
 /// Read all datums of a syntax-three Lisp file, where `<-` is one symbol.
