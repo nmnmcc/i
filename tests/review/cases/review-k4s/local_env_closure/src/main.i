@@ -4,7 +4,7 @@ Dep { Dep(value: Int) }
 get = (d ! Dep) { d.value }
 make = (n: Int) {
  () {
-   ! Dep = Dep(n)
+   ! Dep = Dep(value: n)
    ! S(Dep) = S(() { get() Nil }, (_: Dep) { Nil })
    use()
  }

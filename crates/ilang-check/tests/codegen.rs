@@ -24,8 +24,8 @@ Watch = Clock
 name = (p: Cat | Dog) { p.name }
 second = (t: (Int, String)) { t.1 }
 minus = (a: Int, b: Int) { a - b }
-by_label = minus(b: 1, a: 2)
-piped = 5 |> minus(b: 1)
+by_label = Cat(name: "a", lives: 9)
+piped = 5 |> minus(1)
 tests = (x) {
    x |> {
     _: Int | String -> 1
@@ -101,8 +101,11 @@ fn codegen_data() {
     assert_eq!(fields[0].0.index, 0);
     assert_eq!(by_text(&typed.access, m, "t.1"), &Access::Part(1));
     // The argument that goes to each parameter.
-    assert_eq!(by_text(&typed.args, m, "minus(b: 1, a: 2)"), &vec![1, 0]);
-    assert_eq!(by_text(&typed.args, m, "5 |> minus(b: 1)"), &vec![0, 1]);
+    assert_eq!(
+        by_text(&typed.args, m, "Cat(name: \"a\", lives: 9)"),
+        &vec![1, 0]
+    );
+    assert_eq!(by_text(&typed.args, m, "5 |> minus(1)"), &vec![0, 1]);
     assert_eq!(by_text(&typed.args, m, "minus(1, 2)"), &vec![0, 1]);
     // Whole-head tests have All values (types-joint §2.2).
     let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
@@ -142,12 +145,12 @@ fn codegen_data() {
         v.sort();
         v.into_iter().map(|x| x.1).collect()
     };
-    // name, second, minus, by_label, piped, tests, env, mono, age, first,
-    // pair, div
+    // name, second, minus, by_label (a constructor call, so a direct
+    // value), piped, tests, env, mono, age, first, pair, div
     assert_eq!(
         generalized,
         vec![
-            true, true, true, false, false, true, true, false, true, true, true, true
+            true, true, true, true, false, true, true, false, true, true, true, true
         ]
     );
     // The field of each part of a constructor pattern (§7.1): every field

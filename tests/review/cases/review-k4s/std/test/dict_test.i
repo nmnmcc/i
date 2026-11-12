@@ -878,33 +878,33 @@ run_many_random_tests = (
 
 test("random_operations_small_test", () {
 	run_many_random_tests(
-		count:        100
-		ops_per_test: 50
-		key_space:    32
-		initial:      dict.new()
+		100
+		50
+		32
+		dict.new()
 	)
 })
 
 test("random_operations_medium_test", () {
 	run_many_random_tests(
-		count:        100
-		ops_per_test: 50
-		key_space:    200
-		initial:      range_dict(50)
+		100
+		50
+		200
+		range_dict(50)
 	)
 })
 
 test("random_operations_large_test", () {
 	run_many_random_tests(
-		count:        3
-		ops_per_test: 300
-		key_space:    600
-		initial:      range_dict(300)
+		3
+		300
+		600
+		range_dict(300)
 	)
 })
 
 range_dict = (size) {
-	int.range(from: size, to: 0, with: [], run: list.prepend)
+	int.range(size, 0, [], list.prepend)
 		|> list.map((x) { (x, x) })
 		|> dict.from_list
 }
@@ -1026,16 +1026,16 @@ Point {
 
 test("any_key_type_test", () {
 	d = dict.new()
-		|> dict.insert(Point(1, 2), "a")
+		|> dict.insert(Point(x: 1, y: 2), "a")
 		|> dict.insert((1, [2, 3]), "b")
 		|> dict.insert(<<1, 2>>, "c")
 		|> dict.insert(1.5, "d")
 	assert(dict.size(d) == 4)
-	assert(dict.get(d, Point(1, 2)) == Some("a"))
+	assert(dict.get(d, Point(x: 1, y: 2)) == Some("a"))
 	assert(dict.get(d, (1, [2, 3])) == Some("b"))
 	assert(dict.get(d, <<1, 2>>) == Some("c"))
 	assert(dict.get(d, 1.5) == Some("d"))
-	assert(dict.get(d, Point(2, 1)) == None)
+	assert(dict.get(d, Point(x: 2, y: 1)) == None)
 })
 
 test("zero_keys_test", () {

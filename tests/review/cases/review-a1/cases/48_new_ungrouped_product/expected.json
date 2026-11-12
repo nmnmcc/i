@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "1a50e986cb1f31f49dc7e75ab29000630177bc8a",
+  "binary_sha256": "2ead0f6a40ce8fc9ee2fab4128896e365d86565c447bdb05d449220beb933a18",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:21: error[E0111]: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`\n1 error\n"
+      "stderr": "src/main.i:2:21: error[E0111]: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`\n1 error\n"
     }
   }
 }

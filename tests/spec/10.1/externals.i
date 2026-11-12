@@ -7,10 +7,10 @@
 
 // External functions that the host gives (`ilang_host::services::testing`).
 @external("test:math/v1", "add")
-add: (a: Int, b: Int) -> Int
+add: (Int, Int) -> Int
 
 @external("test:math/v1", "hypot")
-hypot: (a: Float, b: Float) -> Float
+hypot: (Float, Float) -> Float
 
 // A top-level value may call an external function: imports may be called
 // while the values are worked out (B.1).
@@ -42,5 +42,5 @@ test("calls_are_made_as_written", () {
 test("an_external_function_is_a_value", () {
 	check(core.inspect(apply(add, 1, 2)), "3")
 	f = add
-	check(core.inspect(f(b: 1, a: 2)), "3")
+	check(core.inspect(f(2, 1)), "3")
 })

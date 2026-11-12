@@ -61,7 +61,7 @@ subject = (v: T) {
 both = (r: Result(T, T)) {
 	r |> {
 		Ok(x = A(..)) | Error(x = A(..)) -> A(..x, f: x.f + 1)
-		_                                -> B("b")
+		_                                -> B(g: "b")
 	}
 }
 

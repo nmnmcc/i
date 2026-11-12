@@ -39,11 +39,11 @@ CsvError {
 }
 
 /// Comma delimiter, infer row width, LF output.
-defaults = () -> Options { Options(44, 0, False) }
+defaults = () -> Options { Options(delimiter: 44, fields: 0, crlf: False) }
 
 /// A single scalar delimiter, expected width (0 infer, negative variable),
 /// and output line ending. Quotes, NUL, CR, LF, U+FFFD are invalid delimiters.
-/// `csv.options(delimiter: ";", fields: -1, crlf: True)`.
+/// `csv.options(";", -1, True)`.
 options = (
 	delimiter: String
 	fields: Int
@@ -53,11 +53,15 @@ options = (
 		[c] -> {
 			n = core.codepoint_to_int(c)
 			{ n == 0 || n == 34 || n == 10 || n == 13 || n == 65533 } |> {
-				True  -> Error(CsvError(1, 1, "invalid delimiter"))
-				False -> Ok(Options(n, fields, crlf))
+				True -> Error(
+					CsvError(line: 1, column: 1, reason: "invalid delimiter")
+				)
+				False -> Ok(Options(delimiter: n, fields: fields, crlf: crlf))
 			}
 		}
-		_ -> Error(CsvError(1, 1, "delimiter must be one scalar"))
+		_ -> Error(
+			CsvError(line: 1, column: 1, reason: "delimiter must be one scalar")
+		)
 	}
 }
 
@@ -142,7 +146,13 @@ read_row(E, N) = (
 	(c, tail) = next(cursor)
 	c |> {
 		None -> mode |> {
-			2 -> Error(CsvError(line, column, "unterminated quoted field"))
+			2 -> Error(
+				CsvError(
+					line:   line
+					column: column
+					reason: "unterminated quoted field"
+				)
+			)
 			_ -> started |> {
 				False -> Ok((None, tail))
 				True -> Ok((
@@ -228,14 +238,20 @@ read_row(E, N) = (
 								True
 								startline
 							)
-							_ -> Error(CsvError(line, column, "bare quote"))
+							_ -> Error(
+								CsvError(
+									line:   line
+									column: column
+									reason: "bare quote"
+								)
+							)
 						}
 						_ -> mode |> {
 							3 -> Error(
 								CsvError(
-									line
-									column
-									"data after closing quote"
+									line:   line
+									column: column
+									reason: "data after closing quote"
 								)
 							)
 							_ -> read_row(
@@ -273,7 +289,13 @@ row_stream(E, N) = (
 				}
 				{ expected > 0 && n != expected } |> {
 					True -> stream.Next(
-						Error(CsvError(startline, 1, "wrong number of fields"))
+						Error(
+							CsvError(
+								line:   startline
+								column: 1
+								reason: "wrong number of fields"
+							)
+						)
 						stream.new()
 					)
 					False -> stream.Next(
@@ -324,8 +346,10 @@ parse_with = (
 
 header = (names: List(String), line: Int) -> Result(List(String), CsvError) {
 	{ list.length(list.unique(names)) == list.length(names) } |> {
-		True  -> Ok(names)
-		False -> Error(CsvError(line, 1, "duplicate header"))
+		True -> Ok(names)
+		False -> Error(
+			CsvError(line: line, column: 1, reason: "duplicate header")
+		)
 	}
 }
 
@@ -335,7 +359,13 @@ named = (
 	line: Int
 ) -> Result(dict.Dict(String, String), CsvError) {
 	{ list.length(names) != list.length(row) } |> {
-		True  -> Error(CsvError(line, 1, "header width differs from row"))
+		True -> Error(
+			CsvError(
+				line:   line
+				column: 1
+				reason: "header width differs from row"
+			)
+		)
 		False -> Ok(dict.from_list(list.zip(names, row)))
 	}
 }

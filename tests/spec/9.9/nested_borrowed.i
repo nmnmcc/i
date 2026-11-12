@@ -10,7 +10,7 @@
 
 @host("test:async/v1", "request")
 Later {
-	Later(echo: (text: String) -> Request(String))
+	Later(echo: (String) -> Request(String))
 }
 
 

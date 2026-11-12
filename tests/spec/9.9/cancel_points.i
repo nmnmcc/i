@@ -17,7 +17,7 @@
 
 @host("test:io/v1")
 Out {
-	Out(print: (text: String) -> Nil)
+	Out(print: (String) -> Nil)
 }
 
 print = (text: String, out ! Out) { out.print(text) }

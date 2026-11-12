@@ -18,7 +18,7 @@ handle(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! First | N - First {
 wrapper = (p) { handle(() { p.send() }) }
 
 main = () {
-	! First = First(() { Nil })
-	! Second = Second(() { Nil })
+	! First = First(run: () { Nil })
+	! Second = Second(run: () { Nil })
 	wrapper((send: () { operation() }))
 }

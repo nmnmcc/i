@@ -32,24 +32,24 @@ dep3i = (d ! Dep) { use() + d.v }
 spec = () -> Int ! Dep | S(Dep) { use() }
 half(N) = () -> Int ! N | S(Dep) { use() }
 wrap(N) = (body: () -> Int ! N | S(N)) -> Int ! N {
-  ! S(N) = S(() { 1 })
+  ! S(N) = S(f: () { 1 })
   body()
 }
 wrapi = (body) {
-  ! S(Never) = S(() { 1 })
+  ! S(Never) = S(f: () { 1 })
   body()
 }
 wrapj = (body) {
-  ! S(_) = S(() { 1 })
+  ! S(_) = S(f: () { 1 })
   body()
 }
 
 main = (io ! Io) {
   a = wrap(() { use() })
-  ! Dep = Dep(3)
+  ! Dep = Dep(v: 3)
   b = wrap(() { use() + get() })
   c = wrapi(() { use() + get() })
-  ! S(Dep) = S(() { get() - 1 })
+  ! S(Dep) = S(f: () { get() - 1 })
   d = fw2() + fw2i() - outer() - outeri() + dep3() - dep3i() + spec() - half()
   io.print(tell(a))
   io.print(tell(b))

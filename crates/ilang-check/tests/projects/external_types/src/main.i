@@ -13,7 +13,7 @@ Wrap {
 ok1: (Int, Float, String, BitArray, Nil, Bool) -> Nil
 
 @external("a", "ok2")
-ok2: (h: H, n: Id(Int)) -> Id(Handle)
+ok2: (H, Id(Int)) -> Id(Handle)
 
 // Not a function type.
 @external("a", "f5")

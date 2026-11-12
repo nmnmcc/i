@@ -1,6 +1,6 @@
 (i/task, i/request, i/resource)
 @host("test:async/v1", "request")
-Later { Later(echo: (text: String) -> Request(String)) }
+Later { Later(echo: (String) -> Request(String)) }
 cycle = (n: Int, later ! Later) {
  { n == 0 } |> { True -> Nil
  False -> {

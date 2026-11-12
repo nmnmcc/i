@@ -9,6 +9,6 @@ pair = ("b", () {
 
 
 main = () {
-	! Assert = Assert((_) { panic("caught group tuple") })
+	! Assert = Assert(fail: (_) { panic("caught group tuple") })
 	pair.1()
 }
