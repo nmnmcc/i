@@ -276,7 +276,7 @@ fn many_points(n: usize) -> String {
     for i in 1..=n {
         let p = i - 1;
         s.push_str(&format!(
-            "  a{i} = {{ a{p} % 3 }} |> {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
+            "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} | (_) {{ a{p} + 2 }}\n"
         ));
     }
     s.push_str(&format!(
@@ -311,8 +311,8 @@ fn segments_grow_linearly() {
 fn opaque_decoders_keep_the_declared_type_on_both_targets() {
     let source = r#"
 (A, B, same, repeated, different, same_a, echo)
-A {}
-B {}
+A = Opaque
+B = Opaque
 Alias = A
 @external("opaque", "get")
 get_a: () -> A
