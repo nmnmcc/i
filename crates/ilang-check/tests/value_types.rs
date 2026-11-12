@@ -32,7 +32,7 @@ fn alias(c: &Checked, name: &str) -> String {
         .iter()
         .enumerate()
         // The library has types of these names too (`i/syntax.Item`).
-        .find(|(_, t)| t.name == name && p.module(t.module).path == "app/main")
+        .find(|(_, t)| t.name == name && p.module(t.module).package != p.module(p.prelude.unwrap()).package)
         .unwrap();
     c.types.as_ref().unwrap().alias_types[&TypeId(i as u32)].text(&types::type_names(p, t.module))
 }

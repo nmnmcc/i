@@ -24,6 +24,7 @@
 	Transport(..)
 	ResponseStream(..)
 	ClientFunctions(..)
+	BodyReader(..)
 	native_client
 	fetch_client
 	send_stream
@@ -950,7 +951,7 @@ lowercase = (s: String) -> String {
 /// Buffered request handler, built on the incremental body reader.
 serve = (listener, handler) {
 	serve_stream(listener, (req: Request, reader) {
-		body = collect_body(reader, [])
+		body = collect_body((read: reader.read), [])
 		handler(Request(..req, body: body, trailers: reader.trailers()))
 	})
 }
@@ -1004,7 +1005,7 @@ connection_loop = (stream, handler, buffer) {
 							Headers([])
 						)
 					)
-					reader = (
+					reader = BodyReader(
 						read: (max: Int) {
 							read_request_piece(stream, cursor, max)
 						}
@@ -1247,6 +1248,13 @@ ResponseStream {
 		) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
 		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
 	)
+}
+
+/// The body of a request that a handler reads (a custom type: records whose
+/// function fields give a large error union do not check, see
+/// docs/design/syn3-stage3-report.md).
+BodyReader(E, N, M) {
+	BodyReader(read: (max: Int) -> BitArray ^ E ! N, trailers: () -> Headers ! M)
 }
 
 ClientFunctions {
