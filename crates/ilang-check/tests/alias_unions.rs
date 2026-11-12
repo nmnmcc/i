@@ -1,0 +1,81 @@
+//! Unions of one-constructor nominal types joined by an alias: checking
+//! scales with the number of members, and a shown union that is exactly an
+//! alias's expansion is shown by the alias's name.
+mod common;
+
+use std::time::{Duration, Instant};
+
+/// The types shown for `app/main` by `--types`.
+fn lines(source: &str) -> Vec<String> {
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::query::check_for_queries(&graph);
+    let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors.is_empty(),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let program = checked.program.unwrap();
+    let types = checked.types.unwrap();
+    types.lines(&program, common::module(&program, "app/main"))
+}
+
+/// `n` members: `C0`, and `Ci(A) { Ci(A, E(A)) }` for each other `i`,
+/// joined as `E(A)`, with an unannotated recursive match over all of them.
+fn nominal_union(n: usize) -> String {
+    let mut out = vec!["C0 { C0 }".to_string()];
+    for i in 1..n {
+        out.push(format!("C{i}(A) {{ C{i}(A, E(A)) }}"));
+    }
+    let members: Vec<String> = std::iter::once("C0".to_string())
+        .chain((1..n).map(|i| format!("C{i}(A)")))
+        .collect();
+    out.push(format!("E(A) = {}", members.join(" | ")));
+    let clauses: Vec<String> = (1..n)
+        .map(|i| format!("\t\tC{i}(a, r) -> a + f0(r)"))
+        .collect();
+    out.push(format!(
+        "f0 = (e) {{\n\te |> {{\n\t\tC0 -> 0\n{}\n\t}}\n}}",
+        clauses.join("\n")
+    ));
+    out.push("main = () { f0(C1(1, C0)) }".to_string());
+    out.join("\n") + "\n"
+}
+
+#[test]
+fn nominal_union_recursive_match_scales() {
+    // Checking was exponential in the number of members: 9 members took
+    // over a minute with optimizations. The work is now polynomial; an
+    // unoptimized build needs some seconds at 22 members.
+    let bound = Duration::from_secs(if cfg!(debug_assertions) { 60 } else { 5 });
+    for n in [8, 12, 16, 22] {
+        let source = nominal_union(n);
+        let start = Instant::now();
+        let lines = lines(&source);
+        let took = start.elapsed();
+        eprintln!("{n} members: {took:?}");
+        assert!(took < bound, "{n} members took {took:?}");
+        assert!(
+            lines.contains(&"app/main.f0 : (e: E(Int)) -> Int".to_string()),
+            "{n} members: {lines:?}"
+        );
+    }
+}
+
+#[test]
+fn union_is_displayed_by_its_declared_name() {
+    let source = "Some(A) { Some(A) }
+None { None }
+Option(A) = Some(A) | None
+first = (xs: List(Option(Int))) -> Int { xs |> { [Some(x), ..r] -> x  _ -> 0 } }
+pick = (b: Bool) { b |> { True -> Some(1)  False -> None } }
+main = () { first([pick(True)]) }
+";
+    let lines = lines(source);
+    for expected in [
+        "app/main.first : (xs: List(Option(Int))) -> Int",
+        "app/main.pick : (b: Bool) -> Option(1)",
+    ] {
+        assert!(lines.contains(&expected.to_string()), "{lines:?}");
+    }
+}

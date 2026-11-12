@@ -33,6 +33,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+mod features;
+
 /// How the server works.
 #[derive(Clone, Debug)]
 pub struct Options {
@@ -74,10 +76,41 @@ pub fn capabilities() -> lsp::ServerCapabilities {
         ),
         hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
         definition_provider: Some(lsp::OneOf::Left(true)),
+        type_definition_provider: Some(lsp::TypeDefinitionProviderCapability::Simple(true)),
+        implementation_provider: Some(lsp::ImplementationProviderCapability::Simple(true)),
+        references_provider: Some(lsp::OneOf::Left(true)),
+        rename_provider: Some(lsp::OneOf::Right(lsp::RenameOptions {
+            prepare_provider: Some(true),
+            work_done_progress_options: Default::default(),
+        })),
+        document_highlight_provider: Some(lsp::OneOf::Left(true)),
         document_symbol_provider: Some(lsp::OneOf::Left(true)),
+        workspace_symbol_provider: Some(lsp::OneOf::Left(true)),
         completion_provider: Some(lsp::CompletionOptions {
             trigger_characters: Some(vec![".".to_string()]),
+            resolve_provider: Some(true),
             ..Default::default()
+        }),
+        signature_help_provider: Some(lsp::SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+            retrigger_characters: Some(vec![" ".to_string()]),
+            work_done_progress_options: Default::default(),
+        }),
+        code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
+            lsp::CodeActionOptions {
+                code_action_kinds: Some(vec![
+                    lsp::CodeActionKind::QUICKFIX,
+                    lsp::CodeActionKind::REFACTOR_REWRITE,
+                ]),
+                ..Default::default()
+            },
+        )),
+        inlay_hint_provider: Some(lsp::OneOf::Left(true)),
+        folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(true)),
+        selection_range_provider: Some(lsp::SelectionRangeProviderCapability::Simple(true)),
+        document_link_provider: Some(lsp::DocumentLinkOptions {
+            resolve_provider: Some(false),
+            work_done_progress_options: Default::default(),
         }),
         document_formatting_provider: format::formatter().map(|_| lsp::OneOf::Left(true)),
         ..Default::default()
@@ -554,12 +587,11 @@ impl<'c> Server<'c> {
             let items = analysis.and_then(|b| {
                 let q = b.query()?;
                 let module = q.module_of_source(b.source_of(&patch.path)?)?;
-                Some(q.completions_at(module, patch.offset))
+                let items = q.completions_at(module, patch.offset);
+                let uri = self.uri_of(&patch.path)?;
+                Some(features::completion_items(&uri, &patch.text, items))
             });
-            self.send(Message::Response(ok(
-                patch.request,
-                items.map(completion_response),
-            )));
+            self.send(Message::Response(ok(patch.request, items)));
             return;
         }
         let root = job.root;
@@ -578,7 +610,18 @@ impl<'c> Server<'c> {
                 self.analyses.insert(root, a);
             }
             None => {
+                // The problems of a check that failed are not known: clear
+                // the problems of the last one.
                 self.analyses.remove(&root);
+                for uri in self.published.remove(&root).unwrap_or_default() {
+                    self.notify::<lsp::notification::PublishDiagnostics>(
+                        lsp::PublishDiagnosticsParams {
+                            uri,
+                            diagnostics: Vec::new(),
+                            version: None,
+                        },
+                    );
+                }
             }
         }
         // The requests that wait for the package.
@@ -609,41 +652,15 @@ impl<'c> Server<'c> {
             {
                 continue;
             }
-            let (path, range) = match d.source.and_then(|s| a.paths.get(&s).map(|p| (s, p))) {
-                Some((s, p)) => (p.clone(), LineIndex::new(a.text(s)).range(d.span)),
-                None => (root.join("i.toml"), lsp::Range::default()),
+            let path = match d.source.and_then(|s| a.paths.get(&s)) {
+                Some(p) => p.clone(),
+                None => root.join("i.toml"),
             };
             if !seen.insert((path.clone(), d.span, d.code, d.message.clone())) {
                 continue;
             }
-            by_file.entry(path).or_default().push(lsp::Diagnostic {
-                range,
-                severity: Some(match d.severity {
-                    Severity::Error => lsp::DiagnosticSeverity::ERROR,
-                    Severity::Warning => lsp::DiagnosticSeverity::WARNING,
-                    Severity::Note => lsp::DiagnosticSeverity::INFORMATION,
-                }),
-                code: Some(lsp::NumberOrString::String(d.code.to_string())),
-                source: Some("i".to_string()),
-                message: d.message.clone(),
-                related_information: (!d.related.is_empty()).then(|| {
-                    d.related
-                        .iter()
-                        .filter_map(|note| {
-                            let path = a.paths.get(&note.source)?;
-                            let uri = self.uri_of(path)?;
-                            Some(lsp::DiagnosticRelatedInformation {
-                                location: lsp::Location {
-                                    uri,
-                                    range: LineIndex::new(a.text(note.source)).range(note.span),
-                                },
-                                message: note.message.clone(),
-                            })
-                        })
-                        .collect()
-                }),
-                ..Default::default()
-            });
+            let diagnostic = self.lsp_diagnostic(a, d);
+            by_file.entry(path).or_default().push(diagnostic);
         }
         let mut now = Vec::new();
         for (path, mut diags) in by_file {
@@ -686,7 +703,27 @@ impl<'c> Server<'c> {
     // ---- Requests ----
 
     fn request(&mut self, req: Request) {
-        use lsp::request::{Formatting, Request as _, SemanticTokensFullRequest};
+        use lsp::request::{
+            Formatting, Request as _, ResolveCompletionItem, SemanticTokensFullRequest,
+            WorkspaceSymbolRequest,
+        };
+        if req.method == WorkspaceSymbolRequest::METHOD {
+            let id = req.id.clone();
+            let response =
+                match req.extract::<lsp::WorkspaceSymbolParams>(WorkspaceSymbolRequest::METHOD) {
+                    Ok((id, p)) => Response::new_ok(id, self.workspace_symbols(p)),
+                    Err(e) => error(id, ErrorCode::InvalidParams, e.to_string()),
+                };
+            return self.send(Message::Response(response));
+        }
+        if req.method == ResolveCompletionItem::METHOD {
+            let id = req.id.clone();
+            let response = match req.extract::<lsp::CompletionItem>(ResolveCompletionItem::METHOD) {
+                Ok((id, item)) => Response::new_ok(id, self.resolve_completion(item)),
+                Err(e) => error(id, ErrorCode::InvalidParams, e.to_string()),
+            };
+            return self.send(Message::Response(response));
+        }
         if req.method == SemanticTokensFullRequest::METHOD {
             let id = req.id.clone();
             let response =
@@ -724,6 +761,38 @@ impl<'c> Server<'c> {
             Completion::METHOD => params(&req, |p: lsp::CompletionParams| {
                 self.completion(&id, p.text_document_position)
             }),
+            References::METHOD => params(&req, |p: lsp::ReferenceParams| self.references(p)),
+            DocumentHighlightRequest::METHOD => {
+                params(&req, |p: lsp::DocumentHighlightParams| self.highlights(p))
+            }
+            PrepareRenameRequest::METHOD => {
+                answer_params(&req, |p: lsp::TextDocumentPositionParams| {
+                    self.prepare_rename(p)
+                })
+            }
+            Rename::METHOD => answer_params(&req, |p: lsp::RenameParams| self.rename(p)),
+            GotoTypeDefinition::METHOD => params(&req, |p: lsp::GotoDefinitionParams| {
+                self.type_definition(p.text_document_position_params, false)
+            }),
+            GotoImplementation::METHOD => params(&req, |p: lsp::GotoDefinitionParams| {
+                self.type_definition(p.text_document_position_params, true)
+            }),
+            SignatureHelpRequest::METHOD => {
+                params(&req, |p: lsp::SignatureHelpParams| self.signature_help(p))
+            }
+            CodeActionRequest::METHOD => {
+                params(&req, |p: lsp::CodeActionParams| self.code_actions(p))
+            }
+            InlayHintRequest::METHOD => params(&req, |p: lsp::InlayHintParams| self.inlay_hints(p)),
+            FoldingRangeRequest::METHOD => {
+                params(&req, |p: lsp::FoldingRangeParams| self.folding_ranges(p))
+            }
+            SelectionRangeRequest::METHOD => params(&req, |p: lsp::SelectionRangeParams| {
+                self.selection_ranges(p)
+            }),
+            DocumentLinkRequest::METHOD => {
+                params(&req, |p: lsp::DocumentLinkParams| self.document_links(p))
+            }
             _ => Ok(Err(error(
                 id.clone(),
                 ErrorCode::MethodNotFound,
@@ -734,6 +803,26 @@ impl<'c> Server<'c> {
             Ok(Ok(value)) => Response::new_ok(id, value),
             Ok(Err(response)) => response,
             Err(Later::Wait(root)) => {
+                // A request of the same kind for the same document that
+                // still waits is superseded by this one (§ LSP
+                // `ContentModified`).
+                let doc = req.params["textDocument"]["uri"].clone();
+                let mut kept = Vec::new();
+                for (old, r) in std::mem::take(&mut self.waiting) {
+                    if old.method == req.method
+                        && !doc.is_null()
+                        && old.params["textDocument"]["uri"] == doc
+                    {
+                        self.send(Message::Response(error(
+                            old.id,
+                            ErrorCode::ContentModified,
+                            "superseded by a newer request".to_string(),
+                        )));
+                    } else {
+                        kept.push((old, r));
+                    }
+                }
+                self.waiting = kept;
                 self.waiting.push((req, root));
                 return;
             }
@@ -830,6 +919,10 @@ impl<'c> Server<'c> {
             value.push_str("\n\n");
             value.push_str(&doc);
         }
+        for note in h.notes {
+            value.push_str("\n\n");
+            value.push_str(&note);
+        }
         Ok(Some(lsp::Hover {
             contents: lsp::HoverContents::Markup(lsp::MarkupContent {
                 kind: lsp::MarkupKind::Markdown,
@@ -909,7 +1002,11 @@ impl<'c> Server<'c> {
             {
                 let items = q.member_completions_of(place.module, old);
                 if !items.is_empty() {
-                    return Ok(Some(completion_response(items)));
+                    return Ok(Some(features::completion_items(
+                        &p.text_document.uri,
+                        place.text,
+                        items,
+                    )));
                 }
             }
             // Else `v.` with nothing after the dot does not parse: check
@@ -933,8 +1030,11 @@ impl<'c> Server<'c> {
         let Some(q) = place.a.query() else {
             return Ok(None);
         };
-        Ok(Some(completion_response(
-            q.completions_at(place.module, offset),
+        let items = q.completions_at(place.module, offset);
+        Ok(Some(features::completion_items(
+            &p.text_document.uri,
+            place.text,
+            items,
         )))
     }
 
@@ -1050,18 +1150,23 @@ fn error(id: RequestId, code: ErrorCode, message: String) -> Response {
     Response::new_err(id, code as i32, message)
 }
 
-fn completion_response(items: Vec<query::Completion>) -> lsp::CompletionResponse {
-    lsp::CompletionResponse::Array(
-        items
-            .into_iter()
-            .map(|c| lsp::CompletionItem {
-                kind: Some(completion_kind(c.kind)),
-                detail: c.detail,
-                label: c.label,
-                ..Default::default()
-            })
-            .collect(),
-    )
+/// [`params`] for a request that may be refused with a message.
+fn answer_params<P: serde::de::DeserializeOwned, R: serde::Serialize>(
+    req: &Request,
+    f: impl FnOnce(P) -> features::Answer<R>,
+) -> Result<Result<serde_json::Value, Response>, Later> {
+    let mut refused = None;
+    let r = params(req, |p| match f(p)? {
+        Ok(r) => Ok(r),
+        Err(e) => {
+            refused = Some(e);
+            Ok(None)
+        }
+    })?;
+    if let Some((code, message)) = refused {
+        return Ok(Err(error(req.id.clone(), code, message)));
+    }
+    Ok(r)
 }
 
 fn completion_kind(k: CompletionKind) -> lsp::CompletionItemKind {
@@ -1082,12 +1187,7 @@ fn document_symbol(ix: &LineIndex, s: &query::Symbol) -> lsp::DocumentSymbol {
     lsp::DocumentSymbol {
         name: s.name.clone(),
         detail: s.detail.clone(),
-        kind: match s.kind {
-            SymbolKind::Function => lsp::SymbolKind::FUNCTION,
-            SymbolKind::Value => lsp::SymbolKind::CONSTANT,
-            SymbolKind::Type => lsp::SymbolKind::CLASS,
-            SymbolKind::Constructor => lsp::SymbolKind::CONSTRUCTOR,
-        },
+        kind: features::symbol_kind(s.kind),
         tags: None,
         deprecated: None,
         range: ix.range(s.span),

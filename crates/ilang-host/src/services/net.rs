@@ -9,12 +9,13 @@ use std::{
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream, UdpSocket},
     sync::Mutex,
 };
 
 const NS: &str = "i:net/v1";
 const LISTENER: &str = "net listener";
+const DATAGRAM: &str = "net datagram";
 const STREAM: &str = "net stream";
 struct Stream {
     read: Mutex<tokio::net::tcp::OwnedReadHalf>,
@@ -95,6 +96,7 @@ fn port(n: &crate::BigInt, zero: bool) -> Option<u16> {
     u16::try_from(n).ok().filter(|p| zero || *p != 0)
 }
 pub(super) fn register(imports: &mut HostImports) {
+    register_datagrams(imports);
     imports
         .context_async_service(NS, "listen", |ctx, args| {
             let [Value::String(address), Value::Int(n)] = args else {
@@ -329,7 +331,11 @@ pub(super) fn register(imports: &mut HostImports) {
             }
         })
         .expect(super::ONE);
-    for (name, kind) in [("close_stream", STREAM), ("close_listener", LISTENER)] {
+    for (name, kind) in [
+        ("close_stream", STREAM),
+        ("close_listener", LISTENER),
+        ("close_datagram", DATAGRAM),
+    ] {
         imports
             .context_async_service(NS, name, move |ctx, args| {
                 let [Value::Int(id)] = args else {
@@ -343,4 +349,146 @@ pub(super) fn register(imports: &mut HostImports) {
             })
             .expect(super::ONE);
     }
+}
+
+fn register_datagrams(imports: &mut HostImports) {
+    imports
+        .context_async_service(NS, "bind", |ctx, args| {
+            let [Value::String(address), Value::Int(n)] = args else {
+                panic!("net bind arguments")
+            };
+            let address = address.clone();
+            let n = port(n, true);
+            async move {
+                let Some(n) = n.filter(|_| !address.is_empty()) else {
+                    return Ok(Err(code("invalid")));
+                };
+                match UdpSocket::bind((address.as_str(), n)).await {
+                    Ok(socket) => insert(&ctx, DATAGRAM, socket),
+                    Err(e) => Ok(Err(error(e))),
+                }
+            }
+        })
+        .expect(super::ONE);
+    for name in ["local_address", "datagram_port"] {
+        imports
+            .context_async_service(NS, name, move |ctx, args| {
+                let [Value::Int(id)] = args else {
+                    panic!("net datagram address arguments")
+                };
+                let id = id.clone();
+                async move {
+                    let lease = match ctx.acquire::<UdpSocket>(&id, DATAGRAM, "address") {
+                        Ok(l) => l,
+                        Err(e) => return Ok(Err(resource_error(e))),
+                    };
+                    let result = lease
+                        .resource()
+                        .local_addr()
+                        .map(|a| {
+                            if name == "local_address" {
+                                Value::String(a.ip().to_string())
+                            } else {
+                                Value::Int(a.port().into())
+                            }
+                        })
+                        .map_err(error);
+                    Ok(lease
+                        .commit(result)
+                        .unwrap_or_else(|e| Err(resource_error(e))))
+                }
+            })
+            .expect(super::ONE);
+    }
+    imports
+        .context_async_service(NS, "send_to", |ctx, args| {
+            let [
+                Value::Int(id),
+                Value::String(address),
+                Value::Int(n),
+                Value::BitArray(bytes),
+            ] = args
+            else {
+                panic!("net send_to arguments")
+            };
+            let (id, address, n, bytes) =
+                (id.clone(), address.clone(), port(n, false), bytes.clone());
+            async move {
+                let Some(n) = n.filter(|_| !address.is_empty() && bytes.bit_length % 8 == 0) else {
+                    return Ok(Err(code("invalid")));
+                };
+                let lease = match ctx.acquire::<UdpSocket>(&id, DATAGRAM, "write") {
+                    Ok(l) => l,
+                    Err(e) => return Ok(Err(resource_error(e))),
+                };
+                let socket = Arc::clone(lease.resource());
+                let work = async move {
+                    let addresses = tokio::net::lookup_host((address.as_str(), n))
+                        .await
+                        .map_err(error)?;
+                    let mut last = code("invalid");
+                    for address in addresses {
+                        match socket.send_to(&bytes.bytes, address).await {
+                            Ok(n) => {
+                                assert_eq!(n, bytes.bytes.len(), "UDP send is atomic");
+                                return Ok(Value::Nil);
+                            }
+                            Err(e) => last = error(e),
+                        }
+                    }
+                    Err(last)
+                };
+                let result = match select(Box::pin(work), Box::pin(lease.closed())).await {
+                    Either::Left((r, _)) => r,
+                    Either::Right(_) => Err(code("closed")),
+                };
+                Ok(lease
+                    .commit(result)
+                    .unwrap_or_else(|e| Err(resource_error(e))))
+            }
+        })
+        .expect(super::ONE);
+    imports
+        .context_async_service(NS, "receive_from", |ctx, args| {
+            let [Value::Int(id), Value::Int(n)] = args else {
+                panic!("net receive_from arguments")
+            };
+            let (id, n) = (id.clone(), n.clone());
+            async move {
+                if n <= 0.into() {
+                    return Ok(Err(code("invalid")));
+                }
+                let n = if n > 65536.into() {
+                    65536
+                } else {
+                    usize::try_from(&n).expect("bounded datagram")
+                };
+                let lease = match ctx.acquire::<UdpSocket>(&id, DATAGRAM, "read") {
+                    Ok(l) => l,
+                    Err(e) => return Ok(Err(resource_error(e))),
+                };
+                let socket = Arc::clone(lease.resource());
+                let work = async move {
+                    let mut data = vec![0; n];
+                    let (n, sender) = socket.recv_from(&mut data).await.map_err(error)?;
+                    let address = sender.ip().to_string();
+                    let mut reply = sender.port().to_le_bytes().to_vec();
+                    reply.push(u8::try_from(address.len()).expect("numeric IP length"));
+                    reply.extend_from_slice(address.as_bytes());
+                    reply.extend_from_slice(&data[..n]);
+                    let length = reply.len() as u32 * 8;
+                    Ok(Value::BitArray(
+                        BitArray::new(reply, length).expect("whole datagram bytes"),
+                    ))
+                };
+                let result = match select(Box::pin(work), Box::pin(lease.closed())).await {
+                    Either::Left((r, _)) => r,
+                    Either::Right(_) => Err(code("closed")),
+                };
+                Ok(lease
+                    .commit(result)
+                    .unwrap_or_else(|e| Err(resource_error(e))))
+            }
+        })
+        .expect(super::ONE);
 }

@@ -1,9 +1,9 @@
 //! `i fmt [--check] [PATH…]`: formats source files with
 //! `ilang_syntax::format`.
 //!
-//! With no paths, every `.i` file under the `src/` and `test/` directories of
+//! With no paths, every `.i` and `.is` file under the `src/` and `test/` directories of
 //! the package is formatted. A path may be a file or a directory, which is
-//! searched for `.i` files. A file with syntax errors is left as it is, and
+//! searched for `.i` and `.is` files. A file with syntax errors is left as it is, and
 //! its errors are printed. With `--check`, no file is written; the files that
 //! would change are listed, and the exit code is 1 when there are any.
 
@@ -112,7 +112,7 @@ pub fn run(
     })
 }
 
-/// The `.i` files under `dir`, if it is there.
+/// The `.i` and `.is` files under `dir`, if it is there.
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> anyhow::Result<()> {
     if !dir.is_dir() {
         return Ok(());
@@ -147,7 +147,7 @@ fn convert_to_lisp(
             "the module cannot be represented in the other surface",
         )]);
     }
-    Ok((out, lost))
+    Ok((ilang_syntax::lisp::format(&out)?, lost))
 }
 
 fn convert_from_lisp(

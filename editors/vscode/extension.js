@@ -52,6 +52,8 @@ function createClient() {
       fileEvents: [
         vscode.workspace.createFileSystemWatcher("**/i.toml"),
         vscode.workspace.createFileSystemWatcher("**/*.i"),
+        // Lisp-surface modules: the server clears the problems of a deleted file.
+        vscode.workspace.createFileSystemWatcher("**/*.is"),
       ],
     },
     outputChannel,

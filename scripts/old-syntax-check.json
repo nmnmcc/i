@@ -2193,30 +2193,6 @@
     ],
     "reason": "Render Rust format string with a representative port."
   },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:d162de7b30d5d39d": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:04a3d99efcbda47b": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `?`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:eb648ea1f46a27c1": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:d29dbdfffc876b3c": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
   "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
@@ -2969,5 +2945,62 @@
   },
   "crates/ilang-cli/tests/providers.rs:94ebdef83b17a3a3": {
     "not_source": "TOML provider manifest or manifest template; i source is checked separately"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:3ba0d395ea48a08e": {
+    "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:e47b61baf95042a0": {
+    "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
+  },
+  "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
+    "not_source": "Rust format template with a clause placeholder, not a complete i source"
+  },
+  "crates/ilang-check/tests/query.rs:14b48e90364d1623": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/src/server/features.rs:d942f64886578d87": {
+    "not_source": "Code action fix tag, not i source"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d942f64886578d87": {
+    "not_source": "Code action fix tag, not i source"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d2ca964c413f21c8": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:40ccea3ebc617547": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:6108f6cf17bc9fe1": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:c9130ec0e015aa50": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:5d670fc264ba0466": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:274887ecbb44aa02": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:9fa8dccc56811613": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:1418cff66c7679a7": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:02f4d82a1d1b5450": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:2b1965c1b03ffba2": {
+    "reason": "Robustness test: broken input on purpose",
+    "diagnostics": [
+      "E0010: `{` is not closed",
+      "E0010: `(` is not closed",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0010: `{` is not closed",
+      "E0101: expected a closed `{`, found `{`",
+      "E0010: `(` is not closed",
+      "E0002: this string is not closed"
+    ]
   }
 }

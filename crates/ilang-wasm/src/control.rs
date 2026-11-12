@@ -221,7 +221,7 @@ fn mentioned(
                 mentioned(otherwise, set, goes_on);
             }
             Stmt::Block { body, .. } => mentioned(body, set, goes_on),
-            Stmt::Break(_) | Stmt::Unreachable => {}
+            Stmt::Break(_) | Stmt::Unreachable | Stmt::Logical(_) => {}
             Stmt::Return(a) | Stmt::SetGlobal(_, a) => atom_uses(a, &mut add),
             Stmt::TailCall {
                 callee, args, env, ..
@@ -245,7 +245,7 @@ fn mentioned(
 /// Whether each function may suspend: it calls a closure, an operation that
 /// may suspend, or a function that may suspend. Tail calls count here: the
 /// frame of the caller of such a function is on the stack when it suspends.
-fn may_suspend(p: &Program) -> Vec<bool> {
+pub(crate) fn may_suspend(p: &Program) -> Vec<bool> {
     let mut may: Vec<bool> = p
         .funcs
         .iter()
@@ -277,7 +277,7 @@ fn suspends(v: &Value, may: &[bool]) -> bool {
             ..
         } => true,
         Value::Call {
-            callee: Callee::Direct(f),
+            callee: Callee::Direct(f) | Callee::Known { func: f, .. },
             ..
         } => may[f.0 as usize],
         Value::Op(op, _) | Value::OpEnv(op, _, _) => op.suspends(),
@@ -293,7 +293,7 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
             ..
         } => true,
         Stmt::TailCall {
-            callee: Callee::Direct(f),
+            callee: Callee::Direct(f) | Callee::Known { func: f, .. },
             ..
         } => may[f.0 as usize],
         Stmt::If {
@@ -602,6 +602,7 @@ impl Liveness<'_> {
                     live.insert(l);
                 });
             }
+            Stmt::Logical(_) => {}
             Stmt::Unreachable => live = Live::new(),
             Stmt::SetCapture { closure, value, .. } => {
                 live.insert(*closure);
@@ -639,7 +640,7 @@ fn env_uses(e: Env, f: &mut dyn FnMut(Local)) {
 }
 
 fn call_uses(callee: &Callee, args: &[Atom], env: Env, f: &mut dyn FnMut(Local)) {
-    if let Callee::Value(a) = callee {
+    if let Callee::Value(a) | Callee::Known { closure: a, .. } = callee {
         atom_uses(a, f);
     }
     args.iter().for_each(|a| atom_uses(a, f));
@@ -662,7 +663,9 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
             args.iter().for_each(|a| atom_uses(a, f))
         }
         Value::Call { callee, args, env } => call_uses(callee, args, *env, f),
-        Value::Op(_, args) | Value::Tuple(args) => args.iter().for_each(|a| atom_uses(a, f)),
+        Value::Op(_, args) | Value::Finite(_, args) | Value::Tuple(args) => {
+            args.iter().for_each(|a| atom_uses(a, f))
+        }
         Value::OpEnv(_, args, env) => {
             args.iter().for_each(|a| atom_uses(a, f));
             env_uses(*env, f);
