@@ -2985,5 +2985,9 @@
   "crates/ilang-cli/tests/native.rs:b7dd204f0b7730c0": {
     "not_source": true,
     "reason": "Cargo.toml dependency text in a test, not an i module."
+  },
+  "crates/ilang-cli/build.rs:18f1e7e7ee554c11": {
+    "not_source": true,
+    "reason": "Cargo build-script directive, not an i module."
   }
 }
