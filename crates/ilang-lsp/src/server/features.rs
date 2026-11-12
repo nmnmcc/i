@@ -6,7 +6,7 @@
 //! waits for the next check otherwise.
 
 use super::*;
-use ilang_check::query::{Edit, Query, Reference};
+use ilang_check::query::{Edit, Reference};
 use ilang_syntax::span::Span;
 
 /// The answer of a request that may be refused with a message.
@@ -29,7 +29,12 @@ impl Server<'_> {
     }
 
     /// The LSP location of a span of a file of a check, as the file is now.
-    pub(super) fn location(&self, a: &Analysis, source: SourceId, span: Span) -> Result<Option<lsp::Location>, ()> {
+    pub(super) fn location(
+        &self,
+        a: &Analysis,
+        source: SourceId,
+        span: Span,
+    ) -> Result<Option<lsp::Location>, ()> {
         let Some(path) = a.paths.get(&source) else {
             return Ok(None);
         };
@@ -56,13 +61,18 @@ impl Server<'_> {
         Ok(out)
     }
 
+    // `lsp::WorkspaceEdit` keys its changes by `Uri`, which clippy takes
+    // for a mutable key.
+    #[allow(clippy::mutable_key_type)]
     fn workspace_edit(&self, place: &Place, edits: Vec<Edit>) -> Result<lsp::WorkspaceEdit, Later> {
         let mut changes: HashMap<lsp::Uri, Vec<lsp::TextEdit>> = HashMap::new();
         for e in edits {
             let Some(path) = place.a.paths.get(&e.source) else {
                 continue;
             };
-            let Some(uri) = self.uri_of(path) else { continue };
+            let Some(uri) = self.uri_of(path) else {
+                continue;
+            };
             let range = self
                 .range_now(place.a, e.source, e.span)
                 .ok_or_else(|| Later::Wait(place.root.clone()))?;
@@ -77,7 +87,10 @@ impl Server<'_> {
         })
     }
 
-    pub(super) fn references(&self, p: lsp::ReferenceParams) -> Result<Option<Vec<lsp::Location>>, Later> {
+    pub(super) fn references(
+        &self,
+        p: lsp::ReferenceParams,
+    ) -> Result<Option<Vec<lsp::Location>>, Later> {
         let pos = p.text_document_position;
         let Some(place) = self.place(&pos.text_document.uri)? else {
             return Ok(None);
@@ -85,7 +98,9 @@ impl Server<'_> {
         let Some(offset) = Self::old_offset(&place, pos.position) else {
             return place.later();
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let Some((owner, _, target)) = q.target_at_offset(place.module, offset) else {
             return Ok(None);
         };
@@ -97,7 +112,9 @@ impl Server<'_> {
             .into_iter()
             .filter(|r| p.context.include_declaration || !r.definition)
             .collect();
-        Ok(Some(self.locations(&place, refs.into_iter().map(|r| r.location))?))
+        Ok(Some(
+            self.locations(&place, refs.into_iter().map(|r| r.location))?,
+        ))
     }
 
     pub(super) fn highlights(
@@ -108,7 +125,9 @@ impl Server<'_> {
         let Some(place) = self.current(&pos.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let ix = LineIndex::new(place.text);
         let refs = q.highlights(place.module, Self::offset(&place, pos.position));
         Ok(Some(
@@ -126,16 +145,23 @@ impl Server<'_> {
         ))
     }
 
-    pub(super) fn prepare_rename(&self, p: lsp::TextDocumentPositionParams) -> Answer<lsp::PrepareRenameResponse> {
+    pub(super) fn prepare_rename(
+        &self,
+        p: lsp::TextDocumentPositionParams,
+    ) -> Answer<lsp::PrepareRenameResponse> {
         let Some(place) = self.current(&p.text_document.uri)? else {
             return Ok(Ok(None));
         };
-        let Some(q) = place.a.query() else { return Ok(Ok(None)) };
+        let Some(q) = place.a.query() else {
+            return Ok(Ok(None));
+        };
         match q.prepare_rename(place.module, Self::offset(&place, p.position)) {
-            Ok(Some((span, name))) => Ok(Ok(Some(lsp::PrepareRenameResponse::RangeWithPlaceholder {
-                range: LineIndex::new(place.text).range(span),
-                placeholder: name,
-            }))),
+            Ok(Some((span, name))) => {
+                Ok(Ok(Some(lsp::PrepareRenameResponse::RangeWithPlaceholder {
+                    range: LineIndex::new(place.text).range(span),
+                    placeholder: name,
+                })))
+            }
             Ok(None) => Ok(Ok(None)),
             Err(e) => Ok(Err((ErrorCode::RequestFailed, e.0))),
         }
@@ -146,8 +172,14 @@ impl Server<'_> {
         let Some(place) = self.current(&pos.text_document.uri)? else {
             return Ok(Ok(None));
         };
-        let Some(q) = place.a.query() else { return Ok(Ok(None)) };
-        match q.rename(place.module, Self::offset(&place, pos.position), &p.new_name) {
+        let Some(q) = place.a.query() else {
+            return Ok(Ok(None));
+        };
+        match q.rename(
+            place.module,
+            Self::offset(&place, pos.position),
+            &p.new_name,
+        ) {
             Ok(edits) => Ok(Ok(Some(self.workspace_edit(&place, edits)?))),
             Err(e) => {
                 let code = if e.0.contains("not a valid new name") {
@@ -171,7 +203,9 @@ impl Server<'_> {
         let Some(offset) = Self::old_offset(&place, p.position) else {
             return place.later();
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let found = if implementation {
             q.implementations_at(place.module, offset)
         } else {
@@ -181,12 +215,17 @@ impl Server<'_> {
         Ok((!locations.is_empty()).then_some(lsp::GotoDefinitionResponse::Array(locations)))
     }
 
-    pub(super) fn signature_help(&self, p: lsp::SignatureHelpParams) -> Result<Option<lsp::SignatureHelp>, Later> {
+    pub(super) fn signature_help(
+        &self,
+        p: lsp::SignatureHelpParams,
+    ) -> Result<Option<lsp::SignatureHelp>, Later> {
         let pos = p.text_document_position_params;
         let Some(place) = self.current(&pos.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let Some(s) = q.signature_help(place.module, Self::offset(&place, pos.position)) else {
             return Ok(None);
         };
@@ -211,17 +250,25 @@ impl Server<'_> {
         }))
     }
 
-    pub(super) fn code_actions(&self, p: lsp::CodeActionParams) -> Result<Option<lsp::CodeActionResponse>, Later> {
+    pub(super) fn code_actions(
+        &self,
+        p: lsp::CodeActionParams,
+    ) -> Result<Option<lsp::CodeActionResponse>, Later> {
         let Some(place) = self.current(&p.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let ix = LineIndex::new(place.text);
         let range = Span::new(ix.offset(p.range.start), ix.offset(p.range.end));
         let m = place.module;
         let overlaps = |s: Span| s.start <= range.end && range.start <= s.end;
         let mut out: Vec<lsp::CodeActionOrCommand> = Vec::new();
-        let mut push = |fix: query::CodeFix, diagnostic: Option<lsp::Diagnostic>, kind: lsp::CodeActionKind| -> Result<(), Later> {
+        let mut push = |fix: query::CodeFix,
+                        diagnostic: Option<lsp::Diagnostic>,
+                        kind: lsp::CodeActionKind|
+         -> Result<(), Later> {
             out.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
                 title: fix.title,
                 kind: Some(kind),
@@ -277,11 +324,16 @@ impl Server<'_> {
         Ok(Some(out))
     }
 
-    pub(super) fn inlay_hints(&self, p: lsp::InlayHintParams) -> Result<Option<Vec<lsp::InlayHint>>, Later> {
+    pub(super) fn inlay_hints(
+        &self,
+        p: lsp::InlayHintParams,
+    ) -> Result<Option<Vec<lsp::InlayHint>>, Later> {
         let Some(place) = self.current(&p.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let ix = LineIndex::new(place.text);
         let range = Span::new(ix.offset(p.range.start), ix.offset(p.range.end));
         Ok(Some(
@@ -305,11 +357,16 @@ impl Server<'_> {
         ))
     }
 
-    pub(super) fn folding_ranges(&self, p: lsp::FoldingRangeParams) -> Result<Option<Vec<lsp::FoldingRange>>, Later> {
+    pub(super) fn folding_ranges(
+        &self,
+        p: lsp::FoldingRangeParams,
+    ) -> Result<Option<Vec<lsp::FoldingRange>>, Later> {
         let Some(place) = self.current(&p.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let ix = LineIndex::new(place.text);
         let mut out: Vec<lsp::FoldingRange> = Vec::new();
         for f in q.folding_ranges(place.module) {
@@ -336,7 +393,9 @@ impl Server<'_> {
         let Some(place) = self.current(&p.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let ix = LineIndex::new(place.text);
         let mut out = Vec::new();
         for pos in p.positions {
@@ -356,11 +415,16 @@ impl Server<'_> {
         Ok(Some(out))
     }
 
-    pub(super) fn document_links(&self, p: lsp::DocumentLinkParams) -> Result<Option<Vec<lsp::DocumentLink>>, Later> {
+    pub(super) fn document_links(
+        &self,
+        p: lsp::DocumentLinkParams,
+    ) -> Result<Option<Vec<lsp::DocumentLink>>, Later> {
         let Some(place) = self.current(&p.text_document.uri)? else {
             return Ok(None);
         };
-        let Some(q) = place.a.query() else { return Ok(None) };
+        let Some(q) = place.a.query() else {
+            return Ok(None);
+        };
         let ix = LineIndex::new(place.text);
         let mut out = Vec::new();
         for l in q.document_links(place.module) {
@@ -381,7 +445,10 @@ impl Server<'_> {
     }
 
     /// The definitions of the checked packages whose names hold the query.
-    pub(super) fn workspace_symbols(&self, p: lsp::WorkspaceSymbolParams) -> Option<lsp::WorkspaceSymbolResponse> {
+    pub(super) fn workspace_symbols(
+        &self,
+        p: lsp::WorkspaceSymbolParams,
+    ) -> Option<lsp::WorkspaceSymbolResponse> {
         let mut out = Vec::new();
         let mut roots: Vec<&PathBuf> = self.analyses.keys().collect();
         roots.sort();
@@ -396,7 +463,9 @@ impl Server<'_> {
                 if !seen.insert((path.clone(), s.location.span)) {
                     continue;
                 }
-                let Some(uri) = self.uri_of(path) else { continue };
+                let Some(uri) = self.uri_of(path) else {
+                    continue;
+                };
                 let Some(range) = self.range_now(a, s.location.source, s.location.span) else {
                     continue;
                 };
@@ -419,7 +488,9 @@ impl Server<'_> {
         let Some(data) = item.data.take() else {
             return item;
         };
-        let uri = data["uri"].as_str().and_then(|u| u.parse::<lsp::Uri>().ok());
+        let uri = data["uri"]
+            .as_str()
+            .and_then(|u| u.parse::<lsp::Uri>().ok());
         let path = data["module"].as_str();
         let found = uri.zip(path).and_then(|(uri, path)| {
             let file = normalize(&uri::to_path(&uri)?);
@@ -433,7 +504,11 @@ impl Server<'_> {
     }
 
     /// The LSP form of a problem of a check.
-    pub(super) fn lsp_diagnostic(&self, a: &Analysis, d: &ilang_package::Diagnostic) -> lsp::Diagnostic {
+    pub(super) fn lsp_diagnostic(
+        &self,
+        a: &Analysis,
+        d: &ilang_package::Diagnostic,
+    ) -> lsp::Diagnostic {
         let range = match d.source {
             Some(s) if a.paths.contains_key(&s) => LineIndex::new(a.text(s)).range(d.span),
             _ => lsp::Range::default(),
@@ -470,7 +545,8 @@ impl Server<'_> {
                     })
                     .collect()
             }),
-            tags: (d.code == ilang_check::code::UNUSED_BINDING).then(|| vec![lsp::DiagnosticTag::UNNECESSARY]),
+            tags: (d.code == ilang_check::code::UNUSED_BINDING)
+                .then(|| vec![lsp::DiagnosticTag::UNNECESSARY]),
             data,
             ..Default::default()
         }
@@ -496,7 +572,6 @@ pub(super) fn symbol_kind(k: SymbolKind) -> lsp::SymbolKind {
 /// The completion items of a request, with their documentation, edits, and
 /// the data that `completionItem/resolve` reads.
 pub(super) fn completion_items(
-    q: &Query,
     uri: &lsp::Uri,
     text: &str,
     items: Vec<query::Completion>,
@@ -523,10 +598,11 @@ pub(super) fn completion_items(
                 })
             });
             let data = match (&c.defined_in, &c.documentation) {
-                (Some(module), None) => Some(serde_json::json!({ "uri": uri.as_str(), "module": module })),
+                (Some(module), None) => {
+                    Some(serde_json::json!({ "uri": uri.as_str(), "module": module }))
+                }
                 _ => None,
             };
-            let _ = q;
             lsp::CompletionItem {
                 kind: Some(completion_kind(c.kind)),
                 detail: c.detail,

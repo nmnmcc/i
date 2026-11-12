@@ -45,7 +45,12 @@ impl Query<'_> {
         // one module is imported once (§2.3).
         if let Some(n) = name
             && let Some(item) = ast.imports.iter().find(|i| {
-                i.path.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join("/") == path
+                i.path
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join("/")
+                    == path
             })
         {
             let (Some(first), Some(_)) = (item.path.first(), item.path.last()) else {
@@ -63,7 +68,9 @@ impl Query<'_> {
                 (None, true) => {
                     // `(/ a b)` or `(= alias (/ a b))`: the names go before
                     // the path, which starts at its `(`.
-                    let open = text[..first.span.start as usize].rfind('(').unwrap_or(first.span.start as usize) as u32;
+                    let open = text[..first.span.start as usize]
+                        .rfind('(')
+                        .unwrap_or(first.span.start as usize) as u32;
                     if item.alias.is_some() {
                         edit(open, format!("(, {n}) "))
                     } else {
@@ -100,7 +107,9 @@ impl Query<'_> {
                     .imports
                     .last()
                     .map(|i| {
-                        let ls = text[..i.span.start as usize].rfind('\n').map_or(0, |x| x + 1);
+                        let ls = text[..i.span.start as usize]
+                            .rfind('\n')
+                            .map_or(0, |x| x + 1);
                         text[ls..i.span.start as usize].to_string()
                     })
                     .unwrap_or_else(|| "\t".into());
@@ -125,7 +134,11 @@ impl Query<'_> {
                 break;
             }
         }
-        let group = if lisp { format!("(, {item})\n") } else { format!("({item})\n") };
+        let group = if lisp {
+            format!("(, {item})\n")
+        } else {
+            format!("({item})\n")
+        };
         let blank = if ast.exports_span.is_some() { "" } else { "\n" };
         Edit {
             source,
@@ -151,7 +164,9 @@ impl Query<'_> {
             if t == m {
                 continue;
             }
-            let Some(path) = self.import_path(m, t) else { continue };
+            let Some(path) = self.import_path(m, t) else {
+                continue;
+            };
             if qualified {
                 if path.rsplit('/').next() == Some(name) && !imported.contains(&t) {
                     out.push(CodeFix {
@@ -205,7 +220,12 @@ impl Query<'_> {
                 }
             });
             if !used {
-                let path = item.path.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join("/");
+                let path = item
+                    .path
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join("/");
                 out.push((item.span, path));
             }
         }
@@ -239,12 +259,16 @@ impl Query<'_> {
                 end += 1;
             }
             let mut start = item.start as usize;
-            if b.get(end - 1) == Some(&b'\t') || b.get(end - 1) == Some(&b' ') || text[item.end as usize..end].contains('\n') {
+            if b.get(end - 1) == Some(&b'\t')
+                || b.get(end - 1) == Some(&b' ')
+                || text[item.end as usize..end].contains('\n')
+            {
                 while start > 0 && matches!(b[start - 1], b' ' | b'\t') {
                     start -= 1;
                 }
                 if text[item.end as usize..end].contains('\n') {
-                    end = item.end as usize + text[item.end as usize..].find('\n').map_or(0, |i| i + 1);
+                    end = item.end as usize
+                        + text[item.end as usize..].find('\n').map_or(0, |i| i + 1);
                 }
             }
             return Edit {
@@ -328,29 +352,34 @@ impl Query<'_> {
             }
         }
         if types.is_empty() {
-            types = self.completion_subject_types(m, subject, clauses);
+            types = self.subject_types(m, subject, clauses);
         }
         let covered = |ctor: CtorRef| {
             clauses.iter().any(|c| {
                 c.guard.is_none()
                     && c.patterns.iter().any(|pat| match &pat.kind {
-                        PatternKind::Constructor { ctor: x, args, .. } => *x == ctor && args.iter().all(irrefutable),
+                        PatternKind::Constructor { ctor: x, args, .. } => {
+                            *x == ctor && args.iter().all(irrefutable)
+                        }
                         _ => false,
                     })
             })
         };
         let mut patterns = Vec::new();
         for &t in &types {
-            let TypeBody::Custom(cs) = &p.ty(t).body else { continue };
+            let TypeBody::Custom(cs) = &p.ty(t).body else {
+                continue;
+            };
             let prefix = self.ctor_prefix(m, t).unwrap_or_default();
             for (i, c) in cs.iter().enumerate() {
-                if covered(CtorRef { ty: t, index: i as u32 }) {
+                if covered(CtorRef {
+                    ty: t,
+                    index: i as u32,
+                }) {
                     continue;
                 }
                 patterns.push(if c.fields.is_empty() {
                     format!("{prefix}{}", c.name)
-                } else if lisp {
-                    format!("({prefix}{} ..)", c.name)
                 } else {
                     format!("{prefix}{}(..)", c.name)
                 });
@@ -367,7 +396,9 @@ impl Query<'_> {
         let indent = clauses
             .last()
             .map(|c| {
-                let ls = text[..c.span.start as usize].rfind('\n').map_or(0, |x| x + 1);
+                let ls = text[..c.span.start as usize]
+                    .rfind('\n')
+                    .map_or(0, |x| x + 1);
                 text[ls..c.span.start as usize].to_string()
             })
             .filter(|s| s.trim().is_empty())
@@ -375,10 +406,11 @@ impl Query<'_> {
         let line_start = text[..close as usize].rfind('\n').map_or(0, |i| i + 1) as u32;
         let own_line = text[line_start as usize..close as usize].trim().is_empty();
         let body = |pat: &str| {
+            let clause = format!("{pat} -> panic(\"todo\")");
             if lisp {
-                format!("(-> {pat} (panic \"todo\"))")
+                lisp_clause(&clause).unwrap_or(clause)
             } else {
-                format!("{pat} -> panic(\"todo\")")
+                clause
             }
         };
         let mut new = String::new();
@@ -405,40 +437,6 @@ impl Query<'_> {
         })
     }
 
-    fn completion_subject_types(&self, m: ModuleId, subject: &Expr, clauses: &[Clause]) -> Vec<TypeId> {
-        match self.completion_context_types(m, subject, clauses) {
-            CompletionContext::Pattern { types } => types,
-            _ => Vec::new(),
-        }
-    }
-
-    fn completion_context_types(&self, m: ModuleId, subject: &Expr, clauses: &[Clause]) -> CompletionContext {
-        let mut types = Vec::new();
-        let names = match &subject.kind {
-            ExprKind::Name(ValueRef::Local(v)) => {
-                let v = match self.def_of_var(m, *v).map(|d| &self.program.def(d).kind) {
-                    Some(DefKind::Binding { var, .. }) => *var,
-                    _ => *v,
-                };
-                self.var_types(v)
-            }
-            ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
-                DefKind::Binding { var, .. } => self.var_types(var),
-                DefKind::External { .. } => Vec::new(),
-            },
-            _ => Vec::new(),
-        };
-        let _ = clauses;
-        for t in names {
-            if let TypeRef::Custom(t) = t
-                && !types.contains(&t)
-            {
-                types.push(t);
-            }
-        }
-        CompletionContext::Pattern { types }
-    }
-
     /// The annotation `: Type` that can be written after the unannotated
     /// name of a binding or a parameter at `offset`, with the type that
     /// inference found: only when that type can be written in the module,
@@ -460,13 +458,12 @@ impl Query<'_> {
         if !self.writable(m, &ty) {
             return None;
         }
-        let lisp = self.is_lisp(m);
-        let edits = if lisp {
+        let edits = if self.is_lisp(m) {
             let name = &self.written_text(m)[span.start as usize..span.end as usize];
             vec![Edit {
                 source: self.source_of(m),
                 span,
-                text: format!("(: {name} {ty})"),
+                text: format!("(: {name} {})", lisp_type(&ty)?),
             }]
         } else {
             vec![Edit {
@@ -475,10 +472,6 @@ impl Query<'_> {
                 text: format!(": {ty}"),
             }]
         };
-        if lisp {
-            // The Lisp surface writes types in its own syntax.
-            return None;
-        }
         Some(CodeFix {
             title: format!("Add the type annotation `{ty}`"),
             edits,
@@ -499,7 +492,8 @@ impl Query<'_> {
         visit_module(self.program, m, &mut |n| match n {
             Node::Binding(b) => take(&b.pattern),
             Node::Expr(Expr {
-                kind: ExprKind::Fn(f), ..
+                kind: ExprKind::Fn(f),
+                ..
             }) => {
                 for param in &f.params {
                     if let Param::Pattern { pattern, .. } = param {
@@ -524,7 +518,12 @@ impl Query<'_> {
             .map(|t| p.ty(*t).name.clone())
             .collect();
         if let Some(prelude) = p.prelude {
-            names.extend(p.module(prelude).types.iter().map(|t| p.ty(*t).name.clone()));
+            names.extend(
+                p.module(prelude)
+                    .types
+                    .iter()
+                    .map(|t| p.ty(*t).name.clone()),
+            );
         }
         names.extend(BuiltinType::ALL.iter().map(|b| b.name().to_string()));
         let mut word = String::new();
@@ -566,7 +565,8 @@ impl Query<'_> {
                 }
             }
             Node::Expr(Expr {
-                kind: ExprKind::Fn(f), ..
+                kind: ExprKind::Fn(f),
+                ..
             }) => {
                 for param in &f.params {
                     if let Param::Pattern { pattern, .. } = param
@@ -580,10 +580,15 @@ impl Query<'_> {
         });
         let mut out = Vec::new();
         for (b, parameter) in binders {
-            if b.span.end as usize > text.len() || b.span.start < range.start || b.span.end > range.end {
+            if b.span.end as usize > text.len()
+                || b.span.start < range.start
+                || b.span.end > range.end
+            {
                 continue;
             }
-            if b.name.starts_with('%') || text.get(b.span.start as usize..b.span.end as usize) != Some(b.name.as_str()) {
+            if b.name.starts_with('%')
+                || text.get(b.span.start as usize..b.span.end as usize) != Some(b.name.as_str())
+            {
                 continue;
             }
             let ty = match self.def_of_var(m, b.var) {
@@ -604,6 +609,55 @@ impl Query<'_> {
         out.dedup_by_key(|h| h.offset);
         out
     }
+}
+
+/// A type shown in the syntax of §3, in the syntax of the Lisp surface: as
+/// the printer of that surface writes it in an annotation.
+fn lisp_type(ty: &str) -> Option<String> {
+    let (module, diags) = ilang_syntax::parse_module(&format!("x: {ty} = 0\n"));
+    if !diags.is_empty() {
+        return None;
+    }
+    let printed = ilang_syntax::lisp::print_module(&module);
+    let rest = printed.trim().strip_prefix("(= (: x ")?;
+    Some(rest.strip_suffix(") 0)")?.to_string())
+}
+
+/// A clause `p -> e` of the syntax of §6, in the syntax of the Lisp surface,
+/// as its printer writes it.
+pub(crate) fn lisp_clause(clause: &str) -> Option<String> {
+    let (module, diags) =
+        ilang_syntax::parse_module(&format!("f = (s) {{ s |> {{ {clause}  _ -> 0 }} }}\n"));
+    if !diags.is_empty() {
+        return None;
+    }
+    let printed = ilang_syntax::lisp::print_module(&module);
+    let start = printed.find("(->")?;
+    let b = printed.as_bytes();
+    let mut depth = 0i32;
+    let mut quoted = false;
+    for (i, &c) in b.iter().enumerate().skip(start) {
+        match c {
+            b'"' => quoted = !quoted,
+            b'\\' if quoted => {}
+            b'(' | b'[' | b'{' if !quoted => depth += 1,
+            b')' | b']' | b'}' if !quoted => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(printed[start..=i].to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// A pattern of the syntax of §7, in the syntax of the Lisp surface.
+pub(crate) fn lisp_pattern(pattern: &str) -> Option<String> {
+    let clause = lisp_clause(&format!("{pattern} -> 0"))?;
+    let inner = clause.strip_prefix("(-> ")?.strip_suffix(" 0)")?;
+    Some(inner.to_string())
 }
 
 /// A pattern that matches every value of its type.
@@ -636,7 +690,10 @@ fn with_line_end(text: &str, span: Span) -> Span {
 /// An item with its documentation comment before it and its line end.
 fn with_doc_and_line_end(text: &str, item: Span, ast: &ast::Module) -> Span {
     let mut start = item.start as usize;
-    let has_doc = ast.items.iter().any(|i| i.span == item && !i.doc.is_empty());
+    let has_doc = ast
+        .items
+        .iter()
+        .any(|i| i.span == item && !i.doc.is_empty());
     if has_doc {
         let mut ls = text[..start].rfind('\n').map_or(0, |i| i + 1);
         loop {
@@ -653,6 +710,5 @@ fn with_doc_and_line_end(text: &str, item: Span, ast: &ast::Module) -> Span {
             }
         }
     }
-    let s = with_line_end(text, Span::new(start as u32, item.end));
-    s
+    with_line_end(text, Span::new(start as u32, item.end))
 }

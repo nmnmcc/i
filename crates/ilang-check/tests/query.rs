@@ -669,8 +669,16 @@ fn query_references_follow_identity_across_modules() {
     let (owner, _, target) = q.target_at_offset(m, at).unwrap();
     let refs = q.references(&target, owner, &q.own_modules());
     let found = texts_of(&f, &refs);
-    assert_eq!(found.iter().filter(|(p, _)| p == "app/main").count(), 3, "{found:?}");
-    assert_eq!(found.iter().filter(|(p, _)| p == "app/shapes").count(), 2, "{found:?}");
+    assert_eq!(
+        found.iter().filter(|(p, _)| p == "app/main").count(),
+        3,
+        "{found:?}"
+    );
+    assert_eq!(
+        found.iter().filter(|(p, _)| p == "app/shapes").count(),
+        2,
+        "{found:?}"
+    );
     assert!(found.iter().all(|(_, t)| t == "area"), "{found:?}");
     assert_eq!(refs.iter().filter(|r| r.definition).count(), 1);
     // A field: the label of the definition, the labels of the calls, and
@@ -701,7 +709,10 @@ fn query_rename_checks_kind_and_scope() {
     // Refused for the library.
     let text = "main = () { panic(\"x\") }\n";
     let g = Fixture::new(&[("src/main.i", text)]);
-    let e = g.query().prepare_rename(g.module("app/main"), g.at("app/main", "panic", 0, 1)).unwrap_err();
+    let e = g
+        .query()
+        .prepare_rename(g.module("app/main"), g.at("app/main", "panic", 0, 1))
+        .unwrap_err();
     assert!(e.0.contains("library"), "{e}");
 }
 
@@ -711,10 +722,16 @@ fn query_missing_clauses_of_a_match() {
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");
-    let span = ilang_syntax::span::Span::new(f.at("app/main", "s |>", 0, 0), f.at("app/main", "s |>", 0, 1));
+    let span = ilang_syntax::span::Span::new(
+        f.at("app/main", "s |>", 0, 0),
+        f.at("app/main", "s |>", 0, 1),
+    );
     let c = q.missing_clauses(m, span).unwrap();
     assert_eq!(c.patterns, vec!["Circle(..)", "Line"]);
-    assert_eq!(c.edit.text, "    Circle(..) -> panic(\"todo\")\n    Line -> panic(\"todo\")\n");
+    assert_eq!(
+        c.edit.text,
+        "    Circle(..) -> panic(\"todo\")\n    Line -> panic(\"todo\")\n"
+    );
 }
 
 #[test]
@@ -724,8 +741,15 @@ fn query_type_definition_signature_and_hints() {
     let m = f.module("app/main");
     let types = q.type_definition_at(m, f.at("app/main", "area(c)", 0, 5));
     assert_eq!(types.len(), 1);
-    assert_eq!(f.graph.sources.get(types[0].source).text[types[0].span.start as usize..types[0].span.end as usize].to_string(), "Shape");
-    let s = q.signature_help(m, f.at("app/main", "area(c)", 0, 5)).unwrap();
+    assert_eq!(
+        f.graph.sources.get(types[0].source).text
+            [types[0].span.start as usize..types[0].span.end as usize]
+            .to_string(),
+        "Shape"
+    );
+    let s = q
+        .signature_help(m, f.at("app/main", "area(c)", 0, 5))
+        .unwrap();
     assert_eq!(s.label, "area(s: Shape) -> Int");
     assert_eq!(s.active, Some(0));
     let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
@@ -739,7 +763,10 @@ fn query_completion_context() {
     let f = shapes_fixture();
     let q = f.query();
     let shapes = f.module("app/shapes");
-    assert_eq!(q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)), CompletionContext::Type);
+    assert_eq!(
+        q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)),
+        CompletionContext::Type
+    );
     match q.completion_context(shapes, f.at("app/shapes", "Dot -> 0", 0, 0)) {
         CompletionContext::Pattern { types } => assert_eq!(types.len(), 1),
         other => panic!("{other:?}"),
@@ -764,8 +791,13 @@ fn query_unused_imports_and_fixes() {
     let unused = q.unused_imports(m);
     assert_eq!(unused.len(), 1);
     assert_eq!(unused[0].1, "app/shapes");
-    let fixes = q.missing_import_fixes(m, ilang_syntax::span::Span::new(f.at("app/main", "area(", 0, 0), f.at("app/main", "area(", 0, 4)));
+    let fixes = q.missing_import_fixes(
+        m,
+        ilang_syntax::span::Span::new(
+            f.at("app/main", "area(", 0, 0),
+            f.at("app/main", "area(", 0, 4),
+        ),
+    );
     assert_eq!(fixes.len(), 1);
     assert_eq!(fixes[0].edits[0].text, "(area) = ");
 }
-

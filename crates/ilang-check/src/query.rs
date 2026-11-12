@@ -229,7 +229,11 @@ impl<'a> Query<'a> {
     /// The same queries, reading and keeping what they work out in `cache`,
     /// which must have been made for this program.
     pub fn with_cache(mut self, cache: &'a Cache) -> Self {
-        assert_eq!(cache.walks.len(), self.program.modules.len(), "cache of another program");
+        assert_eq!(
+            cache.walks.len(),
+            self.program.modules.len(),
+            "cache of another program"
+        );
         self.cache = Some(cache);
         self
     }
@@ -401,7 +405,11 @@ impl<'a> Query<'a> {
                     {
                         found = (Some(pat), Some(&b.value));
                     }
-                    if let nav::Node::Expr(Expr { kind: ExprKind::Fn(f), .. }) = n {
+                    if let nav::Node::Expr(Expr {
+                        kind: ExprKind::Fn(f),
+                        ..
+                    }) = n
+                    {
                         for param in &f.params {
                             if let Param::Pattern { pattern, .. } = param
                                 && let Some(pat) = binder_pattern(pattern, *v)
@@ -416,8 +424,13 @@ impl<'a> Query<'a> {
             _ => (None, None, m),
         };
         if let Some(value) = value
-            && matches!(value.kind, ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_))
-            && let Some(text) = self.text(module).get(value.span.start as usize..value.span.end as usize)
+            && matches!(
+                value.kind,
+                ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_)
+            )
+            && let Some(text) = self
+                .text(module)
+                .get(value.span.start as usize..value.span.end as usize)
             && !code.ends_with(&format!(": {text}"))
         {
             notes.push(format!("Value: `{text}`"));
@@ -1278,7 +1291,12 @@ impl<'a> Query<'a> {
                     label: label.name.clone(),
                     kind: CompletionKind::Field,
                     detail: Some(self.show_type(&f.ty)),
-                    defined_in: Some(self.program.module(self.program.ty(ctors[0].ty).module).path.clone()),
+                    defined_in: Some(
+                        self.program
+                            .module(self.program.ty(ctors[0].ty).module)
+                            .path
+                            .clone(),
+                    ),
                     ..Default::default()
                 });
             }
@@ -1345,7 +1363,9 @@ impl<'a> Query<'a> {
                 TypeRef::Builtin(b) => Some(builtin_head(b)),
             },
             defined_in: match t {
-                TypeRef::Custom(t) => Some(self.program.module(self.program.ty(t).module).path.clone()),
+                TypeRef::Custom(t) => {
+                    Some(self.program.module(self.program.ty(t).module).path.clone())
+                }
                 TypeRef::Builtin(_) => None,
             },
             ..Default::default()
@@ -1559,7 +1579,9 @@ impl<'a> Query<'a> {
 fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
     match &p.kind {
         PatternKind::Var(b) if b.var == v => Some(p),
-        PatternKind::Typed { binder: Some(b), .. } if b.var == v => Some(p),
+        PatternKind::Typed {
+            binder: Some(b), ..
+        } if b.var == v => Some(p),
         PatternKind::Named { binder, pattern } => {
             if binder.var == v {
                 Some(p)
@@ -1567,9 +1589,9 @@ fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
                 binder_pattern(pattern, v)
             }
         }
-        PatternKind::Constructor { args: ps, .. } | PatternKind::Tuple(ps) | PatternKind::Error(ps) => {
-            ps.iter().find_map(|q| binder_pattern(q, v))
-        }
+        PatternKind::Constructor { args: ps, .. }
+        | PatternKind::Tuple(ps)
+        | PatternKind::Error(ps) => ps.iter().find_map(|q| binder_pattern(q, v)),
         PatternKind::List { items, .. } => items.iter().find_map(|q| binder_pattern(q, v)),
         _ => None,
     }
@@ -1785,7 +1807,8 @@ impl Walk<'_> {
                 continue;
             }
             if let Some(b) = label_binder(a) {
-                self.labels.push((b.span, Target::Field(vec![(ctor, index as u32)])));
+                self.labels
+                    .push((b.span, Target::Field(vec![(ctor, index as u32)])));
             }
         }
     }

@@ -65,12 +65,14 @@ fn visit_binding<'h>(b: &'h Binding, f: &mut dyn FnMut(Node<'h>)) {
 pub(crate) fn visit_pattern<'h>(p: &'h Pattern, f: &mut dyn FnMut(Node<'h>)) {
     f(Node::Pattern(p));
     match &p.kind {
-        PatternKind::Quote { captures, .. } => captures.iter().for_each(|(_, c)| visit_pattern(c, f)),
+        PatternKind::Quote { captures, .. } => {
+            captures.iter().for_each(|(_, c)| visit_pattern(c, f))
+        }
         PatternKind::Typed { ty, .. } => visit_type(ty, f),
         PatternKind::Named { pattern, .. } => visit_pattern(pattern, f),
-        PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) | PatternKind::Error(args) => {
-            args.iter().for_each(|a| visit_pattern(a, f))
-        }
+        PatternKind::Constructor { args, .. }
+        | PatternKind::Tuple(args)
+        | PatternKind::Error(args) => args.iter().for_each(|a| visit_pattern(a, f)),
         PatternKind::List { items, .. } => items.iter().for_each(|a| visit_pattern(a, f)),
         PatternKind::BitArray(segs) => segs.iter().for_each(|s| visit_pattern(&s.value, f)),
         PatternKind::Var(_)
@@ -95,12 +97,21 @@ pub(crate) fn visit_type<'h>(t: &'h Type, f: &mut dyn FnMut(Node<'h>)) {
             }
             fields.iter().for_each(|(_, t)| visit_type(t, f));
         }
-        TypeKind::Fn { params, ret, err, env } => {
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => {
             params.iter().for_each(|p| visit_type(&p.ty, f));
             visit_type(ret, f);
             err.iter().chain(env.iter()).for_each(|t| visit_type(t, f));
         }
-        TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Var(_) | TypeKind::Hole | TypeKind::Error => {}
+        TypeKind::Lit(_)
+        | TypeKind::Of { .. }
+        | TypeKind::Var(_)
+        | TypeKind::Hole
+        | TypeKind::Error => {}
     }
 }
 
@@ -146,7 +157,10 @@ pub(crate) fn visit_expr<'h>(e: &'h Expr, f: &mut dyn FnMut(Node<'h>)) {
             }
             if let Some(r) = &func.ret {
                 visit_type(&r.value, f);
-                r.err.iter().chain(r.env.iter()).for_each(|t| visit_type(t, f));
+                r.err
+                    .iter()
+                    .chain(r.env.iter())
+                    .for_each(|t| visit_type(t, f));
             }
             visit_block(&func.body, f);
         }
@@ -165,7 +179,9 @@ pub(crate) fn visit_expr<'h>(e: &'h Expr, f: &mut dyn FnMut(Node<'h>)) {
             visit_expr(callee, f);
             args.iter().for_each(|a| visit_expr(&a.value, f));
         }
-        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => visit_expr(target, f),
+        ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
+            visit_expr(target, f)
+        }
         ExprKind::RecordUpdate { base, fields, .. } => {
             visit_expr(base, f);
             fields.iter().for_each(|(_, x)| visit_expr(x, f));
@@ -175,7 +191,11 @@ pub(crate) fn visit_expr<'h>(e: &'h Expr, f: &mut dyn FnMut(Node<'h>)) {
             visit_expr(lhs, f);
             visit_expr(rhs, f);
         }
-        ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_) | ExprKind::Name(_) | ExprKind::Error => {}
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Error => {}
     }
 }
 
@@ -336,9 +356,10 @@ impl Query<'_> {
     fn resolve_macro(&self, m: ModuleId, callee: &ast::Expr, call: Span) -> Option<MacroCall> {
         let (module, name) = match &callee.kind {
             ast::ExprKind::Field { target, name } => match &target.kind {
-                ast::ExprKind::Name { module: None, name: base } => {
-                    (Some(self.import_module(m, &base.name)?), name)
-                }
+                ast::ExprKind::Name {
+                    module: None,
+                    name: base,
+                } => (Some(self.import_module(m, &base.name)?), name),
                 _ => return None,
             },
             ast::ExprKind::Name { module: None, name } => (None, name),
@@ -379,10 +400,16 @@ impl Query<'_> {
     fn macro_definition(&self, t: ModuleId, name: &str) -> Option<(Span, Option<String>)> {
         let ast = self.ast(t);
         for item in &ast.items {
-            if !item.attributes.iter().any(|a| a.module.is_none() && a.name.name == "macro") {
+            if !item
+                .attributes
+                .iter()
+                .any(|a| a.module.is_none() && a.name.name == "macro")
+            {
                 continue;
             }
-            let ast::ItemKind::Binding(b) = &item.kind else { continue };
+            let ast::ItemKind::Binding(b) = &item.kind else {
+                continue;
+            };
             let binder = match &b.pattern.kind {
                 ast::PatternKind::Var(n) if n == name => b.pattern.span,
                 ast::PatternKind::Typed { binder, .. } if binder.name == name => binder.span,
@@ -415,7 +442,9 @@ impl Query<'_> {
             if !scoped.is_generated(span) || span.end as usize > text.len() {
                 return;
             }
-            let Some(origin) = scoped.origin(span) else { return };
+            let Some(origin) = scoped.origin(span) else {
+                return;
+            };
             let from_call = origin
                 .call_chain
                 .first()
@@ -462,7 +491,10 @@ impl Query<'_> {
         let mut out = Vec::new();
         for s in [ast.imports_span, ast.exports_span].into_iter().flatten() {
             if lines(s) {
-                out.push(Folding { span: s, imports: true });
+                out.push(Folding {
+                    span: s,
+                    imports: true,
+                });
             }
         }
         for item in &ast.items {
@@ -477,13 +509,21 @@ impl Query<'_> {
             let span = match n {
                 Node::Block(b) => b.span,
                 Node::Clause(c) => c.span,
-                Node::Expr(e) if matches!(e.kind, ExprKind::Case { .. } | ExprKind::Call { .. } | ExprKind::List { .. }) => {
+                Node::Expr(e)
+                    if matches!(
+                        e.kind,
+                        ExprKind::Case { .. } | ExprKind::Call { .. } | ExprKind::List { .. }
+                    ) =>
+                {
                     e.span
                 }
                 _ => return,
             };
             if span.end as usize <= text.len() && lines(span) {
-                out.push(Folding { span, imports: false });
+                out.push(Folding {
+                    span,
+                    imports: false,
+                });
             }
         });
         out.sort_by_key(|f| (f.span.start, std::cmp::Reverse(f.span.end)));
@@ -498,7 +538,11 @@ impl Query<'_> {
         let mut spans = Vec::new();
         visit_module(self.program, m, &mut |n| {
             let s = n.span();
-            if s.start <= offset && offset <= s.end && s.start < s.end && s.end as usize <= text.len() {
+            if s.start <= offset
+                && offset <= s.end
+                && s.start < s.end
+                && s.end as usize <= text.len()
+            {
                 spans.push(s);
             }
         });
@@ -524,7 +568,10 @@ impl Query<'_> {
         // Each span must hold the one before it.
         let mut out: Vec<Span> = Vec::new();
         for s in spans {
-            if out.last().is_none_or(|l| s.start <= l.start && l.end <= s.end && s != *l) {
+            if out
+                .last()
+                .is_none_or(|l| s.start <= l.start && l.end <= s.end && s != *l)
+            {
                 out.push(s);
             }
         }
@@ -609,7 +656,11 @@ pub(crate) fn ast_exprs(e: &ast::Expr, f: &mut dyn FnMut(&ast::Expr)) {
             args.iter().for_each(|a| ast_exprs(&a.value, f));
         }
         K::Field { target, .. } | K::TupleIndex { target, .. } => ast_exprs(target, f),
-        K::RecordUpdate { constructor, base, fields } => {
+        K::RecordUpdate {
+            constructor,
+            base,
+            fields,
+        } => {
             ast_exprs(constructor, f);
             ast_exprs(base, f);
             fields.iter().for_each(|(_, x)| ast_exprs(x, f));

@@ -93,7 +93,25 @@ All take a module and a byte offset or span, and are tested in
 
 ## Measured latencies
 
-Measured by `lsp_latency_on_std` (debug build, `std/src/list.i`), after the
-first check of the `std` package:
+Measured by `lsp_latency_on_std` (debug build of the test, `std/src/list.i`,
+on the shared development machine while other builds ran), after the first
+check of the `std` package. The test requires each answer under 200 ms.
 
-(filled in below from the test run)
+| Request | First | Second | Third |
+|---|---:|---:|---:|
+| hover (`map`) | 21.7 ms | 2.3 ms | 2.6 ms |
+| definition (`reverse`) | 2.6 ms | 2.2 ms | 6.0 ms |
+| completion (in `reverse`) | 14.9 ms | 34.9 ms | 39.2 ms |
+
+The first check of `std` with its tests (macro expansion, inference of every
+module) took 61.7 s in the debug build; the occurrences of the package's own
+modules are worked out on the check thread (`Query::warm`), so the first
+request does not pay for them. Completion is the slowest because it lists the
+exported names of every module that is not imported, for the import edits.
+
+The test `lsp_every_offset_*` sends 12 position requests (hover, definition,
+type definition, implementation, references, highlights, completion,
+signature help, prepare rename, rename, selection range, code action) at every
+character, and 6 document requests, of a correct `.i` package with a
+dependency, its `.is` form, a broken `.i` file and a broken `.is` file; all
+three tests together take about 28 s in the debug build.

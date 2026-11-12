@@ -96,13 +96,15 @@ pub fn capabilities() -> lsp::ServerCapabilities {
             retrigger_characters: Some(vec![" ".to_string()]),
             work_done_progress_options: Default::default(),
         }),
-        code_action_provider: Some(lsp::CodeActionProviderCapability::Options(lsp::CodeActionOptions {
-            code_action_kinds: Some(vec![
-                lsp::CodeActionKind::QUICKFIX,
-                lsp::CodeActionKind::REFACTOR_REWRITE,
-            ]),
-            ..Default::default()
-        })),
+        code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
+            lsp::CodeActionOptions {
+                code_action_kinds: Some(vec![
+                    lsp::CodeActionKind::QUICKFIX,
+                    lsp::CodeActionKind::REFACTOR_REWRITE,
+                ]),
+                ..Default::default()
+            },
+        )),
         inlay_hint_provider: Some(lsp::OneOf::Left(true)),
         folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(true)),
         selection_range_provider: Some(lsp::SelectionRangeProviderCapability::Simple(true)),
@@ -587,7 +589,7 @@ impl<'c> Server<'c> {
                 let module = q.module_of_source(b.source_of(&patch.path)?)?;
                 let items = q.completions_at(module, patch.offset);
                 let uri = self.uri_of(&patch.path)?;
-                Some(features::completion_items(&q, &uri, &patch.text, items))
+                Some(features::completion_items(&uri, &patch.text, items))
             });
             self.send(Message::Response(ok(patch.request, items)));
             return;
@@ -612,11 +614,13 @@ impl<'c> Server<'c> {
                 // the problems of the last one.
                 self.analyses.remove(&root);
                 for uri in self.published.remove(&root).unwrap_or_default() {
-                    self.notify::<lsp::notification::PublishDiagnostics>(lsp::PublishDiagnosticsParams {
-                        uri,
-                        diagnostics: Vec::new(),
-                        version: None,
-                    });
+                    self.notify::<lsp::notification::PublishDiagnostics>(
+                        lsp::PublishDiagnosticsParams {
+                            uri,
+                            diagnostics: Vec::new(),
+                            version: None,
+                        },
+                    );
                 }
             }
         }
@@ -705,10 +709,11 @@ impl<'c> Server<'c> {
         };
         if req.method == WorkspaceSymbolRequest::METHOD {
             let id = req.id.clone();
-            let response = match req.extract::<lsp::WorkspaceSymbolParams>(WorkspaceSymbolRequest::METHOD) {
-                Ok((id, p)) => Response::new_ok(id, self.workspace_symbols(p)),
-                Err(e) => error(id, ErrorCode::InvalidParams, e.to_string()),
-            };
+            let response =
+                match req.extract::<lsp::WorkspaceSymbolParams>(WorkspaceSymbolRequest::METHOD) {
+                    Ok((id, p)) => Response::new_ok(id, self.workspace_symbols(p)),
+                    Err(e) => error(id, ErrorCode::InvalidParams, e.to_string()),
+                };
             return self.send(Message::Response(response));
         }
         if req.method == ResolveCompletionItem::METHOD {
@@ -761,7 +766,9 @@ impl<'c> Server<'c> {
                 params(&req, |p: lsp::DocumentHighlightParams| self.highlights(p))
             }
             PrepareRenameRequest::METHOD => {
-                answer_params(&req, |p: lsp::TextDocumentPositionParams| self.prepare_rename(p))
+                answer_params(&req, |p: lsp::TextDocumentPositionParams| {
+                    self.prepare_rename(p)
+                })
             }
             Rename::METHOD => answer_params(&req, |p: lsp::RenameParams| self.rename(p)),
             GotoTypeDefinition::METHOD => params(&req, |p: lsp::GotoDefinitionParams| {
@@ -773,14 +780,16 @@ impl<'c> Server<'c> {
             SignatureHelpRequest::METHOD => {
                 params(&req, |p: lsp::SignatureHelpParams| self.signature_help(p))
             }
-            CodeActionRequest::METHOD => params(&req, |p: lsp::CodeActionParams| self.code_actions(p)),
+            CodeActionRequest::METHOD => {
+                params(&req, |p: lsp::CodeActionParams| self.code_actions(p))
+            }
             InlayHintRequest::METHOD => params(&req, |p: lsp::InlayHintParams| self.inlay_hints(p)),
             FoldingRangeRequest::METHOD => {
                 params(&req, |p: lsp::FoldingRangeParams| self.folding_ranges(p))
             }
-            SelectionRangeRequest::METHOD => {
-                params(&req, |p: lsp::SelectionRangeParams| self.selection_ranges(p))
-            }
+            SelectionRangeRequest::METHOD => params(&req, |p: lsp::SelectionRangeParams| {
+                self.selection_ranges(p)
+            }),
             DocumentLinkRequest::METHOD => {
                 params(&req, |p: lsp::DocumentLinkParams| self.document_links(p))
             }
@@ -800,7 +809,10 @@ impl<'c> Server<'c> {
                 let doc = req.params["textDocument"]["uri"].clone();
                 let mut kept = Vec::new();
                 for (old, r) in std::mem::take(&mut self.waiting) {
-                    if old.method == req.method && !doc.is_null() && old.params["textDocument"]["uri"] == doc {
+                    if old.method == req.method
+                        && !doc.is_null()
+                        && old.params["textDocument"]["uri"] == doc
+                    {
                         self.send(Message::Response(error(
                             old.id,
                             ErrorCode::ContentModified,
@@ -990,7 +1002,11 @@ impl<'c> Server<'c> {
             {
                 let items = q.member_completions_of(place.module, old);
                 if !items.is_empty() {
-                    return Ok(Some(features::completion_items(&q, &p.text_document.uri, place.text, items)));
+                    return Ok(Some(features::completion_items(
+                        &p.text_document.uri,
+                        place.text,
+                        items,
+                    )));
                 }
             }
             // Else `v.` with nothing after the dot does not parse: check
@@ -1015,7 +1031,11 @@ impl<'c> Server<'c> {
             return Ok(None);
         };
         let items = q.completions_at(place.module, offset);
-        Ok(Some(features::completion_items(&q, &p.text_document.uri, place.text, items)))
+        Ok(Some(features::completion_items(
+            &p.text_document.uri,
+            place.text,
+            items,
+        )))
     }
 
     fn semantic_tokens(&self, id: RequestId, p: lsp::SemanticTokensParams) -> Response {

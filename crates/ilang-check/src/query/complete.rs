@@ -13,7 +13,10 @@ use super::*;
 pub enum CompletionContext {
     /// In the imports: of the names of a module in `(…) = path`, or of the
     /// module paths, written from `start`.
-    Import { names_of: Option<ModuleId>, start: u32 },
+    Import {
+        names_of: Option<ModuleId>,
+        start: u32,
+    },
     /// After `!`: a service type (§9.2).
     Environment,
     /// A type.
@@ -58,7 +61,9 @@ impl Query<'_> {
                 let (Some(first), Some(_)) = (item.path.first(), item.path.last()) else {
                     continue;
                 };
-                if contains(item.span, offset) && offset < first.span.start && !item.names.is_empty()
+                if contains(item.span, offset)
+                    && offset < first.span.start
+                    && !item.names.is_empty()
                     || item.names.iter().any(|n| contains(n.span, offset))
                 {
                     let alias = item.alias.as_ref().or(item.path.last());
@@ -82,11 +87,15 @@ impl Query<'_> {
         let mut call: Option<&Expr> = None;
         let mut record = false;
         visit_module(p, m, &mut |n| match n {
-            Node::Type(t) if t.span.start <= start && offset <= t.span.end && t.span.start < t.span.end => {
+            Node::Type(t)
+                if t.span.start <= start && offset <= t.span.end && t.span.start < t.span.end =>
+            {
                 in_type = true
             }
             Node::Expr(e) if e.span.start < offset && offset <= e.span.end => match &e.kind {
-                ExprKind::Case { .. } if case.is_none_or(|c| c.span.start <= e.span.start) => case = Some(e),
+                ExprKind::Case { .. } if case.is_none_or(|c| c.span.start <= e.span.start) => {
+                    case = Some(e)
+                }
                 ExprKind::Call { callee, .. }
                     if callee.span.end <= start
                         && offset < e.span.end
@@ -116,7 +125,11 @@ impl Query<'_> {
             let in_pattern = clauses
                 .iter()
                 .any(|c| c.patterns.iter().any(|p| contains(p.span, offset)));
-            let at_clause_start = line_before(text, start).trim().is_empty() || prev_byte(text, start) == Some(b'{');
+            // A new clause starts a line, or follows the `{`, or in the
+            // Lisp surface, where clauses are lists, a `(` or a `)`.
+            let at_clause_start = line_before(text, start).trim().is_empty()
+                || prev_byte(text, start) == Some(b'{')
+                || self.is_lisp(m) && matches!(prev_byte(text, start), Some(b'(' | b')'));
             if in_pattern || (!in_body && at_clause_start) {
                 return CompletionContext::Pattern {
                     types: self.subject_types(m, subject, clauses),
@@ -133,7 +146,12 @@ impl Query<'_> {
 
     /// The custom types of the subject of a match: of its constructor
     /// patterns, or else of its known type.
-    fn subject_types(&self, m: ModuleId, subject: &Expr, clauses: &[Clause]) -> Vec<TypeId> {
+    pub(crate) fn subject_types(
+        &self,
+        m: ModuleId,
+        subject: &Expr,
+        clauses: &[Clause],
+    ) -> Vec<TypeId> {
         let mut out = Vec::new();
         for c in clauses {
             for p in &c.patterns {
@@ -176,8 +194,13 @@ impl Query<'_> {
 
     pub(crate) fn context_completions(&self, m: ModuleId, offset: u32) -> Vec<Completion> {
         match self.completion_context(m, offset) {
-            CompletionContext::Import { names_of: Some(t), .. } => self.module_members(t),
-            CompletionContext::Import { names_of: None, start } => self.import_completions(m, Span::new(start, offset)),
+            CompletionContext::Import {
+                names_of: Some(t), ..
+            } => self.module_members(t),
+            CompletionContext::Import {
+                names_of: None,
+                start,
+            } => self.import_completions(m, Span::new(start, offset)),
             CompletionContext::Environment => self.service_completions(m),
             CompletionContext::Type => self.type_completions(m, offset),
             CompletionContext::Pattern { types } => self.pattern_completions(m, offset, &types),
@@ -207,8 +230,14 @@ impl Query<'_> {
             if t == m {
                 continue;
             }
-            let Some(path) = self.import_path(m, t) else { continue };
-            let names: Vec<String> = self.module_members(t).into_iter().map(|c| c.label).collect();
+            let Some(path) = self.import_path(m, t) else {
+                continue;
+            };
+            let names: Vec<String> = self
+                .module_members(t)
+                .into_iter()
+                .map(|c| c.label)
+                .collect();
             let mut doc = self.module_doc(t).unwrap_or_default();
             if !names.is_empty() {
                 if !doc.is_empty() {
@@ -237,7 +266,9 @@ impl Query<'_> {
         if Some(t) == p.prelude || to.path.is_empty() {
             return None;
         }
-        if to.kind == ilang_package::ModuleKind::Test && (from.kind != ilang_package::ModuleKind::Test || from.package != to.package) {
+        if to.kind == ilang_package::ModuleKind::Test
+            && (from.kind != ilang_package::ModuleKind::Test || from.package != to.package)
+        {
             return None;
         }
         if to.kind == ilang_package::ModuleKind::Prelude {
@@ -248,11 +279,15 @@ impl Query<'_> {
         }
         let package = &self.graph.packages[from.package];
         let rest = to.path.split_once('/').map(|x| x.1)?;
-        let deps = package.dependencies.iter().chain(if from.kind == ilang_package::ModuleKind::Test {
-            package.dev_dependencies.iter()
-        } else {
-            [].iter()
-        });
+        let deps =
+            package
+                .dependencies
+                .iter()
+                .chain(if from.kind == ilang_package::ModuleKind::Test {
+                    package.dev_dependencies.iter()
+                } else {
+                    [].iter()
+                });
         for (name, id) in deps {
             if *id == Some(to.package) {
                 return Some(format!("{name}/{rest}"));
@@ -336,7 +371,12 @@ impl Query<'_> {
             .map(|t| t.services.values().copied().collect())
             .unwrap_or_default();
         let module = p.module(m);
-        let mut ids: Vec<TypeId> = module.types.iter().chain(&module.imported_types).copied().collect();
+        let mut ids: Vec<TypeId> = module
+            .types
+            .iter()
+            .chain(&module.imported_types)
+            .copied()
+            .collect();
         if let Some(prelude) = p.prelude {
             ids.extend(&p.module(prelude).types);
         }
@@ -370,27 +410,52 @@ impl Query<'_> {
         let lisp = self.is_lisp(m);
         let mut out = Vec::new();
         for &t in types {
-            let TypeBody::Custom(cs) = &p.ty(t).body else { continue };
-            let Some(prefix) = self.ctor_prefix(m, t) else { continue };
+            let TypeBody::Custom(cs) = &p.ty(t).body else {
+                continue;
+            };
+            let Some(prefix) = self.ctor_prefix(m, t) else {
+                continue;
+            };
             for (i, c) in cs.iter().enumerate() {
-                let cref = CtorRef { ty: t, index: i as u32 };
+                let cref = CtorRef {
+                    ty: t,
+                    index: i as u32,
+                };
                 let name = format!("{prefix}{}", c.name);
                 let mut parts: Vec<String> = Vec::new();
                 for f in &c.fields {
                     if f.label.is_none() {
-                        parts.push(format!("${{{}:_}}", parts.len() + 1));
+                        parts.push("_".into());
                     }
                 }
                 if c.fields.iter().any(|f| f.label.is_some()) {
                     parts.push("..".into());
                 }
-                let insert = if c.fields.is_empty() {
+                let pattern = if c.fields.is_empty() {
                     name.clone()
-                } else if lisp {
-                    format!("({name} {})", parts.join(" "))
                 } else {
                     format!("{name}({})", parts.join(", "))
                 };
+                let pattern = if lisp {
+                    super::actions::lisp_pattern(&pattern).unwrap_or(pattern)
+                } else {
+                    pattern
+                };
+                // Each `_` is a place of the snippet.
+                let mut insert = String::new();
+                let mut place = 0;
+                let bytes = pattern.as_bytes();
+                for (i, ch) in pattern.char_indices() {
+                    let alone = ch == '_'
+                        && (i == 0 || !is_word_byte(bytes[i - 1]))
+                        && bytes.get(i + 1).is_none_or(|b| !is_word_byte(*b));
+                    if alone {
+                        place += 1;
+                        insert.push_str(&format!("${{{place}:_}}"));
+                    } else {
+                        insert.push(ch);
+                    }
+                }
                 out.push(Completion {
                     label: name,
                     kind: CompletionKind::Constructor,
@@ -452,7 +517,10 @@ impl Query<'_> {
         let Some((callee, args)) = self.call_at(m, call) else {
             return Vec::new();
         };
-        let given: Vec<&str> = args.iter().filter_map(|a| a.label.as_ref().map(|l| l.name.as_str())).collect();
+        let given: Vec<&str> = args
+            .iter()
+            .filter_map(|a| a.label.as_ref().map(|l| l.name.as_str()))
+            .collect();
         let lisp = self.is_lisp(m);
         self.callee_params(m, callee)
             .into_iter()
@@ -465,7 +533,11 @@ impl Query<'_> {
                     label: format!("{label}:"),
                     kind: CompletionKind::Field,
                     detail: ty,
-                    insert: Some(if lisp { format!("(: {label} ") } else { format!("{label}: ") }),
+                    insert: Some(if lisp {
+                        format!("(: {label} ")
+                    } else {
+                        format!("{label}: ")
+                    }),
                     preferred: true,
                     ..Default::default()
                 })
@@ -497,7 +569,12 @@ impl Query<'_> {
                 .map(|d| {
                     d.fields
                         .iter()
-                        .map(|f| (f.label.as_ref().map(|l| l.name.clone()), Some(self.show_type(&f.ty))))
+                        .map(|f| {
+                            (
+                                f.label.as_ref().map(|l| l.name.clone()),
+                                Some(self.show_type(&f.ty)),
+                            )
+                        })
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -531,7 +608,10 @@ impl Query<'_> {
                         }
                     }
                     Some(DefKind::External { ty, .. }) => match &ty.kind {
-                        TypeKind::Fn { params, .. } => params.iter().map(|x| x.label.as_ref().map(|l| l.name.clone())).collect(),
+                        TypeKind::Fn { params, .. } => params
+                            .iter()
+                            .map(|x| x.label.as_ref().map(|l| l.name.clone()))
+                            .collect(),
                         _ => Vec::new(),
                     },
                     None => Vec::new(),
@@ -542,7 +622,9 @@ impl Query<'_> {
                         .enumerate()
                         .map(|(i, text)| {
                             let (label, ty) = match text.split_once(": ") {
-                                Some((l, t)) if ilang_package::is_name(l) => (Some(l.to_string()), t.to_string()),
+                                Some((l, t)) if ilang_package::is_name(l) => {
+                                    (Some(l.to_string()), t.to_string())
+                                }
                                 _ => (None, text.clone()),
                             };
                             (labels.get(i).cloned().flatten().or(label), Some(ty))
@@ -567,17 +649,26 @@ impl Query<'_> {
             if t == m || imported.contains(&t) {
                 continue;
             }
-            let Some(path) = self.import_path(m, t) else { continue };
+            let Some(path) = self.import_path(m, t) else {
+                continue;
+            };
             for mut c in self.module_members(t) {
                 if !c.label.starts_with(prefix) || visible.contains(&c.label) {
                     continue;
                 }
-                let names = if c.kind == CompletionKind::Type { None } else { Some(c.label.clone()) };
+                let names = if c.kind == CompletionKind::Type {
+                    None
+                } else {
+                    Some(c.label.clone())
+                };
                 if c.kind == CompletionKind::Type {
                     continue;
                 }
                 c.edits = vec![self.import_edit(m, &path, names.as_deref())];
-                c.detail = Some(format!("{} (import from {path})", c.detail.unwrap_or_default()));
+                c.detail = Some(format!(
+                    "{} (import from {path})",
+                    c.detail.unwrap_or_default()
+                ));
                 out.push(c);
             }
         }
@@ -660,7 +751,11 @@ impl Query<'_> {
         label.push(')');
         let ret = match &callee.kind {
             ExprKind::Name(ValueRef::Ctor(c)) => Some(self.type_head(c.ty)),
-            ExprKind::Name(ValueRef::Def(d)) => self.def_type(*d).as_deref().and_then(split_fn_type).map(|x| x.1),
+            ExprKind::Name(ValueRef::Def(d)) => self
+                .def_type(*d)
+                .as_deref()
+                .and_then(split_fn_type)
+                .map(|x| x.1),
             ExprKind::Name(ValueRef::Local(v)) => {
                 let t = match self.def_of_var(m, *v) {
                     Some(d) => self.def_type(d),
@@ -682,7 +777,10 @@ impl Query<'_> {
                 || a.label.as_ref().is_some_and(|l| contains(l.span, offset));
             if let Some(l) = &a.label {
                 if at {
-                    active = params.iter().position(|(x, _)| x.as_deref() == Some(&l.name)).map(|i| i as u32);
+                    active = params
+                        .iter()
+                        .position(|(x, _)| x.as_deref() == Some(&l.name))
+                        .map(|i| i as u32);
                 }
             } else if at {
                 active = Some(position);
@@ -694,7 +792,9 @@ impl Query<'_> {
         let active = active.or_else(|| {
             let text = self.text(m);
             let after_last = args.last().map_or(callee.span.end, |a| a.value.span.end);
-            let between = text.get(after_last as usize..offset as usize).unwrap_or_default();
+            let between = text
+                .get(after_last as usize..offset as usize)
+                .unwrap_or_default();
             let positional = args.iter().filter(|a| a.label.is_none()).count() as u32;
             Some(if args.is_empty() {
                 0
@@ -727,7 +827,10 @@ impl Query<'_> {
 /// The parameters and the rest of a shown function type `(a, b) -> c`.
 pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
     let t = t.trim();
-    let t = t.strip_prefix("{ ").and_then(|x| x.strip_suffix(" }")).unwrap_or(t);
+    let t = t
+        .strip_prefix("{ ")
+        .and_then(|x| x.strip_suffix(" }"))
+        .unwrap_or(t);
     if !t.starts_with('(') {
         return None;
     }
@@ -763,7 +866,11 @@ pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
     if !cur.trim().is_empty() {
         parts.push(cur.trim().to_string());
     }
-    let rest = t[close + 1..].trim_start().strip_prefix("->")?.trim().to_string();
+    let rest = t[close + 1..]
+        .trim_start()
+        .strip_prefix("->")?
+        .trim()
+        .to_string();
     Some((parts, rest))
 }
 

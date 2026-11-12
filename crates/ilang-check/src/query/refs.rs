@@ -88,7 +88,12 @@ impl Query<'_> {
     /// Every place in `modules` that names `target`, and the place that
     /// defines it, in the order of the modules and of the text. A local
     /// name is only looked for in its own module.
-    pub fn references(&self, target: &Target, owner: ModuleId, modules: &[ModuleId]) -> Vec<Reference> {
+    pub fn references(
+        &self,
+        target: &Target,
+        owner: ModuleId,
+        modules: &[ModuleId],
+    ) -> Vec<Reference> {
         let target = &self.canonical(owner, target.clone());
         let definition = self.definition(owner, target);
         let only: Vec<ModuleId>;
@@ -103,7 +108,9 @@ impl Query<'_> {
         for &m in modules {
             let w = self.walk(m);
             let labels = w.labels.iter().map(|(s, t)| (s, t, true));
-            for (span, found, label_binder) in w.occ.iter().map(|(s, t)| (s, t, false)).chain(labels) {
+            for (span, found, label_binder) in
+                w.occ.iter().map(|(s, t)| (s, t, false)).chain(labels)
+            {
                 if span.start >= span.end || !self.same(m, found, target) {
                     continue;
                 }
@@ -112,7 +119,8 @@ impl Query<'_> {
                 };
                 let r = Reference {
                     location,
-                    definition: definition.is_some_and(|d| d.source == location.source && d.span == location.span),
+                    definition: definition
+                        .is_some_and(|d| d.source == location.source && d.span == location.span),
                     label_binder,
                 };
                 if !out.iter().any(|o| o.location == r.location) {
@@ -176,7 +184,11 @@ impl Query<'_> {
     }
 
     /// The name at a place, when it may be renamed: its span, and its text.
-    pub fn prepare_rename(&self, m: ModuleId, offset: u32) -> Result<Option<(Span, String)>, RenameError> {
+    pub fn prepare_rename(
+        &self,
+        m: ModuleId,
+        offset: u32,
+    ) -> Result<Option<(Span, String)>, RenameError> {
         let Some(r) = self.renamable(m, offset)? else {
             return Ok(None);
         };
@@ -188,7 +200,19 @@ impl Query<'_> {
         Ok(Some((r.span, name)))
     }
 
-    pub(crate) fn renamable(&self, m: ModuleId, offset: u32) -> Result<Option<Renamable>, RenameError> {
+    pub(crate) fn renamable(
+        &self,
+        m: ModuleId,
+        offset: u32,
+    ) -> Result<Option<Renamable>, RenameError> {
+        if let Some(c) = self.macro_call_at(m, offset)
+            && contains(c.name, offset)
+        {
+            return Err(RenameError(format!(
+                "`{}` is a macro: its calls are expanded, so they cannot be renamed",
+                c.macro_name
+            )));
+        }
         let Some((owner, span, target)) = self.target_at_offset(m, offset) else {
             return Ok(None);
         };
@@ -197,12 +221,17 @@ impl Query<'_> {
         match &target {
             Target::Literal(_) => return Ok(None),
             Target::Type(TypeRef::Builtin(b)) => {
-                return refuse(format!("`{}` is a built-in type and cannot be renamed", b.name()));
+                return refuse(format!(
+                    "`{}` is a built-in type and cannot be renamed",
+                    b.name()
+                ));
             }
             _ => {}
         }
         if owner != m || span.end as usize > self.written_text(m).len() {
-            return refuse("this name was produced by a macro expansion and cannot be renamed".into());
+            return refuse(
+                "this name was produced by a macro expansion and cannot be renamed".into(),
+            );
         }
         let defined = match &target {
             Target::Module(t) => Some(*t),
@@ -217,8 +246,11 @@ impl Query<'_> {
         } else if !self.is_own(defined) {
             let package = &self.graph.packages[p.module(defined).package];
             let module = &p.module(defined).path;
-            return if Some(defined) == p.prelude || p.module(defined).package == self.graph.library {
-                refuse(format!("`{module}` is in the library `i`: its names are built in and cannot be renamed"))
+            return if Some(defined) == p.prelude || p.module(defined).package == self.graph.library
+            {
+                refuse(format!(
+                    "`{module}` is in the library `i`: its names are built in and cannot be renamed"
+                ))
             } else {
                 refuse(format!(
                     "this name is defined in `{module}` of the dependency `{}`, which cannot be renamed from here",
@@ -228,29 +260,51 @@ impl Query<'_> {
         }
         if let Some(d) = self.definition(owner, &target)
             && !matches!(target, Target::Module(_))
-            && (p.origin(d.module, d.span).is_some_and(|o| o.template.is_some())
+            && (p
+                .origin(d.module, d.span)
+                .is_some_and(|o| o.template.is_some())
                 || d.span.end as usize > self.written_text(d.module).len())
         {
-            return refuse("this name was produced by a macro expansion and cannot be renamed".into());
+            return refuse(
+                "this name was produced by a macro expansion and cannot be renamed".into(),
+            );
         }
-        Ok(Some(Renamable { owner, span, target }))
+        Ok(Some(Renamable {
+            owner,
+            span,
+            target,
+        }))
     }
 
     /// The edits that rename the name at a place to `new_name`, in every
     /// module of the package.
-    pub fn rename(&self, m: ModuleId, offset: u32, new_name: &str) -> Result<Vec<Edit>, RenameError> {
+    pub fn rename(
+        &self,
+        m: ModuleId,
+        offset: u32,
+        new_name: &str,
+    ) -> Result<Vec<Edit>, RenameError> {
         let Some(r) = self.renamable(m, offset)? else {
             return Err(RenameError("there is no name here to rename".into()));
         };
-        let upper = matches!(r.target, Target::Ctor(_) | Target::Type(_) | Target::TyVar(_));
-        let valid = if upper { is_up_name(new_name) } else { ilang_package::is_name(new_name) };
+        let upper = matches!(
+            r.target,
+            Target::Ctor(_) | Target::Type(_) | Target::TyVar(_)
+        );
+        let valid = if upper {
+            is_up_name(new_name)
+        } else {
+            ilang_package::is_name(new_name)
+        };
         if !valid {
             let kind = if upper {
                 "an UpName (a capital letter, then letters and digits)"
             } else {
                 "a name (a lower-case letter or `_`, then lower-case letters, digits and `_`)"
             };
-            return Err(RenameError(format!("`{new_name}` is not a valid new name: it must be {kind}")));
+            return Err(RenameError(format!(
+                "`{new_name}` is not a valid new name: it must be {kind}"
+            )));
         }
         let old = self.written_text(m)[r.span.start as usize..r.span.end as usize].to_string();
         if old == new_name {
@@ -265,7 +319,8 @@ impl Query<'_> {
         for reference in refs {
             let loc = reference.location;
             let lisp = self.is_lisp(loc.module);
-            let text = &self.written_text(loc.module)[loc.span.start as usize..loc.span.end as usize];
+            let text =
+                &self.written_text(loc.module)[loc.span.start as usize..loc.span.end as usize];
             let edit = match (&r.target, reference.label_binder) {
                 // `User(name, ..)` binds `name` and matches the field
                 // `name`: keep the local, give the new label.
@@ -300,7 +355,12 @@ impl Query<'_> {
     }
 
     /// Renames the name that an import gives to a module, in that module.
-    fn rename_module(&self, m: ModuleId, t: ModuleId, new_name: &str) -> Result<Vec<Edit>, RenameError> {
+    fn rename_module(
+        &self,
+        m: ModuleId,
+        t: ModuleId,
+        new_name: &str,
+    ) -> Result<Vec<Edit>, RenameError> {
         let source = self.source_of(m);
         if self.visible_top_level(m).iter().any(|n| n == new_name) {
             return Err(RenameError(format!(
@@ -321,7 +381,8 @@ impl Query<'_> {
                     text: new_name.to_string(),
                 }),
                 None if self.is_lisp(m) => {
-                    let text = &self.written_text(m)[item.span.start as usize..item.span.end as usize];
+                    let text =
+                        &self.written_text(m)[item.span.start as usize..item.span.end as usize];
                     edits.push(Edit {
                         source,
                         span: item.span,
@@ -344,7 +405,10 @@ impl Query<'_> {
         for (span, target) in &w.occ {
             if *target == Target::Module(t)
                 && !path_spans.contains(span)
-                && !ast.imports.iter().any(|i| i.alias.as_ref().is_some_and(|a| a.span == *span))
+                && !ast
+                    .imports
+                    .iter()
+                    .any(|i| i.alias.as_ref().is_some_and(|a| a.span == *span))
                 && span.end as usize <= self.written_text(m).len()
             {
                 edits.push(Edit {
@@ -357,7 +421,11 @@ impl Query<'_> {
         // A local name with the new name where the module is used would
         // cover it.
         for e in &edits {
-            if self.local_names_at(m, e.span.start).iter().any(|b| b.name == new_name) {
+            if self
+                .local_names_at(m, e.span.start)
+                .iter()
+                .any(|b| b.name == new_name)
+            {
                 return Err(RenameError(format!(
                     "`{new_name}` is a local name where the module is used: it would cover the module"
                 )));
@@ -410,7 +478,12 @@ impl Query<'_> {
         scope
     }
 
-    fn check_conflicts(&self, r: &Renamable, refs: &[Reference], new: &str) -> Result<(), RenameError> {
+    fn check_conflicts(
+        &self,
+        r: &Renamable,
+        refs: &[Reference],
+        new: &str,
+    ) -> Result<(), RenameError> {
         let p = self.program;
         let conflict = |what: String| Err(RenameError(format!("cannot rename to `{new}`: {what}")));
         match &r.target {
@@ -424,12 +497,21 @@ impl Query<'_> {
                     }
                     let at = self.local_names_at(loc.module, loc.span.start);
                     if at.iter().any(|b| b.name == new && b.var != *v) {
-                        return conflict("a local name with that name is in scope where this one is used".into());
+                        return conflict(
+                            "a local name with that name is in scope where this one is used".into(),
+                        );
                     }
-                    if !reference.definition && self.visible_top_level(loc.module).iter().any(|n| n == new) {
-                        let covered = self.local_names_at(loc.module, loc.span.start).iter().all(|b| b.var != *v);
+                    if !reference.definition
+                        && self.visible_top_level(loc.module).iter().any(|n| n == new)
+                    {
+                        let covered = self
+                            .local_names_at(loc.module, loc.span.start)
+                            .iter()
+                            .all(|b| b.var != *v);
                         if covered {
-                            return conflict("a top-level name with that name would be used instead".into());
+                            return conflict(
+                                "a top-level name with that name would be used instead".into(),
+                            );
                         }
                     }
                 }
@@ -440,7 +522,11 @@ impl Query<'_> {
             Target::Def(d) => {
                 let mut modules = vec![d.module];
                 for &m in &self.own_modules() {
-                    if self.ast(m).imports.iter().any(|i| i.names.iter().any(|n| n.name == p.def(*d).name))
+                    if self
+                        .ast(m)
+                        .imports
+                        .iter()
+                        .any(|i| i.names.iter().any(|n| n.name == p.def(*d).name))
                         && refs.iter().any(|x| x.location.module == m)
                     {
                         modules.push(m);
@@ -448,14 +534,24 @@ impl Query<'_> {
                 }
                 for m in modules {
                     if self.visible_top_level(m).iter().any(|n| n == new) {
-                        return conflict(format!("`{}` already has a top-level name `{new}`", p.module(m).path));
+                        return conflict(format!(
+                            "`{}` already has a top-level name `{new}`",
+                            p.module(m).path
+                        ));
                     }
                 }
                 for reference in refs {
                     let loc = reference.location;
                     let qualified = self.qualified_at(loc.module, loc.span);
-                    if !qualified && self.local_names_at(loc.module, loc.span.start).iter().any(|b| b.name == new) {
-                        return conflict("a local name with that name is in scope where this one is used".into());
+                    if !qualified
+                        && self
+                            .local_names_at(loc.module, loc.span.start)
+                            .iter()
+                            .any(|b| b.name == new)
+                    {
+                        return conflict(
+                            "a local name with that name is in scope where this one is used".into(),
+                        );
                     }
                 }
                 Ok(())
@@ -463,14 +559,21 @@ impl Query<'_> {
             Target::Ctor(c) => {
                 let module = p.ty(c.ty).module;
                 if self.visible_top_level(module).iter().any(|n| n == new) {
-                    return conflict(format!("`{}` already has a name `{new}`", p.module(module).path));
+                    return conflict(format!(
+                        "`{}` already has a name `{new}`",
+                        p.module(module).path
+                    ));
                 }
                 for reference in refs {
                     let m = reference.location.module;
-                    if m != module && !self.qualified_at(m, reference.location.span)
+                    if m != module
+                        && !self.qualified_at(m, reference.location.span)
                         && self.visible_top_level(m).iter().any(|n| n == new)
                     {
-                        return conflict(format!("`{}` already has a name `{new}`", p.module(m).path));
+                        return conflict(format!(
+                            "`{}` already has a name `{new}`",
+                            p.module(m).path
+                        ));
                     }
                 }
                 Ok(())
@@ -478,31 +581,40 @@ impl Query<'_> {
             Target::Type(TypeRef::Custom(t)) => {
                 let module = p.ty(*t).module;
                 if self.visible_types(module).iter().any(|n| n == new) {
-                    return conflict(format!("`{}` already has a type `{new}`", p.module(module).path));
+                    return conflict(format!(
+                        "`{}` already has a type `{new}`",
+                        p.module(module).path
+                    ));
                 }
                 if BuiltinType::ALL.iter().any(|b| b.name() == new) {
                     return conflict("it is a built-in type".into());
                 }
                 for reference in refs {
                     let m = reference.location.module;
-                    if m != module && !self.qualified_at(m, reference.location.span)
+                    if m != module
+                        && !self.qualified_at(m, reference.location.span)
                         && self.visible_types(m).iter().any(|n| n == new)
                     {
-                        return conflict(format!("`{}` already has a type `{new}`", p.module(m).path));
+                        return conflict(format!(
+                            "`{}` already has a type `{new}`",
+                            p.module(m).path
+                        ));
                     }
                 }
                 Ok(())
             }
             Target::Field(fields) => {
                 for (c, i) in fields {
-                    let Some(def) = self.ctor_def(*c) else { continue };
-                    if def
-                        .fields
-                        .iter()
-                        .enumerate()
-                        .any(|(j, f)| j != *i as usize && f.label.as_ref().is_some_and(|l| l.name == new))
-                    {
-                        return conflict(format!("the constructor `{}` already has a field `{new}`", def.name));
+                    let Some(def) = self.ctor_def(*c) else {
+                        continue;
+                    };
+                    if def.fields.iter().enumerate().any(|(j, f)| {
+                        j != *i as usize && f.label.as_ref().is_some_and(|l| l.name == new)
+                    }) {
+                        return conflict(format!(
+                            "the constructor `{}` already has a field `{new}`",
+                            def.name
+                        ));
                     }
                 }
                 Ok(())
@@ -534,10 +646,9 @@ impl Query<'_> {
 
     /// The name at `span` is written after the name of a module.
     fn qualified_at(&self, m: ModuleId, span: Span) -> bool {
-        self.walk(m)
-            .occ
-            .iter()
-            .any(|(s, t)| matches!(t, Target::Module(_)) && s.end < span.start && span.start - s.end <= 2)
+        self.walk(m).occ.iter().any(|(s, t)| {
+            matches!(t, Target::Module(_)) && s.end < span.start && span.start - s.end <= 2
+        })
     }
 
     /// The uses of other names spelled `new` where the local `v` is in
@@ -546,20 +657,29 @@ impl Query<'_> {
         let w = self.walk(m);
         let text = self.text(m);
         for (span, target) in &w.occ {
-            let word = text.get(span.start as usize..span.end as usize).unwrap_or_default();
+            let word = text
+                .get(span.start as usize..span.end as usize)
+                .unwrap_or_default();
             if word != new || matches!(target, Target::Module(_) | Target::Literal(_)) {
                 continue;
             }
             if matches!(target, Target::Local(x) if *x == v) {
                 continue;
             }
-            if matches!(target, Target::Type(_) | Target::Ctor(_) | Target::TyVar(_) | Target::Field(_)) {
+            if matches!(
+                target,
+                Target::Type(_) | Target::Ctor(_) | Target::TyVar(_) | Target::Field(_)
+            ) {
                 continue;
             }
             if w.binders.values().any(|b| b == span) {
                 continue;
             }
-            if self.local_names_at(m, span.start).iter().any(|b| b.var == v) {
+            if self
+                .local_names_at(m, span.start)
+                .iter()
+                .any(|b| b.var == v)
+            {
                 return Err(RenameError(format!(
                     "cannot rename to `{new}`: a use of another `{new}` is in the scope of this name and would be captured"
                 )));
