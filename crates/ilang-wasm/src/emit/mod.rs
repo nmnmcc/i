@@ -13,7 +13,6 @@ mod host;
 mod numeric;
 mod wasi;
 
-
 /// Support functions of the generated code, for tests in patterns.
 const SUPPORT: &str = r#"
 (func $is_data (param $v eqref) (param $set i32) (param $n i32) (result i32)
@@ -614,7 +613,10 @@ impl<'p> Emitter<'p> {
     fn call(&mut self, callee: &Callee, args_atoms: &[Atom], tail: bool, env: &str) -> String {
         let n = args_atoms.len() as u32;
         self.arities.insert(n);
-        let args: String = args_atoms.iter().map(|a| format!(" {}", self.atom(a))).collect();
+        let args: String = args_atoms
+            .iter()
+            .map(|a| format!(" {}", self.atom(a)))
+            .collect();
         let prefix = if tail { "return_" } else { "" };
         match callee {
             Callee::Direct(f) => {
@@ -805,8 +807,14 @@ impl<'p> Emitter<'p> {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
             Value::Multi(groups) => {
-                let closures: String = groups.iter().map(|(_, a)| format!(" {}", self.atom(a))).collect();
-                let shapes: String = groups.iter().map(|(s, _)| format!(" (i64.const {s})")).collect();
+                let closures: String = groups
+                    .iter()
+                    .map(|(_, a)| format!(" {}", self.atom(a)))
+                    .collect();
+                let shapes: String = groups
+                    .iter()
+                    .map(|(s, _)| format!(" (i64.const {s})"))
+                    .collect();
                 format!(
                     "(struct.new $multi (i32.const 7) (i32.const 0) (i64.const -1) (f64.const 0) \
                      (ref.null $bytes) (array.new_fixed $values {k}{closures}) (ref.null $limbs) (ref.null $call) \

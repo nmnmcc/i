@@ -2630,7 +2630,12 @@ impl<'a> Lowerer<'a> {
             ExprKind::Name(r) => {
                 // A chain name that an expected type narrowed to one shape
                 // group stands for that group's function.
-                let r = self.typed.selected_names.get(&(fx.module, e.span)).copied().unwrap_or(*r);
+                let r = self
+                    .typed
+                    .selected_names
+                    .get(&(fx.module, e.span))
+                    .copied()
+                    .unwrap_or(*r);
                 self.name(fx, e, r)
             }
             ExprKind::Tuple(items) => {
@@ -2647,7 +2652,11 @@ impl<'a> Lowerer<'a> {
                     let parts = groups
                         .iter()
                         .map(|g| {
-                            let set = if g.shape.has_labels() { self.shape_set(g.shape) } else { 0 };
+                            let set = if g.shape.has_labels() {
+                                self.shape_set(g.shape)
+                            } else {
+                                0
+                            };
                             let id = crate::ir::shape_id(g.shape.positions(), set);
                             let value = self.expr(fx, out, &g.value);
                             if set != 0 {
@@ -2681,9 +2690,7 @@ impl<'a> Lowerer<'a> {
                             let base_shape = base_shape.expect("a key from the spread");
                             let at = match &key {
                                 Some(l) => base_shape.label_index(l).expect("a spread label"),
-                                None => parts
-                                    .len()
-                                    .min(base_shape.positions() as usize),
+                                None => parts.len().min(base_shape.positions() as usize),
                             };
                             let b = base.clone().expect("a spread base");
                             let_value(fx, out, Value::Field(b, at as u32), None)

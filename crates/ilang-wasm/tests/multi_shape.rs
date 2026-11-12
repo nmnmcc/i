@@ -159,7 +159,11 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
 
     // Control: the handler `(k) { control.resume(k, 10) }`.
     let mut f = F::new(1);
-    let r = f.let_(Value::OpEnv(Op::Resume, vec![Atom::Local(0), int(10)], Env::Param));
+    let r = f.let_(Value::OpEnv(
+        Op::Resume,
+        vec![Atom::Local(0), int(10)],
+        Env::Param,
+    ));
     let handler = add(f.done("handler", Some(r)));
     // The shape-1 group that suspends: `(b) { control.suspend(b, handler) + 1 }`,
     // with the handler as global 4 (a multi-shape value with it as its
@@ -180,7 +184,10 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     // The boundary body: `(b) { g3(b) * 2 }`, a call through the multi-shape
     // value of global 3 across the suspension.
     let mut f = F::new(1);
-    let v = f.call(Callee::Value(Atom::Global(GlobalId(3))), vec![Atom::Local(0)]);
+    let v = f.call(
+        Callee::Value(Atom::Global(GlobalId(3))),
+        vec![Atom::Local(0)],
+    );
     let r = f.let_(Value::Op(Op::IntMul, vec![v, int(2)]));
     let body = add(f.done("body", Some(r)));
 
@@ -213,7 +220,10 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
         (0, c_zero.clone()),
     ]));
     s.body.push(Stmt::SetGlobal(GlobalId(0), m));
-    let m2 = s.let_(Value::Multi(vec![(1, c_one.clone()), (2, Atom::Func(looping))]));
+    let m2 = s.let_(Value::Multi(vec![
+        (1, c_one.clone()),
+        (2, Atom::Func(looping)),
+    ]));
     s.body.push(Stmt::SetGlobal(GlobalId(1), m2));
     s.body
         .push(Stmt::SetGlobal(GlobalId(2), Atom::Func(looping_fast)));
@@ -222,11 +232,20 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
         (1, Atom::Func(suspends)),
     ]));
     s.body.push(Stmt::SetGlobal(GlobalId(3), m3));
-    let m4 = s.let_(Value::Multi(vec![(0, c_zero.clone()), (1, Atom::Func(handler))]));
+    let m4 = s.let_(Value::Multi(vec![
+        (0, c_zero.clone()),
+        (1, Atom::Func(handler)),
+    ]));
     s.body.push(Stmt::SetGlobal(GlobalId(4), m4));
-    let m5 = s.let_(Value::Multi(vec![(2, c_two.clone()), (1, Atom::Func(suspends_h))]));
+    let m5 = s.let_(Value::Multi(vec![
+        (2, c_two.clone()),
+        (1, Atom::Func(suspends_h)),
+    ]));
     s.body.push(Stmt::SetGlobal(GlobalId(5), m5));
-    let m6 = s.let_(Value::Multi(vec![(2, c_two.clone()), (1, Atom::Func(body))]));
+    let m6 = s.let_(Value::Multi(vec![
+        (2, c_two.clone()),
+        (1, Atom::Func(body)),
+    ]));
     s.body.push(Stmt::SetGlobal(GlobalId(6), m6));
     // A second value with the same groups as global 0.
     let m7 = s.let_(Value::Multi(vec![
@@ -280,7 +299,11 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     // boundary body calls global 3, whose shape-1 group suspends; the
     // handler resumes with 10, so the body gives (10 + 1) * 2.
     let mut f = F::new(0);
-    let r = f.let_(Value::OpEnv(Op::Boundary, vec![Atom::Func(body)], Env::Param));
+    let r = f.let_(Value::OpEnv(
+        Op::Boundary,
+        vec![Atom::Func(body)],
+        Env::Param,
+    ));
     f.check(r, int(22));
     checks.push(("suspend", f.done("suspend", None)));
 
@@ -336,7 +359,9 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     let t = f.let_(Value::Op(inspect, vec![g(0)]));
     f.check(
         t,
-        Atom::String("//fn(a) { ... } | (a, b) { ... } | (a, port = b) { ... } | () { ... }".into()),
+        Atom::String(
+            "//fn(a) { ... } | (a, b) { ... } | (a, port = b) { ... } | () { ... }".into(),
+        ),
     );
     let t = f.let_(Value::Op(inspect, vec![g(8)]));
     f.check(t, Atom::String("//fn(a, port = b) { ... }".into()));
@@ -384,7 +409,11 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     }
     let body5 = body5.unwrap();
     let mut f = F::new(0);
-    let r = f.let_(Value::OpEnv(Op::Boundary, vec![Atom::Func(body5)], Env::Param));
+    let r = f.let_(Value::OpEnv(
+        Op::Boundary,
+        vec![Atom::Func(body5)],
+        Env::Param,
+    ));
     f.check(r, int(22));
     funcs.push(f.done("suspend_handler", None));
     p.exports.push(Export {
@@ -401,7 +430,17 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
 
     p.funcs = funcs;
     p.func_shapes.insert(labelled, port);
-    p.constants = vec![one, two, looping, looping_fast, handler, suspends, suspends_h, body, body5];
+    p.constants = vec![
+        one,
+        two,
+        looping,
+        looping_fast,
+        handler,
+        suspends,
+        suspends_h,
+        body,
+        body5,
+    ];
     p.globals = 9;
     p.start = Some(start);
     control::split(&mut p);
