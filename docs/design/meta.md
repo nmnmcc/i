@@ -140,21 +140,25 @@ Symbol  = (* a symbol of spec §1.5 that is not a bracket *) .
 - An `Unquote` or a `Splice` may only be inside a `Quote`. A `Quote` may be inside a `Quote` only when an `Unquote` or a `Splice` of the outer quote is around it, as in `` `(f ~..(map xs (-> (x) _ `(g ~x)))) ``.
 - The **head** of a `Round` is its first part.
 
-`i fmt` uses the same 80-column document layout and one-tab indentation as
-for the normal surface. A datum that fits stays on one line. A longer round
-form keeps its head and distinguished first part (`=` name, `->` parameters
-or clause head, `|` subject, `@` attribute) together, then puts the remaining
-parts on separate lines one level in; a call keeps its callee first. Indentation stops at 19 tabs
-so that delimiters still have room within the width. A large
-distinguished part can itself break. Blocks and clause lists with multiple
-parts put one statement or clause on each line. Lists, tuples and bit arrays
-stay together when they fit, otherwise their parts go one per line. Closing
-brackets of broken forms get their own line. Quote, unquote and splice
-prefixes stay attached to their datum. At most one existing blank line is
-kept between top-level items. Literal spellings and strings are kept without
-splitting; comments, including documentation, stay between the same datums,
-and trailing comments stay after their datum. A single indivisible atom,
-string or comment can exceed the width.
+`i fmt` lays out `.is` files by Lisp convention, following cljfmt's
+indentation rules (the same as Emacs `calculate-lisp-indent`) and zprint's
+hang/flow choice, in 80 columns with spaces. A datum that fits stays on one
+line. Closing brackets are gathered at the end of the last line of a form.
+A broken block-like form keeps its head and distinguished parts on the head
+line (`=` pattern, `->` parameters and result of a function or the first
+part of a clause or function type, `|` subject, `.` subject, `@` attribute,
+`:` name, `!` first part) and indents its body two spaces; when they do not
+fit, the distinguished parts go on their own lines four spaces in. Another
+call with an atom head hangs (first argument on the head line, the others
+aligned under it) or flows (arguments under the head, one space in),
+whichever overflows less and then uses fewer lines. A call with a bracketed
+head, and `{`, `[` and `<<`, align parts under the first part. Reader
+prefixes stay attached to their datum. Literal spellings and strings are
+kept without splitting. Comments stay between the same datums; a trailing
+comment stays on its line when it fits, and a line comment before closing
+brackets puts them on the next line, aligned with the form's parts. At most
+one existing blank line is kept between top-level items. A single
+indivisible atom, string or comment can exceed the width.
 
 The parser changes datums into the core tree with the tables of §2.3. The tables are read by **position**. The position of a datum says which rows may be used, and each row says which positions its parts are in. The positions are: import item, export item, item, attribute, constructor, field, type, function result, parameter, expression, statement, call argument, clause, clause head, pattern, bit array segment, and format. A datum that fits no row of its position is a compile error.
 

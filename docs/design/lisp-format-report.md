@@ -1,5 +1,51 @@
 # Lisp surface formatter report
 
+## Revision: Lisp-convention layout (owner decision)
+
+Owner decision: closing brackets are gathered at the end of the line and
+`.is` files follow Lisp convention throughout. The `.is` printer no longer
+uses the shared Wadler document renderer; `.i` formatting is unchanged.
+
+Reference followed: cljfmt's indentation rules (`list-indent`,
+`block-indent`/`inner-indent`, `coll-indent`), which reproduce Emacs
+`calculate-lisp-indent` with `lisp-indent-function`; for choosing where to
+break, zprint's "hang, else flow" choice (no cljfmt/zprint/Emacs checkout is
+under `.rd/ref`; Racket's `pretty.rkt` there uses the same hang/flow split).
+
+Rules as implemented (`crates/ilang-syntax/src/lisp/format.rs`):
+
+1. Width 80 columns, indentation with spaces only.
+2. A datum without comments that fits in the remaining width, counting the
+   closing brackets that follow it on its line, stays on one line.
+3. Closing brackets `)`, `]`, `}`, `>>` never begin a line: they follow the
+   last part of the form.
+4. Block-like heads keep their distinguished parts on the head line and
+   indent the body two spaces under the opening bracket (cljfmt `:block`):
+   `=` (pattern), `->` (parameters and result of a three-part function; the
+   first part of a clause or function type), `|` (subject), `.` (subject of a
+   field access or postfix match), `@` (attribute), `:` (name), `!` (first
+   part). If that overflows more than putting each distinguished part on its
+   own line four spaces in (Emacs `defun` style), the latter is used.
+5. Other calls with an atom head: hang (first argument on the head line,
+   the rest aligned under it) or flow (all arguments on their own lines one
+   space in, under the head: cljfmt/Clojure style guide). The layout that
+   overflows less, then uses fewer lines, wins; ties keep hang.
+6. A call with a bracketed head, and `{` blocks/clause lists/records, `[`
+   lists and `<<` bit arrays: the first part follows the opening bracket and
+   the others align under it (cljfmt `coll-indent`).
+7. Reader prefixes `` ` ``, `~`, `~..` stay attached to their datum.
+8. Comments stay in their source gap. A trailing comment stays on its line
+   when it fits, otherwise it moves to its own line at the indentation of the
+   next part. A line comment directly before closing brackets puts the
+   closers on the next line, aligned with the form's parts (as cljfmt and
+   zprint do; no comment is moved past brackets).
+9. At most one existing blank line is kept between top-level items; blank
+   lines inside forms are removed. Output ends with one newline.
+10. Atoms, strings and comments are never split; only such a single token
+    (with its brackets) may exceed the width.
+
+## Original report
+
 No language or library surface for state was added.
 
 ## Implemented layout

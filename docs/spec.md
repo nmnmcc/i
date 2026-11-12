@@ -134,15 +134,20 @@ One rule does not depend on lines: in the `->` part of a function, after the `)`
 
 `i fmt` formats `.i` and `.is` source files in their own surface, including
 both extensions by default in `src/`, `test/` and given directories;
-`--check` reports files that would change. Both surfaces use 80 columns and
-one tab per indentation level. The Lisp surface keeps a datum on one line
-when it fits, otherwise breaks its parts at datum boundaries, retaining the
-head and distinguished first parts together and indenting the remaining
-parts once. Blocks and clause lists put their statements or clauses one per
-line; lists and tuples break one part per line when needed. Reader prefixes
-stay attached, strings are not split, comments keep their place, and at most
-one existing blank line separates top-level items. A single indivisible atom,
-string or comment may exceed the width. `i fmt --to is` uses that same layout.
+`--check` reports files that would change. Both surfaces use 80 columns. The
+normal surface indents with one tab per level. The Lisp surface is laid out
+by Lisp convention (cljfmt indentation): a datum that fits stays on one
+line; closing brackets never begin a line and are gathered at the end of the
+form's last line; indentation is with spaces. A broken block-like form (`=`,
+`->`, `|`, `.`, `@`, `:`, `!`) keeps its head and distinguished first parts
+on the head line and indents its body two spaces; another call either keeps
+its first argument on the head line and aligns the others under it, or puts
+its arguments under the head, one space in; `{`, `[` and `<<` align their
+parts under the first. Reader prefixes stay attached, strings are not split,
+comments keep their place (a line comment before closing brackets moves them
+to the next line), and at most one existing blank line separates top-level
+items. A single indivisible atom, string or comment may exceed the width.
+`i fmt --to is` uses that same layout.
 
 ## 2. Modules
 
