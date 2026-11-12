@@ -204,3 +204,13 @@ list in `crates/ilang-package/tests/load.rs:201` does not. Updating that
 assertion conflicts with the task's acceptance rule forbidding any `crates/`
 diff, so the assertion is unchanged. The full acceptance gate cannot pass
 under both requirements until the coordinator updates that upstream test.
+
+Independent remaining checks: `scripts/old-syntax-check` passed (4,634
+extracted literals/blocks). `scripts/dev-verify i` failed its review corpus:
+1,973 cases, two unclassified checker timeouts, and 20 listed comparison
+failures. Examples: `review-k4/perf/wide_generic_1024: unclassified checker
+timeout` and `review-k4s/std: unclassified checker timeout`; complete output
+is `/tmp/std4-dev-verify-i.log`. The run had concurrent heavy jobs; the cause
+of the differences was not established. WASI smoke and the preceding std
+runs passed. The gate therefore remains unverified, independently of the
+module-list assertion above.
