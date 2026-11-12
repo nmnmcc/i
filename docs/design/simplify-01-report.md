@@ -22,3 +22,11 @@ The scheme wire tests retain their original text, with the enclosing module's in
  tests/syn2-stages.md                              |   10 -
  11 files changed, 1222 insertions(+), 4750 deletions(-)
 ```
+
+Verification: `scripts/dev-verify rust` and `scripts/old-syntax-check` pass. Two runs of `scripts/dev-verify i` failed in the review corpus, including `review-k4s/std: unclassified checker timeout` and output changes for several stress cases. The compiler implementation is unchanged. Small reproduction (after building the release CLI):
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i scripts/review-corpus run --binary "$PWD/target/release/i" --filter review-k4s/std
+```
+
+This selected one case and failed with `review-k4s/std: full output changed` and `review-k4s/std: unclassified checker timeout`. The complete acceptance check therefore did not pass. The failure was not resolved in this lane.
