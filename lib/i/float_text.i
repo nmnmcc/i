@@ -17,14 +17,6 @@
 	to_string
 )
 
-sign_mask = 9223372036854775808
-
-fraction_unit = 4503599627370496
-
-// The bits of 2^53, the first Float whose whole digits imply more precision
-// than a Float has.
-precise_limit = 4845873199050653696
-
 /// The shortest text that reads back as `x`.
 ///
 /// ```i
@@ -34,8 +26,10 @@ precise_limit = 4845873199050653696
 /// ```
 to_string = (x: Float) -> String {
 	bits = core.float_to_bits(x)
-	(sign, magnitude) = { bits >= sign_mask } |> {
-		True  -> ("-", bits - sign_mask)
+	// 2^63 is the sign bit. The numbers are written out in place: a
+	// top-level value is worked out at start, in the frame of every program.
+	(sign, magnitude) = { bits >= 9223372036854775808 } |> {
+		True  -> ("-", bits - 9223372036854775808)
 		False -> ("", bits)
 	}
 	{ magnitude == 0 } |> {
@@ -46,14 +40,15 @@ to_string = (x: Float) -> String {
 
 // The pieces of the text of the positive Float with these bits.
 positive = (bits: Int) -> List(String) {
-	encoded = bits / fraction_unit
-	fraction = bits % fraction_unit
+	// 2^52 is the lowest bit of the exponent.
+	encoded = bits / 4503599627370496
+	fraction = bits % 4503599627370496
 	// v = r / s × 2^e, with the midpoint distances minus / s and plus / s.
 	// At an exact normal power of two the binade below has half the spacing.
 	(mantissa, r, minus, plus, e) = { encoded == 0 } |> {
 		True -> (fraction, fraction * 2, 1, 1, -1075)
 		False -> {
-			m = fraction + fraction_unit
+			m = fraction + 4503599627370496
 			low = { fraction == 0 && encoded > 1 } |> {
 				True  -> 1
 				False -> 2
@@ -85,7 +80,9 @@ positive = (bits: Int) -> List(String) {
 	(r, minus, plus, k) = shrink(r, s, minus, plus, k)
 	(reversed, k) = generate(r, s, minus, plus, inclusive, [], k)
 	digits = reverse_onto(trim(reversed), [])
-	layout(digits, length(digits, 0), k, bits >= precise_limit)
+	// 4845873199050653696 is the bits of 2^53, the first Float whose whole
+	// digits imply more precision than a Float has.
+	layout(digits, length(digits, 0), k, bits >= 4845873199050653696)
 }
 
 // floor(a / b) for b > 0.

@@ -37,10 +37,6 @@ digits: (Int) -> List(Int)
 @external("ilang:big", "from_digits")
 from_digits: (sign: Int, digits: List(Int)) -> Int
 
-base = 16384
-
-half = 8192
-
 /// -1, 0 or 1, as `a` is less than, equal to or greater than `b`.
 compare = (a: Int, b: Int) -> Int {
 	sa = sign(a)
@@ -216,8 +212,8 @@ magnitude_add = (x: List(Int), y: List(Int), carry: Int, acc: List(Int)) -> List
 }
 
 add_digit = (sum: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int) {
-	{ sum >= base } |> {
-		True  -> magnitude_add(x, y, 1, [sum - base, ..acc])
+	{ sum >= 16384 } |> {
+		True  -> magnitude_add(x, y, 1, [sum - 16384, ..acc])
 		False -> magnitude_add(x, y, 0, [sum, ..acc])
 	}
 }
@@ -233,7 +229,7 @@ magnitude_subtract = (x: List(Int), y: List(Int), borrow: Int, acc: List(Int)) -
 
 subtract_digit = (difference: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int) {
 	{ difference < 0 } |> {
-		True  -> magnitude_subtract(x, y, 1, [difference + base, ..acc])
+		True  -> magnitude_subtract(x, y, 1, [difference + 16384, ..acc])
 		False -> magnitude_subtract(x, y, 0, [difference, ..acc])
 	}
 }
@@ -244,7 +240,7 @@ multiply_digit = (x: List(Int), d: Int, carry: Int, acc: List(Int)) -> List(Int)
 		[] -> reverse([carry, ..acc], [])
 		[a, ..xs] -> {
 			p = a * d + carry
-			multiply_digit(xs, d, p / base, [p % base, ..acc])
+			multiply_digit(xs, d, p / 16384, [p % 16384, ..acc])
 		}
 	}
 }
@@ -314,7 +310,7 @@ split_top = (top: List(Int), n: Int, acc: List(Int)) -> (List(Int), List(Int)) {
 }
 
 normal_shift = (top: Int, s: Int) -> Int {
-	{ top >= half } |> {
+	{ top >= 8192 } |> {
 		True  -> s
 		False -> normal_shift(top * 2, s + 1)
 	}
@@ -326,7 +322,7 @@ shift_left = (x: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int) {
 		[] -> trim(reverse([carry, ..acc], []))
 		[d, ..ds] -> {
 			v = d * power_of_two(s, 1) + carry
-			shift_left(ds, s, v / base, [v % base, ..acc])
+			shift_left(ds, s, v / 16384, [v % 16384, ..acc])
 		}
 	}
 }
@@ -337,7 +333,7 @@ shift_right = (top: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int) 
 		[] -> trim(acc)
 		[d, ..ds] -> {
 			p = power_of_two(s, 1)
-			v = carry * base + d
+			v = carry * 16384 + d
 			shift_right(ds, s, v % p, [v / p, ..acc])
 		}
 	}
@@ -356,7 +352,7 @@ short_divide = (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), I
 	top |> {
 		[] -> (trim(acc), r)
 		[a, ..rest] -> {
-			v = r * base + a
+			v = r * 16384 + a
 			short_divide(rest, d, v % d, [v / d, ..acc])
 		}
 	}
@@ -381,7 +377,7 @@ long_divide = (
 				True  -> []
 				False -> [a, ..r]
 			}
-			estimate = { at(shifted, m) * base + at(shifted, m - 1) } / divisor_top
+			estimate = { at(shifted, m) * 16384 + at(shifted, m - 1) } / divisor_top
 			reduced = { estimate == 0 } |> {
 				True  -> shifted
 				False -> magnitude_subtract(shifted, trim(multiply_digit(y, estimate, 0, [])), 0, [])

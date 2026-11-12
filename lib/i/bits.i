@@ -27,8 +27,6 @@ read_unsigned: (bits: BitArray, start: Int, width: Int) -> Int
 @external("ilang:bits", "from_unsigned")
 from_unsigned: (value: Int, width: Int) -> BitArray
 
-chunk = 14
-
 /// The Int in the `width` bits of `bits` at `start`.
 read_int = (bits: BitArray, start: Int, width: Int, signed: Bool, little: Bool) -> Int {
 	value = little |> {
@@ -46,7 +44,7 @@ read_big = (bits: BitArray, start: Int, left: Int, acc: Int) -> Int {
 	{ left == 0 } |> {
 		True -> acc
 		False -> {
-			n = min(left, chunk)
+			n = min(left, 14)
 			read_big(
 				bits
 				start + n
@@ -97,7 +95,7 @@ write_big = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |> {
 		True -> acc
 		False -> {
-			n = min(left, chunk)
+			n = min(left, 14)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
 			write_big(core.shift_right(u, n), left - n, [from_unsigned(low, n), ..acc])
 		}
