@@ -4701,7 +4701,7 @@ The `{ }` around the right side of a name whose right side is a data type is par
 
 - In the position of an expression, `(-> …)` is a function: an optional `Square` of type parameters, the parameter data pattern, the result (`_` when no `->` part is written, or `(<- R needs)` with a service pattern), and the body, which is any one expression. In the position of a type, `(-> …)` is a function type. In an expression, `(<- e s)` is a provide.
 - `(| …)` in the position of an expression is a chain of two or more functions.
-- `(,)` is the empty data in the positions of values, types and patterns. The empty `()` has no position.
+- `(,)` is the empty data wherever data is written. The empty `()` has no position.
 - In the position of a data pattern item, `(= n …)` whose first part is a name is a labelled item: `n` is the label and the other parts are its pattern. So `(size = whole = (w, h))` is `(, (= size whole (, w h)))`, and `((a, b) = args)` is `(, (= (, a b) args))`.
 - `|`, `&` and `-` take two or more parts in a type. A string interpolation of the normal surface is written as the `<>` of its parts (§1.6).
 
