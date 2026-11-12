@@ -211,6 +211,9 @@ pub enum Op {
     Boundary,
     /// `control.suspend(b, f)`: it throws `$capture`.
     Suspend,
+    /// `control.escape(b, v)`: throws `$error` with `(b, v)`; the boundary
+    /// `b` ends with `v`.
+    Escape,
     /// `control.resume(k, value)`.
     Resume,
     /// `control.cancel(k)`.
@@ -237,6 +240,7 @@ impl Op {
                 | Op::Ensure
                 | Op::Boundary
                 | Op::Suspend
+                | Op::Escape
                 | Op::Resume
                 | Op::Cancel
                 | Op::WaitRequests

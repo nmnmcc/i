@@ -930,7 +930,7 @@ impl Norm<'_> {
                         .collect(),
                     ret: self.norm(f.ret),
                     err: self.env(f.err),
-                    env: self.env(f.env),
+                    env: self.services(f.env),
                 }))
             }
             Ty::Both(a, b) => {
@@ -951,18 +951,60 @@ impl Norm<'_> {
     /// An environment: two forms of one type constructor are not put
     /// together, because their arguments must be equal (§9.2).
     fn env(&self, t: Ty) -> Ty {
+        self.env_in(t, false)
+    }
+
+    /// A service environment: two forms of one constructor whose
+    /// parameters all have a direction are one entry, their value meet
+    /// (rule A).
+    fn services(&self, t: Ty) -> Ty {
+        self.env_in(t, true)
+    }
+
+    fn env_in(&self, t: Ty, directed: bool) -> Ty {
         match t {
             Ty::Both(a, b) => {
-                let a = self.env(*a);
-                let b = self.env(*b);
+                let a = self.env_in(*a, directed);
+                let b = self.env_in(*b, directed);
                 self.norm(Ty::Both(Box::new(a), Box::new(b)))
             }
-            Ty::Diff(a, hs) => {
-                self.diff(self.env(*a), hs.into_iter().map(|h| self.norm(h)).collect())
+            Ty::Diff(a, hs) => self.diff(
+                self.env_in(*a, directed),
+                hs.into_iter().map(|h| self.norm(h)).collect(),
+            ),
+            Ty::Union(ms) => {
+                let ms: Vec<Ty> = ms.into_iter().map(|m| self.norm(m)).collect();
+                let ms = if directed { self.meet_forms(ms) } else { ms };
+                self.union_in(ms, true)
             }
-            Ty::Union(ms) => self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true),
             t => self.norm(t),
         }
+    }
+
+    /// Members with one constructor, equal value sets, and no invariant
+    /// parameter, put together by value intersection.
+    fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
+        let mut out: Vec<Ty> = Vec::new();
+        for m in ms {
+            let directed = |t: &Ty| match t {
+                Ty::Con(h, _, xs) if !xs.is_empty() => self
+                    .s
+                    .variances(*h, xs.len())
+                    .all(|v| v != Variance::Inv),
+                _ => false,
+            };
+            if directed(&m)
+                && let Some(i) = out
+                    .iter()
+                    .position(|o| o.head() == m.head() && o.values() == m.values())
+            {
+                let old = std::mem::replace(&mut out[i], Ty::Never);
+                out[i] = self.merge(old, m, false);
+                continue;
+            }
+            out.push(m);
+        }
+        out
     }
 
     fn union(&self, ms: Vec<Ty>) -> Ty {

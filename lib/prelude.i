@@ -10,6 +10,7 @@
 	Result(..)
 	AssertionFailure(..)
 	Assert(..)
+	Fail(..)
 	panic
 	assert
 )
@@ -34,6 +35,11 @@ AssertionFailure {
 
 Assert {
 	Assert(fail: (failure: AssertionFailure) -> Never)
+}
+
+/// The service that ends a computation with an error of type `E` (§9.3).
+Fail(E) {
+	Fail(raise: (error: E) -> Never)
 }
 
 /// Stops the program with `panic: ` and the message (§11.7).

@@ -1286,7 +1286,7 @@ impl<'a> Checker<'a> {
             FailKind::EnvForms => (
                 code::ENV_FORMS,
                 format!(
-                    "`{l}` and `{r}` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)"
+                    "`{l}` and `{r}` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)"
                 ),
             ),
             FailKind::Ambiguous => (
