@@ -5,7 +5,7 @@
 )
 Box(A) = (A)
 Alias(A) = Box(A)
-id: <A>(A) -> A = <A>(x) { x }
+id: <A>(A) -> A = (x) { x }
 outer = <A>(x: A) -> A {
 	inherited = (y: A) -> A { y }
 	inner = <A>(y: A) -> A { y }

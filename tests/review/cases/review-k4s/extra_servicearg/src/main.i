@@ -4,4 +4,4 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 run = <A, N>(f: () <- N -> A) { f() }
-forward: <N>() <- (S(N), ..N) -> Nil = <N>() <- (s: S(N)) { run(() { use() }) }
+forward: <N>() <- (S(N), ..N) -> Nil = () <- (s: S(N)) { run(() { use() }) }

@@ -5,7 +5,9 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = <N>(body: () <- (S(N), ..N) -> Int, svc: S(N)) -> Int { body() <- (svc) }
+wrap: <N>(() <- (S(N), ..N) -> Int, S(N)) <- N -> Int = (body, svc) {
+	body() <- (svc)
+}
 
 main = () {
 	assert(wrap(() { use() }, S(f = () { 1 }, m = (_: Never) { Nil })) == 1)

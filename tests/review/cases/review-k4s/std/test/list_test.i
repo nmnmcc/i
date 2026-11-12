@@ -1866,7 +1866,7 @@ Counter = (step = Int)
 Yield(A) = (emit = (A) -> Nil)
 
 // A generator made with `i/control` (§9.4).
-collect = <A, N>(body: () <- (Yield(A), ..N) -> Nil) -> List(A) {
+collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {
 		{
 			body()

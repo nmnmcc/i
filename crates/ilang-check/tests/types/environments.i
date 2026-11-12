@@ -8,7 +8,7 @@ Yield(A) = (emit = (A) -> Nil)
 
 Source(A) = (next = () -> A)
 
-collect = <A, N>(body: () <- (Yield(A), ..N) -> Nil) -> List(A) {
+collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {
 		{
 			body()

@@ -17,8 +17,8 @@ inner = <A>(x: A) -> A {
 
 // Two local bindings next to each other have their own `a`.
 apart = () {
-	f: <A>(A) -> A = <A>(x) { x }
-	g: <A>(A) -> A = <A>(x) { x }
+	f: <A>(A) -> A = (x) { x }
+	g: <A>(A) -> A = (x) { x }
 	(f(1), g("s"))
 }
 

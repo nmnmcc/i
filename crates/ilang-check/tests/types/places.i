@@ -18,6 +18,6 @@ inter_in = <A>(x: A & Int) -> A { x }
 
 union_param_of_param = <A, B>(f: (A | B) -> Int) { 1 }
 
-union_out: <A, B>(Int) -> A | B = <A, B>(x) { panic("") }
+union_out: <A, B>(Int) -> A | B = (x) { panic("") }
 
 Wrap(A, B) = (value = A | B)

@@ -2,7 +2,7 @@ Svc(A) = (f = () -> A)
 
 use = () <- (s: Svc(Int)) { s.f() }
 
-wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
+wrap: <N>(() <- (Svc(Int), ..N) -> Int, Svc(Int)) <- N -> Int = (body, svc) {
 	body() <- (svc)
 }
 

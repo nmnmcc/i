@@ -4,7 +4,7 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 D = ()
-run: <N>(() <- N -> Nil) <- N -> Nil = <N>(body) { body() }
+run: <N>(() <- N -> Nil) <- N -> Nil = (body) { body() }
 forward = <N>() <- (s: S(N)) -> Nil {
 	local = run
 	local(() { use() })

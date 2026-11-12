@@ -9,7 +9,7 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = <N>(body: () <- (S(N), ..N) -> Int) -> Int {
+wrap: <N>(() <- (S(N), ..N) -> Int) <- N -> Int = (body) {
 	body() <- (S(f = () { 1 }))
 }
 

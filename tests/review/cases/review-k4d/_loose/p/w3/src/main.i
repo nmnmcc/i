@@ -3,4 +3,6 @@ use = <N>() <- (s: S(N)) {
 	S(f = f, ..) = s
 	f()
 }
-wrap = <N>(body: () <- (S(N), ..N) -> Int, svc: S(N)) -> Int { body() <- (svc) }
+wrap: <N>(() <- (S(N), ..N) -> Int, S(N)) <- N -> Int = (body, svc) {
+	body() <- (svc)
+}

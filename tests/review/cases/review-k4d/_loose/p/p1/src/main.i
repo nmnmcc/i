@@ -32,7 +32,7 @@ dep3 = <N>() <- (s: S(N), d: Dep) -> Int { use() + d.v }
 dep3i = () <- (d: Dep) { use() + d.v }
 spec = () -> Int { use() }
 half = () -> Int { use() }
-wrap = <N>(body: () <- (S(N), ..N) -> Int) -> Int {
+wrap: <N>(() <- (S(N), ..N) -> Int) <- N -> Int = (body) {
 	body() <- (S(f = () { 1 }))
 }
 wrapi = (body) { body() <- (S(f = () { 1 })) }
