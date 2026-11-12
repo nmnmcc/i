@@ -284,16 +284,13 @@ pub fn parse_source_legacy(source: &str) -> (crate::ast::Module, Vec<Diagnostic>
 /// Format a Lisp module without discarding its ordinary comments.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     if crate::syn3::enabled() {
-        let (module, diagnostics) = crate::syn3::lisp::from_lisp(source);
+        // The rows are checked by syntax three's reader; the layout is the
+        // source-preserving one of the Lisp convention, which keeps comments.
+        let (_, diagnostics) = crate::syn3::lisp::from_lisp(source);
         if !diagnostics.is_empty() {
             return Err(diagnostics);
         }
-        // The printer of syntax three's Lisp rows does not place comments
-        // yet: a file with comments is left as it is rather than lose them.
-        if !crate::lexer::lex3_lisp(source).comments.is_empty() {
-            return Ok(source.to_string());
-        }
-        return Ok(crate::syn3::lisp::to_lisp(&module));
+        return format::format(source);
     }
     let (_, diagnostics) = parse_source(source);
     if !diagnostics.is_empty() {

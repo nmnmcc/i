@@ -606,18 +606,45 @@ impl Cx {
         }
     }
 
-    /// `e <- (s1, s2)`: the environment statements and then `e`.
+    /// `e <- (s1, s2)`: the environment statements and then `e`. Every
+    /// service is worked out in the outer environment (§2.10.5): when there
+    /// are several and one is not a name, each is bound to a fresh local
+    /// first, so that no service sees another.
     fn provide(&mut self, target: &n::Expr, services: &n::Expr) -> Vec<o::Stmt> {
         let mut stmts = Vec::new();
+        let mut envs = Vec::new();
         match &services.kind {
             n::ExprKind::Data(items) => {
+                let apart = items.len() > 1
+                    && items.iter().any(|i| {
+                        !matches!(i, n::DItem::Pos(n::Expr { kind: n::ExprKind::Name { .. }, .. }))
+                    });
                 for item in items {
                     match item {
-                        n::DItem::Pos(e) => stmts.push(o::Stmt::Env {
-                            ty: ty(o::TypeKind::Hole, e.span.0),
-                            value: self.expr(e),
-                            span: e.span.0,
-                        }),
+                        n::DItem::Pos(e) => {
+                            let mut value = self.expr(e);
+                            if apart {
+                                let name = self.fresh("service");
+                                stmts.push(o::Stmt::Bind(o::Binding {
+                                    pattern: pat(o::PatternKind::Var(name.clone()), e.span.0),
+                                    value,
+                                    span: e.span.0,
+                                    type_params: Vec::new(),
+                                }));
+                                value = expr(
+                                    o::ExprKind::Name {
+                                        module: None,
+                                        name: ident(name, e.span.0),
+                                    },
+                                    e.span.0,
+                                );
+                            }
+                            envs.push(o::Stmt::Env {
+                                ty: ty(o::TypeKind::Hole, e.span.0),
+                                value,
+                                span: e.span.0,
+                            });
+                        }
                         n::DItem::Label(l, _) => self.error(
                             l.span.0,
                             "a provided service has no label: it is keyed by its type (§2.10.2)",
@@ -634,6 +661,7 @@ impl Cx {
                 "providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
             ),
         }
+        stmts.extend(envs);
         match &target.kind {
             n::ExprKind::Block(b) => stmts.extend(self.block(b).stmts),
             n::ExprKind::Provide {

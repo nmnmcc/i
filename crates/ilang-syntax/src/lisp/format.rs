@@ -21,7 +21,11 @@ use std::rc::Rc;
 
 pub(super) fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     let document = super::parse(source)?;
-    let lexed = lex_lisp(source);
+    let lexed = if crate::syn3::enabled() {
+        crate::lexer::lex3_lisp(source)
+    } else {
+        lex_lisp(source)
+    };
     let mut builder = Builder {
         source,
         comments: &lexed.comments,

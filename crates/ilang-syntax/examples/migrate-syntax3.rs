@@ -132,7 +132,9 @@ fn convert_file(
     }
     if is_lisp(path) {
         let (module, notes) = convert::convert(&old, None, ctors);
-        let text = syn3::lisp::to_lisp(&module);
+        // Laid out by the Lisp convention (`i fmt`).
+        let text = ilang_syntax::lisp::format(&syn3::lisp::to_lisp(&module))
+            .expect("the converted Lisp text reads back");
         Ok(Converted {
             module,
             notes,
