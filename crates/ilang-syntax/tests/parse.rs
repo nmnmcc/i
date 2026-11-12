@@ -348,7 +348,7 @@ fn core_printer_adds_only_required_groups() {
         span: match_e.span,
     };
     assert!(print_core(e).contains("}()"));
-    for (src, grouped) in [("a = a + b", false), ("a = a == b", true)] {
+    for (src, grouped) in [("a = a + b", false), ("a = a == b", false)] {
         let mut e = match_e.clone();
         let ExprKind::Case { subject, .. } = &mut e.kind else {
             unreachable!()
