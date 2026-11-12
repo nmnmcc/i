@@ -86,6 +86,14 @@ the argument of a macro whose expansion fails.
   `i/syntax` query functions.
 - `i test --project examples/macro-tests`: 9 passed, 0 failed, 1 skipped;
   `i expand --project examples/macro-tests` exits 0.
-- `scripts/dev-verify rust`: see the final worker report. `scripts/dev-verify i`
+- `scripts/dev-verify rust` was stopped by the coordinator while
+  `ilang-check --test value_types` ran `spec_corpus_reverse_order_and_recovery`
+  for a long time under machine load. Watching the corpus directory it read,
+  that test advanced through `tests/spec` at the same pace on this lane and on
+  `.rd/integ` (no M4), so it is slow, not looping. The lane still had a real
+  overhead on code without typed macros: every inference group walked all
+  schemes for the T2 fixed set, and every expression stored its known type.
+  Both now run only when a typed call is present.
+  `cargo test -p ilang-cli --test value_types`: 1 passed. `scripts/dev-verify i`
   was not run at the end: the coordinator asked workers not to run it under the
   current machine load; it runs at merge.
