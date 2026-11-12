@@ -997,9 +997,10 @@ fn review_declaration_permutations_are_identical() {
     let mut programs = Vec::new();
     permutations(&mut items, 0, &mut programs);
     assert_eq!(programs.len(), 120);
-    let mut expected = None;
-    for src in programs {
-        let (_, c) = good(&src);
+    // Each permutation is checked independently, so they run on scoped
+    // threads; every permutation must equal the first one's schemes.
+    let schemes_of = |src: &String| {
+        let (_, c) = good(src);
         let p = c.program.as_ref().unwrap();
         let m = common::module(p, "app/main");
         let t = c.types.as_ref().unwrap();
@@ -1019,13 +1020,24 @@ fn review_declaration_permutations_are_identical() {
                 )
             })
             .collect::<std::collections::BTreeMap<_, _>>();
-        assert_eq!(alias(&c, "Left"), "Int");
-        assert_eq!(alias(&c, "Right"), "String");
-        if let Some(expected) = &expected {
-            assert_eq!(expected, &schemes);
-        } else {
-            expected = Some(schemes);
-        }
+        assert_eq!(alias(&c, "Left"), "Int", "{src}");
+        assert_eq!(alias(&c, "Right"), "String", "{src}");
+        schemes
+    };
+    let workers = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let chunk = programs.len().div_ceil(workers);
+    let results = std::thread::scope(|scope| {
+        let handles = programs
+            .chunks(chunk)
+            .map(|part| scope.spawn(move || part.iter().map(schemes_of).collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    for (src, schemes) in programs.iter().zip(&results) {
+        assert_eq!(&results[0], schemes, "{src}");
     }
 }
 
