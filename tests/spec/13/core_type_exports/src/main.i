@@ -1,6 +1,5 @@
 (
- core = i/core
- (List, String) = i/core
+ core = (List, String) = i/core
  prelude = i/prelude
  other = spec/other
 )
