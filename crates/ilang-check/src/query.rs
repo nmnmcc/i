@@ -202,12 +202,36 @@ impl<'a> Query<'a> {
     pub fn type_at(&self, m: ModuleId, offset: u32) -> Option<Hover> {
         let (owner, span, at, target) = self.target_at(m, offset)?;
         let (mut code, doc_at) = self.describe(owner, at, &target)?;
-        if let Target::Def(d)=target && self.program.typed_macros.contains(&d) && let Some(typed)=self.types {
-            if let Some((_,output))=typed.typed_expansions.iter().filter(|((module,call),_)|*module==m && call.start<=offset && offset<call.end).min_by_key(|((_,call),_)|call.end-call.start) {
-                code.push_str("\n\n// expansion\n");
-                let module=ast::Module {items:vec![ast::Item {doc:Vec::new(),attributes:Vec::new(),span:output.syntax.span,kind:ast::ItemKind::Binding(ast::Binding {pattern:ast::Pattern {kind:ast::PatternKind::Discard("_".into()),span:output.syntax.span},value:output.syntax.clone(),type_params:Vec::new(),span:output.syntax.span})}],..ast::Module::default()};
-                code.push_str(&ilang_syntax::lisp::print_module(&module));
-            }
+        if let Target::Def(d) = target
+            && self.program.typed_macros.contains(&d)
+            && let Some(typed) = self.types
+            && let Some((_, output)) = typed
+                .typed_expansions
+                .iter()
+                .filter(|((module, call), _)| {
+                    *module == m && call.start <= offset && offset < call.end
+                })
+                .min_by_key(|((_, call), _)| call.end - call.start)
+        {
+            code.push_str("\n\n// expansion\n");
+            let module = ast::Module {
+                items: vec![ast::Item {
+                    doc: Vec::new(),
+                    attributes: Vec::new(),
+                    span: output.syntax.span,
+                    kind: ast::ItemKind::Binding(ast::Binding {
+                        pattern: ast::Pattern {
+                            kind: ast::PatternKind::Discard("_".into()),
+                            span: output.syntax.span,
+                        },
+                        value: output.syntax.clone(),
+                        type_params: Vec::new(),
+                        span: output.syntax.span,
+                    }),
+                }],
+                ..ast::Module::default()
+            };
+            code.push_str(&ilang_syntax::lisp::print_module(&module));
         }
         Some(Hover {
             span,

@@ -178,6 +178,7 @@ struct PendingTyped {
     module: ModuleId,
     span: Span,
     signature: Ty,
+    argument_types: Vec<Ty>,
     locals: HashMap<VarId, Scheme>,
     known: HashMap<VarId, Ty>,
 }
@@ -233,7 +234,8 @@ pub(crate) struct Checker<'a> {
     /// What the code generator needs, gathered while typing.
     pub out: Typed,
     numeric_handles: HashMap<(ModuleId, Span), Ty>,
-    pub(super) numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
+    numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
+    pub(super) query_binder_handles: HashMap<(ModuleId, Span), Ty>,
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds (§4.8 rule 11).
     pub cases: Vec<super::pattern::PendingCase>,
@@ -252,6 +254,8 @@ pub(crate) struct Checker<'a> {
     checked_holes: HashMap<Span, (Ty, Ty)>,
     expression_known: HashMap<(ModuleId, Span), Ty>,
     pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
+    typed_generalized_roots: HashSet<super::V>,
+    typed_depth: u16,
     typed_var_count: u32,
     typed_ty_var_count: u32,
 }
@@ -302,6 +306,7 @@ impl<'a> Checker<'a> {
             out: Typed::default(),
             numeric_handles: HashMap::new(),
             numeric_param_handles: HashMap::new(),
+            query_binder_handles: HashMap::new(),
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
@@ -315,6 +320,8 @@ impl<'a> Checker<'a> {
             checked_holes: HashMap::new(),
             expression_known: HashMap::new(),
             expression_effects: HashMap::new(),
+            typed_generalized_roots: HashSet::new(),
+            typed_depth: 0,
             typed_var_count: p.var_count,
             typed_ty_var_count: p.ty_var_count,
         }
@@ -737,6 +744,7 @@ impl<'a> Checker<'a> {
                 .flat_map(super::typed_macro::variables)
                 .collect();
             roots.extend(self.kgen.iter().copied());
+            roots.extend(self.typed_generalized_roots.iter().copied());
             for scheme in self.defs.values() {
                 roots.extend(super::typed_macro::variables(&scheme.ty));
             }
@@ -817,12 +825,34 @@ impl<'a> Checker<'a> {
         let mut calls = std::mem::take(&mut self.pending_typed);
         calls.sort_by_key(|c| (c.module, c.span.start, std::cmp::Reverse(c.span.end)));
         let snapshot = self.s.clone();
+        let mut expanded_ancestors: Vec<(ModuleId, Span, HashSet<Span>)> = Vec::new();
         for call in calls {
+            if expanded_ancestors
+                .iter()
+                .rev()
+                .any(|(m, parent, retained)| {
+                    *m == call.module
+                        && parent.start <= call.span.start
+                        && call.span.end <= parent.end
+                        && !retained.contains(&call.span)
+                })
+            {
+                continue;
+            }
+            if self.typed_depth == 256 {
+                self.set_module(call.module);
+                self.error(
+                    code::MACRO_RESERVED,
+                    call.span,
+                    "typed macro expansion exceeds depth 256",
+                );
+                continue;
+            }
             self.set_module(call.module);
             let expressions = self
                 .numeric_handles
                 .iter()
-                .chain(&self.numeric_param_handles)
+                .chain(&self.query_binder_handles)
                 .filter(|((m, _), _)| *m == call.module)
                 .map(|((_, span), ty)| (*span, ty.clone()))
                 .collect();
@@ -832,15 +862,18 @@ impl<'a> Checker<'a> {
                 expressions,
                 fixed.clone(),
                 call.span,
+                &call.argument_types,
             ));
             let output = match expander.expand(
-                self.p,
-                call.module,
-                call.span,
-                call.definition,
+                crate::typed_macro::Invocation {
+                    program: self.p,
+                    module: call.module,
+                    span: call.span,
+                    definition: call.definition,
+                    var_count: self.typed_var_count,
+                    ty_var_count: self.typed_ty_var_count,
+                },
                 query.clone(),
-                self.typed_var_count,
-                self.typed_ty_var_count,
             ) {
                 Ok(o) => o,
                 Err(ds) => {
@@ -848,7 +881,10 @@ impl<'a> Checker<'a> {
                     continue;
                 }
             };
-            let mut trial = Checker::new(self.p, self.sources);
+            let mut trial = Checker::new(&output.resolution, self.sources);
+            trial.typed_depth = self.typed_depth + 1;
+            trial.typed_var_count = output.var_count;
+            trial.typed_ty_var_count = output.ty_var_count;
             trial.module = call.module;
             trial.s = snapshot.clone();
             trial
@@ -906,19 +942,22 @@ impl<'a> Checker<'a> {
                         "typed macro output needs an environment outside its signature",
                     );
                 }
-                let exposed = {
+                let (exposed, actual) = {
                     let q = query.state.lock().expect("query snapshot");
-                    super::typed_macro::substitute(&f.ret, &q.substitution)
+                    (
+                        super::typed_macro::substitute(&f.ret, &q.substitution),
+                        super::typed_macro::substitute(&ty, &q.substitution),
+                    )
                 };
-                trial.sub(&ty, &exposed, call.span);
+                trial.sub(&actual, &exposed, call.span);
             }
             for pending in std::mem::take(&mut trial.cases) {
                 trial.check_case(pending);
             }
             trial.discharge_union_proofs();
-            let nested = std::mem::take(&mut trial.pending_typed);
-            if !nested.is_empty() {
-                trial.error(code::MACRO_RESERVED,call.span,"a typed macro result cannot introduce a new typed call without a signature barrier");
+            if !trial.pending_typed.is_empty() {
+                let nested_fixed = (0..boundary).map(|i| super::V(i as u32)).collect();
+                trial.expand_typed_calls(nested_fixed);
             }
             // Expansion diagnostics are attributed to the call; argument
             // warnings already came from the signature check.
@@ -928,7 +967,13 @@ impl<'a> Checker<'a> {
                 .filter(Diagnostic::is_error)
                 .collect();
             for error in &mut errors {
-                if let Some(origin)=output.scoped.origin(error.span) {error.related.push(ilang_package::DiagnosticNote {source:ilang_package::SourceId(origin.syntax.scope().module),span:origin.syntax.span(),message:"typed output originates here".into()});}
+                if let Some(origin) = output.scoped.origin(error.span) {
+                    error.related.push(ilang_package::DiagnosticNote {
+                        source: ilang_package::SourceId(origin.syntax.scope().module),
+                        span: origin.syntax.span(),
+                        message: "typed output originates here".into(),
+                    });
+                }
                 error.span = call.span;
                 error.message = format!("invalid typed macro expansion: {}", error.message);
             }
@@ -939,12 +984,25 @@ impl<'a> Checker<'a> {
                     "typed output changed a snapshot variable"
                 );
                 self.s.vars.extend(trial.s.vars.into_iter().skip(boundary));
-                for note in &output.notes {self.diags.push(Diagnostic::note(Some(self.p.module(call.module).source),call.span,note.clone()));}
+                for note in &output.notes {
+                    self.diags.push(Diagnostic::note(
+                        Some(self.p.module(call.module).source),
+                        call.span,
+                        note.clone(),
+                    ));
+                }
                 self.out = trial.out;
                 self.numeric_handles = trial.numeric_handles;
                 self.numeric_param_handles = trial.numeric_param_handles;
-                self.typed_var_count = output.var_count;
-                self.typed_ty_var_count = output.ty_var_count;
+                self.typed_var_count = trial.typed_var_count;
+                self.typed_ty_var_count = trial.typed_ty_var_count;
+                let mut retained = HashSet::new();
+                let mut tree = output.expression.clone();
+                visit_expr_mut(&mut tree, &mut |e| {
+                    retained.insert(e.span);
+                    true
+                });
+                expanded_ancestors.push((call.module, call.span, retained));
                 self.out
                     .typed_expansions
                     .insert((call.module, call.span), output);
@@ -1893,7 +1951,7 @@ impl<'a> Checker<'a> {
         }
         // A frame per node retains the argument's effects independently of
         // where an expansion later places or drops that checked node.
-        let observe = self.s.rigid_boundary == 0 && !self.p.typed_macros.is_empty();
+        let observe = !self.p.typed_macros.is_empty();
         if observe {
             self.effects.push(Effects::default());
         }
@@ -2464,6 +2522,8 @@ impl<'a> Checker<'a> {
             }
             _ => Ty::Top,
         };
+        let typed_argument_types =
+            typed_definition.map(|_| placed.iter().map(|(t, _)| t.clone()).collect());
         let t = match &f {
             Ty::Fn(ft) if ft.params.len() == placed.len() => {
                 for ((t, s), (_, p)) in placed.iter().zip(&ft.params) {
@@ -2513,6 +2573,7 @@ impl<'a> Checker<'a> {
                 module: self.module,
                 span,
                 signature: typed_signature,
+                argument_types: typed_argument_types.expect("typed call arguments retained"),
                 locals: self.locals.clone(),
                 known: self.kvars.clone(),
             });
@@ -3453,6 +3514,13 @@ impl<'a> Checker<'a> {
     }
 
     fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+        if !self.p.typed_macros.is_empty() {
+            self.typed_generalized_roots.extend(
+                super::typed_macro::variables(t)
+                    .into_iter()
+                    .filter(|v| self.s.vars[v.0 as usize].level > level),
+            );
+        }
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
             Err(()) => {

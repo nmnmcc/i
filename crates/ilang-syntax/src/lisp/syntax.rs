@@ -906,9 +906,35 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
 }
 
 /// Flip one expansion mark on a set of values, preserving shared value identity.
+/// The memo lives for one macro run, so a compiler-owned variable has one
+/// marked Syntax node across separate Types answers. Retained roots prevent
+/// pointer reuse while the memo is live.
+pub struct MarkCache {
+    mark: u64,
+    roots: Vec<Syntax>,
+    seen: std::collections::HashMap<usize, Syntax>,
+}
+impl MarkCache {
+    pub fn new(mark: u64) -> Self {
+        Self {
+            mark,
+            roots: Vec::new(),
+            seen: std::collections::HashMap::new(),
+        }
+    }
+    pub fn flip(&mut self, values: &[Syntax]) -> Vec<Syntax> {
+        self.roots.extend_from_slice(values);
+        flip_mark_memo(values, self.mark, &mut self.seen)
+    }
+}
 pub fn flip_mark_all(values: &[Syntax], mark: u64) -> Vec<Syntax> {
-    use std::collections::HashMap;
-    let mut seen = HashMap::<usize, Syntax>::new();
+    MarkCache::new(mark).flip(values)
+}
+fn flip_mark_memo(
+    values: &[Syntax],
+    mark: u64,
+    seen: &mut std::collections::HashMap<usize, Syntax>,
+) -> Vec<Syntax> {
     let mut pending = Vec::new();
     for value in values.iter().rev() {
         pending.push((value, false));

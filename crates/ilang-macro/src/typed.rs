@@ -8,8 +8,8 @@ use crate::{
 };
 use ilang_check::{
     Parsed,
-    hir::{self, DefId, ModuleId, Program},
-    typed_macro::{Expander, Output},
+    hir::{self, ModuleId, Program},
+    typed_macro::{Expander, Invocation, Output},
     types::{MacroTruth, TypedMacroQuery},
 };
 use ilang_package::{Diagnostic, PackageGraph};
@@ -31,6 +31,7 @@ use std::{
 struct State {
     session: Session,
     scoped: HashMap<ModuleId, ScopedSource>,
+    generated: HashMap<(ModuleId, Span), ast::Expr>,
 }
 pub struct Driver {
     graph: PackageGraph,
@@ -50,6 +51,7 @@ impl Driver {
             state: Mutex::new(State {
                 session: Session::default(),
                 scoped: HashMap::new(),
+                generated: HashMap::new(),
             }),
         }
     }
@@ -99,22 +101,36 @@ fn syntax_for(p: &Parsed, graph: &PackageGraph, e: &ast::Expr) -> Syntax {
 impl Expander for Driver {
     fn expand(
         &self,
-        program: &Program,
-        module: ModuleId,
-        span: Span,
-        definition: DefId,
+        call: Invocation<'_>,
         query: Arc<TypedMacroQuery>,
-        var_count: u32,
-        ty_var_count: u32,
     ) -> Result<Output, Vec<Diagnostic>> {
-        let p = &self.parsed[module.0 as usize];
+        let Invocation {
+            program,
+            module,
+            span,
+            definition,
+            var_count,
+            ty_var_count,
+        } = call;
+        let mut caller = self.parsed[module.0 as usize].clone();
+        caller.scoped = program.module(module).scoped.clone();
+        let p = &caller;
         let mut expressions = Expressions(HashMap::new());
         p.ast.clone().walk(&mut expressions);
         let original = expressions
             .0
             .get(&span)
+            .cloned()
+            .or_else(|| {
+                self.state
+                    .lock()
+                    .expect("typed session")
+                    .generated
+                    .get(&(module, span))
+                    .cloned()
+            })
             .expect("resolved typed call has source syntax");
-        let written = crate::call::expression(original).expect("typed expression is a call");
+        let written = crate::call::expression(&original).expect("typed expression is a call");
         let mut arguments: Vec<_> = written
             .prefix
             .into_iter()
@@ -127,7 +143,7 @@ impl Expander for Driver {
             .map(|i| arguments[*i as usize].clone())
             .collect();
         query.set_arguments(&arguments);
-        let call = syntax_for(p, &self.graph, original);
+        let call = syntax_for(p, &self.graph, &original);
         let parser_graph = self.graph.clone();
         let parser_parsed = self.parsed.clone();
         let parser_program = program.clone();
@@ -135,9 +151,13 @@ impl Expander for Driver {
         query.set_parser(Arc::new(move |syntax| {
             let mut parsed = parser_parsed.clone();
             let index = module.0 as usize;
-            let mut scoped = parsed[index].scoped.clone().unwrap_or_else(|| {
-                ScopedSource::new(parser_graph.sources.get(parsed[index].source).text.clone())
-            });
+            let mut scoped = parser_program
+                .module(module)
+                .scoped
+                .clone()
+                .unwrap_or_else(|| {
+                    ScopedSource::new(parser_graph.sources.get(parsed[index].source).text.clone())
+                });
             let ty = scoped.ty(syntax, &parser_call).map_err(|e| e.message)?;
             parsed[index].scoped = Some(scoped);
             let expr = ast::Expr {
@@ -155,7 +175,7 @@ impl Expander for Driver {
                     },
                 })),
             };
-            let (resolved, _, _) = ilang_check::resolve::typed_output(
+            let (resolved, _) = ilang_check::resolve::typed_output(
                 &parser_graph,
                 &parsed,
                 &parser_program,
@@ -166,6 +186,12 @@ impl Expander for Driver {
                 ty_var_count,
             )
             .map_err(|ds| {
+                ds.into_iter()
+                    .map(|d| d.message)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            })?;
+            check_dependencies(&parser_program, module, span, &resolved).map_err(|ds| {
                 ds.into_iter()
                     .map(|d| d.message)
                     .collect::<Vec<_>>()
@@ -256,7 +282,6 @@ impl Expander for Driver {
                     format!("typed macro must return expression syntax: {e:?}"),
                 )
             })?;
-        let start = syntax.span.start;
         engine.scoped.inherit_call_chain(syntax.span, span, name);
         // Ordinary syntax macros in the result still run in expression/type
         // position. No Items service exists in this phase.
@@ -272,7 +297,7 @@ impl Expander for Driver {
                 },
                 value: syntax,
                 type_params: Vec::new(),
-                span: span,
+                span,
             }),
         });
         crate::body_walk::expressions(&mut wrapper, &mut engine)
@@ -288,7 +313,7 @@ impl Expander for Driver {
         state.scoped.insert(module, scoped.clone());
         let mut parsed = self.parsed.clone();
         parsed[module.0 as usize].scoped = Some(scoped.clone());
-        let (mut expression, var_count, ty_var_count) = ilang_check::resolve::typed_output(
+        let (mut expression, mut resolution) = ilang_check::resolve::typed_output(
             &self.graph,
             &parsed,
             program,
@@ -327,41 +352,19 @@ impl Expander for Driver {
             });
         }
         let mut holes = Vec::new();
-        let mut capture = None;
         hir::visit_expr_mut(&mut expression, &mut |e| {
-            if let Some(origin) = scoped.origin(e.span) {
-                if let Some(input) = input_nodes.iter().find(|s| s.same_input(&origin.syntax)) {
-                    if let Some(old) = query.input_span(input).and_then(|span|original_nodes.get(&span)) {
-                        if matches!(e.kind, hir::ExprKind::Name(_))
-                            && matches!(old.kind, hir::ExprKind::Name(_))
-                        {
-                            // Forwarded free names keep their original resolved identity.
-                            *e = old.clone();
-                        }
-                        holes.push((old.span, old.span));
-                        if !matches!(e.kind, hir::ExprKind::Name(_)) {
-                            *e = old.clone();
-                            return false;
-                        }
-                    }
-                }
-            }
-            if e.span.start < start {
+            if let Some(origin) = scoped.origin(e.span)
+                && let Some(input) = input_nodes.iter().find(|s| s.same_input(&origin.syntax))
+                && let Some(old) = query
+                    .input_span(input)
+                    .and_then(|span| original_nodes.get(&span))
+            {
+                holes.push((old.span, old.span));
+                *e = old.clone();
                 return false;
-            }
-            if matches!(e.kind, hir::ExprKind::Error) {
-                capture = Some(e.span);
             }
             true
         });
-        if capture.is_some() {
-            return Err(diagnostic(
-                program,
-                module,
-                span,
-                "typed macro output cannot capture or escape an argument binder",
-            ));
-        }
         struct Delayed<'a> {
             depth: usize,
             holes: &'a [(Span, Span)],
@@ -386,13 +389,6 @@ impl Expander for Driver {
         }
         // The source output uses virtual spans; match each forwarded input by
         // its retained origin before inspecting function boundaries.
-        let source_holes = Vec::new();
-        let mut delayed = Delayed {
-            depth: 0,
-            holes: &source_holes,
-            query: &query,
-            invalid: false,
-        };
         // Populate the source occurrences using their immutable Syntax origins.
         struct HoleSpans<'a> {
             scoped: &'a ScopedSource,
@@ -405,8 +401,9 @@ impl Expander for Driver {
                 if enter
                     && let Some(o) = self.scoped.origin(e.span)
                     && let Some(s) = self.inputs.iter().find(|s| s.same_input(&o.syntax))
+                    && let Some(span) = self.query.input_span(s)
                 {
-                    if let Some(span)=self.query.input_span(s) {self.out.push((e.span,span));}
+                    self.out.push((e.span, span));
                 }
             }
         }
@@ -418,7 +415,12 @@ impl Expander for Driver {
             out: Vec::new(),
         };
         source.walk(&mut spans);
-        delayed.holes = &spans.out;
+        let mut delayed = Delayed {
+            depth: 0,
+            holes: &spans.out,
+            query: &query,
+            invalid: false,
+        };
         source.walk(&mut delayed);
         if delayed.invalid {
             return Err(diagnostic(
@@ -429,6 +431,23 @@ impl Expander for Driver {
             ));
         }
         check_dependencies(program, module, span, &expression)?;
+        let mut generated = Expressions(HashMap::new());
+        syntax.clone().walk(&mut generated);
+        state
+            .generated
+            .extend(generated.0.into_iter().map(|(span, e)| ((module, span), e)));
+        resolution.modules[module.0 as usize].scoped = Some(scoped.clone());
+        for binding in &mut resolution.modules[module.0 as usize].bindings {
+            hir::visit_expr_mut(&mut binding.binding.value, &mut |e| {
+                if e.span == span {
+                    *e = expression.clone();
+                    return false;
+                }
+                true
+            });
+        }
+        let var_count = resolution.var_count;
+        let ty_var_count = resolution.ty_var_count;
         Ok(Output {
             expression,
             syntax,
@@ -436,6 +455,7 @@ impl Expander for Driver {
             var_count,
             ty_var_count,
             holes,
+            resolution: Arc::new(resolution),
             trace: transactions.iter().map(|t| t.trace.clone()).collect(),
             notes: transactions.into_iter().flat_map(|t| t.notes).collect(),
         })
@@ -483,10 +503,10 @@ fn check_dependencies(
         for b in &program.order.groups[i] {
             let mut e = program.binding(*b).binding.value.clone();
             hir::visit_expr_mut(&mut e, &mut |e| {
-                if let hir::ExprKind::Name(hir::ValueRef::Def(d)) = e.kind {
-                    if let Some(j) = groups.get(&d) {
-                        work.push(*j);
-                    }
+                if let hir::ExprKind::Name(hir::ValueRef::Def(d)) = e.kind
+                    && let Some(j) = groups.get(&d)
+                {
+                    work.push(*j);
                 }
                 true
             });

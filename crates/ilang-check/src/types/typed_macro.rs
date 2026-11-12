@@ -32,10 +32,12 @@ pub(super) struct QueryState {
     pub solver: Solver,
     pub signature: Ty,
     pub expressions: HashMap<Span, Ty>,
-    pub inputs: Vec<(Syntax,Span)>,
+    pub inputs: Vec<(Syntax, Span)>,
     pub argument_order: Vec<u32>,
     pub substitution: HashMap<V, Ty>,
+    observed: HashSet<V>,
     pub handles: Vec<Ty>,
+    answers: HashMap<u32, Syntax>,
     pub program: Arc<Program>,
     pub sources: Sources,
     pub reads: super::value_types::Reads,
@@ -84,9 +86,10 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
             for (_, p) in &f.params {
                 occurrences(s, p, pol.flip(), out);
             }
-            for t in [&f.ret, &f.err, &f.env] {
+            for t in [&f.ret, &f.err] {
                 occurrences(s, t, pol, out);
             }
+            occurrences_env(s, &f.env, pol, out);
         }
         Ty::Union(xs) | Ty::Inter(xs) => {
             for x in xs {
@@ -99,6 +102,22 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
             occurrences(s, b, pol.flip(), out);
         }
         Ty::Never | Ty::Top => {}
+    }
+}
+fn occurrences_env(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
+    match t {
+        Ty::Con(_, _, xs) => {
+            for x in xs {
+                occurrences(s, x, Pol::Both, out);
+            }
+        }
+        Ty::Union(xs) | Ty::Inter(xs) => {
+            for x in xs {
+                occurrences_env(s, x, pol, out);
+            }
+        }
+        Ty::Diff(base, _) => occurrences_env(s, base, pol, out),
+        _ => occurrences(s, t, pol, out),
     }
 }
 pub(super) fn reachable(s: &Solver, roots: impl IntoIterator<Item = V>) -> HashSet<V> {
@@ -132,14 +151,10 @@ pub(super) fn reachable(s: &Solver, roots: impl IntoIterator<Item = V>) -> HashS
 fn observe(s: &Solver, t: &Ty, fixed: &HashSet<V>, parts: Option<&FnTy>) -> HashMap<V, Ty> {
     let mut ps = HashMap::new();
     if let Some(f) = parts {
-        for t in f
-            .params
-            .iter()
-            .map(|(_, t)| t)
-            .chain([&f.ret, &f.err, &f.env])
-        {
+        for t in f.params.iter().map(|(_, t)| t).chain([&f.ret, &f.err]) {
             occurrences(s, t, Pol::Pos, &mut ps);
         }
+        occurrences_env(s, &f.env, Pol::Pos, &mut ps);
     } else {
         occurrences(s, t, Pol::Pos, &mut ps);
     }
@@ -175,27 +190,34 @@ impl TypedMacroQuery {
         expressions: HashMap<Span, Ty>,
         fixed: HashSet<V>,
         span: Span,
+        argument_types: &[Ty],
     ) -> Self {
-        let substitution = observe(
-            &c.s,
-            &signature,
-            &fixed,
-            if let Ty::Fn(f) = &signature {
-                Some(f)
-            } else {
-                None
-            },
-        );
+        let mut observation = if let Ty::Fn(f) = &signature {
+            f.as_ref().clone()
+        } else {
+            unreachable!("typed signature is a function")
+        };
+        observation
+            .params
+            .extend(argument_types.iter().cloned().map(|t| (None, t)));
+        let substitution = observe(&c.s, &signature, &fixed, Some(&observation));
         Self {
             id: NEXT_SNAPSHOT.fetch_add(1, Ordering::Relaxed),
             parser: OnceLock::new(),
             state: Mutex::new(QueryState {
                 solver: c.s.clone(),
                 signature,
-                expressions:expressions.into_iter().filter(|(s,_)|s.start>=span.start && s.end<=span.end).collect(),
+                expressions: expressions
+                    .into_iter()
+                    .filter(|(s, _)| s.start >= span.start && s.end <= span.end)
+                    .collect(),
                 inputs: Vec::new(),
+                observed: variables(&Ty::Fn(Box::new(observation)))
+                    .into_iter()
+                    .collect(),
                 substitution,
                 handles: Vec::new(),
+                answers: HashMap::new(),
                 program: Arc::new(c.p.clone()),
                 fixed,
                 effects: c
@@ -217,8 +239,14 @@ impl TypedMacroQuery {
             }),
         }
     }
-    pub fn input_span(&self,syntax:&Syntax)->Option<Span> {
-        self.state.lock().expect("query snapshot").inputs.iter().find(|(x,_)|x.same_input(syntax)).map(|(_,span)|*span)
+    pub fn input_span(&self, syntax: &Syntax) -> Option<Span> {
+        self.state
+            .lock()
+            .expect("query snapshot")
+            .inputs
+            .iter()
+            .find(|(x, _)| x.same_input(syntax))
+            .map(|(_, span)| *span)
     }
     pub fn argument_is_effectful(&self, span: Span) -> bool {
         let s = self.state.lock().expect("query snapshot");
@@ -252,17 +280,34 @@ impl TypedMacroQuery {
                 Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => work.push(x.clone()),
                 _ => {}
             }
-            let mut candidates:Vec<_>=s.expressions.keys().copied().collect();
-            candidates.sort_by_key(|s|(s.start,s.end));
-            let occurrence=candidates.into_iter().find(|span| {
-                if let Some(origin)=s.program.module(s.module).scoped.as_ref().and_then(|sc|sc.origin(*span)) {origin.syntax.same_input(&x)} else {*span==x.span()}
+            let mut candidates: Vec<_> = s.expressions.keys().copied().collect();
+            candidates.sort_by_key(|s| (s.start, s.end));
+            let occurrence = candidates.into_iter().find(|span| {
+                if let Some(origin) = s
+                    .program
+                    .module(s.module)
+                    .scoped
+                    .as_ref()
+                    .and_then(|sc| sc.origin(*span))
+                {
+                    origin.syntax.same_input(&x)
+                } else {
+                    *span == x.span()
+                }
             });
-            if let Some(span)=occurrence {s.inputs.push((x,span));}
+            if let Some(span) = occurrence {
+                s.inputs.push((x, span));
+            }
         }
     }
     pub fn type_of(&self, syntax: &Syntax) -> Result<Syntax, String> {
         let mut s = self.state.lock().expect("type query snapshot");
-        let Some(span)=s.inputs.iter().find(|(x,_)|x.same_input(syntax)).map(|(_,span)|*span) else {
+        let Some(span) = s
+            .inputs
+            .iter()
+            .find(|(x, _)| x.same_input(syntax))
+            .map(|(_, span)| *span)
+        else {
             return Err(
                 "type_of needs an original argument expression or pattern-bound name".into(),
             );
@@ -273,7 +318,7 @@ impl TypedMacroQuery {
             .expect("registered input has a type")
             .clone();
         let extra = observe(&s.solver, &ty, &s.fixed, None);
-        let signature_vars: HashSet<V> = variables(&s.signature).into_iter().collect();
+        let signature_vars = s.observed.clone();
         for (v, t) in extra {
             if !signature_vars.contains(&v) {
                 s.substitution.entry(v).or_insert(t);
@@ -339,6 +384,24 @@ impl TypedMacroQuery {
         Ok(answer)
     }
     fn read(&self, s: &mut QueryState, syntax: &Syntax) -> Result<Ty, String> {
+        let mut work = vec![syntax];
+        while let Some(node) = work.pop() {
+            let stale = match node.node() {
+                Node::TypeView(h) => h.snapshot != self.id || h.index as usize >= s.handles.len(),
+                _ => {
+                    matches!(node.scope_identity(),Some(ScopeIdentity::TypeVariable{variable,..}) if *variable>>32!=self.id || (*variable as u32) as usize>=s.handles.len())
+                }
+            };
+            if stale {
+                return Err("type handle belongs to a different module-check snapshot".into());
+            }
+            match node.node() {
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    work.extend(xs)
+                }
+                _ => {}
+            }
+        }
         if let Node::TypeView(h) = syntax.node() {
             if h.snapshot != self.id {
                 return Err("TypeView belongs to a different module-check snapshot".into());
@@ -371,7 +434,6 @@ impl TypedMacroQuery {
         for (i, t) in s.handles.iter().enumerate() {
             c.tyvars.insert(TyVarId(0x8000_0000 | i as u32), t.clone());
         }
-        c.check_places(&ty, Pol::Pos, 0);
         let t = c.conv(&ty, &HashMap::new());
         if let Some(error) = c.diags.iter().find(|d| d.is_error()) {
             return Err(error.message.clone());
@@ -417,26 +479,76 @@ impl TypedMacroQuery {
             xs.insert(0, atom(DatumKind::Symbol(name.into())));
             round(xs)
         };
+        if let Ty::Graph(g) = t {
+            if matches!(
+                g.node(),
+                super::records::Node::Never
+                    | super::records::Node::Var(_)
+                    | super::records::Node::Con(..)
+                    | super::records::Node::Fn(_)
+            ) {
+                return self.syntax(
+                    s,
+                    &g.view().expect("ordinary graph head has a surface view"),
+                );
+            }
+            if let Some(fields) = g.fields()
+                && fields
+                    .iter()
+                    .all(|(label, _)| matches!(label, super::records::Label::Name(_)))
+            {
+                if fields.is_empty() {
+                    return atom(DatumKind::UpName("Record".into())).with_scope_identity(
+                        ScopeIdentity::Builtin {
+                            name: "Record".into(),
+                        },
+                    );
+                }
+                let fields = fields
+                    .iter()
+                    .map(|(label, t)| {
+                        let super::records::Label::Name(name) = label else {
+                            unreachable!("surface record label")
+                        };
+                        form(
+                            ":",
+                            vec![atom(DatumKind::String(name.to_string())), self.syntax(s, t)],
+                        )
+                    })
+                    .collect();
+                return round(fields);
+            }
+        }
         match t {
             Ty::Graph(_) | Ty::Top | Ty::Both(..) => {
                 let index = self.handle(s, t);
-                Syntax::type_view(
+                if let Some(answer) = s.answers.get(&index) {
+                    return answer.clone();
+                }
+                let answer = Syntax::type_view(
                     TypeHandle {
                         snapshot: self.id,
                         index,
                     },
                     &atom(DatumKind::UpName("TypeView".into())),
-                )
+                );
+                s.answers.insert(index, answer.clone());
+                answer
             }
             Ty::Var(_) => {
                 let index = self.handle(s, t);
+                if let Some(answer) = s.answers.get(&index) {
+                    return answer.clone();
+                }
                 let name = format!("A{index}");
-                atom(DatumKind::UpName(name.clone())).with_scope_identity(
+                let answer = atom(DatumKind::UpName(name.clone())).with_scope_identity(
                     ScopeIdentity::TypeVariable {
-                        variable: index as u64,
+                        variable: (self.id << 32) | u64::from(index),
                         name,
                     },
-                )
+                );
+                s.answers.insert(index, answer.clone());
+                answer
             }
             Ty::Never => atom(DatumKind::UpName("Never".into())).with_scope_identity(
                 ScopeIdentity::Builtin {
@@ -573,6 +685,10 @@ impl TypedMacroQuery {
         let mut roots = vec![s.signature.clone()];
         roots.extend(expressions.into_iter().map(|(_, ty)| ty.clone()));
         roots.extend(s.handles.iter().cloned());
+        let mut substitutions: Vec<_> = s.substitution.iter().collect();
+        substitutions.sort_by_key(|(v, _)| v.0);
+        roots.extend(substitutions.iter().map(|(_, t)| (*t).clone()));
+        roots.extend((0..s.solver.vars.len()).map(|i| Ty::Var(V(i as u32))));
         let scheme = Scheme::mono(Ty::tuple(roots));
         let artifact = super::scheme_wire::SchemeArtifact {
             catalog: Arc::new(super::scheme_wire::SchemeCatalog {
@@ -582,14 +698,19 @@ impl TypedMacroQuery {
             }),
             scheme,
         };
-        artifact.text_with(&mut |t| match t {
+        let graph = artifact.text_with(&mut |t| match t {
             TypeRef::Builtin(b) => b.name().into(),
             TypeRef::Custom(id) => format!(
                 "{}:{}",
                 s.program.module(s.program.ty(id).module).path,
                 s.program.ty(id).name
             ),
-        })
+        });
+        let mut fixed: Vec<_> = s.fixed.iter().map(|v| v.0).collect();
+        fixed.sort_unstable();
+        let mut observed: Vec<_> = s.observed.iter().map(|v| v.0).collect();
+        observed.sort_unstable();
+        serde_json::json!({"version":1,"graph_bundle":serde_json::from_str::<serde_json::Value>(&graph).expect("scheme bundle JSON"),"fixed":fixed,"observed":observed,"substitutions":substitutions.iter().map(|(v,_)|v.0).collect::<Vec<_>>(),"handle_count":s.handles.len(),"variable_count":s.solver.vars.len()}).to_string()
     }
     pub(crate) fn handles(&self) -> Vec<Ty> {
         self.state
@@ -805,5 +926,49 @@ mod tests {
             _ => unreachable!(),
         });
         assert_eq!(bundle, again);
+    }
+    #[test]
+    fn typed_macro_query_cache_uses_graph_bundle_and_fixation_state() {
+        let mut solver = solver();
+        let variable = solver.fresh();
+        let Ty::Var(v) = variable else { unreachable!() };
+        let graph = solver.record(vec![
+            (super::super::records::Label::name("x"), variable.clone()),
+            (super::super::records::Label::name("y"), variable.clone()),
+        ]);
+        let query = TypedMacroQuery {
+            id: 1,
+            parser: OnceLock::new(),
+            state: Mutex::new(QueryState {
+                solver,
+                signature: graph,
+                expressions: HashMap::new(),
+                inputs: Vec::new(),
+                argument_order: Vec::new(),
+                substitution: HashMap::new(),
+                observed: HashSet::from([v]),
+                handles: vec![variable],
+                answers: HashMap::new(),
+                program: Arc::new(Program::default()),
+                sources: Sources::default(),
+                reads: super::super::value_types::Reads::default(),
+                tyvars: HashMap::new(),
+                module: ModuleId(0),
+                fixed: HashSet::from([v]),
+                effects: HashMap::new(),
+            }),
+        };
+        let wire: serde_json::Value = serde_json::from_str(&query.graph_bundle()).unwrap();
+        assert_eq!(wire["fixed"], serde_json::json!([v.0]));
+        assert!(wire["graph_bundle"]["graph"].is_string());
+        let graph = super::super::SchemeArtifact::from_bundle(
+            &wire["graph_bundle"].to_string(),
+            &mut |_| None,
+        )
+        .unwrap();
+        assert!(graph.needs_semantic_comparison());
+        let before = query.graph_bundle();
+        query.state.lock().unwrap().fixed.clear();
+        assert_ne!(before, query.graph_bundle());
     }
 }

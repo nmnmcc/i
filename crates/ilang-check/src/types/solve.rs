@@ -284,6 +284,7 @@ impl Solver {
         (seen, bounds)
     }
     fn rigid_constraint(&mut self, l: &Ty, r: &Ty, mode: Mode) -> bool {
+        let mode = mode.max(self.mode(l)).max(self.mode(r));
         if !self.frozen(l) && !self.frozen(r) {
             return false;
         }
@@ -294,6 +295,10 @@ impl Solver {
         if let Ty::Var(v) = r
             && !self.frozen(r)
         {
+            self.mark_mode(r, mode);
+            if self.var(*v).lower.contains(l) {
+                return true;
+            }
             if self.add_bound(*v, l.clone(), true, mode) {
                 for ub in self.var(*v).upper.clone() {
                     self.constrain_in(l, &ub, mode);
@@ -304,6 +309,10 @@ impl Solver {
         if let Ty::Var(v) = l
             && !self.frozen(l)
         {
+            self.mark_mode(l, mode);
+            if self.var(*v).upper.contains(r) {
+                return true;
+            }
             if self.add_bound(*v, r.clone(), false, mode) {
                 for lb in self.var(*v).lower.clone() {
                     self.constrain_in(&lb, r, mode);

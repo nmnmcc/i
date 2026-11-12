@@ -3008,5 +3008,8 @@
   },
   "crates/ilang-cli/tests/providers.rs:94ebdef83b17a3a3": {
     "not_source": "TOML provider manifest or manifest template; i source is checked separately"
+  },
+  "crates/ilang-check/src/types/typed_macro.rs:fe904007a1a28013": {
+    "not_source": "Rust formatting template for a compiler-owned opaque type-variable name; it generates an identifier, not an i module."
   }
 }

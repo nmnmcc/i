@@ -264,3 +264,189 @@ fn typed_macro_can_delay_pure_argument() {
     )
     .unwrap();
 }
+
+fn same_principal(
+    left: &ilang_macro::project::ProjectChecked,
+    right: &ilang_macro::project::ProjectChecked,
+    name: &str,
+) {
+    use ilang_check::{
+        hir::{DefId, ModuleId, TypeRef},
+        types::{SchemeArtifact, SchemeComparison},
+    };
+    fn get(c: &ilang_macro::project::ProjectChecked, name: &str) -> SchemeArtifact {
+        let p = c.program.as_ref().unwrap();
+        let (mi, m) = p
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == "app/main")
+            .unwrap();
+        let di = m.defs.iter().position(|d| d.name == name).unwrap();
+        c.types.as_ref().unwrap().provider_scheme_artifacts[&DefId {
+            module: ModuleId(mi as u32),
+            index: di as u32,
+        }]
+            .clone()
+    }
+    let names = |c: &ilang_macro::project::ProjectChecked, t: TypeRef| match t {
+        TypeRef::Builtin(b) => b.name().to_string(),
+        TypeRef::Custom(id) => {
+            let p = c.program.as_ref().unwrap();
+            format!("{}/{}", p.module(p.ty(id).module).path, p.ty(id).name)
+        }
+    };
+    let comparison = get(left, name)
+        .compare(&get(right, name), &mut |t| names(left, t), &mut |t| {
+            names(right, t)
+        })
+        .unwrap();
+    assert!(
+        matches!(comparison, SchemeComparison::Equivalent(_)),
+        "{comparison:?}"
+    );
+}
+#[test]
+fn typed_macro_identity_principal_graph_differential() {
+    let (_, typed) = checked(
+        ID,
+        "(m = app/macros)\nf = (x) { m.identity(x) }\nmain = () { assert(f(42) == 42) }",
+    )
+    .unwrap();
+    let (_, plain) = checked(
+        ID,
+        "(m = app/macros)\nf = (x) { x }\nmain = () { assert(f(42) == 42) }",
+    )
+    .unwrap();
+    same_principal(&typed, &plain, "f");
+}
+#[test]
+fn typed_macro_forwarding_principal_record_graph_differential() {
+    let (_,typed)=checked(ID,"(m = app/macros)\nf = (x: (a: Int, b: String)) { m.identity(x) }\nmain = () { f((a: 42, b: \"x\")) }").unwrap();
+    let (_, plain) = checked(
+        ID,
+        "(m = app/macros)\nf = (x: (a: Int, b: String)) { x }\nmain = () { f((a: 42, b: \"x\")) }",
+    )
+    .unwrap();
+    same_principal(&typed, &plain, "f");
+}
+#[test]
+fn typed_macro_nested_forwarding_runs_retained_inner_call() {
+    let dir = project(
+        ID,
+        "(m = app/macros)\nmain = () { assert(m.identity(m.identity(42)) == 42) }",
+    );
+    let b = ilang_cli::build(
+        dir.path(),
+        ilang_cli::BuildOptions {
+            tests: false,
+            opt: ilang_cli::Level::O0,
+            offline: true,
+            target: ilang_cli::Target::Native,
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        ilang_host::Program::from_bytes(&b.wasm)
+            .unwrap()
+            .with_binding_plan(b.binding_plan)
+            .unwrap()
+            .run_entry(ilang_host::HostOptions::default())
+            .unwrap(),
+        ilang_host::Outcome::Ok(_)
+    ));
+}
+#[test]
+fn typed_macro_outer_drop_does_not_execute_inner_macro() {
+    let macros = r#"(, (= syntax (/ i syntax)) (= fail (/ i fail)))
+(, drop bad)
+(@ macro (: drop (-> (Int) Int)))
+(@ macro (= drop (-> (x) _ `7)))
+(@ macro (: bad (-> (Int) Int)))
+(@ macro (= bad (-> (x) _ ((. fail raise) ((. syntax SyntaxError) "must not run" x)))))
+"#;
+    let (_, c) = checked(
+        macros,
+        "(m = app/macros)\nmain = () { assert(m.drop(m.bad(1)) == 7) }",
+    )
+    .unwrap();
+    assert_eq!(c.types.unwrap().typed_expansions.len(), 1);
+}
+#[test]
+fn typed_macro_result_can_introduce_another_typed_call() {
+    let macros = r#"(, (= syntax (/ i syntax)))
+(, outer)
+(@ macro (: outer (-> (Int) Int)))
+(@ macro (= outer (-> (x) _ `(inner ~x))))
+(@ macro (: inner (-> (Int) Int)))
+(@ macro (= inner (-> (x) _ `(+ ~x 1))))
+"#;
+    let (_, c) = checked(
+        macros,
+        "(m = app/macros)\nmain = () { assert(m.outer(41) == 42) }",
+    )
+    .unwrap();
+    assert_eq!(c.types.unwrap().typed_expansions.len(), 2);
+}
+#[test]
+fn typed_macro_library_inside_syntax_generated_test_runs() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args([
+            "test",
+            "--project",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/macro-tests"),
+            "--opt",
+            "0",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("passed, 0 failed"),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+fn typed_macro_forwarding_effect_rows_graph_differential() {
+    let (_, typed) = checked(
+        ID,
+        "(m = app/macros)\nf = (g) { m.identity(g()) }\nmain = () { assert(f(() { 42 }) == 42) }",
+    )
+    .unwrap();
+    let (_, plain) = checked(
+        ID,
+        "(m = app/macros)\nf = (g) { g() }\nmain = () { assert(f(() { 42 }) == 42) }",
+    )
+    .unwrap();
+    same_principal(&typed, &plain, "f");
+}
+#[test]
+fn typed_macro_graph_members_keep_one_exact_record_graph() {
+    let m = declared(
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax members) t) { (-> [one] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"record graph was split\" value))) }) })",
+    );
+    checked(
+        &m,
+        "(m = app/macros)\nf = (x: (a: Int) | (b: String)) { m.m(x) }\nmain = () { f((a: 42)) }",
+    )
+    .unwrap();
+}
+#[test]
+fn typed_macro_frozen_variable_is_legal_in_output_annotation() {
+    let m = declared(
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) `{ (= (: saved ~t) ~value) saved } })",
+    );
+    checked(
+        &m,
+        "(m = app/macros)\nf = (x) { m.m(x) }\nmain = () { assert(f(42) == 42) }",
+    )
+    .unwrap();
+}

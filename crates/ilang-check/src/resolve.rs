@@ -4483,7 +4483,7 @@ pub fn typed_output(
     expression: &ast::Expr,
     var_count: u32,
     ty_var_count: u32,
-) -> Result<(Expr, u32, u32), Vec<Diagnostic>> {
+) -> Result<(Expr, Program), Vec<Diagnostic>> {
     let names = original
         .expansion_names
         .as_ref()
@@ -4495,6 +4495,8 @@ pub fn typed_output(
     let mut p = original.clone();
     p.var_count = var_count;
     p.ty_var_count = ty_var_count;
+    p.ty_var_names
+        .resize_with(ty_var_count as usize, || "Output".into());
     let reads = p.of_sites.len();
     let mut r = Resolver {
         graph,
@@ -4532,6 +4534,6 @@ pub fn typed_output(
     if r.diags.iter().any(Diagnostic::is_error) {
         Err(r.diags)
     } else {
-        Ok((result, r.p.var_count, r.p.ty_var_count))
+        Ok((result, r.p))
     }
 }

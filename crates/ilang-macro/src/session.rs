@@ -116,8 +116,9 @@ impl Session {
             }
         }));
         if let Some(types) = self.types.clone() {
+            let cache = std::sync::Mutex::new(ilang_syntax::lisp::syntax::MarkCache::new(mark));
             context.set_types(Arc::new(move |op, args| {
-                types(op, args).map(|xs| xs.into_iter().map(|s| s.flip_mark(mark)).collect())
+                types(op, args).map(|xs| cache.lock().expect("typed answer marks").flip(&xs))
             }));
         }
         let items = (position == MacroPosition::Item)

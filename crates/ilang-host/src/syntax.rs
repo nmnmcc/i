@@ -798,6 +798,89 @@ fn install_inner(
     Ok(())
 }
 
+fn install_types(
+    imports: &mut HostImports,
+    context: Option<Arc<DefinitionContext>>,
+    budget: Option<MacroBudget>,
+) -> Result<()> {
+    for operation in ["type_of", "signature", "subtype", "members"] {
+        let context = context.clone();
+        let budget = budget.clone();
+        imports.external("i:compiler/syntax/v1", operation, move |args| {
+            let args: Vec<_> = args
+                .iter()
+                .map(|v| get::<Syntax>(v).cloned())
+                .collect::<Result<_>>()?;
+            if let Some(b) = &budget {
+                b.charge(1, 8)?;
+                for arg in &args {
+                    charge_tree(b, arg, false)?;
+                }
+            }
+            let c = context
+                .as_ref()
+                .expect("compiler instance has no type service context");
+            let callback = c
+                .types
+                .lock()
+                .expect("typed service")
+                .clone()
+                .expect("Types is installed only for typed macros");
+            let result = callback(operation, &args);
+            if let Err((message, at)) = &result
+                && message.starts_with("E0546:")
+            {
+                *c.abort.lock().expect("type query abort") = Some(DefinitionAbort::CompileError {
+                    message: message.clone(),
+                    at: at.clone(),
+                });
+                bail!("type proof resource limit exceeded");
+            }
+            if let (Some(b), Ok(xs)) = (&budget, &result) {
+                for x in xs {
+                    charge_tree(b, x, true)?;
+                }
+            }
+            Ok(opaque(TypeResult(result)))
+        })?;
+    }
+    for operation in [
+        "type_ok",
+        "type_value",
+        "type_truth",
+        "type_len",
+        "type_child",
+        "type_message",
+        "type_at",
+    ] {
+        imports.external("i:compiler/syntax/v1", operation, move |args| {
+            let result = get::<TypeResult>(&args[0])?;
+            Ok(match operation {
+                "type_ok" => Value::Bool(result.0.is_ok()),
+                "type_value" => encode(result.0.as_ref().expect("successful query")[0].clone()),
+                "type_truth" => Value::Int(
+                    match result.0.as_ref().expect("successful query")[0].node() {
+                        Node::Up(s) if s == "Yes" => 0,
+                        Node::Up(s) if s == "No" => 1,
+                        _ => 2,
+                    }
+                    .into(),
+                ),
+                "type_len" => Value::Int(result.0.as_ref().expect("successful query").len().into()),
+                "type_child" => {
+                    encode(result.0.as_ref().expect("successful query")[number(&args[1])?].clone())
+                }
+                "type_message" => {
+                    Value::String(result.0.as_ref().expect_err("failed query").0.clone())
+                }
+                "type_at" => encode(result.0.as_ref().expect_err("failed query").1.clone()),
+                _ => unreachable!("type result operation"),
+            })
+        })?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1030,78 +1113,4 @@ mod tests {
         charge_tree(&syntax_budget, &syntax, true).unwrap();
         assert_eq!(datum_budget.usage(), syntax_budget.usage());
     }
-}
-
-fn install_types(
-    imports: &mut HostImports,
-    context: Option<Arc<DefinitionContext>>,
-    budget: Option<MacroBudget>,
-) -> Result<()> {
-    for operation in ["type_of", "signature", "subtype", "members"] {
-        let context = context.clone();
-        let budget = budget.clone();
-        imports.external("i:compiler/syntax/v1", operation, move |args| {
-            let args: Vec<_> = args
-                .iter()
-                .map(|v| get::<Syntax>(v).cloned())
-                .collect::<Result<_>>()?;
-            if let Some(b) = &budget {
-                b.charge(1, 8)?;
-                for arg in &args {
-                    charge_tree(b, arg, false)?;
-                }
-            }
-            let c = context
-                .as_ref()
-                .expect("compiler instance has no type service context");
-            let callback = c
-                .types
-                .lock()
-                .expect("typed service")
-                .clone()
-                .expect("Types is installed only for typed macros");
-            let result = callback(operation, &args);
-            if let (Some(b), Ok(xs)) = (&budget, &result) {
-                for x in xs {
-                    charge_tree(b, x, true)?;
-                }
-            }
-            Ok(opaque(TypeResult(result)))
-        })?;
-    }
-    for operation in [
-        "type_ok",
-        "type_value",
-        "type_truth",
-        "type_len",
-        "type_child",
-        "type_message",
-        "type_at",
-    ] {
-        imports.external("i:compiler/syntax/v1", operation, move |args| {
-            let result = get::<TypeResult>(&args[0])?;
-            Ok(match operation {
-                "type_ok" => Value::Bool(result.0.is_ok()),
-                "type_value" => encode(result.0.as_ref().expect("successful query")[0].clone()),
-                "type_truth" => Value::Int(
-                    match result.0.as_ref().expect("successful query")[0].node() {
-                        Node::Up(s) if s == "Yes" => 0,
-                        Node::Up(s) if s == "No" => 1,
-                        _ => 2,
-                    }
-                    .into(),
-                ),
-                "type_len" => Value::Int(result.0.as_ref().expect("successful query").len().into()),
-                "type_child" => {
-                    encode(result.0.as_ref().expect("successful query")[number(&args[1])?].clone())
-                }
-                "type_message" => {
-                    Value::String(result.0.as_ref().expect_err("failed query").0.clone())
-                }
-                "type_at" => encode(result.0.as_ref().expect_err("failed query").1.clone()),
-                _ => unreachable!("type result operation"),
-            })
-        })?;
-    }
-    Ok(())
 }
