@@ -818,6 +818,8 @@ pub struct Program {
     /// Workers of an entry run ([`worker_count`]); more than one needs
     /// epoch-instrumented code (native N12).
     workers: usize,
+    /// The engine is epoch-instrumented, so every store needs a deadline.
+    epochs: bool,
 }
 
 impl Program {
@@ -917,7 +919,15 @@ impl Program {
             provider_registrations,
             macro_static_cost,
             workers,
+            epochs: workers > 1,
         })
+    }
+
+    /// Run entries on at most `workers` workers (multicore D12: the host's
+    /// choice). One worker keeps the FIFO fast path (native N10).
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.workers = if self.epochs { workers.max(1) } else { 1 };
+        self
     }
 
     /// Give the metadata of a module that has no `ilang.abi` section.
@@ -1058,7 +1068,7 @@ impl Program {
                 workers: None,
             },
         );
-        if self.workers > 1 {
+        if self.epochs {
             // Only remote workers are ever interrupted (native N12).
             store.set_epoch_deadline(1 << 62);
         }
