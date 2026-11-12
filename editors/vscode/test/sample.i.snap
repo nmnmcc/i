@@ -1,5 +1,5 @@
 "//"  comment.line.double-slash.i punctuation.definition.comment.i
-" old-syntax-check: E0003,E0106"  comment.line.double-slash.i
+" old-syntax-check: E0101,E0003,E0106,E0101"  comment.line.double-slash.i
 "////"  comment.line.documentation.module.i punctuation.definition.comment.i
 " The module documentation."  comment.line.documentation.module.i
 "("  meta.header.i punctuation.definition.header.begin.i

@@ -1877,13 +1877,6 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/spec/1.7/a1_same_line_tuple.i:ad30ee59732b5c6a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0102: expected the function body, a `{` on the same line, found `->`"
-    ]
-  },
   "tests/spec/2.2/a1_empty_header.i:1e1dadc9eac538e0": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -1901,16 +1894,6 @@
     "diagnostics": [
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
-  },
-  "tests/spec/6/a1_wrong_pattern.i:b85b9d281734af03": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0101: expected an expression, found `->`"
-    ]
-  },
-  "tests/spec/6/syn2_empty_tuple_type.i:4dfd264ad80b24c8": {
-    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/spec/6/syn2_mixed_tuple.i:4434f59aa351dc4c": {
     "reason": "Intentional negative syntax example.",
@@ -2010,9 +1993,6 @@
     "diagnostics": [
       "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
     ]
-  },
-  "tests/spec/7/syn2_old_empty_tuple_pattern.i:e2dca65404826320": {
-    "reason": "Intentional legacy migration or rejection fixture. (valid in syntax three)"
   },
   "crates/ilang-check/tests/front_end.rs:1b999808f689275a": {
     "reason": "Checker rejects the removed attribute.",
@@ -2444,66 +2424,11 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "editors/vscode/test/sample.i:c502997562f7493a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0003: unknown escape",
-      "E0001: `^` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `^`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `,`, `?` or `)`, found `!`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
-    ]
-  },
   "crates/ilang-cli/src/commands/package.rs:df747cb87930f0f2": {
     "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
   },
   "crates/ilang-cli/tests/common/test_project.rs:df747cb87930f0f2": {
     "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:d8f95b5fb6532cf4": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:46feaf394748b272": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: expected a type, found `a string`"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:cc4dd6b69b368079": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: expected a type, found `a string`"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:cbd9f653790dabf1": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0101: expected an expression, found `->`"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:d2e4ebd2c9e65f33": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern. (valid in syntax three)"
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:f7892fa942823195": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: expected an UpName, found `a string`"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:e2bc8a6c691e2917": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0101: expected an expression, found `->`"
-    ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:5c703ec833151f17": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
@@ -2594,13 +2519,6 @@
     ]
   },
   "tests/spec/7/suffix_nonliteral.i:08a91b960c1bc656": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0101: expected an expression, found `->`"
-    ]
-  },
-  "tests/spec/7/suffix_two_binders.i:09f5fa9e575099c6": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
       "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
@@ -2796,5 +2714,32 @@
       ]
     ],
     "reason": "Render the existing source template; runtime tests still exercise the full generator"
+  },
+  "tests/spec/7/suffix_two_binders.i:12dad9a8f81d08ba": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: expected `,`, `?` or `)`, found `<>`"
+    ]
+  },
+  "tests/spec/1.7/a1_same_line_tuple.i:bb17b44ae2201195": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0106: a discard binds nothing, so it may not be used as a value"
+    ]
+  },
+  "editors/vscode/test/sample.i:4738af5a675ee645": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0003: unknown escape",
+      "E0106: a discard binds nothing, so it may not be used as a value",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
+    ]
+  },
+  "tests/spec/6/a1_wrong_pattern.i:03fa6b0f25d02282": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
+    ]
   }
 }
