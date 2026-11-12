@@ -142,12 +142,12 @@ fn codegen_data() {
         v.sort();
         v.into_iter().map(|x| x.1).collect()
     };
-    // name, second, minus, by_label, piped, tests, env, mono, age, first,
-    // pair, div
+    // name, second, minus, by_label (a constructor call, so a direct
+    // value), piped, tests, env, mono, age, first, pair, div
     assert_eq!(
         generalized,
         vec![
-            true, true, true, false, false, true, true, false, true, true, true, true
+            true, true, true, true, false, true, true, false, true, true, true, true
         ]
     );
     // The field of each part of a constructor pattern (§7.1): every field
