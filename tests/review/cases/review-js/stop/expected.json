@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "ae2f13b8a553e9309047d74d2101fa0626859a62",
+  "binary_sha256": "f2447ed6524ac42e527ffba7bc86f6ce4166071bc4a0c4ee9ec692f4c1e3ec59",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -20,7 +20,7 @@
         "0"
       ],
       "exit": 1,
-      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  panic: before main\n  probe/main:1:5\n0 passed, 1 failed\n",
+      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  the program stopped in ilang_start: panic: before main\nprobe/main:1:5\n0 passed, 1 failed\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `x` is not used\n"
     },
     "run0": {
@@ -40,7 +40,7 @@
         "2"
       ],
       "exit": 1,
-      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  panic: before main\n  probe/main:1:5\n0 passed, 1 failed\n",
+      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  the program stopped in ilang_start: panic: before main\nprobe/main:1:5\n0 passed, 1 failed\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `x` is not used\n"
     },
     "run2": {

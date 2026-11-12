@@ -54,6 +54,12 @@ No language or library surface was added, including state mechanisms.
   parser's E0101 rather than the old record-brace diagnostic. Inspected the
   sources and complete release-CLI observations, including both startup runs
   for the four now-valid inputs, before refreshing these five snapshots.
+  The duplicate `runtime/25/original` input needs the same parser diagnostic.
+  Reviewed later differences before copying their complete release results:
+  K4 conflict/invariant observations change only rendered error slots from
+  `? E` to `^ E`; JS coarse/raw missing-host diagnostics now identify their
+  service, and startup-stop diagnostics explicitly name `ilang_start`.
+  These preserve error codes, exits, source positions and runtime failures.
 - i WASI smoke: its generated stopping program also used removed `@main`
   and failed with E0301 after the hello module built. Generate the ordinary
   main binding; retain both engines, both optimization levels, output/stop

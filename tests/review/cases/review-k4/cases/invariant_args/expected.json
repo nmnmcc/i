@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "ae2f13b8a553e9309047d74d2101fa0626859a62",
+  "binary_sha256": "f2447ed6524ac42e527ffba7bc86f6ce4166071bc4a0c4ee9ec692f4c1e3ec59",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.run : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.f : () -> A ! N | S(B & A, N)\n",
+      "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.run : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.f : () -> A ! N | S(B & A, N)\n",
       "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `f` is not used\n"
     },
     "test0": {
