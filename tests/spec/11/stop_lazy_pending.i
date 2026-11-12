@@ -1,11 +1,11 @@
 // spec: 11.7, 9.4
 // expect: stop "panic: after"
-// at: spec/main:31:3
-// at: spec/main:25:7
-// at: spec/main:20:7
-// at: spec/main:15:7
-// at: spec/main:39:5
-// at: spec/main:43:18
+// at: spec/main:33:3
+// at: spec/main:27:7
+// at: spec/main:22:7
+// at: spec/main:17:7
+// at: spec/main:41:5
+// at: spec/main:45:18
 (i/control)
 
 Paused = PausedCase | Done

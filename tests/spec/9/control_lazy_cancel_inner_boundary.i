@@ -1,6 +1,6 @@
 // spec: 9.4, 9.5, 11.7
 // expect: stop "control: boundary is not active"
-// at: spec/main:48:7
+// at: spec/main:50:7
 (i/control, i/core, i/resource)
 
 check = (got: String, want: String) {

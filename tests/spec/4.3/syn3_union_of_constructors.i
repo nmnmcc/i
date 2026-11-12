@@ -1,6 +1,6 @@
 // spec: 4.3, 4.4
 // expect: pass
-(main, area)
+(main, area, Circle(..), Square(..), Shape)
 
 Circle { Circle(radius: Float) }
 Square { Square(side: Float) }
@@ -8,8 +8,8 @@ Shape = Circle | Square
 
 area = (s: Shape) -> Float {
   s |> {
-    Circle(r) -> 3.0 *. r *. r
-    Square(a) -> a *. a
+    Circle(radius: r) -> 3.0 *. r *. r
+    Square(side: a) -> a *. a
   }
 }
 
