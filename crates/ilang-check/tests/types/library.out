@@ -87,6 +87,28 @@ i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
 i/core.portable : (value: A) -> Bool
+i/float_text.sign_mask : 9223372036854775808
+i/float_text.fraction_unit : 4503599627370496
+i/float_text.precise_limit : 4845873199050653696
+i/float_text.to_string : (x: Float) -> String
+i/float_text.positive : (bits: Int) -> List(String)
+i/float_text.grow : (r: Int, s: Int, k: Int) -> (Int, Int)
+i/float_text.shrink : (r: Int, s: Int, minus: Int, plus: Int, k: Int) -> (Int, Int, Int, Int)
+i/float_text.generate : (r: Int, s: Int, minus: Int, plus: Int, inclusive: Bool, acc: List(Int), k: Int) -> (List(Int), Int)
+i/float_text.carry : (reversed: List(Int)) -> (List(Int), Bool)
+i/float_text.trim : (reversed: List(Int)) -> List(Int)
+i/float_text.reverse_onto : (list: List(Int), acc: List(Int)) -> List(Int)
+i/float_text.length : (list: List(Int), n: Int) -> Int
+i/float_text.layout : (digits: List(Int), n: Int, k: Int, imprecise: Bool) -> List(String)
+i/float_text.split : (digits: List(Int), k: Int, acc: List(String)) -> List(String)
+i/float_text.reverse_texts : (list: List(String), acc: List(String)) -> List(String)
+i/float_text.append : (front: List(String), back: List(String)) -> List(String)
+i/float_text.zeros : (count: Int, rest: List(String)) -> List(String)
+i/float_text.texts : (digits: List(Int), rest: List(String)) -> List(String)
+i/float_text.digit_list : (digits: List(Int), acc: List(String)) -> List(String)
+i/float_text.int_text : (e: Int) -> List(String)
+i/float_text.int_digits : (e: Int, acc: List(String)) -> List(String)
+i/float_text.digit_text : (d: Int) -> String
 i/record.get : (r: (K: A), key: K) -> A
 i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
 i/record.remove : (r: Record & A, key: K) -> (..A, -K)

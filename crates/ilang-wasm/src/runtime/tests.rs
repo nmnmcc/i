@@ -15,9 +15,56 @@ pub(crate) const STUB_HOST: &str = r#"
 (func $host_reference_id (param $r externref) (result i64)
   (if (result i64) (ref.is_null (local.get $r)) (then (i64.const 0)) (else (i64.const 1))))
 ;; The text of a Float is i code (`lib/i/float_text.i`), which these
-;; modules do not have.
-(func $float_to_string (param eqref) (result eqref) unreachable)
+;; modules do not have. Here a Float is written as its 64 bits, as a signed
+;; decimal number, and `Checks::inspect` expects that form ([`float_bits`]).
+(func $float_to_string (param $value eqref) (result eqref)
+  (call $int_to_string (call $int_from_i64
+    (i64.reinterpret_f64 (call $float_get (local.get $value))))))
 "#;
+
+/// The text form of [`STUB_HOST`]: each Float literal of `text`, such as
+/// `-1.5` or `1.0e-7`, written as the signed decimal of its 64 bits.
+pub(crate) fn float_bits(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let start = i;
+        let mut j = i;
+        if bytes[j] == b'-' {
+            j += 1;
+        }
+        let digits = |mut k: usize| {
+            while k < bytes.len() && bytes[k].is_ascii_digit() {
+                k += 1;
+            }
+            k
+        };
+        let whole = digits(j);
+        let previous = start.checked_sub(1).map(|p| bytes[p]);
+        let begins = !previous.is_some_and(|b| b.is_ascii_alphanumeric() || b == b'.');
+        if begins && whole > j && whole < bytes.len() && bytes[whole] == b'.' {
+            let fraction = digits(whole + 1);
+            if fraction > whole + 1 {
+                let mut end = fraction;
+                if end < bytes.len() && bytes[end] == b'e' {
+                    let sign = usize::from(bytes.get(end + 1) == Some(&b'-'));
+                    let exponent = digits(end + 1 + sign);
+                    if exponent > end + 1 + sign {
+                        end = exponent;
+                    }
+                }
+                let value: f64 = text[start..end].parse().expect("a Float literal");
+                out.extend((value.to_bits() as i64).to_string().bytes());
+                i = end;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).expect("UTF-8 is kept")
+}
 
 /// A list of checks, each an `i32` expression that must not be 0.
 #[derive(Default)]
@@ -52,7 +99,7 @@ impl Checks {
         self.string(
             format!("inspect {expected}"),
             &format!("(call $inspect {expression})"),
-            expected,
+            &float_bits(expected),
         );
     }
 
@@ -221,7 +268,11 @@ fn checks() -> Checks {
 
 #[test]
 fn runtime_with_host_imports_is_valid_wasm() {
-    let source = format!("(module {TYPES} {HOST} {})", wat());
+    let source = format!(
+        "(module {TYPES} {HOST} {} {})",
+        wat(),
+        super::LIBRARY_ABSENT
+    );
     let binary = wat::parse_str(source).expect("the runtime must assemble");
     wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
         .validate_all(&binary)

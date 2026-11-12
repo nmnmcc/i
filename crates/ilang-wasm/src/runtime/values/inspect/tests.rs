@@ -152,6 +152,8 @@ fn cases() -> Vec<(String, String)> {
             (1_u128 << 120).to_string(),
         ),
         (integer(-1_073_741_825), "-1073741825".into()),
+        ("(call $float_new (f64.const -0))".into(), "-0.0".into()),
+        ("(call $float_new (f64.const 1e-7))".into(), "1.0e-7".into()),
         (
             "(struct.new $hostref (ref.null extern) (i32.const 41) (i64.const 1))".into(),
             "//wasm(opaque)".into(),
