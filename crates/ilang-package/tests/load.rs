@@ -143,6 +143,7 @@ fn graph_with_path_dependencies() {
             "i/core",
             "i/float_text",
             "i/big",
+            "i/bits",
             "i/record",
             "i/io",
             "i/task",

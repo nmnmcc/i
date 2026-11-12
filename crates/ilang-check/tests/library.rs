@@ -25,6 +25,7 @@ fn library_resolves_cleanly() {
             "i/core",
             "i/float_text",
             "i/big",
+            "i/bits",
             "i/record",
             "i/io",
             "i/task",
@@ -141,6 +142,7 @@ fn library_names() {
         ),
         ("i/prelude", &["panic", "assert"]),
         ("i/float_text", &["to_string"]),
+        ("i/bits", &["read_int", "from_int"]),
         (
             "i/big",
             &[

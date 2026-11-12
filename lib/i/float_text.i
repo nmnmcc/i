@@ -66,11 +66,50 @@ positive = (bits: Int) -> List(String) {
 		True  -> (r, core.shift_left(1, -e), minus, plus)
 		False -> (core.shift_left(r, e), 1, core.shift_left(minus, e), core.shift_left(plus, e))
 	}
-	(s, k) = grow(r, s, 1)
+	// Scale by a power of ten first, from an estimate of the decimal
+	// exponent that is never too high: j <= floor(log10(v)). 78913 / 2^18 is
+	// just below log10(2); the binary exponent of v is at least `low`.
+	low = { encoded == 0 } |> {
+		True  -> -1075
+		False -> encoded - 1023
+	}
+	j = floor_divide(low * 78913, 262144) - 1
+	(r, s, minus, plus) = { j >= 0 } |> {
+		True -> (r, s * power_of_ten(j), minus, plus)
+		False -> {
+			t = power_of_ten(-j)
+			(r * t, s, minus * t, plus * t)
+		}
+	}
+	(s, k) = grow(r, s, j + 1)
 	(r, minus, plus, k) = shrink(r, s, minus, plus, k)
 	(reversed, k) = generate(r, s, minus, plus, inclusive, [], k)
 	digits = reverse_onto(trim(reversed), [])
 	layout(digits, length(digits, 0), k, bits >= precise_limit)
+}
+
+// floor(a / b) for b > 0.
+floor_divide = (a: Int, b: Int) -> Int {
+	{ a < 0 } |> {
+		True  -> 0 - { b - 1 - a } / b
+		False -> a / b
+	}
+}
+
+// 10^n, by squaring.
+power_of_ten = (n: Int) -> Int { power(10, n, 1) }
+
+power = (base: Int, n: Int, acc: Int) -> Int {
+	{ n == 0 } |> {
+		True -> acc
+		False -> {
+			next = { n % 2 == 1 } |> {
+				True  -> acc * base
+				False -> acc
+			}
+			power(base * base, n / 2, next)
+		}
+	}
 }
 
 // Exact normalization, part one: the smallest `s × 10^j` above `r`, with

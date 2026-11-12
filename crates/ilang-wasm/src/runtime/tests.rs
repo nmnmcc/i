@@ -45,6 +45,9 @@ pub(crate) const STUB_HOST: &str = r#"
 (func $big_multiply (param eqref eqref) (result eqref) unreachable)
 (func $big_divide (param eqref eqref) (result eqref) unreachable)
 (func $big_remainder (param eqref eqref) (result eqref) unreachable)
+;; Integer segments wider than 63 bits are i code (`lib/i/bits.i`).
+(func $bits_from_int_wide (param eqref eqref eqref) (result eqref) unreachable)
+(func $bits_read_int_wide (param eqref eqref eqref eqref eqref) (result eqref) unreachable)
 ;; A small Int in decimal.
 (func $small_decimal (param $v i32) (result eqref)
   (local $m i64) (local $out (ref $bytes)) (local $at i32) (local $text (ref $bytes))

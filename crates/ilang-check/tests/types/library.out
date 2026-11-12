@@ -148,6 +148,17 @@ i/big.chunk_of : (radix: Int, chunk: Int, width: Int) -> (Int, Int)
 i/big.text_chunks : (x: List(Int), chunk: Int, radix: Int, width: Int, acc: List(String)) -> List(String)
 i/big.chunk_text : (v: Int, radix: Int, width: Int, padded: Bool, acc: List(String)) -> List(String)
 i/big.digit_text : (d: Int) -> String
+i/bits.read_unsigned : (bits: BitArray, start: Int, width: Int) -> Int
+i/bits.from_unsigned : (value: Int, width: Int) -> BitArray
+i/bits.chunk : 14
+i/bits.read_int : (bits: BitArray, start: Int, width: Int, signed: Bool, little: Bool) -> Int
+i/bits.read_big : (bits: BitArray, start: Int, left: Int, acc: Int) -> Int
+i/bits.read_little : (bits: BitArray, start: Int, left: Int, acc: Int, scale: Int) -> Int
+i/bits.from_int : (value: Int, width: Int, little: Bool) -> BitArray
+i/bits.write_big : (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray)
+i/bits.write_little : (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray)
+i/bits.reverse : (list: List(BitArray), acc: List(BitArray)) -> List(BitArray)
+i/bits.min : (a: Int, b: Int) -> Int
 i/record.get : (r: (K: A), key: K) -> A
 i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
 i/record.remove : (r: Record & A, key: K) -> (..A, -K)

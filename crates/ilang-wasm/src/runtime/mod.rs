@@ -330,6 +330,8 @@ pub const LIBRARY_ABSENT: &str = "\
 (func $big_divide (param eqref eqref) (result eqref) unreachable)
 (func $big_remainder (param eqref eqref) (result eqref) unreachable)
 (func $big_to_text (param eqref eqref) (result eqref) unreachable)
+(func $bits_from_int_wide (param eqref eqref eqref) (result eqref) unreachable)
+(func $bits_read_int_wide (param eqref eqref eqref eqref eqref) (result eqref) unreachable)
 ";
 
 /// The first constructor id that the code generator may use.

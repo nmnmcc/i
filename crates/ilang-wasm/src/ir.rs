@@ -88,6 +88,8 @@ pub const RUNTIME_CALLS: &[(&str, &str, &str)] = &[
     ("$big_divide", "i/big", "divide"),
     ("$big_remainder", "i/big", "remainder"),
     ("$big_to_text", "i/big", "to_text"),
+    ("$bits_from_int_wide", "i/bits", "from_int"),
+    ("$bits_read_int_wide", "i/bits", "read_int"),
 ];
 
 /// The service id of `Assert` (§9.6).

@@ -9,7 +9,7 @@ use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
 use ilang_wasm::{Numeric, Options};
 use num_bigint::BigInt;
 
-const SOURCE: &str = "(i/core)\n(apply, bits, float_of, whole)\n\
+const SOURCE: &str = "(i/core)\n(apply, bits, float_of, whole, segment, read_u, read_i, le72, le72_i, le512, le512_u)\n\
 apply = (a: Int, b: Int) -> String {\n\
  core.inspect((a + b, a - b, a * b, a / b, a % b, a < b, a == b, a > b, a <= b))\n\
 }\n\
@@ -18,14 +18,21 @@ bits = (a: Int, b: Int, n: Int) -> String {\n\
  core.shift_left(a, n), core.shift_right(a, n)))\n\
 }\n\
 float_of = (a: Int) -> Float { core.to_float(a) }\n\
-whole = (x: Float) -> String { core.inspect(core.truncate(x)) }\n";
+whole = (x: Float) -> String { core.inspect(core.truncate(x)) }\n\
+segment = (v: Int, n: Int) -> BitArray { <<v:u(n)>> }\n\
+read_u = (b: BitArray, n: Int) -> Int { b |> { <<x:u(n)>> -> x  _ -> -1 } }\n\
+read_i = (b: BitArray, n: Int) -> Int { b |> { <<x:i(n)>> -> x  _ -> -1 } }\n\
+le72 = (v: Int) -> BitArray { <<v:u72le>> }\n\
+le72_i = (b: BitArray) -> Int { b |> { <<x:i72le>> -> x  _ -> -1 } }\n\
+le512 = (v: Int) -> BitArray { <<v:u512le>> }\n\
+le512_u = (b: BitArray) -> Int { b |> { <<x:u512le>> -> x  _ -> -1 } }\n";
 
 fn programs() -> Vec<(u8, Program)> {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        "name = \"big\"\n[wasm]\nexports = [\"big/main.apply\", \"big/main.bits\", \"big/main.float_of\", \"big/main.whole\"]\n",
+        "name = \"big\"\n[wasm]\nexports = [\"big/main.apply\", \"big/main.bits\", \"big/main.float_of\", \"big/main.whole\", \"big/main.segment\", \"big/main.read_u\", \"big/main.read_i\", \"big/main.le72\", \"big/main.le72_i\", \"big/main.le512\", \"big/main.le512_u\"]\n",
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), SOURCE).unwrap();
@@ -253,6 +260,119 @@ fn bitwise_operations_shifts_and_floats_match_num_bigint() {
                 expected,
                 "O{opt}: truncate {x}"
             );
+        }
+    }
+}
+
+/// The `width` low bits of `value` in two's complement, as a number from 0.
+fn unsigned(value: &BigInt, width: usize) -> BigInt {
+    let modulus = BigInt::from(1) << width;
+    ((value % &modulus) + &modulus) % &modulus
+}
+
+/// The bytes of a segment: big endian with the last byte filled from its
+/// highest bit, or little endian for a multiple of 8.
+fn encoding(value: &BigInt, width: usize, little: bool) -> Vec<u8> {
+    let length = width.div_ceil(8);
+    let u = unsigned(value, width);
+    let mut bytes = if little {
+        u.to_bytes_le().1
+    } else {
+        (u << ((8 - width % 8) % 8)).to_bytes_be().1
+    };
+    if bytes == [0] {
+        bytes.clear();
+    }
+    if little {
+        bytes.resize(length, 0);
+    } else {
+        let mut padded = vec![0; length - bytes.len()];
+        padded.extend(bytes);
+        bytes = padded;
+    }
+    bytes
+}
+
+fn int_of(value: Value) -> BigInt {
+    match value {
+        Value::Int(n) => n,
+        other => panic!("not an Int: {other:?}"),
+    }
+}
+
+#[test]
+fn wide_integer_segments_match_their_encoding() {
+    let mut cases: Vec<(BigInt, usize)> = Vec::new();
+    for width in [64_usize, 65, 100, 127, 128, 129, 255, 512] {
+        let boundary: BigInt = BigInt::from(1) << width;
+        for value in [
+            BigInt::from(0),
+            BigInt::from(1),
+            BigInt::from(-1),
+            &boundary - 1_u8,
+            -(&boundary - 1_u8),
+            boundary.clone(),
+            -&boundary,
+            BigInt::from(1) << (width - 1),
+        ] {
+            cases.push((value, width));
+        }
+    }
+    for value in values() {
+        cases.push((value.clone(), 64 + (value.bits() as usize % 449)));
+    }
+    for (opt, program) in programs() {
+        let mut instance = program
+            .instantiate(HostOptions::new(HostImports::default()))
+            .unwrap();
+        let mut run = |export: &str, args: Vec<Value>| match instance.call(export, &args).unwrap()
+        {
+            Outcome::Ok(value) => value,
+            other => panic!("O{opt} {export} {args:?}: {other:?}"),
+        };
+        for (value, width) in &cases {
+            let n = Value::Int(BigInt::from(*width));
+            let bytes = encoding(value, *width, false);
+            match run("big/main.segment", vec![Value::Int(value.clone()), n.clone()]) {
+                Value::BitArray(b) => {
+                    assert_eq!((b.bytes, b.bit_length as usize), (bytes.clone(), *width), "O{opt}: u({width}) of {value}")
+                }
+                other => panic!("{other:?}"),
+            }
+            let bits = Value::BitArray(ilang_host::BitArray::new(bytes, *width as u32).unwrap());
+            assert_eq!(
+                int_of(run("big/main.read_u", vec![bits.clone(), n.clone()])),
+                unsigned(value, *width),
+                "O{opt}: read u({width}) of {value}"
+            );
+            let half = BigInt::from(1) << (width - 1);
+            let u = unsigned(value, *width);
+            let signed = if u >= half { u - (BigInt::from(1) << *width) } else { u };
+            assert_eq!(
+                int_of(run("big/main.read_i", vec![bits, n])),
+                signed,
+                "O{opt}: read i({width}) of {value}"
+            );
+        }
+        for value in values() {
+            for (width, write, read, signed) in [
+                (72, "big/main.le72", "big/main.le72_i", true),
+                (512, "big/main.le512", "big/main.le512_u", false),
+            ] {
+                let bytes = encoding(&value, width, true);
+                match run(write, vec![Value::Int(value.clone())]) {
+                    Value::BitArray(b) => assert_eq!(b.bytes, bytes, "O{opt}: le{width} of {value}"),
+                    other => panic!("{other:?}"),
+                }
+                let bits = Value::BitArray(ilang_host::BitArray::new(bytes, width as u32).unwrap());
+                let u = unsigned(&value, width);
+                let expected = if signed && u >= BigInt::from(1) << (width - 1) {
+                    u - (BigInt::from(1) << width)
+                } else {
+                    u
+                };
+                assert_eq!(int_of(run(read, vec![bits])), expected, "O{opt}: read le{width} of {value}");
+            }
         }
     }
 }

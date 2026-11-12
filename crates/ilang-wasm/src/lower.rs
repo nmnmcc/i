@@ -2485,6 +2485,18 @@ impl<'a> Lowerer<'a> {
         };
         match module.as_str() {
             "ilang:prelude" if function == "panic" => Ok((Op::Panic, arity)),
+            // The private primitives of `lib/i/bits.i`.
+            "ilang:bits" => Ok((
+                Op::Runtime {
+                    name: match function.as_str() {
+                        "read_unsigned" => "bits_read_unsigned",
+                        "from_unsigned" => "bits_from_unsigned",
+                        _ => return Err(format!("`bits.{function}` is not known")),
+                    },
+                    arity,
+                },
+                arity,
+            )),
             // The private primitives of `lib/i/big.i`.
             "ilang:big" => Ok((
                 Op::Runtime {
