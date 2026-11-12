@@ -2,76 +2,67 @@
 
 i is a small, statically typed functional language that compiles to WebAssembly GC and runs natively, in JavaScript hosts and on WASI.
 
-```i
+```text
 (
 	i/stdio
 	std/int
 )
 
-Expr {
-	Num(Int)
-	Add(Expr, Expr)
-	Mul(Expr, Expr)
-}
+Num = (Int)
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
 
-// Inferred: (e: Expr) -> Int
-eval = (e) {
-	e |> {
-		Num(n)    -> n
-		Add(a, b) -> eval(a) + eval(b)
-		Mul(a, b) -> eval(a) * eval(b)
-	}
-}
+// Inferred: (Expr) -> Int
+eval =
+	(Num(n)) { n }
+	| (Add(a, b)) { eval(a) + eval(b) }
+	| (Mul(a, b)) { eval(a) * eval(b) }
 
 main = () { stdio.print(int.to_string(eval(Mul(Add(Num(1), Num(5)), Num(7))))) }
 ```
 
-`i run` prints `42`. There are no keywords: a type is a name with its constructors in braces, a function is `(parameters) { body }`, and matching gives a value to a block of clauses with `|>`. No type is written, and every type is checked.
+`i run` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `|` are one function that matches its argument. No type is written, and every type is checked.
 
-A function type has three parts, `(T) -> A ^ E ! N`: the value, the errors, and the services the function needs. All three are inferred. A service is an ordinary value, and the caller gives it with `!`, so a test gives its own:
+A function type has three parts, `(P) <- (S) -> R`: the parameters, the services the function needs, and the result. An error is a service too, `Fail(E)`. All of it is inferred. A service is an ordinary value: a function takes it with `<-` in its head, and the caller gives it with `<-` after an expression, so a test gives its own:
 
-```i
+```text
 (
 	testlib = (test) = std/test
 	i/fail
 )
 
-Clock {
-	Clock(now: () -> Int)
-}
+Clock = (now = () -> Int)
 
-Late {
-	Late(by: Int)
-}
+Late = (by = Int)
 
-// Inferred: (deadline: Int) -> Int ^ Late ! Clock
-remaining = (deadline, clock ! Clock) {
-	deadline - clock.now() |> {
-		left ? left < 0 -> fail.raise(Late(by: 0 - left))
-		left            -> left
-	}
+// Inferred: (Int) <- (Clock, Fail(Late)) -> Int
+remaining = (deadline) <- (clock: Clock) {
+	deadline - clock.now() |>
+		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
+		| (left) { left }
 }
 
 test("a test gives its own clock", () {
-	! Clock = Clock(now: () { 40 })
-	assert(remaining(42) == 2)
-	assert(fail.catch(() { remaining(30) }) == Error(Late(by: 10)))
+	{
+		assert(remaining(42) == 2)
+		assert(fail.catch(() { remaining(30) }) == Error(Late(by = 10)))
+	} <- (Clock(now = () { 40 }))
 })
 ```
 
 `i test` prints `pass tour/clock_test.a test gives its own clock`. `test` is not part of the language either. It is a macro of the standard library, and a macro is an i function from code to code. This one is written in the Lisp surface of the same language (`.is`), where code can be quoted. i has no `if`; here is one:
 
-```is
+```text
 (, if)
-(@ macro
-  (= if (-> (test then else) _ `(| ~test {(-> True ~then) (-> False ~else)}))))
+(@ macro (= if (-> (, test then else) _ `(|> ~test (| (-> (, True) _ ~then) (-> (, False) _ ~else))))))
 ```
 
 A module that imports it with `sugar = (if) = tour/sugar` writes `sign = (n) { if(n < 0, "negative", "not negative") }`, and `i expand` prints the code after expansion.
 
 Concurrency is structured: a task belongs to a scope, and a scope ends only when all its tasks have ended. This is a TCP echo server that serves every connection in its own task and closes each one however it ends:
 
-```i
+```text
 (
 	i/net
 	i/task
@@ -82,13 +73,12 @@ Concurrency is structured: a task belongs to a scope, and a scope ends only when
 
 echo = (stream) {
 	bytes = net.read(stream, 65536)
-	core.bit_size(bytes) |> {
-		0 -> Nil
-		_ -> {
+	core.bit_size(bytes) |>
+		(0) { Nil }
+		| (_) {
 			net.write(stream, bytes)
 			echo(stream)
 		}
-	}
 }
 
 serve = (listener, scope) {
@@ -107,14 +97,14 @@ main = () {
 }
 ```
 
-These files are in [examples/tour](examples/tour) and [examples/echo](examples/echo).
+These programs are [examples/tour](examples/tour) and [examples/echo](examples/echo).
 
 ## What keeps it small
 
 - No keywords. Every word is a name; imports, exports, matching and guards are brackets and symbols.
 - No mutation. Every value and binding is immutable; state that cannot be avoided is an explicit `task.ref`.
 - Types are sets of values, with unions, intersections, differences and literal types, and the compiler infers the principal type of every binding.
-- One function type carries the value, the errors and the environment, so errors and dependencies need no other mechanism.
+- One function type carries the parameters, the needed services and the result; an error is a service, so errors and dependencies need no other mechanism.
 - Structured concurrency only: tasks, scopes, channels and events, and no task outlives its scope.
 - No library is special. Services, schemas, HTTP, logging and tests are i code over the general features.
 - Two surfaces, `.i` and `.is`, for one language; `i fmt` converts between them, and both use the same macros.
@@ -152,7 +142,7 @@ Every command takes `--help`. Editor support is in [editors](editors): a VS Code
 
 The language is defined in one document, [docs/spec.md](docs/spec.md). The library modules `i/…` are in [lib/i](lib/i) and the standard library `std/…` is in [std/src](std/src); each module is documented in its source. The reasons for the design are in [docs/design](docs/design).
 
-i is in development and has no release: the spec comes first, the compiler does not yet do everything in it, and the language still changes.
+The examples above are written in the language's new syntax, which is landing now; until it has landed, the files under `examples` are in the syntax before it. i is in development and has no release: the spec comes first, the compiler does not yet do everything in it, and the language still changes.
 
 ## License
 
