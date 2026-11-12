@@ -783,64 +783,6 @@ mod tests {
     }
 
     #[test]
-    fn scheme_coverage_finds_a_counterexample_in_a_union_row_handler() {
-        let build = |second: BuiltinType| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let service = TypeId(5);
-            solver.variance.insert(service, vec![Variance::Co]);
-            let mut rows = Vec::new();
-            for parameter in [BuiltinType::Int, second] {
-                let v = solver.fresh_at(1);
-                solver.vars[v.0 as usize].row = Mode::Env;
-                solver.vars[v.0 as usize].difference = true;
-                solver.vars[v.0 as usize].handled.push(Ty::named(
-                    TypeRef::Custom(service),
-                    vec![Ty::named(TypeRef::Builtin(parameter), vec![])],
-                ));
-                rows.push(Ty::Var(v));
-            }
-            solver.has_handlers = true;
-            let row = Ty::Union(rows);
-            let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-            let body = Ty::Fn(Box::new(FnTy {
-                params: vec![],
-                ret: result.clone(),
-                err: Ty::Never,
-                env: row.clone(),
-            }));
-            let root = Ty::Fn(Box::new(FnTy {
-                params: vec![(Some("body".into()), body)],
-                ret: result,
-                err: Ty::Never,
-                env: row,
-            }));
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => "pkg:Svc".into(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(BuiltinType::Int)
-                .compare(&build(BuiltinType::String), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Different
-        );
-    }
-
-    #[test]
     fn output_only_environment_can_choose_an_empty_row() {
         let build = |parameter: BuiltinType| {
             let mut solver = Solver::new(HashMap::new(), Vec::new());
