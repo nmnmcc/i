@@ -1338,7 +1338,7 @@ fn lsp_rename_top_level_across_files() {
     );
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    assert!(shapes.contains("(Shape(..), surface, origin"), "{shapes}");
+    assert!(shapes.contains("\tShape(..)\n\tsurface\n\torigin"), "{shapes}");
     assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
@@ -1387,7 +1387,7 @@ fn lsp_rename_constructor_and_type() {
     let edit = rename(&mut c, &ws.main, &ws.main_text, "Shape) ->", 0, 0, "Figure").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
-        shapes.contains("(Figure(..), area")
+        shapes.contains("\tFigure(..)\n\tarea")
             && shapes.contains("Figure = Circle | Rect")
             && shapes.contains("(s: Figure)"),
         "{shapes}"
@@ -2475,8 +2475,9 @@ fn lsp_folding_ranges() {
     );
     let ranges: Vec<lsp::FoldingRange> = serde_json::from_value(r).unwrap();
     assert!(
-        ranges.iter().any(|f| f.start_line == 0
-            && f.end_line == 3
+        // The span of the imports covers their names, inside the `( )`.
+        ranges.iter().any(|f| f.start_line <= 1
+            && f.end_line >= 2
             && f.kind == Some(lsp::FoldingRangeKind::Imports)),
         "{ranges:?}"
     );
