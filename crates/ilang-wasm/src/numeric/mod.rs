@@ -242,7 +242,7 @@ fn callbacks(p: &mut Program) -> (usize, BTreeMap<FuncId, FuncId>, BTreeMap<Func
                 } else {
                     let count = counts.entry(origin).or_default();
                     let cost = rewrite::size(&clone.body);
-                    if *count == 4 || growth + cost > total {
+                    if *count == 2 || growth + cost > total {
                         p.numeric_log
                             .push(format!("code {} callback budget", origin.0));
                         continue;
@@ -301,6 +301,16 @@ fn has_numeric(f: &Func) -> bool {
     rewrite::walk(&mut body, &mut |s| {
         if matches!(
             s,
+            Stmt::Return(Atom::Float(_) | Atom::Int(_))
+                | Stmt::Let {
+                    value: Value::Atom(Atom::Float(_) | Atom::Int(_)),
+                    ..
+                }
+        ) {
+            found = true;
+        }
+        if matches!(
+            s,
             Stmt::Let {
                 value: Value::Op(
                     Op::IntAdd
@@ -352,17 +362,6 @@ pub fn run(p: &mut Program) {
         }
     }
     let source_count = p.funcs.len();
-    let source_size: usize = p
-        .funcs
-        .iter()
-        .filter_map(|f| {
-            if let FuncKind::Code(f) = f {
-                Some(rewrite::size(&f.body))
-            } else {
-                None
-            }
-        })
-        .sum();
     let (mut growth, callback_roots, mut worker_counts) = callbacks(p);
     // Freeze this exclusion before any expansion. It is never weakened later.
     let may = crate::control::may_suspend(p);
@@ -434,6 +433,22 @@ pub fn run(p: &mut Program) {
             break;
         }
     }
+    let source_size: usize = originals
+        .iter()
+        .take(source_count)
+        .enumerate()
+        .filter_map(|(i, f)| {
+            let FuncKind::Code(f) = f else { return None };
+            let id = FuncId(i as u32);
+            (has_numeric(f)
+                || results[i]
+                || worker_counts.contains_key(&id)
+                || p.numeric_locals
+                    .get(&id)
+                    .is_some_and(|facts| !facts.is_empty()))
+            .then(|| rewrite::size(&f.body))
+        })
+        .sum();
     let mut workers = BTreeMap::new();
     for (i, f) in originals.iter().enumerate() {
         let id = FuncId(i as u32);
@@ -715,7 +730,7 @@ pub fn run(p: &mut Program) {
         "numeric per-binding worker budget"
     );
     p.numeric_log.push(format!(
-        "budget extra-statements={growth}/{} workers-per-binding<=4",
+        "budget actual-extra-statements={actual_extra}/{} eligible-statements={source_size} workers-per-binding<=4",
         2 * source_size
     ));
     let after = crate::control::may_suspend(p);

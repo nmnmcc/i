@@ -125,3 +125,15 @@ N5 differential corpus and the ilang-wasm tests pass, including the exact
 subnormal/overflow enclosure tests. A final budget audit counts argument binds,
 logical actions and aggregate expansion in actual extra worker statements,
 and narrows expansion if it would exceed the bound.
+
+Final corpus: 399 exported programs, with an assertion requiring at least 200
+different source bodies, plus the exact standalone resumed-stop project. All
+four reference/visible/scalar configurations agree, including complete stop
+traces and final effects. The million-call unknown-tail relay remains bounded.
+The final worker denominator includes only numeric-eligible original code;
+callback roots are included, and every extra statement is counted after expansion.
+Two callback code variants can each gain one scalar entry within the four-worker
+per-binding limit. Additional keys use the ordinary entry.
+
+The task's “at redesign” is interpreted as the starting revision: work stays on
+the existing lane/jp branch, as the shared rule forbids edits on redesign.

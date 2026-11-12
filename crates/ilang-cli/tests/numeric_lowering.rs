@@ -221,13 +221,18 @@ fn corpus() -> Vec<Case> {
     // middle result overflows even though the final expression would be finite.
     for n in 0..24 {
         let x = n as f64 * 0.125 - 1.5;
-        let expected = if (-1.0..=1.0).contains(&x) {
-            let a = x * 0.5 + 0.25;
+        let t = x + n as f64 / 32.0;
+        let expected = if (-1.0..=1.0).contains(&t) {
+            let a = t * 0.5 + 0.25;
             a * 0.5 - 0.125
         } else {
-            x
+            t
         };
-        cases.push(float_case("bounded_float(x)", x, expected));
+        cases.push(float_case(
+            &format!("bounded_float(x +. {n}.0 /. 32.0)"),
+            x,
+            expected,
+        ));
         cases.push(Case {
             body: format!("core.inspect({{ a = x *. 2.0 b = a /. 0.0 b +. {n}.0 }})"),
             input: Value::Float(1.0e308),
@@ -255,8 +260,14 @@ fn corpus() -> Vec<Case> {
     // effect trace checks that leaving a guarded worker never replays a step.
     for n in 0..24 {
         let x = BigInt::from(1073741823_i64 - n);
-        cases.push(int_case("loop_int(7, x)", x.clone(), &x + 28));
-        cases.push(int_case("loop_down(7, x)", -&x, -&x - 28));
+        let count = n + 1;
+        let sum = count * (count + 1) / 2;
+        cases.push(int_case(
+            format!("loop_int({count}, x)"),
+            x.clone(),
+            &x + sum,
+        ));
+        cases.push(int_case(format!("loop_down({count}, x)"), -&x, -&x - sum));
     }
     let start = BigInt::from(1073741821_i64);
     let mut acc = start.clone();
@@ -281,33 +292,41 @@ fn corpus() -> Vec<Case> {
     // joins and repeated projections. Shapes carry actual labels/constructors.
     for n in 0..24 {
         let x = n as f64 * 0.125 - 1.5;
-        cases.push(float_case("{ p = Left(x, 0.25) p.x +. p.x }", x, x + x));
-        cases.push(float_case("{ p = Right(0.25, x) p.x +. p.x }", x, x + x));
         cases.push(float_case(
-            "{ (a, b) = numeric_pair(x) a +. b }",
+            &format!("{{ p = Left(x, {n}.0) p.x +. p.x }}"),
             x,
-            (x + 0.25) + x * 0.5,
+            x + x,
         ));
         cases.push(float_case(
-            "{ r = (a: x, b: x *. 0.5) r.a +. r.a +. r.b }",
+            &format!("{{ p = Right({n}.0, x) p.x +. p.x }}"),
             x,
-            (x + x) + x * 0.5,
+            x + x,
         ));
-        cases.push(float_case("{ r = { x <. 0.0 } |> { True -> (a: x, b: 0.5) False -> (a: x, b: 0.25) } r.a +. r.b }", x, x + if x < 0.0 { 0.5 } else { 0.25 }));
+        cases.push(float_case(
+            &format!("{{ (a, b) = numeric_pair(x +. {n}.0) a +. b }}"),
+            x,
+            ((x + n as f64) + 0.25) + (x + n as f64) * 0.5,
+        ));
+        cases.push(float_case(
+            &format!("{{ r = (a: x, b: x *. {n}.0) r.a +. r.a +. r.b }}"),
+            x,
+            (x + x) + x * n as f64,
+        ));
+        cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> {{ True -> (a: x, b: {n}.0) False -> (a: x, b: {}.0) }} r.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
     }
     // N2: cross-call scalar chains and closures with different captures share
     // code without sharing identity or the capture values.
     for n in 0..32 {
         let x = n as f64 * 0.125 - 2.0;
         cases.push(float_case(
-            "step_float(step_float(x))",
+            &format!("step_float(step_float(x +. {n}.0))"),
             x,
-            (x * 0.5 + 0.25) * 0.5 + 0.25,
+            ((x + n as f64) * 0.5 + 0.25) * 0.5 + 0.25,
         ));
         cases.push(float_case(
-            "{ f = (v: Float) -> Float { v *. 0.5 +. x } apply(f, 0.25) }",
+            &format!("{{ f = (v: Float) -> Float {{ v *. 0.5 +. x }} apply(f, {n}.0) }}"),
             x,
-            0.125 + x,
+            n as f64 * 0.5 + x,
         ));
     }
     cases
@@ -317,6 +336,15 @@ fn corpus() -> Vec<Case> {
 fn numeric_corpus_agrees_at_o0_o2_o3() {
     let cases = corpus();
     assert!(cases.len() >= 200);
+    assert!(
+        cases
+            .iter()
+            .map(|case| &case.body)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            >= 200,
+        "corpus must contain at least 200 different source programs"
+    );
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     let exports = (0..cases.len())
