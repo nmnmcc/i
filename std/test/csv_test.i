@@ -1,6 +1,7 @@
 (
 	testlib = (test) = std/test
 	i/core
+	i/control
 	i/fail
 	std/csv
 	std/list
@@ -17,6 +18,12 @@ config = (delimiter: String, fields: Int, crlf: Bool) -> csv.Options {
 		Error(_) -> panic("test options")
 	}
 }
+
+PullProbe {
+	PullProbe(note: () -> Nil)
+}
+
+note_pull = (probe ! PullProbe) -> Nil ! PullProbe { probe.note() }
 
 test("parse_empty", () {
 	assert(csv.parse("") == Ok([]))
@@ -979,5 +986,51 @@ test("duplicate_header_error_line", () {
 		csv.parse_header("\n\na,a\n", csv.defaults()) ==
 			Error(csv.CsvError(3, 1, "duplicate header"))
 	)
+	Nil
+})
+
+test("bare_cr_lookahead_pulls_once", () -> Nil ! Assert {
+	events = control.boundary((boundary) {
+		! PullProbe = PullProbe(() {
+			control.suspend(boundary, (continuation) {
+				[1, ..control.resume(continuation, Nil)]
+			})
+		})
+		last = stream.make(
+			() -> stream.Step(String, Never, PullProbe) ! PullProbe {
+				note_pull()
+				stream.Next("b\n", stream.new())
+			}
+		)
+		source = stream.append(stream.from_list(["a\r"]), last)
+		assert(
+			stream.to_list(csv.rows(source, csv.defaults())) == [Ok(["a\rb"])]
+		)
+		[]
+	})
+	assert(events == [1])
+	Nil
+})
+
+test("bare_cr_eof_pulls_once", () -> Nil ! Assert {
+	events = control.boundary((boundary) {
+		! PullProbe = PullProbe(() {
+			control.suspend(boundary, (continuation) {
+				[1, ..control.resume(continuation, Nil)]
+			})
+		})
+		last = stream.make(
+			() -> stream.Step(String, Never, PullProbe) ! PullProbe {
+				note_pull()
+				stream.Done
+			}
+		)
+		source = stream.append(stream.from_list(["a\r"]), last)
+		assert(
+			stream.to_list(csv.rows(source, csv.defaults())) == [Ok(["a\r"])]
+		)
+		[]
+	})
+	assert(events == [1])
 	Nil
 })

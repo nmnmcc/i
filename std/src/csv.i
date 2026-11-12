@@ -76,7 +76,7 @@ raw(E, N) = (cursor: Cursor(E, N)) -> (Option(Int), Cursor(E, N)) ^ E ! N {
 			(Some(c), Cursor(rest, source, l, k))
 		}
 		[] -> stream.pull(source) |> {
-			stream.Done -> (None, cursor)
+			stream.Done -> (None, Cursor([], stream.new(), line, column))
 			stream.Next(chunk, tail) -> raw(
 				Cursor(
 					list.map(core.codepoints(chunk), core.codepoint_to_int)
@@ -96,7 +96,14 @@ next(E, N) = (cursor: Cursor(E, N)) -> (Option(Int), Cursor(E, N)) ^ E ! N {
 			(d, after) = raw(tail)
 			d |> {
 				Some(10) -> (Some(10), after)
-				_        -> (c, tail)
+				None     -> (c, after)
+				Some(value) -> {
+					// Keep the already-pulled chunk. Replaying tail here would repeat a
+					// source effect when a bare CR falls at the end of a chunk.
+					Cursor(pending, source, _, _) = after
+					Cursor(_, _, line, column) = tail
+					(c, Cursor([value, ..pending], source, line, column))
+				}
 			}
 		}
 		_ -> (c, tail)
