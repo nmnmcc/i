@@ -488,40 +488,6 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/package_commands.rs:e53fe79dce989f13": {
-    "substitutions": [
-      [
-        "{ty}",
-        "Int"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:40426a075d07979f": {
-    "substitutions": [
-      [
-        "{ty}",
-        "Int"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-cli/tests/wasi.rs:6d488eb17aafdb21": {
     "suffix": "\nGreet = (greet = (String) -> String)\n\nmain = () <- (io: Io, g: Greet) { io.print(g.greet(\"i\")) }\n",
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
@@ -685,6 +651,15 @@
       "E0101: expected `,` or `)`, found `=`",
       "E0101: expected an expression, found `->`"
     ]
+  },
+  "crates/ilang-cli/tests/package_commands.rs:5888b0d352a6a1b0": {
+    "not_source": "search text in a test: the head of the template main"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:baccf998e7fb47a5": {
+    "not_source": "search text in a test: a label of a host service"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:e62e28decc0ee04d": {
+    "not_source": "search text in a test: a label of a host service"
   },
   "crates/ilang-lsp/src/change.rs:4cdfb1ce888445e2": {
     "reason": "Existing deliberately invalid syntax fixture",
@@ -1443,10 +1418,6 @@
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
   "crates/ilang-cli/tests/entries.rs:41a8b6c35fcc6353": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
-  "crates/ilang-cli/tests/package_commands.rs:63b8eb2dbb020e7c": {
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
