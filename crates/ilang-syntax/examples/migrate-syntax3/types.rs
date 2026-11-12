@@ -18,10 +18,14 @@
 //! of the original head. Exports follow: `T(..)` becomes `T, C1(..), C2(..)`
 //! and `T` becomes `T, C1, C2`. `T {}` and one-constructor types stay.
 //!
-//! Not rewritten, and listed as manual work (§7.3): a constructor named like
-//! a built-in type (a wrapper such as `Int(Int)`, suggested: drop the
-//! wrapper), like the type itself, like another type of the module or an
-//! imported name, and a type with a parameter that no constructor uses.
+//! A constructor whose name is already a type name (a built-in type, the
+//! type itself, another type of the module, an imported name) gives its new
+//! type the name `<name>Case`, so that the constructor and every use of it
+//! stay as they are (§7.3's manual list, made mechanical): `Paused {
+//! Paused(K) Done }` becomes `Paused = PausedCase | Done` with
+//! `PausedCase { Paused(K) }`. A wrapper of the built-in type of the same
+//! name (`Int(Int)`) is also listed with §7.3's suggestion to drop it.
+//! Left for manual work: a type with a parameter that no constructor uses.
 
 use crate::common::{KEEP, Outcome, Source};
 use ilang_syntax::{ast::*, lexer::lex, token::TokenKind as T};
@@ -29,8 +33,7 @@ use std::collections::HashSet;
 
 pub const NAME: &str = "types";
 
-/// Types built into the compiler, which no module may rename a constructor
-/// type to without covering them.
+/// Types built into the compiler; a new type with such a name would cover them.
 const BUILTIN: &[&str] = &[
     "Int", "Float", "String", "List", "BitArray", "UtfCodepoint", "Never", "Boundary",
     "Continuation",
