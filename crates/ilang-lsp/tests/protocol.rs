@@ -930,7 +930,8 @@ fn typed_macro_hover_and_definition_through_call() {
     let definition =
         client.request::<lsp::request::GotoDefinition>(position_params(&main, line, column + 1));
     assert_eq!(definition["uri"], mac);
-    assert_eq!(definition["range"]["start"]["line"], 3);
+    // The definition is the binding of the macro, as for any name that also has a declaration.
+    assert_eq!(definition["range"]["start"]["line"], 4);
 }
 
 // ---- Features over a package with modules, tests, and a dependency ----
