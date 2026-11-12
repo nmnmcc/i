@@ -289,7 +289,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             Definition::Builtin { name } => {
                 if matches!(
                     name.as_str(),
-                    "Bool" | "Nil" | "Result" | "Assert" | "AssertionFailure"
+                    "Bool" | "True" | "False" | "Nil" | "Result" | "Ok" | "Error" | "Assert" | "AssertionFailure"
                 ) {
                     preflight(DefinitionCost::Builtin(name))?;
                 }
