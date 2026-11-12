@@ -473,6 +473,11 @@ i/tls.write : (Stream, bytes: BitArray) -> Nil ^ TlsError ! Tls | request.Await 
 i/tls.shutdown_write : (Stream) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.close : (Stream) -> Nil ! Tls | request.Await | request.Owner
 i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { request.Await | Tls } }, read: (max: Int) -> BitArray ^ TlsError ! { request.Owner | { request.Await | Tls } }, shutdown_write: () -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } }, write: (bytes: BitArray) -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } })
+i/fetch.open : (method: String, url: String, headers: String, body: BitArray) -> Response ^ String ! Fetch | request.Await | request.Owner
+i/fetch.status : (Response) -> Int ^ String ! Fetch | request.Await | request.Owner
+i/fetch.headers : (Response) -> String ^ String ! Fetch | request.Await | request.Owner
+i/fetch.read : (Response, max: Int) -> BitArray ^ String ! Fetch | request.Await | request.Owner
+i/fetch.close : (Response) -> Nil ! Fetch | request.Await | request.Owner
 i/stdio.read : (max_bytes: Int) -> BitArray ^ StdioError ! Stdio | request.Await | request.Owner
 i/stdio.write : (bytes: BitArray) -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
 i/stdio.write_error : (bytes: BitArray) -> Nil ^ StdioError ! Stdio | request.Await | request.Owner
