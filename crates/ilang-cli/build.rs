@@ -70,6 +70,11 @@ fn main() {
                 "CARGO_PRIMARY_PACKAGE",
                 "CARGO_CRATE_NAME",
                 "CARGO_TARGET_DIR",
+                // `cargo clippy` lints the runner's crates itself; the
+                // nested build only compiles them.
+                "RUSTC_WORKSPACE_WRAPPER",
+                "CLIPPY_ARGS",
+                "CLIPPY_CONF_DIR",
             ]
             .contains(&key.as_ref())
         {

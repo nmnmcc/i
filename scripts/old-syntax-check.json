@@ -2969,5 +2969,21 @@
   },
   "crates/ilang-cli/tests/providers.rs:94ebdef83b17a3a3": {
     "not_source": "TOML provider manifest or manifest template; i source is checked separately"
+  },
+  "crates/ilang-cli/tests/native.rs:0ec7fda8361d6c0d": {
+    "not_source": true,
+    "reason": "i.toml manifest text in a test, not an i module."
+  },
+  "crates/ilang-cli/build.rs:1c713f59c8bfc4d7": {
+    "not_source": true,
+    "reason": "Cargo build-script directive, not an i module."
+  },
+  "crates/ilang-cli/tests/native.rs:76df5d4e33397944": {
+    "not_source": true,
+    "reason": "i.toml manifest text in a test, not an i module."
+  },
+  "crates/ilang-cli/tests/native.rs:b7dd204f0b7730c0": {
+    "not_source": true,
+    "reason": "Cargo.toml dependency text in a test, not an i module."
   }
 }

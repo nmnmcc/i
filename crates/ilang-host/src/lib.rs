@@ -911,7 +911,7 @@ fn check_imports(
         }
         // Check every declaration before linking the coalesced import names.
         if let Some(plan) = plan {
-            plan.validate(artifact_digest, &abi)?;
+            plan.validate(artifact_digest, abi)?;
             for declaration in &plan.declarations {
                 let key = (declaration.namespace.clone(), declaration.name.clone());
                 ensure!(
