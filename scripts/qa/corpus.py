@@ -10,6 +10,8 @@ import re
 import runpy
 import shutil
 import signal
+import math
+import resource
 import subprocess
 import tempfile
 import time
@@ -207,13 +209,20 @@ def import_reviews(args):
 
 
 def invoke(binary, project, command, bound):
+    # The bound is CPU time of the process, so a busy machine does not turn a slow case into a
+    # timeout. Wall time is only a backstop for a process that waits without using the CPU.
     argv = [str(binary), *command, '--offline', '--project', str(project)]
     started = time.monotonic()
-    env = dict(os.environ, NO_COLOR='1', TERM='dumb')
-    with subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True) as process:
+    env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1')
+    cpu = max(1, math.ceil(bound))
+    def limit():
+        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
+    with subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, preexec_fn=limit) as process:
         try:
-            stdout, stderr = process.communicate(timeout=bound)
+            stdout, stderr = process.communicate(timeout=max(30, 6 * bound))
             code = process.returncode
+            if code in (-signal.SIGXCPU, -signal.SIGKILL):
+                code = 'timeout'
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
             stdout, stderr = process.communicate()
