@@ -58,9 +58,6 @@ Completed focused checks (all cargo/fixture commands used heavy + direnv):
 
 Corrected development failures:
 
-- `scripts/syntax-2-migrate --repo --write` exited 1 after applying 1450 snippet
-  changes: `manual: 22`, `invalid: 415`. The reports include deliberate negative
-  fixtures and non-i host strings; merged redesign carries their reviewed forms.
 - The first syntax audit reported unclassified TOML, for example:
   `crates/ilang-check/tests/provider_graph.rs:27 ... actual ['E0101: expected an item: a type definition, or a binding pattern = value, found [']`.
   Added exact host-literal identities, retained parsing for the import fragment,
