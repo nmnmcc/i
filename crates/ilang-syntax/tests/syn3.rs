@@ -955,3 +955,35 @@ fn convert_lisp_surface() {
     assert!(diags.is_empty(), "{diags:#?}");
     assert_eq!(read, new);
 }
+
+/// Owner rule: a call whose call depth is greater than 2 is never on one line.
+#[test]
+fn nested_calls_break() {
+    let fmt = |s: &str| {
+        let out = syn3::format(s).unwrap();
+        assert_eq!(syn3::format(&out).unwrap(), out, "the formatter is stable");
+        out
+    };
+    // Depth 2 stays on one line.
+    let two = "main = () { f(g(x)) }\n";
+    assert_eq!(fmt(two), two);
+    // Depth 3 breaks once: the outer call; the inner one has depth 2.
+    assert_eq!(
+        fmt("main = () { stdio.print(int.to_string(eval(Mul(Add(Num(1), Num(5)), Num(7))))) }\n"),
+        "main = () {\n\tstdio.print(\n\t\tint.to_string(eval(Mul(Add(Num(1), Num(5)), Num(7)))),\n\t)\n}\n"
+    );
+    // Depth 4 breaks twice.
+    assert_eq!(
+        fmt("x = a(b(c(d(1))))\n"),
+        "x = a(\n\tb(\n\t\tc(d(1)),\n\t),\n)\n"
+    );
+    // Constructors and data do not count; field access does not add depth.
+    let ctors = "x = f(A(B(C(g(1)))), (1, h(2)))\n";
+    assert_eq!(fmt(ctors), ctors);
+    let fields = "x = f(g(y).z.w)\n";
+    assert_eq!(fmt(fields), fields);
+    // A function literal starts again.
+    let lit = "x = f(g((y) { h(k(y)) }))\n";
+    assert_eq!(fmt(lit), lit);
+    assert_eq!(syn3::call_depth(&value("x = f(g(h(1)))")), 3);
+}

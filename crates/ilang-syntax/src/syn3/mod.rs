@@ -8,7 +8,8 @@ mod print;
 
 pub use parse::{parse_expr, parse_module, parse_pattern, parse_type, pipe_target};
 pub use print::{
-    WIDTH, format, print_expr, print_module, print_pattern, print_type, print_with_comments,
+    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_expr, print_module, print_pattern, print_type,
+    print_with_comments,
 };
 pub mod convert;
 pub mod lisp;

@@ -319,8 +319,15 @@ fn convert_command(args: &[String]) -> i32 {
         match if forced { Reading::Old } else { reading(path, &source, &ctors) } {
             Reading::New => {
                 already += 1;
+                // Formatted, so that the layout is the formatter's everywhere.
+                let text = match syn3::format(&source) {
+                    Ok(text) if !is_lisp(path) => text,
+                    _ => source.clone(),
+                };
                 if !write {
-                    print!("{source}");
+                    print!("{text}");
+                } else if text != source {
+                    std::fs::write(path, &text).expect("the file can be written");
                 }
                 continue;
             }
