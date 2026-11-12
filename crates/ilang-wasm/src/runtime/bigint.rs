@@ -136,8 +136,24 @@ const BASE_WAT: &str = r#"
       (if (i64.gt_u (local.get $mag) (i64.const 9223372036854775807)) (then unreachable))
       (local.get $mag))))
 
+;; Whether an Int's magnitude is below 2^62: then the operators below work
+;; in i64 without overflow (a product is checked), and only larger operands
+;; call the i code of `lib/i/big.i`.
+(func $int_fits62 (param $v eqref) (result i32)
+  (local $a (ref $limbs))
+  (if (ref.test (ref i31) (local.get $v)) (then (return (i32.const 1))))
+  (local.set $a (ref.as_non_null (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v)))))
+  (if (i32.eq (array.len (local.get $a)) (i32.const 1)) (then (return (i32.const 1))))
+  (i32.and (i32.eq (array.len (local.get $a)) (i32.const 2))
+    (i32.lt_u (array.get $limbs (local.get $a) (i32.const 1)) (i32.const 1073741824))))
+
+(func $int_both62 (param $a eqref) (param $b eqref) (result i32)
+  (if (result i32) (call $int_fits62 (local.get $a))
+    (then (call $int_fits62 (local.get $b)))
+    (else (i32.const 0))))
+
 (func $int_compare (param $a eqref) (param $b eqref) (result i32)
-  (local $as i32) (local $bs i32)
+  (local $as i32) (local $bs i32) (local $x i64) (local $y i64)
   (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
     (then
       (local.set $as (i31.get_s (ref.cast (ref i31) (local.get $a))))
@@ -145,6 +161,11 @@ const BASE_WAT: &str = r#"
       (return
         (i32.sub (i32.gt_s (local.get $as) (local.get $bs))
                  (i32.lt_s (local.get $as) (local.get $bs))))))
+  (if (call $int_both62 (local.get $a) (local.get $b))
+    (then
+      (local.set $x (call $int_to_i64 (local.get $a)))
+      (local.set $y (call $int_to_i64 (local.get $b)))
+      (return (i32.sub (i64.gt_s (local.get $x) (local.get $y)) (i64.lt_s (local.get $x) (local.get $y))))))
   ;; A large Int is outside the small range, so its sign decides against a
   ;; small one, and different signs decide between two large ones.
   (local.set $as (call $int_sign (local.get $a)))
@@ -156,13 +177,15 @@ const BASE_WAT: &str = r#"
   (i31.get_s (ref.cast (ref i31) (call $big_compare (local.get $a) (local.get $b)))))
 
 (func $int_add (param $a eqref) (param $b eqref) (result eqref)
-  (if (result eqref)
-    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+    (then (return (call $int_from_i64
+      (i64.add
+        (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
+        (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+  (if (result eqref) (call $int_both62 (local.get $a) (local.get $b))
     (then
       (call $int_from_i64
-        (i64.add
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))
+        (i64.add (call $int_to_i64 (local.get $a)) (call $int_to_i64 (local.get $b)))))
     (else (call $big_add (local.get $a) (local.get $b)))))
 
 (func $int_neg (param $v eqref) (result eqref)
@@ -176,49 +199,54 @@ const BASE_WAT: &str = r#"
         (call $int_limbs (local.get $v))))))
 
 (func $int_sub (param $a eqref) (param $b eqref) (result eqref)
-  (if (result eqref)
-    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+    (then (return (call $int_from_i64
+      (i64.sub
+        (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
+        (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+  (if (result eqref) (call $int_both62 (local.get $a) (local.get $b))
     (then
       (call $int_from_i64
-        (i64.sub
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))
+        (i64.sub (call $int_to_i64 (local.get $a)) (call $int_to_i64 (local.get $b)))))
     (else (call $big_subtract (local.get $a) (local.get $b)))))
 
 (func $int_mul (param $a eqref) (param $b eqref) (result eqref)
-  (if (result eqref)
-    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (local $x i64) (local $y i64) (local $p i64)
+  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+    (then (return (call $int_from_i64
+      (i64.mul
+        (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
+        (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+  (if (call $int_both62 (local.get $a) (local.get $b))
     (then
-      (call $int_from_i64
-        (i64.mul
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))
-    (else (call $big_multiply (local.get $a) (local.get $b)))))
+      (local.set $x (call $int_to_i64 (local.get $a)))
+      (local.set $y (call $int_to_i64 (local.get $b)))
+      (local.set $p (i64.mul (local.get $x) (local.get $y)))
+      ;; |x|, |y| < 2^62, so x = -1 never meets the most negative product.
+      (if (if (result i32) (i64.eqz (local.get $x))
+            (then (i32.const 1))
+            (else (i64.eq (i64.div_s (local.get $p) (local.get $x)) (local.get $y))))
+        (then (return (call $int_from_i64 (local.get $p)))))))
+  (call $big_multiply (local.get $a) (local.get $b)))
 
 (func $int_div (param $a eqref) (param $b eqref) (result eqref)
-  (if (result eqref)
-    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (local $y i64)
+  (if (result eqref) (call $int_both62 (local.get $a) (local.get $b))
     (then
-      (if (result eqref) (i32.eqz (i31.get_s (ref.cast (ref i31) (local.get $b))))
+      (local.set $y (call $int_to_i64 (local.get $b)))
+      (if (result eqref) (i64.eqz (local.get $y))
         (then (ref.i31 (i32.const 0)))
-        (else
-          (call $int_from_i64
-            (i64.div_s
-              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+        (else (call $int_from_i64 (i64.div_s (call $int_to_i64 (local.get $a)) (local.get $y))))))
     (else (call $big_divide (local.get $a) (local.get $b)))))
 
 (func $int_rem (param $a eqref) (param $b eqref) (result eqref)
-  (if (result eqref)
-    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (local $y i64)
+  (if (result eqref) (call $int_both62 (local.get $a) (local.get $b))
     (then
-      (if (result eqref) (i32.eqz (i31.get_s (ref.cast (ref i31) (local.get $b))))
+      (local.set $y (call $int_to_i64 (local.get $b)))
+      (if (result eqref) (i64.eqz (local.get $y))
         (then (ref.i31 (i32.const 0)))
-        (else
-          (call $int_from_i64
-            (i64.rem_s
-              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+        (else (call $int_from_i64 (i64.rem_s (call $int_to_i64 (local.get $a)) (local.get $y))))))
     (else (call $big_remainder (local.get $a) (local.get $b)))))
 
 ;; The private primitives of `lib/i/big.i` ("ilang:big"): the sign, and the
