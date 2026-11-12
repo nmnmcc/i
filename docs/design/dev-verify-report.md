@@ -64,6 +64,30 @@ No language or library surface was added, including state mechanisms.
   and failed with E0301 after the hello module built. Generate the ordinary
   main binding; retain both engines, both optimization levels, output/stop
   checks and expected exit codes.
+- Corpus resource reproduction: two bounded runs of
+  `scripts/review-corpus run --filter review-k4/perf/wide_generic_1024
+  --binary target/release/i` reached test-phase timeouts with the saved
+  10-second cap. The original source plus the ordinary injected
+  `test("qa_startup", () { Nil })` reproduces it; an unbounded O0 execution
+  completes successfully in about 10.1 seconds. The observation budget and
+  required acceptance remain unchanged. Phase measurements isolated about
+  6 seconds in type checking; a debugger sample identified `Norm::union_in`
+  repeatedly comparing members with unrelated type heads. Index members by
+  head while preserving first-occurrence order and all distinct same-head
+  service arguments. The unchanged 10-second bounded reproduction now passes.
+  Read Simple-sub's `TypeSimplifier.scala::CompactType`/`merge`, which groups
+  components using sets and maps, before making this local normalization fix.
+  Temporary profiling source was removed.
+- K4c missing-service observations predated the source/target split. Under
+  spec §2.6.2, untargeted checking may succeed; both test/run target builds
+  must still reject before execution. Inspected representative sources,
+  inferred rows and all four target-phase outcomes, then refreshed only
+  observations whose previous errors were E0522 and whose four target phases
+  now reject with the planner's E0523. The 80 explicit missing-service code
+  requirements now require E0523 (`providers::PLAN_ERROR`) instead of the
+  removed source-only E0522; each still requires rejection before execution,
+  and incompatible-provision E0515 requirements remain unchanged. No extra
+  diagnostic code or successful runtime outcome was allowed.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
@@ -107,6 +131,9 @@ Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
 - `cargo check -p ilang-check --all-targets`: passed.
 - `cargo check -p ilang-wasm --all-targets`: passed.
 - `cargo check -p ilang-cli --all-targets`: passed.
+- After the normalization fix, `cargo check -p ilang-check --all-targets`
+  and `cargo test -p ilang-check --lib --test generic_services --test
+  row_schemes --test types --locked`: passed, with type goldens unchanged.
 - `cargo test -p ilang-syntax --test format --locked`: passed, both tests.
 - `cargo test -p ilang-syntax --test format format_properties --locked` with
   the original task source copy: passed.

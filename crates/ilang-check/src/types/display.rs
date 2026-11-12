@@ -892,27 +892,35 @@ impl Norm<'_> {
             flat = super::solve::join_literals(flat);
         }
         let mut out: Vec<Ty> = Vec::new();
+        // Equal members have the same head. Keep the original order within
+        // each head, including distinct invariant service instantiations.
+        let mut by_head: HashMap<Option<Head>, Vec<usize>> = HashMap::default();
         for m in flat {
             let m = match m {
                 Ty::Graph(g) if g.is_ordinary_head() => g.view().expect("ordinary graph head"),
                 m => m,
             };
-            if m == Ty::Never || out.contains(&m) {
+            let head = m.head();
+            let positions = by_head.entry(head).or_default();
+            if m == Ty::Never || positions.iter().any(|&i| out[i] == m) {
                 continue;
             }
             if is_top(&m) {
                 return Ty::Top;
             }
-            match m
-                .head()
-                .and_then(|h| out.iter().position(|o| o.head() == Some(h)))
-            {
-                Some(_) if env || m.value_head() == Some(Head::Record) => out.push(m),
+            match head.and_then(|_| positions.first().copied()) {
+                Some(_) if env || m.value_head() == Some(Head::Record) => {
+                    positions.push(out.len());
+                    out.push(m);
+                }
                 Some(i) => {
                     let old = std::mem::replace(&mut out[i], Ty::Never);
                     out[i] = self.merge(old, m, true);
                 }
-                None => out.push(m),
+                None => {
+                    positions.push(out.len());
+                    out.push(m);
+                }
             }
         }
         // `a | a - H` is `a`, and `a | a & T` is `a`.
