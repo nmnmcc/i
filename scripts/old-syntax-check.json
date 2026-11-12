@@ -2126,42 +2126,6 @@
   "crates/ilang-macro/src/definition_world.rs:134ce6db26ee8173": {
     "not_source": "Invariant message"
   },
-  "crates/ilang-macro/src/prepare.rs:cd20ee4ea6d72c1a": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{}",
-        "app/macros"
-      ],
-      [
-        "{parameters}",
-        "arg0: syntax.Syntax"
-      ],
-      [
-        "{item_service}",
-        ""
-      ],
-      [
-        "{item_row}",
-        ""
-      ],
-      [
-        "target.app/macros",
-        "target.expand"
-      ],
-      [
-        "{arguments}",
-        "arg0"
-      ]
-    ]
-  },
   "crates/ilang-syntax/src/lisp/to_ast.rs:0e503166f27db3d3": {
     "not_source": "Lisp conversion diagnostic message"
   },
@@ -2477,23 +2441,6 @@
     "not_source": true,
     "reason": "TOML named-entry/test manifest or dependency path format template."
   },
-  "crates/ilang-cli/src/commands/package.rs:f3b00c7d58e41220": {
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
@@ -2736,9 +2683,6 @@
   "crates/ilang-cli/tests/numeric_lowering.rs:e47b61baf95042a0": {
     "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
   },
-  "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
-    "not_source": "Rust format template with a clause placeholder, not a complete i source"
-  },
   "crates/ilang-check/tests/query.rs:14b48e90364d1623": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
@@ -2787,22 +2731,70 @@
       "E0002: this string is not closed"
     ]
   },
-  "crates/ilang-check/tests/alias_unions.rs:beaaa485d82b9360": {
-    "not_source": "Rust format template fragment of a generated i program"
-  },
   "crates/ilang-check/tests/alias_unions.rs:c4a37f2a714decb3": {
     "not_source": "Rust format template fragment of a generated i program"
   },
   "crates/ilang-check/tests/alias_unions.rs:4ff96d8c9f03da76": {
     "not_source": "Rust format template fragment of a generated i program"
   },
-  "crates/ilang-check/tests/alias_unions.rs:1176f1053a24405c": {
-    "not_source": "Rust format template fragment of a generated i program"
-  },
-  "crates/ilang-check/tests/alias_unions.rs:3bb2195cc9c09f06": {
-    "not_source": "Rust format template fragment of a generated i program"
-  },
   "crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1": {
     "not_source": "JSON object key in a serde_json macro"
+  },
+  "crates/ilang-macro/src/prepare.rs:2bdef896cb528363": {
+    "substitutions": [
+      [
+        "{items}",
+        ""
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{}",
+        "app/macros"
+      ],
+      [
+        "{parameters}",
+        "arg0: syntax.Syntax"
+      ],
+      [
+        "{item_service}",
+        ""
+      ],
+      [
+        "{item_row}",
+        ""
+      ],
+      [
+        "target.app/macros",
+        "target.expand"
+      ],
+      [
+        "{arguments}",
+        "arg0"
+      ]
+    ]
+  },
+  "crates/ilang-cli/src/commands/package.rs:27726af531628f45": {
+    "substitutions": [
+      [
+        "{name}",
+        "app"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template; runtime tests still exercise the full generator"
   }
 }
