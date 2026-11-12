@@ -910,7 +910,8 @@ mod tests {
         let mut ps = HashMap::new();
         let record = Ty::record(vec![("x".to_string(), Ty::Var(v))]);
         occurrences(&s, &record, Pol::Pos, &mut ps);
-        assert_eq!(ps[&v], Pol::Both);
+        // Closed data is covariant in its parts (syntax-3 §6.2).
+        assert_eq!(ps[&v], Pol::Pos);
     }
     #[test]
     fn typed_macro_graph_bundle_gate_preserves_sharing_and_obligations() {
@@ -1010,7 +1011,8 @@ mod tests {
             &mut |_| None,
         )
         .unwrap();
-        assert!(graph.needs_semantic_comparison());
+        // Closed data needs no semantic comparison (syntax-3 stage 6).
+        assert!(!graph.needs_semantic_comparison());
         let before = query.graph_bundle();
         query.state.lock().unwrap().fixed.clear();
         assert_ne!(before, query.graph_bundle());

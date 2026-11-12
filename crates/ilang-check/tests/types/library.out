@@ -87,13 +87,6 @@ i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
 i/core.portable : (value: A) -> Bool
-i/record.get : (r: (K: A), key: K) -> A
-i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
-i/record.remove : (r: Record & A, key: K) -> (..A, -K)
-i/record.has : (r: Record, key: String) -> Bool
-i/record.keys : (r: Record) -> List(String)
-i/record.size : (r: Record) -> Int
-i/record.texts : (r: Record) -> List((String, String))
 i/task.finalizing : (k: Continuation(A, B, C, D), b: Boundary(F, G, H)) -> Bool
 i/task.no_waiters : WaitQueue
 i/task.address_key : Key(Address)
@@ -476,28 +469,28 @@ i/net.slice : (text: String, start: Int, length: Int) -> String
 i/net.parts : (text: String, start: Int) -> List(String)
 i/net.resolve : (name: String) -> List(String) ^ NetError ! Net | request.Await | request.Owner
 i/net.stream_number : (Stream) -> Int
-i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { Net | request.Await } }, read: (max: Int) -> BitArray ^ NetError ! { request.Owner | { Net | request.Await } }, shutdown_write: () -> Nil ^ NetError ! { request.Owner | { Net | request.Await } }, write: (bytes: BitArray) -> Nil ^ NetError ! { request.Owner | { Net | request.Await } })
+i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! Net | request.Await | request.Owner, read: (max: Int) -> BitArray ^ NetError ! Net | request.Await | request.Owner, shutdown_write: () -> Nil ^ NetError ! Net | request.Await | request.Owner, write: (bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner)
 i/net.bind : (address: String, port: Int) -> Datagram ^ NetError ! Net | request.Await | request.Owner
 i/net.send_to : (Datagram, address: String, port: Int, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
 i/net.receive_from : (Datagram, max_bytes: Int) -> (address: String, data: BitArray, port: Int) ^ NetError ! Net | request.Await | request.Owner
 i/net.decode_datagram : (A) -> (address: String, data: BitArray, port: Int)
 i/net.local_address : (Datagram) -> String ^ NetError ! Net | request.Await | request.Owner
 i/net.close_datagram : (Datagram) -> Nil ! Net | request.Await | request.Owner
-i/tls.options : () -> (alpn: List(Never), cert: BitArray, key: BitArray, roots: BitArray)
+i/tls.options : () -> (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)
 i/tls.identity : (cert: BitArray, key: BitArray) -> (cert: BitArray, key: BitArray)
 i/tls.join : (items: List(String)) -> String
 i/tls.slice : (text: String, start: Int, len: Int) -> String
 i/tls.raise : (message: String) -> Never ^ TlsError
 i/tls.finish : (r: Request(Result(Int, String))) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.connect : (stream: net.Stream, name: String, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
-i/tls.accept : (stream: net.Stream, ident: (cert: BitArray, key: BitArray), opts: (alpn: List(String))) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.accept : (stream: net.Stream, ident: (cert: BitArray, key: BitArray), opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.dial : (host: String, port: Int, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError | net.NetError ! Tls | net.Net | request.Await | request.Owner
 i/tls.alpn : (Stream) -> String ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.read : (Stream, max: Int) -> BitArray ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.write : (Stream, bytes: BitArray) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.shutdown_write : (Stream) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.close : (Stream) -> Nil ! Tls | request.Await | request.Owner
-i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { request.Await | Tls } }, read: (max: Int) -> BitArray ^ TlsError ! { request.Owner | { request.Await | Tls } }, shutdown_write: () -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } }, write: (bytes: BitArray) -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } })
+i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! Tls | request.Await | request.Owner, read: (max: Int) -> BitArray ^ TlsError ! Tls | request.Await | request.Owner, shutdown_write: () -> Nil ^ TlsError ! Tls | request.Await | request.Owner, write: (bytes: BitArray) -> Nil ^ TlsError ! Tls | request.Await | request.Owner)
 i/fetch.open : (method: String, url: String, headers: String, body: BitArray) -> Response ^ String ! Fetch | request.Await | request.Owner
 i/fetch.status : (Response) -> Int ^ String ! Fetch | request.Await | request.Owner
 i/fetch.headers : (Response) -> String ^ String ! Fetch | request.Await | request.Owner
