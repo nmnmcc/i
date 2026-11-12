@@ -461,7 +461,6 @@ impl<'a> Checker<'a> {
                         .scheme_hovers
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
-                    typed.provider_scheme_types.insert(id, shown.clone());
                     let catalog = artifact_catalog.get_or_insert_with(|| {
                         std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
                             solver: std::sync::Mutex::new(self.s.scheme_snapshot()),
@@ -473,7 +472,6 @@ impl<'a> Checker<'a> {
                         catalog: catalog.clone(),
                         scheme: scheme.clone(),
                     };
-                    typed.provider_scheme_artifacts.insert(id, artifact.clone());
                     if d.exported || opts.written {
                         typed.scheme_artifacts.insert(id, artifact);
                     }
@@ -1079,7 +1077,7 @@ impl<'a> Checker<'a> {
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
-    /// take. Target provider planning validates its inferred environment later.
+    /// take. The platform check of the target (`platform.rs`) reads its need.
     fn entry_point(&mut self, d: DefId, require_nil: bool, export: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);

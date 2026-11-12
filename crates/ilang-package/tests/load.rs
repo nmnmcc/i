@@ -233,32 +233,3 @@ fn standard_library_modules() {
     );
 }
 
-#[test]
-fn provider_dependency_defaults_keep_authority_under_root_overrides() {
-    use ilang_package::providers::{Cell, Target};
-    let dir = tempfile::tempdir().unwrap();
-    write(
-        dir.path(),
-        &[
-            (
-                "app/i.toml",
-                "name=\"app\"\n[dependencies]\ndep={path=\"../dep\"}\n[providers.\"dep/main.S\"]\nhost=\"app/main.fake\"\n",
-            ),
-            (
-                "dep/i.toml",
-                "name=\"dep\"\n[providers.\"dep/main.S\"]\njs=\"dep/main.js\"\nhost=\"dep/main.host\"\n",
-            ),
-        ],
-    );
-    let (graph, diags) = load(&dir.path().join("app"));
-    assert!(diags.is_empty(), "{diags:?}");
-    let root = graph.root.unwrap();
-    let rows = graph.selected_provider_rows();
-    let row = rows.iter().find(|r| r.row.service == "dep/main.S").unwrap();
-    assert_ne!(row.package, root);
-    assert_ne!(row.cells[&Target::Js].package, root);
-    assert_eq!(row.cells[&Target::Host].package, root);
-    assert!(
-        matches!(row.cells[&Target::Host].cell, Cell::Factory { factory, .. } if factory == "app/main.fake")
-    );
-}

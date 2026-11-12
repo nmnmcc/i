@@ -571,49 +571,9 @@ pub(super) fn effects() -> String {
             ("owner_gone", "request: owner is gone"),
         ],
     ));
-    out.push_str(&runtime::with_literals(
-        PROVIDERS.to_string(),
-        &[
-            ("provider_called", "provider: body already called"),
-            ("provider_inactive", "provider: body is not active"),
-            ("provider_incomplete", "provider: body was not completed"),
-        ],
-    ));
     out
 }
 
-const PROVIDERS: &str = r#"
-;; An entry-lifetime continuation token. Its ordinary value header lets the
-;; shared portability walk classify the generated body's capture as local.
-(type $provider_guard (sub $obj (struct
-  (field (mut i32)) (field i32) (field i64) (field f64)
-  (field (ref null $bytes)) (field (ref null $values))
-  (field (ref null $limbs)) (field (ref null $call))
-  (field (mut i32)) (field (mut i32)))))
-(func $provider_guard_new (result eqref)
-  (struct.new $provider_guard (i32.const 19) (i32.const 0) (i64.const 0) (f64.const 0)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-    (i32.const 1) (i32.const 0)))
-(func $provider_guard_enter (param $value eqref) (result eqref)
-  (local $g (ref $provider_guard))
-  (local.set $g (ref.cast (ref $provider_guard) (local.get $value)))
-  (if (i32.eqz (struct.get $provider_guard 8 (local.get $g)))
-    (then (call $panic {{provider_inactive}}) unreachable))
-  (if (struct.get $provider_guard 9 (local.get $g))
-    (then (call $panic {{provider_called}}) unreachable))
-  (struct.set $provider_guard 9 (local.get $g) (i32.const 1))
-  (ref.null eq))
-(func $provider_guard_complete (param $value eqref) (result eqref)
-  (struct.set $provider_guard 9 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 2))
-  (ref.null eq))
-(func $provider_guard_leave (param $value eqref) (result eqref)
-  (struct.set $provider_guard 8 (ref.cast (ref $provider_guard) (local.get $value)) (i32.const 0))
-  (ref.null eq))
-(func $provider_guard_check (param $value eqref) (result eqref)
-  (if (i32.ne (struct.get $provider_guard 9 (ref.cast (ref $provider_guard) (local.get $value))) (i32.const 2))
-    (then (call $panic {{provider_incomplete}}) unreachable))
-  (ref.null eq))
-"#;
 
 impl<'p> Emitter<'p> {
     /// Starts an import of an async host service (B.4) with a new request

@@ -39,7 +39,7 @@
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
-use ilang_check::providers::{self, ResolvedArgument, ResolvedPlan, Scope, Supply};
+use ilang_check::platform::{self, Stub};
 use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
@@ -655,25 +655,36 @@ pub(crate) fn lower_tests_numeric(
     if !typed.coalescing_errors().is_empty() {
         return Err(typed.coalescing_errors().to_vec());
     }
-    let mut plans = std::collections::BTreeMap::new();
-    let mut errors = if typed.entry_provider_needs.keys().all(|&entry| {
-        !providers::entry_is_eligible(program, entry, options.target.provider_target())
-    }) {
-        providers::validate_plan_schema(program, typed, graph, options.target.provider_target())
-    } else {
-        Vec::new()
-    };
-    for (entry, plan) in
-        providers::resolve_program_plans(program, typed, graph, options.target.provider_target())
-    {
+    let mut stubs = std::collections::BTreeMap::new();
+    let mut errors = Vec::new();
+    for (entry, stub) in platform::stubs(program, typed, options.target.platform()) {
         if program.module(entry.module).kind == ModuleKind::Test
             && (!options.tests || options.target == ir::Target::Wasi)
         {
             continue;
         }
-        match plan {
-            Ok(plan) => {
-                plans.insert(entry, plan);
+        match stub {
+            Ok(stub) => {
+                // §2.6.2: a synchronous export may not be async.
+                let synchronous = graph.root.is_some_and(|root| {
+                    graph.packages[root].wasm_synchronous.iter().any(|e| {
+                        e.module == program.module(entry.module).path
+                            && e.function == program.def(entry).name
+                    })
+                });
+                if synchronous && stub.is_async {
+                    errors.push(Diagnostic::error(
+                        platform::NOT_PROVIDED,
+                        Some(program.module(entry.module).source),
+                        program.def(entry).span,
+                        format!(
+                            "synchronous export `{}` needs an asynchronous platform service (§2.6.2)",
+                            program.def(entry).name
+                        ),
+                    ));
+                    continue;
+                }
+                stubs.insert(entry, stub);
             }
             Err(more) => errors.extend(more),
         }
@@ -682,7 +693,7 @@ pub(crate) fn lower_tests_numeric(
         return Err(errors);
     }
     let mut l = Lowerer::new(graph, program, typed, options, None);
-    l.install_plans(plans);
+    l.install_stubs(stubs);
     l.extra_tests = tests.to_vec();
     l.run();
     if l.diags.is_empty() {
@@ -739,13 +750,8 @@ pub(crate) fn lower_selected_numeric(
         options,
         Some((target, export.to_owned())),
     );
-    let plans =
-        providers::resolve_program_plans(program, typed, graph, options.target.provider_target());
-    let plan = plans
-        .get(&target)
-        .expect("selected entry has provider needs")
-        .clone()?;
-    l.install_plans(std::collections::BTreeMap::from([(target, plan)]));
+    let stub = platform::stub(program, typed, target, options.target.platform())?;
+    l.install_stubs(std::collections::BTreeMap::from([(target, stub)]));
     l.run();
     let is_async = l.selected_async;
     if l.diags.is_empty() {
@@ -761,15 +767,10 @@ pub(crate) fn lower_selected_numeric(
     }
 }
 
-/// Runtime inputs captured for one invocation of a provider plan.
-struct ProviderInputs<'a> {
-    key: Option<Atom>,
-    seeds: &'a HashMap<TypeId, Atom>,
-}
-
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
-    plans: std::collections::BTreeMap<DefId, ResolvedPlan>,
+    /// The entry stub of each entry (syntax-3 §2.10.11).
+    stubs: std::collections::BTreeMap<DefId, Stub>,
     program: &'a hir::Program,
     typed: &'a Typed,
     options: Options,
@@ -818,7 +819,7 @@ impl<'a> Lowerer<'a> {
     ) -> Self {
         let mut l = Lowerer {
             graph,
-            plans: Default::default(),
+            stubs: Default::default(),
             program,
             typed,
             options,
@@ -853,16 +854,19 @@ impl<'a> Lowerer<'a> {
         l
     }
 
-    fn install_plans(&mut self, plans: std::collections::BTreeMap<DefId, ResolvedPlan>) {
-        self.plans = plans;
-        // Generated constructors and seeds can introduce services absent from source bindings.
-        for plan in self.plans.values() {
-            for step in &plan.steps {
-                let next = self.services.len() as u32;
-                self.services
-                    .entry(TypeRef::Custom(step.service.constructor))
-                    .or_insert(next);
-            }
+    fn install_stubs(&mut self, stubs: std::collections::BTreeMap<DefId, Stub>) {
+        self.stubs = stubs;
+        // The stub gives services that the source may not name.
+        let mut given: Vec<TypeId> = platform::request_types(self.program)
+            .into_iter()
+            .flatten()
+            .collect();
+        for stub in self.stubs.values() {
+            given.extend(stub.hosts.iter().copied());
+        }
+        for t in given {
+            let next = self.services.len() as u32;
+            self.services.entry(TypeRef::Custom(t)).or_insert(next);
         }
         self.out.services = self.services.len() as u32;
     }
@@ -1090,11 +1094,9 @@ impl<'a> Lowerer<'a> {
         // Resolve host leaves before generating wrappers. Import conflicts are
         // source diagnostics; no wrapper is emitted from an invalid binding.
         let hosts: BTreeSet<_> = self
-            .plans
+            .stubs
             .values()
-            .flat_map(|p| p.steps.iter())
-            .filter(|step| step.supply == Supply::Host)
-            .map(|step| step.service.constructor)
+            .flat_map(|stub| stub.hosts.iter().copied())
             .collect();
         for host in hosts {
             self.host_service(host);
@@ -1237,7 +1239,7 @@ impl<'a> Lowerer<'a> {
             let callee = self.entry_callee(target, 0);
             let fx = Fx::new(target.module, false);
             let site = self.site(&fx, def.span.start);
-            let is_async = self.plans[&target].is_async;
+            let is_async = self.stubs[&target].is_async;
             let async_body = is_async.then(|| self.async_body(&callee, 0));
             self.selected_async = is_async;
             if self.options.target == ir::Target::Wasi {
@@ -1267,7 +1269,7 @@ impl<'a> Lowerer<'a> {
                 let callee = self.entry_callee(d, 0);
                 let fx = Fx::new(mid, false);
                 let site = self.site(&fx, b.binding.span.start);
-                let is_async = self.plans[&d].is_async;
+                let is_async = self.stubs[&d].is_async;
                 let async_body = is_async.then(|| self.async_body(&callee, 0));
                 self.out.exports.push(Export {
                     name: name.clone(),
@@ -1283,7 +1285,7 @@ impl<'a> Lowerer<'a> {
             let callee = self.entry_callee(d, 0);
             let fx = Fx::new(d.module, false);
             let site = self.site(&fx, program.def(d).span.start);
-            let is_async = self.plans[&d].is_async;
+            let is_async = self.stubs[&d].is_async;
             let async_body = is_async.then(|| self.async_body(&callee, 0));
             self.out.exports.push(Export {
                 name: name.clone(),
@@ -1312,7 +1314,7 @@ impl<'a> Lowerer<'a> {
                 errors: sig.errors.iter().map(|t| abi_type(*t)).collect(),
             };
             let callee = self.entry_callee(d, abi.params.len() as u32);
-            let is_async = self.plans[&d].is_async;
+            let is_async = self.stubs[&d].is_async;
             let async_body = is_async.then(|| self.async_body(&callee, abi.params.len() as u32));
             exports.push((name.clone(), abi.clone(), is_async));
             self.out.exports.push(Export {
@@ -1344,10 +1346,12 @@ impl<'a> Lowerer<'a> {
         );
     }
 
-    /// Apply the checked topological graph, keeping each factory's lexical
-    /// environment separate even for different instances of one constructor.
+    /// The entry stub (syntax-3 §2.10.11): the platform's host services in
+    /// the environment, then `Root`, `Owner` and `Await` of the request root
+    /// when the entry needs one of them or tasks, and `task.run` around the
+    /// entry when it needs `Runner` or `Scheduler`.
     fn entry_callee(&mut self, d: DefId, n: u32) -> Callee {
-        let plan = self.plans[&d].clone();
+        let stub = self.stubs[&d].clone();
         let mut fx = Fx::new(d.module, false);
         let args: Vec<_> = (0..n)
             .map(|_| Atom::Local(fx.local(LocalType::Value)))
@@ -1365,8 +1369,26 @@ impl<'a> Lowerer<'a> {
             ),
             None,
         );
-        let key = plan.needs_entry_root_key.then(|| {
-            let_value(
+        let mut env = Env::Root;
+        for &t in &stub.hosts {
+            let slot = self.services[&TypeRef::Custom(t)];
+            let host = self
+                .out
+                .host_services
+                .iter()
+                .find(|h| h.service == slot)
+                .expect("checked host service");
+            let value = Value::Record {
+                ctor: host.ctor,
+                ty: host.ty,
+                fields: host.fields.iter().copied().map(Atom::Func).collect(),
+            };
+            let value = let_value(&mut fx, &mut body, value, None);
+            env = self.stub_bind(&mut fx, &mut body, env, t, value);
+        }
+        if stub.requests() {
+            let [root, owner, await_, runner, _] = platform::request_types(self.program);
+            let key = let_value(
                 &mut fx,
                 &mut body,
                 Value::Op(
@@ -1377,169 +1399,51 @@ impl<'a> Lowerer<'a> {
                     vec![],
                 ),
                 None,
-            )
-        });
-        let mut values = vec![None; plan.steps.len()];
-        let enter_at = plan
-            .adapter
-            .as_ref()
-            .map_or(plan.steps.len(), |a| a.enter_at);
-        self.provider_steps(
-            &plan,
-            0..enter_at,
-            &mut fx,
-            &mut body,
-            &mut values,
-            ProviderInputs {
-                key: key.clone(),
-                seeds: &HashMap::new(),
-            },
-        );
-        let result = if let Some(adapter) = &plan.adapter {
-            let guard = let_value(
-                &mut fx,
-                &mut body,
-                Value::Op(
-                    Op::Runtime {
-                        name: "provider_guard_new",
-                        arity: 0,
-                    },
-                    vec![],
-                ),
-                None,
             );
-            let mut captures = args.clone();
-            captures.push(key.clone().unwrap_or(Atom::Nil));
-            captures.push(guard.clone());
-            let positions: Vec<_> = values
-                .iter()
-                .enumerate()
-                .filter_map(|(i, v)| v.as_ref().map(|v| (i, v.clone())))
-                .collect();
-            captures.extend(positions.iter().map(|(_, v)| v.clone()));
-            let continuation =
-                self.provider_closure(&mut fx, &mut body, captures, |this, fx, out, captured| {
-                    let guard = captured[n as usize + 1].clone();
-                    let_value(
-                        fx,
-                        out,
-                        Value::Op(
-                            Op::Runtime {
-                                name: "provider_guard_enter",
-                                arity: 1,
-                            },
-                            vec![guard.clone()],
-                        ),
-                        None,
-                    );
-                    // Snapshot all adapter seeds at continuation entry, before any
-                    // factory can suspend or replace its own lexical environment.
-                    let mut captured = captured;
-                    let supplied = &plan.adapter.as_ref().expect("selected adapter").supplies;
-                    for service in supplied {
-                        let slot = this.services[&TypeRef::Custom(service.constructor)];
-                        captured.push(let_value(fx, out, Value::Service(Env::Param, slot), None));
-                    }
-                    let call =
-                        this.provider_closure(fx, out, captured, |this, fx, out, captured| {
-                            let mut values = vec![None; plan.steps.len()];
-                            for ((position, _), value) in positions
-                                .iter()
-                                .zip(&captured[n as usize + 2..n as usize + 2 + positions.len()])
-                            {
-                                values[*position] = Some(value.clone());
-                            }
-                            let key = plan
-                                .needs_entry_root_key
-                                .then(|| captured[n as usize].clone());
-                            let seeds: HashMap<_, _> = supplied
-                                .iter()
-                                .zip(&captured[n as usize + 2 + positions.len()..])
-                                .map(|(service, value)| (service.constructor, value.clone()))
-                                .collect();
-                            this.provider_steps(
-                                &plan,
-                                enter_at..plan.steps.len(),
-                                fx,
-                                out,
-                                &mut values,
-                                ProviderInputs { key, seeds: &seeds },
-                            );
-                            this.provider_entry_call(
-                                &plan,
-                                fx,
-                                out,
-                                &values,
-                                captured[..n as usize].to_vec(),
-                            );
-                        });
-                    let value = this.provider_finish(
-                        fx,
-                        out,
-                        call,
-                        Env::Param,
-                        "provider_guard_complete",
-                        vec![guard],
-                    );
-                    out.push(Stmt::Return(value));
+            let factory = self.library_callee("i/request", "_provider_root");
+            let value = self.stub_factory(&mut fx, &mut body, factory, vec![Atom::EmptyList, key], env);
+            env = self.stub_bind(&mut fx, &mut body, env, root.expect("Root"), value);
+            let factory = self.library_callee("i/request", "_provider_owner");
+            let value = self.stub_factory(&mut fx, &mut body, factory, vec![Atom::EmptyList], env);
+            env = self.stub_bind(&mut fx, &mut body, env, owner.expect("Owner"), value);
+            let factory = self.library_callee("i/request", "_provider_await");
+            let value = self.stub_factory(&mut fx, &mut body, factory, vec![Atom::EmptyList], env);
+            env = self.stub_bind(&mut fx, &mut body, env, await_.expect("Await"), value);
+            if stub.tasks {
+                let factory = self.library_callee("i/task", "_provider_runner");
+                let value =
+                    self.stub_factory(&mut fx, &mut body, factory, vec![Atom::EmptyList], env);
+                env = self.stub_bind(&mut fx, &mut body, env, runner.expect("Runner"), value);
+            }
+        }
+        let callee = self.def_callee(d);
+        let result = if stub.tasks {
+            // `task.run(() { entry(args) })`: the entry runs as the root task.
+            let main = self.provider_closure(&mut fx, &mut body, args, |_, _, out, args| {
+                out.push(Stmt::TailCall {
+                    callee,
+                    args,
+                    env: Env::Param,
+                    site: None,
                 });
-            let adapter_env =
-                self.provider_environment(&plan, &adapter.requires, &values, &mut fx, &mut body);
-            // Bind adapter prerequisites in a separate thunk so the delimiter preserves
-            // that environment while the continuation reads adapter seeds.
-            let adapter_callee = self.def_callee(adapter.binding);
-            let call = self.provider_closure(
-                &mut fx,
-                &mut body,
-                vec![continuation],
-                |_, _, out, captured| {
-                    // This thunk is called under adapter_env below.
-                    out.push(Stmt::TailCall {
-                        callee: adapter_callee,
-                        args: captured,
-                        env: Env::Param,
-                        site: None,
-                    });
-                },
-            );
-            let result = self.provider_finish(
-                &mut fx,
-                &mut body,
-                call,
-                adapter_env,
-                "provider_guard_leave",
-                vec![guard.clone()],
-            );
-            let_value(
-                &mut fx,
-                &mut body,
-                Value::Op(
-                    Op::Runtime {
-                        name: "provider_guard_check",
-                        arity: 1,
-                    },
-                    vec![guard],
-                ),
-                None,
-            );
-            result
+            });
+            let run = self.library_callee("i/task", "run");
+            self.provider_call(&mut fx, &mut body, run, vec![main], env)
         } else {
-            let env = self.provider_body_environment(&plan, &values, &mut fx, &mut body);
-            let callee = self.def_callee(d);
             self.provider_call(&mut fx, &mut body, callee, args, env)
         };
         body.push(Stmt::Return(result));
         let inner = self.new_func();
         self.out.funcs[inner.0 as usize] = FuncKind::Code(Func {
-            name: "provider entry".into(),
+            name: "entry stub".into(),
             arity: n,
             budget_frame: 1 + fx.locals.len() as u32,
             locals: fx.locals,
             body,
             frame: true,
         });
-        // Primitive cleanup is outside the entire plan, including construction
-        // failures and adapter errors. Traps retire through host teardown.
+        // The request root ends after the whole entry, also when it ends
+        // with an error. Traps retire through host teardown.
         let mut fx = Fx::new(d.module, false);
         let args: Vec<_> = (0..n)
             .map(|_| Atom::Local(fx.local(LocalType::Value)))
@@ -1564,7 +1468,7 @@ impl<'a> Lowerer<'a> {
         body.push(Stmt::Return(result));
         let wrapper = self.new_func();
         self.out.funcs[wrapper.0 as usize] = FuncKind::Code(Func {
-            name: "provider context".into(),
+            name: "entry context".into(),
             arity: n,
             budget_frame: 1 + fx.locals.len() as u32,
             locals: fx.locals,
@@ -1572,6 +1476,30 @@ impl<'a> Lowerer<'a> {
             frame: true,
         });
         Callee::Direct(wrapper)
+    }
+
+    /// `env` with the service `t` bound to `value`.
+    fn stub_bind(&self, fx: &mut Fx, out: &mut Vec<Stmt>, env: Env, t: TypeId, value: Atom) -> Env {
+        let dst = fx.local(LocalType::Env);
+        out.push(Stmt::LetEnv {
+            dst,
+            env,
+            service: self.services[&TypeRef::Custom(t)],
+            value,
+        });
+        Env::Local(dst)
+    }
+
+    /// The value of a library factory of the stub, called in `env`.
+    fn stub_factory(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        callee: Callee,
+        args: Vec<Atom>,
+        env: Env,
+    ) -> Atom {
+        let_value(fx, out, Value::Call { callee, args, env }, None)
     }
 
     fn provider_closure(
@@ -1699,134 +1627,6 @@ impl<'a> Lowerer<'a> {
             },
             None,
         )
-    }
-
-    fn provider_environment(
-        &self,
-        plan: &ResolvedPlan,
-        positions: &[usize],
-        values: &[Option<Atom>],
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-    ) -> Env {
-        let mut env = Env::Root;
-        for &position in positions {
-            let service = self.services[&TypeRef::Custom(plan.steps[position].service.constructor)];
-            let dst = fx.local(LocalType::Env);
-            out.push(Stmt::LetEnv {
-                dst,
-                env,
-                service,
-                value: values[position]
-                    .clone()
-                    .expect("dependency precedes provider"),
-            });
-            env = Env::Local(dst);
-        }
-        env
-    }
-
-    fn provider_body_environment(
-        &self,
-        plan: &ResolvedPlan,
-        values: &[Option<Atom>],
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-    ) -> Env {
-        // Only actual entry needs belong together; sibling parameter instances
-        // used by separate factories must never be unioned into one environment.
-        let needs = &self.typed.entry_services[&plan.entry];
-        let positions: Vec<_> = plan
-            .steps
-            .iter()
-            .enumerate()
-            .filter_map(|(i, step)| {
-                (step.scope == Scope::Body && needs.contains(&step.service.constructor))
-                    .then_some(i)
-            })
-            .collect();
-        self.provider_environment(plan, &positions, values, fx, out)
-    }
-
-    fn provider_entry_call(
-        &mut self,
-        plan: &ResolvedPlan,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        values: &[Option<Atom>],
-        args: Vec<Atom>,
-    ) {
-        let env = self.provider_body_environment(plan, values, fx, out);
-        let callee = self.def_callee(plan.entry);
-        let value = self.provider_call(fx, out, callee, args, env);
-        out.push(Stmt::Return(value));
-    }
-
-    fn provider_steps(
-        &mut self,
-        plan: &ResolvedPlan,
-        range: std::ops::Range<usize>,
-        fx: &mut Fx,
-        out: &mut Vec<Stmt>,
-        values: &mut [Option<Atom>],
-        inputs: ProviderInputs<'_>,
-    ) {
-        for position in range {
-            let step = &plan.steps[position];
-            let mut args = Vec::new();
-            let mut dependencies = Vec::new();
-            for argument in &step.arguments {
-                match argument {
-                    ResolvedArgument::Seed(seed) => {
-                        let seed = if seed.is_some() {
-                            let value = inputs.seeds[&step.service.constructor].clone();
-                            let_value(fx, out, Value::Cons(value, Atom::EmptyList), None)
-                        } else {
-                            Atom::EmptyList
-                        };
-                        args.push(seed);
-                    }
-                    ResolvedArgument::EntryRootKey => {
-                        args.push(inputs.key.clone().expect("plan registers initial root"))
-                    }
-                    ResolvedArgument::Service(i) => dependencies.push(*i),
-                }
-            }
-            let env = self.provider_environment(plan, &dependencies, values, fx, out);
-            let value = match step.supply {
-                Supply::Host => {
-                    let host = self
-                        .out
-                        .host_services
-                        .iter()
-                        .find(|h| {
-                            h.service == self.services[&TypeRef::Custom(step.service.constructor)]
-                        })
-                        .expect("checked host service");
-                    Value::Record {
-                        ctor: host.ctor,
-                        ty: host.ty,
-                        fields: host.fields.iter().copied().map(Atom::Func).collect(),
-                    }
-                }
-                Supply::Factory(d) => {
-                    let callee = self.def_callee(d);
-                    Value::Atom(self.provider_call(fx, out, callee, args, env))
-                }
-                Supply::Constructor(c) => {
-                    let fields = dependencies
-                        .iter()
-                        .map(|&i| values[i].clone().expect("constructor dependency"))
-                        .collect();
-                    match self.ctors[&c].repr {
-                        CtorRepr::Record { ctor, ty } => Value::Record { ctor, ty, fields },
-                        CtorRepr::Bool(b) => Value::Atom(Atom::Bool(b)),
-                        CtorRepr::Nil => Value::Atom(Atom::Nil),
-                    }
-                }
-            };
-            values[position] = Some(let_value(fx, out, value, None));
-        }
     }
 
     /// Whether a host service is async in the module: on the WASI target

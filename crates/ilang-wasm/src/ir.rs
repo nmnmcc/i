@@ -748,8 +748,9 @@ pub enum Target {
 }
 
 impl Target {
-    pub fn provider_target(self) -> ilang_package::providers::Target {
-        use ilang_package::providers::Target as P;
+    /// The target of the platform check (syntax-3 §2.10.11).
+    pub fn platform(self) -> ilang_check::platform::Target {
+        use ilang_check::platform::Target as P;
         match self {
             Self::Host => P::Host,
             Self::Js => P::Js,
