@@ -39,9 +39,12 @@ const BUILTIN: &[&str] = &[
 /// Prelude types that keep their meaning in every module unless covered.
 const PRELUDE: &[&str] = &["Bool", "Nil", "Result", "AssertionFailure", "Assert"];
 
+/// The constructors of a type with two or more. A head that is not a list
+/// of type parameters is not today's syntax (`T(a) { … }`), so such a
+/// definition is left alone.
 fn multi(t: &TypeDef) -> Option<&[Constructor]> {
     match &t.body {
-        TypeBody::Custom(cs) if cs.len() >= 2 => Some(cs),
+        TypeBody::Custom(cs) if cs.len() >= 2 && t.head.is_empty() => Some(cs),
         _ => None,
     }
 }
@@ -78,45 +81,49 @@ pub fn run(source: &Source) -> Outcome {
     };
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
     // The constructors of each migrated type, for the exports.
-    let mut migrated: Vec<(&str, Vec<&str>)> = Vec::new();
+    let mut migrated: Vec<(&str, Vec<String>)> = Vec::new();
+    // The names given to new types so far.
+    let mut taken: HashSet<String> = HashSet::new();
     for (item, def) in &defs {
         let Some(ctors) = multi(def) else { continue };
         let at = format!("{}:{}", source.path, source.line + src[..def.name.span.start as usize].matches('\n').count());
         let mut problems = Vec::new();
+        // The name of each constructor's new type: the constructor's name,
+        // or `<name>Case` when that name is taken (§7.3 manual list).
+        let mut type_of = Vec::new();
         for c in ctors {
             let n = c.name.name.as_str();
-            let wraps_self = c.fields.len() == 1
-                && matches!(&c.fields[0].ty.kind, TypeKind::Named { module: None, name, .. } if name.name == n);
-            if BUILTIN.contains(&n) || (!prelude && PRELUDE.contains(&n)) {
-                let field = c
-                    .fields
-                    .first()
-                    .map(|f| &src[f.ty.span.start as usize..f.ty.span.end as usize])
-                    .unwrap_or("");
-                if wraps_self {
-                    problems.push(format!(
-                        "constructor `{n}` wraps the built-in type `{field}`: suggested, drop the wrapper and make `{field}` a member of `{}`; `{n}(e)` becomes `e`, the pattern `{n}(p)` becomes `p: {field}` (§7.3)",
-                        def.name.name
-                    ));
-                } else {
-                    problems.push(format!("constructor `{n}` is named like a built-in type"));
-                }
-            } else if n == def.name.name {
-                problems.push(format!("constructor `{n}` is named like its type"));
-            } else if type_names.contains(n) {
-                problems.push(format!("constructor `{n}` is named like another type of the module"));
-            } else if imported.contains(n) {
-                problems.push(format!("constructor `{n}` is named like an imported name"));
+            let wraps_builtin = c.fields.len() == 1
+                && matches!(&c.fields[0].ty.kind, TypeKind::Named { module: None, name, .. } if name.name == n)
+                && BUILTIN.contains(&n);
+            if wraps_builtin {
+                out.manual.push(format!(
+                    "{at}: `{}`: constructor `{n}` wraps the built-in type `{n}`; its type is named `{n}Case`. Suggested by hand: drop the wrapper and make `{n}` a member of `{}`; `{n}(e)` becomes `e`, the pattern `{n}(p)` becomes `p: {n}` (§7.3)",
+                    def.name.name, def.name.name
+                ));
             }
+            let clash = |x: &str| {
+                BUILTIN.contains(&x)
+                    || (!prelude && PRELUDE.contains(&x))
+                    || x == def.name.name
+                    || type_names.contains(x)
+                    || imported.contains(x)
+                    || taken.contains(x)
+            };
+            let mut t = n.to_string();
+            let mut k = 1;
+            while clash(&t) {
+                t = if k == 1 { format!("{n}Case") } else { format!("{n}Case{k}") };
+                k += 1;
+            }
+            taken.insert(t.clone());
+            type_of.push(t);
         }
         let used: Vec<Vec<&str>> = ctors.iter().map(|c| used_params(src, def, c)).collect();
         for p in &def.params {
             if !used.iter().any(|u| u.contains(&p.name.as_str())) {
                 problems.push(format!("type parameter `{}` is used by no constructor", p.name));
             }
-        }
-        if !def.head.is_empty() {
-            problems.push("the head is not a list of type parameters".to_string());
         }
         if !problems.is_empty() {
             out.remaining += 1;
@@ -127,8 +134,8 @@ pub fn run(source: &Source) -> Outcome {
         }
         let start = def.name.span.start as usize;
         let end = item.span.end as usize;
-        edits.push((start, end, definitions(src, def, ctors, &used, start)));
-        migrated.push((def.name.name.as_str(), ctors.iter().map(|c| c.name.name.as_str()).collect()));
+        edits.push((start, end, definitions(src, def, ctors, &type_of, &used, start)));
+        migrated.push((def.name.name.as_str(), type_of));
     }
     if let Some(span) = module.exports_span {
         let group = &src[span.start as usize..span.end as usize];
@@ -145,7 +152,7 @@ pub fn run(source: &Source) -> Outcome {
             let mut text = e.name.name.clone();
             for n in names {
                 text.push_str(&sep);
-                text.push_str(n);
+                text.push_str(n.as_str());
                 text.push_str(suffix);
             }
             edits.push((e.span.start as usize, e.span.end as usize, text));
@@ -210,7 +217,14 @@ fn comments(src: &str, from: usize, to: usize) -> Vec<String> {
     out
 }
 
-fn definitions(src: &str, def: &TypeDef, ctors: &[Constructor], used: &[Vec<&str>], start: usize) -> String {
+fn definitions(
+    src: &str,
+    def: &TypeDef,
+    ctors: &[Constructor],
+    type_of: &[String],
+    used: &[Vec<&str>],
+    start: usize,
+) -> String {
     let base = indent_of(src, start).to_string();
     let body = &src[ctors[0].span.start as usize..ctors.last().unwrap().span.end as usize];
     let multi_line = body.contains('\n') || src[start..ctors[0].span.start as usize].contains('\n');
@@ -221,11 +235,7 @@ fn definitions(src: &str, def: &TypeDef, ctors: &[Constructor], used: &[Vec<&str
         String::new()
     };
     let params: Vec<&str> = def.params.iter().map(|p| p.name.as_str()).collect();
-    let members: Vec<String> = ctors
-        .iter()
-        .zip(used)
-        .map(|(c, u)| head(&c.name.name, u))
-        .collect();
+    let members: Vec<String> = type_of.iter().zip(used).map(|(t, u)| head(t, u)).collect();
     let mut parts = vec![format!("{} = {}", head(&def.name.name, &params), members.join(" | "))];
     let open = src[start..].find('{').unwrap() + start;
     let mut prev = open + 1;
@@ -291,10 +301,13 @@ mod tests {
     }
 
     #[test]
-    fn lists_wrappers() {
-        let out = migrate("a.i", "Node { Int(Int) Name(String) }\n");
-        assert!(out.text.is_none());
-        assert_eq!(out.remaining, 1);
+    fn renames_clashing_constructor_types() {
+        let out = migrate("a.i", "Value { Int(Int) Name(String) }\nPaused { Paused(Paused) Done }\n");
+        assert_eq!(
+            out.text.unwrap(),
+            "Value = IntCase | Name\nIntCase { Int(Int) }\nName { Name(String) }\nPaused = PausedCase | Done\nPausedCase { Paused(Paused) }\nDone { Done }\n"
+        );
+        assert_eq!(out.remaining, 0);
         assert!(out.manual[0].contains("drop the wrapper"));
     }
 }

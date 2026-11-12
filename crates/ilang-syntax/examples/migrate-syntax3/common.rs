@@ -86,6 +86,10 @@ pub fn sources(root: &Path, only: &[String]) -> BTreeMap<String, (String, Vec<So
         if !only.is_empty() && !only.iter().any(|o| path.starts_with(o.trim_end_matches('/'))) {
             continue;
         }
+        // The migrator's own tests hold old forms on purpose.
+        if path.starts_with("crates/ilang-syntax/examples/migrate-syntax3") {
+            continue;
+        }
         let host = std::fs::read_to_string(root.join(&path)).unwrap();
         let mut list = Vec::new();
         if path.ends_with(".i") {
@@ -246,12 +250,11 @@ fn rust_strings(path: &str, text: &str) -> Vec<Source> {
         if b[i] == b'\'' {
             // A character literal, or a lifetime.
             let rest = &text[i + 1..];
-            let len = if rest.starts_with('\\') {
-                rest[1..].find('\'').map(|e| e + 2)
-            } else {
-                rest.chars().next().filter(|_| rest[1..].len() > 0).and_then(|c| {
-                    rest[c.len_utf8()..].starts_with('\'').then_some(c.len_utf8())
-                })
+            // The length of the character between the quotes.
+            let len = match rest.chars().next() {
+                Some('\\') => rest[1..].find('\'').map(|e| e + 1),
+                Some(c) => rest[c.len_utf8()..].starts_with('\'').then_some(c.len_utf8()),
+                None => None,
             };
             i += len.map_or(1, |l| l + 2);
             continue;
