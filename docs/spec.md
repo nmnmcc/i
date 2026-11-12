@@ -1,5 +1,10 @@
 # The i Language
 
+<!-- Text between syn3-old markers is the language before the conversion to the
+syntax of §1 to §8 that the syn3-new blocks state. At the conversion, delete each
+syn3-old block with its markers, delete the syn3-new marker lines, and change each
+`i future-SYN3` fence to `i`. -->
+
 This document is the definition of the i programming language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
 This document is complete in itself. It defines:
@@ -7,7 +12,12 @@ This document is complete in itself. It defines:
 - the source language (§1 to §8);
 - effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, `i/request`, `i/clock`, `i/fs`, `i/process`, `i/net`, `i/tls`, and `i/stdio` (§9);
 - the library module `i/core`, which has the operations that are not written in i (§13);
+<!-- syn3-old -->
+
 - the library module `i/record`, which reads and sets fields of records (§15);
+
+<!-- /syn3-old -->
+
 - macros, the Lisp surface, and the library module `i/syntax` (§14);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
@@ -15,23 +25,52 @@ This document is complete in itself. It defines:
 
 Every compiler must give the library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. A program may not define a module with any of these library paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
 
+<!-- syn3-old -->
+
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a clause block is a function too (§6.12). A binding is a binding wherever it is written, and a clause block with one clause and no guard binds its pattern as a parameter does. Where two forms look the same, they have the same rules, with these exceptions, where the place of a form decides its rules:
 
 - `x: T` in a clause pattern is a type annotation when the clause block has one clause, no guard, and no choices, and a test when not (§7.1). So with `v: Int | String`, `v |> { x: Int -> x }` is a compile error, but `v |> { x: Int -> x  _ -> 0 }` is correct.
 - A `{` that begins an expression is a clause block or a block by its first statement, but the body of a function is always a block (§6.1). So in `make = (n) { (x) -> Int { x + n } }`, the body is a block that gives a function, but `g = { (x) -> Int { x + n } }` is a clause block with the pattern `(x)`.
 - In the first statement of a `{`, `n = ( … ) -> T` is the binding of a function when a `{` comes after `T` on the same line, and a clause pattern followed by `->` when not (§6.1).
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a chain of branches is a function too (§6.12). A binding is a binding wherever it is written, and a parameter group is a pattern matched as a binding matches. Where two forms look the same, they have the same rules, with this exception, where the place of a form decides its rules:
+
+- `x: T` in a parameter item is a type annotation when its branch is the only branch of its shape group, has no guard, and the item has no alternatives, and a test when not (§7.1). So with `v: Int | String`, `v |> (x: Int) { x }` is a compile error, but `v |> (x: Int) { x } | (_) { 0 }` is correct.
+
+<!-- /syn3-new -->
+
 ## 0. How to read this document
 
 The grammar is in EBNF: `|` is a choice, `[ ]` may be there or not, `{ }` may come zero or more times, and text in quotes is written as it is.
 
+<!-- syn3-old -->
+
 Inside a type in the rules and in the prose, a capital letter, alone or with a digit, such as `A`, `T`, `E`, `N`, or `P1`, stands for any type, and a lowercase letter, alone or with a digit, such as `a`, `r`, or `b1`, stands for a type variable. A letter followed by an index, `i`, `j`, `k`, `m`, or `n`, as in `Ti`, `Qi`, `ai`, `an`, or `bm`, is that letter with that index, and stands for the same kind of thing as the letter alone. Outside a type, the letters keep the sense that the text gives them: in §4.8, for example, `C` is a constructor, `e` an expression, and `r` an expression or a name. This is notation of this document, not i syntax: in i code, a type variable is an `UpName` that is declared (§4.7), as in `id(A): (A) -> A`.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+Inside a type in the rules and in the prose, a capital letter, alone or with a digit, such as `A`, `T`, `E`, `N`, or `P1`, stands for any type, and a lowercase letter, alone or with a digit, such as `a`, `r`, or `b1`, stands for a type variable. A letter followed by an index, `i`, `j`, `k`, `m`, or `n`, as in `Ti`, `Qi`, `ai`, `an`, or `bm`, is that letter with that index, and stands for the same kind of thing as the letter alone. Outside a type, the letters keep the sense that the text gives them: in §4.8, for example, `C` is a constructor, `e` an expression, and `r` an expression or a name. This is notation of this document, not i syntax: in i code, a type variable is an `UpName` that is declared as a type parameter (§4.7), as in `<A>(A) -> A`.
+
+<!-- /syn3-new -->
 
 These words have a fixed sense in this document:
 
 - **Compile error**: the compiler does not take the program and makes no output.
 - **Stop**: the program ends at once while it is running. The host gets a message (§11.7). In a test, a stop makes that test fail, and the other tests go on.
+<!-- syn3-old -->
+
 - **Error**: a value that a function gives in place of its normal value (§9.3). An error is not a compile error.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- **Error**: a value raised through the service `Fail` in place of a normal value (§9.3). An error is not a compile error.
+
+<!-- /syn3-new -->
 - **Host**: the system that runs the compiled Wasm module, for example a web browser or Wasmtime.
 - **Type constructor**: a type name with a fixed number of parameters. `List` has one parameter; `Int` has none.
 - **Program source**: all modules but the library modules (§2.1). Built-in names (§12) are not in the program source.
@@ -64,9 +103,20 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 
 ### 1.4 Keywords
 
+<!-- syn3-old -->
+
 i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a chain of functions (§6.12), and a guard is written with `?` inside a parameter group.
+
+<!-- /syn3-new -->
+
 Some forms are macro calls (§14): an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with neither `@external` nor `@js`, which goes with a typed macro binding of the same name (§14.8); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full without knowing which names are macros. Each of them is a compile error when its name is not a macro there.
+
+<!-- syn3-old -->
 
 ### 1.5 Symbols
 
@@ -78,6 +128,22 @@ Some forms are macro calls (§14): an attribute that is not built in, such as `@
 ```
 
 Source text is cut into tokens from left to right. At every point, the longest token that matches is taken: `<=.` is one token, and `<<` is one token. Spaces (U+0020 and tab), line ends, and comments come between tokens, and some line ends are breaks (§1.7). After `.`, digits are read as a `decimal`, never as a float: `t.0.1` is `(t.0).1`. A token may not be followed directly by a letter, a digit, or `_` that would continue it as a word or a number: `12px`, `0xG`, `1.0E5`, and `fooBar` are compile errors.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+### 1.5 Symbols
+
+```
+=   :   ,   .   ..   ->   <-   ?   |   @
+(   )   [   ]   {   }   <<   >>
++   -   *   /   %   <   <=   >   >=   ==   !=   &&   ||   <>   &
++.  -.  *.  /.      <.  <=.  >.  >=.
+```
+
+Source text is cut into tokens from left to right. At every point, the longest token that matches is taken: `<=.` is one token, and `<<` is one token. `<<` is matched before `<-`, so `<<-1` is `<<` and `-1`; `x<-1` is `x`, `<-` and `1`, and a comparison with a negative number is written `x < -1`. `!` alone and `^` are not tokens. `<` and `>` also enclose type parameters (§4.7). Spaces (U+0020 and tab), line ends, and comments come between tokens, and some line ends are breaks (§1.7). After `.`, digits are read as a `decimal`, never as a float: `t.0.1` is `(t.0).1`. A token may not be followed directly by a letter, a digit, or `_` that would continue it as a word or a number: `12px`, `0xG`, `1.0E5`, and `fooBar` are compile errors.
+
+<!-- /syn3-new -->
 
 ### 1.6 Literals
 
@@ -100,9 +166,20 @@ escape     = "\" ( "n" | "r" | "t" | "f" | '"' | "\" ) | "\u{" hex { hex } "}" .
 - `\u{…}` has 1 to 6 hex digits. Its value must be a Unicode scalar value: 0 to 10FFFF, but not D800 to DFFF. If not, it is a compile error.
 - An integer literal may be of any size.
 - A string may go over more than one line. Line ends in it are changed as in §1.1.
+<!-- syn3-old -->
+
 - In an expression, `"a\(e)b"` interpolates an expression `e`, including calls, blocks and nested string literals. Every interpolated expression must have type `String`; there is no implicit conversion. Before the core tree, interpolation becomes `<>` of its parts from the left, leaving out empty text parts. `"a\(x)b"` is `"a" <> x <> "b"`; a sole expression keeps an empty part: `"\(x)"` is `"" <> x`. Interpolation is forbidden in record labels, attribute arguments, import paths, literal types and patterns. The normal formatter retains interpolation as written; the Lisp surface has no interpolation and uses `<>`.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- In an expression, `"a\(e)b"` interpolates an expression `e`, including calls, blocks and nested string literals. Every interpolated expression must have type `String`; there is no implicit conversion. Before the core tree, interpolation becomes `<>` of its parts from the left, leaving out empty text parts. `"a\(x)b"` is `"a" <> x <> "b"`; a sole expression keeps an empty part: `"\(x)"` is `"" <> x`. Interpolation is forbidden in labels, attribute arguments, import paths, literal types and patterns. The normal formatter retains interpolation as written; the Lisp surface has no interpolation and uses `<>`.
+
+<!-- /syn3-new -->
 - A multi-line string begins with `"""` immediately followed by a line break. Its closing `"""` is on a line preceded only by spaces or tabs. That exact indentation prefix is removed from every nonblank content line; a line with less or different indentation is a compile error. Blank lines with less indentation are accepted and made empty; indentation beyond the closing prefix remains part of a blank line. The opening line break and the line break before the closing line are not part of the value. Escapes and interpolation work as in ordinary strings. A backslash immediately before a physical line break joins that line to the next after indentation is removed.
 - A raw string surrounds its quotes with one or more matching `#`, as in `#"text"#`, `##"text"##` or `#"""` … `"""#`. Backslashes are literal unless followed by exactly the opening number of hashes. With one hash, `\#n` is a line feed and `\#(e)` interpolates, while `\n` and `\(e)` remain literal text. Raw multi-line strings use the same indentation and delimiter-line rules; `\#` at line end joins lines in a one-hash raw string. Closing quotes consume the matching number of hashes; too few do not close the string.
+
+<!-- syn3-old -->
 
 ### 1.7 Lines
 
@@ -132,6 +209,40 @@ From this rule:
 - `a` and then `- b` on the next line are two statements. To write `a - b` on two lines, put `-` at the end of the first line. In the same way, `! N` of a function type may not begin a line.
 
 One rule does not depend on lines: in the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `^`, `!`, `|`, `&`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+### 1.7 Lines
+
+A line end is a **break** when both sides of it allow one:
+
+- the last token before it **can end** an expression: a name, an `UpName`, a discard, a literal, `)`, `]`, `}`, or `>>`; and
+- the first token after it **can begin** a statement: a name, an `UpName`, a discard, a literal, `(`, `[`, `{`, `<<`, `-`, `-.`, `..`, or `@`, or `<` when it begins type parameters (below).
+
+Comments are not tokens, so the tokens on the two sides of a comment are what count. Every line end that is not a break is only a space.
+
+A break ends something. What it ends depends on the brackets it is directly inside:
+
+- Directly inside the `{ }` of a block, and at the top level of a file, a break ends a statement or an item. Attributes are part of the item after them, so a break after an attribute does not end the item.
+- Directly inside `( )` (data, data types, data patterns, parameter groups, service patterns and needs), `[ ]`, or `<< >>`, a break is the same as a `,`. A `,` at the end of a line may be left out.
+- Directly inside a `{ }` that groups a type (§3), a break is a compile error.
+
+With no break, as on one line, a statement is the longest expression that may be read from its start, and a `,` is needed between parts. So statements may share a line: `b |> (True) { 1 } | (False) { 0 }`.
+
+But a statement that starts with `(`, `-`, or `-.` begins a new line, because the expression before it on the same line goes on with it. In `{ a = f  (b, c) = g … }`, `f(b, c)` is read as a call, so the statement is the expression `f(b, c)` followed by a stray `=`, a compile error. With a constructor, the one binding may be correct and mean something else: `{ mk = Pair  (b, c) = g … }` is the binding `mk = Pair(b, c) = g`, which takes `g` apart, and it does not bind `mk` to `Pair`.
+
+From this rule:
+
+- When `(` is on the same line as the expression before it, it is a call (§6.6). When `(` is the first thing on a line, it begins a new statement or part.
+- The `{` of a function body (§6.8) is on the same line as the `)` or the type before it.
+- A line that ends in an operator, `,`, `=`, `:`, `->`, `<-`, `(`, `[`, `{`, or `<<` goes on in the next line. A line that begins with `.`, `|`, `?`, `->`, `<-`, or a binary operator other than `-` and `-.` goes on from the line before. So a branch of a chain that begins a line begins it with `|` (§6.12), and a provide may begin a line with `<-`.
+- `a` and then `- b` on the next line are two statements. To write `a - b` on two lines, put `-` at the end of the first line.
+- A line whose first tokens are `<`, one or more `UpName`s with `,` between them, `>` and `(` begins a new statement: a function with type parameters (§6.8). To go on with a comparison in that form on the next line, put the operator at the end of the line before.
+
+One rule does not depend on lines: in the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `|`, `&`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
+
+<!-- /syn3-new -->
 
 `i fmt` formats `.i` and `.is` source files in their own surface, including
 both extensions by default in `src/`, `test/` and given directories;
@@ -199,15 +310,42 @@ At the start of a file, a group in `( )` that is not followed by `=` is not an i
 - When an item in it has a module path (§2.3), which always has a `/`, the group is the **imports**.
 - When not, it is the **exports**: every item in it is a `name`, or an `UpName` with or without `(..)`.
 
+<!-- syn3-old -->
+
 A file has at most one imports group and at most one exports group. They come first, the imports before the exports. Neither may be empty: a file with nothing to import or export leaves the group out. Attributes may not come before the imports or the exports: a group in `( )` with an attribute before it is an item. A group in `( )` that is followed by `=` is a binding with a tuple pattern, as in `(even, odd) = …`. Any other group in `( )` at the top level, with or without attributes before it, is a compile error.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+A file has at most one imports group and at most one exports group. They come first, the imports before the exports. Neither may be empty: a file with nothing to import or export leaves the group out. Attributes may not come before the imports or the exports: a group in `( )` with an attribute before it is an item. A group in `( )` that is followed by `=` is a binding with a data pattern, as in `(even, odd) = …`. Any other group in `( )` at the top level, with or without attributes before it, is a compile error.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 An item that is a `name`, with or without type parameters (§2.5), then `:` and a type, with no `=` after the type, is a declaration, whatever its attributes. Any other item that starts with an `UpName` is a type definition (§4.3). An item that is a call, `m(args)` or `a.m(args)`, with no `=` or `:` after its `)`, is a `MacroItem`. Every other item is a binding (§2.5).
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+An item that is a `name`, then `:` and a type, with no `=` after the type, is a declaration, whatever its attributes. Any other item that starts with an `UpName` is a type definition (§4.3). An item that is a call, `m(args)` or `a.m(args)`, with no `=` or `:` after its `)`, is a `MacroItem`. Every other item is a binding (§2.5).
+
+<!-- /syn3-new -->
 
 A `MacroItem` is a macro call in the position of an item (§14.5). When its name is not a macro, it is a compile error.
 
 A declaration requires `@external` or `@js` (§10.1), or is the signature of a typed macro, with `@macro` in a `.is` file and a binding of the same name (§14.8). Any other declaration is a compile error, unless a macro before it replaces it.
 
+<!-- syn3-old -->
+
 In one module, every top-level name is defined one time only. Two bindings may not bind the same name, two type definitions may not define the same type, and two constructors may not have the same name. A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+In one module, every top-level name is defined one time only. Two bindings may not bind the same name, and two type definitions may not define the same type. Each labelled type defines one constructor with its name (§4.3). A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
+
+<!-- /syn3-new -->
 
 These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels,. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item (§14.5); `@macro` marks a macro definition in a `.is` file (§14.5). An attribute in another place, or one attribute given two times on one item, is a compile error.
 
@@ -224,7 +362,16 @@ ImportName = name | UpName .
 ModulePath = name "/" name { "/" name } .
 ```
 
+<!-- syn3-old -->
+
 Header groups are not record or tuple values. A colon does not introduce an import alias. An arbitrary parenthesised record is not a top-level item.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+Header groups are not data. A colon does not introduce an import alias.
+
+<!-- /syn3-new -->
 
 The imports and the exports are each a parenthesised group of items. In each group, the items have `,` or a break (§1.7) between them:
 
@@ -247,7 +394,18 @@ Every item gives a name to a module:
 
 Importing an `UpName` puts in the type and the constructor with that name, if they are there. Only exported names may be imported. Two imports may not put in the same name. An imported name may not be the same as a top-level name of this module.
 
+<!-- syn3-old -->
+
 Module names, value names, and constructor names are in one space of names. So a module name may not be the same as a top-level name or another imported name of the module, and a local name may cover a module name. In `a.b`, when `a` is a value, `.b` is a field; when `a` is a module, `a.b` is a member of the module. Type names are in a different space, so a type and a value may have the same name.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+Module names, value names, and constructor names are in one space of names. So a module name may not be the same as a top-level name or another imported name of the module, and a local name may cover a module name. In `a.b`, when `a` is a value, `.b` reads a key (§6.7); when `a` is a module, `a.b` is a member of the module. Type names are in a different space, so a type and a value may have the same name.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
 
 ### 2.4 Exports
 
@@ -262,15 +420,45 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 
 A type bound by an alias pattern is an alias with no constructors of its own; exporting it with `(..)` has the same effect as exporting it alone. An exported alias or annotation that depends on a value is checked after its type is complete and must not expose a private nominal type. Its source value need not be exported. Reading from another module never fixes that source’s weak type; a new permanent read requires a wholly closed completed source, or the consumer uses a closed alias exported by the source module (§4.7).
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+### 2.4 Exports
+
+```
+ExportItem = name | UpName [ "(" ".." ")" ] .
+```
+
+- A top-level name that is not in the exports may only be used in its module.
+- For a labelled type `T` (§4.3), `T` exports the type but not its constructor: other modules may use the type, but may not make its values, take them apart, read their keys, or spread them. `T(..)` exports the type and its constructor.
+- For a name `A` (§4.3), `A` exports the name. `A(..)` exports the name and every member of its expansion with `(..)`; every member must be a labelled type defined in this module, or it is a compile error. `(..)` on a labelled type exports only that type and its constructor, also when its data is a union.
+- Every exported name must be defined in this module.
+- If the type of an exported definition, or the expansion of an exported name, uses a type defined in this module, that type must be exported too. If not, it is a compile error. A type that a macro brings in from another module must be exported by that module.
+
+A type bound by an alias pattern is a name with no constructors of its own; exporting it with `(..)` has the same effect as exporting it alone. An exported name or annotation that depends on a value is checked after its type is complete and must not expose a private labelled type. Its source value need not be exported. Reading from another module never fixes that source's weak type; a new permanent read requires a wholly closed completed source, or the consumer uses a closed name exported by the source module (§4.7).
+
+<!-- /syn3-new -->
+
 ### 2.4.1 Unused top-level bindings
 
 A top-level value name bound by a binding (§2.5) gives warning W0504 when it is not used. Names starting with `_` do not give this warning (§1.3). The warning does not change initialization or make `i check` fail.
 
 A name is used when it is referenced in its module, exported from a module outside `test/`, an entry of its package (§10.2), a test, or named in `[wasm].exports`. References inside any binding, including unused bindings, function bodies, patterns, and written types, count. Merely importing a name does not use it. In test modules, an export is used when referenced by a module of the same package. Each name in a binding is checked separately; using one name does not make its other names used. A name starting with `_` suppresses its own warning.
 
+<!-- syn3-old -->
+
 This warning does not apply to type definitions, aliases, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, with no value parameters and result type `Nil`, the warning adds: "did you forget to register this function with `test`?" Environment parameters do not count as value parameters (§10.2). The hint is not given outside test modules.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+This warning does not apply to type definitions, names, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, whose parameter group is `()` and whose result type is `Nil`, the warning adds: "did you forget to register this function with `test`?" The hint is not given outside test modules.
+
+<!-- /syn3-new -->
+
 ### 2.5 Top-level bindings
+
+<!-- syn3-old -->
 
 ```
 Binding     = Pattern "=" Expr | name TypeParams [ ":" Type ] "=" Expr .
@@ -282,9 +470,30 @@ A binding whose pattern is one name, with or without a type, may declare type va
 
 An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is always a binding or a declaration with type parameters. It is never a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1). So `wrap(A) = (x: A) { Some(x) }` declares `A`. The same is true for a statement of a block (§6.1).
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+```
+Binding     = Pattern "=" Expr .
+Declaration = name ":" Type .
+```
+
+Type parameters of a function are written on the function (§6.8) or on its written type (§4.7): `id = <A>(x: A) -> A { x }`, `id: <A>(A) -> A = (x) { x }`, and the declaration `inspect: <A>(A) -> String`. A lowercase name followed by `(` is not a pattern (§7.1), so an item `id(A) = …` is a compile error.
+
+<!-- /syn3-new -->
+
 An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is a macro call (§2.2, §14.5).
 
+<!-- syn3-old -->
+
 An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+An item `name : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
+
+<!-- /syn3-new -->
 
 A top-level binding has the same rules as a binding in a block (§6.10). Only these things are different, and they come from its place:
 
@@ -292,7 +501,16 @@ A top-level binding has the same rules as a binding in a block (§6.10). Only th
 
 - Its names may be used anywhere in the module, before or after it. So top-level functions may use one another.
 - Its value is worked out once, when the program starts, before any entry point runs (§B.1). The order is below.
+<!-- syn3-old -->
+
 - It may not give errors or need an environment, because nothing is there to take them. So its pattern may not fail, because a pattern that may fail needs `Assert` (§4.8 rule 10).
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- It may not have a need (§9.2), because nothing is there to provide it. So its pattern may not fail, because a pattern that may fail needs `Assert` (§4.8 rule 10).
+
+<!-- /syn3-new -->
 - If working out a value stops the program, no entry point runs.
 
 **Order.** Working out a direct value (§6.10) runs no code, so it only reads the names outside the function bodies in it. Working out any other value may call every function it can get to, so it may read every name in it, also inside function bodies. From this:
@@ -331,6 +549,8 @@ exports = ["app/math.add"]                     # host exports (§10.2): module p
 - The packages that a package uses, directly or through other packages, may not be in a circle.
 - The `dev-dependencies` of a package are only used when its own tests are compiled. The `dev-dependencies` of other packages are not used.
 
+<!-- syn3-old -->
+
 The optional `[entries]` table maps entry names (ordinary `name`s) to
 strings `"module.path.function"`. The module path is relative to this package;
 its components name directories below `src` or `test`, followed by the function. Targets must be top-level functions of this package;
@@ -341,12 +561,40 @@ Names are unique as TOML keys; several names may select the same function.
 not replace it. A package without that function has no default entry.
 Entry declarations and main functions in dependencies have no effect.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The optional `[entries]` table maps entry names (ordinary `name`s) to
+strings `"module.path.function"`. The module path is relative to this package;
+its components name directories below `src` or `test`, followed by the function. Targets must be top-level functions of this package;
+they need not be exported. Each has the parameter group `()`. All declarations are checked even when unselected.
+Names are unique as TOML keys; several names may select the same function.
+`main` in `src/main.i` is the default entry, if present; `[entries]` does
+not replace it. A package without that function has no default entry.
+Entry declarations and main functions in dependencies have no effect.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 `i run` and `i build` select the default entry when no entry is named.
 `i run NAME` and `i build NAME` select a key of `[entries]`; an unknown key is an error listing the declared names. Program arguments to `i run` follow `--`.
 Entry selection changes only the program entry, not module visibility or
 host exports. The selected function uses the existing entry checking,
 provider, error, and calling rules of §10.2. An unused-binding warning must
 exclude both the default entry and every declared entry.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+`i run` and `i build` select the default entry when no entry is named.
+`i run NAME` and `i build NAME` select a key of `[entries]`; an unknown key is an error listing the declared names. Program arguments to `i run` follow `--`.
+Entry selection changes only the program entry, not module visibility or
+host exports. The selected function uses the entry checking,
+platform services and calling rules of §10.2. An unused-binding warning must
+exclude both the default entry and every declared entry.
+
+<!-- /syn3-new -->
 
 ### 2.6.1 Target provider plans
 
@@ -598,6 +846,8 @@ The parts are the location, the version, the git commit of the tag, and the **ha
 - When the files that are got for a package do not have the commit and the hash in `i.lock`, it is an error, and nothing is compiled. So a tag that is moved, or files that are changed on the way, are found.
 - When `i.lock` has no line for a version that is used, the line is added. Lines for versions that are no longer used, with or without the tests, are taken out. So when a version is raised, the line for the old version is taken out and a line for the new one is added.
 - A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files.
+
+<!-- syn3-old -->
 
 ## 3. Type syntax
 
@@ -911,6 +1161,327 @@ So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(
 - A local name may cover an outer name with the same name, and an earlier binding in the same block.
 - A `discard` makes no name.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+## 3. Type syntax
+
+```
+Type       = Union .
+Union      = Inter { "|" Inter } .
+Inter      = Diff { "&" Diff } .
+Diff       = Prim { "-" Prim } .
+Prim       = FnType | DataType | NamedType | TypeCall | ValueType | Literal | "_" | "{" Type "}" .
+FnType     = [ TypeParams ] FnParam [ "<-" Needs ] "->" Union .
+TypeParams = "<" UpName { "," UpName } [ "," ] ">" .
+FnParam    = DataType | "{" Type "}" .
+Needs      = UpName | "(" [ NItem { "," NItem } [ "," ] ] ")" .
+NItem      = NamedType | ".." UpName .
+DataType   = "(" [ TItem { "," TItem } [ "," ] ] ")" .
+TItem      = [ name "=" ] Type .
+NamedType  = [ name "." ] UpName [ "(" Type { "," Type } [ "," ] ")" ] .
+ValueType  = [ name "." ] name .
+TypeCall   = [ name "." ] name "(" [ TypeArg { "," TypeArg } [ "," ] ] ")" .
+TypeArg    = Type .
+Literal    = int_lit | "-" IntPart | string_lit .
+IntPart    = int_lit | "{" IntPart "}" .
+```
+
+- An `UpName` with no module name before it is a type parameter when one with that name is in scope where the type is written (§4.7, §5), and a type when not. `_` is a hole that type inference fills in.
+- A `Literal` is a literal type (§4.2): `"a"`, `0`, `-1`. A `-` followed by an integer literal, also inside groups, where a `Prim` begins, is part of the literal: `-{1}` is `-1`. Every other `-` is a difference. So `Int - -1` is `Int` without `-1`, `Int - 1` is `Int` without `1`, and `-1 | 1` is a union of two literal types. A float literal is not a type, because Float has no literal types.
+- A type parameter takes no arguments: `A(Int)`, where `A` is a type parameter, is a compile error.
+- A lowercase `x` in a type, without `(` after it, means the type of the value named `x` at that place. The name follows value scope (§5). `m.x` means an exported value of module `m`, never a key of a value. If `m` names a value, it is a compile error. `{ x }` groups the same type. A lowercase name or member followed by `(` is a macro call, not a value type or a type application.
+- A type may not name a value bound by that same pattern; a name of a parameter group in the types of that function's own head, including its `<-` and `->` parts; or its own binding's name inside that binding's value. A distinct inner binder that has entered scope may cover that name. This is a compile error even if an outer value has the same name. Those names may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
+- A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
+- A value type, directly or through names, may not occur in the data of a labelled type, an external or host declaration, or a need. Those types must be complete before inference.
+- A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is a macro call in the position of a type (§14.5), and a compile error when its name is not a macro. It is in the grammar, so a type with it is read in full.
+- `A | B` is a union, `A & B` is an intersection, and `A - B` is a difference (§4.4). `-` is stronger than `&`, and `&` is stronger than `|`.
+- `( … )` is a **data type** (§4.1). Its items are `T`, the next position, and `name = T`, a label. Positions come before labels, and a label may not occur twice. `()` is the data type of the empty data. A `:` in a type is a compile error: labels are written `name = T`, and a function type has no parameter names.
+- `( … ) -> R` is a function type whose parameter is that data type. `{ T } -> R` is a function type whose parameter is `T`: every member of `T`, after expanding names, must be a data type, and two members may not have one shape. This is the type of a function with several shapes (§4.6).
+- A function type goes as far to the right as it can: `(A) -> B | C` gives `B | C`. `{ }` puts a type in a group: `{ (A) -> B } | C`, `(A) -> { (B) -> C } | D`.
+- `<- N` is the **need** of a function type (§4.6, §9.2). `<- (T1, …, Tn)` lists named service types, in any order; at most one item is `..N`, a row variable. `<- N` with a bare `UpName` is the same as `<- (..N)`, and `N` must be a type parameter in scope. A missing `<-` part means "needs nothing", in every place where a type is written; `<- ()` is not written. Two items with one type constructor are merged as §9.2 says.
+- `<A, N>` before the parameter part binds type parameters for the rest of that function type (§4.7). `<>` is one token, so an empty list of type parameters cannot be written.
+- `Opaque` is not a type. It is only the right side of a type definition (§4.3).
+- A `{ }` in a type groups exactly one type. Breaks in data types separate items; breaks directly in type groups are compile errors.
+
+## 4. Types
+
+### 4.1 Types are sets of values
+
+Every type is a set of values.
+
+- Values of different type constructors are never the same.
+- Values of different forms of one type constructor, such as `List(Int)` and `List(String)`, may not be told apart at run time (§7.1).
+- **Data** is a finite map from keys to parts. A key is a position, counting from 0, or a label, a `name`. The **shape** of data is its number of positions and its set of labels. Data of one shape is one type constructor; data of different shapes are different type constructors. `()` is the empty data, of the empty shape.
+- Each labelled type (§4.3) is a type constructor of its own. Its values are never data, and data is never a value of a labelled type.
+- The values of a function type are functions. All function types are one type constructor.
+
+A **member** of a type (§4.4) is a type constructor, its type arguments, and a **value set**: the values of that type constructor that are in the member. Only `Int` and `String` may have a value set that is not all of their values (§4.2). For every other type constructor, the value set is all of its values.
+
+### 4.2 Built-in types
+
+These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. So a module that defines a type with the name of a built-in type can still name the built-in type. The prelude types may be named through `i/prelude`.
+
+| Type | Values |
+|---|---|
+| `Int` | Whole numbers of any size |
+| `Float` | Finite IEEE 754 binary64 numbers |
+| `String` | Lists of Unicode scalar values, kept as UTF-8 |
+| `List(A)` | Lists that may not be changed |
+| `BitArray` | Lists of bits; the number of bits may be any number |
+| `UtfCodepoint` | One Unicode scalar value |
+| `Never` | No values |
+
+These prelude types are normal type definitions (§4.3):
+
+```i future-SYN3
+True = ()
+False = ()
+Bool = True | False
+Nil = ()
+Ok(A) = (A)
+Error(E) = (E)
+Result(A, E) = Ok(A) | Error(E)
+```
+
+The types `Fail` (§9.3), `Assert` and `AssertionFailure` (§9.6) are prelude types too. The types `Boundary` and `Continuation` are in §9.4. The types `Key` and `Keyed` are in §9.8. `Request(A)` and `Ticket` are built-in types, with operations in `i/request` (§9.11). `Request(A)` contains request handles whose answer belongs to `A`. `Ticket` is an answer-erased handle. Neither has public constructors.
+
+#### Literal types
+
+Every value of `Int` and of `String` is also a type, the **literal type** with only that value. It is written as the literal: `1`, `-1`, `"a"`. `1 <: Int`, and `"a" <: String`. Two Int literal types are the same when their numbers are equal, so `0x10` is `16` and `-0` is `0`. Two String literal types are the same when their scalar values are equal (§11.4).
+
+The value set (§4.1) of an `Int` or `String` member is one of these:
+
+- all the values: `Int`, `String`;
+- a finite set of values: `"a" | "b"`;
+- all the values but a finite set: `String - "a" - "b"`.
+
+Union, intersection and difference of these sets give a set of the same kind, so the rules of §4.4 and §4.5 always have an answer, and inference still finds principal types (§4.7). `Float`, `BitArray` and `UtfCodepoint` have no literal types.
+
+Values are never changed, so a literal type is never made wider: `x = "a"` gives `x` the type `"a"`, and `[200, 404]` has the type `List(200 | 404)`. Such a value may be used where a `String` or an `Int` is needed, because `"a" <: String`. Operators give the whole type: `1 + 1` has the type `Int` (§6.9).
+
+### 4.3 Type definitions
+
+```
+TypeDef     = UpName [ TypeHead ] "=" TypeRhs .
+TypeHead    = "(" TypePattern { "," TypePattern } [ "," ] ")" .
+TypeRhs     = "Opaque" | Type .
+TypePattern = UpName | "_"
+            | [ name "." ] UpName "(" TypePattern { "," TypePattern } [ "," ] ")"
+            | name "." UpName
+            | "(" [ TPItem { "," TPItem } [ "," ] ] ")" .
+TPItem      = [ name "=" ] TypePattern .
+```
+
+A type definition has one form, `Name [ (params) ] = right side`. Its kind is decided by the outermost written form of the right side, before any expansion, in this order:
+
+1. **Alias pattern.** The right side, after removing groups, is a value type (§3).
+2. **Opaque type.** The right side is the word `Opaque`, not in a group.
+3. **Labelled type with data.** The whole right side is one data type, not in a group.
+4. **Name.** Any other right side.
+
+- For kinds 2 to 4 the head is a list of **type parameters**: distinct, unqualified `UpName`s with no arguments, which do not already name an accessible type.
+- `T = Opaque` defines a new **opaque type**, a labelled type whose values i code cannot make or take apart. They come from the host (§10), including `@js` declarations (§10.1.1). `Opaque` anywhere else, and a type named `Opaque`, are compile errors.
+- `T = D`, where `D` is a data type, defines a new **labelled type** with the data `D`, and its one **constructor**, also named `T`. The constructor is the function `(D) -> T(P1, …)`, or, when `D` is `()`, the value `T`. Two labelled types are different types even when their data is the same. The module defines the constructor name `T` in its space of value names (§2.3).
+- Any other right side defines a **name**: a transparent alias for the type on its right. A name may not occur in its own expansion, directly or through other names or alias patterns. The data of a labelled type is not part of the expansion of a name, so a name may reach itself through the data of a labelled type: `Tree(A) = Leaf | Node(A)` with `Node(A) = (Tree(A), A, Tree(A))` and `Leaf = ()` is correct, but `T = List(T)` is not.
+- In a name, every parameter must be used, and every type parameter on the right must be a parameter of the head. In a labelled type, a parameter need not be used. A parameter of a labelled type that its data does not use, and every parameter of an opaque type, does not change (§4.5 rule 6); the other parameters change as the data says.
+- A **sum** is a name for a union, or a labelled type whose data is one item of a union type. Its members may be any types, labelled or not, also built-in types and data types. Values of a sum are told apart by type tests and constructor patterns (§7.1), so every two members of a sum must have different type constructors (§4.4). Members that would share a type constructor are each wrapped in a labelled type. One labelled type may be a member of several sums.
+- `{ D }`, a data type in a group, is a name for that data type: `Point = { (Int, Int) }` makes `Point` mean `(Int, Int)`, while `Pair = (Int, Int)` makes a new labelled type.
+- An item `T(P1, …, Pn) = v` is an **alias pattern** exactly when its written right side is a value type (§3), after removing groups. This classification is made before expanding the right side; it never depends on imports or on what a macro returns there.
+- In an alias pattern, the unqualified head names an existing type, with the written arity; the item does not define that head. It may be a labelled or built-in type, or a name expanding to one named type or data type. In a head name each parameter is used at most once, only as a named argument or a data part. Constant subtrees of that name require an equal, fully determined source part.
+- A bare unqualified UpName in a pattern always defines a new zero-parameter name. Its part of the source type must be fully determined (§4.7). It may not duplicate a definition or conflict with an imported or built-in type. It never tests an existing type with that name.
+- `_` in an alias pattern skips a part and binds nothing; it is not an inference hole. For a new read after source completion, the whole source type must first be closed (§4.7); a skip cannot hide an open argument from that check. Elsewhere in a type, `_` remains a hole. Shared type variables remain shared even if one occurrence is skipped.
+- A named pattern with arguments, or a qualified named pattern, requires exactly one member with that type constructor and matches its arguments. A data pattern requires one member that is data of the same shape and matches its parts at their keys. No union member is discarded to make a match. A mismatch is a compile error. Function, literal, union, intersection, difference, value-type and macro-call patterns are compile errors.
+- Every pattern and every value-dependent name is checked, also when unused. Its demands are processed at the completion of their source (§4.7), and its results are assembled after its name dependencies are complete. A new read after source completion follows the closed-source rule in §4.7. A definition read may not choose an instance of a generalized variable to make its pattern fit.
+- Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
+
+```i future-SYN3
+Some(A) = (A)
+None = ()
+Option(A) = Some(A) | None
+User = (name = String, age = Int)
+Pair(A, B) = (A, B)
+Point = { (Int, Int) }
+Meters = Int
+Element = Opaque
+
+Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
+size = Codec(decode = (s) { string.length(s) }, encode = (n: Int) { int.to_string(n) })
+Codec(Size, _) = size
+```
+
+Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, Int)`; and the alias pattern makes `Size` the type `Int`, leaving the `encode` part unread.
+
+### 4.4 Union, intersection, and difference
+
+- The values of `A | B` are the values of `A` and the values of `B`. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
+- Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Data of one shape is one type constructor, whose part under each key goes in the same direction as the data. All function types are one type constructor: `(P) <- N -> R | (Q) <- M -> S` is `(P & Q) <- N ∧ M -> R | S`, where `N ∧ M` is the merge of the two needs (§9.2). When `P` and `Q` have no shape in common, `P & Q` is `Never`, and the function cannot be called. So `List(Int) | List(String)` is `List(Int | String)`.
+- The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor. A type variable may be a member.
+- The values of `A & B` are the values that are in both `A` and `B`. `{ A | B } & C` is `A & C | B & C`. When `T` and `U` are not type variables, `T & U` is `Never` when they have different type constructors; when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change. For `Int` and `String`, the value set is the values in both; when there are none, `T & U` is `Never`. So `"a" & String` is `"a"`, and `"a" & "b"` is `Never`. `a & T`, with a type variable `a`, stays as it is.
+- Intersections come from inference. `(x) { x + 1  x }` has the type `(a & Int) -> a`: the value that comes in is given back, and it must be an `Int`.
+- `A - B` takes out of `A` every member whose type constructor is the type constructor of a member of `B`. For `Int` and `String`, it takes out only the values of the value set of that member of `B` (below). These rules work it out:
+  - `{ A | B } - C` is `A - C | B - C`, and `A - { B | C }` is `A - B - C`.
+  - When `T` and `U` are not type variables: `T - U` is `T` when they have different type constructors. When they are both `Int` or both `String`, `T - U` has the values of the value set of `T` that are not in the value set of `U`, and is `Never` when none are left: `String - "a"` is every string but `"a"`, `{"a" | "b"} - "a"` is `"b"`, and `"a" - String` is `Never`. For every other type constructor that is the same in both, `T - U` is `Never`, and `T <: U` must be true (below).
+  - When `T - U` is `Never`, `T <: U` must be true. This is a constraint for inference, like any other. When it cannot be true, it is a compile error: for example `List(Int | String) - List(String)`.
+  - The right side of `-` may not have a type variable as a member. `a - U`, with a type variable `a`, stays as it is until `a` is known.
+- So `{ Int | String | Nil } - String` is `Int | Nil`, `A - A` is `Never`, and `{ Yield(a) | n } - Yield(a)` is `n - Yield(a)`.
+- `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
+- Unions, intersections, and differences may be used in every place where a type may be used. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameter of a function is an input place; its `->` part, the type at the top of a binding pattern, and the data of a type are output places. The parts of data keep the direction of the place of the data. The restrictions on variable members apply to expanded annotations and shown types, including after substitution and completion.
+
+### 4.5 Subtypes
+
+`A <: B` says that every value of `A` is a value of `B`. These are the rules:
+
+1. `Never <: A`, and `A <: A`.
+2. `A <: A | B`. `A | B <: C` when `A <: C` and `B <: C`. `A & B <: A`. `C <: A & B` when `C <: A` and `C <: B`.
+3. `A - B <: A`. `X <: A - B` when `X <: A` and `X` and `B` are **disjoint**: every member of `X` and every member of `B` have different type constructors, or are both `Int` or both `String` with value sets that have no value in common. So `"a"` and `"b"` are disjoint, and `"a"` and `String - "b"` are not. Only the members themselves are compared, not their type arguments: `(1, 2)` and `(3, 4)` are not disjoint. A type variable as a member is never disjoint from anything.
+4. `{P} <- N -> R <: {Q} <- M -> S` when `Q <: P`, `R <: S`, and `N` **fits in** `M`: for every type constructor `C` with an entry in `N`, `M` has an entry for `C` and `M_C <: N_C`, or `N` and `M` have the same row variable and it carries `C`. Here `{P}` is the parameter type, a data type or a union of data types, and needs are compared in the reverse direction of values.
+5. Data of the same shape: `D1 <: D2` when the part under every key of `D1` is a subtype of the part under the same key of `D2`. Data of different shapes are disjoint.
+6. A type parameter of a labelled type changes in the same direction as the type, in the other direction, or not at all. This is decided from the definition: a parameter that is only in output places goes in the same direction; one that is only in input places goes in the other direction; one that is in both does not change. The data of a labelled type is an output place, the parameter of a function type is an input place, and a place inside an input place is the other way round. A parameter that the data does not use, and a parameter of an opaque type, does not change.
+7. `List(a)` goes in the same direction as `a`. In `Continuation(A, R, N)`, `A` goes in the other direction and `R` and `N` in the same direction. `Boundary(R, N)` does not change.
+8. A member of `Int` or `String` is a subtype of a member with the same type constructor when every value of its value set is in the value set of the other. So `"a" <: "a" | "b" <: String`, and `String - "a" <: String`, but `String` is not a subtype of `"a" | "b"`, and `String - "a"` is not a subtype of `"b"`.
+
+Two types are **equal** when each is a subtype of the other. A value of a subtype may be used in every place where a value of the type is needed.
+
+`Key(A)` (§9.8) does not change. `Request(A)` (§9.11) goes in the same direction as `A`. The variance of task types follows their definitions (§9.9).
+
+### 4.6 Function types
+
+The function type `(D) <- N -> A` has one parameter, a data type `D`; a **need** `N` after `<-`, the services that it takes from where it is called (§9.2); and a **value** `A` after `->`, the type of the value that it gives back. Errors are the need entry `Fail(E)` (§9.3), so `Effect<A, E, R>` of Effect-TS is `() <- (..R, Fail(E)) -> A`. A missing `<-` part means "needs nothing".
+
+The shape of `D` is part of the type: its positions and its labels. There is no currying and there are no default parameters. `{ D1 | … | Dn } <- N -> A`, where the `Di` have different shapes, is the type of a function with several shapes (§6.12): calling it with data of the shape of `Di` needs that data to be in `Di`, and gives `A`. Such a type is a subtype of each of its shapes, `{ (Int) | (Int, Int) } -> R <: (Int) -> R`, so a function with several shapes may be given where a function of one of them is needed.
+
+`<A, N>` before the parameter part makes the type polymorphic (§4.7).
+
+### 4.7 Type inference
+
+Types are worked out by inference with subtypes (algebraic subtyping).
+
+- Type annotations may be left out everywhere for inference, but not on `@external` or `@js` declarations. Some uses of a name need a known type, which may need an annotation (§4.8).
+- Foreign linking (§10.1.2) does not change inferred source types or remove inferred needs.
+- For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance. MLsub (Dolan and Mycroft, POPL 2017) and MLstruct (Parreaux and Chau, OOPSLA 2022) give ways to do this.
+- A type is made simpler before it is shown: equal parts are put together, and type variables that have no effect on the meaning are taken out. This never changes which programs are correct or what they do. A type scheme that is used as a known type (§4.8) is in this simpler form. A type variable that is not generalized is shown as the union of the types that come to it. A union that is the expansion of a declared name is shown by that name.
+- Annotations are used in inference, and the inferred type must agree with them. A type variable in an annotation may become a more exact type.
+
+**Type parameters.**
+
+- A function expression may begin with `<A, N, …>` before its parameter group (§6.8), and a function type may begin with it before its parameter part (§3). The names are distinct unqualified `UpName`s that do not name a type that may be written with no module name in the module (a type of the module, an imported `UpName`, or a built-in type). A type definition declares type parameters in its head (§4.3). The parts of an alias pattern are not type parameters: its bare UpNames define names.
+- On a function expression, the type parameters may be used in its parameter group, its service pattern, its `->` part and its body, also in nested functions and annotations there. On a function type, they may be used in the rest of that type.
+- A type parameter used where a need is written (`<- N`, `<- (..N, …)`) is a **row variable**: it stands for a whole set of services. Any other use makes it an ordinary type variable. Using one name both ways is a compile error.
+- On a function expression, a type parameter is a type variable of that function, and it is generalized with it. Inference may make it more exact: `id = <A>(x: A) -> A { 1 }` is correct.
+- A written function type with type parameters in a parameter, in the data of a type, in a type definition, or in an annotation is a **polymorphic type**, as `Show = (write = <A>(A) -> Nil)`. A value checked against it is checked with a new rigid type for each of its parameters, which may not escape; each use of a value of that type instantiates it again. Inference never guesses a polymorphic type: a parameter gets one only from a written type.
+- An `UpName` in a type that is neither a type nor a type parameter in scope is a compile error. The message says how to declare it.
+- A bound on a type variable is written as an intersection where it is used, as `x: A & Show`. Capabilities are passed as parameters or as services; none is passed implicitly.
+
+**Generalization.**
+
+- **A binding is generalized when its value is a direct value** (§6.10): the type variables of its type that are not in the types of names from outside it become general, so each use of the name may give them different types. A binding whose value is not a direct value is not generalized, because working out its value runs code, and that code may make a value for one type only (for example with `control.suspend`). This is the value restriction of ML, which is known to be safe. Functions are direct values, so every function binding is generalized.
+- A type variable that is not generalized is one type for all uses of the binding.
+- Parameter groups (§6.11) are matched like bindings, but they are not generalized. Their values are not known where they are written, so each of their names has one type in the whole branch. So `(f) { (f(1), f("a")) }` needs `f` to take both `Int` and `String`.
+- Inside its own value (§6.10), a name of a binding is not general: all its uses there have one type. It becomes general when the binding is generalized.
+- A **group** is a set of top-level bindings that use one another, directly or through other bindings of the group. The bindings of a group are worked out together and then generalized together, after the groups that they use. Inside the group, their names are not general.
+- A type that has itself inside it, through a type variable, is a compile error. The parts of data count as places inside a type constructor.
+- Simplification and type display preserve type variables that affect invariant arguments, even when their input and output forms print alike. Reading a type never generalizes a weak variable.
+- A long union of literal types may be shortened in messages and hovers, as `"a" | "b" | … (40 more)`, but never in a type scheme or in the interface of a package. An inferred type may have literal types in it, also in the interface: an exported constant or an unannotated exported function whose value is a literal has that literal type, so giving one more literal as a value changes the interface. Exported functions should have written types, as the standard library has.
+
+**Reading types of values.**
+
+- In an annotation, a completed generalized value is read as a fresh instance of its scheme (§4.8 rule 3), separately for each occurrence. A parameter name or local monomorphic value shares its one type. Generalized local schemes also keep their non-general variables shared. A completed top-level value uses its fixed non-general parts; reading an unfixed part is a compile error. Reading through a local does not copy such a part or allow a name to escape from it. A value type never generalizes its source or its annotated binder.
+- In a name or alias pattern, every used value-derived part must be closed: it has no generalized variable, unresolved type variable, unknown top type or hole. The name's own declared parameters remain parameters. A skip demands no contents, but the shapes needed to reach the used parts must also be determined.
+- A top-level value's group has one **completion point**, after its values are typed and linked and its generalization is decided. All value-type demands written in its own module are collected before inference, including annotation reads and unused type definitions. An annotation read takes part in fixation like a name read; its quantified parts still use fresh scheme instances. Ordinary group checks finish first. All demands at this completion point read one unchanged snapshot and are checked in one batch before any permanent name is published. At this point their weak parts are fixed as follows. A demand in another module never fixes them.
+- For a demanded non-general variable, collect all types that come to it, including through variable relationships. Put them together by union, replacing the non-general variables needed inside them by their fixed types. Pure cycles of variable relationships count once. A structural recursive type, an unfilled part, a generalized variable needed inside this replacement, or a part that cannot be made closed is a compile error. An explicit closed `Never` is allowed; the absence of any information does not invent `Never`. Literal types are never widened.
+- Fixing adds both subtype constraints between the variable and the resulting closed type, keeping every previous constraint. Every needed variable is fixed together, and the usual occurs and place rules apply. If these equations cannot hold, it is a compile error. Pattern shape checks use the original argument variables, so skipping a distinct argument leaves it shared and unfixed. The pattern cannot supply a type to fill an unknown.
+- A group that constrains an earlier non-general variable that was not fixed cannot fix its own non-general parts. A demanded part carrying such an earlier variable also cannot be fixed. This conservative rule makes the result independent of unrelated groups' inference order.
+- From then on, later uses must agree with each fixed part. A use that would widen it incompatibly is a type error with a note at the place that fixed it. Write a wider annotation at the source when needed. For example, reading `r = task.ref(1)` may fix its invariant argument to `1`; write `r: Ref(Int) = task.ref(1)` to allow other Int values.
+- In another module, or when a new definition read is performed by a later group, an alias pattern or other permanent value-derived definition must start from a wholly closed completed source type. A fixed component behind an open enclosing type is not sufficient, even when the open arguments are skipped. This read adds no constraints to the source. If the source remains open, the error says to use the closed name made by its source module and to export it when needed. Annotation instantiation and current-group local monotype sharing keep their rules above. Adding foreign fixation demands cannot change the source module's completion result. Ordinary expression constraints and local monomorphic sharing remain shared as elsewhere in this section; this rule does not fix the display of every uncompleted weak part.
+- A permanent name denotes the completed closed part. It does not change when later bindings are checked. A same-module top-level pattern is handled at its source's completion, regardless of where the item is written. Names with several sources assemble already closed per-source results, not saved partial source types. Definitions are completed before their dependents. Importing or using the closed name later does not read its source value again.
+- The whole annotation after value types and names are read must obey §4.4's rules of places. A value-type spelling does not hide variable members from that check.
+
+### 4.8 Typing rules
+
+`Γ ⊢ e : A <- N` says: with the names in `Γ`, the expression `e` has the type `A` and needs the services `N` (§9.2), errors included as `Fail(E)` (§9.3). `Γ` gives every name a type scheme `∀a1 … an. T`. A program is correct when every binding has a type by these rules. Every rule may use any `N`; the parts of one rule use the same `N`, unless the rule says otherwise. **Every value that an expression can have at run time is in its known type** (below); selection (rule 5a), narrowing (rule 12) and keys (rule 13) depend on this.
+
+1. **Subtypes.** If `e : A <- N`, `A <: A'`, and `N` fits in `N'` (§4.5 rule 4), then `e : A' <- N'`.
+2. **Literals** have the types of §6.3.
+3. **Names.** If `Γ(x) = ∀a1 … an. T`, then `x : T` with each `ai` changed to any type.
+4. **Functions.** Let the parameter group be the data pattern `q`, and the service pattern `x1: T1, …, xk: Tk` (§6.8). `q` is fitted to a data type `P` (below). If `Γ` with the names of `q` and `xi : Ti` gives `body : A <- M`, the function has the type `(P) <- M' -> A`, where `M'` is the merge (§9.2) of `M`, every `Ti`, and `Assert` when `q` may fail for `P` (§7.3). With `..env: N` in the service pattern, `M` must fit in `(..N, T1, …, Tk)`, and `M'` is `(..N, T1, …, Tk)`. Making the function needs nothing.
+5. **Calls.** If `f : {P} <- N -> A` and the argument data `d : D` with `D <: P`, then `f(d) : A <- N`.
+   **5a. Selection.** When `f` is a name with a selection table (§6.12), its type at the call is the type of the selected branches, computed from the known types of the arguments before inference constrains the call.
+   **5b. Provide.** For `e <- s`, where `e : A <- N` and the provided data has keys `K` with types `T_k` (§9.2): for every `k` in `K` that `N` has, `T_k <: N_k`. The provide has the type `A <- N'`, where `N'` is `N` without the keys `K`, merged with the need of working out `s`. A provided key that `N` does not have gives a warning. When `N` has a rigid row variable, a key that it may carry and that `N` does not state is a compile error.
+6. **Data and lists.** If every item `ei : Ti` at key `ki`, the data has the data type with `Ti` at `ki`; a spread contributes the parts of the type of its base at their keys. If every `ei : T` and `r : List(T)`, then `[e1, …, en] : List(T)` and `[e1, …, en, ..r] : List(T)`.
+7. **Constructors** are functions from their data type to their type, or values when the data is `()` (§6.7).
+8. **Operators** are not functions. Each has the types of §6.9. `a |> f(b)` has the type of `f(a, b)`.
+9. **Blocks.** `{ s1 … sn e }` has the type of `e`, with the names bound by `s1 … sn` (§6.10). The need of a block is the merge of the needs of its statements and of `e`.
+10. **Bindings.** For `p = e` with `e : A`: `p` is fitted to `A` (below). If `p` may fail for `A` (§7.3), then `Assert` is in `N`.
+11. **Groups.** This rule is for a shape group of a chain (§6.12) with more than one branch or with a guard. Let it be called with data of type `B`: in a match `e |> C` with `e : A`, the one-position data `(A)`; in a call, the argument data type. The parameter patterns (each alternative of `|` counts) are looked at by **place**. The top place is the argument data. Below a pattern at a place, its parts are at places of their own: the part under each key of a data pattern, the part under each key of a constructor's data, and the parts and the rest of a list. Places below different constructors are different places. At each place, let `B` be the type of the values there (the argument data at the top place, and else the part type of the pattern type above it), and let `P` be the union of the pattern types (below) of the patterns at that place that are not catch-alls. Patterns at one place with the same type constructor use the same new type variables, so `Ok(v)` and `Error(e)` at one place give `Ok(b1) | Error(b2)`, and `Some(v)` and `None` give `Some(b) | None`. A type test `x: T` at a place also needs `B <: T | r - T`, with a new type variable `r`: it takes every value whose type constructor is that of a member of `T`, and that, for a member of `Int` or `String`, is in the value set of that member (§7.1), so those values must be in `T`. So `v |> (x: Box(Int)) { … } | (y: Box(String)) { … }` with `v: Box(Int | String)` is a compile error. A data or constructor pattern with `..` counts as having a catch-all at the places of the keys that it leaves out. If some branch without a guard has a catch-all at that place or at a place above it, then `B <: P | r - P`, with a new type variable `r`: a value that no pattern takes may still come there. If not, then `B <: P`. So a group with only literal branches and no catch-all takes only those values: `(0) { "zero" } | (1) { "one" }` has the type `(0 | 1) -> "one" | "zero"`. In a match `e |> C` whose subject already has a type with values that are in no literal of `P`, so that `B <: P` is not true only for that reason, as `(n: Int) { n |> (0) { "zero" } | (1) { "one" } }`, the error is the one of §7.4, with a value that no branch matches, and no other error is given for it. A chain that is not the right side of a match gets its values later, through the type of its parameter: from a call, or from the type it is given to, as in `list.map(xs, (0) { "zero" } | (1) { "one" })` with `xs: List(Int)`. Then there are two errors: a type error where the values come, and the error of §7.4 at the chain. A catch-all at a place gets the type of rule 12. Every guard has the type `Bool`, each branch body has its own type `Ri`, and the need of every guard and body is part of the need `N` of the chain. The group has the type `(B) <- N -> R1 | … | Rn`, and a match has the type `R1 | … | Rn`. Making the chain needs nothing, as for a function in rule 4. Coverage (§7.4) is checked with the types that inference finds.
+
+    A group with one branch and no guard is not typed by this rule. It is the function of rule 4: its parameter group is fitted to the parameter type (below), it is not checked for coverage, and `Assert` is in its need when the pattern may fail. A match `s |> (p) { e }` with such a chain is typed as the binding `p = s` followed by `e` (rule 10), with the one difference that `p` is not generalized, as a parameter is not. So the subject `s` gets the expected type that a binding gives its value (below).
+
+12. **Narrowing.** Let a catch-all be at some place in a parameter pattern of a group, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the branch's pattern matches, with a value of `T` at that place, is matched by an earlier branch of the group without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the pattern matches with it at that place is matched by an earlier branch without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s |> ("a") { 0 } | (rest) { f(rest) }` with `s: String`, `rest` gets `String - "a"`. Guarded branches take nothing.
+13. **Keys.** For `v.k` and `v.f`, `v` must have a known type, and every member of it must be data with that key, or a labelled type whose data has that key and whose constructor may be used here (§2.4). The inferred result is the union of those parts with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v` must fit the bound. If not, it is a compile error. The bound takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Use this bound also when a known function type constrains a call. Known key results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
+14. **Generalization.** A binding whose value is a direct value is generalized (§4.7) after its value is typed. Other bindings and parameter groups are not.
+
+A **catch-all** is a `name`, a discard, or a conjunction `p1 = … = pk` whose parts are all catch-alls.
+
+To **fit** a pattern `q` to a type `B`, in a binding or in the parameter group of a group with one branch and no guard: if `q` is a catch-all, its names get `B`. If not, `B <: Q`, where `Q` is the pattern type of `q`, and the parts of `q` are fitted to the parts of `Q` given below. A constructor pattern `C(…)` with pattern type `Q` needs only `B <: Q | r - Q`, with a new type variable `r`: it may fail, and when the known type of the value is disjoint from `Q` the compiler warns that it can never match. Fitting never adds `Assert` by itself; rule 4 and rule 10 do. In any other group, rules 11 and 12 take the place of fitting.
+
+Only a fitted group may have alternatives `q1 | … | qn` in a parameter item. If one alternative is a catch-all, the names get `B`. If not, `B <: Q1 | … | Qn`, where `Qi` is the pattern type of `qi`, and alternatives with the same type constructor use the same new type variables. The parts of each `qi` are fitted to the parts of its `Qi`, and a name gets the union of its types in the alternatives (§7.2). In alternatives, `x: T` is a test, not a type annotation (§7.1), so `T` may not have a type variable as a member. The alternatives may fail for `B` when together they do not match every value of `B` (§7.3); then `Assert` is in the need of the function (rule 4).
+
+The **pattern type** of a pattern that is not a catch-all, and its parts, are:
+
+- A literal of `Int` or `String`, also `-` and an integer literal: in a group typed by rule 11, its literal type (§4.2); where it is fitted, `Int` or `String`, so that every value of that type may come there and the pattern may fail (§7.3). At a place whose type is shared with another place, or inside one, also `Int` or `String`: an item of a list pattern, because all the items of a list have one type, and a key of a constructor whose written data has a type parameter that occurs more than once in it (counting through names), as both parts of `Twin(A) = (A, A)`, and the parts of the data of `W(A) = ((A, A))`. A literal type at one such place would be a type for all of them. So when that type is not written and does not come from the subject, a group that matches those places only with literals is not covered (§7.4): `(xs) { xs |> ([]) { 0 } | (["a", ..]) { 1 } | (["b", ..]) { 2 } }` gives `xs` the type `List(String)`, and the error names a value such as `[""]`. With `(xs: List("a" | "b"))` written, the same chain is covered. A float literal: `Float`.
+- `C(…)`: `C(b1, …, bm)`, the labelled type `C` with a new type variable for each type parameter. The part for each item is the part of its data type at that item's key, with these variables.
+- A data pattern: the data type of its shape, with a new type variable at each key. The part for each item is the variable at its key; a rest `..r` gets the data type of the remaining keys.
+- `[p1, …, pn]` and `[p1, …, pn, ..r]`: `List(b)`, with a new type variable. The part for each `pi` is `b`, and `r` gets `List(b)`.
+- `"lit" <> r`, `r <> "lit"`, and `"a" <> r <> "b"`: `String`, and `r` gets `String`.
+- A bit array pattern: `BitArray`. The parts get the types of their formats (§8.2). A literal value in a segment also has the type of its format, not its literal type.
+- A conjunction `p1 = … = pk`: the intersection of the pattern types of its parts that are not catch-alls, and each name part gets that type.
+- `x: T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
+
+A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or branch narrowing do not refine this shape. Thus `((a = Int, b = String) = d) { q: a = d.a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s: String`, `x`'s inferred type is `String` even though its known type is `"a"`; an annotation naming `x` uses `String`.
+
+The parts of data are covariant in the hidden-input and whole-literal operations below; invariant arguments inside them still count in both directions. An item written in a data literal gets the matching expected part, when guaranteed. The base of a spread gets no expected type.
+
+The **known type** `K(e)` of an expression is found from the parts of the expression, left to right, and from the expected type of its place (below). Where no case below gives it, `e` has no known type.
+
+- A data literal has the data of the known types of its items, with `_` for an item that has none; a spread contributes the known parts of its base.
+- A literal, also `-` and an integer literal, also inside groups, has its type (§6.3), and a bit array has `BitArray`. A list has `List` of the union of the known types of its parts when they all have one, and `List(_)` when not. So `[]` has `List(Never)`.
+- An operator expression has the result type of §6.9; `a |> f(…)` is the call `f(a, …)`.
+- A match `e |> C` has the union of the known types of its branch bodies when they all have one.
+- The names of a parameter group get known types as names in patterns (below), but the argument data has no known type. So `x: T` gives `x` the type `T`, and a parameter with no type has no known type. A name of a service pattern `x: T` has `T`.
+- A built-in name, an imported name, and a member `m.x` of an imported module have their type scheme. So does the name of a generalized binding (§4.7), local or top-level, where it is used outside its own value and outside its group. A type variable in such a scheme that is not generalized is replaced by the matching part of the known type of the binding's value, or by `_`. A constructor has its function type, or its type when it is a value.
+- A function expression has the type made from: for its parameter data, the shape of its parameter group, with the type written at the top of each item (as in `x: T`), or else the type it gets from an expected type (below), or else `_`; and for the result, the written `->` part, or else the known type of its body, or else `_`. A chain literal has, for each shape group, a known function type made in the same way, with the union of the known types of its branch bodies as the result when they all have one; a chain with several groups has the known multi-shape type `{ D1 | … | Dn } <- N -> R` of §6.12. When the parameter of a group has a known type `B`, from a written type or from an expected type, every parameter pattern of the group is a pattern fitted to a value with the known type `B`, as in a match (below), and the narrowing of rule 12 is used in the same way. So with `opts: List(Option(User))`, `list.map(opts, (Some(u)) { u.name } | (None) { "" })` is correct.
+- A name used inside the value of its own binding, and a top-level name of the same group, get their known types only from what is written, because their values are not yet known there: from `x: T` at the top of the binding's pattern when it is there, or else from what is written in the value, with `_` for the rest. So a function that uses its own result in `.f` or `.k` needs a written `->` part. Every other name bound by a pattern gets its known type as below.
+- A known type may have `_` in it, for a part that is not known. A part that is `_` has no known type, but the rest of the type is still known. So the shape of a function is known even when its types are not.
+- A call `f(d)`, also when written with `|>`, has a known type when `f` has a known function type, and every type variable of its result gets a type when its parameter type is matched with the known type of the argument data (below). Then it has the result type with those types put in. A constructor with data is a call.
+- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a data type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the parts at each key, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(a | Nil)` with `(User | Nil)` gives `a` the type `User`.
+- **Expected types.** An expression may have an **expected type** from its place, as in TypeScript:
+  - An item of the argument data of a call (also with `|>`) whose callee has a known function type has the type of the parameter data at that key. Its type variables are put in when matching the parameter type with the known types of the items before it fixes them. Function expressions that have a parameter with no written type, and names with a selection table of more than one branch, are left out of this matching, and come last: their expected types use all the other items. A function given as an argument may give values to the called function that the other arguments do not show: as its result, as the argument of a function it is given (a parameter of a parameter), or to a service of its need. A service in the called function's own need gives it values that come from the caller's provide. And a function that the called function gives back may get values from a later caller. Walk the type of the called function, also its own need: its parameter is given to it, its result is given by it, and every type variable in its own need is given to it, and the direction turns at each parameter of a function type and at each contravariant argument of a constructor; an argument of a constructor that is invariant or bivariant, and a need, count as both directions. A type variable at a place given to the called function, other than a place in the parameter reached from its top only through parts of data and covariant arguments of constructors (the argument shows the values there), is matched as usual, and then its type is made whole, both in the expected type of every item and in the known type of the call: every `Int` and `String` member, also in a part of data or an argument of a constructor, or in the result of a function type, has all its values, `Never` there is `_`, and every other part that is not covariant (a parameter of a function type, an argument of a constructor that is not covariant, a need) is `_`. So in `list.fold(xs, 0, (n, x) { … })`, `n` has the known type `Int`, not `0`; with `(0, 0)` as the start, `(Int, Int)`; with `[]` as the start, `List(_)`. With `loop: <S>(S, (S, (S) -> Nil) -> Nil) -> Nil`, in `loop(0, (n, again) { … })`, `n` has the known type `Int`. With `make: <S>(S) -> ((S) -> S) -> S`, `make(0)` has the known type `((Int) -> Int) -> Int`. With `cur: <S>(S) <- (State(S)) -> S`, `cur(0)` has the known type `Int`, so `cur(0) == 5` is correct.
+  - The value of a binding whose pattern has `x: T` at its top has `T`. The body of a function with a written `->` part has that type.
+  - The last expression of a block has the expected type of the block, and every branch body of a match has the expected type of the match. A part of data or of a list has the matching part of the expected type, when that type has one member, data of that shape or a list.
+  - When a function expression has an expected type with one member, a function type whose parameter type has a member of the function's shape, every item of its parameter group with no type written at its top is fitted to the matching part of that member, as for names in patterns below. This only gives known types. So `list.map(users, (u) { u.name })` is correct when `users` has a known type.
+  - In a match `s |> (p) { e }` whose chain has one branch with no guard and no alternatives, when `p` has `x: T` at its top, `s` has the expected type `T`, as the value of a binding `x: T = s` does.
+  - A name with a selection table used other than as a callee, at a place whose expected type has exactly one member, a function type with parameter part `P`, has the type of the branches selected for each member of `P` whose shape it has (§6.12). So in `list.map([1, 2], show)`, the expected type of `show` is `(Int) -> B`, and the result is selected by it.
+- `v.f` and `v.k` have the part type of rule 13, when it has no type variable that is not put in.
+- A block has the known type of its last expression.
+- In a match `e |> C`, every parameter pattern of the one-position group of `C` is a pattern fitted to a value with the known type of `e` (below), also when the group has one branch and no guard. So with `opt: Option(User)`, `opt |> (Some(u)) { u.name }` is correct, as `Some(u) = opt` followed by `u.name` is.
+- **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`); if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in; the binder `r` of a string prefix, suffix, or combined pattern has the known type `String`, all its values, because the known type of the whole value says nothing about its remaining part. A name part of a conjunction gets that member. The name `x` of `x: T` gets `T`, whatever the value.
+
+So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(User)`, `opt |> (Some(u)) { u.name } | (None) { "" }` is correct.
+
+## 5. Names and scope
+
+- Built-in names (§12) may be used in every module. Imported names and top-level names may cover them.
+- A top-level name may be used anywhere in its module (§2.5).
+- A local name may be used from the next statement to the end of its block. When the value of its binding is a direct value, it may also be used inside the function bodies in that value (§6.10). The names of a parameter group, and of a service pattern, may be used in the guard and the body of their branch. `( )` makes no scope: the items of data are worked out in the scope around it, and a label is not a name.
+- A type parameter of a function (§4.7) may be used in that function, or in the rest of that function type. A type parameter of a type definition may be used in that definition (§4.3). An alias pattern has no type parameters; its binders are types of the module.
+- A local name may cover an outer name with the same name, and an earlier binding in the same block.
+- A `discard` makes no name.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 ## 6. Expressions
 
 ### 6.1 Grammar
@@ -1183,6 +1754,262 @@ All records count as one type constructor for coverage.
 
 When a pattern `x = C(…)` matches, `x` is known to be made by `C` where `x` may be used. When a clause pattern `C(…)` of the match `v |> { … }` matches the value of the name `v`, and the match has no clauses, more than one clause, or a guard (§4.8 rule 11), `v` is known to be made by `C` inside that clause. A match with one clause and no guard gives only what the binding of its pattern to `v` gives (§6.12). This is used by §6.7.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+## 6. Expressions
+
+### 6.1 Grammar
+
+```
+Expr      = Provide .
+Provide   = Pipe { "<-" Postfix } .
+Pipe      = Binary { "|>" Binary } .
+Binary    = Unary { BinOp Unary } .
+BinOp     = "||" | "&&" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "<." | "<=." | ">." | ">=."
+          | "<>" | "+" | "-" | "+." | "-." | "*" | "/" | "%" | "*." | "/." .
+Unary     = [ "-" | "-." ] Postfix .
+Postfix   = Primary { Call | "." name | "." decimal } .
+Call      = Data .
+Primary   = int_lit | float_lit | string_lit | Name | Data | List | BitArray | Block | Branches .
+Name      = [ name "." ] ( name | UpName ) .
+Data      = "(" [ DItem { "," DItem } [ "," ] ] ")" .
+DItem     = name "=" Expr | ".." Expr | Expr .
+List      = "[" [ Expr { "," Expr } [ "," ".." Expr ] [ "," ] ] "]" .
+Block     = "{" { Statement } Expr "}" .
+Statement = Binding | Expr .
+Binding   = Pattern "=" Expr .
+Branches  = Function { "|" Function } .
+Function  = [ TypeParams ] Params [ "<-" SvcPat ] [ "->" Union ] Block .
+Params    = "(" [ PItem { "," PItem } [ "," ] ] [ "?" Expr ] ")" .
+SvcPat    = "(" [ SvcItem { "," SvcItem } [ "," ] ] ")" .
+SvcItem   = name ":" NamedType | ".." name ":" UpName .
+```
+
+`TypeParams` and `Union` are the productions of §3; `PItem` is that of §7.1. Every rule below decides by tokens and brackets, never by names or types, and none needs a comma.
+
+- **Function or data.** A `(` that begins a primary is the `Params` of a function when its matching `)` is followed by `->`, or by `{` on the same line, or by `<-` and a bracket group whose matching `)` is followed on the same line by `->` or `{`; that group is then the service pattern. Otherwise the `(` begins `Data`, and a `<-` after the data is a provide (§9.2). A primary that begins with `<` is a function with type parameters, and its `>` must be followed by `(`. The decision is made before the contents of the brackets are read. Function bodies are always blocks.
+- **Calls.** A `Data` on the same line right after a postfix expression is a call (§1.7). So `f(x) { … }` is a call and then a block.
+- **Items.** In `Data`, a data type, a data pattern and `Params`, an item whose first two tokens are a `name` and `=` is a labelled item. `==` is one token, so `(a == b)` has one position. `..` begins a spread or a rest.
+- **Branches.** After the `}` of a function body, a `|`, also at the start of the next line, joins the next branch, which must begin a function (`(`, or the `<` of type parameters); anything else after it is a compile error. A `|` after any other expression is a compile error. A call, `.f` or `.k` after a chain applies to the whole chain.
+- **The `->` part.** In the `->` part of a function, a `{` right after `->`, `|`, `&` or `-` is part of the type (§3); the first other `{` not inside brackets is the body.
+- **Statements.** A statement reads pattern parts while each is followed by `=`. If at least one is, the statement is a binding: the parts read form its pattern, and its value begins at the first part not followed by `=`. Otherwise the statement is an expression. A lowercase name followed by `(` is never a pattern part (§7.1), so `id(A) = …` is an expression followed by a stray `=`, a compile error.
+- **Guards.** `?` inside `Params` begins the guard, after the last item, and the guard ends at the matching `)`. A `?` in any other pattern is a compile error.
+
+### 6.2 Order of evaluation
+
+i is strict. Expressions are worked out from left to right:
+
+- The items of data, lists and bit arrays are worked out in the order written; a spread `..e` is worked out where it is written. The order of keys never changes this order.
+- In a call, first the function, then the items of the argument data in the order written, then the call.
+- In a binary operation, first the left side, then the right side. `&&` and `||` do not do the right side when the left side is enough.
+- `a |> f(b)` does `a` first, and then the rest in the order of `f(a, b)`.
+- In `e <- s`, `s` is worked out first, in the services around it, and then `e` with the services provided (§9.2).
+
+### 6.3 Literals and names
+
+The type of an integer literal is its literal type (§4.2): `1` has the type `1`. When the operand of `-` is an integer literal, also inside groups, the result has the literal type of the negative number: `-1` and `-{1}` have the type `-1`. Every other `-e` has the type `Int`, as `-x` and `-{-1}`. The type of a string literal is its literal type: `"a"` has the type `"a"`. The type of a float literal is `Float`. The value of a name is the value it is bound to. A member of a module is `module.name`, or an imported name (§2.3). A constructor whose data is `()` is a value; any other constructor is a function from its data (§6.7).
+
+### 6.4 Data
+
+`( … )` in an expression makes data (§4.1). Its items are `e`, the next position, counting from 0; `name = e`, a label; and `..e`, a spread. The type of the data is the data type with the type of each item at its key. Positions come before labels, and a label may not be given twice.
+
+- A spread `..e` needs a known type of `e` (§4.8) with exactly one member, which is a data type, or a labelled type whose constructor may be used here (§2.4). Its positions come next in the numbering, and its labels are added. A labelled item written after a spread may replace a label of that spread; any other repeated key is a compile error.
+- `( )` is not a scope: the items are worked out in the scope around the data, in the order written, and a label makes no name. So `(w = h, h = w)` swaps the outer `w` and `h`.
+- `()` is the empty data. `(e)` is data with one position; it is not `e`. `{ e }` puts an expression in a group (§6.10).
+- `d.k`, where `k` is a decimal, reads position `k`; `d.f` reads the label `f` (§4.8 rule 13).
+
+### 6.5 Lists
+
+The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T` may be a union: `[1, "a"]` has the type `List(1 | "a")`, and may be used where a `List(Int | String)` is needed. `[e1, …, en, ..rest]` puts the parts in front of the list `rest`.
+
+### 6.6 Calls
+
+`f(…)` calls the function `f` with the data in the brackets. Every function is called in this way, whatever expression gives it. The data must have a shape that `f` takes (§4.6). There are no labels outside data and no default parameters: every key is given exactly once, by the data. `f()` passes `()`, and `f(x)` passes the one-position data `(x)`.
+
+### 6.7 Constructors and keys
+
+`C(…)` makes a value of the labelled type `C` (§4.3). It is a call of the constructor with the data in the brackets, which must be in the data type of `C`. `C` alone is the value of a labelled type whose data is `()`; `C()` is a compile error. `C(..v, label = e)` is an ordinary call whose data has a spread.
+
+`v.f` and `v.k` read a key of data, or of the data of a labelled value. Every member of the known type of `v` (§4.8) must have that key, and its type is the union of those parts (§4.8 rule 13). With no known type it is a compile error. Reading a key of a labelled value, and spreading it, needs the same visibility as taking it apart with a constructor pattern (§2.4).
+
+### 6.8 Functions
+
+`<A, N>(p1, …) <- (x: T, …) -> R { body }` is a function value. Every part but the parameter group and the body may be left out.
+
+- The **parameter group** `( … )` is a data pattern (§6.11). Its shape is the shape of the function.
+- The **service pattern** after `<-` names the services that the function itself uses: each item `x: T` binds `x` to the service whose key is the named type `T` (§9.2), and the type is required. `..env: N` binds the whole set of services that the function receives, as one value of the row type `N`; it is the last item, at most once, and `N` must be a type parameter of the function. A service pattern has no labels, no guard and no alternatives, and is not part of the shape. `<- ()` is a compile error: a function that takes no service writes no `<-` part.
+- The **`->` part** is the type of the value the function gives. When it is left out, the value is inferred.
+- **Type parameters** `<A, N>` are in scope in the whole function (§4.7).
+- The function may use local names from outside. The body is a block, and the value of the block is the value that the function gives back. The need of the function is inferred (§4.8 rule 4), also when the `->` part is written.
+
+### 6.9 Operators
+
+Operators are part of the syntax. They are not functions, and they may not be used as values. They are in this order, from weakest to strongest. Operators at the same level go from left to right.
+
+| Level | Operators | Operand type | Result type |
+|---|---|---|---|
+| 0 | `<-` | See below | |
+| 1 | `\|>` | See below | |
+| 2 | `\|\|` | Bool | Bool |
+| 3 | `&&` | Bool | Bool |
+| 4 | `==` `!=` | Any two types; see below | Bool |
+| 5 | `<` `<=` `>` `>=` | Int | Bool |
+| 5 | `<.` `<=.` `>.` `>=.` | Float | Bool |
+| 6 | `<>` | String | String |
+| 7 | `+` `-` | Int | Int |
+| 7 | `+.` `-.` | Float | Float |
+| 8 | `*` `/` `%` | Int | Int |
+| 8 | `*.` `/.` | Float | Float |
+
+The operators take values of literal types, because these are subtypes of `Int` and `String`. Their results have the whole type: `1 + 2` has the type `Int`, not `3`, and `"a" <> "b"` has the type `String`. The one exception is `-` on an integer literal, also inside groups, which has a literal type (§6.3): `-1` and `-{1}` have the type `-1`, but `-x` has the type `Int`.
+
+The unary operators `-` (Int) and `-.` (Float) are stronger than all binary operators. Calls, `.f`, and `.k` are stronger still. There is no operator for "not"; the function `core.not` (§13) does this.
+
+- Int and Float have different operators. One is never changed into the other without a function such as `core.to_float` (§13).
+- `a |> f` is `f(a)`, passing the one-position data `(a)`. `a |> f(b, port = 1)` is `f(a, b, port = 1)`: `a` is put in as position 0. `a |> f(..t)` is `f(a, ..t)`. The right side of `|>` must be a name, a call, or a chain (§6.12); anything else is a compile error that suggests a group. `|>` is weaker than every operator but `<-`, so its whole left side is its left operand: `a == b |> f` is `{ a == b } |> f`, and `x |> g == 2` is a compile error.
+- `e |> C`, where `C` is a chain, is a match (§6.12).
+- `e <- s` works out `e` with the services `s` provided (§9.2). Its left operand is the whole expression to its left, and its right operand is one postfix expression: `a + f(x) <- (s)` provides to `a + f(x)`, `x |> g <- (s)` provides to `x |> g`, and `e <- (s) + 1` is a compile error. A group provides to a part: `a + { f(x) <- (s) }`.
+- When both sides of `==` or `!=` have known types (§4.8), and these are disjoint (§4.5 rule 3), the compiler gives warning W0503, showing both types: the two sides can never be equal. The comparison is well defined and has type `Bool`: `==` is always `False` and `!=` is always `True`. A member of a known type that is `_` or a type variable is never disjoint from anything. Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s: String) { s == 1 }` give the warning, but `(s: String) { s == "a" }`, `(m: "a" | "b") { m == "b" }`, `x == Nil` with `x: Int | Nil`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` do not. Only the top members of the two types are compared (§4.5 rule 3), so `(1, 2) == (3, 4)` and `Some(1) == Some(2)` give no warning, though they are always `False`. Literal types are not widened. The warning adds no narrowing fact. A guard `? x == 2` with `x: 1` is always false; coverage treats it as any guard (§7.4). What `==` does is in §11.4.
+
+### 6.10 Blocks and bindings
+
+The statements of a block are done in order. The value of a block is the value of its last expression. The last statement may not be a binding. A block with only one expression puts it in a group: `{ a + b } * c`. A block is the only thing that makes a scope.
+
+An expression statement that is not the last, and whose working out can do nothing but make its value, gives a compile warning: its value is not used. These are literals, names, functions, chains, and data, lists, constructor calls, `.f`, `.k`, `-`, and Int, Bool, String, and comparison operators made only of these. A call, `|>`, a provide, a block, a bit array, and a Float operator, which may stop (§11.3), do not give the warning. So `assert 1 + 1 == 3`, which is the two statements `assert` and `1 + 1 == 3` (§1.7), gives two warnings.
+
+`p = e` is a binding. It works out `e` and matches it with the pattern `p`. The names in `p` may be used from the next statement. `e` is a whole expression, so `u = find_user(id) <- (db)` binds the result of the provide.
+
+- The type of `e` must be a subtype of the pattern type of `p` (§4.8 rule 10). So `x: Int = e` says that `e` has the type `Int`, and `(a, b) = v` with `v: (Int, Int) | Nil` is a compile error; a match is used for this.
+- If `p` can not fail for the type of `e` (§7.3), the binding needs no service.
+- If not, as in `Ok(v) = r`, when it runs, the binding works like the match `e |> (p) { … } | (_) { a.fail(AssertionFailure(message = m)) }`, where the first branch goes on with the rest of the block. The binding is still typed by §4.8 rule 10, not by rule 11. Here `a` is the `Assert` service, and `m` is the text `pattern `, then the source text of `p`, then ` did not match `, then the text form (§11.8) of the value. So `Assert` is in the need of the binding (§9.6).
+- A pattern is a conjunction of parts, `p1 = … = pk`: `a = (x, y) = e` binds `e` to `a` and to `(x, y)`, and `a = b = c = d` binds `a`, `b` and `c` to `d`.
+
+A **direct value** is an expression that is made without running any code: a function expression or a chain; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`); a name; or data with no spread, a list, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one binding of data may make functions that call one another:
+
+```i future-SYN3
+fact = (0) { 1 } | (n: Int) { n * fact(n - 1) }
+
+(even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
+```
+
+### 6.11 Parameters
+
+A function's parameter group is a data pattern (§7). When the function is called, the argument data is matched with it as in a binding (§6.10), but its names are not generalized (§4.7): the names of the pattern may be used in the guard and the body, and a pattern that may fail reports to `Assert`.
+
+- An item `p` is a positional item; an item `label = p` matches the part under `label`. `(name: T)` is a positional item that binds `name`; labels are given only by `label = p`.
+- The parameter group has no rest `..` at its top: the shape of a function is fixed by its written group. Rest is allowed in nested data patterns.
+- `(port = 80)` in a parameter group says that the label `port` must have the value `80`; there are no default parameters. Optional parts are written as branches of different shapes (§6.12).
+- The names of one parameter group may not be bound twice, and its labels are distinct.
+- A group may end with a guard `? e` (§6.12).
+
+### 6.12 Branches and matching
+
+A **chain** `F1 | … | Fn` of function expressions, with `n ≥ 1`, is one function value. Each branch may write its own type parameters, which are in scope in that branch only. The branches are grouped by shape: a **shape group** has the branches whose parameter groups have one shape, in the order written. When the chain is called with data, the group with the shape of the data is used, and in it the first branch whose parameter group matches the data and whose guard, if it has one, is `True` is taken; the value of its body is the value of the call. A guard is any expression of type `Bool`. It is worked out only after its parameter group matched, and it may use the names of the group and of the service pattern. Alternatives in an item are tried in order.
+
+```i future-SYN3
+gcd = (a: Int, 0) -> Int { a } | (a: Int, b: Int) -> Int { gcd(b, a % b) }
+
+area = (r: Float) -> Float { 3.14159 *. r *. r } | (w: Float, h: Float) -> Float { w *. h }
+
+label = (opt) {
+  opt |> (Some(v) ? string.is_empty(v)) { "empty" }
+      | (Some(v)) { v }
+      | (None) { "none" }
+}
+```
+
+- A group with one branch and no guard is a function of one shape: its parameter group is fitted (§4.8), `x: T` in it is a type annotation unless its item has alternatives, it is not checked for coverage, and when it may fail it reports to `Assert`.
+- Any other group is typed by §4.8 rule 11, and its branches must cover every value of its parameter type (§7.4). If not, it is a compile error. A guarded branch is not counted for coverage.
+- A chain whose groups all have one shape has the type `(B) <- N -> R`, where `R` is the union of its branch results. A chain with several groups has the type `{ B1 | … | Bm } <- N -> R`, where `Bi` is the parameter type of group `i` and `R` the union of the results of all branches. All branches of a chain share one need `N`, the merge of the needs of their guards and bodies and of their service patterns. Calling such a value with data of shape `S` uses the group of shape `S`, at run time also when the value went through data, a list or another function.
+- `e |> C`, where `C` is a chain, is a **match**, and `e` is its **subject**. It works out `e` and calls `C` with `(e)`, so it uses the group of shape "one position". A match adds no call frame: the branches run in the place of the match, a call in a branch body of a match in tail position is in tail position (§11.6), and the match is not one of the calls in a stop message (§11.7). Branches of other shapes in a matched chain can never run. To match a pair, write a pattern for it in one position: `p |> ((0, y)) { y } | ((x, _)) { x }`.
+- A branch that can never be used gives a compile warning.
+- A chain is a direct value (§6.10), as every function is. Where §2.5, §5, and §6.10 speak of the function bodies in a value, the guards and branch bodies of a chain count as function bodies. Each time a chain is worked out, it makes a new value, which is the same only as itself (§11.4).
+- `core.never : <A>(Never) -> A` (§13) is the match on `Never`: `core.never(x)` is correct only when `x` has no values.
+
+**Selection.** A binding whose pattern is one name with no written type, and whose value is a chain or a name of a binding with a selection table, after removing groups, has a **selection table**: the branches of that chain, each with its shape, its written parameter pattern, its parameter type and its result type. A chain bound with a written type, put in data or a list, or passed as an argument, has no table. A call `f(d)`, `x |> f` or `x |> f(…)` of a name `f` with a table is typed by the branches it **selects**:
+
+1. The shape of the argument data is read from the call: its positions and labels, and the keys of each spread, which need a known shape. No group of that shape is a compile error that lists the shapes `f` has.
+2. In that group, a branch is skipped when, at some key, the known type of that item of the data is disjoint (§4.5 rule 3) from the branch's pattern type at that key less what earlier unguarded branches of the group take there (§4.8 rule 12, applied at every place). An item with no known type is never disjoint from anything. Every branch that is not skipped is selected. When none is selected, it is a compile error that names the known types of the items.
+3. The call is typed as a call of the function type whose parameter is the union of the parameter types of the selected branches and whose result is the union of their results.
+
+So with `show = (n: Int) -> String { int.to_string(n) } | (s: String) -> Int { string.length(s) }`, `show(1)` has the type `String`, `show(x)` with `x: Int | String` has the type `String | Int`, and `h = (x) { show(x) }` gives `h` the type `(Int | String) -> String | Int`. A name used where a function type is expected selects for that type (§4.8), so `list.map([1, 2], show)` is a `List(String)`. Selection chooses only a type; at run time the first matching branch is always taken.
+
+## 7. Patterns
+
+### 7.1 Grammar
+
+```
+Pattern   = Part { "=" Part } .
+Part      = Atom | StringPat .
+StringPat = string_lit "<>" Binder [ "<>" string_lit ] | Binder "<>" string_lit .
+Binder    = name | discard .
+Atom      = name | discard | ( name | discard ) ":" Type
+          | [ "-" ] int_lit | [ "-." ] float_lit | string_lit
+          | Name [ DataPat ]
+          | DataPat
+          | "[" [ ListPats ] "]"
+          | BitArrayPattern .
+DataPat   = "(" [ DPItem { "," DPItem } [ "," ] ] ")" .
+DPItem    = name "=" Pattern | Pattern | Rest .
+PItem     = name "=" Choices | Choices .
+Choices   = Pattern { "|" Pattern } .
+ListPats  = Rest | Pattern { "," Pattern } [ "," [ Rest ] ] .
+Rest      = ".." [ name | discard ] .
+```
+
+- A `Name` in a pattern must be a constructor (an `UpName`, or `m.C`). Its data is matched by a data pattern `C(…)`, with every key of its data type or `..` at the end. `C` alone matches a labelled value whose data is `()`; `C()` is a compile error. A lowercase name followed by `(` is not a pattern.
+- A data pattern `( … )` matches data of its shape whose parts match its items. A positional item matches the next position, and `label = p` matches the part under `label`. A data pattern lists every key of its shape, or ends with `..`, which leaves out the other keys, or `..r`, which binds them as data: the remaining positions numbered again from 0 in order, and the remaining labels. `..` needs the shape of the matched value to be known, from a type or from the constructor. A positional item may not follow a labelled item.
+- A pattern is a conjunction `p1 = … = pk`: it matches what every part matches, and each part binds its names. Directly inside a data pattern or a parameter group, an item whose first two tokens are a `name` and `=` is a labelled item, never a conjunction. So to name a whole positional item, the name is written last: `((a, b) = args)`. `(size = whole = (w, h))` is the label `size`, whose part matches both `whole` and `(w, h)`. A positional item that is a conjunction of names starts with a discard: `(_ = x = y)`.
+- A labelled part of a constructor's data is matched only by its label: with `User = (name = String, age = Int)`, `User(name = n, age = a)` and `User(age = a, ..)` are correct, and `User(name, age)` is a shape error. There is no shorthand for `name = name`.
+- Alternatives `p1 | p2` are allowed only in the items of a parameter group (§6.11). Every alternative binds the same names, and a name gets the union of its types. `|` is looser than `=`.
+- The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a parameter item, a type ends at `,`, `?` or `)`. A `|` after a type is part of the type, so a type test is written after the other alternatives: `(True | _: Int)`. The type is read with no going back. In `(x: Int | y)`, `Int | y` is a type, and `y` is a value type (§3).
+
+`x: T` is one thing in every place where it may be written (in a bit array segment, `:` begins a format instead, §8.1). It matches the values of the type `T`, and `x` gets the type `T`. In a binding, and in a parameter item that is fitted (§4.8) and has no alternatives, every value that comes there is in `T` (§4.8 rules 4 and 10), so `x: Int = e` and `(x: Int) { … }` are type annotations. In a group typed by §4.8 rule 11, and in alternatives, `x: T` tests the value. At run time, a member of `T` is tested by its type constructor; a member of `Int` or `String` whose value set is not all the values is also tested by equality (§11.4) with the values in it. So `x: "a" | "b"` takes the strings `"a"` and `"b"`, and `x: String - "a"` takes every other string, but no Int. So in a test, `T` may not have a type variable as a member. Opaque types cannot be told apart at run time, so for a type test they all count as one type constructor, as all function types do.
+
+### 7.2 What patterns match
+
+| Pattern | Matches | Names |
+|---|---|---|
+| `x` | Any value | `x` |
+| A discard | Any value | None |
+| A literal, or `-` or `-.` and a literal | An equal value (§11.4) | None |
+| `C`, `C(…)` | A value made by `C` whose data matches the data pattern | Those of the items |
+| A data pattern | Data of its shape, or of a shape with more keys when it ends with `..`, whose parts match the items | Those of the items, and the rest |
+| `[p1, …, pn]` | A list of exactly n parts that match | Those of the parts |
+| `[p1, …, pn, ..r]` | A list of n or more parts; `r` is the rest | Those of the parts, and `r` |
+| `"lit" <> r` | A string that starts with `"lit"`; `r` is the rest | `r` |
+| `r <> "lit"` | A string that ends with `"lit"`; `r` is the start | `r` |
+| `"a" <> r <> "b"` | A string with that prefix and suffix, without overlap; `r` is the middle | `r` |
+| `p1 = … = pk` | What every part matches | Those of every part |
+| `x: T` | A value whose type constructor is that of a member of `T`; for a member of `Int` or `String`, the value must also be in the value set of the member | `x` |
+| `<< … >>` | See §8 | |
+
+- A string pattern has exactly one binder (or discard), whose inferred and known type is `String` (§4.8). Its literals have no interpolation. `a <> "x" <> b` is a compile error. Prefix and suffix must not overlap: `"ab" <> r <> "ba"` does not match `"aba"`.
+- A pattern may not bind one name two times.
+
+### 7.3 Patterns that may fail
+
+A pattern **can not fail** for a type `T` when it matches every value of `T`. Other patterns **may fail**. A catch-all can not fail for any type, and `x: U` can not fail for a type `T` with `T <: U`, so `id = <A>(x: A) -> A { x }` needs no `Assert`. A value of a type variable may be any value, so a pattern that tests more than its type, such as a literal or a constructor, may fail for it.
+
+A literal pattern can not fail for its literal type, so `"a" = x` with `x: "a"` needs no `Assert`. Where a pattern is fitted (§4.8), a literal has the whole `Int` or `String`, so `"a" = s` with `s: String` is correct and may fail: it reports to `Assert`. A constructor pattern fitted to a union, as `Ok(v) = r` with `r: Ok(Int) | Error(String)`, is correct and may fail. Whether a pattern may fail is decided with every value that may come, also when the value is a direct value of the same group (§6.10), whose values are known only when the whole group is checked: in `pair = ("b", () { ("a", _) = pair  1 })`, the binding may fail, and the function reports to `Assert`. The same holds for a match whose chain has one branch and no guard.
+
+### 7.4 Covering every value
+
+The branches of a shape group whose parameter has the type `A` **cover** `A` when, for every value of `A`, some branch without a guard has a parameter group that matches it. A branch with a guard is not counted. A branch is **never used** when every value that its pattern matches is matched by an earlier branch without a guard.
+
+A literal pattern matches its own value, and string prefix/suffix patterns match the strings with their fixed ends. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m: "GET" | "POST"`, `m |> ("GET") { 1 } | ("POST") { 2 }` is covered. Literal patterns alone never cover a member with all its values, or with all but a finite set; a catch-all, a type test such as `x: String - "a"`, or, for `String`, the patterns `"" <> r` and `r <> ""`, which match every string, must take the other values. A literal in an item of a list pattern, or at a key of a constructor whose type parameter occurs more than once in its data (`Twin(A) = (A, A)`), has the whole `Int` or `String` (§4.8), so such literals cover a finite set only when that type is written or comes from the subject: `(xs: List("a" | "b")) { xs |> ([]) { 0 } | (["a", ..]) { 1 } | (["b", ..]) { 2 } }` is covered, and the same chain with `(xs)` is not. Literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered. Data of one shape is one type constructor.
+
+When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the group already says so (§4.8 rule 11: `(n: Int) { n |> (0) { "zero" } | (1) { "one" } }` needs `Int <: 0 | 1`). In a match whose subject already has such a type, that is reported as this error alone, with a value that no branch matches, such as `2`. A chain that is not the right side of a match gets these values later, through its parameter, so there it is a type error where the values come and also this error (§4.8 rule 11). When a value that is not covered is at a list item place, or at such a key, where the branches have only literals, the message also says to write that type, such as `List("a" | "b")` or `Twin("a" | "b")`.
+
+Only a group with more than one branch or with a guard must cover the type of its parameter (§6.12). A group with one branch and no guard is not checked for coverage: when its pattern may fail, it reports to `Assert`.
+
+### 7.5 Known constructors
+
+When a conjunction with a name part `x` and a part `C(…)` matches, `x` is known to be made by `C` where `x` may be used. When a branch pattern `C(…)` of the match `v |> C1 | …` matches the value of the name `v`, and its group has more than one branch or a guard (§4.8 rule 11), `v` is known to be made by `C` inside that branch. A match with one branch and no guard gives only what the binding of its pattern to `v` gives (§6.12). This is used by §6.7.
+
+<!-- /syn3-new -->
+
 ## 8. Bit arrays
 
 ### 8.1 Grammar
@@ -1237,6 +2064,8 @@ A bit array pattern matches the segments in order from the start. It matches onl
 - A string format in a pattern needs a string literal, which gives the bits to match. A `_codepoint` format matches one correctly encoded codepoint.
 - A length may use names bound by earlier segments of the same pattern.
 - If there are not enough bits, the pattern does not match. The program does not stop.
+
+<!-- syn3-old -->
 
 ## 9. Effects
 
@@ -1502,6 +2331,286 @@ The first four have public constructors for ordinary fakes. Process keeps privat
 `i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`. UDP datagrams are part of `i/net`: `bind(address, port)` returns a private nominal `Datagram` over Int, `send_to(socket, address, port, bytes)` sends one datagram, and `receive_from(socket, max_bytes)` returns `(data: BitArray, address: String, port: Int)` with the numeric sender address and port. `local_address(socket)` and `local_port(socket)` return the bound numeric address and port; `close_datagram(socket)` closes it. Bind accepts IPv4, IPv6 and host names; port 0 asks the OS to choose a port. Send accepts a numeric address or host name and port 1..65535; addresses are resolved and tried in system order as for TCP. Receive requires a positive bound, capped at 65536 bytes; it consumes exactly one datagram and discards any excess bytes. An empty datagram is data, not EOF. Sends require whole bytes and are atomic; expected host failures give `NetError` values through the ordinary error axis. UDP provides no delivery or ordering guarantee.
 
 Datagrams follow TCP's resource identity, owner, creation guard, teardown and lease rules (native N9). One send and one receive may overlap; a second operation in the same direction gives `busy`. Close is idempotent and error-free and wakes a blocked receive with `closed` unless its answer already committed. Scope cancellation cancels an owned blocked receive and releases its lease, leaving the socket usable until close or entry teardown. The Rust host uses tokio and Node uses `node:dgram`; browser and WASI have no Net provider and compilation fails naming `i/net.Net`. No automatic unsupported provider is installed.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+## 9. Effects
+
+i has no special effect definitions. Effects are made from normal things: functions with no parameters (§9.1), services (§9.2), errors as the service `Fail` (§9.3), and the control operations of `i/control` (§9.4). There is no error channel, no implicit capability and no layer concept.
+
+### 9.1 Computations
+
+A function with no parameters, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
+
+```i future-SYN3
+retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) <- (..N, Fail(E)) -> A {
+  fail.catch(body) |> (Ok(value)) { value }
+    | (Error(error) ? times > 1) { retry(times - 1, body) }
+    | (Error(error)) { fail.raise(error) }
+}
+
+user = () { retry(3, () { load_user("1") }) }
+```
+
+### 9.2 Services
+
+A **service** is an ordinary value of a labelled type (§4.3), normally one whose data holds functions. Two services of one form are made by defining two types. A service is a normal value: it may be stored and given to functions, and code that has it may call its functions directly.
+
+The **need** `N` of a function type `(P) <- N -> R` is the set of services that a call takes from the place where it is called. Every item of a need, of a service pattern and of provided data is **keyed** by the type constructor of its type: order does not count, and there are no names or labels. `<- (Db, Log)` is the same type as `<- (Log, Db)`. Needs are shown in the UTF-8 byte order of the qualified names of their type constructors, then the row variable. Only after `<-` is anything keyed by type; ordinary data keeps positions and labels.
+
+```i future-SYN3
+Clock = (now = () -> Int)
+
+elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
+// elapsed : (Int) <- (Clock) -> Int
+
+fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
+// fixed : () -> Int
+```
+
+- **Taking.** The service pattern of a function head (§6.8) names the services that the function uses itself: `x: T` binds `x` to the service keyed by `T`. A need that a head does not write still passes down: a function that calls `elapsed` needs `Clock` too, and inference writes it into its type.
+- **Calls.** The services go with every call: a called function gets the services of the place of the call. Nothing marks such a call. So a function made in one place and called in another gets its services from the place where it is called.
+- **Providing.** `e <- s` works out `e` with the services of the place plus the data `s` (§6.9), for any expression `e`; `s` is worked out first, with the services of the place. For a key that `s` has, `s` wins; the other keys come from outside. `f(x) <- (s)` provides to one call, and `{ … } <- (s)` to every statement and the result of a block. Provided data is a data literal whose items are expressions or spreads, with no labels, or any postfix expression whose type is a data type with positions only or a row type (§9.4). An explicit item wins over an item from a spread with the same key; two explicit items, or two spreads, with one key are a compile error. A provided item is keyed by its known type (§4.8), which must be one named service type: not a union, a type variable, or unknown. A provided key that the need does not have gives a warning.
+- **Merging.** When a need has one type constructor twice, the two entries are merged, parameter by parameter, by the direction of the parameter (§4.5 rule 6): a parameter that goes in the other direction gives the union, as `Fail(A)` and `Fail(B)` give `Fail(A | B)`; one that goes in the same direction gives the intersection, and a compile error when that is `Never` while neither is; one that does not change must be equal, else it is a compile error. A provided value of type `P` satisfies the need entry `S` when `P <: S`, so a `Fail(A | B)` satisfies code that needs only `Fail(A)`. An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.
+- **Row variables.** A type parameter can stand for a whole need: `map : <A, B, N>(List(A), (A) <- N -> B) <- N -> List(B)`. In `(..N, C(…))`, `N` has no entry for `C`. A rigid row variable that reaches a provide of `C` without a stated `C` entry is a compile error.
+- **Branches.** All branches of a chain share one need (§6.12).
+- Type checking makes certain that every service is there when a call takes it. Getting it never fails at run time.
+
+`Await`, `Root` and `Owner` (§9.11), `Scheduler` and `Runner` (§9.9) are normal service values. Replacing a host service in i is a provide, as for any service. Replacing a random seed with `task.top` keeps the run route of the current `Runner`.
+
+A service value can be captured. Providing the service later changes calls that take it from their caller, not the captured value:
+
+```i future-SYN3
+Clock = (now = () -> Int)
+Reading = (read = () -> Int)
+make = () <- (clock: Clock) { Reading(read = () { clock.now() }) }
+now = () <- (clock: Clock) { clock.now() }
+example = () {
+  saved = make() <- (Clock(now = () { 1 }))
+  (saved.read(), now()) <- (Clock(now = () { 2 }))
+}
+// example() gives (1, 2).
+```
+
+**Layers.** There is no layer concept. A function that returns several services returns ordinary data, which may be provided whole or spread:
+
+```i future-SYN3
+base = () <- (io: Io) -> (Config, Log) {
+  (Config(url = "https://example.com"), Log(write = (s) { io.print(s) }))
+}
+live = () -> (Config, Log, Db) {
+  s = base()
+  d = db_layer() <- s
+  (..s, ..d)
+}
+main = () { app() <- live() }
+check = () { app() <- (..live(), fake_db) }
+```
+
+Here `live` has the type `() <- (Io) -> (Config, Log, Db)`, and in `check` the explicit `fake_db` wins over the `Db` of the spread. The order in which services are made is written by hand.
+
+### 9.3 Errors
+
+An error is raised through the prelude service `Fail(E)`:
+
+```i future-SYN3
+Fail(E) = (raise = (E) -> Never)
+```
+
+An error may be a value of any type. Needs merge by direction (§9.2), so a function that calls functions needing `Fail(A)` and `Fail(B)` needs `Fail(A | B)`. The module `i/fail` has these functions, written in i over `Fail` and `control.escape` (§9.4):
+
+| Function | Type | What it does |
+|---|---|---|
+| `fail.raise` | `<E>(E) <- (Fail(E)) -> Never` | Ends the computation with the error |
+| `fail.catch` | `<A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E)` | Changes every error of the body into `Error(…)` |
+| `fail.from_result` | `<A, E>(Result(A, E)) <- (Fail(E)) -> A` | Raises `x` for `Error(x)` |
+| `fail.map_error` | `<A, E, E2, N>(() <- (..N, Fail(E)) -> A, (E) <- N -> E2) <- (..N, Fail(E2)) -> A` | Changes the errors |
+
+```i future-SYN3
+raise = <E>(error: E) <- (handler: Fail(E)) -> Never { handler.raise(error) }
+
+catch = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
+  control.boundary((b) {
+    Ok(body() <- (Fail(raise = (e) { control.escape(b, Error(e)) })))
+  })
+}
+```
+
+Because `N` has no entry for `Fail`, `catch` takes every error of its body.
+
+```i future-SYN3
+load = (id) { parse_user(http_get(id)) }
+// load : (String) <- (Fail(HttpError | ParseError), Http) -> User
+
+safe = (id) {
+  fail.catch(() { load(id) }) |> (Ok(user)) { user }
+    | (Error(_: ParseError)) { default_user }
+    | (Error(other)) { fail.raise(other) }        // other: HttpError
+}
+// safe : (String) <- (Fail(HttpError), Http) -> User
+```
+
+- To handle only some errors, take all of them with `fail.catch`, then match with type tests. A later catch-all gets the rest of the union (§4.8 rule 12), which may be raised again, as in `safe` above.
+- An error goes out through the calls to the `catch` that provided its `Fail`. The computation that is jumped over is unwound first (§9.5).
+- A `Fail` value that is used after the `catch` that made it has ended, because it was returned, stored, or captured by a function that runs later, stops the program with the message `boundary not active` (§9.4). The compiler warns when a `Fail` bound in a service pattern is captured by a function value or put into data.
+- `Assert` is a separate service (§9.6), so `catch` does not take assertion failures.
+- At an entry, the platform provides a top-level `Fail` (§10.2): an error that reaches it from the program entry or a test stops the program or fails the test, and one that reaches it from a host export is given to the host.
+
+### 9.4 Control
+
+The module `i/control` pauses a computation and goes on with it later:
+
+| Function | Type |
+|---|---|
+| `control.boundary` | `<R, N>((Boundary(R, N)) <- N -> R) <- N -> R` |
+| `control.suspend` | `<A, R, N>(Boundary(R, N), (Continuation(A, R, N)) <- N -> R) -> A` |
+| `control.resume` | `<A, R, N>(Continuation(A, R, N), A) <- N -> R` |
+| `control.cancel` | `<A, R, N>(Continuation(A, R, N)) <- N -> Nil` |
+| `control.escape` | `<R, N>(Boundary(R, N), R) -> Never` |
+
+`Boundary` and `Continuation` are built-in types. Their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
+
+1. `boundary(body)` makes a boundary `b` and does `body(b)`. The value of `body` is the value of `boundary`. `b` is **active** while the computation between it and the running code is on the stack: from the start of `body` until `body` ends, but not while that part is paused in a continuation. After `resume`, it is active again.
+2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, with the services of that place, and its value is the value of `boundary`. If `b` is not active, the program stops.
+3. `resume(k, v)` goes on with the paused computation, with `v` as the value of `suspend`. It goes on on top of the place where `resume` is called, and the value that the computation has when it gets to the boundary is the value of `resume`. The paused part keeps the services provided inside it; for the rest, it gets the services of the place where `resume` is called. So an error raised after `resume` goes to the `Fail` of the place of `resume`, unless the paused part provided its own. The services that a function made by `keep` keeps (below) count, for the code inside that function, like services provided inside the paused part.
+4. `cancel(k)` unwinds the paused computation (§9.5) and gives `Nil`. While it unwinds, the boundary stays not active, and the final functions get the services as in rule 3, from the place where `cancel` is called; inside a function made by `keep`, they get the kept services.
+5. `escape(b, v)` ends the computation back to the boundary `b` at once, unwinding it (§9.5), and `v` is the value of `boundary`. It is `suspend(b, (k) { cancel(k)  v })` with no continuation made. If `b` is not active, the program stops with the message `boundary not active`.
+6. **One use only**: `resume` and `cancel` together may be used one time for a continuation. A second use stops the program.
+7. If a continuation is never resumed or cancelled, its final functions are not run.
+8. A boundary and a continuation stay on the worker that made them (§11.9). They are not portable.
+
+A structured task cancel resumes its scheduling continuation with a cancel answer; i code then cancels an inner continuation (§9.9). It does not change rule 4's rule that the boundary of the cancelled continuation is not active during unwinding.
+
+**Keeping services.** In a service pattern, `..env: N` binds the whole set of services that the function receives as one value of the row type `N` (§6.8). A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` makes a function that, wherever it is called, calls `f` with the services of the place where `keep` was called, but with the caller's `Fail`:
+
+```i future-SYN3
+keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
+  (x) { f(x) <- env }
+}
+```
+
+An error raised inside the kept function goes to the `catch` of its caller.
+
+Generators, async code, and schedulers are libraries made from services and these operations. For example, a generator:
+
+```i future-SYN3
+Yield(A) = (emit = (A) -> Nil)
+
+collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) <- N -> List(A) {
+  control.boundary((b) {
+    body() <- (Yield(emit = (x) { control.suspend(b, (k) { [x, ..control.resume(k, Nil)] }) }))
+    []
+  })
+}
+```
+
+### 9.5 Unwinding and final functions
+
+A computation that is dropped is first **unwound**: its final functions are run, from the innermost to the outermost. This takes place when an error or an `escape` goes through it (§9.3, §9.4), and when its continuation is cancelled (§9.4).
+
+The module `i/resource` puts final functions in place. `Scope` is a service of `i/resource`; the platform gives every entry one (§10.2).
+
+| Function | Type | What it does |
+|---|---|---|
+| `resource.ensure` | `<A, N>(() <- N -> A, () <- N -> Nil) <- N -> A` | Runs the second function after the first, whether the first ends normally, ends with an error, or is unwound |
+| `resource.acquire` | `<A, N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A` | Opens a resource and attaches its release to the current `Scope` |
+| `resource.scoped` | `<A, N>(() <- (..N, Scope) -> A) <- N -> A` | Runs the body with a new `Scope`, and runs the attached releases in reverse order when the body ends, also by an error, an escape or a cancel |
+
+A release that needs services is made with `keep` (§9.4). A final function may not raise errors. When the program stops (§11.7), final functions are not run.
+
+A structured task group waits for cancelled children and their final functions before it returns (§9.9). Those final functions may suspend and resume and use services, but may not raise errors. An unstarted child has no installed final functions. A host failure or a destroyed instance cannot run i final functions; the host instead releases its own work and resources (Appendix B).
+
+### 9.6 Assert
+
+`Assert` and `AssertionFailure` are prelude types:
+
+```i future-SYN3
+AssertionFailure = (message = String)
+Assert = (fail = (AssertionFailure) -> Never)
+```
+
+An `Assert` service is where failures are reported. Its `fail` never gives back a value. The built-in function `assert` is a normal function, which may be written in i:
+
+```i future-SYN3
+assert = (c: Bool) <- (a: Assert) -> Nil {
+  c |> (True) { Nil } | (False) { a.fail(AssertionFailure(message = "assert")) }
+}
+// assert : (Bool) <- (Assert) -> Nil
+```
+
+A binding whose pattern may fail also reports to `Assert` (§6.10).
+
+At an entry point (§10.2), the platform gives an `Assert` whose `fail` stops the program; in a test, the test fails. Any code may provide its own `Assert`. The module `i/assertion` has one function that does this:
+
+```i future-SYN3
+catch = <A, N>(body: () <- (..N, Assert) -> A) <- N -> Result(A, AssertionFailure) {
+  control.boundary((b) {
+    Ok(body() <- (Assert(fail = (failure) { control.escape(b, Error(failure)) })))
+  })
+}
+```
+
+`Assert` is for mistakes in the program. A failure that may be expected uses an error (§9.3). `fail.catch` and `fail.map_error` do not take `Assert` failures.
+
+### 9.7 Host services
+
+A type definition with the attribute `@host("namespace")` is a **host service**:
+
+```i future-SYN3
+@host("app:storage/v1", "async")
+Storage = (read = (String) <- (Fail(String)) -> String)
+```
+
+- It is a labelled type whose data has only labels, each with a function type. The parameter data of these functions has positions only. Their parameters and values must be types that the host can take (§10.3). A function type there may have no need, or exactly `<- (Fail(E))` with an `E` that the host can take: the host's error is raised through the caller's `Fail`. Two host services may not have the same namespace and a field with the same label.
+- With `@host("namespace", "async")`, the host does the functions **later**: the program waits at the call, and goes on from the call when the host gives a value or an error. In i code, such a call is a normal call.
+- A host service that the platform provides at an entry (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B. i code may also provide a host service, for example to put a fake in its place in a test; then no import is used for it.
+- The library module `i/io` declares and exports the **standard service** `@host("i:io/v1") Io = (print = (String) -> Nil)`. `print` writes the text and a line feed to the standard output, and gives `Nil`, also after an output error. A program that prints imports it, for example `((Io) = i/io)`. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
+
+**Targets and platform services.**
+
+The module `i/target` exports these types; the modules `i/js` and `i/wasi` export the roots named in them (§10.1, §B.7.1):
+
+```i future-SYN3
+Js = (js = js.Js)
+NodeJS = (js = js.Js)
+Wasi = (wasi = wasi.Wasi)
+Native = ()
+Host = ()
+Target = (Js | NodeJS | Wasi | Native | Host)
+```
+
+`Target` is a service that the platform provides at every entry, holding the target the program was built for. Only §10.1.2's certified entry binding is known to hold the build's target. A program may provide another `Target`.
+
+At an entry the **platform** of the target provides its services: `Assert`, `Scope`, `Fail`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and the host services of this table. No library and no package chooses services for the program: every other service is provided in the program's code, normally in `main`. A program built for targets that need different services has one entry for each such target.
+
+| Target | Host services of the platform |
+|---|---|
+| js | Io, Clock, Entropy |
+| nodejs | Io, Clock, Entropy, Arguments, Environment, WorkingDirectory, Fs, Net, Process, Stdio |
+| wasi | Io, Clock, Entropy, Arguments, Environment, Fs over preopened directories, Stdio |
+| native | Io, Clock, Entropy, Arguments, Environment, WorkingDirectory, Fs, Net, Tls, Process, Stdio |
+| host | The services that the embedder registers |
+
+The JS loader checks the required feature profile before starting: WasmGC, tail calls, exception handling, console and clocks/timers, and secure entropy. There is no insecure random fallback. A target never installs a service that only reports `unsupported`. Resource services use the same granted factories in generated Node builds and the SDK; an arbitrary Js value cannot manufacture authority over their private resource numbers.
+
+The process services are split by capability, keeping their operation arguments, results, `ProcessError` values and cancellation rules. Each public wrapper needs only the service in its row, plus `Await` and `Owner` when it waits. `Clock`, `Fs`, `Net`, `Stdio` and `Io` are separate:
+
+| Service | Namespace | Raw fields |
+|---|---|---|
+| Entropy | `i:entropy/v1` | entropy |
+| Arguments | `i:arguments/v1` | args |
+| Environment | `i:environment/v1` | env |
+| WorkingDirectory | `i:working-directory/v1` | cwd |
+| Process | `i:process/v1` | spawn, wait, terminate, close |
+
+The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private labelled `Child` type over Int. The same private Int representation is used for other IO resources. Neither these types nor their errors add a boundary type (§10.3).
+
+`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`. UDP datagrams are part of `i/net`: `bind(address, port)` returns a private labelled `Datagram` over Int, `send_to(socket, address, port, bytes)` sends one datagram, and `receive_from(socket, max_bytes)` returns `(data = BitArray, address = String, port = Int)` with the numeric sender address and port. `local_address(socket)` and `local_port(socket)` return the bound numeric address and port; `close_datagram(socket)` closes it. Bind accepts IPv4, IPv6 and host names; port 0 asks the OS to choose a port. Send accepts a numeric address or host name and port 1..65535; addresses are resolved and tried in system order as for TCP. Receive requires a positive bound, capped at 65536 bytes; it consumes exactly one datagram and discards any excess bytes. An empty datagram is data, not EOF. Sends require whole bytes and are atomic; expected host failures raise `NetError` values through `Fail`. UDP provides no delivery or ordering guarantee.
+
+Datagrams follow TCP's resource identity, owner, creation guard, teardown and lease rules. One send and one receive may overlap; a second operation in the same direction gives `busy`. Close is idempotent and raises no error, and wakes a blocked receive with `closed` unless its answer already committed. Group cancellation cancels an owned blocked receive and releases its lease, leaving the socket usable until close or entry teardown. The browser and WASI platforms have no `Net`, so a program that needs `i/net.Net` there is a compile error naming it (§10.2).
+
+<!-- /syn3-new -->
 
 ### 9.8 Keys
 
