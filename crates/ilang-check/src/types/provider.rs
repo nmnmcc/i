@@ -30,11 +30,14 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
                 lits::ValueSet::only([value.into()]).expect("one literal"),
             )
         }
-        ShownType::Tuple(xs) => Ty::Con(
-            Head::Tuple(xs.len() as u32),
-            lits::ValueSet::ALL,
-            xs.iter().map(concrete).collect::<Result<_, _>>()?,
-        ),
+        ShownType::Tuple(xs) => Ty::tuple(xs.iter().map(concrete).collect::<Result<_, _>>()?),
+        ShownType::Record(keys, xs) => {
+            let positions = keys.iter().filter(|k| k.is_none()).count() as u32;
+            Ty::data(
+                ShapeId::new(positions, keys.iter().flatten().cloned()),
+                xs.iter().map(concrete).collect::<Result<_, _>>()?,
+            )
+        }
         ShownType::Union(xs) => Ty::Union(xs.iter().map(concrete).collect::<Result<_, _>>()?),
         ShownType::Inter(xs) => Ty::Inter(xs.iter().map(concrete).collect::<Result<_, _>>()?),
         ShownType::Diff(a, xs) => Ty::Diff(
@@ -61,7 +64,6 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
                 .transpose()?
                 .unwrap_or(Ty::Never),
         })),
-        ShownType::Graph(g) if g.graph.variables().is_empty() => Ty::Graph(g.graph.clone()),
         _ => return Err("provider type must be closed (no holes or free variables)".into()),
     })
 }
@@ -107,7 +109,9 @@ impl Typed {
             && head == wanted
         {
             for (actual, wanted) in actual.iter().zip(args) {
-                if !s.records.graph(actual).variables().is_empty() {
+                let mut vars = Vec::new();
+                display::ty_vars(actual, &mut vars);
+                if !vars.is_empty() {
                     s.constrain(wanted, actual);
                 }
             }
@@ -182,7 +186,6 @@ impl Typed {
         }));
         let scheme = Scheme {
             level: 0,
-            key_slots: vec![],
             ty: Ty::Fn(Box::new(FnTy {
                 params: vec![(Some("body".into()), body)],
                 ret: a,
@@ -206,10 +209,34 @@ impl Typed {
         // Normalize the identity on both sides before comparing the complete
         // generalized schemes; parameterized services keep their constraints.
         fn view(t: &Ty) -> Ty {
-            match t {
-                Ty::Graph(g) => g.view().expect("ordinary environment node"),
-                _ => t.clone(),
-            }
+            t.clone()
+        }
+        fn map_nodes(ty: &Ty, env: bool, f: &mut dyn FnMut(Ty, bool) -> Ty) -> Ty {
+            let all = |xs: &[Ty], env: bool, f: &mut dyn FnMut(Ty, bool) -> Ty| -> Vec<Ty> {
+                xs.iter().map(|x| map_nodes(x, env, f)).collect()
+            };
+            let shallow = match ty {
+                Ty::Con(h, vs, args) => Ty::Con(*h, vs.clone(), all(args, false, f)),
+                Ty::Fn(fun) => Ty::Fn(Box::new(FnTy {
+                    params: fun
+                        .params
+                        .iter()
+                        .map(|(l, p)| (l.clone(), map_nodes(p, false, f)))
+                        .collect(),
+                    ret: map_nodes(&fun.ret, false, f),
+                    err: map_nodes(&fun.err, false, f),
+                    env: map_nodes(&fun.env, true, f),
+                })),
+                Ty::Union(xs) => Ty::Union(all(xs, env, f)),
+                Ty::Inter(xs) => Ty::Inter(all(xs, env, f)),
+                Ty::Diff(b, hs) => Ty::Diff(Box::new(map_nodes(b, env, f)), all(hs, false, f)),
+                Ty::Both(a, b) => Ty::Both(
+                    Box::new(map_nodes(a, env, f)),
+                    Box::new(map_nodes(b, env, f)),
+                ),
+                t => t.clone(),
+            };
+            f(shallow, env)
         }
         fn parts(t: &Ty, intersection: bool) -> Vec<Ty> {
             let mut pending = vec![t.clone()];
@@ -244,9 +271,7 @@ impl Typed {
             }
         }
         fn ordered_differences(p: &Program, ty: &Ty) -> Ty {
-            records::Pool::default()
-                .graph(ty)
-                .map_nodes(false, &mut |ty, env| match ty {
+            map_nodes(ty, false, &mut |ty, env| match ty {
                     Ty::Diff(base, mut removed) => {
                         removed.sort_by_cached_key(|ty| match ty.head() {
                             Some(Head::Named(TypeRef::Custom(id))) => {
@@ -267,9 +292,28 @@ impl Typed {
         let name = |r: TypeRef| format!("{r:?}");
         match actual.compare(&expected, &mut |r| name(r), &mut |r| name(r))? {
             SchemeComparison::Equivalent(_) => Ok(()),
-            other => Err(format!(
-                "adapter must have the generalized structured body/result/error/environment type ({other:?})"
-            )),
+            other => {
+                // The solver's own subtype check, both ways, each side
+                // instantiated fresh (simplification U4).
+                let mut t = expected
+                    .catalog
+                    .solver
+                    .lock()
+                    .expect("adapter scheme snapshot")
+                    .clone();
+                t.level = 1;
+                let a = t.freshen(&actual.scheme.ty, actual.scheme.level, &mut Default::default());
+                t.constrain(&a, &expected.scheme.ty);
+                let e = t.freshen(&expected.scheme.ty, 0, &mut Default::default());
+                t.constrain(&e, &actual.scheme.ty);
+                if t.failures.is_empty() {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "adapter must have the generalized structured body/result/error/environment type ({other:?})"
+                    ))
+                }
+            }
         }
     }
 }

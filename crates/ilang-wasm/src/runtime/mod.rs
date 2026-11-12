@@ -40,7 +40,7 @@
 //! | 1 | Bool | field 1 is 0 or 1; use `$bool_new` (or the globals `$value_true` and `$value_false`) |
 //! | 2 | Float | field 3; always finite |
 //! | 3 | String | field 4: UTF-8 bytes |
-//! | 4 | Tuple | field 5: the parts |
+//! | 4 | Tuple, data | field 1: the index of the label set (0 for none, `$shape_labels`); field 5: the parts, positions then labels in UTF-8 order |
 //! | 5 | Custom type value | field 1: constructor id, field 2: type id, field 5: the fields, or null when there are none |
 //! | 6 | List | `[]` is an `$obj` (the global `$value_empty_list`); any other list is a `$cons`: field 1 the head, field 2 the tail |
 //! | 7 | Function | field 1 bit 0: patched captures with a final walk stamp; field 2: arity |
@@ -50,7 +50,6 @@
 //! | 11 | Boundary | an `$obj` with tag 11; the other fields belong to the code generator |
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
-//! | 14 | Record | field 5: labels and values, interleaved, sorted by the UTF-8 bytes of the labels |
 //! | 15 | Key | identity value; no parts |
 //! | 16 | Keyed | field 5: key, value |
 //! | 17 | Request | identity cell with private mutable completion state |

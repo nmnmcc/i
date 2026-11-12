@@ -22,15 +22,6 @@ pub(super) type Sigma = HashMap<V, Vec<Ty>>;
 /// members, and an intersection `a & T` by `T`.
 pub(super) fn members(k: &Ty) -> Vec<Ty> {
     match k {
-        Ty::Graph(g) if g.record_only() => match g.known_summary() {
-            Some(Ty::Never) => Vec::new(),
-            Some(summary) => vec![summary],
-            None => vec![k.clone()],
-        },
-        Ty::Graph(g) => match g.view() {
-            Some(view) => members(&view),
-            None => vec![k.clone()],
-        },
         Ty::Union(ms) => ms.iter().flat_map(members).collect(),
         Ty::Diff(a, h) => members(a)
             .into_iter()
@@ -216,37 +207,12 @@ impl Checker<'_> {
             TypeKind::Of { value, site, .. } => self.read_shape(*value, *site),
             TypeKind::Hole | TypeKind::Error => Ty::Top,
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(go).collect()),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let pool = super::records::Pool::default();
-                let labels: Vec<_> = fields
+            TypeKind::Record { fields } => Ty::record(
+                fields
                     .iter()
-                    .map(|(name, _)| super::records::written_label(name, self.s.level))
-                    .chain(
-                        removed
-                            .iter()
-                            .map(|name| super::records::written_label(name, self.s.level)),
-                    )
-                    .collect();
-                let record = pool.record(
-                    fields
-                        .iter()
-                        .map(|(name, ty)| {
-                            (super::records::written_label(name, self.s.level), go(ty))
-                        })
-                        .collect(),
-                );
-                match base {
-                    Some(base) => {
-                        let rest = pool.without(&go(base), labels);
-                        pool.inter(&[rest, record])
-                    }
-                    None => record,
-                }
-            }
+                    .map(|(name, ty)| (name.name.clone(), go(ty)))
+                    .collect(),
+            ),
             TypeKind::Fn {
                 params,
                 ret,
@@ -346,20 +312,15 @@ impl Checker<'_> {
     /// of `v` is a subtype of its known type). Its parts that are `_` or
     /// type variables are new type variables, because a known type takes
     /// no part in constraints.
-    pub fn known_bound(
-        &mut self,
-        k: &Ty,
-        demand: &mut super::records::Demand,
-    ) -> Result<Ty, super::records::ResourceLimit> {
-        Ok(match k {
-            Ty::Graph(g) => g.known_bound(&mut self.s, demand)?,
+    pub fn known_bound(&mut self, k: &Ty) -> Ty {
+        match k {
             Ty::Var(_) | Ty::Top | Ty::Both(..) => self.s.fresh(),
             Ty::Never => Ty::Never,
             Ty::Con(h, values, xs) => {
                 let mut args = Vec::with_capacity(xs.len());
                 for (x, v) in xs.iter().zip(self.s.variances(*h, xs.len())) {
                     args.push(if v == super::Variance::Co {
-                        self.known_bound(x, demand)?
+                        self.known_bound(x)
                     } else {
                         self.s.fresh()
                     });
@@ -380,28 +341,28 @@ impl Checker<'_> {
                     .iter()
                     .map(|(l, _)| (l.clone(), self.s.fresh()))
                     .collect(),
-                ret: self.known_bound(&f.ret, demand)?,
-                err: self.known_bound(&f.err, demand)?,
+                ret: self.known_bound(&f.ret),
+                err: self.known_bound(&f.err),
                 env: self.s.fresh(),
             })),
             Ty::Union(xs) => Ty::Union(
                 xs.iter()
-                    .map(|x| self.known_bound(x, demand))
-                    .collect::<Result<_, _>>()?,
+                    .map(|x| self.known_bound(x))
+                    .collect(),
             ),
             Ty::Inter(xs) => Ty::Inter(
                 xs.iter()
-                    .map(|x| self.known_bound(x, demand))
-                    .collect::<Result<_, _>>()?,
+                    .map(|x| self.known_bound(x))
+                    .collect(),
             ),
             Ty::Diff(a, h)
                 if h.iter()
                     .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
             {
-                self.known_bound(a, demand)?
+                self.known_bound(a)
             }
-            Ty::Diff(a, h) => Ty::Diff(Box::new(self.known_bound(a, demand)?), h.clone()),
-        })
+            Ty::Diff(a, h) => Ty::Diff(Box::new(self.known_bound(a)), h.clone()),
+        }
     }
 
     /// Notes the type variables of `t` as variables of a type scheme that
@@ -409,7 +370,6 @@ impl Checker<'_> {
     /// match nothing (§4.8).
     pub fn note_general(&mut self, t: &Ty) {
         match t {
-            Ty::Graph(g) => self.kgen.extend(g.variables()),
             Ty::Var(v) => {
                 self.kgen.insert(*v);
             }
@@ -480,19 +440,6 @@ impl Checker<'_> {
             return;
         }
         match p {
-            Ty::Graph(graph) => {
-                if let Some(view) = graph.view() {
-                    self.match_k(&view, k, sigma, depth + 1);
-                } else if let Some(fields) = graph.fields()
-                    && let Some(Ty::Graph(known)) = member(k, Some(Head::Record))
-                {
-                    for (label, ty) in fields {
-                        if let super::records::Field::Found(actual) = known.field(&label) {
-                            self.match_k(&ty, &actual, sigma, depth + 1);
-                        }
-                    }
-                }
-            }
             Ty::Var(v) => sigma.entry(*v).or_default().push(k.clone()),
             Ty::Con(..) | Ty::Fn(_) => match (p, member(k, p.head())) {
                 (Ty::Con(_, _, ps), Some(Ty::Con(_, _, ks))) if ps.len() == ks.len() => {
@@ -543,7 +490,6 @@ impl Checker<'_> {
         let go = |x: &Ty| self.ksubst_in(x, sigma, partial);
         let all = |xs: &[Ty]| xs.iter().map(go).collect::<Option<Vec<Ty>>>();
         Some(match t {
-            Ty::Graph(g) => g.try_map_vars(&mut |v| go(&Ty::Var(v)).ok_or(())).ok()?,
             Ty::Var(v) => match sigma.get(v) {
                 Some(ts) => self.kunion(ts.clone()),
                 None if partial => Ty::Top,
@@ -605,7 +551,7 @@ impl Checker<'_> {
             PatternKind::String(_) | PatternKind::Prefix { .. } => prim(BuiltinType::String),
             PatternKind::BitArray(_) => prim(BuiltinType::BitArray),
             PatternKind::Constructor { ctor, .. } => Head::Named(TypeRef::Custom(ctor.ty)),
-            PatternKind::Tuple(ps) => Head::Tuple(ps.len() as u32),
+            PatternKind::Tuple(ps) => Head::Shape(super::ShapeId::positional(ps.len() as u32)),
             PatternKind::List { .. } => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             PatternKind::Error(_) => return Ty::Top,
         };
@@ -684,7 +630,7 @@ impl Checker<'_> {
                 }
             }
             PatternKind::Tuple(ps) => {
-                let parts = match member(b, Some(Head::Tuple(ps.len() as u32))) {
+                let parts = match member(b, Some(Head::Shape(super::ShapeId::positional(ps.len() as u32)))) {
                     Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
@@ -840,13 +786,6 @@ impl Checker<'_> {
 /// The type variables of `t`.
 fn ty_vars(t: &Ty, out: &mut Vec<V>) {
     match t {
-        Ty::Graph(g) => {
-            for v in g.variables() {
-                if !out.contains(&v) {
-                    out.push(v);
-                }
-            }
-        }
         Ty::Var(v) => {
             if !out.contains(v) {
                 out.push(*v);
@@ -912,44 +851,6 @@ pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
 /// Widen known literal facts only in covariant parts (literal-types decision 7).
 pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
     match t {
-        Ty::Graph(g) => g.map_nodes(false, &mut |t, _| match t {
-            Ty::Never | Ty::Both(..) => Ty::Top,
-            Ty::Con(h, values, args) => {
-                let values = if args.is_empty()
-                    && matches!(
-                        h,
-                        Head::Named(TypeRef::Builtin(BuiltinType::Int | BuiltinType::String))
-                    ) {
-                    ValueSet::ALL
-                } else {
-                    values
-                };
-                let variance = s.variances(h, args.len());
-                let args = args
-                    .into_iter()
-                    .zip(variance)
-                    .map(|(t, v)| if v == super::Variance::Co { t } else { Ty::Top })
-                    .collect();
-                Ty::Con(h, values, args)
-            }
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f.params.into_iter().map(|(l, _)| (l, Ty::Top)).collect(),
-                ret: f.ret,
-                err: f.err,
-                env: Ty::Top,
-            })),
-            Ty::Union(ms) => display::known_union(s, ms),
-            Ty::Inter(ms) => display::known_inter(s, ms),
-            Ty::Diff(base, heads)
-                if heads
-                    .iter()
-                    .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
-            {
-                *base
-            }
-            Ty::Diff(base, heads) => display::known_diff(s, *base, heads),
-            t => t,
-        }),
         Ty::Never => Ty::Top,
         Ty::Con(h, values, xs) => Ty::Con(
             *h,
@@ -993,47 +894,6 @@ pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
 pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
     fn walk(s: &super::solve::Solver, t: &Ty, given: bool, shown: bool, out: &mut Vec<V>) {
         match t {
-            Ty::Graph(g) => {
-                use super::records::Node;
-                let mut seen = std::collections::HashSet::new();
-                let mut pending = vec![(g.id, given, shown)];
-                while let Some((id, given, shown)) = pending.pop() {
-                    if !seen.insert((id, given, shown)) {
-                        continue;
-                    }
-                    match g.node_at(id) {
-                        Node::Var(v) if given && !shown => {
-                            if !out.contains(&v) {
-                                out.push(v);
-                            }
-                        }
-                        Node::Con(h, _, args) => {
-                            let variance = s.variances(h, args.len());
-                            for (id, v) in args.into_iter().zip(variance) {
-                                let (given, shown) = match v {
-                                    super::Variance::Co => (given, shown),
-                                    super::Variance::Contra => (!given, false),
-                                    _ => (true, false),
-                                };
-                                pending.push((id, given, shown));
-                            }
-                        }
-                        Node::Fn(fun) => {
-                            pending
-                                .extend(fun.params.into_iter().map(|(_, id)| (id, !given, false)));
-                            pending.extend([
-                                (fun.ret, given, false),
-                                (fun.err, given, false),
-                                (fun.env, true, false),
-                            ]);
-                        }
-                        Node::Both(a, b) => pending.extend([(a, true, false), (b, true, false)]),
-                        node => {
-                            pending.extend(node.children().into_iter().map(|id| (id, given, shown)))
-                        }
-                    }
-                }
-            }
             Ty::Var(v) if given && !shown => {
                 if !out.contains(v) {
                     out.push(*v);

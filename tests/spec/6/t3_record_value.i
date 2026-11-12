@@ -2,7 +2,7 @@
 // expect: pass
 (main)
 
-name_of = (r) { r.name }
+name_of = (r: (age: Int, name: String)) { r.name }
 
 
 main = () {
@@ -12,6 +12,6 @@ main = () {
   assert(updated.name == "Ada")
   assert(updated.age == 37)
   assert(updated == (name: "Ada", age: 37))
-  assert(("name": "Ada", age: 37) == updated)
+  assert((name: "Ada", age: 37) == updated)
   Nil
 }

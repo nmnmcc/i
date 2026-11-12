@@ -52,7 +52,7 @@ fn affix_matches(value: &str, prefix: &str, suffix: &str) -> bool {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Ctor {
     Custom(CtorRef),
-    Tuple(u32),
+    Shape(super::ShapeId),
     Nil,
     Cons,
     Lit(Lit),
@@ -285,16 +285,6 @@ impl Vals {
 /// value (§7.3).
 fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
     match t {
-        Ty::Graph(g) => {
-            if g.record_only() {
-                Vals {
-                    heads: vec![(Head::Record, ValueSet::ALL, Vec::new(), mode)],
-                    other: false,
-                }
-            } else {
-                values(s, &g.view().expect("non-record graph step"), mode, seen)
-            }
-        }
         Ty::Var(v) => {
             if seen.contains(&(*v, mode)) {
                 return match mode {
@@ -377,7 +367,7 @@ impl Ctor {
     pub fn head(&self) -> Head {
         match self {
             Ctor::Custom(c) => Head::Named(TypeRef::Custom(c.ty)),
-            Ctor::Tuple(n) => Head::Tuple(*n),
+            Ctor::Shape(n) => Head::Shape(*n),
             Ctor::Nil | Ctor::Cons => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             Ctor::Lit(Lit::Opaque(ty)) => Head::Named(TypeRef::Custom(*ty)),
             Ctor::Lit(l) => Head::Named(TypeRef::Builtin(match l {
@@ -396,7 +386,7 @@ impl Ctor {
                 TypeBody::Custom(cs) => cs.get(c.index as usize).map_or(0, |x| x.fields.len()),
                 TypeBody::Alias(_) => 0,
             },
-            Ctor::Tuple(n) => *n as usize,
+            Ctor::Shape(n) => n.len(),
             Ctor::Cons => 2,
             Ctor::Nil | Ctor::Lit(_) => 0,
         }
@@ -821,7 +811,7 @@ impl Checker<'_> {
                     .map(|f| f.1)
                     .collect()
             }
-            Ctor::Tuple(_) => args,
+            Ctor::Shape(_) => args,
             Ctor::Cons => {
                 let e = args.first().cloned().unwrap_or(Ty::Top);
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
@@ -870,7 +860,7 @@ impl Checker<'_> {
                 _ => return None,
             },
             Head::Named(TypeRef::Builtin(BuiltinType::List)) => vec![Ctor::Nil, Ctor::Cons],
-            Head::Tuple(n) => vec![Ctor::Tuple(n)],
+            Head::Shape(n) => vec![Ctor::Shape(n)],
             _ => return None,
         };
         if matches!(col, Col::Any) {
@@ -1018,9 +1008,9 @@ impl Checker<'_> {
                 format!("_: {}", super::display::show_known(&self.s, &t))
             }
             Pat::Head(h, n) => format!("_: {}", self.show_head(*h, *n)),
-            Pat::Ctor(Ctor::Tuple(_), args) => {
+            Pat::Ctor(Ctor::Shape(shape), args) => {
                 let parts: Vec<String> = args.iter().map(|a| self.show_pat(a)).collect();
-                format!("({})", parts.join(", "))
+                shape.text(&parts)
             }
             Pat::Ctor(Ctor::Nil, _) => "[]".into(),
             Pat::Ctor(Ctor::Cons, _) => {
@@ -1086,7 +1076,6 @@ impl Checker<'_> {
     fn show_head(&self, h: Head, n: usize) -> String {
         let holes = |n: usize| vec!["_"; n].join(", ");
         match h {
-            Head::Record => "{..}".to_string(),
             Head::Named(TypeRef::Builtin(b)) if n == 0 => b.name().to_string(),
             Head::Named(TypeRef::Builtin(b)) => format!("{}({})", b.name(), holes(n)),
             Head::Named(TypeRef::Custom(id)) => {
@@ -1097,7 +1086,10 @@ impl Checker<'_> {
                     format!("{name}({})", holes(n))
                 }
             }
-            Head::Tuple(k) => format!("{{ ({}) }}", holes(k as usize)),
+            Head::Shape(k) => format!(
+                "{{ {} }}",
+                k.text(&vec!["_".to_string(); k.len()])
+            ),
             Head::Fn => format!("{{ ({}) -> _ }}", holes(n)),
         }
     }
@@ -1187,7 +1179,7 @@ pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
                 .collect(),
         ),
         PatternKind::Tuple(ps) => Pat::Ctor(
-            Ctor::Tuple(ps.len() as u32),
+            Ctor::Shape(super::ShapeId::positional(ps.len() as u32)),
             ps.iter().map(|a| fit_pat(p, a)).collect(),
         ),
         PatternKind::List { items, rest } => list(
@@ -1320,7 +1312,7 @@ mod literal_coverage_tests {
             Pat::Wild(None),
             Pat::Or(vec![prefix[0].clone(), prefix[2].clone()]),
             Pat::Or(vec![prefix[0].clone(), Pat::Wild(None)]),
-            Pat::Ctor(Ctor::Tuple(1), vec![Pat::Wild(None)]),
+            Pat::Ctor(Ctor::Shape(crate::types::ShapeId::positional(1)), vec![Pat::Wild(None)]),
             lit(Lit::Float(0)),
         ]);
         let inputs = [

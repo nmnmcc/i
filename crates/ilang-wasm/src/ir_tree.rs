@@ -31,7 +31,7 @@ impl Clone for Cond {
                         todo.push(Work::Visit(b));
                         todo.push(Work::Visit(a));
                     }
-                    Cond::IsRec(a) => done.push(Cond::IsRec(a.clone())),
+                    Cond::Data(a, set, n) => done.push(Cond::Data(a.clone(), *set, *n)),
                     Cond::True(a) => done.push(Cond::True(a.clone())),
                     Cond::Tag(a, n) => done.push(Cond::Tag(a.clone(), *n)),
                     Cond::Bool(a, b) => done.push(Cond::Bool(a.clone(), *b)),
@@ -111,6 +111,11 @@ impl PartialEq for Cond {
                 | (Cond::Type(a, n), Cond::Type(b, m))
                 | (Cond::Tuple(a, n), Cond::Tuple(b, m)) => {
                     if a != b || n != m {
+                        return false;
+                    }
+                }
+                (Cond::Data(a, n, k), Cond::Data(b, m, l)) => {
+                    if a != b || n != m || k != l {
                         return false;
                     }
                 }

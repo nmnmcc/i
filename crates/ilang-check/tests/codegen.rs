@@ -123,7 +123,7 @@ fn codegen_data() {
     assert_eq!(
         by_text(&typed.type_tests, m, "_: { (Int, Int) }"),
         &vec![TestMember {
-            head: Head::Tuple(2),
+            head: Head::Shape(ilang_check::types::ShapeId::positional(2)),
             values: TestValues::All
         }]
     );

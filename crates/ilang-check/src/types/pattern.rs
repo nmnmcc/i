@@ -920,7 +920,6 @@ impl Checker<'_> {
                                 }
                                 Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
                                 Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
-                                Ty::Graph(g) if g.record_only() => Some(Pat::Head(Head::Record, 0)),
                                 _ => None,
                             })
                             .collect(),
@@ -1061,7 +1060,7 @@ impl Checker<'_> {
             }
             PatternKind::Tuple(ps) => {
                 let n = ps.len() as u32;
-                let h = Head::Tuple(n);
+                let h = Head::Shape(super::ShapeId::positional(n));
                 let parts = self.shared(places, at, h, ps.len());
                 let kparts = match known::member(&places[at].known, Some(h)) {
                     Some(Ty::Con(_, _, xs)) => xs,
@@ -1079,7 +1078,7 @@ impl Checker<'_> {
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
-                (Ty::tuple(parts), Pat::Ctor(Ctor::Tuple(n), pats))
+                (Ty::tuple(parts), Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats))
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));

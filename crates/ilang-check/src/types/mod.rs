@@ -19,21 +19,24 @@
 //! - `shown.rs`: a shown type as a tree ([`ShownType`]), and its text.
 
 mod alias;
+mod codec;
 mod coverage;
 mod display;
+mod groups;
 mod infer;
 mod known;
 mod lits;
 mod pattern;
+mod prove;
 mod provider;
-mod records;
 mod scheme_wire;
+mod shape;
 mod shown;
 mod solve;
 mod value_types;
 
 pub use lits::{LitValue, TestValues};
-pub use records::ShownGraph;
+pub use shape::ShapeId;
 pub use scheme_wire::{
     AliasArtifact, SchemeArtifact, SchemeComparison, SchemeEnvironment, compare_scheme_group,
 };
@@ -53,9 +56,9 @@ pub(crate) struct V(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Head {
     Named(TypeRef),
-    Tuple(u32),
+    /// Data of one shape: tuples, records and `()` (syntax-3 §6.2).
+    Shape(ShapeId),
     Fn,
-    Record,
 }
 
 /// A runtime type test, including the values of an Int or String member.
@@ -69,8 +72,6 @@ pub struct TestMember {
 /// type variable that has no effect, in an input place.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Ty {
-    /// Shared exact graph, including every record field and suspended operation.
-    Graph(records::Graph),
     Var(V),
     /// A named type or a tuple, with its arguments or parts.
     Con(Head, lits::ValueSet, Vec<Ty>),
@@ -146,7 +147,6 @@ impl Ty {
     }
     pub fn head(&self) -> Option<Head> {
         match self {
-            Ty::Graph(g) => g.head(),
             Ty::Con(h, _, _) => Some(*h),
             Ty::Fn(_) => Some(Head::Fn),
             _ => None,
@@ -154,22 +154,32 @@ impl Ty {
     }
 
     pub fn named(t: TypeRef, args: Vec<Ty>) -> Ty {
-        if t == TypeRef::Builtin(crate::hir::BuiltinType::Record) {
-            assert!(args.is_empty(), "Record takes no type arguments");
-            return records::Pool::default().record(Vec::new());
-        }
         Ty::Con(Head::Named(t), lits::ValueSet::ALL, args)
     }
 
     pub fn tuple(parts: Vec<Ty>) -> Ty {
-        Ty::Con(Head::Tuple(parts.len() as u32), lits::ValueSet::ALL, parts)
+        Ty::data(ShapeId::positional(parts.len() as u32), parts)
+    }
+
+    /// Data of a shape, with its parts in canonical order.
+    pub fn data(shape: ShapeId, parts: Vec<Ty>) -> Ty {
+        debug_assert_eq!(shape.len(), parts.len());
+        Ty::Con(Head::Shape(shape), lits::ValueSet::ALL, parts)
+    }
+
+    /// Data with these labelled parts, in any order.
+    /// A repeated label has been reported; its first part is kept.
+    pub fn record(mut fields: Vec<(String, Ty)>) -> Ty {
+        fields.sort_by(|a, b| a.0.cmp(&b.0));
+        fields.dedup_by(|a, b| a.0 == b.0);
+        let shape = ShapeId::new(0, fields.iter().map(|(l, _)| l.clone()));
+        Ty::data(shape, fields.into_iter().map(|(_, t)| t).collect())
     }
 
     /// A type variable, or a difference of one: a member that a value of
     /// any type constructor may go to.
     pub fn is_varlike(&self) -> bool {
         match self {
-            Ty::Graph(g) => matches!(g.node(), records::Node::Without(..)),
             Ty::Var(_) => true,
             Ty::Diff(a, _) => a.is_varlike(),
             _ => false,
@@ -177,10 +187,7 @@ impl Ty {
     }
 
     pub fn value_head(&self) -> Option<Head> {
-        match self {
-            Ty::Graph(g) if g.record_only() => Some(Head::Record),
-            _ => self.head(),
-        }
+        self.head()
     }
 
     pub fn is_headed(&self) -> bool {
@@ -227,33 +234,12 @@ pub(crate) fn boundary_type(
                     .map(|t| convert(s, t, p, expand))
                     .collect::<Option<_>>()?,
             ),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let mut labels = Vec::new();
-                let mut resolved = Vec::new();
-                for (name, ty) in fields {
-                    let label = records::written_label(name, s.level);
-                    labels.push(label.clone());
-                    resolved.push((label, convert(s, ty, p, expand)?));
-                }
-                labels.extend(
-                    removed
-                        .iter()
-                        .map(|name| records::written_label(name, s.level)),
-                );
-                let record = s.record(resolved);
-                match base {
-                    Some(base) => {
-                        let base = convert(s, base, p, expand)?;
-                        let rest = s.without(&base, labels);
-                        s.inter(vec![rest, record])
-                    }
-                    None => record,
-                }
-            }
+            TypeKind::Record { fields } => Ty::record(
+                fields
+                    .iter()
+                    .map(|(name, ty)| Some((name.name.clone(), convert(s, ty, p, expand)?)))
+                    .collect::<Option<_>>()?,
+            ),
             TypeKind::Fn {
                 params,
                 ret,
@@ -386,13 +372,12 @@ impl Variance {
 /// How `v.f` or `v.k` reads a part of its value (§4.8 rule 13).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Access {
-    /// A structural record field selected by its label.
-    Label(String),
     /// `v.f`: each constructor that may have made `v` (§6.7), with the
     /// index of its field with the label `f`. At run time, the constructor
     /// of the value picks one.
     Field(Vec<(CtorRef, u32)>),
-    /// `v.k`: part `k` of a tuple, whatever its size.
+    /// `v.k` or `v.f` on data: the part at index `k` in canonical order,
+    /// whatever the shape (syntax-3 §2.3).
     Part(u32),
 }
 
@@ -415,6 +400,13 @@ pub struct Typed {
     pub numeric_params: HashMap<(ModuleId, Span), NumericFact>,
     /// Spans of empty record expressions reached by type inference.
     pub empty_records: std::collections::HashSet<(ModuleId, Span)>,
+    /// Each data expression `(f: e, …)` or `(..b, f: e, …)` that type checks,
+    /// by its span: its shape, and the shape of its spread base.
+    pub data_shapes: HashMap<(ModuleId, Span), (ShapeId, Option<ShapeId>)>,
+    /// Each multi-shape function expression that an expected type narrows
+    /// to one of its shape groups, by its span: the index of that group.
+    /// Its value is that group's function alone (syntax three §2.6.4).
+    pub selected_groups: HashMap<(ModuleId, Span), u32>,
     /// Diagnostics retained when coalescing could not produce a finite
     /// type. IDEs may use the partial result; lowering must reject it.
     pub(crate) coalescing_errors: Vec<Diagnostic>,

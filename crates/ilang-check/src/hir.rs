@@ -54,6 +54,9 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// The hidden group bindings of each top-level name bound to a chain
+    /// with several shape groups (syntax three §2.5), in group order.
+    pub chain_groups: std::collections::HashMap<DefId, Vec<DefId>>,
     /// Reads in invalid dependency components, before query recovery.
     pub failed_reads: std::collections::HashSet<OfId>,
     /// Expression SCC members invalidated by a type-dependency cycle.
@@ -265,7 +268,6 @@ pub enum BuiltinType {
     BitArray,
     UtfCodepoint,
     Never,
-    Record,
     Boundary,
     Continuation,
     Key,
@@ -275,7 +277,7 @@ pub enum BuiltinType {
 }
 
 impl BuiltinType {
-    pub const ALL: [BuiltinType; 14] = [
+    pub const ALL: [BuiltinType; 13] = [
         BuiltinType::Int,
         BuiltinType::Float,
         BuiltinType::String,
@@ -283,7 +285,6 @@ impl BuiltinType {
         BuiltinType::BitArray,
         BuiltinType::UtfCodepoint,
         BuiltinType::Never,
-        BuiltinType::Record,
         BuiltinType::Boundary,
         BuiltinType::Continuation,
         BuiltinType::Key,
@@ -301,7 +302,6 @@ impl BuiltinType {
             BuiltinType::BitArray => "BitArray",
             BuiltinType::UtfCodepoint => "UtfCodepoint",
             BuiltinType::Never => "Never",
-            BuiltinType::Record => "Record",
             BuiltinType::Boundary => "Boundary",
             BuiltinType::Continuation => "Continuation",
             BuiltinType::Key => "Key",
@@ -335,19 +335,6 @@ pub struct Type {
 }
 
 #[derive(Clone, Debug)]
-pub struct RecordLabel {
-    pub ident: Ident,
-    pub parameter: Option<TyVarId>,
-}
-
-impl std::ops::Deref for RecordLabel {
-    type Target = Ident;
-    fn deref(&self) -> &Ident {
-        &self.ident
-    }
-}
-
-#[derive(Clone, Debug)]
 pub enum TypeKind {
     Lit(crate::types::LitValue),
     Of {
@@ -365,10 +352,9 @@ pub enum TypeKind {
     /// `_`.
     Hole,
     Tuple(Vec<Type>),
+    /// Closed labelled data (syntax-3 §2.3): `(name: String, age: Int)`.
     Record {
-        base: Option<Box<Type>>,
-        fields: Vec<(RecordLabel, Type)>,
-        removed: Vec<RecordLabel>,
+        fields: Vec<(Ident, Type)>,
     },
     Fn {
         params: Vec<FnParamType>,
@@ -464,6 +450,9 @@ pub enum ExprKind {
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
     Fn(Box<Function>),
+    /// A multi-shape function value: one function per shape group of a
+    /// chain, in the order of the first branch of each group.
+    Multi(Vec<MultiGroup>),
     Case {
         subject: Box<Expr>,
         clauses: Vec<Clause>,
@@ -506,6 +495,15 @@ pub enum ExprKind {
 #[derive(Clone, Debug)]
 pub struct Arg {
     pub label: Option<Ident>,
+    pub value: Expr,
+}
+
+/// One shape group of a multi-shape function value. The value is the name
+/// of the group's function or a function expression; it takes the parts of
+/// the shape in canonical order.
+#[derive(Clone, Debug)]
+pub struct MultiGroup {
+    pub shape: crate::types::ShapeId,
     pub value: Expr,
 }
 
@@ -683,10 +681,7 @@ pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
                 walk_type(t, f);
             }
         }
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(base) = base {
-                walk_type(base, f);
-            }
+        TypeKind::Record { fields } => {
             for (_, field) in fields {
                 walk_type(field, f);
             }
@@ -921,6 +916,11 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
                 }
             }
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => expr(target, f),
+            ExprKind::Multi(groups) => {
+                for g in groups {
+                    expr(&g.value, f);
+                }
+            }
             ExprKind::RecordUpdate { base, fields, .. } => {
                 expr(base, f);
                 for (_, e) in fields {

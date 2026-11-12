@@ -17,7 +17,6 @@ pub(super) struct Template {
 
 fn has_algebra(t: &Ty) -> bool {
     match t {
-        Ty::Graph(_) => true,
         Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
         Ty::Fn(f) => {
@@ -31,12 +30,6 @@ fn has_algebra(t: &Ty) -> bool {
 
 fn has_record(t: &Ty) -> bool {
     match t {
-        Ty::Graph(g) => g.nodes().into_iter().any(|(_, node)| {
-            matches!(
-                node,
-                super::records::Node::Rec(_) | super::records::Node::Without(..)
-            )
-        }),
         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
         Ty::Fn(f) => {
             f.params.iter().any(|(_, t)| has_record(t))
@@ -58,7 +51,6 @@ impl Template {
 
 pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
     match t {
-        Ty::Graph(g) => g.map_vars(f),
         Ty::Var(v) => f(*v),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -223,34 +215,12 @@ impl Checker<'_> {
                 }
             }
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(&mut go).collect::<Option<_>>()?),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let pool = super::records::Pool::default();
-                let mut labels = Vec::new();
-                let mut resolved = Vec::new();
-                for (name, ty) in fields {
-                    let label = super::records::written_label(name, self.s.level);
-                    labels.push(label.clone());
-                    resolved.push((label, go(ty)?));
-                }
-                labels.extend(
-                    removed
-                        .iter()
-                        .map(|name| super::records::written_label(name, self.s.level)),
-                );
-                let record = pool.record(resolved);
-                match base {
-                    Some(base) => {
-                        let base = go(base)?;
-                        let rest = pool.without(&base, labels);
-                        pool.inter(&[rest, record])
-                    }
-                    None => record,
-                }
-            }
+            TypeKind::Record { fields } => Ty::record(
+                fields
+                    .iter()
+                    .map(|(name, ty)| Some((name.name.clone(), go(ty)?)))
+                    .collect::<Option<_>>()?,
+            ),
             TypeKind::Union(ts) => Ty::Union(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Inter(ts) => Ty::Inter(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Diff(ts) => {
@@ -318,7 +288,6 @@ impl Checker<'_> {
     fn normalize_known_alias(&self, t: Ty) -> Ty {
         let go = |t| self.normalize_known_alias(t);
         match t {
-            Ty::Graph(_) => t,
             Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),

@@ -85,8 +85,6 @@ pub(crate) struct VarState {
     pub upper: Vec<Ty>,
     /// The name written in an annotation (§4.7), kept when it is shown.
     pub name: Option<String>,
-    /// The binding-scoped label whose key value has this variable's type.
-    pub label_key: Option<crate::hir::TyVarId>,
     /// Values may come to the variable from outside the constraints: it is
     /// the type of a parameter, a written type variable, or the result of a
     /// function that is not known. Its lower bounds are then not all its
@@ -101,11 +99,6 @@ pub(crate) struct VarState {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum FailKind {
-    NoField,
-    LabelMayBe,
-    LabelEscapes,
-    UnionProof,
-    ResourceLimit,
     /// The left side is not a subtype of the right side.
     Mismatch,
     /// Only an Int/String value-set inclusion failed.
@@ -120,6 +113,9 @@ pub(crate) enum FailKind {
     EnvForms,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
+    /// A multi-shape function value where a function of one shape is
+    /// wanted. Temporary, until the run time has multi-shape values.
+    MultiCall,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -127,17 +123,6 @@ pub(crate) struct Failure {
     pub kind: FailKind,
     pub lhs: Ty,
     pub rhs: Ty,
-    pub record: Option<RecordFailure>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum RecordFailure {
-    Missing(super::records::Label),
-    Removed(super::records::Label),
-    MayBe {
-        key: super::records::Label,
-        required: super::records::Label,
-    },
 }
 
 /// The polarity of a place: output (`Pos`), input (`Neg`), or both, for an
@@ -169,7 +154,6 @@ impl Pol {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Solver {
-    pub records: super::records::Pool,
     observed_shape: bool,
     /// Allocation ownership observed during a demanded source group.
     pub observation: Option<(usize, HashSet<V>, std::cell::RefCell<HashSet<V>>)>,
@@ -235,34 +219,14 @@ impl Solver {
     /// proof caches or diagnostic observations from the inference run.
     pub(super) fn scheme_snapshot(&self) -> Solver {
         let mut snapshot = Solver::new(self.variance.clone(), self.type_names.clone());
-        snapshot.records = self.records.clone();
         snapshot.vars = self.vars.clone();
         snapshot.row_params = self.row_params.clone();
         snapshot.has_handlers = self.has_handlers;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
         snapshot
     }
-    pub fn record(&mut self, mut fields: Vec<(super::records::Label, Ty)>) -> Ty {
-        fields.sort_by(|(a, _), (b, _)| a.cmp(b));
-        let mut merged: Vec<(super::records::Label, Ty)> = Vec::with_capacity(fields.len());
-        for (label, ty) in fields {
-            if let Some((last, value)) = merged.last_mut()
-                && *last == label
-            {
-                *value = self.inter(vec![value.clone(), ty]);
-            } else {
-                merged.push((label, ty));
-            }
-        }
-        self.records.record(merged)
-    }
-
-    pub fn without(&self, base: &Ty, labels: Vec<super::records::Label>) -> Ty {
-        self.records.without(base, labels)
-    }
     pub fn new(variance: StdHashMap<TypeId, Vec<Variance>>, type_names: Vec<String>) -> Solver {
         Solver {
-            records: super::records::Pool::default(),
             coalescing_failed: std::cell::Cell::new(false),
             observed_shape: false,
             observation: None,
@@ -301,7 +265,6 @@ impl Solver {
 
     fn observe_type(&self, t: &Ty) {
         match t {
-            Ty::Graph(g) => g.variables().into_iter().for_each(|v| self.observe(v)),
             Ty::Var(v) => self.observe(*v),
             Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
                 for t in ts {
@@ -357,7 +320,6 @@ impl Solver {
             lower: Vec::new(),
             upper: Vec::new(),
             name: None,
-            label_key: None,
             input: false,
             from: Vec::new(),
             into: Vec::new(),
@@ -403,17 +365,16 @@ impl Solver {
             return ParamModes::repeated(Variance::Inv, 0);
         }
         match h {
-            Head::Record => unreachable!("record fields use their graph covariant edges"),
             Head::Named(TypeRef::Custom(id)) => self.variance.get(&id).map_or_else(
                 || ParamModes::repeated(Variance::Inv, n),
                 |ms| ParamModes::from_slice(ms),
             ),
             Head::Named(TypeRef::Builtin(b)) => ParamModes::from_slice(builtin_variance_values(b)),
-            Head::Tuple(_) | Head::Fn => ParamModes::repeated(Variance::Co, n),
+            Head::Shape(_) | Head::Fn => ParamModes::repeated(Variance::Co, n),
         }
     }
 
-    fn fail(&mut self, kind: FailKind, lhs: &Ty, rhs: &Ty) {
+    pub(super) fn fail(&mut self, kind: FailKind, lhs: &Ty, rhs: &Ty) {
         if self
             .failures
             .iter()
@@ -425,33 +386,12 @@ impl Solver {
             kind,
             lhs: lhs.clone(),
             rhs: rhs.clone(),
-            record: None,
         });
-    }
-
-    fn fail_record(&mut self, reason: RecordFailure, lhs: &Ty, rhs: &Ty) {
-        self.fail(
-            if matches!(reason, RecordFailure::MayBe { .. }) {
-                FailKind::LabelMayBe
-            } else {
-                FailKind::NoField
-            },
-            lhs,
-            rhs,
-        );
-        self.failures.last_mut().expect("record failure").record = Some(reason);
     }
 
     /// The highest level of the variables in `t`.
     pub fn level_of(&self, t: &Ty) -> u32 {
         match t {
-            Ty::Graph(g) => g
-                .variables()
-                .into_iter()
-                .map(|v| self.var(v).level)
-                .max()
-                .unwrap_or(0)
-                .max(g.label_level()),
             Ty::Var(v) => self.var(*v).level,
             Ty::Con(_, _, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
             Ty::Fn(f) => f
@@ -842,53 +782,7 @@ impl Solver {
         if l == r
             || matches!(l, Ty::Never)
             || matches!(r, Ty::Top)
-            || matches!(l, Ty::Graph(g) if g.contains_member(r, false))
-            || matches!(r, Ty::Graph(g) if g.contains_member(l, true))
         {
-            return;
-        }
-        if env == Mode::Value
-            && matches!(l, Ty::Graph(g) if g.record_only())
-            && matches!(r, Ty::Graph(g) if g.fields().is_some_and(|fields| fields.is_empty()))
-        {
-            return;
-        }
-        if env == Mode::Value && !matches!(l, Ty::Var(_)) && !matches!(r, Ty::Var(_)) {
-            let record_source = matches!(l, Ty::Graph(g) if g.record_only())
-                || matches!(l, Ty::Inter(ms) if ms.iter().any(|t| matches!(t, Ty::Graph(g) if g.record_only())));
-            if record_source {
-                let members: Vec<_> = match r {
-                    Ty::Graph(g) if g.record_only() && g.has_choices() => vec![r.clone()],
-                    Ty::Union(ms) => ms
-                        .iter()
-                        .filter(|t| t.value_head() == Some(Head::Record))
-                        .cloned()
-                        .collect(),
-                    _ => Vec::new(),
-                };
-                if members.len() > 1
-                    || members
-                        .iter()
-                        .any(|t| matches!(t, Ty::Graph(g) if g.has_choices()))
-                {
-                    let target = self.records.union(&members);
-                    self.prove_record_union(l, &target);
-                    return;
-                }
-            }
-        }
-        if let Ty::Graph(g) = l
-            && !matches!(r, Ty::Var(_))
-            && let Some(view) = g.view()
-        {
-            self.constrain_in(&view, r, env);
-            return;
-        }
-        if let Ty::Graph(g) = r
-            && !matches!(l, Ty::Var(_))
-            && let Some(view) = g.view()
-        {
-            self.constrain_in(l, &view, env);
             return;
         }
         if matches!(l, Ty::Inter(ms) if ms.contains(r))
@@ -995,37 +889,6 @@ impl Solver {
                 let l2 = self.extrude(l, Pol::Pos, level, env, &mut HashMap::default());
                 self.constrain_in(&l2, r, env);
             }
-            (_, Ty::Graph(g)) if matches!(g.node(), super::records::Node::Without(..)) => {
-                let (base, labels) = g.forgotten().expect("forgetting");
-                let mut candidates = vec![l.clone()];
-                if let Ty::Inter(ms) = l {
-                    candidates.extend(ms.iter().cloned());
-                }
-                let witness = candidates.into_iter().find_map(|t| {
-                    let Ty::Graph(g) = t else {
-                        return None;
-                    };
-                    let (b, removed) = g.forgotten()?;
-                    removed.iter().all(|l| labels.contains(l)).then_some(b)
-                });
-                if let Some(witness) = witness {
-                    self.constrain_in(&witness, &base, env);
-                } else {
-                    self.constrain_in(l, &base, env);
-                    let all = self.record(Vec::new());
-                    self.constrain_in(l, &all, env);
-                }
-            }
-            (_, Ty::Graph(g))
-                if g.fields().is_some_and(|fs| fs.len() > 1)
-                    && !matches!(l, Ty::Graph(left) if left.fields().is_some()) =>
-            {
-                for field in g.fields().expect("record product") {
-                    let part = self.record(vec![field]);
-                    self.constrain_in(l, &part, env);
-                }
-            }
-            (Ty::Graph(g), _) if g.forgotten().is_some() => self.record_without_left(g, r, env),
             (Ty::Inter(ms), _) => {
                 // `a & T <: R` is true when `T <: R` or when `a <: R`
                 // (§4.5 rule 2). The members that are not type variables
@@ -1041,27 +904,13 @@ impl Solver {
                 }
                 tries.extend(vars);
                 let before = self.failures.len();
-                let mut record_failure = None;
                 let last = tries.len().saturating_sub(1);
                 for (i, t) in tries.iter().enumerate() {
                     self.constrain_in(t, r, env);
-                    if record_failure.is_none()
-                        && self.failures[before..]
-                            .iter()
-                            .any(|f| matches!(f.kind, FailKind::NoField | FailKind::LabelMayBe))
-                    {
-                        record_failure = Some(self.failures[before..].to_vec());
-                    }
                     if self.failures.len() == before || i == last {
                         break;
                     }
                     self.failures.truncate(before);
-                }
-                if self.failures.len() > before
-                    && let Some(failures) = record_failure
-                {
-                    self.failures.truncate(before);
-                    self.failures.extend(failures);
                 }
             }
             (Ty::Diff(a, h), _) => self.diff_left(a, h, r, env),
@@ -1087,36 +936,6 @@ impl Solver {
                     );
                 } else {
                     self.constrain_in(l, a, env);
-                }
-            }
-            (Ty::Graph(left), Ty::Graph(right))
-                if left.fields().is_some() && right.fields().is_some() =>
-            {
-                if env != Mode::Value {
-                    self.fail(FailKind::Mismatch, l, r);
-                    return;
-                }
-                for (label, wanted) in right.fields().expect("record") {
-                    match left.field(&label) {
-                        super::records::Field::Found(value) => {
-                            self.constrain_in(&value, &wanted, Mode::Value)
-                        }
-                        super::records::Field::MayBe(key) => {
-                            let part = self.record(vec![(label.clone(), wanted)]);
-                            self.fail_record(
-                                RecordFailure::MayBe {
-                                    key,
-                                    required: label,
-                                },
-                                l,
-                                &part,
-                            );
-                        }
-                        _ => {
-                            let part = self.record(vec![(label.clone(), wanted)]);
-                            self.fail_record(RecordFailure::Missing(label), l, &part);
-                        }
-                    }
                 }
             }
             (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
@@ -1145,12 +964,15 @@ impl Solver {
                 }
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if f.params.len() != g.params.len() {
+                if super::groups::is_multi(f) || super::groups::is_multi(g) {
+                    self.constrain_fn_data(f, g, l, r);
+                } else if f.params.len() != g.params.len() {
                     self.fail(FailKind::Arity, l, r);
                     return;
-                }
-                for (p, q) in f.params.iter().zip(&g.params) {
-                    self.constrain(&q.1, &p.1);
+                } else {
+                    for (p, q) in f.params.iter().zip(&g.params) {
+                        self.constrain(&q.1, &p.1);
+                    }
                 }
                 self.constrain(&f.ret, &g.ret);
                 self.constrain_row(&f.err, &g.err);
@@ -1169,49 +991,6 @@ impl Solver {
                 self.constrain_in(y, x, row);
             }
             Variance::Bi => {}
-        }
-    }
-
-    fn record_without_left(&mut self, graph: &super::records::Graph, r: &Ty, env: Mode) {
-        let l = Ty::Graph(graph.clone());
-        let (base, removed) = graph.forgotten().expect("forgetting source");
-        match r {
-            Ty::Graph(target) if target.fields().is_some() => {
-                let fields = target.fields().expect("record target");
-                if fields.is_empty() && env == Mode::Value {
-                    return;
-                }
-                for (label, value) in fields {
-                    if removed.contains(&label) {
-                        let part = self.record(vec![(label.clone(), value)]);
-                        self.fail_record(RecordFailure::Removed(label), &l, &part);
-                        return;
-                    }
-                    if let Some(key) = removed.iter().find(|key| key.may_equal(&label)) {
-                        let part = self.record(vec![(label.clone(), value)]);
-                        self.fail_record(
-                            RecordFailure::MayBe {
-                                key: key.clone(),
-                                required: label,
-                            },
-                            &l,
-                            &part,
-                        );
-                        return;
-                    }
-                }
-                self.constrain_in(&base, r, env);
-            }
-            Ty::Union(ms) => self.route(&l, ms, env),
-            Ty::Diff(base, heads) => {
-                if heads.iter().any(|h| h.value_head() == Some(Head::Record)) {
-                    self.fail(FailKind::Mismatch, &l, r);
-                } else {
-                    self.constrain_in(&l, base, env);
-                }
-            }
-            Ty::Both(_, input) => self.constrain_in(&l, input, env),
-            _ => self.fail(FailKind::Mismatch, &l, r),
         }
     }
 
@@ -1404,19 +1183,6 @@ impl Solver {
 
     /// The checks of `add_bound` for two bounds on one side of a variable.
     fn compare(&mut self, a: &Ty, b: &Ty, lower: bool, env: Mode, level: u32) {
-        if let Ty::Graph(g) = a
-            && g.is_ordinary_head()
-        {
-            self.compare(&g.view().expect("ordinary head"), b, lower, env, level);
-            return;
-        }
-        if let Ty::Graph(g) = b
-            && g.is_ordinary_head()
-        {
-            self.compare(a, &g.view().expect("ordinary head"), lower, env, level);
-            return;
-        }
-
         if a == b || a.head() != b.head() {
             return;
         }
@@ -1424,20 +1190,11 @@ impl Solver {
         // problems at each place.
         let first = !self.compared.contains(&(b.clone(), a.clone(), lower, env))
             && self.compared.insert((a.clone(), b.clone(), lower, env));
-        let is_lower_bound = lower;
         let lower = lower && first;
         match (a, b) {
-            (Ty::Graph(left), Ty::Graph(right))
-                if !is_lower_bound && left.fields().is_some() && right.fields().is_some() =>
-            {
-                for (label, x) in left.fields().expect("record bound") {
-                    if let super::records::Field::Found(y) = right.field(&label) {
-                        self.compare(&x, &y, false, env, level);
-                    }
-                }
-            }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if g.params.len() != f.params.len() {
+                let multi = super::groups::is_multi(f) || super::groups::is_multi(g);
+                if g.params.len() != f.params.len() && !multi {
                     // All function types are one head; their parameters
                     // must agree in number to be put together.
                     self.fail(FailKind::Arity, b, a);
@@ -1494,22 +1251,6 @@ impl Solver {
         let mut flat = Vec::new();
         flatten_union(ms, &mut flat);
         let h = l.value_head();
-        if h == Some(Head::Record) {
-            let records: Vec<_> = flat
-                .iter()
-                .filter(|m| m.value_head() == h)
-                .cloned()
-                .collect();
-            if records.len() > 1
-                || records
-                    .iter()
-                    .any(|t| matches!(t, Ty::Graph(g) if g.has_choices()))
-            {
-                let target = self.records.union(&records);
-                self.prove_record_union(l, &target);
-                return;
-            }
-        }
         let mut rest = None;
         if h.is_some()
             && let Some(m) = flat.iter().find(|m| m.value_head() == h)
@@ -1552,16 +1293,6 @@ impl Solver {
                 &Ty::Union(ms.to_vec()),
             ),
             _ => self.fail(FailKind::Ambiguous, l, &Ty::Union(ms.to_vec())),
-        }
-    }
-
-    fn prove_record_union(&mut self, l: &Ty, r: &Ty) {
-        let mut demand = super::records::Demand::new(super::records::Demand::LIMIT, true);
-        match super::records::prove(self, l, r, &mut demand) {
-            super::records::Verdict::Proven => (),
-            super::records::Verdict::Refuted => self.fail(FailKind::Mismatch, l, r),
-            super::records::Verdict::Unknown => self.fail(FailKind::UnionProof, l, r),
-            super::records::Verdict::ResourceLimit => self.fail(FailKind::ResourceLimit, l, r),
         }
     }
 
@@ -1627,10 +1358,6 @@ impl Solver {
     ) -> Ty {
         let env = env.max(self.mode(t));
         self.observe_type(t);
-        if matches!(t, Ty::Graph(g) if g.label_level() > level) {
-            self.fail(FailKind::LabelEscapes, t, &Ty::Top);
-            return Ty::Never;
-        }
         if self.level_of(t) <= level {
             return t.clone();
         }
@@ -1738,10 +1465,6 @@ impl Solver {
                     return Ty::Var(*nv);
                 }
                 let nv = self.fresh_at(self.level);
-                if let Some(label) = self.vars[v.0 as usize].label_key {
-                    self.vars[nv.0 as usize].name = self.vars[v.0 as usize].name.clone();
-                    self.vars[nv.0 as usize].label_key = Some(label);
-                }
                 map.insert(*v, nv);
                 self.var_mut(nv).row = self.var(*v).row;
                 self.var_mut(nv).difference = self.var(*v).difference;
@@ -1779,10 +1502,6 @@ impl Solver {
         f: &mut dyn FnMut(&mut Solver, &Ty, Pol) -> Ty,
     ) -> Ty {
         match t {
-            Ty::Graph(g) => {
-                let variance = self.variance.clone();
-                g.map_leaves(pol, &variance, &mut |t, p| f(self, t, p))
-            }
             Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
             Ty::Con(h, values, args) => {
                 let vs = self.variances(*h, args.len());
@@ -1866,25 +1585,6 @@ impl Solver {
     fn union_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         flatten_union(&ms, &mut flat);
-        let mut records = Vec::new();
-        flat.retain(|t| {
-            if matches!(t, Ty::Graph(g) if g.record_only()) {
-                records.push(t.clone());
-                false
-            } else {
-                true
-            }
-        });
-        if !records.is_empty() {
-            flat.push(self.records.union(&records));
-        }
-        for member in &mut flat {
-            if let Ty::Graph(g) = member
-                && g.is_ordinary_head()
-            {
-                *member = g.view().expect("ordinary graph head");
-            }
-        }
         if !env {
             flat = join_literals(flat);
         }
@@ -1900,7 +1600,6 @@ impl Solver {
                 .head()
                 .and_then(|h| out.iter().position(|o| o.head() == Some(h)))
             {
-                Some(_) if m.value_head() == Some(Head::Record) => out.push(m),
                 Some(i) if env => {
                     if out[i].values() != m.values() {
                         out.push(m);
@@ -1942,36 +1641,6 @@ impl Solver {
             match m {
                 Ty::Inter(inner) => flat.extend(inner),
                 m => flat.push(m),
-            }
-        }
-        if flat
-            .iter()
-            .any(|t| matches!(t, Ty::Graph(g) if g.record_only()))
-        {
-            let mut fields = Vec::new();
-            let mut has_product = false;
-            let mut rest = Vec::new();
-            for t in flat {
-                if let Ty::Graph(g) = &t
-                    && let Some(product) = g.fields()
-                {
-                    has_product = true;
-                    fields.extend(product);
-                    continue;
-                }
-                rest.push(t);
-            }
-            if has_product {
-                let product = self.record(fields);
-                rest.push(product);
-            }
-            return self.records.inter(&rest);
-        }
-        for member in &mut flat {
-            if let Ty::Graph(g) = member
-                && g.is_ordinary_head()
-            {
-                *member = g.view().expect("ordinary graph head");
             }
         }
         // `{ A | B } & C` is `A & C | B & C` (§4.4), for a union whose
@@ -2027,6 +1696,15 @@ impl Solver {
     /// and by intersection when not. In an environment (`env`), the
     /// arguments must be equal (§9.2).
     fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
+        // A multi-shape function type is put together with any function
+        // type through the parameter data (syntax three §2.6.5).
+        let (a, b) = match (a, b) {
+            (Ty::Fn(f), Ty::Fn(g)) if super::groups::is_multi(&f) != super::groups::is_multi(&g) => (
+                Ty::Fn(Box::new(super::groups::as_multi(*f))),
+                Ty::Fn(Box::new(super::groups::as_multi(*g))),
+            ),
+            pair => pair,
+        };
         match (a, b) {
             (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
                 if env {
@@ -2206,7 +1884,6 @@ impl Solver {
     pub fn normalize_mode(&mut self, t: Ty, mode: Mode) -> Ty {
         let mode = mode.max(self.mode(&t));
         match t {
-            Ty::Graph(g) => g.normalize(self, mode),
             Ty::Con(h, values, args) => {
                 let modes = self.rows(h, args.len());
                 Ty::Con(
@@ -2257,14 +1934,6 @@ impl Solver {
             ),
             t => t,
         }
-    }
-
-    pub(super) fn inter_mode(&mut self, members: Vec<Ty>, mode: Mode) -> Ty {
-        let scalar = members.iter().any(|t| t.scalar().is_some());
-        self.inter_in(
-            members,
-            mode != Mode::Value && !(mode == Mode::Row && scalar),
-        )
     }
 
     /// `t` with each `Top` in it changed to a new variable at `level`.
@@ -2680,17 +2349,6 @@ fn edge_vars(s: &Solver, (v, p): (V, bool)) -> Vec<(V, bool, bool)> {
 /// goes into them.
 fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
-        Ty::Graph(g) => {
-            let pol = if pos { Pol::Pos } else { Pol::Neg };
-            for (v, pol, con) in g.variable_sites(s, pol, con, false) {
-                if pol != Pol::Neg {
-                    out.push((v, true, con));
-                }
-                if pol != Pol::Pos {
-                    out.push((v, false, con));
-                }
-            }
-        }
         Ty::Var(v) => out.push((*v, pos, con)),
         Ty::Con(h, _, args) => {
             let vs = s.variances(*h, args.len());

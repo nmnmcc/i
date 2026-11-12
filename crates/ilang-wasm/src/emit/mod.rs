@@ -13,12 +13,16 @@ mod host;
 mod numeric;
 mod wasi;
 
-pub(super) const FIXED_MAX: usize = 10_000;
 
 /// Support functions of the generated code, for tests in patterns.
 const SUPPORT: &str = r#"
-(func $is_record (param $v eqref) (result i32)
-  (i32.eq (call $value_tag (local.get $v)) (i32.const 14)))
+(func $is_data (param $v eqref) (param $set i32) (param $n i32) (result i32)
+  (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 4))
+    (then (i32.and
+      (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $set))
+      (i32.eq (array.len (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v)))))
+        (local.get $n))))
+    (else (i32.const 0))))
 (func $is_ctor (param $v eqref) (param $c i32) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 5))
     (then (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $c)))
@@ -44,10 +48,7 @@ const SUPPORT: &str = r#"
     (then (i32.eqz (call $string_compare (local.get $v) (local.get $s))))
     (else (i32.const 0))))
 (func $is_tuple (param $v eqref) (param $n i32) (result i32)
-  (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 4))
-    (then (i32.eq (array.len (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v)))))
-      (local.get $n)))
-    (else (i32.const 0))))
+  (call $is_data (local.get $v) (i32.const 0) (local.get $n)))
 "#;
 
 /// The `fail` of the `Assert` of entry points, after the host part.
@@ -233,21 +234,6 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m.push_str(&host::effects());
     m.push_str(ENTRY);
     m.push_str(&e.data);
-    for (id, label) in p.labels.iter().enumerate() {
-        if label.len() > FIXED_MAX {
-            let _ = writeln!(m, "(global $label_{id} (mut eqref) (ref.null eq))");
-        } else {
-            let bytes = label
-                .bytes()
-                .map(|b| format!(" (i32.const {b})"))
-                .collect::<String>();
-            let _ = writeln!(
-                m,
-                "(global $label_{id} (ref $obj) (struct.new $obj (i32.const 3) (i32.const 0) (i64.const 0) (f64.const 0) (array.new_fixed $bytes {}{bytes}) (ref.null $values) (ref.null $limbs) (ref.null $call)))",
-                label.len()
-            );
-        }
-    }
     for (ctor, ty) in &e.ctors {
         let _ = writeln!(
             m,
@@ -403,10 +389,6 @@ impl<'p> Emitter<'p> {
             let _ = write!(self.out, " (param $l{i} eqref)");
         }
         self.out.push_str(" (result eqref)\n");
-        if self.p.labels.len() > FIXED_MAX / 2 {
-            self.out
-                .push_str(" (local $record_pairs (ref null $values))\n");
-        }
         for (i, t) in locals.iter().enumerate().skip(arity as usize) {
             let _ = write!(self.out, " (local $l{i} {})", local_type(*t));
         }
@@ -716,7 +698,6 @@ impl<'p> Emitter<'p> {
                 None => format!("(local.get $l{l})"),
             },
             Atom::Global(g) => format!("(global.get $g{})", g.0),
-            Atom::Label(label) => self.label(*label),
             Atom::Func(f) => format!("(global.get $c{})", f.0),
             Atom::Nil => "(ref.null eq)".into(),
             Atom::Bool(true) => "(global.get $value_true)".into(),
@@ -740,46 +721,6 @@ impl<'p> Emitter<'p> {
 
     fn atoms(&mut self, atoms: &[Atom]) -> String {
         atoms.iter().map(|a| format!(" {}", self.atom(a))).collect()
-    }
-
-    fn label(&self, label: LabelConst) -> String {
-        if self.p.labels[label.0 as usize].len() > FIXED_MAX {
-            format!("(ref.as_non_null (global.get $label_{}))", label.0)
-        } else {
-            format!("(global.get $label_{})", label.0)
-        }
-    }
-
-    fn record_pairs(&mut self, fields: &[(LabelConst, Atom)]) -> String {
-        let mut fields: Vec<_> = fields.iter().collect();
-        fields.sort_unstable_by(|a, b| {
-            self.p.labels[a.0.0 as usize]
-                .as_bytes()
-                .cmp(self.p.labels[b.0.0 as usize].as_bytes())
-        });
-        let len = 2 * fields.len();
-        if len <= FIXED_MAX {
-            let pairs = fields
-                .into_iter()
-                .map(|(label, atom)| format!(" {} {}", self.label(*label), self.atom(atom)))
-                .collect::<String>();
-            return format!("(array.new_fixed $values {len}{pairs})");
-        }
-        let mut body = format!(
-            "(block (result (ref $values)) (local.set $record_pairs (array.new_default $values (i32.const {len})))\n"
-        );
-        for (index, (label, atom)) in fields.into_iter().enumerate() {
-            let label = self.label(*label);
-            let value = self.atom(atom);
-            let _ = writeln!(
-                body,
-                "(array.set $values (ref.as_non_null (local.get $record_pairs)) (i32.const {}) {label})\n(array.set $values (ref.as_non_null (local.get $record_pairs)) (i32.const {}) {value})",
-                2 * index,
-                2 * index + 1
-            );
-        }
-        body.push_str("(ref.as_non_null (local.get $record_pairs)))");
-        body
     }
 
     /// An operation; those that call i code get the environment `env`.
@@ -897,16 +838,10 @@ impl<'p> Emitter<'p> {
                 parts.len(),
                 self.atoms(parts)
             ),
-            Value::RecNew(fields) => format!("(call $record_new {})", self.record_pairs(fields)),
-            Value::RecGet(base, label) => format!(
-                "(call $record_get {} {})",
-                self.atom(base),
-                self.label(*label)
-            ),
-            Value::RecWith(base, fields) => format!(
-                "(call $record_with {} {})",
-                self.atom(base),
-                self.record_pairs(fields)
+            Value::Data(set, parts) => format!(
+                "(call $data (i32.const {set}) (array.new_fixed $values {}{}))",
+                parts.len(),
+                self.atoms(parts)
             ),
             Value::Record { ctor, ty, fields } => format!(
                 "(call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {}{}))",
@@ -1095,7 +1030,10 @@ impl<'p> Emitter<'p> {
                 self.atom(a),
                 *t as i32
             ),
-            Cond::IsRec(a) => format!("(call $is_record {})", self.atom(a)),
+            Cond::Data(a, set, n) => format!(
+                "(call $is_data {} (i32.const {set}) (i32.const {n}))",
+                self.atom(a)
+            ),
             Cond::Bool(a, b) => {
                 format!("(call $is_bool {} (i32.const {}))", self.atom(a), *b as i32)
             }
@@ -1167,12 +1105,26 @@ impl<'p> Emitter<'p> {
         let modules: Vec<String> = self.p.site_modules.iter().map(|m| self.string(m)).collect();
         let names: Vec<String> = self.p.constructors.iter().map(|m| self.string(m)).collect();
         let _ = writeln!(self.out, "(func $ilang_start (export \"ilang_start\")");
-        for (id, label) in self.p.labels.iter().enumerate() {
-            if label.len() > FIXED_MAX {
-                let value = self.string(label);
-                let _ = writeln!(self.out, "(global.set $label_{id} {value})");
-            }
-        }
+        let shapes: Vec<String> = self
+            .p
+            .shapes
+            .clone()
+            .iter()
+            .map(|labels| {
+                let labels: Vec<String> = labels.iter().map(|l| self.string(l)).collect();
+                format!(
+                    "(array.new_fixed $values {} {})",
+                    labels.len(),
+                    labels.join(" ")
+                )
+            })
+            .collect();
+        let _ = writeln!(
+            self.out,
+            "(call $shapes_install (array.new_fixed $values {} {}))",
+            shapes.len(),
+            shapes.join(" ")
+        );
         let _ = writeln!(
             self.out,
             "(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {}))\n\

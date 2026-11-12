@@ -347,12 +347,13 @@ pub fn wat() -> String {
       ;; 2: the parts of a tuple or a custom value, from `index` on.
       (if (i32.eq (local.get $kind) (i32.const 2))
         (then
-          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 14))
-            (then (call $inspect_record_field (local.get $value) (local.get $index)) (br $next)))
           (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
           (if (ref.is_null (local.get $fields)) (then (br $next)))
           (br_if $next (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $fields)))))
           (if (local.get $index) (then (call $ib_comma)))
+          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 4))
+            (then (call $inspect_label (local.get $value) (local.get $index)
+              (array.len (ref.as_non_null (local.get $fields))))))
           (call $inspect_push (i32.const 2) (local.get $value) (i32.add (local.get $index) (i32.const 1)))
           (call $inspect_push (i32.const 0)
             (array.get $values (ref.as_non_null (local.get $fields)) (local.get $index)) (i32.const 0))
@@ -370,8 +371,6 @@ pub fn wat() -> String {
 
       ;; 0: a value.
       (local.set $tag (call $value_tag (local.get $value)))
-      (if (i32.eq (local.get $tag) (i32.const 14))
-        (then (call $inspect_record (local.get $value)) (br $next)))
       (if (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
         (then
           (local.set $obj (ref.cast (ref $obj) (local.get $value)))
@@ -400,6 +399,17 @@ pub fn wat() -> String {
     (global.set $it_values (ref.null $values))
     (global.set $it_meta (ref.null $frames))
     (call $string_from_bytes (local.get $out)))
+
+  ;; `label = ` before the labelled part `index` of data (syntax-3 §2.15).
+  (func $inspect_label (param $value eqref) (param $index i32) (param $len i32)
+    (local $labels (ref null $values)) (local $at i32)
+    (local.set $labels (call $data_labels (local.get $value)))
+    (if (ref.is_null (local.get $labels)) (then (return)))
+    (local.set $at (i32.sub (local.get $index)
+      (i32.sub (local.get $len) (array.len (ref.as_non_null (local.get $labels))))))
+    (if (i32.lt_s (local.get $at) (i32.const 0)) (then (return)))
+    (call $ib_string (array.get $values (ref.as_non_null (local.get $labels)) (local.get $at)))
+    (call $ib_byte (i32.const 32)) (call $ib_byte (i32.const 61)) (call $ib_byte (i32.const 32)))
 
   (func $value_inspect (param $value eqref) (result eqref)
     (return_call $inspect (local.get $value)))
