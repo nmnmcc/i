@@ -84,7 +84,12 @@ Source text is cut into tokens from left to right. At every point, the longest t
 int_lit    = decimal | "0x" hex { hex | "_" } | "0o" oct { oct | "_" } | "0b" bin { bin | "_" } .
 decimal    = digit { digit | "_" } .
 float_lit  = decimal "." [ decimal ] [ "e" [ "-" ] decimal ] .
-string_lit = '"' { char | escape } '"' .
+string_lit = cooked_string | multiline_string | raw_string .
+cooked_string = '"' { char | escape | interpolation } '"' .
+interpolation = "\(" Expr ")" .
+multiline_string = '"""' line_end { char | escape | interpolation } line_end indent '"""' .
+raw_string = hashes ( cooked_string | multiline_string ) hashes .
+hashes = "#" { "#" } .
 escape     = "\" ( "n" | "r" | "t" | "f" | '"' | "\" ) | "\u{" hex { hex } "}" .
 ```
 
@@ -94,6 +99,9 @@ escape     = "\" ( "n" | "r" | "t" | "f" | '"' | "\" ) | "\u{" hex { hex } "}" .
 - `\u{…}` has 1 to 6 hex digits. Its value must be a Unicode scalar value: 0 to 10FFFF, but not D800 to DFFF. If not, it is a compile error.
 - An integer literal may be of any size.
 - A string may go over more than one line. Line ends in it are changed as in §1.1.
+- In an expression, `"a\(e)b"` interpolates an expression `e`, including calls, blocks and nested string literals. Every interpolated expression must have type `String`; there is no implicit conversion. Before the core tree, interpolation becomes `<>` of its parts from the left, leaving out empty text parts. `"a\(x)b"` is `"a" <> x <> "b"`; a sole expression keeps an empty part: `"\(x)"` is `"" <> x`. Interpolation is forbidden in record labels, attribute arguments, import paths, literal types and patterns. The normal formatter retains interpolation as written; the Lisp surface has no interpolation and uses `<>`.
+- A multi-line string begins with `"""` immediately followed by a line break. Its closing `"""` is on a line preceded only by spaces or tabs. That exact indentation prefix is removed from every nonblank content line; a line with less or different indentation is a compile error. Blank lines with less indentation are accepted and made empty; indentation beyond the closing prefix remains part of a blank line. The opening line break and the line break before the closing line are not part of the value. Escapes and interpolation work as in ordinary strings. A backslash immediately before a physical line break joins that line to the next after indentation is removed.
+- A raw string surrounds its quotes with one or more matching `#`, as in `#"text"#`, `##"text"##` or `#"""` … `"""#`. Backslashes are literal unless followed by exactly the opening number of hashes. With one hash, `\#n` is a line feed and `\#(e)` interpolates, while `\n` and `\(e)` remain literal text. Raw multi-line strings use the same indentation and delimiter-line rules; `\#` at line end joins lines in a one-hash raw string. Closing quotes consume the matching number of hashes; too few do not close the string.
 
 ### 1.7 Lines
 
@@ -830,7 +838,7 @@ The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 - `C(p1, …)`: `T(b1, …, bm)`, the type of `C` with a new type variable for each type parameter. The part for `pi` is the type of the field that `pi` is matched to (§7.1), with these variables.
 - `(p1, …, pn)`: `(b1, …, bn)`, with new type variables. The part for `pi` is `bi`.
 - `[p1, …, pn]` and `[p1, …, pn, ..r]`: `List(b)`, with a new type variable. The part for each `pi` is `b`, and `r` gets `List(b)`.
-- `"lit" <> r`: `String`, and `r` gets `String`.
+- `"lit" <> r`, `r <> "lit"`, and `"a" <> r <> "b"`: `String`, and `r` gets `String`.
 - A bit array pattern: `BitArray`. The parts get the types of their formats (§8.2). A literal value in a segment also has the type of its format, not its literal type.
 - `x = q`: the pattern type of `q`, and `x` gets that type.
 - `x: T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
@@ -862,7 +870,7 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - `v.f` and `v.k` have the field or part type of rule 13, when it has no type variable that is not put in.
 - A block has the known type of its last expression.
 - In a match `e |> { … }`, every clause pattern is a pattern fitted to a value with the known type of `e` (below), also when the clause block has one clause and no guard. So with `opt: Option(User)`, `opt |> { Some(u) -> u.name }` is correct, as `Some(u) = opt` followed by `u.name` is.
-- **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`); if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in; the rest `r` of `"lit" <> r` has the known type `String`, all its values, because it is only the end of the value, so the known type of the value says nothing about it. The name `x` of `x = q` gets that member. The name `x` of `x: T` gets `T`, whatever the value. So in `f: (x: Int) -> Int = (y) { … }`, `f` has the label `x`, from its annotation.
+- **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`); if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in; the binder `r` of a string prefix, suffix, or combined pattern has the known type `String`, all its values, because the known type of the whole value says nothing about its remaining part. The name `x` of `x = q` gets that member. The name `x` of `x: T` gets `T`, whatever the value. So in `f: (x: Int) -> Int = (y) { … }`, `f` has the label `x`, from its annotation.
 
 So `(u) { u.name }` needs a type, `(u: User) { u.name }`, but with `opt: Option(User)`, `opt |> { Some(u) -> u.name  None -> "" }` is correct.
 
@@ -1079,8 +1087,9 @@ r = () |> record.put("name", "ada") |> record.put("age", 36)
 ### 7.1 Grammar
 
 ```
-Pattern    = name "=" Pattern | PrefixPat | Atom .
-PrefixPat  = string_lit "<>" ( name | discard ) .
+Pattern    = name "=" Pattern | StringPat | Atom .
+StringPat  = string_lit "<>" Binder [ "<>" string_lit ] | Binder "<>" string_lit .
+Binder     = name | discard .
 Atom       = name | discard | ( name | discard ) ":" Type
            | [ "-" ] int_lit | [ "-." ] float_lit | string_lit
            | Name [ "(" [ PatArgs ] ")" ]
@@ -1115,10 +1124,13 @@ A type test whose type is a record or spread tests only the record head: every p
 | `[p1, …, pn]` | A list of exactly n parts that match | Those of the parts |
 | `[p1, …, pn, ..r]` | A list of n or more parts; `r` is the rest | Those of the parts, and `r` |
 | `"lit" <> r` | A string that starts with `"lit"`; `r` is the rest | `r` |
+| `r <> "lit"` | A string that ends with `"lit"`; `r` is the start | `r` |
+| `"a" <> r <> "b"` | A string with that prefix and suffix, without overlap; `r` is the middle | `r` |
 | `x = p` | What `p` matches | `x` (the full value), and those of `p` |
 | `x: T` | A value whose type constructor is that of a member of `T`; for a member of `Int` or `String`, the value must also be in the value set of the member | `x` |
 | `<< … >>` | See §8 | |
 
+- A string pattern has exactly one binder (or discard), whose inferred and known type is `String` (§4.8). Its literals have no interpolation. `a <> "x" <> b` is a compile error. Prefix and suffix must not overlap: `"ab" <> r <> "ba"` does not match `"aba"`.
 - A pattern may not bind one name two times.
 - In choices `p1 | p2`, every choice must bind the same names. A name gets the union of its types in the choices.
 - `=` is stronger than `|`.
@@ -1133,7 +1145,7 @@ A literal pattern can not fail for its literal type, so `"a" = x` with `x: "a"` 
 
 The clauses of a clause block whose parameter has the type `A` **cover** `A` when, for every value of `A`, some clause without a guard has a pattern that matches it. A clause with a guard is not counted. A clause is **never used** when every value that its pattern matches is matched by an earlier clause without a guard.
 
-A literal pattern matches its own value, and `"lit" <> r` matches every string that starts with `"lit"`. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m: "GET" | "POST"`, `m |> { "GET" -> 1  "POST" -> 2 }` is covered. Literal patterns alone never cover a member with all its values, or with all but a finite set; a catch-all, a type test such as `x: String - "a"`, or, for `String`, the prefix pattern `"" <> r`, which matches every string, must take the other values. A literal in an item of a list pattern, or in a field of a constructor whose type parameter occurs more than once in the fields of its type (`Pair(A) { Pair(A, A) }`, `Event(A) { Start(A)  Stop(A) }`), has the whole `Int` or `String` (§4.8), so such literals cover a finite set only when that type is written or comes from the subject: `(xs: List("a" | "b")) { xs |> { [] -> 0  ["a", ..] -> 1  ["b", ..] -> 2 } }` is covered, and the same block with `(xs)` is not. Literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered, and `{}` covers only `Never`.
+A literal pattern matches its own value, and string prefix/suffix patterns match the strings with their fixed ends. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m: "GET" | "POST"`, `m |> { "GET" -> 1  "POST" -> 2 }` is covered. Literal patterns alone never cover a member with all its values, or with all but a finite set; a catch-all, a type test such as `x: String - "a"`, or, for `String`, the patterns `"" <> r` and `r <> ""`, which match every string, must take the other values. A literal in an item of a list pattern, or in a field of a constructor whose type parameter occurs more than once in the fields of its type (`Pair(A) { Pair(A, A) }`, `Event(A) { Start(A)  Stop(A) }`), has the whole `Int` or `String` (§4.8), so such literals cover a finite set only when that type is written or comes from the subject: `(xs: List("a" | "b")) { xs |> { [] -> 0  ["a", ..] -> 1  ["b", ..] -> 2 } }` is covered, and the same block with `(xs)` is not. Literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered, and `{}` covers only `Never`.
 
 When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the clause block already says so (§4.8 rule 11: `(n: Int) { n |> { 0 -> "zero"  1 -> "one" } }` needs `Int <: 0 | 1`). In a match whose subject already has such a type, that is reported as this error alone, with a value that no clause matches, such as `2`. A clause block that is not the right side of a match gets these values later, through its parameter, so there it is a type error where the values come and also this error (§4.8 rule 11). When a value that is not covered is at a list item place, or at such a field, where the clauses have only literals, the message also says to write that type, such as `List("a" | "b")` or `Pair("a" | "b")`.
 
@@ -2770,3 +2782,16 @@ Wasm call. Teardown does not run i finals; explicit process exit is termination,
 not a way to detach work. WASI resource cleanup must finish before this call.
 
 The adapter reuses the runtime-owned fd_write/proc_exit imports; it does not declare duplicates. The independent runtime stop path, including startup stops, source positions, partial-write retries, LF and exit code 1, cannot call a replaceable Io. Replacing Io leaves this stop path intact.
+
+## Appendix C. String grammar
+
+The string additions to the surface grammar are summarized here (the full lexical rules are §1.6 and pattern rules are §7.1):
+
+```ebnf
+StringExpr = cooked_string | multiline_string | raw_string .
+StringInterpolation = "\(" Expr ")" .
+StringPattern = string_lit "<>" Binder [ "<>" string_lit ]
+              | Binder "<>" string_lit .
+```
+
+`raw_string` requires equal opening and closing hash counts and enables escapes/interpolation only with that same count after the backslash. `string_lit` in a pattern or another literal-only position excludes interpolation. Multi-line delimiters and indentation have the line constraints of §1.6.

@@ -483,15 +483,15 @@ quote = (s: String) -> String {
 	pieces = list.map(core.codepoints(s), (cp) {
 		x = core.codepoint_to_int(cp)
 		x |> {
-			34 -> "\\\""
-			92 -> "\\\\"
-			8  -> "\\b"
-			9  -> "\\t"
-			10 -> "\\n"
-			12 -> "\\f"
-			13 -> "\\r"
+			34 -> #"\""#
+			92 -> #"\\"#
+			8  -> #"\b"#
+			9  -> #"\t"#
+			10 -> #"\n"#
+			12 -> #"\f"#
+			13 -> #"\r"#
 			n ? n < 32 -> string.concat([
-				"\\u00"
+				#"\u00"#
 				text_bytes([hex_char(n / 16), hex_char(n % 16)])
 			])
 			_ -> core.from_codepoints([cp])

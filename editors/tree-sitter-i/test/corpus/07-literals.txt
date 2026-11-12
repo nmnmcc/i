@@ -15,7 +15,9 @@ values = [1, 2, ..tail]
   (binding
     (identifier)
     (string
-      (string_content)))
+      (string_start)
+      (string_content)
+      (string_end)))
   (binding
     (identifier)
     (binary_expression
@@ -38,6 +40,7 @@ values = [1, 2, ..tail]
   (binding
     (identifier)
     (string
+      (string_start)
       (string_content)
       (escape_sequence)
       (string_content)
@@ -46,7 +49,8 @@ values = [1, 2, ..tail]
       (escape_sequence)
       (string_content)
       (escape_sequence)
-      (string_content)))
+      (string_content)
+      (string_end)))
   (binding
     (identifier)
     (bit_array

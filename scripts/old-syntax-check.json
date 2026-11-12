@@ -2830,5 +2830,149 @@
   "crates/ilang-cli/tests/providers.rs:cb4a79fc55a008e5": {
     "not_source": true,
     "reason": "TOML named-entry/test manifest or dependency path format template."
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:d8f95b5fb6532cf4": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:46feaf394748b272": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:cc4dd6b69b368079": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:cbd9f653790dabf1": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is not allowed in patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:d2e4ebd2c9e65f33": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is not allowed in attribute arguments"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:f7892fa942823195": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:e2bc8a6c691e2917": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:5c703ec833151f17": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: a multi-line string opening delimiter must be followed by a line break"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:2cecfa5704a61c22": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: a multi-line string line has less or different indentation than its closing delimiter"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:62a146c0e2796848": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: a multi-line string closing delimiter must be on its own line"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:fa5852397c8fa74a": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0002: this string is not closed"
+    ]
+  },
+  "tests/spec/6/interpolation_attribute.i:c48412aaddaa5301": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is not allowed in attribute arguments"
+    ]
+  },
+  "tests/spec/6/interpolation_import.i:ecd8ff798c1c584a": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "tests/spec/6/interpolation_literal_type.i:75bb4c7f93c42554": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "tests/spec/6/interpolation_pattern.i:88e260862f055ddf": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is not allowed in patterns"
+    ]
+  },
+  "tests/spec/6/interpolation_record_label.i:eeb9f0c09edfea15": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "tests/spec/6/interpolation_type_label.i:45c2037bb33cc260": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+    ]
+  },
+  "tests/spec/6/multiline_close.i:5e7a109bf6e238cc": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: a multi-line string closing delimiter must be on its own line"
+    ]
+  },
+  "tests/spec/6/multiline_open.i:06d9a13f05bbdd4b": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: a multi-line string opening delimiter must be followed by a line break"
+    ]
+  },
+  "tests/spec/6/multiline_underindent.i:8dc3651f587c573b": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: a multi-line string line has less or different indentation than its closing delimiter"
+    ]
+  },
+  "tests/spec/6/raw_string_bad_escape.i:44b7be619631260e": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0003: unknown escape"
+    ]
+  },
+  "tests/spec/6/raw_string_unterminated.i:cbe4abb5f33ac6c0": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0002: this string is not closed"
+    ]
+  },
+  "tests/spec/7/suffix_nonliteral.i:08a91b960c1bc656": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: expected a string literal in a string pattern, found `x`"
+    ]
+  },
+  "tests/spec/7/suffix_two_binders.i:09f5fa9e575099c6": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
+    ]
   }
 }

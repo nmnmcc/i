@@ -5,7 +5,7 @@
   "fileTypes": [
     "i"
   ],
-  "comment": "The syntax of docs/spec.md, §1 to §8.",
+  "comment": "The syntax of docs/spec.md, \u00a71 to \u00a78.",
   "patterns": [
     {
       "include": "#code"
@@ -71,7 +71,7 @@
       ]
     },
     "comments": {
-      "comment": "§1.2: `////` documents the module, `///` the item after it.",
+      "comment": "\u00a71.2: `////` documents the module, `///` the item after it.",
       "patterns": [
         {
           "name": "comment.line.documentation.module.i",
@@ -103,32 +103,129 @@
       ]
     },
     "strings": {
-      "comment": "§1.6: a string may go over more than one line.",
-      "name": "string.quoted.double.i",
-      "begin": "\"",
-      "beginCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.begin.i"
-        }
-      },
-      "end": "\"",
-      "endCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.end.i"
-        }
-      },
       "patterns": [
         {
-          "name": "constant.character.escape.unicode.i",
-          "match": "\\\\u\\{[0-9a-fA-F]{1,6}\\}"
+          "name": "string.quoted.double.raw.i",
+          "begin": "(#+)(\"\"\"|\")",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.i"
+            }
+          },
+          "end": "\\2\\1",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.i"
+            }
+          }
         },
         {
-          "name": "constant.character.escape.i",
-          "match": "\\\\[nrtf\"\\\\]"
+          "name": "string.quoted.double.i",
+          "begin": "\"\"\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.i"
+            }
+          },
+          "end": "\"\"\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.i"
+            }
+          },
+          "patterns": [
+            {
+              "name": "meta.interpolation.i",
+              "begin": "\\\\\\(",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.begin.i"
+                }
+              },
+              "end": "\\)",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.end.i"
+                }
+              },
+              "patterns": [
+                {
+                  "include": "#interpolation-parens"
+                },
+                {
+                  "include": "#code"
+                }
+              ]
+            },
+            {
+              "name": "constant.character.escape.i",
+              "match": "\\\\\\s*$"
+            },
+            {
+              "name": "constant.character.escape.unicode.i",
+              "match": "\\\\u\\{[0-9a-fA-F]{1,6}\\}"
+            },
+            {
+              "name": "constant.character.escape.i",
+              "match": "\\\\[nrtf\"\\\\]"
+            },
+            {
+              "name": "invalid.illegal.escape.i",
+              "match": "\\\\(?:u\\{[^}\"]*\\}?|.)?"
+            }
+          ]
         },
         {
-          "name": "invalid.illegal.escape.i",
-          "match": "\\\\(?:u\\{[^}\"]*\\}?|.)?"
+          "name": "string.quoted.double.i",
+          "begin": "\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.i"
+            }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.i"
+            }
+          },
+          "patterns": [
+            {
+              "name": "meta.interpolation.i",
+              "begin": "\\\\\\(",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.begin.i"
+                }
+              },
+              "end": "\\)",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.section.interpolation.end.i"
+                }
+              },
+              "patterns": [
+                {
+                  "include": "#interpolation-parens"
+                },
+                {
+                  "include": "#code"
+                }
+              ]
+            },
+            {
+              "name": "constant.character.escape.unicode.i",
+              "match": "\\\\u\\{[0-9a-fA-F]{1,6}\\}"
+            },
+            {
+              "name": "constant.character.escape.i",
+              "match": "\\\\[nrtf\"\\\\]"
+            },
+            {
+              "name": "invalid.illegal.escape.i",
+              "match": "\\\\(?:u\\{[^}\"]*\\}?|.)?"
+            }
+          ]
         }
       ]
     },
@@ -155,7 +252,7 @@
       ]
     },
     "numbers": {
-      "comment": "§1.6. After `.`, digits are a decimal, never a float: `t.0.1`.",
+      "comment": "\u00a71.6. After `.`, digits are a decimal, never a float: `t.0.1`.",
       "patterns": [
         {
           "name": "constant.numeric.integer.hexadecimal.i",
@@ -180,7 +277,7 @@
       ]
     },
     "bit-array": {
-      "comment": "§8: `<<a, b: u16be, s: utf8>>`. The formats are fixed words.",
+      "comment": "\u00a78: `<<a, b: u16be, s: utf8>>`. The formats are fixed words.",
       "begin": "<<",
       "beginCaptures": {
         "0": {
@@ -232,7 +329,7 @@
       }
     },
     "call": {
-      "comment": "§6.6: `f(…)`, `m.f(…)`.",
+      "comment": "\u00a76.6: `f(\u2026)`, `m.f(\u2026)`.",
       "match": "\\b(_?[a-z][a-z0-9_]*)(?=\\()",
       "captures": {
         "1": {
@@ -241,7 +338,7 @@
       }
     },
     "field": {
-      "comment": "§6.7: `v.f` and `m.x`; `t.0` is a number.",
+      "comment": "\u00a76.7: `v.f` and `m.x`; `t.0` is a number.",
       "match": "(?<=[\\w)\\]}])(\\.)(_?[a-z][a-z0-9_]*)\\b(?!\\s*\\()",
       "captures": {
         "1": {
@@ -257,12 +354,12 @@
       "match": "\\b(?:True|False|Nil)\\b"
     },
     "builtin-types": {
-      "comment": "§4.2, §9.4, §9.6, §12.",
+      "comment": "\u00a74.2, \u00a79.4, \u00a79.6, \u00a712.",
       "name": "support.type.builtin.i",
       "match": "\\b(?:Record|Int|Float|String|List|BitArray|UtfCodepoint|Never|Bool|Result|Boundary|Continuation|Assert|AssertionFailure)\\b"
     },
     "up-name": {
-      "comment": "§1.3: an UpName is a type or a constructor.",
+      "comment": "\u00a71.3: an UpName is a type or a constructor.",
       "patterns": [
         {
           "name": "entity.name.type.i",
@@ -271,7 +368,7 @@
       ]
     },
     "discard": {
-      "comment": "§1.3: `_` and `__name` bind nothing.",
+      "comment": "\u00a71.3: `_` and `__name` bind nothing.",
       "name": "variable.language.discard.i",
       "match": "\\b(?:_|__[a-z0-9_]*)\\b"
     },
@@ -280,7 +377,7 @@
       "match": "\\b_?[a-z][a-z0-9_]*\\b"
     },
     "operators": {
-      "comment": "§1.5, §6.9. Longer tokens first.",
+      "comment": "\u00a71.5, \u00a76.9. Longer tokens first.",
       "patterns": [
         {
           "name": "keyword.operator.match.i",
@@ -377,7 +474,7 @@
       ]
     },
     "header": {
-      "comment": "§2.2: a header group at the start of a file; nested groups select imported names.",
+      "comment": "\u00a72.2: a header group at the start of a file; nested groups select imported names.",
       "name": "meta.header.i",
       "begin": "^\\s*(\\()(?![^\\n]*\\)\\s*=)",
       "beginCaptures": {
@@ -434,7 +531,7 @@
       ]
     },
     "type-parameters": {
-      "comment": "§4.7: declared UpName variables on a binding head.",
+      "comment": "\u00a74.7: declared UpName variables on a binding head.",
       "begin": "\\b(_?[a-z][a-z0-9_]*)\\s*(\\()(?=[A-Z][A-Za-z0-9]*(?:\\s*,\\s*[A-Z][A-Za-z0-9]*)*\\s*\\)\\s*[:=])",
       "beginCaptures": {
         "1": {
@@ -470,6 +567,18 @@
         },
         {
           "include": "#header"
+        }
+      ]
+    },
+    "interpolation-parens": {
+      "begin": "\\(",
+      "end": "\\)",
+      "patterns": [
+        {
+          "include": "#interpolation-parens"
+        },
+        {
+          "include": "#code"
         }
       ]
     }

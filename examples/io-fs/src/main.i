@@ -14,7 +14,10 @@ main = () {
 	file = dir <> "/first"
 	moved = dir <> "/second"
 	fs.mkdir(dir)
-	fs.write_file(file, <<"hello\nworld\n":utf8>>)
+	fs.write_file(file, <<"""
+		hello
+		world\n
+		""":utf8>>)
 	assert(fs.read_file(file) == <<"hello\nworld\n":utf8>>)
 	assert(fs.read_lines(file) == ["hello", "world"])
 	assert(fs.list(dir) == ["first"])
