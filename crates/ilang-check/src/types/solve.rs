@@ -1187,11 +1187,15 @@ impl Solver {
         // problems at each place.
         let first = !self.compared.contains(&(b.clone(), a.clone(), lower, env))
             && self.compared.insert((a.clone(), b.clone(), lower, env));
+        let upper = !lower;
         let lower = lower && first;
         match (a, b) {
             (Ty::Fn(f), Ty::Fn(g)) => {
                 let multi = super::groups::is_multi(f) || super::groups::is_multi(g);
-                if g.params.len() != f.params.len() && !multi {
+                // Two uses of one value with argument data of different
+                // shapes need a multi-shape value with both (syntax-3.md
+                // §2.6.5): each lower bound is checked against each use.
+                if g.params.len() != f.params.len() && !multi && !upper {
                     // All function types are one head; their parameters
                     // must agree in number to be put together.
                     self.fail(FailKind::Arity, b, a);
