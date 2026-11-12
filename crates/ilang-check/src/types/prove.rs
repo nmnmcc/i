@@ -239,12 +239,10 @@ impl Prover<'_> {
                 }
                 Ok(true)
             }
-            (Ty::Fn(f), Ty::Fn(g)) => {
-                Ok(self.sub(&g.param, &f.param, Mode::Value)?
-                    && self.sub(&f.ret, &g.ret, Mode::Value)?
-                    && self.sub(&f.err, &g.err, Mode::Row)?
-                    && self.sub(&f.env, &g.env, Mode::Env)?)
-            }
+            (Ty::Fn(f), Ty::Fn(g)) => Ok(self.sub(&g.param, &f.param, Mode::Value)?
+                && self.sub(&f.ret, &g.ret, Mode::Value)?
+                && self.sub(&f.err, &g.err, Mode::Row)?
+                && self.sub(&f.env, &g.env, Mode::Env)?),
             _ => Ok(false),
         }
     }

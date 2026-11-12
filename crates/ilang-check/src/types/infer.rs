@@ -77,9 +77,20 @@ struct PendingFailure {
     span: Span,
 }
 
+struct PendingTyped {
+    definition: DefId,
+    module: ModuleId,
+    span: Span,
+    signature: Ty,
+    argument_types: Vec<Ty>,
+    input_spans: HashSet<Span>,
+    locals: HashMap<VarId, Scheme>,
+    known: HashMap<VarId, Ty>,
+}
+
 pub(crate) struct Checker<'a> {
     pub p: &'a Program,
-    sources: &'a Sources,
+    pub(super) sources: &'a Sources,
     pub s: Solver,
     pub diags: Vec<Diagnostic>,
     /// The module whose code is being typed, for the place of problems.
@@ -90,6 +101,8 @@ pub(crate) struct Checker<'a> {
     pub(super) recovery: bool,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
+    /// The expression being typed is the callee of a call.
+    in_callee: bool,
     recursive_bindings: HashSet<VarId>,
     /// The type written at the top of the pattern that binds a name: its
     /// type is shown as written (§2.4).
@@ -116,6 +129,7 @@ pub(crate) struct Checker<'a> {
     pub out: Typed,
     numeric_handles: HashMap<(ModuleId, Span), Ty>,
     numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
+    pub(super) query_binder_handles: HashMap<(ModuleId, Span), Ty>,
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds (§4.8 rule 11).
     pub cases: Vec<super::pattern::PendingCase>,
@@ -129,6 +143,16 @@ pub(crate) struct Checker<'a> {
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
+    pending_typed: Vec<PendingTyped>,
+    checked_holes: HashMap<Span, (Ty, Ty)>,
+    expression_known: HashMap<(ModuleId, Span), Ty>,
+    pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
+    pub(super) typed_handles: super::typed_macro::HandleArena,
+    typed_generalized_roots: HashSet<super::V>,
+    typed_depth: u16,
+    typed_var_count: u32,
+    typed_ty_var_count: u32,
+    pub(super) coverage: std::cell::RefCell<super::coverage::Searches>,
 }
 
 impl<'a> Checker<'a> {
@@ -159,6 +183,7 @@ impl<'a> Checker<'a> {
             reads: super::value_types::Reads::default(),
             recovery: false,
             tyvars: HashMap::new(),
+            in_callee: false,
             written: HashMap::new(),
             kvars: HashMap::new(),
             effects: Vec::new(),
@@ -172,6 +197,7 @@ impl<'a> Checker<'a> {
             out: Typed::default(),
             numeric_handles: HashMap::new(),
             numeric_param_handles: HashMap::new(),
+            query_binder_handles: HashMap::new(),
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
@@ -180,6 +206,16 @@ impl<'a> Checker<'a> {
             group_level: None,
             pending_failures: Vec::new(),
             shared_fields: HashMap::new(),
+            pending_typed: Vec::new(),
+            checked_holes: HashMap::new(),
+            expression_known: HashMap::new(),
+            expression_effects: HashMap::new(),
+            typed_handles: super::typed_macro::HandleArena::new(),
+            typed_generalized_roots: HashSet::new(),
+            typed_depth: 0,
+            typed_var_count: p.var_count,
+            typed_ty_var_count: p.ty_var_count,
+            coverage: Default::default(),
         }
     }
 
@@ -216,10 +252,7 @@ impl<'a> Checker<'a> {
                         module: ModuleId(mi as u32),
                         index: di as u32,
                     };
-                    self.defs.insert(
-                        id,
-                        Scheme { level: 0, ty: t },
-                    );
+                    self.defs.insert(id, Scheme { level: 0, ty: t });
                 }
             }
             for b in &m.bindings {
@@ -385,6 +418,7 @@ impl<'a> Checker<'a> {
     /// One group of top-level bindings (§4.7): typed together, then
     /// generalized together when every value is a direct value.
     fn group(&mut self, group: &[BindingRef]) {
+        let error_start = self.diags.len();
         if group.iter().any(|b| self.p.failed_type_groups.contains(b)) {
             // O4: a dependency-cycle component is Failed before query inference.
             // Never is only recovery data; no fresh inferred alias is published.
@@ -530,6 +564,27 @@ impl<'a> Checker<'a> {
             self.check_case(c);
         }
         self.finish_reads(group, &candidates);
+        if self.pending_typed.is_empty() {
+            // No typed call in this group: no barrier work.
+        } else if !self.diags[error_start..].iter().any(Diagnostic::is_error) {
+            let mut roots: Vec<_> = self
+                .tyvars
+                .values()
+                .flat_map(super::typed_macro::variables)
+                .collect();
+            roots.extend(self.kgen.iter().copied());
+            roots.extend(self.typed_generalized_roots.iter().copied());
+            for scheme in self.defs.values() {
+                roots.extend(super::typed_macro::variables(&scheme.ty));
+            }
+            for (_, _, t, _) in &types {
+                roots.extend(super::typed_macro::variables(t));
+            }
+            let fixed = super::typed_macro::reachable(&self.s, roots);
+            self.expand_typed_calls(fixed);
+        } else {
+            self.pending_typed.clear();
+        }
         self.group_level = None;
         for (d, _, t, span) in types {
             self.set_module(d.module);
@@ -571,6 +626,238 @@ impl<'a> Checker<'a> {
             let b = group[0];
             self.set_module(b.module);
             self.report_coalescing(p.binding(b).binding.span);
+        }
+    }
+
+    fn expand_typed_calls(&mut self, fixed: HashSet<super::V>) {
+        let Some(expander) = self.p.typed_expander.clone() else {
+            if let Some((module, span)) = self.pending_typed.first().map(|c| (c.module, c.span)) {
+                self.set_module(module);
+                self.error(
+                    code::MACRO_RESERVED,
+                    span,
+                    "a typed macro needs the compiler expansion driver",
+                );
+            }
+            return;
+        };
+        let mut calls = std::mem::take(&mut self.pending_typed);
+        calls.sort_by_key(|c| (c.module, c.span.start, std::cmp::Reverse(c.span.end)));
+        let snapshot = self.s.clone();
+        let mut expanded_ancestors: Vec<(ModuleId, Span, HashSet<Span>)> = Vec::new();
+        for call in calls {
+            if expanded_ancestors
+                .iter()
+                .rev()
+                .any(|(m, parent, retained)| {
+                    *m == call.module
+                        && parent.start <= call.span.start
+                        && call.span.end <= parent.end
+                        && !retained.contains(&call.span)
+                })
+            {
+                continue;
+            }
+            if self.typed_depth == 256 {
+                self.set_module(call.module);
+                self.error(
+                    code::MACRO_RESERVED,
+                    call.span,
+                    "typed macro expansion exceeds depth 256",
+                );
+                continue;
+            }
+            self.set_module(call.module);
+            let expressions = self
+                .numeric_handles
+                .iter()
+                .chain(&self.query_binder_handles)
+                .filter(|((m, _), _)| *m == call.module)
+                .map(|((_, span), ty)| (*span, ty.clone()))
+                .collect();
+            let query = std::sync::Arc::new(super::TypedMacroQuery::new(
+                self,
+                call.signature.clone(),
+                expressions,
+                fixed.clone(),
+                call.span,
+                &call.argument_types,
+                &call.input_spans,
+            ));
+            let output = match expander.expand(
+                crate::typed_macro::Invocation {
+                    program: self.p,
+                    module: call.module,
+                    span: call.span,
+                    definition: call.definition,
+                    var_count: self.typed_var_count,
+                    ty_var_count: self.typed_ty_var_count,
+                },
+                query.clone(),
+            ) {
+                Ok(o) => o,
+                Err(ds) => {
+                    self.diags.extend(ds);
+                    continue;
+                }
+            };
+            let mut trial = Checker::new(&output.resolution, self.sources);
+            trial.typed_depth = self.typed_depth + 1;
+            trial.typed_var_count = output.var_count;
+            trial.typed_ty_var_count = output.ty_var_count;
+            trial.module = call.module;
+            trial.s = snapshot.clone();
+            trial
+                .s
+                .vars
+                .extend(self.s.vars[snapshot.vars.len()..].iter().cloned());
+            trial.s.freeze();
+            let boundary = trial.s.vars.len();
+            trial.locals = call.locals;
+            trial.kvars = call.known;
+            trial.defs = self.defs.clone();
+            trial.tyvars = self.tyvars.clone();
+            trial.reads = self.reads.clone();
+            trial.known = self.known.clone();
+            trial.known_args = self.known_args.clone();
+            trial.kgen = self.kgen.clone();
+            trial.out = self.out.clone();
+            trial.numeric_handles = self.numeric_handles.clone();
+            trial.numeric_param_handles = self.numeric_param_handles.clone();
+            trial.expression_known = self.expression_known.clone();
+            trial.expression_effects = self.expression_effects.clone();
+            trial.query_binder_handles = self.query_binder_handles.clone();
+            trial.typed_handles = query.arena();
+            for (index, t) in &trial.typed_handles.types {
+                trial
+                    .tyvars
+                    .insert(TyVarId(0x8000_0000 | *index), t.clone());
+            }
+            trial.checked_holes = output
+                .holes
+                .iter()
+                .filter_map(|(new, old)| {
+                    Some((
+                        *new,
+                        (
+                            self.numeric_handles.get(&(call.module, *old))?.clone(),
+                            self.expression_known
+                                .get(&(call.module, *old))
+                                .cloned()
+                                .unwrap_or(Ty::Top),
+                        ),
+                    ))
+                })
+                .collect();
+            trial.effects.push(Effects::default());
+            let ty = trial.infer(&output.expression);
+            let (err, env) = trial.pop_effects(call.span);
+            if let Ty::Fn(f) = &call.signature {
+                let before = trial.diags.len();
+                trial.sub(&ty, &f.ret, call.span);
+                let mut input_vars = HashSet::new();
+                super::alias::map_vars(&f.param, &mut |v| {
+                    input_vars.insert(v);
+                    Ty::Var(v)
+                });
+                let mut result_only = false;
+                super::alias::map_vars(&f.ret, &mut |v| {
+                    result_only |= !input_vars.contains(&v);
+                    Ty::Var(v)
+                });
+                for d in trial.diags[before..].iter_mut().filter(|d| d.is_error()) {
+                    d.message = if result_only {
+                        format!(
+                            "a result-only signature variable has no lower evidence, so the output cannot choose its type (§15.7.5): {}",
+                            d.message
+                        )
+                    } else {
+                        format!(
+                            "the output does not have the declared result type; a call's type cannot depend on its expansion (§15.7.5): {}",
+                            d.message
+                        )
+                    };
+                }
+                trial.sub(&err, &f.err, call.span);
+                trial.s.constrain_env(&env, &f.env);
+                if !trial.s.failures.is_empty() {
+                    trial.s.failures.clear();
+                    trial.error(
+                        code::TYPE_MISMATCH,
+                        call.span,
+                        "typed macro output needs an environment outside its signature",
+                    );
+                }
+                let (exposed, actual) = {
+                    let q = query.state.lock().expect("query snapshot");
+                    (
+                        super::typed_macro::substitute(&f.ret, &q.substitution),
+                        super::typed_macro::substitute(&ty, &q.substitution),
+                    )
+                };
+                trial.sub(&actual, &exposed, call.span);
+            }
+            for pending in std::mem::take(&mut trial.cases) {
+                trial.check_case(pending);
+            }
+            if !trial.pending_typed.is_empty() {
+                let nested_fixed = (0..boundary)
+                    .map(|i| super::V(i as u32))
+                    .chain(trial.typed_generalized_roots.iter().copied())
+                    .collect();
+                trial.expand_typed_calls(nested_fixed);
+            }
+            // Expansion diagnostics are attributed to the call; argument
+            // warnings already came from the signature check.
+            let mut errors: Vec<_> = trial
+                .diags
+                .into_iter()
+                .filter(Diagnostic::is_error)
+                .collect();
+            for error in &mut errors {
+                if let Some(origin) = output.scoped.origin(error.span) {
+                    error.related.push(ilang_package::DiagnosticNote {
+                        source: ilang_package::SourceId(origin.syntax.scope().module),
+                        span: origin.syntax.span(),
+                        message: "typed output originates here".into(),
+                    });
+                }
+                error.span = call.span;
+                error.message = format!("invalid typed macro expansion: {}", error.message);
+            }
+            if errors.is_empty() {
+                assert_eq!(
+                    &trial.s.vars[..boundary],
+                    &self.s.vars[..boundary],
+                    "typed output changed a snapshot variable"
+                );
+                self.s.vars.extend(trial.s.vars.into_iter().skip(boundary));
+                for note in &output.notes {
+                    self.diags.push(Diagnostic::note(
+                        Some(self.p.module(call.module).source),
+                        call.span,
+                        note.clone(),
+                    ));
+                }
+                self.typed_handles = trial.typed_handles;
+                self.out = trial.out;
+                self.numeric_handles = trial.numeric_handles;
+                self.numeric_param_handles = trial.numeric_param_handles;
+                self.typed_var_count = trial.typed_var_count;
+                self.typed_ty_var_count = trial.typed_ty_var_count;
+                let mut retained = HashSet::new();
+                let mut tree = output.expression.clone();
+                visit_expr_mut(&mut tree, &mut |e| {
+                    retained.insert(e.span);
+                    true
+                });
+                expanded_ancestors.push((call.module, call.span, retained));
+                self.out
+                    .typed_expansions
+                    .insert((call.module, call.span), output);
+            } else {
+                self.diags.extend(errors);
+            }
         }
     }
 
@@ -1082,7 +1369,6 @@ impl<'a> Checker<'a> {
         self.error(code, span, message);
     }
 
-
     pub fn union(&mut self, ms: Vec<Ty>, span: Span) -> Ty {
         let t = self.s.union(ms);
         self.flush(span, None);
@@ -1397,7 +1683,25 @@ impl<'a> Checker<'a> {
     /// The type of `e`, and its known type (§4.8), `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
+        if let Some((ty, known)) = self.checked_holes.get(&e.span).cloned() {
+            return (ty, known);
+        }
+        // A frame per node retains the argument's effects independently of
+        // where an expansion later places or drops that checked node.
+        let observe = !self.p.typed_macros.is_empty();
+        if observe {
+            self.effects.push(Effects::default());
+        }
         let result = self.infer_k_inner(e, expected);
+        if observe {
+            let effects = self.pop_effects(e.span);
+            self.add_err(effects.0.clone());
+            self.add_env(effects.1.clone());
+            self.expression_effects
+                .insert((self.module, e.span), effects);
+            self.expression_known
+                .insert((self.module, e.span), result.1.clone());
+        }
         self.numeric_handles
             .insert((self.module, e.span), result.0.clone());
         result
@@ -1418,6 +1722,13 @@ impl<'a> Checker<'a> {
                 (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
             }
             ExprKind::Name(ValueRef::Def(d)) => {
+                if self.p.typed_macros.contains(d) && !self.in_callee {
+                    self.error(
+                        code::MACRO_RESERVED,
+                        e.span,
+                        "a typed macro is allowed only as an expression call, not as a value",
+                    );
+                }
                 let scheme = self.defs.get(d).cloned();
                 let k = match self.p.def(*d).kind {
                     // §4.8: an imported name, and a member `m.x` of an
@@ -1544,8 +1855,7 @@ impl<'a> Checker<'a> {
                     knowns.push(k);
                 }
                 let positions = keys.iter().filter(|k| k.is_none()).count() as u32;
-                let shape =
-                    super::ShapeId::new(positions, keys.iter().flatten().cloned());
+                let shape = super::ShapeId::new(positions, keys.iter().flatten().cloned());
                 // Canonical order: positions, then labels in byte order.
                 let mut order: Vec<usize> = (0..keys.len()).collect();
                 order.sort_by(|&a, &b| keys[a].cmp(&keys[b]));
@@ -1713,7 +2023,14 @@ impl<'a> Checker<'a> {
     }
 
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+        let was_callee = std::mem::replace(&mut self.in_callee, true);
         let (f, kf) = self.infer_k(callee, &Ty::Top);
+        self.in_callee = was_callee;
+        let typed_definition = match callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) if self.p.typed_macros.contains(&d) => Some(d),
+            _ => None,
+        };
+        let typed_signature = f.clone();
         let kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
@@ -1729,9 +2046,8 @@ impl<'a> Checker<'a> {
                     None
                 }
                 Some(k) => {
-                    let labels: Vec<Option<String>> = (0..k.arity().unwrap_or(0))
-                        .map(|i| k.label(i))
-                        .collect();
+                    let labels: Vec<Option<String>> =
+                        (0..k.arity().unwrap_or(0)).map(|i| k.label(i)).collect();
                     let given: Vec<(Option<&Ident>, Span)> = first
                         .iter()
                         .map(|x| (None, x.span))
@@ -1808,6 +2124,8 @@ impl<'a> Checker<'a> {
             }
             _ => Ty::Top,
         };
+        let typed_argument_types =
+            typed_definition.map(|_| placed.iter().map(|(t, _)| t.clone()).collect());
         let t = match &f {
             Ty::Fn(ft) if ft.arity() == Some(placed.len()) => {
                 let parts = ft.parts().expect("data parameter").to_vec();
@@ -1835,13 +2153,41 @@ impl<'a> Checker<'a> {
                     self.s.fresh_input(),
                     self.s.fresh_input(),
                 );
-                let want = Ty::Fn(Box::new(FnTy::new(placed.into_iter().map(|(t, _)| (None, t)).collect(), r.clone(), e.clone(), n.clone())));
+                let want = Ty::Fn(Box::new(FnTy::new(
+                    placed.into_iter().map(|(t, _)| (None, t)).collect(),
+                    r.clone(),
+                    e.clone(),
+                    n.clone(),
+                )));
                 self.sub(&f, &want, span);
                 self.add_err(e);
                 self.add_env(n);
                 r
             }
         };
+        if let Some(definition) = typed_definition {
+            let mut input_spans = HashSet::new();
+            for value in &values {
+                let mut e = (*value).clone();
+                visit_expr_mut(&mut e, &mut |e| {
+                    input_spans.insert(e.span);
+                    true
+                });
+                for binder in expression_binders(value) {
+                    input_spans.insert(binder.span);
+                }
+            }
+            self.pending_typed.push(PendingTyped {
+                definition,
+                module: self.module,
+                span,
+                signature: typed_signature,
+                argument_types: typed_argument_types.expect("typed call arguments retained"),
+                input_spans,
+                locals: self.locals.clone(),
+                known: self.kvars.clone(),
+            });
+        }
         (t, known)
     }
 
@@ -2424,6 +2770,42 @@ impl<'a> Checker<'a> {
                         );
                     }
                 }
+                Stmt::Env { ty, value, span } if matches!(ty.kind, TypeKind::Hole) => {
+                    // Syntax three, `r <- (e1)` (§2.10.2): the key is the
+                    // type constructor of the known type of `e1`.
+                    let (v, k) = self.infer_k(value, &Ty::Top);
+                    let head = [&v, &k].into_iter().find_map(|t| match t {
+                        Ty::Con(super::Head::Named(r), _, args) => Some((*r, args.len())),
+                        _ => None,
+                    });
+                    let Some((r, args)) = head else {
+                        self.error(
+                            code::ENV_TYPE,
+                            value.span,
+                            "a provided service is keyed by its type, and the type of this value is not known to be one service type: give it a written type (syntax-3 §2.10.2)",
+                        );
+                        return self.block(&stmts[i + 1..], *span, expected);
+                    };
+                    self.out.services.insert((self.module, *span), r);
+                    self.effects.push(Effects::default());
+                    let a = self.block(&stmts[i + 1..], *span, expected);
+                    let (err, env) = self.pop_effects(*span);
+                    self.add_err(err);
+                    // The service type is the need of the rest for this
+                    // key, when the rest writes one; else its arguments are
+                    // left open, and the value and the rest fix them.
+                    let t = self
+                        .s
+                        .env_need(&env, super::Head::Named(r))
+                        .unwrap_or_else(|| {
+                            Ty::named(r, (0..args).map(|_| self.s.fresh()).collect())
+                        });
+                    self.sub2(&v, &t, value.span, value.span);
+                    let rest = self.s.env_diff(env, vec![t]);
+                    self.flush(*span, None);
+                    self.add_env(rest);
+                    return a;
+                }
                 Stmt::Env { ty, value, span } => {
                     // `! T = e1` and the rest `r`: `A ^ E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
@@ -2510,8 +2892,15 @@ impl<'a> Checker<'a> {
                 self.check_places(t, Pol::Pos, 0);
             }
         }
+        // Syntax three (transition front): `-> R ^ _ ! _` is a written
+        // result whose needs are left to inference.
+        let hole = |t: &Option<Type>| matches!(t, Some(t) if matches!(t.kind, TypeKind::Hole));
+        let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.err) && hole(&r.env));
         let ret = f.ret.as_ref().map(|r| {
             let value = self.conv(&r.value, &HashMap::new());
+            if inferred_needs {
+                return (value, Ty::Never, Ty::Never);
+            }
             let err = r
                 .err
                 .as_ref()
@@ -2536,6 +2925,20 @@ impl<'a> Checker<'a> {
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
         let t = match (ret, &f.ret) {
+            (Some((value, _, _)), Some(written)) if inferred_needs => {
+                let body_span = match f.body.stmts.last() {
+                    Some(Stmt::Expr(e)) => e.span,
+                    _ => f.body.span,
+                };
+                self.sub2(&a, &value, body_span, written.value.span);
+                let mut envs = vec![env];
+                envs.extend(env_tys);
+                if fails {
+                    envs.push(assert);
+                }
+                let env = self.env_union(envs, f.span);
+                Ty::Fn(Box::new(FnTy::new(params, value, err, env)))
+            }
             (Some((value, rerr, renv)), Some(written)) => {
                 // §6.8: the written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
@@ -2625,10 +3028,7 @@ impl<'a> Checker<'a> {
                     let value = self.kvars.get(v).cloned().unwrap_or(Ty::Top);
                     let known = self.scheme_known(&ty, level, &value);
                     self.kvars.insert(*v, known);
-                    self.locals.insert(
-                        *v,
-                        Scheme { level, ty },
-                    );
+                    self.locals.insert(*v, Scheme { level, ty });
                 }
             }
         }
@@ -2677,6 +3077,13 @@ impl<'a> Checker<'a> {
     }
 
     fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+        if !self.p.typed_macros.is_empty() {
+            self.typed_generalized_roots.extend(
+                super::typed_macro::variables(t)
+                    .into_iter()
+                    .filter(|v| self.s.vars[v.0 as usize].level > level),
+            );
+        }
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
             Err(()) => {
@@ -2797,10 +3204,7 @@ fn has_both(t: &Ty) -> bool {
     match t {
         Ty::Both(..) => true,
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
-        Ty::Fn(f) => {
-            has_both(&f.param)
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_both)
-        }
+        Ty::Fn(f) => has_both(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_both),
         Ty::Diff(a, _) => has_both(a),
         _ => false,
     }

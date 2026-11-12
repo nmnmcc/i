@@ -32,13 +32,15 @@ mod scheme_wire;
 mod shape;
 mod shown;
 mod solve;
+mod typed_macro;
 mod value_types;
+pub use typed_macro::{MacroTruth, TypedMacroQuery};
 
 pub use lits::{LitValue, TestValues};
-pub use shape::ShapeId;
 pub use scheme_wire::{
     AliasArtifact, SchemeArtifact, SchemeComparison, SchemeEnvironment, compare_scheme_group,
 };
+pub use shape::ShapeId;
 pub use shown::{ShownFn, ShownType};
 
 use crate::hir::{BindingRef, CtorRef, DefId, ModuleId, Program, TypeRef};
@@ -281,7 +283,8 @@ pub(crate) fn boundary_type(
                 ret,
                 err,
                 env,
-            } => Ty::Fn(Box::new(FnTy::new(params
+            } => Ty::Fn(Box::new(FnTy::new(
+                params
                     .iter()
                     .map(|part| {
                         Some((
@@ -289,13 +292,17 @@ pub(crate) fn boundary_type(
                             convert(s, &part.ty, p, expand)?,
                         ))
                     })
-                    .collect::<Option<_>>()?, convert(s, ret, p, expand)?, match err {
+                    .collect::<Option<_>>()?,
+                convert(s, ret, p, expand)?,
+                match err {
                     Some(t) => convert(s, t, p, expand)?,
                     None => Ty::Never,
-                }, match env {
+                },
+                match env {
                     Some(t) => convert(s, t, p, expand)?,
                     None => Ty::Never,
-                }))),
+                },
+            ))),
             TypeKind::Union(ts) | TypeKind::Inter(ts) => {
                 let ms = ts
                     .iter()
@@ -425,6 +432,7 @@ pub enum NumericFact {
 /// node in the HIR, which is unique among the nodes of one kind.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
+    pub typed_expansions: HashMap<(ModuleId, Span), crate::typed_macro::Output>,
     /// Numeric expression facts, frozen after completion and deferred checks.
     pub numeric: HashMap<(ModuleId, Span), NumericFact>,
     /// Parameter-pattern facts from the same completed inference lifecycle.
@@ -689,7 +697,7 @@ pub fn type_names(program: &Program, module: ModuleId) -> Vec<String> {
 /// Infers the type of every binding of the program, and reports the type
 /// errors.
 pub fn check(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
-    infer::Checker::new(program, sources).run()
+    check_selected(program, sources, &[])
 }
 
 pub fn check_selected(
@@ -697,7 +705,13 @@ pub fn check_selected(
     sources: &Sources,
     selected: &[(DefId, bool)],
 ) -> (Typed, Vec<Diagnostic>) {
-    infer::Checker::new(program, sources).run_selected(selected)
+    if !program.typed_originals.is_empty() {
+        let mut original = program.clone();
+        crate::typed_macro::restore(&mut original);
+        infer::Checker::new(&original, sources).run_selected(selected)
+    } else {
+        infer::Checker::new(program, sources).run_selected(selected)
+    }
 }
 
 /// `check`, keeping the types of the local names in `Typed::locals`.

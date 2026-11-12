@@ -1,14 +1,15 @@
 //! Structural traversal of AST data, including every span and string payload.
 use crate::{ast::*, span::Span};
 
-pub(crate) trait Visitor {
+pub trait Visitor {
     fn expr(&mut self, _: &mut Expr, _: bool) {}
     fn pattern(&mut self, _: &mut Pattern) {}
+    fn ty(&mut self, _: &mut TypeExpr) {}
     fn float(&mut self, _: &mut f64) {}
     fn span(&mut self, _: &mut Span) {}
     fn string(&mut self, _: &mut String) {}
 }
-pub(crate) trait Walk {
+pub trait Walk {
     fn walk(&mut self, v: &mut impl Visitor);
 }
 impl Walk for Span {
@@ -86,7 +87,13 @@ impl Walk for Pattern {
     }
 }
 fields!(Binder { name, span } skip { discard });
-fields!(TypeExpr { kind, span } skip {});
+impl Walk for TypeExpr {
+    fn walk(&mut self, v: &mut impl Visitor) {
+        v.ty(self);
+        self.kind.walk(v);
+        self.span.walk(v);
+    }
+}
 fields!(FnParamType { label, ty } skip {});
 impl<T: Walk> Walk for Segment<T> {
     fn walk(&mut self, v: &mut impl Visitor) {

@@ -17,7 +17,7 @@ pub struct BindingDeclaration {
     pub declaration: String,
     pub namespace: String,
     pub name: String,
-    /// `service` or `external`.
+    /// The kind of the declaration: `service` or `external`.
     pub kind: String,
     pub signature: Signature,
 }

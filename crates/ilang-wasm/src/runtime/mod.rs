@@ -74,6 +74,10 @@
 //! `$constructors_install (param (ref $values))`, an array of String values.
 //! `Bool` and `Nil` use tags 1 and 0, not constructor ids.
 //!
+//! Numeric workers have separate internal signatures and receive the original
+//! closure plus the current call-site environment. Generic closure references,
+//! host adapters and continuation results retain the canonical value protocol.
+//!
 //! # Shadow stack and stop messages (spec §11.7)
 //!
 //! Stop messages need the source positions of the running calls. The code

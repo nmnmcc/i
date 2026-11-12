@@ -6,7 +6,7 @@ use std::{cell::Cell, future::Future};
 use crate::THREAD_STACK;
 
 thread_local! {
-    /// Set on the threads that `block_on` starts.
+    /// Whether this is a thread that `block_on` started.
     static ON_ILANG_THREAD: Cell<bool> = const { Cell::new(false) };
     /// The Wasm calls of the fast path that are running on this thread.
     static WASM_DEPTH: Cell<u32> = const { Cell::new(0) };
@@ -25,7 +25,7 @@ impl Drop for Background {
     }
 }
 
-/// Run a future to its end on a new thread named `ilang`, with a stack of
+/// Runs a future to its end on a new thread named `ilang`, with a stack of
 /// [`THREAD_STACK`] bytes and a tokio `current_thread` runtime with time
 /// and IO enabled. IO is there whenever tokio is built with its IO driver,
 /// which a service that uses tokio IO turns on through its own tokio

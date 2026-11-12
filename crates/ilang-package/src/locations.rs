@@ -1,5 +1,4 @@
-//! Choosing and getting the packages with a location (§2.7), and keeping
-//! `i.lock` (§2.8).
+//! Chooses and gets the packages with a location, and keeps `i.lock`.
 //!
 //! The packages got by path are read first, by the loader. Then their
 //! dependencies by location are the start of minimal version selection,
@@ -104,7 +103,7 @@ fn walk(root: &Path) -> (HashMap<PathBuf, PathNode>, bool) {
 }
 
 /// The dependencies by location of the packages got by path from `root`:
-/// the start of minimal version selection (§2.7).
+/// the start of minimal version selection.
 fn start(nodes: &HashMap<PathBuf, PathNode>, root: &Path, tests: bool) -> Vec<Requirement<Origin>> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
@@ -153,9 +152,10 @@ impl Resolver<'_> {
         }
     }
 
-    /// The commit of a version, and the dependencies in its `i.toml`
-    /// (§2.7). Its path dependencies are not followed: they are an error
-    /// when the version is used (§2.6).
+    /// The commit of a version, and the dependencies in its `i.toml`.
+    /// Its path dependencies are not followed: a package got by location may
+    /// not have path dependencies, so they are an error when the version is
+    /// used.
     fn read(&mut self, key: &PackageKey, version: Version) -> Reached {
         let (repository, dir) = split_place(&key.location);
         let expected = self
@@ -267,7 +267,7 @@ fn report(loader: &mut Loader, origin: &Origin, what: &str, e: &GitError) {
 }
 
 /// Chooses the versions of the packages with a location, gets them, checks
-/// them against `i.lock`, and brings `i.lock` up to date (§2.7, §2.8).
+/// them against `i.lock`, and brings `i.lock` up to date.
 /// Gives the packages of the selection for [`LoadOptions::tests`], or none
 /// when the files do not match `i.lock`.
 pub(crate) fn resolve(
@@ -367,7 +367,7 @@ pub(crate) fn resolve(
                             source,
                             span,
                             format!(
-                                "`{what}` was got with the commit `{commit}` and the hash `{hash}`, but `i.lock` has the commit `{}` and the hash `{}`; the tag may have been moved, or the files changed on the way (§2.8)",
+                                "`{what}` was got with the commit `{commit}` and the hash `{hash}`, but `i.lock` has the commit `{}` and the hash `{}`; the tag may have been moved, or the files changed on the way",
                                 l.commit, l.hash
                             ),
                         ));
@@ -424,7 +424,7 @@ pub(crate) fn resolve(
         }
     }
 
-    // §2.8: when the files do not match `i.lock`, nothing is compiled.
+    // When the files do not match `i.lock`, nothing is compiled.
     if mismatch {
         return HashMap::new();
     }

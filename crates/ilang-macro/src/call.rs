@@ -1,4 +1,4 @@
-//! Extract macro call candidates without evaluating or traversing arguments.
+//! Extracts macro call candidates without evaluating or traversing arguments.
 use ilang_syntax::ast::{Arg, BinOp, Expr, ExprKind, Ident, TypeArg, TypeExpr, TypeKind};
 
 pub struct ExprCall<'a> {

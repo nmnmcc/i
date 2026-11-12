@@ -6,7 +6,7 @@ User { User(name: String) }
 
 main = () {
   assert(1 + 2 |> { 3 -> True  _ -> False })
-  assert({ 2 == 2 } |> { True -> 7  False -> 8 } == 7)
+  assert({ { 2 == 2 } |> { True -> 7  False -> 8 } } == 7)
   assert({ 1 |> { 0 -> 1  _ -> 2 } } * 10 == 20)
   assert(1 + { 2 |> { n -> n } } == 3)
   assert(-{ 3 |> { n -> n } } == -3)

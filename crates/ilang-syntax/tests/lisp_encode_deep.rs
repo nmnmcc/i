@@ -468,7 +468,7 @@ fn direct_charge_events(
                 });
                 bytes
             }
-            Node::Float(_) => 8,
+            Node::Float(_) | Node::TypeView(_) => 8,
             Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
                 let n = xs.len() as u64;
                 events.push(C::Charge {

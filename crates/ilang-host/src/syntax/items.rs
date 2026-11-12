@@ -269,7 +269,7 @@ pub(super) fn install(
     Ok(())
 }
 
-/// Flip a successful result and its journal as one graph, so shared syntax
+/// Flips a successful result and its journal as one graph, so shared syntax
 /// values remain identical across the result and all requests.
 pub fn flip_output_and_requests(
     output: &Syntax,
@@ -284,7 +284,7 @@ pub fn flip_output_and_requests(
     (output, rebuild_requests(requests, &mut flipped))
 }
 
-/// Flip a journal when there is no result to transform with it.
+/// Flips a journal when there is no result to transform with it.
 pub fn flip_requests(requests: &[ItemRequest], mark: u64) -> Vec<ItemRequest> {
     use ilang_syntax::lisp::syntax::flip_mark_all;
     let mut roots = Vec::new();

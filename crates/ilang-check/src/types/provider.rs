@@ -48,11 +48,26 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
             param: concrete(&f.params[0].1)?,
             labels: Vec::new(),
             ret: concrete(&f.ret)?,
-            err: f.err.as_ref().map(concrete).transpose()?.unwrap_or(Ty::Never),
-            env: f.env.as_ref().map(concrete).transpose()?.unwrap_or(Ty::Never),
+            err: f
+                .err
+                .as_ref()
+                .map(concrete)
+                .transpose()?
+                .unwrap_or(Ty::Never),
+            env: f
+                .env
+                .as_ref()
+                .map(concrete)
+                .transpose()?
+                .unwrap_or(Ty::Never),
         })),
         ShownType::Fn(f) => Ty::Fn(Box::new(FnTy {
-            param: Ty::tuple(f.params.iter().map(|(_, t)| concrete(t)).collect::<Result<_, _>>()?),
+            param: Ty::tuple(
+                f.params
+                    .iter()
+                    .map(|(_, t)| concrete(t))
+                    .collect::<Result<_, _>>()?,
+            ),
             labels: f.params.iter().map(|(l, _)| l.clone()).collect(),
             ret: concrete(&f.ret)?,
             err: f
@@ -187,7 +202,12 @@ impl Typed {
         let body = Ty::Fn(Box::new(FnTy::new(vec![], a.clone(), e.clone(), body_env)));
         let scheme = Scheme {
             level: 0,
-            ty: Ty::Fn(Box::new(FnTy::new(vec![(Some("body".into()), body)], a, e, env))),
+            ty: Ty::Fn(Box::new(FnTy::new(
+                vec![(Some("body".into()), body)],
+                a,
+                e,
+                env,
+            ))),
         };
         let expected = SchemeArtifact {
             scheme: scheme.clone(),
@@ -265,18 +285,18 @@ impl Typed {
         }
         fn ordered_differences(p: &Program, ty: &Ty) -> Ty {
             map_nodes(ty, false, &mut |ty, env| match ty {
-                    Ty::Diff(base, mut removed) => {
-                        removed.sort_by_cached_key(|ty| match ty.head() {
-                            Some(Head::Named(TypeRef::Custom(id))) => {
-                                format!("{}.{}", p.module(p.ty(id).module).path, p.ty(id).name)
-                            }
-                            head => format!("{head:?}"),
-                        });
-                        Ty::Diff(base, removed)
-                    }
-                    ty if env => admission(ty),
-                    ty => ty,
-                })
+                Ty::Diff(base, mut removed) => {
+                    removed.sort_by_cached_key(|ty| match ty.head() {
+                        Some(Head::Named(TypeRef::Custom(id))) => {
+                            format!("{}.{}", p.module(p.ty(id).module).path, p.ty(id).name)
+                        }
+                        head => format!("{head:?}"),
+                    });
+                    Ty::Diff(base, removed)
+                }
+                ty if env => admission(ty),
+                ty => ty,
+            })
         }
         let mut actual = actual.clone();
         actual.scheme.ty = ordered_differences(p, &actual.scheme.ty);
@@ -297,11 +317,19 @@ impl Typed {
                     .expect("adapter scheme snapshot")
                     .clone();
                 t.level = 1;
-                let a = t.freshen(&actual.scheme.ty, actual.scheme.level, &mut Default::default());
+                let a = t.freshen(
+                    &actual.scheme.ty,
+                    actual.scheme.level,
+                    &mut Default::default(),
+                );
                 t.constrain(&a, &expected.scheme.ty);
                 let e = t.freshen(&expected.scheme.ty, 0, &mut Default::default());
                 t.constrain(&e, &actual.scheme.ty);
-                let leak = t.freshen(&actual.scheme.ty, actual.scheme.level, &mut Default::default());
+                let leak = t.freshen(
+                    &actual.scheme.ty,
+                    actual.scheme.level,
+                    &mut Default::default(),
+                );
                 match &leak {
                     Ty::Fn(f) => match f.parts() {
                         Some([Ty::Fn(body)]) => {

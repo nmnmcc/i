@@ -17,7 +17,8 @@ use ilang_syntax::lisp::{
 };
 
 /// A step either finishes an ordinary item or replaces it with the returned
-/// items. `retained` is the written type definition protected by §4.3.
+/// items. `retained` is the written type definition: a macro on a type
+/// definition adds items beside it and never replaces it.
 pub enum Step {
     Finished(Item),
     Expanded {
@@ -100,7 +101,7 @@ impl BodyEngine<'_> {
         }
     }
 
-    /// Expand one outer item call, or one outer attribute call. A written type
+    /// Expands one outer item call, or one outer attribute call. A written type
     /// stays in the module; other attributed items are replaced by the result.
     pub fn item_step(
         &mut self,
@@ -421,7 +422,7 @@ struct Audit {
     identity: DefinitionIdentity,
 }
 
-/// Expand a module's item phase with fresh attempts. The callback implements
+/// Expands a module's item phase with fresh attempts. The callback implements
 /// hygienic package lookup; this driver enforces retry, ordering and atomicity.
 /// Later phases consume transactions only after this function succeeds.
 pub fn expand_items(
