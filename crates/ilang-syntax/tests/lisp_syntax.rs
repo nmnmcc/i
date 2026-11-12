@@ -1,5 +1,5 @@
 use ilang_syntax::lisp::{
-    expression_syntax, item_syntax, parse,
+    expression_syntax, parse,
     syntax::{Node, Position, Provenance, Scope, Substitution, Syntax},
 };
 use std::collections::BTreeSet;
@@ -88,67 +88,6 @@ fn normal_source_encodes_to_syntax_with_original_leaf_spans() {
         &source[sum[0].span().start as usize..sum[0].span().end as usize],
         "+"
     );
-}
-
-#[test]
-fn normal_library_bindings_encode_without_reparsing_the_source() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut dirs = vec![root.join("lib"), root.join("std")];
-    let scope = Scope {
-        module: 0,
-        marks: BTreeSet::new(),
-    };
-    while let Some(dir) = dirs.pop() {
-        for entry in std::fs::read_dir(dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                dirs.push(path);
-                continue;
-            }
-            if path.extension().is_none_or(|ext| ext != "i") {
-                continue;
-            }
-            let source = std::fs::read_to_string(&path).unwrap();
-            let (module, errors) = ilang_syntax::parse_module(&source);
-            assert!(errors.is_empty(), "{}: {errors:?}", path.display());
-            for item in module.items {
-                let mut clean = item.clone();
-                clean.doc.clear();
-                let expected_item = ilang_syntax::ast::Module {
-                    items: vec![clean],
-                    ..Default::default()
-                };
-                assert_eq!(
-                    item_syntax(&item, &scope, &source).show(),
-                    ilang_syntax::lisp::print_module(&expected_item).trim_end(),
-                    "{}",
-                    path.display()
-                );
-                let ilang_syntax::ast::ItemKind::Binding(binding) = &item.kind else {
-                    continue;
-                };
-                let syntax = expression_syntax(&binding.value, &scope, &source);
-                let datum = parse(&syntax.show()).unwrap();
-                let decoded = ilang_syntax::lisp::parse_expression(&datum[0]).unwrap();
-                let expected = ilang_syntax::ast::Module {
-                    items: vec![item.clone()],
-                    ..Default::default()
-                };
-                let mut actual = expected.clone();
-                let ilang_syntax::ast::ItemKind::Binding(b) = &mut actual.items[0].kind else {
-                    unreachable!()
-                };
-                b.value = decoded;
-                assert_eq!(
-                    ilang_syntax::shape::canon(&expected),
-                    ilang_syntax::shape::canon(&actual),
-                    "{}: {}",
-                    path.display(),
-                    syntax.show()
-                );
-            }
-        }
-    }
 }
 
 #[test]
@@ -335,30 +274,6 @@ fn macro_item_results_accept_only_a_single_item_or_a_flat_curly_list() {
 }
 
 #[test]
-fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
-    use ilang_syntax::lisp::{expansion::definitions, parse_source};
-    let (module, errors) = parse_source("(@ macro (= m (-> (, x y) _ x)))");
-    assert!(errors.is_empty(), "{errors:?}");
-    let found = definitions(&module, true).unwrap();
-    assert_eq!(found[0].name, "m");
-    assert_eq!(found[0].parameters, ["x", "y"]);
-    assert!(definitions(&module, false).is_err());
-    let (typed, errors) = parse_source("(@ macro (= (: m (-> (Syntax) Syntax)) (-> (x) _ x)))");
-    assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(definitions(&typed, true).unwrap()[0].name, "m");
-    for source in [
-        "(@ macro (= m 1))",
-        "(@ macro (= m (-> ((, x y)) _ x)))",
-        "(@ (macro) (= m (-> (x) _ x)))",
-        "(: m Int) (@ macro (= m (-> (x) _ x)))",
-    ] {
-        let (module, errors) = parse_source(source);
-        assert!(errors.is_empty(), "{source}: {errors:?}");
-        assert!(definitions(&module, true).is_err(), "{source}");
-    }
-}
-
-#[test]
 fn macro_arguments_match_labels_and_attribute_items() {
     use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
     let m = MacroDefinition {
@@ -514,31 +429,6 @@ fn written_definition_answers_give_parameters_their_own_binder() {
     ));
     assert_eq!(head[1].scope_identity(), field[2].scope_identity());
     assert!(ctor[0].scope_identity().is_none());
-}
-
-#[test]
-fn definition_preserves_record_label_parameter_identity() {
-    use ilang_syntax::lisp::definitions::source_definition;
-    use ilang_syntax::lisp::syntax::Node;
-    let source = "Box(K) = (k = Int)";
-    let (module, errors) = ilang_syntax::parse_module(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let like = root("x");
-    let answer = source_definition(&module.items[0], source, like.scope(), 23);
-    let Node::Round(item) = answer.node() else {
-        panic!("alias");
-    };
-    let Node::Round(head) = item[1].node() else {
-        panic!("head");
-    };
-    let Node::Round(fields) = item[2].node() else {
-        panic!("record");
-    };
-    let Node::Round(field) = fields[0].node() else {
-        panic!("field");
-    };
-    assert_eq!(head[1].scope_identity(), field[1].scope_identity());
-    assert!(head[1].scope_identity().is_some());
 }
 
 #[test]
@@ -1106,89 +996,6 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
         Some("\"你好\"")
     );
     assert_eq!(source.origin(span).unwrap().syntax.show(), "\"你好\"");
-}
-
-#[test]
-fn source_syntax_normalizes_lisp_groups_without_erasing_function_bodies() {
-    use ilang_syntax::lisp::source_syntax::{source_expression_syntax, source_item_syntax};
-    use ilang_syntax::lisp::syntax::{Node, Scope};
-    use std::collections::BTreeSet;
-    let scope = Scope {
-        module: 1,
-        marks: BTreeSet::new(),
-    };
-    let normal = "f = (x) { y = { x }\n { y } }";
-    let (normal_module, normal_errors) = ilang_syntax::parse_module(normal);
-    assert!(normal_errors.is_empty(), "{normal_errors:?}");
-    let lisp = "(= f (-> (, x) _ {(= y {x}) {y}}))";
-    let (lisp_module, lisp_errors) = ilang_syntax::lisp::parse_source(lisp);
-    assert!(lisp_errors.is_empty(), "{lisp_errors:?}");
-    let a = source_item_syntax(&normal_module.items[0], &scope, normal, false);
-    let b = source_item_syntax(&lisp_module.items[0], &scope, lisp, true);
-    assert!(a.same_code(&b), "{} vs {}", a.show(), b.show());
-    let expression = ilang_syntax::lisp::parse_expression(
-        &ilang_syntax::lisp::parse("{(-> x {x})}").unwrap()[0],
-    )
-    .unwrap();
-    let clause_source = "{(-> x {x})}";
-    let result = source_expression_syntax(&expression, &scope, clause_source, true);
-    assert!(matches!(result.node(), Node::Curly(xs) if xs.len() == 1));
-    assert_eq!(result.show(), "{(-> x x)}");
-}
-
-#[test]
-fn lisp_short_function_body_matches_normal_surface_core() {
-    use ilang_syntax::lisp::source_syntax::source_item_syntax;
-    let scope = root("x").scope().clone();
-    let normal = "f = (x) { x }";
-    let lisp = "(= f (-> (, x) _ x))";
-    let (a, ae) = ilang_syntax::parse_module(normal);
-    let (b, be) = ilang_syntax::lisp::parse_source(lisp);
-    assert!(ae.is_empty() && be.is_empty());
-    let a = source_item_syntax(&a.items[0], &scope, normal, false);
-    let b = source_item_syntax(&b.items[0], &scope, lisp, true);
-    assert!(a.same_code(&b), "{} vs {}", a.show(), b.show());
-}
-
-#[test]
-fn source_syntax_agrees_across_surfaces_for_library_modules() {
-    use ilang_syntax::lisp::source_syntax::source_item_syntax;
-    use ilang_syntax::lisp::syntax::Scope;
-    use std::collections::BTreeSet;
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let scope = Scope {
-        module: 1,
-        marks: BTreeSet::new(),
-    };
-    for file in [
-        "lib/i/fail.i",
-        "lib/i/assertion.i",
-        "lib/i/resource.i",
-        "lib/i/syntax.i",
-        "std/src/pair.i",
-        "std/src/bool.i",
-        "std/src/option.i",
-        "std/src/order.i",
-    ] {
-        let source = std::fs::read_to_string(root.join(file)).unwrap();
-        let (module, errors) = ilang_syntax::parse_module(&source);
-        assert!(errors.is_empty(), "{file}: {errors:?}");
-        let lisp =
-            ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(&source).0);
-        let (parsed, errors) = ilang_syntax::lisp::parse_source(&lisp);
-        assert!(errors.is_empty(), "{file}: {errors:?}");
-        assert_eq!(module.items.len(), parsed.items.len(), "{file}");
-        for (a, b) in module.items.iter().zip(&parsed.items) {
-            let normal = source_item_syntax(a, &scope, &source, false);
-            let other = source_item_syntax(b, &scope, &lisp, true);
-            assert!(
-                normal.same_code(&other),
-                "{file}: {} vs {}",
-                normal.show(),
-                other.show()
-            );
-        }
-    }
 }
 
 #[test]

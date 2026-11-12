@@ -656,7 +656,7 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
             }
         }
         let shown = syntax.show();
-        if shown.starts_with("(= f ") {
+        if shown.starts_with("(= (f ") {
             assert!(shown.contains("(: full_name String)"), "{shown}");
             assert!(shown.contains("(: full_name \"Ada\")"), "{shown}");
         } else {

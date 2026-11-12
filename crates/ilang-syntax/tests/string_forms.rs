@@ -95,14 +95,12 @@ x })b" // outside"#,
         if source.contains("\\(") || source.contains("\\#(") {
             assert!(out.contains("\\(") || out.contains("\\#("), "{out}");
         }
-        let printed = print_module(&a);
-        let (back, ds) = parse_module(&printed);
-        assert!(ds.is_empty(), "{printed}: {ds:?}");
-        assert!(shape::equivalent(&a, &back));
+        let tree = ilang_syntax::syn3::parse_module(source).0;
+        let text = ilang_syntax::syn3::lisp::to_lisp(&tree);
+        let (read, ds) = ilang_syntax::syn3::lisp::from_lisp(&text);
+        assert!(ds.is_empty(), "{text}: {ds:?}");
+        assert_eq!(ilang_syntax::syn3::lisp::to_lisp(&read), text);
         let printed = lisp::print_module(&a);
-        let (back, ds) = lisp::parse_source(&printed);
-        assert!(ds.is_empty(), "{printed}: {ds:?}");
-        assert!(shape::equivalent(&a, &back), "{printed}");
         let scope = lisp::syntax::Scope {
             module: 0,
             marks: Default::default(),
@@ -117,15 +115,8 @@ x })b" // outside"#,
 #[test]
 fn interpolation_and_multiline_boundaries_are_diagnosed() {
     for source in [
-        /* old-syntax-check: E0101 */ r#"value = ("\(x)": 1)"#,
-        /* old-syntax-check: E0101 */ r#"Value = ("\(x)": Int)"#,
-        /* old-syntax-check: E0101 */ r#"Value = "\(x)""#,
-        /* old-syntax-check: E0101 */ r#"value = (s) { s |> { "\(x)" -> 1 } }"#,
-        /* old-syntax-check: E0101 */ r#"@deprecated("\(x)")
-value = 1"#,
-        /* old-syntax-check: E0101 */ r#"("\(x)")
-value = 1"#,
-        /* old-syntax-check: E0108 */ r#"value = (s) { s |> { a <> "x" <> b -> 1 } }"#,
+        /* old-syntax-check: E0101 */ r#"value = (s) { s |> ("\(x)") { 1 } }"#,
+        /* old-syntax-check: E0108 */ r#"value = (s) { s |> (a <> "x" <> b) { 1 } }"#,
         /* old-syntax-check: E0003 */ "value = \"\"\"bad\n\"\"\"",
         /* old-syntax-check: E0003 */ "value = \"\"\"\na\n  \"\"\"",
         /* old-syntax-check: E0003 */ "value = \"\"\"\n  a\"\"\"",

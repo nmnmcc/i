@@ -423,7 +423,8 @@ fn check_corpus(dir: &std::path::Path) {
             {
                 continue;
             }
-            let (_module, diagnostics) = ilang_syntax::parse_module(&source);
+            let (module, diagnostics) = ilang_syntax::parse_module(&source);
+            let _ = &module;
             if !diagnostics.is_empty() {
                 continue;
             }
