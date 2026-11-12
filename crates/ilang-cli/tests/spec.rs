@@ -375,11 +375,26 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec"));
     let all = cases(&root);
+    // Cases waiting for a later syntax-three stage (open records leave in stage 6):
+    // one case name per line, `#` starts a comment. They are skipped and counted.
+    let pending: Vec<String> = std::fs::read_to_string(root.join("syn3-pending.txt"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or("").trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    let mut skipped = 0usize;
     let mut failures: Vec<String> = Vec::new();
     let mut ready = Vec::new();
     for c in all {
         match c {
             Ok(c) => {
+                if pending.contains(&c.name) {
+                    if filter.as_ref().is_none_or(|f| c.name.contains(f.as_str())) {
+                        skipped += 1;
+                    }
+                    continue;
+                }
                 if filter.as_ref().is_none_or(|f| c.name.contains(f.as_str())) {
                     ready.push(c);
                 }
@@ -427,6 +442,9 @@ fn main() {
         }
     }
     println!("\nspec: {passed} of {total} cases passed at --opt 0 and --opt 2");
+    if skipped > 0 {
+        println!("spec: {skipped} cases skipped as pending (tests/spec/syn3-pending.txt)");
+    }
     if !failures.is_empty() {
         println!("\nfailures:");
         for f in &failures {

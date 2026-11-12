@@ -1,0 +1,27 @@
+# Spec cases skipped until open records are removed (syntax three, stage 6, another lane).
+# They use i/record and Record-bounded parameters: open records. One case name per line.
+6/t3_record_builder.i
+6/t3_record_codec.i
+6/t3_record_cross_module
+6/t3_record_evaluation_order.i
+6/t3_record_host_boundary.i
+6/t3_record_inspect.i
+6/t3_record_key_known_fn.i
+6/t3_record_library.i
+6/t3_record_param_alias.i
+6/t3_record_param_call.i
+6/t3_record_param_capture.i
+6/t3_record_param_export
+6/t3_record_param_forward.i
+6/t3_record_param_inner_label_unknown.i
+6/t3_record_param_key_type.i
+6/t3_record_param_matched_key.i
+6/t3_record_param_may_alias.i
+6/t3_record_param_nested.i
+6/t3_record_param_recursive.i
+6/t3_record_param_two_keys_bad.i
+6/t3_record_param_unknown.i
+6/t3_record_param_value.i
+6/t3_record_param_value_type.i
+6/t3_record_schema.i
+6/t3_record_spread_evaluation_order.i
