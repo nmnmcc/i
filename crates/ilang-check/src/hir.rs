@@ -54,6 +54,9 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// The hidden group bindings of each top-level name bound to a chain
+    /// with several shape groups (syntax three §2.5), in group order.
+    pub chain_groups: std::collections::HashMap<DefId, Vec<DefId>>,
     /// Reads in invalid dependency components, before query recovery.
     pub failed_reads: std::collections::HashSet<OfId>,
     /// Expression SCC members invalidated by a type-dependency cycle.
@@ -447,6 +450,9 @@ pub enum ExprKind {
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
     Fn(Box<Function>),
+    /// A multi-shape function value: one function per shape group of a
+    /// chain, in the order of the first branch of each group.
+    Multi(Vec<MultiGroup>),
     Case {
         subject: Box<Expr>,
         clauses: Vec<Clause>,
@@ -489,6 +495,15 @@ pub enum ExprKind {
 #[derive(Clone, Debug)]
 pub struct Arg {
     pub label: Option<Ident>,
+    pub value: Expr,
+}
+
+/// One shape group of a multi-shape function value. The value is the name
+/// of the group's function or a function expression; it takes the parts of
+/// the shape in canonical order.
+#[derive(Clone, Debug)]
+pub struct MultiGroup {
+    pub shape: crate::types::ShapeId,
     pub value: Expr,
 }
 
@@ -901,6 +916,11 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
                 }
             }
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => expr(target, f),
+            ExprKind::Multi(groups) => {
+                for g in groups {
+                    expr(&g.value, f);
+                }
+            }
             ExprKind::RecordUpdate { base, fields, .. } => {
                 expr(base, f);
                 for (_, e) in fields {

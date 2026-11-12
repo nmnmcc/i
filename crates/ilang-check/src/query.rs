@@ -1525,6 +1525,7 @@ impl Walk<'_> {
                 }
             }
             ExprKind::TupleIndex { target, .. } => self.expr(target),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate {
                 ctor,
                 ctor_span,
@@ -1698,6 +1699,7 @@ impl Scope<'_> {
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
                 self.expr(target)
             }
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate { base, fields, .. } => {
                 self.expr(base);
                 fields.iter().for_each(|(_, x)| self.expr(x));

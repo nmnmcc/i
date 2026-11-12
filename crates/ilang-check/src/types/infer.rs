@@ -7,6 +7,7 @@
 //! the rest of a block after an environment statement starts a new entry.
 
 use super::display;
+use super::groups;
 use super::known;
 use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
 use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
@@ -1046,6 +1047,12 @@ impl<'a> Checker<'a> {
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
             ),
+            FailKind::MultiCall => (
+                code::MULTI_VALUE_CALL,
+                format!(
+                    "a multi-shape function value `{l}` can only be called directly by its name until the run time has multi-shape values; here a function `{r}` is wanted"
+                ),
+            ),
             FailKind::Arity => (
                 code::FN_ARITY,
                 format!("the function types `{l}` and `{r}` have different numbers of parameters"),
@@ -1604,6 +1611,7 @@ impl<'a> Checker<'a> {
             }
             ExprKind::Block(b) => self.block(&b.stmts, b.span, expected),
             ExprKind::Fn(f) => self.function(f, expected),
+            ExprKind::Multi(gs) => self.multi(gs, expected, e.span),
             ExprKind::Case { subject, clauses } => self.case(subject, clauses, e.span, expected),
             ExprKind::Call { callee, args } => self.call(callee, None, args, e.span),
             ExprKind::Field { target, name } => self.field(target, name, e.span),
@@ -1725,7 +1733,7 @@ impl<'a> Checker<'a> {
 
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
         let (f, kf) = self.infer_k(callee, &Ty::Top);
-        let kfn = known::one_fn(&kf);
+        let kfn = known::one_fn(&kf).filter(|k| !groups::is_multi(k));
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
@@ -1815,7 +1823,7 @@ impl<'a> Checker<'a> {
             _ => Ty::Top,
         };
         let t = match &f {
-            Ty::Fn(ft) if ft.params.len() == placed.len() => {
+            Ty::Fn(ft) if !groups::is_multi(ft) && ft.params.len() == placed.len() => {
                 for ((t, s), (_, p)) in placed.iter().zip(&ft.params) {
                     self.sub2(t, p, *s, callee.span);
                 }
@@ -1823,7 +1831,7 @@ impl<'a> Checker<'a> {
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }
-            Ty::Fn(ft) => {
+            Ty::Fn(ft) if !groups::is_multi(ft) => {
                 let n = ft.params.len();
                 self.error(
                     code::FN_ARITY,
@@ -1858,6 +1866,44 @@ impl<'a> Checker<'a> {
             }
         };
         (t, known)
+    }
+
+    /// A multi-shape function value (syntax three §2.6.4, §2.6.5). With an
+    /// expected type that is one function type whose shape the value has,
+    /// it is the function of that shape group. In every other place it has
+    /// the type `{ B_g1 | … | B_gm } -> R_all` over its groups, and no
+    /// known type.
+    fn multi(&mut self, gs: &[MultiGroup], expected: &Ty, span: Span) -> (Ty, Ty) {
+        if let [Ty::Fn(want)] = known::members(expected).as_slice()
+            && !groups::is_multi(want)
+        {
+            let shape = super::ShapeId::positional(want.params.len() as u32);
+            if let Some(i) = gs.iter().position(|g| g.shape == shape) {
+                self.out.selected_groups.insert((self.module, span), i as u32);
+                return self.infer_k(&gs[i].value, expected);
+            }
+        }
+        let (ret, err, env) = (self.s.fresh(), self.s.fresh(), self.s.fresh());
+        let mut data = Vec::new();
+        for g in gs {
+            let (t, _) = self.infer_k(&g.value, &Ty::Top);
+            let params: Vec<(Option<String>, Ty)> = match &t {
+                Ty::Fn(f) if !groups::is_multi(f) && f.params.len() == g.shape.len() => f.params.clone(),
+                _ => (0..g.shape.len()).map(|_| (None, self.s.fresh_input())).collect(),
+            };
+            // The results and the needs of every group are those of the
+            // value (the need is shared by all branches, §2.5).
+            let part = FnTy {
+                params,
+                ret: ret.clone(),
+                err: err.clone(),
+                env: env.clone(),
+            };
+            data.push(groups::group_data(g.shape, &part));
+            self.sub(&t, &Ty::Fn(Box::new(part)), g.value.span);
+        }
+        let param = if data.len() == 1 { data.pop().unwrap() } else { Ty::Union(data) };
+        (Ty::Fn(Box::new(groups::with_data(param, ret, err, env))), Ty::Top)
     }
 
     /// §6.6: arguments by position go to the first parameters, and
@@ -3115,6 +3161,7 @@ fn has_no_effect(e: &Expr) -> bool {
         | ExprKind::String(_)
         | ExprKind::Name(_)
         | ExprKind::Fn(_) => true,
+        ExprKind::Multi(groups) => groups.iter().all(|g| has_no_effect(&g.value)),
         ExprKind::Tuple(items) => items.iter().all(has_no_effect),
         ExprKind::Record { base, fields } => {
             base.as_deref().is_none_or(has_no_effect)

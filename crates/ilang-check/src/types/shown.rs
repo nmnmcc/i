@@ -191,18 +191,28 @@ impl ShownType {
             }
             ShownType::Fn(f) => {
                 open(out, 0);
-                out.push('(');
-                for (i, (l, p)) in f.params.iter().enumerate() {
-                    if i > 0 {
-                        out.push_str(", ");
-                    }
-                    if let Some(l) = l {
-                        out.push_str(l);
-                        out.push_str(": ");
-                    }
+                if let [(Some(l), p)] = f.params.as_slice()
+                    && l == super::groups::DATA
+                {
+                    // A multi-shape function type: its parameter data
+                    // types in a group (syntax three §2.4).
+                    out.push_str("{ ");
                     p.write(0, out, n);
+                    out.push_str(" } -> ");
+                } else {
+                    out.push('(');
+                    for (i, (l, p)) in f.params.iter().enumerate() {
+                        if i > 0 {
+                            out.push_str(", ");
+                        }
+                        if let Some(l) = l {
+                            out.push_str(l);
+                            out.push_str(": ");
+                        }
+                        p.write(0, out, n);
+                    }
+                    out.push_str(") -> ");
                 }
-                out.push_str(") -> ");
                 // A function type followed by `^` or `!` is put in `{ }`.
                 let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
                     let braces = followed && matches!(x, ShownType::Fn(_));

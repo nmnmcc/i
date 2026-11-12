@@ -113,6 +113,9 @@ pub(crate) enum FailKind {
     EnvForms,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
+    /// A multi-shape function value where a function of one shape is
+    /// wanted. Temporary, until the run time has multi-shape values.
+    MultiCall,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -371,7 +374,7 @@ impl Solver {
         }
     }
 
-    fn fail(&mut self, kind: FailKind, lhs: &Ty, rhs: &Ty) {
+    pub(super) fn fail(&mut self, kind: FailKind, lhs: &Ty, rhs: &Ty) {
         if self
             .failures
             .iter()
@@ -961,12 +964,15 @@ impl Solver {
                 }
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if f.params.len() != g.params.len() {
+                if super::groups::is_multi(f) || super::groups::is_multi(g) {
+                    self.constrain_fn_data(f, g, l, r);
+                } else if f.params.len() != g.params.len() {
                     self.fail(FailKind::Arity, l, r);
                     return;
-                }
-                for (p, q) in f.params.iter().zip(&g.params) {
-                    self.constrain(&q.1, &p.1);
+                } else {
+                    for (p, q) in f.params.iter().zip(&g.params) {
+                        self.constrain(&q.1, &p.1);
+                    }
                 }
                 self.constrain(&f.ret, &g.ret);
                 self.constrain_row(&f.err, &g.err);
@@ -1187,7 +1193,8 @@ impl Solver {
         let lower = lower && first;
         match (a, b) {
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if g.params.len() != f.params.len() {
+                let multi = super::groups::is_multi(f) || super::groups::is_multi(g);
+                if g.params.len() != f.params.len() && !multi {
                     // All function types are one head; their parameters
                     // must agree in number to be put together.
                     self.fail(FailKind::Arity, b, a);
@@ -1689,6 +1696,15 @@ impl Solver {
     /// and by intersection when not. In an environment (`env`), the
     /// arguments must be equal (§9.2).
     fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
+        // A multi-shape function type is put together with any function
+        // type through the parameter data (syntax three §2.6.5).
+        let (a, b) = match (a, b) {
+            (Ty::Fn(f), Ty::Fn(g)) if super::groups::is_multi(&f) != super::groups::is_multi(&g) => (
+                Ty::Fn(Box::new(super::groups::as_multi(*f))),
+                Ty::Fn(Box::new(super::groups::as_multi(*g))),
+            ),
+            pair => pair,
+        };
         match (a, b) {
             (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
                 if env {

@@ -33,7 +33,12 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
         }
         for b in &m.bindings {
-            references.binding(&b.binding);
+            // A chain name does not use its own shape groups: the name
+            // and its groups are used together (below).
+            let chain = b.defs.iter().any(|d| p.chain_groups.contains_key(d));
+            if !chain {
+                references.binding(&b.binding);
+            }
         }
     }
     references.pending.extend(&p.host_exports);
@@ -49,7 +54,15 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
         }
     }
-    let used: HashSet<_> = references.pending.into_iter().collect();
+    let mut used: HashSet<_> = references.pending.into_iter().collect();
+    // A direct call of a chain is a call of one of its shape groups; a use
+    // of any of them, or of the name, is a use of the whole chain.
+    for (chain, groups) in &p.chain_groups {
+        if used.contains(chain) || groups.iter().any(|g| used.contains(g)) {
+            used.insert(*chain);
+            used.extend(groups);
+        }
+    }
     let mut diags = Vec::new();
     for (mi, m) in p.modules.iter().enumerate() {
         for (di, d) in m.defs.iter().enumerate() {
@@ -59,6 +72,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             };
             if !matches!(d.kind, DefKind::Binding { .. })
                 || d.name.starts_with('_')
+                || d.name.contains('%')
                 || used.contains(&id)
             {
                 continue;
@@ -189,6 +203,7 @@ impl References<'_> {
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
                 self.expr(target)
             }
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate { base, fields, .. } => {
                 self.expr(base);
                 fields.iter().for_each(|(_, e)| self.expr(e));

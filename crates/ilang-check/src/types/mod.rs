@@ -22,6 +22,7 @@ mod alias;
 mod codec;
 mod coverage;
 mod display;
+mod groups;
 mod infer;
 mod known;
 mod lits;
@@ -402,6 +403,10 @@ pub struct Typed {
     /// Each data expression `(f: e, …)` or `(..b, f: e, …)` that type checks,
     /// by its span: its shape, and the shape of its spread base.
     pub data_shapes: HashMap<(ModuleId, Span), (ShapeId, Option<ShapeId>)>,
+    /// Each multi-shape function expression that an expected type narrows
+    /// to one of its shape groups, by its span: the index of that group.
+    /// Its value is that group's function alone (syntax three §2.6.4).
+    pub selected_groups: HashMap<(ModuleId, Span), u32>,
     /// Diagnostics retained when coalescing could not produce a finite
     /// type. IDEs may use the partial result; lowering must reject it.
     pub(crate) coalescing_errors: Vec<Diagnostic>,
