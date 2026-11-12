@@ -20,22 +20,22 @@ fn lines(source: &str) -> Vec<String> {
     types.lines(&program, common::module(&program, "app/main"))
 }
 
-/// `n` members: `C0`, and `Ci(A) { Ci(A, E(A)) }` for each other `i`,
+/// `n` members: `C0`, and `Ci(A) = (A, E(A))` for each other `i`,
 /// joined as `E(A)`, with an unannotated recursive match over all of them.
 fn nominal_union(n: usize) -> String {
     let mut out = vec!["C0 = ()".to_string()];
     for i in 1..n {
-        out.push(format!("C{i}(A) {{ C{i}(A, E(A)) }}"));
+        out.push(format!("C{i}(A) = (A, E(A))"));
     }
     let members: Vec<String> = std::iter::once("C0".to_string())
         .chain((1..n).map(|i| format!("C{i}(A)")))
         .collect();
     out.push(format!("E(A) = {}", members.join(" | ")));
     let clauses: Vec<String> = (1..n)
-        .map(|i| format!("\t\tC{i}(a, r) -> a + f0(r)"))
+        .map(|i| format!("\t\t| (C{i}(a, r)) {{ a + f0(r) }}"))
         .collect();
     out.push(format!(
-        "f0 = (e) {{\n\te |> {{\n\t\tC0 -> 0\n{}\n\t}}\n}}",
+        "f0 = (e) {{\n\te |>\n\t\t(C0) {{ 0 }}\n{}\n}}",
         clauses.join("\n")
     ));
     out.push("main = () { f0(C1(1, C0)) }".to_string());
