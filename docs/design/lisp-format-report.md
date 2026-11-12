@@ -102,8 +102,12 @@ and LSP formatting/idempotence/syntax-error behavior.
 - The first whole syntax-crate run failed at
   `macro_quotes_are_core_nodes_and_can_be_formatted`; the obsolete
   AST-regeneration expectation was corrected as described above.
-- Full acceptance verification: running after the formatting/report commit;
-  final results will be recorded here before completion.
+- Initial acceptance: formatter checks passed; `dev-verify rust` failed at
+  `an_error_stops_a_test` because formatting changed the macro source location
+  from `std/test:5:73` to `std/test:21:15`. Updated the expected location.
+- Heavy-wrapped `cargo check -p ilang-cli --all-targets` and
+  `cargo test -p ilang-cli --test commands an_error_stops_a_test`: passed.
+- Full acceptance verification is being rerun after that correction.
 
 ## std/src/test.is before and after
 
@@ -165,4 +169,4 @@ First 30 lines:
 
 ## Unfinished
 
-Acceptance verification is in progress; no implementation behavior is deferred.
+Acceptance verification is being rerun; no implementation behavior is deferred.
