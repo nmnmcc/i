@@ -2,6 +2,8 @@
 # syntax three nor syntax three reads them. They are the parse-error fixtures of
 # the syntax before syntax three; each line is the path and the first message of
 # the old parser. A file that fails and is not here stops the conversion.
+# Lines `path:hash reason` name snippets in strings (the key of
+# scripts/old-syntax-check.json) that are not i or not complete.
 crates/ilang-check/tests/projects/package_deps/lib/test/broken.i expected an item: a type definition, or a binding `pattern = value`, found `this`
 crates/ilang-check/tests/projects/syntax_error/src/main.i `(` is not closed
 crates/ilang-syntax/tests/golden/err_arg_order.i an argument by position may not come after an argument by label
@@ -124,3 +126,4 @@ tests/spec/6/syn2_old_brace_record.i expected an expression, found `:`
 tests/spec/6/syn2_old_mixed_tuple.i tuples have positional parts only and records have labelled fields only; positions and labels cannot mix
 tests/spec/7/suffix_nonliteral.i expected a string literal in a string pattern, found `x`
 tests/spec/7/suffix_two_binders.i a string pattern has exactly one binder; two binders around a literal are not allowed
+crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1 a JSON key "export", not i

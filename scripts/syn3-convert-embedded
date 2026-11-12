@@ -121,20 +121,44 @@ def migrate(binary, ctors, sources):
     return answers
 
 
+# Files whose strings are inputs of the syntax before syntax three on purpose:
+# the migrator and its tests.
+OLD_ON_PURPOSE = (
+    "crates/ilang-syntax/examples/migrate-syntax3.rs",
+    "crates/ilang-syntax/tests/syn3.rs",
+    "crates/ilang-syntax/tests/syn3_lower.rs",
+)
+# A Rust format string: `{name}`, `{}` or `{0}` with no space inside.
+FORMAT = re.compile(r"\{(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]*)(?::[^}\s]*)?\}")
+
+
+def listed():
+    """The snippets of scripts/syn3-unconvertible.txt (`path:hash reason`)."""
+    keys = set()
+    for line in (ROOT / "scripts/syn3-unconvertible.txt").read_text().splitlines():
+        key = line.split(" ", 1)[0]
+        if re.fullmatch(r".+:[0-9a-f]{16}", key):
+            keys.add(key)
+    return keys
+
+
 def convert(binary, ctors):
     os.chdir(ROOT)
     config = json.loads(check.DATA.read_text())
+    unconvertible = listed()
     items = []
     left = []
     for item in check.snippets():
         if item["kind"] == "file":
             continue
-        entry = config.get(check.identity(item["path"], item["source"]), {})
-        if entry.get("not_source"):
+        key = check.identity(item["path"], item["source"])
+        entry = config.get(key, {})
+        if entry.get("not_source") or item["path"] in OLD_ON_PURPOSE:
             continue
         why = ("invalid on purpose" if entry.get("diagnostics") else
+               "listed in scripts/syn3-unconvertible.txt" if key in unconvertible else
                "source template" if any(k in entry for k in ("prefix", "suffix", "substitutions")) else
-               "format string" if item["path"].endswith(".rs") and ("{{" in item["source"] or "}}" in item["source"]) else
+               "format string" if item["path"].endswith(".rs") and ("{{" in item["source"] or "}}" in item["source"] or FORMAT.search(item["source"])) else
                None)
         if why:
             left.append(f'{item["path"]}:{item["line"]}: left: {why}')
@@ -151,7 +175,7 @@ def convert(binary, ctors):
             counts["already"] += 1
             continue
         if kind != "old":
-            failed.append(f"{where}: FAILED: {kind}: {text}")
+            failed.append(f"{where}: FAILED: {kind}: {text} (key {check.identity(item['path'], item['source'])})")
             continue
         host = item["host"]
         if item["kind"] == "markdown":
