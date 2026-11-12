@@ -458,6 +458,18 @@ impl<'a> Resolver<'a> {
                 remaining.attributes.retain(|attribute| {
                     !(attribute.module.is_none() && attribute.name.name == "macro")
                 });
+                for attribute in &remaining.attributes {
+                    if attribute.module.is_none() && attribute.name.name == "main" {
+                        self.error(
+                            code::ATTRIBUTE_PLACE,
+                            attribute.span,
+                            "`@main` cannot be put on a macro",
+                        );
+                    }
+                }
+                remaining.attributes.retain(|attribute| {
+                    attribute.module.is_some() || attribute.name.name != "main"
+                });
                 self.attributes(&remaining);
                 if let ast::ItemKind::Binding(binding) = &item.kind {
                     let mut names = Vec::new();

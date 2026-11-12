@@ -144,3 +144,7 @@ macro tests to the core checker (`error[E0234]`). That checker-only example test
 now loads source without test modules; the CLI continues to execute both hello
 macro tests. This follows the same checker/expansion boundary as the runtime
 review fixture.
+
+The workspace scan also caught the pre-existing macro-definition `@main`
+rejection diagnostic changing (`invalid_macro_definitions_are_reported`). Its
+unrelated rejection check is retained; only the test-attribute branch is removed.
