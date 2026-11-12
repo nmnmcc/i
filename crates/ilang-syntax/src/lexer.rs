@@ -337,7 +337,7 @@ impl Lexer<'_> {
     }
 
     fn symbol(&mut self, c: u8) -> Option<T> {
-        if self.syn3 && (c == b'^' || c == b'!' && self.at(1) != b'=') {
+        if self.syn3 && !self.lisp && (c == b'^' || c == b'!' && self.at(1) != b'=') {
             // Syntax three P0: `^` and `!` alone are no symbols of i.
             let span = Span::new(self.pos as u32, self.pos as u32 + 1);
             self.error(

@@ -288,7 +288,7 @@ fn block(b: &Block) -> String {
 
 fn expr(e: &Expr) -> String {
     match &e.kind {
-        ExprKind::Quote(d) => format!("`{}", show(&d.0)),
+        ExprKind::Quote(d) => show(&d.0),
         ExprKind::Int(n) => n.to_string(),
         ExprKind::Float(n) => float(*n),
         ExprKind::String(s) => string_literal(s),
@@ -364,7 +364,7 @@ fn dpitems(items: &[DPItem]) -> Vec<String> {
 
 fn pattern(p: &Pattern) -> String {
     match &p.kind {
-        PatternKind::Quote(d) => format!("`{}", show(&d.0)),
+        PatternKind::Quote(d) => show(&d.0),
         PatternKind::Var(s) | PatternKind::Discard(s) => s.clone(),
         PatternKind::Typed { binder, ty } => form(":", [binder.name.clone(), typ(ty)]),
         PatternKind::Int { negative, value } => {
@@ -1039,7 +1039,7 @@ fn expr_of(d: &Datum) -> R<Expr> {
             name: any_name(d)?,
         },
         K::Discard(_) => return err(d, "a discard binds nothing, so it may not be used as a value"),
-        K::Quote(q) => ExprKind::Quote(Quoted(q.clone())),
+        K::Quote(_) => ExprKind::Quote(Quoted(Box::new(d.clone()))),
         K::Square(parts) => {
             let mut items = Vec::new();
             let mut rest = None;
@@ -1195,7 +1195,7 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
             name: upper(d)?,
             args: None,
         },
-        K::Quote(q) => PatternKind::Quote(Quoted(q.clone())),
+        K::Quote(_) => PatternKind::Quote(Quoted(Box::new(d.clone()))),
         K::Square(parts) => {
             let mut items = Vec::new();
             let mut rest = None;

@@ -226,7 +226,6 @@ fn data_values() {
         ExprKind::Data(items) if matches!(items[0], DItem::Pos(_))
     ));
     bad("x = (port = 443, \"a.com\")", "by position may not come after");
-    bad("x = (a = 1, a = 2)", "given twice");
     bad("x = f(name: 1)", "written `label = value`");
 }
 

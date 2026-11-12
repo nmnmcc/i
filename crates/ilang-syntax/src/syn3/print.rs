@@ -819,7 +819,7 @@ impl Printer<'_> {
 
     fn expr_raw(&mut self, e: &Expr) -> Doc {
         match &e.kind {
-            ExprKind::Quote(d) => t(format!("`{}", crate::lisp::show(&d.0))),
+            ExprKind::Quote(d) => t(crate::lisp::show(&d.0)),
             ExprKind::Int(n) => t(self
                 .written(e.span, |k| matches!(k, T::Int(x) if x == n))
                 .unwrap_or_else(|| n.to_string())),
@@ -1011,7 +1011,7 @@ impl Printer<'_> {
 
     fn pattern(&mut self, p: &Pattern) -> Doc {
         match &p.kind {
-            PatternKind::Quote(d) => t(format!("`{}", crate::lisp::show(&d.0))),
+            PatternKind::Quote(d) => t(crate::lisp::show(&d.0)),
             PatternKind::Var(s) | PatternKind::Discard(s) => t(s.clone()),
             PatternKind::Typed { binder, ty } => {
                 cat(vec![t(format!("{}: ", binder.name)), self.ty(ty, 0)])

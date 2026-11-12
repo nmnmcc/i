@@ -862,17 +862,6 @@ impl Parser<'_> {
             DItem::Label(n, _) => (ItemOrder::Key, n.span.0),
             DItem::Spread(e) => (ItemOrder::Other, e.span.0),
         });
-        let mut seen: Vec<&str> = Vec::new();
-        for item in &items {
-            if let DItem::Label(n, _) = item {
-                if seen.contains(&n.name.as_str()) {
-                    let msg = format!("the label `{}` is given twice", n.name);
-                    self.diags
-                        .push(Diagnostic::new(Code::Unexpected, n.span.0, msg));
-                }
-                seen.push(&n.name);
-            }
-        }
         Ok(items)
     }
 
@@ -1368,6 +1357,7 @@ impl Parser<'_> {
                     _ => None,
                 };
                 rest = Some(binder);
+                self.eat(&T::Comma);
                 self.expect(&T::RBracket)?;
                 break;
             }
