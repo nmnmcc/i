@@ -151,9 +151,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         let _ = writeln!(
             m,
             "(type $fn{n} (func (param (ref null $obj) (ref null $env){params}) (result eqref)))\n\
-             (type $clo{n} (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64) \
+             (type $clo{n} (sub final $clo (struct (field (mut i32)) (field i32) (field i64) (field f64) \
              (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
-             (field (ref null $call)) (field (ref $fn{n})))))"
+             (field (ref null $call)) (field (mut i64)) (field (ref $fn{n})))))"
         );
     }
     let wasi = p.target == Target::Wasi;
@@ -311,7 +311,7 @@ fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
     let flags = u32::from(patched);
     format!(
         "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const {}) \
-         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
+         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $f{}))",
         f.0 + 3,
         f.0
     )
@@ -707,7 +707,7 @@ impl<'p> Emitter<'p> {
             Callee::Value(a) => {
                 let a = self.atom(a);
                 format!(
-                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
+                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 9 (ref.cast (ref $clo{n}) {a})))"
                 )
             }
         };
@@ -1280,7 +1280,7 @@ impl<'p> Emitter<'p> {
              (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {ASSERT_SERVICE})\n\
              (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1\n\
              (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 2) (ref.null $bytes)\n\
-             (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
+             (ref.null $values) (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $entry_assert_fail)))))",
             self.p.services.max(1)
         );
         if self.p.start.is_some() {
@@ -1347,7 +1347,7 @@ impl<'p> Emitter<'p> {
                 let a = self.atom(a);
                 format!(
                     "(call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env} {} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))",
+                     (struct.get $clo{n} 9 (ref.cast (ref $clo{n}) {a})))",
                     converted.join(" ")
                 )
             }

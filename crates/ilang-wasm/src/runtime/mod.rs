@@ -250,6 +250,12 @@ pub const TYPES: &str = r#"
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
 (type $cons (sub final $val (struct (field (mut i32)) (field eqref) (field eqref))))
+;; A function value: `$obj`, then its id (multicore D6, given when it is first
+;; copied to another worker; 0 before). Each arity's `$clo{n}` adds its code.
+(type $clo (sub $obj (struct
+ (field (mut i32)) (field i32) (field i64) (field f64)
+ (field (ref null $bytes)) (field (ref null $values))
+ (field (ref null $limbs)) (field (ref null $call)) (field (mut i64)))))
 (type $hostref (struct (field externref) (field i32) (field i64)))
 (type $sites (array i32))
 (type $frames (array (mut i32)))

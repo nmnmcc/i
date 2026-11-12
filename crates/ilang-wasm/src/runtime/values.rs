@@ -155,9 +155,11 @@ const CORE: &str = r#"
       (if (i32.eq (local.get $ka) (i32.const 10)) (then
         (local.set $c (call $compare_i64 (call $host_id (local.get $a)) (call $host_id (local.get $b))))
         (br $compared)))
-      ;; Copies of one key on two workers keep its id (multicore D6).
+      ;; Copies of one key or function on two workers keep its id (multicore D6).
       (if (i32.eq (local.get $ka) (i32.const 15)) (then
         (br_if $compared (call $key_same (local.get $a) (local.get $b)))))
+      (if (i32.eq (local.get $ka) (i32.const 7)) (then
+        (br_if $compared (call $closure_same (local.get $a) (local.get $b)))))
       ;; Identity values that are not ref.eq are different. The order between
       ;; them only has to be consistent within one comparison.
       (if (call $value_identity_kind (local.get $ka)) (then (return (i32.const 1))))
@@ -407,6 +409,13 @@ const CORE: &str = r#"
   (global.set $id_next (i64.add (global.get $id_next) (i64.const 1)))
   (struct.new $obj (i32.const 15) (i32.const 0) (i64.or (global.get $id_prefix) (global.get $id_next)) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+(func $closure_same (param $a eqref) (param $b eqref) (result i32)
+  (if (i32.eqz (i32.and (ref.test (ref $clo) (local.get $a)) (ref.test (ref $clo) (local.get $b))))
+    (then (return (i32.const 0))))
+  (i32.and
+    (i64.ne (struct.get $clo 8 (ref.cast (ref $clo) (local.get $a))) (i64.const 0))
+    (i64.eq (struct.get $clo 8 (ref.cast (ref $clo) (local.get $a)))
+            (struct.get $clo 8 (ref.cast (ref $clo) (local.get $b))))))
 (func $key_same (param $a eqref) (param $b eqref) (result i32)
   (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
   (if (i32.eqz (i32.and (ref.test (ref $obj) (local.get $a)) (ref.test (ref $obj) (local.get $b))))

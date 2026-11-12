@@ -107,6 +107,14 @@ pub(super) const WAT: &str = r#"
   (f64.store (i32.add (global.get $enc_ptr) (global.get $enc_len)) (local.get $v))
   (global.set $enc_len (i32.add (global.get $enc_len) (i32.const 8))))
 
+;; The id of a function, given the first time it is copied.
+(func $closure_id (param $v eqref) (result i64)
+  (local $c (ref $clo))
+  (local.set $c (ref.cast (ref $clo) (local.get $v)))
+  (if (i64.eqz (struct.get $clo 8 (local.get $c))) (then
+    (global.set $id_next (i64.add (global.get $id_next) (i64.const 1)))
+    (struct.set $clo 8 (local.get $c) (i64.or (global.get $id_prefix) (global.get $id_next)))))
+  (struct.get $clo 8 (local.get $c)))
 ;; A value that cannot leave this worker, in a message: a token (marker 9).
 (func $enc_token (param $v eqref)
   (local $grown (ref null $values)) (local $n i32)
@@ -208,6 +216,8 @@ pub(super) const WAT: &str = r#"
     (call $enc_mark (local.get $v) (local.get $tag))
     (call $enc_u8 (i32.const 4))
     (call $enc_i32 (local.get $code))
+    ;; Its id: a copy is the same function as its original (D6).
+    (call $enc_i64 (call $closure_id (local.get $v)))
     (call $enc_i32 (struct.get $obj 1 (local.get $o)))
     (call $enc_i32 (i32.wrap_i64 (struct.get $obj 2 (local.get $o))))
     (if (ref.is_null (local.get $xs)) (then (call $enc_i32 (i32.const -1)) (return)))
@@ -381,13 +391,15 @@ pub(super) const WAT: &str = r#"
     (return (local.get $out))))
   (if (i32.eq (local.get $m) (i32.const 4)) (then
     (local.set $code (call $dec_i32))
+    (local.set $f2 (call $dec_i64))
     (local.set $flags (call $dec_i32))
     (local.set $arity (call $dec_i32))
     (local.set $n (call $dec_i32))
     (if (i32.ge_s (local.get $n) (i32.const 0))
       (then (local.set $xs (array.new_default $values
         (i32.add (local.get $n) (i32.and (local.get $flags) (i32.const 1)))))))
-    (local.set $v (call $codec_make_closure (local.get $arity) (local.get $code) (local.get $flags) (local.get $xs)))
+    (local.set $v (call $codec_make_closure (local.get $arity) (local.get $code) (local.get $flags) (local.get $xs)
+      (local.get $f2)))
     (drop (call $dec_register (local.get $v)))
     (block $done (loop $each
       (br_if $done (i32.ge_s (local.get $i) (local.get $n)))
@@ -630,14 +642,14 @@ pub(super) fn closures(
     );
     out.push_str(
         "(func $codec_make_closure (param $arity i32) (param $code i32) (param $flags i32) \
-         (param $caps (ref null $values)) (result eqref)\n",
+         (param $caps (ref null $values)) (param $id i64) (result eqref)\n",
     );
     for n in arities {
         let _ = writeln!(
             out,
             "  (if (i32.eq (local.get $arity) (i32.const {n})) (then (return (struct.new $clo{n} (i32.const 7) \
              (local.get $flags) (i64.const {n}) (f64.convert_i32_u (local.get $code)) (ref.null $bytes) \
-             (local.get $caps) (ref.null $limbs) (ref.null $call) \
+             (local.get $caps) (ref.null $limbs) (ref.null $call) (local.get $id) \
              (ref.cast (ref $fn{n}) (table.get $codes (local.get $code)))))))"
         );
     }

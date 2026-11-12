@@ -15,8 +15,10 @@ probe = (wait: () -> Nil ! request.Await) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.send(armed, Nil)
+				// §9.9: the failure may come before or after the await; the
+				// child then waits until the cancellation reaches it.
 				wait()
-				panic("await continued")
+				task.sync(task.never())
 			})
 			task.go(s, () {
 				task.receive(armed)

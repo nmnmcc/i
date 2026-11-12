@@ -22,6 +22,18 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
+// §9.9 lets the failure come before or after any one step of the waiting
+// child, so the child repeats its step until the cancellation reaches it.
+yield_forever = () -> Nil ! task.Scheduler {
+	task.yield()
+	yield_forever()
+}
+
+sync_forever = () -> Nil ! task.Scheduler {
+	task.sync(task.map(task.always(Nil), (_) { Nil }))
+	sync_forever()
+}
+
 probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 	result = fail.catch(() {
 		task.scope((s) {
@@ -48,15 +60,11 @@ probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 
 
 main = () {
-	probe("yield", () { task.yield() })
+	probe("yield", () { yield_forever() })
 	c: task.Channel(Nil) = task.channel()
 	probe("send", () { task.send(c, Nil) })
 	probe("receive", () { task.receive(c) })
-	probe("sync", () {
-		task.sync(task.map(task.always(Nil), (_) {
-			panic("map ran after cancellation")
-		}))
-	})
+	probe("sync", () { sync_forever() })
 	result = fail.catch(() {
 		task.scope((s) {
 			target = task.go(s, () { task.sync(task.never()) })

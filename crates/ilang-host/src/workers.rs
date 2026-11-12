@@ -33,25 +33,27 @@ use wasmtime::{Caller, Engine, Linker, Module, Store, UpdateDeadline};
 
 use crate::{Abi, Bridge, HOST_MODULE, HostOptions, ResourceContext, State, THREAD_STACK};
 
-/// The number of workers of an entry run: one by default; `I_WORKERS=<n>`
-/// asks for n, and `I_WORKERS=auto` for the available cores, at most one per
-/// GiB of available memory.
+/// The number of workers of an entry run: `I_WORKERS=<n>` asks for n;
+/// unset or `auto` gives the available cores, at most one per GiB of
+/// available memory.
 pub fn worker_count() -> usize {
     match std::env::var("I_WORKERS") {
-        Err(_) => 1,
-        Ok(text) if text.trim() == "auto" => {
-            let cores = std::thread::available_parallelism().map_or(1, |n| n.get().min(255));
-            // Each worker is an instance with its own GC heap: keep a worker
-            // for each WORKER_MEMORY of available memory, at least one.
-            match available_memory() {
-                Some(bytes) => cores.min((bytes / WORKER_MEMORY).max(1) as usize),
-                None => cores,
-            }
-        }
+        Err(_) => auto_workers(),
+        Ok(text) if text.trim() == "auto" => auto_workers(),
         Ok(text) => match text.trim().parse::<usize>() {
             Ok(n) if n >= 1 => n.min(255),
             _ => panic!("I_WORKERS must be `auto` or a positive number of workers, not {text:?}"),
         },
+    }
+}
+
+/// The available cores, at most one worker per WORKER_MEMORY of available
+/// memory (each worker is an instance with its own GC heap), at least one.
+fn auto_workers() -> usize {
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get().min(255));
+    match available_memory() {
+        Some(bytes) => cores.min((bytes / WORKER_MEMORY).max(1) as usize),
+        None => cores,
     }
 }
 

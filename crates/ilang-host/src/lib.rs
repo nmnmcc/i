@@ -1182,6 +1182,14 @@ impl Program {
         })
     }
 
+    /// The engine of this program is epoch-instrumented: entries may use
+    /// `workers` workers.
+    pub(crate) fn with_epochs(mut self, workers: usize) -> Self {
+        self.epochs = true;
+        self.workers = if self.macro_static_cost.is_some() { 1 } else { workers.max(1) };
+        self
+    }
+
     /// Runs entries on at most `workers` workers (multicore D12: the host's
     /// choice). One worker keeps the FIFO fast path (native N10).
     pub fn with_workers(mut self, workers: usize) -> Self {
