@@ -80,8 +80,9 @@
                    name))
                 (= target
                   ((. syntax make)
-                   ((. syntax Name)
-                    (<> "generated_test_" ((. int to_string) index)))
+                   ((. syntax Node)
+                    ((. syntax Name)
+                     (<> "generated_test_" ((. int to_string) index))))
                    `generated_test))
                 ((. items add)
                  `tests
