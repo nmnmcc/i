@@ -778,7 +778,7 @@ node = (syntax: Syntax) -> Node {
         | (_) { panic("syntax: invalid node kind") }
 }
 
-make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
+make = (node: Node, like: Syntax) -> Syntax {
     result = node |>
         (Node(Name(value))) { raw_make_text(0, value, like) }
         | (Node(Discard(value))) { raw_make_text(1, value, like) }
@@ -815,7 +815,8 @@ make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
 - **The prelude.** `True = ()`, `False = ()`, `Bool = True | False`,
   `Nil = ()`, `Ok(A) = (A)`, `Error(E) = (E)`, `Result(A, E) = Ok(A) | Error(E)`,
   `AssertionFailure = (message = String)`,
-  `Assert = (fail = (AssertionFailure) -> Never)`.
+  `Assert = (fail = (AssertionFailure) -> Never)`,
+  `Fail(E) = (raise = (E) -> Never)` (§2.10.6).
 
 ### 2.9 Guards
 
@@ -1245,8 +1246,11 @@ function `core.never : (Never) -> A` (D9; the name [R4]) is the match on
   by hand anyway after the migration removes their documentation labels.
 - A host service is a labelled type with data whose every item is labelled
   with a function type: `@host("app:storage/v1", "async")
-  Storage = (read = (String) -> String ^ String)`. Its field labels are the
-  import names (spec §9.7, unchanged).
+  Storage = (read = (String) <- (Fail(String)) -> String)`. Its field labels
+  are the import names (spec §9.7, unchanged). A field's function type has no
+  need or exactly `<- (Fail(E))` with a host-passable `E` (§2.10.12).
+- An entry's need, after what it provides itself, is within the platform
+  services of the target (§2.10.11).
 - Types the host can take (spec §10.3): `Nil`, `Bool` (the prelude name for
   `True | False`), `Int`, `Float`, `String`, `BitArray`, and `Opaque` types.
   Data, labelled types with data, and functions do not cross.
@@ -1667,7 +1671,7 @@ count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
 }
 
 // after
-count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
+count = <A, N>(list: List(A), where: (A) <- N -> Bool) -> Int {
     go =
         ([], n) { n }
         | ([x, ..xs], n) {
@@ -1679,6 +1683,10 @@ count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
 }
 ```
 
+The type is `count : <A, N>(List(A), (A) <- N -> Bool) <- N -> Int`: the
+error part `E` is gone (errors of `where` are a `Fail` entry in `N`), the type
+parameters move to the function literal, and the need `N` of the result is
+inferred from the call `where(x)` (R2), so the head writes no `<-`.
 `list` and `where` are now positional binders; callers that wrote
 `count(list: xs, where: f)` become `count(xs, f)`. `go` has one group of
 shape (2 positions) with two branches (rule 11, covered: `[]` and
@@ -1706,7 +1714,7 @@ Leaf = ()
 Node(A) = (left = Tree(A), value = A, right = Tree(A))
 Tree(A) = Leaf | Node(A)
 
-size(A) = (t: Tree(A)) -> Int {
+size = <A>(t: Tree(A)) -> Int {
     t |>
         (Leaf) { 0 }
         | (Node(left = l, right = r, ..)) { size(l) + 1 + size(r) }
@@ -1734,20 +1742,21 @@ fake = () -> User ^ NotFound {
 
 // after
 NotFound = (String)
-Db = (find = (String) -> User ^ NotFound)
+Db = (find = (String) <- (Fail(NotFound)) -> User)
 
-find_user = (id: String) -> User ^ NotFound ! Db {
-    db ! Db
+find_user = (id: String) <- (db: Db) -> User {
     db.find(id)
 }
+// find_user : (String) <- (Db, Fail(NotFound)) -> User
 
-fake = () -> User ^ NotFound {
-    ! Db = Db(find = (id) { fail.raise(NotFound(id)) })
-    find_user("1")
+fake = () -> User {
+    find_user("1") <- (Db(find = (id) { fail.raise(NotFound(id)) }))
 }
+// fake : () <- (Fail(NotFound)) -> User
 ```
 
-`db.find(id)` reads the label `find` of a value whose known type is `Db`.
+`db.find(id)` reads the label `find` of a value whose known type is `Db`
+(the service pattern's annotation).
 The parameter `id` of the fake gets its expected type `String` from `Db`'s
 data type.
 
@@ -1853,7 +1862,19 @@ Point = (x: Int, y: Int)           Point = { (x = Int, y = Int) }   // a name, a
 Pair(A, B) = (A, B)                Pair(A, B) = { (A, B) }          // keeps today's alias meaning
 
 // function types lose documentation labels
-fail.raise: (error: E) -> Never ^ E        fail.raise: (E) -> Never ^ E
+fail.raise: (error: E) -> Never ^ E        fail.raise: <E>(E) <- (Fail(E)) -> Never
+
+// type parameters move to the function literal
+id(A) = (x: A) -> A { x }                  id = <A>(x: A) -> A { x }
+
+// errors and environment become one need after <-
+(String) -> User ^ NotFound ! Db           (String) <- (Db, Fail(NotFound)) -> User
+
+// environment parameters and reads become the service pattern
+(a, log ! Log) -> T { body }               (a) <- (log: Log) -> T { body }
+
+// environment statements become a provide
+{ ! Db = fake_db  run() }                  { run() } <- (fake_db)
 
 // opaque types
 Element {}                                 Element = Opaque
@@ -1888,6 +1909,7 @@ absurd = (x: Never) { x |> {} }            absurd = (x: Never) { core.never(x) }
 | §2.2 | "two constructors may not have the same name" becomes "each labelled type defines one constructor with its name". |
 | §2.3 | "Importing an `UpName` puts in the type and the constructor with that name": unchanged. "Header groups are not record or tuple values" becomes "are not data". |
 | §2.4 | Replaced (§5.2.1). |
+| §2.6.1 | Deleted: target provider plans (roles, adapters, seeds, guards, topological order) and the `providers` section of `i.toml` (§2.10.11). §2.6.2 and §10.2 lose their references to it. |
 | §2.4.1 | "Environment parameters do not count as value parameters" is removed. |
 | §3 | Grammar replaced (§3.1); bullets replaced (§5.2.2). `Record`, record labels, `(..R, f: T)`, `(..R, -f)`, label parameters are removed. |
 | §4.1 | "Records are values of one type constructor" becomes "data of one shape is one type constructor"; "Tuples with different numbers of parts are different" becomes "data of different shapes is different". |
@@ -1905,21 +1927,22 @@ absurd = (x: Never) { x |> {} }            absurd = (x: Never) { core.never(x) }
 | §6.4 | Replaced by Data (§5.2.6). |
 | §6.6 | Replaced (§5.2.6). |
 | §6.7 | Replaced (§5.2.6). |
-| §6.8 | "`! N` must have the types of the environment parameters" becomes "of the environment reads of its body". |
+| §6.8 | "`! N` must have the types of the environment parameters" becomes "the need after `<-` contains the types of its head's service pattern". |
 | §6.9 | Table: `\|>` moves to a new level 0 below `\|\|`. The `\|>` bullets are replaced by §2.11. The bullet on a match at level 6 is removed. |
 | §6.10 | Add the environment read; "`name = pattern` is itself a pattern" becomes the conjunction rule; direct values: "a function expression or a chain; … data whose items are direct values …"; the record example goes. |
 | §6.11 | Replaced (§5.2.7). Labels of parameters and environment parameters are removed. |
 | §6.12 | Replaced by "Branches and matching" (§5.2.7). `{}` removed. |
 | §6.13 | Removed. |
 | §7 | Replaced (§3.4, §5.2.9). "There are no record patterns" and "Empty tuple patterns are compile errors" are removed. |
-| §9.1-§9.12 | Examples rewritten. Tables of function types lose documentation labels. §9.2: environment parameters become environment reads (§2.10); "a record is not a value of a custom type, so a record type is never a service type" becomes "a service type is a labelled type". §9.7: host services as in §2.14. |
+| §9.1-§9.12 | Examples rewritten. Tables of function types lose documentation labels and use `<-` needs. §9.1: a computation has a value and a need (`A <- M`); the error part goes. §9.2 replaced by §2.10.1 to §2.10.5 and §2.10.8 (service patterns, keys, R1 to R6, rules A to C, provide); "a record is not a value of a custom type, so a record type is never a service type" becomes "a service type is a labelled type"; "one constructor may not have different arguments in one environment" is replaced by R4. §9.3 replaced by §2.10.6 (`Fail`, library `fail.raise` and `fail.catch`). §9.4: the table and rule 3's `keep_env` sentences as §2.10.7 and §2.10.8, plus `control.escape`. §9.5: `resource.acquire` and `resource.scoped` on the `Scope` service (§2.10.9). §9.7: host services as in §2.14 and §2.10.12; the platform table of §2.10.11. §9.9: `task.Scope(E)` becomes `task.Group(E)`. |
 | §10.1 | Types positional (§2.14). §10.1.1: `Element {}` becomes `Element = Opaque`; "closed nominal type with no constructors" becomes "`Opaque` type". |
 | §10.3 | "custom types with no constructors" becomes "`Opaque` types"; the records and label-parameter sentences become "data, labelled types with data and functions do not cross". |
 | §11.1 | "tuples … records" becomes "data". |
 | §11.4 | Tuple and record rules become §2.3's data rule. |
 | §11.6 | "the expression of a clause of a clause block that is called as a function" becomes "the body of a branch of a chain that is called"; "a clause of a match" becomes "a branch of a match". |
 | §11.8 | Rows as §2.15. |
-| §12 | `Record` and `i/record` removed; `Bool`, `Result` are names, `True`, `False`, `Nil`, `Ok`, `Error`, `AssertionFailure`, `Assert` labelled types; `assert : (Bool) -> Nil ! Assert`, `panic : (String) -> Never`. |
+| §10.2 | Entries: the platform services and the one check of §2.10.11; the top-level `Fail`. |
+| §12 | `Record` and `i/record` removed; `Bool`, `Result` are names, `True`, `False`, `Nil`, `Ok`, `Error`, `AssertionFailure`, `Assert`, `Fail` labelled types; `assert : (Bool) <- (Assert) -> Nil`, `panic : (String) -> Never`. |
 | §13 | Labels removed from the types (`index_of : (String, String, Int) -> Result(Int, Nil)`, `byte_slice : (String, Int, Int) -> …`, `portable : (A) -> Bool`); add `never : (Never) -> A`. |
 | §14 | Removed. |
 | App. B.2 | "A custom type with no constructors" becomes "An `Opaque` type". |
@@ -1955,8 +1978,10 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 
 - An `UpName` with no module name before it is a declared type variable or a
   type (unchanged). `_` is a hole.
-- Literal types, value types, type calls, `A | B`, `A & B`, `A - B`, `^` and
-  `!`: unchanged.
+- Literal types, value types, type calls, `A | B`, `A & B`, `A - B`:
+  unchanged. The error part `^ E` and the environment part `! N` of a
+  function type are removed; a function type is
+  `[<Params>] P [<- Needs] -> R` (§3.1, §2.10).
 - `( … )` is a **data type**. Its items are `T` (the next position) and
   `name = T` (a label). Positions come before labels. A label may not occur
   twice. `()` is the data type of the empty data. A `:` in a type is a compile
@@ -1965,8 +1990,9 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
   `{ T } -> R` is a function type whose parameter is `T`; every member of `T`
   must be a data type, and members of one shape are not allowed twice.
 - A function type goes as far to the right as it can; `{ }` groups.
-- In a written function type, a missing `^ E` means `^ Never`, and a missing
-  `! N` means `! Never` (unchanged).
+- In a written function type, a missing `<-` part means "needs nothing".
+- `<A, N>` before the parameter part binds type parameters for the rest of
+  the type (§2.16).
 - `Opaque` is not a type. It is only the right side of a type definition
   (§4.3).
 
@@ -2022,8 +2048,9 @@ Codec(Size, _) = size      // an alias pattern
 - Members of a union with the same type constructor are put together into
   one, as today. Data of one shape is one type constructor; its parts go in
   the same direction as the data. All function types are one type
-  constructor: `(P) -> R ^ E ! N | (Q) -> S ^ F ! M` is
-  `(P & Q) -> R | S ^ E | F ! N | M`; when `P` and `Q` have no shape in
+  constructor: `(P) <- N -> R | (Q) <- M -> S` is
+  `(P & Q) <- N ∧ M -> R | S`, where `N ∧ M` is the merge of the two needs
+  (§2.10.4, R4); when `P` and `Q` have no shape in
   common, `P & Q` is `Never`, which is correct and gives a function that
   cannot be called. The same holds for `&` the other way round.
 
@@ -2034,9 +2061,11 @@ and spreads in the last bullet.
 
 §4.5 rule 4 replaced:
 
-4. `{P} -> R ^ E ! N <: {Q} -> S ^ F ! M` when `Q <: P`, `R <: S`, `E <: F`,
-   and `N` is in `M` (the rest of today's rule 4 on services is unchanged).
-   Here `{P}` is the parameter type: a data type or a union of data types.
+4. `{P} <- N -> R <: {Q} <- M -> S` when `Q <: P`, `R <: S`, and `N` fits
+   in `M` (rule A of §2.10.4: for every constructor of `N`, `M` has it and
+   `M_C <: N_C`). The sentence "Service arguments are compared as equal, not
+   by direction …" is removed. Here `{P}` is the parameter type: a data type
+   or a union of data types.
 
 §4.5 rule 5 replaced:
 
@@ -2044,18 +2073,24 @@ and spreads in the last bullet.
    a subtype of the part under the same key of `D2`. Data of different shapes
    are disjoint.
 
+§4.5 rule 7, second sentence, replaced: in `Continuation(A, R, N)`, `A` goes
+in the other direction and `R` and `N` in the same direction.
+`Boundary(R, N)` does not change.
+
 §4.5 rule 9: removed.
 
 #### 5.2.5 §4.6 Function types
 
-The function type `(D) -> A ^ E ! N` has one parameter, a data type `D`, and
-three parts after the arrow: the value `A`, the errors `E`, the environment
-`N`, in the order of `Effect<A, E, R>` in Effect-TS. `E` and `N` are normally
-unions, and `Never` means none. The shape of `D` is part of the type: its
-positions and its labels. There is no currying and there are no default
-parameters. `{ D1 | … | Dn } -> A ^ E ! N` is the type of a function with
+The function type `(D) <- N -> A` has one parameter, a data type `D`, a need
+`N` written after `<-` (what it takes from outside, §9.2) and a value `A`
+after `->`. Errors are the need entry `Fail(E)`, so `Effect<A, E, R>` of
+Effect-TS is `() <- (..R, Fail(E)) -> A`. A missing `<-` part means "needs
+nothing". The shape of `D` is part of the type: its positions and its
+labels; the need is not. There is no currying and there are no default
+parameters. `{ D1 | … | Dn } <- N -> A` is the type of a function with
 several shapes (§6.12); calling it with data of the shape of `Di` needs that
-data to be in `Di`, and gives `A`.
+data to be in `Di`, and gives `A`. `<A, N>` before the parameter part makes
+the type polymorphic (§2.16).
 
 #### 5.2.6 §6.4 Data, §6.6 Calls, §6.7 Constructors and keys
 
@@ -2094,8 +2129,9 @@ binding (§6.10), but its names are not generalized (§4.7). An item `p` is a
 positional item; an item `label = p` matches the part under `label`. The
 parameter group has no rest. A group may end with a guard `? e` (§6.12). The
 names of a parameter group may not be bound twice, and its labels are
-distinct. A function has no environment parameters; its body reads services
-with `x ! T` (§6.10).
+distinct. A function has no environment parameters; the services it uses
+itself are named by its service pattern `<- (x: T, …)` after the parameter
+group (§9.2).
 
 **§6.12 Branches and matching.** A chain `F1 | … | Fn` of function literals
 (n ≥ 1) is one function value. Its branches are grouped by shape (§4.6). When
@@ -2135,11 +2171,13 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
 
 4. **Functions.** Let the parameter group be the data pattern `q`. `q` is
    fitted to a data type `P` (below). If `Γ` with the names of `q` gives
-   `body : A ^ F ! M`, the function has the type `(P) -> A ^ F ! M | S`. `S` is
-   `Assert` when `q` may fail for `P` (§7.3), and `Never` when not. Making the
-   function needs nothing.
-5. **Calls.** If `f : {P} -> A ^ E ! N` and the argument data `d : D` with
-   `D <: P`, then `f(d) : A`.
+   `body : A <- M` (with the names of the service pattern bound to their
+   annotated types), the function has the type `(P) <- M' -> A`, where `M'` is
+   the merge of `M`, the service pattern's types, and `Assert` when `q` may
+   fail for `P` (§7.3) (§2.10.4). Making the function needs nothing.
+5. **Calls.** If `f : {P} <- N -> A` and the argument data `d : D` with
+   `D <: P`, then `f(d) : A <- N`.
+   **5b. Provide.** `e <- s` as §2.10.4 "Provide".
    **5a. Selection.** When `f` is a name with a selection table, its type at
    the call is `F_sel` of §2.6.2, computed from the known types
    before inference constrains the call.
@@ -2148,9 +2186,9 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
    its base at their keys. Lists: unchanged.
 7. **Constructors** are functions from their data type to their type, or
    values when the data is `()`.
-9. **Blocks.** Unchanged, and: for an environment read `x ! T` and the rest
-   `r` of the block, if `r`, with `x : T`, has `A ^ E ! M`, then together they
-   have `A ^ E ! M | T`.
+9. **Blocks.** Unchanged, with needs in place of errors and environment: the
+   need of a block is the merge of the needs of its statements and result.
+   The environment statement and the environment read are removed.
 11. **Groups.** This rule is for a group of a chain with more than one branch
     or with a guard. Let it be called with data of type `B`: in a match, the
     one-tuple `(A)` of the subject's type; in a call, the argument data type.
@@ -2159,7 +2197,7 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
     data" for "each field of a constructor"; the top place is the argument
     data, which has one shape. Each branch body has its own type `Ri`; the
     group's result is the union of the `Ri`. Every guard has type `Bool`, and
-    every guard and body has the errors `E` and environment `N` of the chain.
+    the need of every guard and body is part of the need `N` of the chain.
     The rest of today's rule 11 (shared type variables per type constructor,
     type tests, catch-alls, `B <: P | r - P`, literal-only blocks, the coverage
     error in a match) is unchanged.
@@ -2225,8 +2263,26 @@ Grammar as §3.4. Then:
 // today (types/mod.rs:94-100)
 pub(crate) struct FnTy { pub params: Vec<(Option<String>, Ty)>, pub ret: Ty, pub err: Ty, pub env: Ty }
 // after
-pub(crate) struct FnTy { pub param: Ty, pub ret: Ty, pub err: Ty, pub env: Ty }
+pub(crate) struct FnTy { pub param: Ty, pub ret: Ty, pub env: Ty }
 ```
+
+- **One need row.** `err` is removed (stage E3): errors are the `Fail(E)`
+  entry of `env`. `Fail`'s parameter keeps `Mode::Row`, so error unions keep
+  today's cheap set treatment; `env` keeps `Mode::Env`.
+- **Directed rows (stage E1).** The `equal` of service arguments
+  (`solve.rs`:1135-1141, and in `handle` and `add_bound`) becomes the
+  variance-directed constraint of R4 and rule A. `add_bound`'s check of a new
+  upper bound against only the first bound with the same head
+  (`solve.rs`:1228-1235) was justified by equality and is replaced by one
+  canonical entry per (row variable, constructor) with fresh argument
+  variables; each new bound is constrained against it, which keeps it linear.
+  The handled obligation on row variables (`solve.rs`:630-658) implements
+  rule B.
+- **Polymorphic types (stage 7).** An internal `Ty::Poly(vars, body)` for a
+  written type with `TypeParams` in a parameter, field or annotation;
+  checking against it skolemises with a level-escape check, each use
+  instantiates (§2.16). Declared type parameters of a function literal stay
+  flexible.
 
 - `param` is a data type (`Ty::Con(Head::Shape(s), …)`), a union of data
   types of different shapes, `Never`, or a type variable.
@@ -2350,8 +2406,10 @@ with its own captures.
   atom. Not measured.
 - All 11 sites need the slow path: 4 in emit/mod.rs and 7 in emit/control.rs,
   including `$call0`, `$call1`, `$catch_run`, `$ensure_run` and the
-  `return_call_ref` at control.rs:494, because `fail.catch(body)` can receive a
-  multi-shape value with a `()` shape.
+  `return_call_ref` at control.rs:494, because a body passed to
+  `control.boundary` or `resource.ensure` can be a multi-shape value with a
+  `()` shape. `$catch_run` is deleted in stage E3 (§2.10.7); if stage 10
+  comes later, it has 10 sites.
 - **Tail calls** (spec §11.6): a tail site uses `return_call $dispatch{n}`;
   the dispatcher ends in `return_call_ref`, so no frame is left.
 - **Suspension.** A non-tail closure call is a `Stmt::Suspendable` whose
@@ -2364,6 +2422,12 @@ with its own captures.
   (emit/mod.rs:1150-1154) needs no slow path.
 - **Direct calls** of a named chain go to the group function of the call's
   shape: no dispatch.
+
+**Services.** `$env` is unchanged (§2.10.7). A provide `e <- s` is today's
+`LetEnv` over `e` (one array copy); a service pattern item reads its slot of
+`$env` at entry, as an environment parameter does today
+(`lower.rs`:2302-2307); `..env: N` keeps the `$env` pointer; `escape` throws
+the `$error` tag with `(b, v)`.
 
 **Matches.** `e |> chain` lowers to the one-position group's `Case` in place,
 as a `Clauses` right side does today (parser.rs:1015-1033). A function literal
@@ -2411,14 +2475,21 @@ not read.
   shows the selected branches and `F_sel`; hover on the name shows the shape
   groups. Go-to-definition from a call goes to the selected branches.
   Completion offers the labels of a known shape after `(` and after `.`.
+  Hover on a function lists the `Fail(…)` entries of its need separately as
+  "possible errors" and the other entries as services; an inlay hint after a
+  call shows, in grey, the services that step takes (review gap 18). Hover on
+  `<-` of a provide shows the keys it provides and which of them the left
+  side needs. Signature help shows `<A, …>` and the need.
   Signature help lists one signature per shape group. Semantic tokens: labels
   in data and types, the guard `?`, the join `|`.
 - **tree-sitter** (`editors/tree-sitter-i`): remove `clause_block`, `clause`,
   `record`, `record_type`, `custom_type`, `environment_parameter`; add
   `branches`, `function` with `parameters` and `guard`, `data`, `data_type`,
-  `data_pattern`, `labelled_item`, `spread`, `rest`, `environment_read`,
-  `type_definition` with an `opaque` alternative. The precedence of `|>`
-  becomes the lowest. The 10 corpus files are rewritten; `05-records.txt`
+  `data_pattern`, `labelled_item`, `spread`, `rest`, `type_parameters`,
+  `service_pattern`, `needs`, `provide`, `type_definition` with an `opaque`
+  alternative; remove `environment_read`, `environment_statement`,
+  `error_type`, `environment_type`. `provide` is the lowest precedence, then
+  `|>`. The 10 corpus files are rewritten; `05-records.txt`
   becomes `05-data.txt`.
 - **VS Code and Zed** grammars (`editors/vscode`, `editors/zed`): scopes for
   `|` after `}`, `?` in a group, `label =` in brackets; remove the clause
@@ -2448,6 +2519,10 @@ Expression  ValueItem  Statement  Pattern  PatternItem  Segment  Format
 - The parameter part of a function is in position `Pattern`: a data pattern
   `(, …)`, or, only there, the guard form `(? (, …) g)`.
 - A branch of a chain is in position `Expression`.
+- The items of a service pattern and of a need are in `PatternItem` and
+  `TypeItem` (`(: x T)`, `.. (: env N)`, `T`, `.. N`); the result form
+  `(<- R …)` is in position `FunctionResult`; the Square of type parameters
+  is part of the function form. No position is added.
 
 `position_id` (lib/i/syntax.i:437) and `show_as` follow the new order.
 
@@ -2477,6 +2552,9 @@ type.
 |---|---|---|
 | Data type | `(T1, x = T2)`, `(T)`, `()` | `(, T1 (= x T2))`, `(, T)`, `(,)` |
 | Function type | `(T1, x = T2) -> R`, `() -> R` | `(-> (, T1 (= x T2)) R)`, `(-> (,) R)` |
+| Function type with a need | `(T) <- (Db, Log) -> R`, `(T) <- N -> R`, `(T) <- (..N, Db) -> R` | `(-> (, T) (<- R (, Db Log)))`, `(-> (, T) (<- R N))`, `(-> (, T) (<- R (, .. N Db)))` |
+| Polymorphic function type | `<A>(A) -> A`, `<A, N>(A) <- N -> A` | `(-> [A] (, A) A)`, `(-> [A N] (, A) (<- A N))` |
+| Error part, environment part `(! (^ R E) V)` | removed | removed |
 | Multi-shape function type | `{ (T) \| (T, T) } -> R` | `(-> (\| (, T) (, T T)) R)` |
 | Tuple type, record type | removed | removed |
 
@@ -2492,15 +2570,22 @@ type.
 | Call | `f(e1, x = e2)`, `f()`, `f(..e)` | `(f e1 (= x e2))`, `(f)`, `(f .. e)` |
 | Data | `(e1, x = e2)`, `(e)`, `()`, `(..e, x = v)` | `(, e1 (= x e2))`, `(, e)`, `(,)`, `(, .. e (= x v))` |
 | Function | `(p1, x = p2) { e }`, `(p) -> R { e }`, `() { e }` | `(-> (, p1 (= x p2)) _ e)`, `(-> (, p) R e)`, `(-> (,) _ e)` |
+| Function with a service pattern | `(id: String) <- (db: Db) -> User { e }`, `(x) <- (log: Log) { e }`, `(f) <- (..env: N) { e }` | `(-> (, (: id String)) (<- User (, (: db Db))) e)`, `(-> (, x) (<- _ (, (: log Log))) e)`, `(-> (, f) (<- _ (, .. (: env N))) e)` |
+| Function with type parameters | `<A, N>(x: A) -> A { e }` | `(-> [A N] (, (: x A)) A e)` |
+| Provide | `e <- (s1, ..env)`, `app() <- live()` | `(<- e (, s1 .. env))`, `(<- (app) (live))` |
 | Function with a guard | `(p1, p2 ? g) { e }` | `(-> (? (, p1 p2) g) _ e)` |
 | Chain | `F1 \| F2` | `(\| F1 F2)` |
 | Pipe, match | `e \|> f`, `e \|> F1 \| F2` | `(\|> e f)`, `(\|> e (\| F1 F2))` |
-| Environment read | `x ! N` | `(! x N)` |
-| Environment statement | `! N = e` | `(! N e)` (unchanged) |
+| Environment read `(! x N)`, environment statement `(! N e)` | removed | removed |
 | Clause block, clause, record, record update, environment parameter | removed | removed |
 
-- `(! x N)` with a lowercase name first is a read; `(! N e)` with a named type
-  first is the environment statement.
+- `<-` in the result position of a function or function type (the third part
+  of `(-> …)` after the optional Square) is `(<- R needs)`: the result type
+  (`_` for none) and the need or service pattern. In an expression position,
+  `(<- e s)` is the provide, with `e` first as in the normal surface.
+- Type parameters are a leading Square right after `->`: `(-> [A N] …)`. A
+  parameter part is never a Square, and `<>` (string concatenation) and
+  `(< …)` (comparison) are other heads, so this is unambiguous.
 - `(| …)` in the position of an expression is a chain: two or more parts, each
   a three-part `(-> …)`. Today `(| a f)` is the pipe (`lisp/to_ast.rs`:489,
   `encode.rs`:969); the pipe's head becomes `|>`, the spelling of its token in
@@ -2620,6 +2705,16 @@ data. A macro that reads a node writes `(Node(Name(t)))` or `(Node(n: Int))`
 where it wrote `Name(t)` or `Int(n)`, and builds `Node(Text(s))` or
 `Node(5)` for `make`.
 
+**Macro signatures** (review gap 9). The macro function type of meta.md:382,
+today `(Syntax, …) -> Syntax ^ SyntaxError ! Definitions | Items | Diagnostics | Assert`,
+becomes `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), Items) -> Syntax`;
+the generated wrapper text (`crates/ilang-macro/src/prepare.rs`:243) is
+regenerated in stage E3.
+
+**`suite`** (review gap 10). The `suite` macro of `std/src/test.is`:11 copies
+`(! service value)` statements into test bodies today; it is rewritten to
+wrap each body as `(<- body (, value …))`, the provide of §2.10.5.
+
 ## 7. Migration
 
 ### 7.1 Spellings that keep their form and change meaning
@@ -2634,11 +2729,17 @@ where it wrote `Name(t)` or `Int(n)`, and builds `Node(Text(s))` or
 | 6 | `e \|> (x) { … }` | Ordinary call of a function literal | Match in place | Silent: no frame, tail position and stop messages change |
 | 7 | `()` | Empty record, type `Record` | Empty data, type `()` | Silent for values; types change |
 | 8 | Inspect text of records and labelled constructor values | `(label: value)`, `User("ada", 36)` | `(label = value)`, `User(age = 36, name = "ada")` | Silent: printed output changes |
+| 9 | `x<-1` | `x < -1` | A provide of `1` to `x` | Loud: a compile error (none in the corpus) |
+| 10 | An error raised inside a function kept by `keep` and called after its `catch` ended | Goes to the caller's `fail.catch` | Same with the signature of §2.10.8; a `Fail` captured elsewhere stops with "boundary not active" | Loud at run time, with a warning at compile time |
+| 11 | `fail.raise`, `fail.catch` | Built-in operations | Library code over `Fail` and `control.escape` | Silent; frames in stop messages may change |
 
 Spellings that become errors (loud): `label: value` in calls and records,
 `(name: T)` in types, labels in function types, `T { … }`, `T {}`, `x |> {}`,
 `{}`, clause guards `p ? g -> e`, environment parameters `x ! T` in groups,
-positional construction of labelled fields, punning in constructor patterns.
+positional construction of labelled fields, punning in constructor patterns,
+`^ E` and `! N` in types, the statements `! T = e` and `x ! T`, binding heads
+`name(A) = …` of functions, a need of an entry that the target does not
+provide, the `providers` section of `i.toml`.
 
 ### 7.2 Staged plan
 
@@ -2649,19 +2750,34 @@ the new one from stage 8 to stage 12 (SYN2 did the same:
 
 | # | Stage and scope | Files | Acceptance | Mechanical | On today's language |
 |---|---|---|---|---|---|
-| 0 | This note; spec replacement text staged in `i future-SYN3` fences | `docs/design/syntax-3.md`, `docs/spec.md`, `scripts/old-syntax-check.json` | `scripts/old-syntax-check` exits 0 | No | Yes |
+| 0 | This note, amended for services and effects and for type parameters (§2.10, §2.16, O23 to O32); spec replacement text staged in `i future-SYN3` fences, with fences for R1 to R6 and rules A to C | `docs/design/syntax-3.md`, `docs/spec.md`, `scripts/old-syntax-check.json` | `scripts/old-syntax-check` exits 0 | No | Yes |
 | 1 | Solver: unannotated recursive matches over parametric unions of one-constructor types (B2); display folds unions to declared names (D7) | `crates/ilang-check/src/types/solve.rs`, `display.rs`, `shown.rs`, `shown_tree.rs`; new `scripts/gen-syn3-union.py`; new fixtures `tests/spec/4.4/syn3_union_perf/` (12 members, generated) and `tests/spec/4.7/syn3_display_name.i` | `timeout 2 I check --project tests/spec/4.4/syn3_union_perf` exits 0; `cargo test -p ilang-cli --test spec --locked` passes, with the display fixture expecting `first : (xs: List(Option(Int))) -> Int` | No | Yes |
+| E1 | (after 1) Directed need rows: R4 merge by direction, rule A for function subtyping, rule B (handled obligation, directed), one canonical entry per (row variable, constructor) | `crates/ilang-check/src/types/solve.rs`, `infer.rs`, `display.rs`; fixtures under `tests/spec/9/` | Fixtures: `both = (f ! Fail(Int \| String)) { need_int() }` checks (today's syntax); a provider `Yield(Never)` for a need `Yield(Int)` is rejected; `collect` over a body emitting `Int` and `String` shows `List(Int \| String)` (review gap 13); the Q1-B split of `catch` is rejected; a covariant merge to `Never` is an error; `cargo test -p ilang-cli --test spec --locked` | No | Yes |
+| E2 | `control.escape`; light (escape-only) boundary; library `Fail`, `raise`, `catch` beside today's `i/fail` | `crates/ilang-wasm/src/emit/control.rs`, `emit/mod.rs`, `ir.rs`, `lower.rs`, `lib/i/control.i`, `lib/i/fail.i`, prelude | A fixture runs `catch` + `raise` through nested catches and `resource.ensure`; `escape` on an inactive boundary stops; the bench gate of §2.10.7 (≤ 1.25x today's `fail.catch`, with and without an error) | No | Yes |
+| E3 | (after E1, E2) Remove the error channel: `-> R ^ E ! N` becomes `-> R ! Fail(E) \| N` everywhere; entries get the platform `Fail` (O31); host-service, export and `@external` glue (§2.10.12); macro signatures (§6.9); delete `FnTy.err`, `Op::Raise`, `Op::Catch`, `$fail_catch`, `$catch_run`, `$catch_reenter` | migrator subcommand `errors`; `types/*`, `ilang-wasm`, `ilang-macro`, `lib/**`, `std/**`, `tests/**`, `examples/**` | `! grep -rn 'Op::Catch' crates`; `scripts/dev-verify` passes | Migration yes; checker and codegen no | Yes |
+| E4 | (after E3) Std API: about 140 `-> Result(` signatures report through `Fail`; callers and tests; `resource.acquire` on `Scope` (§2.10.9) | `std/src`, `std/test`, `lib/i`, examples | `scripts/dev-verify`; `json.parse("{")` under `fail.catch` gives `Error(…)` | Partly (per-function judgement) | Yes |
+| E5 | (after E3) Entry stub and per-target platform table; delete the provider plan (§2.10.11, spec §2.6.1); per-target entries in the package file; `task.Scope(E)` renamed `task.Group(E)` | `crates/ilang-check/src/providers.rs`, `types/provider.rs`, `crates/ilang-package/src/providers.rs` (deleted), `ilang-wasm/src/lower.rs` provider section, `emit/host.rs`:575-640, `lib/provider-plan.toml`, the three fixture packages under `tests/spec/9.11/`, provider tests | `test ! -e crates/ilang-check/src/providers.rs`; `i run` of `examples/echo`, `http-get`, `http-server` works; `i check --target js` of a program needing `Net` gives the one "not provided by the target" error | Deletion yes; stub no | Yes |
 | 2 | Fitting of constructor patterns `B <: Q \| r - Q`, with the disjointness warning (D4) | `types/pattern.rs`, `infer.rs`, `coverage.rs`; fixtures `tests/spec/4.8/syn3_refutable_member.i` (expects a stop `assertion failed: pattern Some(q) did not match None`) and `tests/spec/4.8/syn3_refutable_disjoint.i` (expects the warning) | `cargo test -p ilang-cli --test spec --locked` | No | Yes |
 | 3 | Types in today's syntax: every multi-constructor type becomes one-constructor types plus an alias, prelude included (`True { True }`, `False { False }`, `Bool = True \| False`, …); `T {}` stays; then a definition with two or more constructors is a compile error | migrator `crates/ilang-syntax/examples/migrate-syntax3.rs` (subcommand `types`); `lib/**`, `std/**`, `tests/**`, `examples/**`, docs; `crates/ilang-wasm/src/lower.rs`:905-940 and `crates/ilang-check/src/resolve.rs`:2423 (prelude representations), `types/infer.rs`:254 | `cargo run -p ilang-syntax --example migrate-syntax3 -- --check types` reports 0 multi-constructor definitions; `scripts/dev-verify` passes | Yes, after 1 and 2; wrappers of a built-in of the same name and other name clashes are a manual list (§7.3); `i/syntax.Node` is rewritten by hand to `Node { Node(Name \| Discard \| … \| Int \| Float \| …) }` with one-constructor member types, which is today's spelling of §2.8's `Node` | Yes |
 | 4 | Labels in today's syntax: labelled calls of non-constructor functions become positional (evaluation order kept); constructor calls give every labelled field by label; constructor patterns write every label (no punning); labels in function types removed (also `@external`, host-service fields, doc tables); then a labelled argument to a non-constructor function is a compile error | migrator (subcommand `labels`, resolver-aware: runs on the checked HIR's spans); `types/infer.rs`; fixture `tests/spec/6.6/syn3_label_call_rejected.i` (`t9(second: 1, first: 5)` expects a compile error) | `cargo test -p ilang-cli --test spec --locked`; `scripts/dev-verify` | Yes (needs the resolver) | Yes |
 | 5 | `\|>` level in today's syntax: group every `a \|> f OP b` (OP at levels 1 to 5) as `{ a \|> f } OP b` and every `a OP b \|> f` as `a OP { b \|> f }`; then move `\|>` to the lowest level | migrator (subcommand `pipe`); `crates/ilang-syntax/src/parser.rs`:1005-1056; fixture `tests/spec/6.9/syn3_pipe_weakest.i` | `scripts/dev-verify` passes before and after the level change, with no source edit between | Yes | Yes |
 | 6 | Remove open records in today's syntax: `Record`, type spreads, forgetting, label parameters, string and `UpName` labels, `i/record`, width subtyping; records become closed labelled data; tuples and records share `Head::Shape`; `()` has the type `()`; `Ty::Graph` deleted; record run time deleted; text form `(label = value)` | `crates/ilang-check/src/types/records.rs`, `records/` (deleted), `solve.rs`, `infer.rs`, `known.rs`, `display.rs`, `scheme_wire.rs`, `value_types.rs`, `alias.rs`, `mod.rs`; `crates/ilang-wasm/src/runtime/values/record.rs` (deleted), `values.rs`, `inspect.rs`, `lower.rs`; `lib/i/record.i` (deleted); the 23 test files that use open records rewritten or deleted; `tests/t3-record-*.py` (deleted) | `test ! -e crates/ilang-check/src/types/records.rs && ! grep -rn "Ty::Graph" crates`; `scripts/dev-verify` passes; fixture `tests/spec/11/syn3_data_equality.i` (`(a: 1) == (a: 1)`, `(1, 2) != (a: 1, b: 2)`, inspect `(a = 1)`) | No | Yes |
-| 7 | `FnTy` with one data parameter in today's syntax; arity failure becomes a shape mismatch; unions of functions of different shapes give a `Never` parameter | `types/mod.rs`, `solve.rs`, `known.rs`, `infer.rs`, `display.rs`, `shown.rs`, `scheme_wire.rs`, `pattern.rs`, `coverage.rs`; fixture `tests/spec/4.4/syn3_fn_shapes.i` (`xs = [(a) { a }, (a, b) { a }]` checks with no E0502 and its shown parameter part is `{ Never }`) | `cargo test -p ilang-cli --test spec --locked` | No | Yes |
-| 8 | New parser, AST, printer, formatter, Lisp rows of §6.8 (data-form parameters, pipe head `\|>`, chain `\|`), `i/syntax` positions, tree-sitter, editor grammars, LSP syntax; the migrator converts every `.i`, `.is`, embedded Rust string and doc fence in one commit; spec §§ replaced by §5.2; chains with one shape group only (a chain with two groups is a temporary compile error); environment reads; guards | `crates/ilang-syntax/src/{lexer,parser,parser/*,ast,ast_eq,ast_clone,print,format,shape,walk}.rs`, `lisp/*`, `parser_legacy.rs` (kept); `crates/ilang-check/src/resolve.rs` (chain lowering), `hir.rs`; `lib/i/syntax.i`; `editors/**`; `crates/ilang-lsp`; migrator subcommand `convert` | `cargo run -p ilang-syntax --example migrate-syntax3 -- --verify` (for every file: `ast_eq(new_parse(print(convert(old_parse(f)))), convert(old_parse(f)))`, and no file outside the manual list fails to convert); `scripts/old-syntax-check`; `scripts/dev-verify` | Conversion yes; parser no | No |
+| 7 | `FnTy` with one data parameter and one need row (no `err`) in today's syntax; arity failure becomes a shape mismatch; unions of functions of different shapes give a `Never` parameter; internal `Ty::Poly` with rigid checking and the level-escape check (§2.16) | `types/mod.rs`, `solve.rs`, `known.rs`, `infer.rs`, `display.rs`, `shown.rs`, `scheme_wire.rs`, `pattern.rs`, `coverage.rs`; fixture `tests/spec/4.4/syn3_fn_shapes.i` (`xs = [(a) { a }, (a, b) { a }]` checks with no E0502 and its shown parameter part is `{ Never }`) | `cargo test -p ilang-cli --test spec --locked`; a Rust unit test: `(x) { 1 }` against `<A>(A) -> A` fails and `(x) { x }` passes | No | Yes |
+| 8 | New parser, AST, printer, formatter, Lisp rows of §6.8 (data-form parameters, pipe head `\|>`, chain `\|`), `i/syntax` positions, tree-sitter, editor grammars, LSP syntax; the migrator converts every `.i`, `.is`, embedded Rust string and doc fence in one commit; spec §§ replaced by §5.2; chains with one shape group only (a chain with two groups is a temporary compile error); guards; `<-` (lexer P0, needs, service patterns, `e <- s` at the weakest level, P14, P15); `<A, …>` on function literals and types; no `!`, `^`, `name(A) =`; the Lisp rows of §6.8 for them | `crates/ilang-syntax/src/{lexer,parser,parser/*,ast,ast_eq,ast_clone,print,format,shape,walk}.rs`, `lisp/*`, `parser_legacy.rs` (kept); `crates/ilang-check/src/resolve.rs` (chain lowering), `hir.rs`; `lib/i/syntax.i`; `editors/**`; `crates/ilang-lsp`; migrator subcommand `convert` | `cargo run -p ilang-syntax --example migrate-syntax3 -- --verify` (for every file: `ast_eq(new_parse(print(convert(old_parse(f)))), convert(old_parse(f)))`, and no file outside the manual list fails to convert); `scripts/old-syntax-check`; a fixture file with `find_user`, `fail.raise`, `fail.catch`, `map`, `live` and a block provide (§2.10) parses and checks; `scripts/dev-verify` | Conversion yes; parser no | No |
+| E6 | (after 8) `..env: N` service patterns and library `keep`; delete `control.keep_env` only if its fixture passes on the library version (§2.10.8) | `infer.rs`, `lower.rs`, `lib/i/control.i`, `lib/i/task.i` | `tests/spec/9/keep_env.i` and a `task.keep` error-propagation fixture pass on `keep` | No | No |
 | 9 | Shape groups in the checker: chains with several groups; direct calls choose the group by shape; the multi-shape value type; a multi-shape value may only be called directly (temporary error) | `types/infer.rs`, `pattern.rs`, `coverage.rs`, `known.rs`, `scheme_wire.rs`; fixtures `tests/spec/6.12/syn3_connect.i` (answers 3c `connect`, runs) and `tests/spec/4.8/syn3_area_value.i` (`fs = [area]` shows `fs : List({ (Float) \| (Float, Float) } -> Float)`) | `cargo test -p ilang-cli --test spec --locked` | No | No |
 | 10 | Run time: `$multi`, shape ids in closures, the slow path at the 11 call sites, display; lift stage 9's temporary error | `crates/ilang-wasm/src/emit/mod.rs`, `emit/control.rs`, `ir.rs`, `lower.rs`, `runtime/values/inspect.rs`; fixtures `tests/spec/11/syn3_multi_value.i` (`fs = [area]`, `Some(f) = list.first(fs)`, prints `f(2.0)` and `f(3.0, 4.0)`), `tests/spec/11/syn3_multi_tail.i` (10^6 tail calls through a multi-shape value, constant stack), `tests/spec/9/syn3_multi_suspend.i` (a call through it across `control.suspend`) | `cargo test -p ilang-cli --test spec --locked` (both optimization levels); `scripts/bench` closure-call case within noise of stage 9 | No | No |
-| 11 | Selection by known types and by expected types; direct aliases | `types/infer.rs`, `known.rs`, `coverage.rs` (taken at every place) | fixture `tests/spec/4.8/syn3_select.i`: `s: String = show(1)` checks; `gcd` checks; `x: String \| Int = f(Some(5))` checks and `y: String = f(Some(5))` is rejected; `g = show; t: String = g(1)` checks; `h = (x) { show(x) }` shows `h : (Int \| String) -> String \| Int`; `list.map([1, 2], show)` shows `List(String)`; then `cargo test -p ilang-cli --test spec --locked` | No | No |
-| 12 | Delete the legacy parser, clause-block AST, brace decision, label and record leftovers, spec exceptions, stage 9's temporary error | `crates/ilang-syntax/src/parser_legacy.rs` and users | `test ! -e crates/ilang-syntax/src/parser_legacy.rs`; `scripts/dev-verify` | Yes | No |
+| 11 | Selection by known types and by expected types; direct aliases | `types/infer.rs`, `known.rs`, `coverage.rs` (taken at every place) | fixture `tests/spec/4.8/syn3_select.i`: `s: String = show(1)` checks; `gcd` checks; `x: String \| Int = f(Some(5))` checks and `y: String = f(Some(5))` is rejected; `g = show; t: String = g(1)` checks; `h = (x) { show(x) }` shows `h : (Int \| String) -> String \| Int`; `list.map([1, 2], show)` shows `List(String)`; a chain with one generic branch (`<A>(x: A) { x } | (x: Int, y: Int) { y }`) selects and instantiates per branch; then `cargo test -p ilang-cli --test spec --locked` | No | No |
+| 12 | Delete the legacy parser, clause-block AST, brace decision, label and record leftovers, leftovers of `!`, `^` and binding-head type parameters, spec exceptions, stage 9's temporary error | `crates/ilang-syntax/src/parser_legacy.rs` and users | `test ! -e crates/ilang-syntax/src/parser_legacy.rs`; `scripts/dev-verify` | Yes | No |
+
+Order constraints of the effects stages: E1 follows stage 1 (the B2 fix);
+E3 needs E1 and E2; E4 and E5 need E3 (E5 because of the platform `Fail`);
+stage 8 follows stage 0 and the owner's answers O29 to O32 (given); E6 needs
+stage 8. E1 to E5 work on today's syntax, because `-> R ^ E ! N` rewrites
+mechanically to `-> R ! Fail(E) | N`; stage 8 then prints that as
+`<- (Fail(E), ..N) -> R`. Rough sizes (review Q2, Q8): checker 2,500 to 2,800
+lines, syntax 700 to 900, std migration 1,500 to 2,500 changed lines,
+provider-plan deletion about 2,650 source and 1,550 test lines.
 
 The evaluation's stages map as: its 0-6 are 0-6 here; its 8 (`FnTy`) is split
 into 7 (representation, on today's language) and 9 (groups); its 7 is 8; its
@@ -2691,7 +2807,17 @@ printed unchanged.
 | `x \|> {}`, `{}` | `core.never(x)`, `core.never` | |
 | Parameter `(t = (a, b))` | `((a, b) = t)` | Same for nested data patterns. |
 | Parameter `(x = label)`, `(x = label: T)` | `(_ = x = label)`, `(label: T = x)` | Today the label is `label` and both names are bound; signatures become positional (D1). |
-| Environment parameters `(a, log ! Log) -> T { body }` | `(a) -> T { log ! Log  body }` | Reads first, in parameter order; `! N` of the `->` part unchanged. |
+| Environment parameters `(a, log ! Log) -> T { body }` | `(a) <- (log: Log) -> T { body }` | The service pattern in parameter order; the `! N` of the `->` part goes into the type only (§2.10.1). |
+| Environment reads `log ! Log` in a block (the first version of this note) | a service pattern item of the enclosing function | Never written by users; listed for completeness (review gap 6). |
+| Function type `(P) -> R ^ E ! N` | `(P) <- (Fail(E), ..N) -> R` | The members of `N` are written one by one; a row variable becomes `..N`; `^ Never`, `! Never` disappear; a need that is empty writes no `<-`. Stage E3 does the semantic part on today's syntax (`-> R ! Fail(E) \| N`); stage 8 prints it. |
+| Result part `-> R ^ E ! N` of a function literal | `-> R` with the needs left to inference, plus a service pattern for the services the body reads | A written `! N` that is wider than what the body needs is kept as a type annotation on the binding (`f: (P) <- … -> R = …`), so that the type does not change. |
+| Environment statement `! T = e` followed by the rest `r` of a block | `{ r } <- (e)` | Consecutive statements whose values are direct values (spec §6.10) merge into one provide data `(e1, e2)`; otherwise they nest, `{ { r } <- (e2) } <- (e1)`, because `e2` may need `e1`. When `r` is the whole rest of a function body, the provide becomes the body's last expression. |
+| Binding head `f(A, E, N) = (…) -> … { … }` | `f = <A, N>(…) -> … { … }` | A parameter used only in `^` parts is dropped: its `Fail(E)` is carried by the row variable (`count(A, E, N)` becomes `<A, N>`, §4.1). A declaration `f(A): (A) -> A` becomes `f: <A>(A) -> A`. Type definitions are not touched. |
+| `fail.raise(e)`, `fail.catch(f)` | unchanged text | Now library code (§2.10.6). |
+| `control.keep_env(f)` | unchanged until stage E6, then `keep(f)` | §2.10.8. |
+| `resource.acquire(open, release, use)` | `resource.scoped(() { use(resource.acquire(open, release)) })` | Stage E4 (§2.10.9). |
+| `providers` section of `i.toml` | deleted; overrides written in `main` as `app() <- (…)` | Stage E5. |
+| `x<-1` | `x < -1` | None in the corpus; the migrator checks. |
 | Labelled call of a function `f(b: g(), a: h())` | `f(h2, b1)` with locals | Positional in parameter order. When the order changes and two or more moved arguments are not direct values (spec §6.10), bind each such argument, in written order, to a fresh local in a group block: `{ _syn3_0 = g()  f(h(), _syn3_0) }`. Fresh names start with `_syn3_` and are checked against every name in scope. Stage 4. |
 | Constructor call with positional arguments to labelled fields | `C(name = e1, age = e2)` | Stage 4. |
 | Labelled constructor argument `C(name: e)` | `C(name = e)` | |
@@ -2703,7 +2829,7 @@ printed unchanged.
 | `e \|> (x) { … }` (function literal) | unchanged text | Now a match (§7.1 row 6). The migrator lists these for review of stop-message expectations. |
 | Open records, `Record`, `i/record`, label parameters | not migrated | 23 test files (evaluation), rewritten by hand or deleted in stage 6. |
 | Inspect expectations in tests | regenerated | `(label: value)` becomes `(label = value)`; labelled constructor values gain their labels. |
-| `.is` files and Lisp strings in Rust tests | Lisp rows of §6.8 | Parameters `(a b)` become `(, a b)` and `()` becomes `(,)`; the pipe `(\| e f)` becomes `(\|> e f)`; a clause block `{ (-> p e) … }` becomes the chain `(\| (-> (, p) _ e) …)` and a match `(\| s { … })` becomes `(\|> s (\| …))`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` moves from the parameters to the body; `i/syntax` node values gain `Node(…)` and lose the `Int` and `Float` wrappers. Quote patterns and templates are rewritten with the same rows. |
+| `.is` files and Lisp strings in Rust tests | Lisp rows of §6.8 | Parameters `(a b)` become `(, a b)` and `()` becomes `(,)`; the pipe `(\| e f)` becomes `(\|> e f)`; a clause block `{ (-> p e) … }` becomes the chain `(\| (-> (, p) _ e) …)` and a match `(\| s { … })` becomes `(\|> s (\| …))`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` in the parameters becomes the service pattern `(<- R (, (: x N)))`; `(! N e)` statements become `(<- … (, e))`; `(! (^ R E) V)` result wrappers become `(<- R (, (Fail E) …))`; `i/syntax` node values gain `Node(…)` and lose the `Int` and `Float` wrappers. Quote patterns and templates are rewritten with the same rows. |
 | Rust-embedded snippets and doc fences | converted | The `old-syntax-check` inventory lists them. |
 
 ## 8. Open questions
@@ -2720,7 +2846,19 @@ revision is still open; it is a detail for the coordinator (O22):
    exports every labelled member of its data's union defined in the module,
    which saves the list but makes `(..)` mean two things for labelled types.
 
+The four owner questions of the effects review (block provide, platform
+`Fail`, per-target defaults, the cost of `catch`) are answered (O29 to O32).
+
 Things this note could not determine:
+
+- Whether the light boundary meets the 1.25x gate; it was not prototyped
+  (review Q5 projects 1.6x with an error and 2.8x without for a plain
+  boundary).
+- The effect of `Fail` rows on B2 (review Q2: expected neutral or better,
+  not measured).
+- How `Root` and the other platform services reach the stub on every target
+  beyond `request._entry` and `task._entry`, and spec §10.1.2's
+  certification of a platform-provided `Target` (review Q3, not checked).
 
 - The cause of B2 and whether a small solver change removes it.
 - How `Bool` as `True | False` reaches the ABI `i32` beyond the name-based
