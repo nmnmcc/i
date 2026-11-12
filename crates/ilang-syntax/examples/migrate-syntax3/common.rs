@@ -96,8 +96,11 @@ pub fn sources(root: &Path, only: &[String]) -> BTreeMap<String, (String, Vec<So
         {
             continue;
         }
-        // The migrator's own tests hold old forms on purpose.
-        if path.starts_with("crates/ilang-syntax/examples/migrate-syntax3") {
+        // The migrator's own tests, and the inputs of the stage 8 converter's
+        // tests, hold old forms on purpose.
+        if path.starts_with("crates/ilang-syntax/examples/migrate-syntax3")
+            || path.starts_with("crates/ilang-syntax/tests/syn3")
+        {
             continue;
         }
         let host = std::fs::read_to_string(root.join(&path)).unwrap();
