@@ -34,13 +34,13 @@ export interface BitArray { bytes: Uint8Array; bitLength: number }
 export type Value = undefined | null | boolean | bigint | number | string | BitArray | unknown;
 export type ModuleSource = WebAssembly.Module | BufferSource | Response | Request | URL | string;
 export interface Options {
-  /** Install the standard IO services; args are passed to i/process. */
+  /** Installs the standard IO services; args are passed to i/process. */
   standardServices?: boolean | { args?: string[] };
   /** Context registrations are restricted to approved resolved declarations. */
   contextImports?: Record<string, Record<string, (context: ResourceContext, ...args: any[]) => unknown>>;
   /** Host approval from authorizeBindings; a plain manifest cannot grant itself. */
   bindings?: BindingAuthorization;
-  /** Reuse this host across instances/tests; each invocation has its own table. */
+  /** Reuses this host across instances/tests; each invocation has its own table. */
   resourceHost?: ResourceHost;
   /** Metadata for a module without an ilang.abi section. */
   abi?: Abi;
@@ -53,7 +53,7 @@ export interface Options {
   imports?: Record<string, Record<string, (...args: any[]) => unknown>>;
   rawImports?: WebAssembly.Imports;
   /**
-   * Check the answers of host functions in the loader, and stop the program
+   * Checks the answers of host functions in the loader, and stops the program
    * there, with no positions, when one is not correct. By default an answer
    * of the right type is given to the module as it is, and the module checks
    * it and stops with the positions of the call.
@@ -68,14 +68,14 @@ export interface Guest {
   readonly collections: CollectionArtifact | null;
   /** Why the instance cannot be used any more, or null. */
   readonly unusable: string | null;
-  /** Stop admission and cancel work/resources independently of language finals. */
+  /** Stops admission and cancels work/resources independently of language finals. */
   dispose(): void;
-  /** Drain the host-wide cleanup diagnostic queue without entering Wasm. */
+  /** Drains the host-wide cleanup diagnostic queue without entering Wasm. */
   takeCleanupErrors(): CleanupFailure[];
   /** Gives the value; throws GuestError for an error of `? E` and Stop when the program stops. */
   call(name: string, args?: unknown[]): unknown;
   callAsync(name: string, args?: unknown[]): Promise<unknown>;
-  /** Run the program entry; a Promise when it is async. */
+  /** Runs the program entry; a Promise when it is async. */
   run(): void | Promise<void>;
   runEntryPoint(name: string): void | Promise<void>;
   runCollection(handle: string): void | Promise<void>;
@@ -103,7 +103,7 @@ export function readAbi(module: WebAssembly.Module, supplied?: Abi): Readonly<Re
 export function instantiate(source: ModuleSource, options?: Options): Promise<Guest>;
 export function runTests(source: ModuleSource, options?: Options & { tests?: string[] }): Promise<Array<{ name: string; passed: boolean; error?: unknown }>>;
 
-/** Required resolved declaration before Wasm imports are coalesced (native 3.1). */
+/** Required resolved declaration before Wasm imports are coalesced. */
 export interface BindingDeclaration {
   package: string;
   module: string;
@@ -154,5 +154,5 @@ export class ResourceContext {
   provisional(id: bigint, kind: string): ProvisionalResource;
 }
 
-/** Construct context-aware standard service registrations. */
+/** Constructs context-aware standard service registrations. */
 export function standardServices(options?: { args?: string[] }): Record<string, Record<string, (context: ResourceContext, ...args: any[]) => unknown>>;

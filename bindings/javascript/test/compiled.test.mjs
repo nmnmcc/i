@@ -93,8 +93,8 @@ test("compiled opaque imports and exports preserve nominal identity", async () =
   }
 });
 
-// Native 3.1 and N9.1/N9.5: consume the real compiler's separate plan, keep
-// restricted callbacks in one invocation, and dispose every created resource.
+// Consumes the real compiler's separate plan, keeps restricted callbacks in
+// one invocation, and disposes every created resource.
 test("compiler binding plan authorizes context registrations on the JS host", async () => {
   const { authorizeBindings } = await import("../ilang.mjs");
   const plan = JSON.parse(await readFile(new URL("../../../tests/browser/fixtures/compiled.bindings.json", import.meta.url), "utf8"));

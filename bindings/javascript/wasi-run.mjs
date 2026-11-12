@@ -3,7 +3,7 @@ import { WASI } from 'node:wasi';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-/** Run an i preview-1 command with explicit args, environment and preopens. */
+/** Runs an i preview-1 command with explicit args, environment and preopens. */
 export async function runWasi(file, { args = [], env = {}, preopens = {}, stdout = 1, stderr = 2, stdin = 0 } = {}) {
   const wasi = new WASI({ version: 'preview1', args: [file, ...args], env, preopens, stdout, stderr, stdin, returnOnExit: true });
   const module = await WebAssembly.compile(await readFile(file));
