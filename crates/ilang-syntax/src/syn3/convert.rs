@@ -60,8 +60,11 @@ fn param_label(p: &o::Pattern) -> Option<String> {
     }
 }
 
+/// The names of a module with the labels of each.
+type Named = Vec<(String, Labels)>;
+
 /// The constructors and the top-level functions of a module.
-fn definitions(module: &o::Module) -> (Vec<(String, Labels)>, Vec<(String, Labels)>) {
+fn definitions(module: &o::Module) -> (Named, Named) {
     let (mut ctors, mut fns) = (Vec::new(), Vec::new());
     for item in &module.items {
         match &item.kind {
