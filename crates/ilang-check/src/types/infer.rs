@@ -1917,13 +1917,6 @@ impl<'a> Checker<'a> {
                 Some(l) => labelled.push((l.name.clone(), t)),
             }
         }
-        // syn3-stage10: the run time cannot make this call yet. Delete this
-        // error when it can.
-        self.error(
-            code::MULTI_VALUE_CALL,
-            span,
-            "a call with labels through a function value is not possible until the run time has multi-shape values; call the function directly by its name",
-        );
         labelled.sort_by(|a, b| a.0.cmp(&b.0));
         let shape = super::ShapeId::new(
             positions.len() as u32,

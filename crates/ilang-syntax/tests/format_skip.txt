@@ -58,6 +58,9 @@ parse tests/spec/7/syn2_old_empty_tuple_pattern.i
 parse tests/syn3/area_value/src/main.i
 parse tests/syn3/chain_import/src/geo.i
 parse tests/syn3/connect/src/main.i
+parse tests/syn3/multi_suspend/src/main.i
+parse tests/syn3/multi_tail/src/main.i
+parse tests/syn3/multi_value/src/main.i
 parse tests/syn3/multi_value_call/src/main.i
 parse tests/syn3/no_shape/src/main.i
 parse tests/syn3/select/src/main.i

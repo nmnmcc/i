@@ -32,7 +32,7 @@ main = () <- (io: Io) {
 	io.print(core.inspect(g(1.0, 2.0)))
 	c = first([connect], connect)
 	io.print(c("a.com"))
-	io.print(c("b.com"))
+	io.print(c("b.com", port = 8080))
 	io.print(core.inspect(f))
 	io.print(core.inspect(c))
 	io.print(core.inspect(f == f))
