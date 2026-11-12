@@ -2746,7 +2746,7 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "editors/vscode/test/sample.i:1b4b9e4de98c425f": {
+  "editors/vscode/test/sample.i:c502997562f7493a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
