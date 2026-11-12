@@ -533,6 +533,92 @@ struct Coalescer<'s> {
 }
 
 impl Coalescer<'_> {
+    /// Alias-class variables expand identically when their row roles agree.
+    /// Graph aliases also keep their row and constructor-path roles.
+    fn bound_key(&self, t: &Ty) -> Ty {
+        match t {
+            Ty::Graph(g) => {
+                use super::solve::Pol;
+                let variables = g.variables();
+                if !variables
+                    .iter()
+                    .any(|v| self.rep.get(v).is_some_and(|r| r != v))
+                {
+                    return t.clone();
+                }
+                let mut roles: HashMap<_, [u8; 4]> =
+                    variables.into_iter().map(|v| (v, [0; 4])).collect();
+                for (i, (pol, env)) in [
+                    (Pol::Pos, false),
+                    (Pol::Neg, false),
+                    (Pol::Pos, true),
+                    (Pol::Neg, true),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    for (v, p, constructor) in g.variable_sites(self.s, pol, false, env) {
+                        if constructor {
+                            roles.get_mut(&v).expect("graph variable has a role")[i] |= match p {
+                                Pol::Pos => 1,
+                                Pol::Neg => 2,
+                                Pol::Both => 4,
+                            };
+                        }
+                    }
+                }
+                let mut class_roles = HashMap::default();
+                let mut distinct = HashSet::default();
+                for (&v, &role) in &roles {
+                    let rep = self.rep.get(&v).copied().unwrap_or(v);
+                    if self.s.is_row(&Ty::Var(v)) != self.s.is_row(&Ty::Var(rep)) {
+                        distinct.insert(rep);
+                    }
+                    if let Some(old) = class_roles.insert(rep, role)
+                        && old != role
+                    {
+                        distinct.insert(rep);
+                    }
+                }
+                g.map_vars(&mut |v| {
+                    let rep = self.rep.get(&v).copied().unwrap_or(v);
+                    Ty::Var(if distinct.contains(&rep) { v } else { rep })
+                })
+            }
+            Ty::Var(v) => {
+                let rep = self.rep.get(v).copied().unwrap_or(*v);
+                if self.s.is_row(t) == self.s.is_row(&Ty::Var(rep)) {
+                    Ty::Var(rep)
+                } else {
+                    t.clone()
+                }
+            }
+            Ty::Con(h, values, xs) => Ty::Con(
+                *h,
+                values.clone(),
+                xs.iter().map(|x| self.bound_key(x)).collect(),
+            ),
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+                params: f
+                    .params
+                    .iter()
+                    .map(|(l, p)| (l.clone(), self.bound_key(p)))
+                    .collect(),
+                ret: self.bound_key(&f.ret),
+                err: self.bound_key(&f.err),
+                env: self.bound_key(&f.env),
+            })),
+            Ty::Union(xs) => Ty::Union(xs.iter().map(|x| self.bound_key(x)).collect()),
+            Ty::Inter(xs) => Ty::Inter(xs.iter().map(|x| self.bound_key(x)).collect()),
+            Ty::Diff(a, hs) => Ty::Diff(
+                Box::new(self.bound_key(a)),
+                hs.iter().map(|h| self.bound_key(h)).collect(),
+            ),
+            Ty::Both(a, b) => Ty::Both(Box::new(self.bound_key(a)), Box::new(self.bound_key(b))),
+            Ty::Never | Ty::Top => t.clone(),
+        }
+    }
+
     /// The variables that `v` stands for.
     fn members(&self, v: V) -> Vec<V> {
         match self.members.get(&v) {
@@ -613,12 +699,20 @@ impl Coalescer<'_> {
                 self.stack.insert(v, depth);
                 let mut parts = Vec::new();
                 let solver = self.s;
+                // Alias-class members can share stored bounds. Expand each
+                // identical input once on this active path, before building
+                // the recursively coalesced type that is deduplicated below.
+                // Bound keys refer to immutable interned graph nodes.
+                #[allow(clippy::mutable_key_type)]
+                let mut expanded_bounds = HashSet::default();
                 if mono {
                     // Not generalized: the types that come to it (§4.7).
                     for m in self.members(v) {
                         let st = &solver.vars[m.0 as usize];
                         for b in &st.lower {
-                            parts.push(self.go(b, true, depth, env));
+                            if expanded_bounds.insert(self.bound_key(b)) {
+                                parts.push(self.go(b, true, depth, env));
+                            }
                         }
                         for w in &st.from {
                             parts.push(self.go(&Ty::Var(*w), true, depth, env));
@@ -630,7 +724,9 @@ impl Coalescer<'_> {
                         let st = &solver.vars[m.0 as usize];
                         let bounds = if pos { &st.lower } else { &st.upper };
                         for b in bounds {
-                            parts.push(self.go(b, pos, depth, env));
+                            if expanded_bounds.insert(self.bound_key(b)) {
+                                parts.push(self.go(b, pos, depth, env));
+                            }
                         }
                     }
                 }

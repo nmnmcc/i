@@ -107,7 +107,21 @@ No language or library surface was added, including state mechanisms.
   `Coalescer::go`: alias-class members shared identical stored bounds, which
   were recursively expanded before the resulting trees were deduplicated.
   Deduplicate those identical input bounds on the same active path before
-  expansion. Cycle detection and path-sensitive memoization remain intact.
+  expansion. Alias-equivalent keys preserve row flags and graph constructor
+  roles, so occurs checks see the same paths. Cycle detection and
+  path-sensitive memoization remain intact; all checker type goldens pass.
+- The preserved std fixture's source check exceeded its unchanged 10-second
+  cap. `i expand` alone took 23 seconds; debugger samples found whole-module
+  AST clones for every item macro. Share immutable item trees across frozen
+  attempts and materialize the definition module on its first actual query.
+  Snapshot ordering, retries, audits and rollback remain unchanged. Share
+  compiled imported macro programs across the project's expansion session;
+  each invocation retains its own fresh guest, budget and resolver. Followed
+  rust-analyzer's `proc-macro-srv::ProcMacroSrv::expander` cache of shared
+  compiled expanders. The existing macro and budget suites pass, including
+  the new two-caller definition-context regression. Its first draft queried
+  a value with the type-only definition API (E0234); corrected the test to
+  query distinct caller type aliases, then reran the full suites successfully.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
