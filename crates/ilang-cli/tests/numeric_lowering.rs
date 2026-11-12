@@ -336,6 +336,131 @@ fn corpus() -> Vec<Case> {
             n as f64 * 0.5 + x,
         ));
     }
+    // Inlined helpers whose operations stop must keep every pending logical
+    // frame; an inlined tail call keeps its tail site. Mixed Int/Float workers
+    // leave the i31 region mid-loop. Range proofs at the exact overflow tie.
+    let stop = |body: String, input: Value| Case {
+        body: format!("core.inspect({body})"),
+        input,
+        expected: "float: result is not finite".into(),
+        stop: true,
+        events: vec![],
+    };
+    for (i, x) in [3.0_f64, 1.0e200, 1.0e154, 1.5e154].into_iter().enumerate() {
+        let y = x * x;
+        let finite = y.is_finite() && (y + 1.0).is_finite();
+        let body = format!("helper_g(x) +. {i}.0");
+        if finite {
+            cases.push(float_case(&body, x, y + 1.0 + i as f64));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+        let deep = format!("helper_deep(x *. {i}.0 +. 1.0)");
+        let z = x * i as f64 + 1.0;
+        let w = ((z * z) * (z * z)) * ((z * z) * (z * z));
+        if w.is_finite() {
+            cases.push(float_case(&deep, x, w));
+        } else {
+            cases.push(stop(deep, Value::Float(x)));
+        }
+    }
+    for n in 0..8 {
+        let x = 10f64.powi(n * 40 - 300);
+        let mut y = x;
+        let mut ok = true;
+        for _ in 0..5 {
+            y *= 1.0e100;
+            ok &= y.is_finite();
+        }
+        let body = format!("helper_outer(x) -. {n}.0");
+        if ok && (y + 2.0).is_finite() {
+            cases.push(float_case(&body, x, (y + 2.0) - n as f64));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+    }
+    for n in 0..8 {
+        // acc crosses the i31 boundary after the first step; f overflows
+        // after six steps, while the Int part has already been promoted.
+        let body = format!("mixed_worker({n}, 1073741000, x)");
+        let mut f = 1.0f64;
+        let mut acc = 1073741000i64;
+        let mut ok = true;
+        for _ in 0..n {
+            acc += 1073741000;
+            f *= 1.0e60;
+            ok &= f.is_finite();
+        }
+        if ok {
+            cases.push(float_case(&body, 1.0, f + acc as f64));
+        } else {
+            cases.push(stop(body, Value::Float(1.0)));
+        }
+        cases.push(int_case(
+            format!("mixed_int({n}, x)"),
+            BigInt::from(-1073741824 + n),
+            BigInt::from(-1073741824 + n) + BigInt::from(1073741000) * n,
+        ));
+        cases.push(int_case(
+            format!("halve_int({n}, x)"),
+            BigInt::from(1) << (25 + n),
+            BigInt::from(1) << 25,
+        ));
+    }
+    for (i, (text, k)) in [
+        ("2.0", 2.0_f64),
+        ("3.0", 3.0),
+        ("0.5", 0.5),
+        ("1.0e200", 1.0e200),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let body = format!("twice(scale_by({text}), x) +. {i}.0");
+        let y = 1.5 * k * k;
+        if y.is_finite() {
+            cases.push(float_case(&body, 1.5, y + i as f64));
+        } else {
+            cases.push(stop(body, Value::Float(1.5)));
+        }
+    }
+    for (i, x) in [2.0_f64, 1.0e200, -0.0].into_iter().enumerate() {
+        let body = format!("unused_field(x) +. {i}.0");
+        if (x * x).is_finite() {
+            cases.push(float_case(&body, x, 1.0 + i as f64));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+    }
+    let two970 = 2f64.powi(970);
+    for (i, x) in [two970, f64::from_bits(two970.to_bits() - 1), 0.0, 1.0]
+        .into_iter()
+        .enumerate()
+    {
+        let body = format!("tie_add(x) +. {i}.0 *. 0.0");
+        let y = if (0.0..=1.0e292).contains(&x) {
+            x + f64::MAX
+        } else {
+            0.0
+        };
+        if y.is_finite() {
+            cases.push(float_case(&body, x, y));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+    }
+    for (i, y) in [0.0_f64, -0.0, 1.0e-300, -1.0e-300, 1.0e-310]
+        .into_iter()
+        .enumerate()
+    {
+        let body = format!("bounded_div(0.5 +. {i}.0 *. 0.0, x)");
+        let q = if y == 0.0 { 0.0 } else { 0.5 / y };
+        if q.is_finite() {
+            cases.push(float_case(&body, y, q));
+        } else {
+            cases.push(stop(body, Value::Float(y)));
+        }
+    }
     cases
 }
 
@@ -392,6 +517,26 @@ resumed_f = (b, x: Float) -> Float { y = resumed_g(b, x) y +. 0.25 }
 resumed_h = (x: Float) -> Float {
  control.boundary((b) { y = resumed_f(b, x) y +. 0.5 })
 }
+helper_sq = (x: Float) -> Float { x *. x }
+helper_g = (x: Float) -> Float {
+ y = helper_sq(x)
+ y +. 1.0
+}
+helper_deep = (x: Float) -> Float { helper_sq(helper_sq(helper_sq(x))) }
+helper_loop = (n: Int, x: Float) -> Float { n |> { 0 -> x _ -> helper_loop(n - 1, x *. 1.0e100) } }
+helper_tail = (x: Float) -> Float { helper_loop(5, x) }
+helper_outer = (x: Float) -> Float {
+ a = helper_tail(x)
+ a +. 2.0
+}
+mixed_worker = (n: Int, acc: Int, f: Float) -> Float { n |> { 0 -> f +. core.to_float(acc) _ -> mixed_worker(n - 1, acc + 1073741000, f *. 1.0e60) } }
+mixed_int = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> mixed_int(n - 1, acc + 1073741000) } }
+halve_int = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> halve_int(n - 1, acc / 2) } }
+scale_by = (k: Float) -> (Float) -> Float { (v: Float) -> Float { v *. k } }
+twice = (f: (Float) -> Float, x: Float) -> Float { f(f(x)) }
+unused_field = (x: Float) -> Float { r = (a: x *. x, b: 1.0) r.b }
+tie_add = (x: Float) -> Float { { x <=. 1.0e292 } |> { True -> { x >=. 0.0 } |> { True -> x +. 1.7976931348623157e308 False -> 0.0 } False -> 0.0 } }
+bounded_div = (x: Float, y: Float) -> Float { { y >=. -.1.0e-300 } |> { True -> { y <=. 1.0e-300 } |> { True -> x /. y False -> 0.0 } False -> 0.0 } }
 "#,
     );
     source = source.replacen(

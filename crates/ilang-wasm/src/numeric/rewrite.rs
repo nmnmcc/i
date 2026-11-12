@@ -233,25 +233,40 @@ pub fn size(stmts: &[Stmt]) -> usize {
 
 /// ANF arguments are already evaluated. Forward fresh, single-definition copies
 /// inside an expansion, retaining its checks, captures and logical actions.
-/// Multiple-definition joins are deliberately excluded.
+/// Joins are excluded on both sides: neither the copy nor its source may have
+/// more than one definition in the expansion, so the source still holds the
+/// copied value at every use of the copy.
 pub fn copies(body: &mut Vec<Stmt>, first: Local) {
-    let mut definitions = std::collections::BTreeMap::<Local, Vec<(Value, Option<Site>)>>::new();
-    walk(body, &mut |s| {
-        if let Stmt::Let { dst, value, site } = s
-            && *dst >= first
-        {
-            definitions
-                .entry(*dst)
-                .or_default()
-                .push((value.clone(), *site));
+    let mut definitions = std::collections::BTreeMap::<Local, Vec<Option<Value>>>::new();
+    walk(body, &mut |s| match s {
+        Stmt::Let { dst, value, site } => definitions
+            .entry(*dst)
+            .or_default()
+            .push(site.is_none().then(|| value.clone())),
+        Stmt::LetNum { dst, .. } | Stmt::LetEnv { dst, .. } => {
+            definitions.entry(*dst).or_default().push(None)
         }
+        Stmt::ReadUtf {
+            codepoint,
+            width,
+            ok,
+            ..
+        } => {
+            for l in [*codepoint, *width, *ok] {
+                definitions.entry(l).or_default().push(None);
+            }
+        }
+        _ => {}
     });
+    let single = |l: &Local| definitions.get(l).is_none_or(|v| v.len() == 1);
     let aliases = definitions
-        .into_iter()
-        .filter_map(|(dst, values)| {
-            if values.len() == 1
-                && let (Value::Atom(a), None) = &values[0]
+        .iter()
+        .filter_map(|(&dst, values)| {
+            if dst >= first
+                && values.len() == 1
+                && let Some(Value::Atom(a)) = &values[0]
                 && *a != Atom::Local(dst)
+                && !matches!(a, Atom::Local(source) if !single(source))
             {
                 Some((dst, a.clone()))
             } else {
