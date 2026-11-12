@@ -447,7 +447,7 @@ i/process.close_stdin : (Child) -> Nil ^ ProcessError ! Process | request.Await 
 i/net.listen : (address: String, port: Int) -> Listener ^ NetError ! Net | request.Await | request.Owner
 i/net.connect : (address: String, port: Int) -> Stream ^ NetError ! Net | request.Await | request.Owner
 i/net.accept : (Listener) -> Stream ^ NetError ! Net | request.Await | request.Owner
-i/net.local_port : (Listener) -> Int ^ NetError ! Net | request.Await | request.Owner
+i/net.local_port : (socket: Listener | Datagram) -> Int ^ NetError ! Net | request.Await | request.Owner
 i/net.read : (Stream, max_bytes: Int) -> BitArray ^ NetError ! Net | request.Await | request.Owner
 i/net.write : (Stream, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
 i/net.shutdown_write : (Stream) -> Nil ^ NetError ! Net | request.Await | request.Owner
@@ -458,6 +458,12 @@ i/net.parts : (text: String, start: Int) -> List(String)
 i/net.resolve : (name: String) -> List(String) ^ NetError ! Net | request.Await | request.Owner
 i/net.stream_number : (Stream) -> Int
 i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { Net | request.Await } }, read: (max: Int) -> BitArray ^ NetError ! { request.Owner | { Net | request.Await } }, shutdown_write: () -> Nil ^ NetError ! { request.Owner | { Net | request.Await } }, write: (bytes: BitArray) -> Nil ^ NetError ! { request.Owner | { Net | request.Await } })
+i/net.bind : (address: String, port: Int) -> Datagram ^ NetError ! Net | request.Await | request.Owner
+i/net.send_to : (Datagram, address: String, port: Int, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
+i/net.receive_from : (Datagram, max_bytes: Int) -> (address: String, data: BitArray, port: Int) ^ NetError ! Net | request.Await | request.Owner
+i/net.decode_datagram : (A) -> (address: String, data: BitArray, port: Int)
+i/net.local_address : (Datagram) -> String ^ NetError ! Net | request.Await | request.Owner
+i/net.close_datagram : (Datagram) -> Nil ! Net | request.Await | request.Owner
 i/tls.options : () -> (alpn: List(Never), cert: BitArray, key: BitArray, roots: BitArray)
 i/tls.identity : (cert: BitArray, key: BitArray) -> (cert: BitArray, key: BitArray)
 i/tls.join : (items: List(String)) -> String

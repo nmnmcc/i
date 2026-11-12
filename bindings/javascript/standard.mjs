@@ -3,7 +3,7 @@ import { GuestError, requestSignal } from './ilang.mjs';
 import { ResourceError } from './resources.mjs';
 
 const node = typeof process !== 'undefined' && !!process.versions?.node;
-const [fs, net, dns, child, crypto, tls, os] = node ? await Promise.all(['node:fs/promises','node:net','node:dns/promises','node:child_process','node:crypto','node:tls','node:os'].map(x => import(x))) : [];
+const [fs, net, dns, child, crypto, tls, os, dgram] = node ? await Promise.all(['node:fs/promises','node:net','node:dns/promises','node:child_process','node:crypto','node:tls','node:os','node:dgram'].map(x => import(x))) : [];
 const fail = code => { throw new GuestError(code); };
 const bits = bytes => ({bytes: new Uint8Array(bytes), bitLength: bytes.length * 8});
 const bytes = b => { if (b.bitLength % 8) fail('invalid'); return b.bytes; };
@@ -21,6 +21,13 @@ const streamOps = kind => ({
  read: wrap((c,id,n)=>leased(c,id,kind,'read',(s,signal)=>readStream(s,count(n),signal))),
  write: wrap((c,id,b)=>leased(c,id,kind,'write',s=>writeStream(s,b))),
  shutdown_write: wrap((c,id)=>leased(c,id,kind,'write',s=>endStream(s))),
+});
+// Keep whole datagrams until a receiver claims one. Cancellation removes only the waiter.
+const receiveDatagram = (x,n,signal) => new Promise((resolve,reject) => {
+ const clean=()=>{x.socket.off('message',ready);x.socket.off('error',ready);signal.removeEventListener('abort',abort);};
+ const ready=()=>{const item=x.queue.shift();if(!item)return;clean();if(item.error){reject(item.error);return;}const address=new TextEncoder().encode(item.sender.address), data=item.data.subarray(0,n), out=new Uint8Array(3+address.length+data.length);new DataView(out.buffer).setUint16(0,item.sender.port,true);out[2]=address.length;out.set(address,3);out.set(data,3+address.length);resolve(bits(out));};
+ const abort=()=>{clean();reject(new ResourceError('closed'));};
+ x.socket.on('message',ready);x.socket.on('error',ready);signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();else ready();
 });
 const encode = values => { const enc=new TextEncoder(), items=values.map(s=>enc.encode(s)); const b=new Uint8Array(4+items.reduce((n,x)=>n+4+x.length,0)), v=new DataView(b.buffer); let p=0; v.setUint32(p,items.length,true); p+=4; for(const x of items){v.setUint32(p,x.length,true);p+=4;b.set(x,p);p+=x.length;} return bits(b); };
 const decode = b => { const a=bytes(b), v=new DataView(a.buffer,a.byteOffset,a.byteLength), d=new TextDecoder('utf-8',{fatal:true}); let p=0; try { const number=()=>{const n=v.getUint32(p,true);p+=4;return n;}; const n=number(), out=[]; for(let i=0;i<n;i++){const len=number(); if(p+len>a.length) fail('invalid');out.push(d.decode(a.subarray(p,p+len)));p+=len;} if(p!==a.length) fail('invalid');return out; } catch(e) { fail('invalid'); } };
@@ -41,6 +48,30 @@ export function standardServices({args = node ? process.argv.slice(2) : []} = {}
  local_port:wrap((c,id)=>leased(c,id,'listener','port',x=>BigInt(x.server.address().port))),
  accept:wrap((c,id)=>leased(c,id,'listener','accept',async(x,signal)=>{const request=requestSignal();let s=x.queue.shift();if(!s) s=await new Promise((res,rej)=>{const got=()=>{clean();res(x.queue.shift());};const abort=()=>{clean();rej(new ResourceError('closed'));};const clean=()=>{x.server.off('connection',got);signal.removeEventListener('abort',abort);};x.server.on('connection',got);signal.addEventListener('abort',abort,{once:true});});return insertStream(c,s,'stream',request); })),
  connect:creation(async(c,address,port)=>{const signal=requestSignal();if(!address||port<=0n||port>65535n)fail('invalid');let last;for(const a of await dns.lookup(address,{all:true})){try {const s=net.createConnection({host:a.address,port:Number(port),allowHalfOpen:true});await new Promise((res,rej)=>{s.once('connect',res);s.once('error',rej);});return insertStream(c,s,'stream',signal);}catch(e){last=e;}}throw last??new Error('no addresses');})};
+ Object.assign(network, {
+ bind:creation(async(c,address,port)=>{
+  const signal=requestSignal();if(!address||port<0n||port>65535n)fail('invalid');let last;
+  for(const a of await dns.lookup(address,{all:true})){
+   const socket=dgram.createSocket(a.family===6?'udp6':'udp4'), queue=[];
+   socket.on('message',(data,sender)=>queue.push({data,sender}));
+   const onError=error=>queue.push({error});socket.on('error',onError);
+   try {await new Promise((res,rej)=>{const bad=e=>{socket.off('listening',ready);rej(e);};const ready=()=>{socket.off('error',bad);res();};socket.once('error',bad);socket.once('listening',ready);socket.bind(Number(port),a.address);});}
+   catch(e){socket.close();last=e;continue;}
+   return publish(c,'datagram',{socket,queue},x=>new Promise(resolve=>x.socket.close(resolve)),signal);
+  }
+  throw last??new Error('no addresses');
+ }),
+ local_address:wrap((c,id)=>leased(c,id,'datagram','address',x=>x.socket.address().address)),
+ datagram_port:wrap((c,id)=>leased(c,id,'datagram','address',x=>BigInt(x.socket.address().port))),
+ send_to:wrap((c,id,address,port,b)=>{const data=bytes(b);if(!address||port<=0n||port>65535n)fail('invalid');return leased(c,id,'datagram','write',async(x,signal)=>{
+  let last;for(const a of await dns.lookup(address,{all:true})){
+   if(signal.aborted)throw new ResourceError('closed');
+   try {await new Promise((res,rej)=>x.socket.send(data,Number(port),a.address,e=>e?rej(e):res()));return;}catch(e){last=e;}
+  }throw last??new Error('no addresses');
+ });}),
+ receive_from:wrap((c,id,n)=>leased(c,id,'datagram','read',(x,signal)=>receiveDatagram(x,count(n),signal))),
+ close_datagram:wrap((c,id)=>c.close(id,'datagram')),
+ });
  const proc={
  spawn:creation((c,p,a)=>spawn(c,p,a,['inherit','inherit','inherit'])),spawn_piped:creation((c,p,a,...m)=>spawn(c,p,a,m)),spawn_config:creation((c,p,a,i,o,e,mode,env,dir,cwdmode)=>{if(!['inherit','replace'].includes(mode)||!['inherit','set'].includes(cwdmode))fail('invalid');const vars=mode==='inherit'?{...process.env}:{};for(const item of decode(env)){const at=item.indexOf('=');const key=at<0?item:item.slice(0,at);if(!key)fail('invalid');if(at<0)delete vars[key];else vars[key]=item.slice(at+1);}return spawn(c,p,a,[i,o,e],{env:vars,...(cwdmode==='set'?{cwd:dir}:{})});}),
  own:wrap((c,id)=>{const l=c.acquire(id,'child','owner');const signal=requestSignal();signal.addEventListener('abort',()=>{l.release();c.close(id,'child');},{once:true});return new Promise(()=>{});}),
