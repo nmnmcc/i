@@ -797,6 +797,140 @@ pub struct Program {
     macro_static_cost: Option<(u64, u64)>,
 }
 
+/// Where compiled machine code is kept between processes: the directory
+/// named by `ILANG_COMPILE_CACHE`. Unset, empty or `0`, there is no cache.
+/// Nothing removes old entries; the caller owns the directory.
+fn compile_cache_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("ILANG_COMPILE_CACHE")
+        .filter(|value| !value.is_empty() && value != "0")
+        .map(Into::into)
+}
+
+/// Feeds a `Hash` value into SHA-256.
+struct Sha256Hasher(sha2::Sha256);
+
+impl std::hash::Hasher for Sha256Hasher {
+    fn write(&mut self, bytes: &[u8]) {
+        sha2::Digest::update(&mut self.0, bytes);
+    }
+    fn finish(&self) -> u64 {
+        unreachable!("only the full digest is used")
+    }
+}
+
+/// The identity of this executable (path, size, modification time), part of
+/// every cache key so that a rebuilt compiler never reads code that an older
+/// one stored.
+fn executable_identity() -> &'static str {
+    static IDENTITY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    IDENTITY.get_or_init(|| {
+        let executable = std::env::current_exe()
+            .and_then(|path| Ok((std::fs::metadata(&path)?, path)))
+            .map(|(meta, path)| (path, meta.len(), meta.modified().ok()));
+        format!("{executable:?}")
+    })
+}
+
+fn hex_digest(parts: &[&[u8]]) -> String {
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    for part in parts {
+        hasher.update((part.len() as u64).to_le_bytes());
+        hasher.update(part);
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// The key of a compiled module: the Wasm bytes and everything about the
+/// engine that the machine code depends on (Wasmtime's version and the
+/// compiler settings, from `precompile_compatibility_hash`), plus the identity
+/// of this executable.
+fn compile_cache_key(engine: &Engine, bytes: &[u8]) -> String {
+    use sha2::Digest;
+    use std::hash::Hash;
+    let mut hasher = Sha256Hasher(sha2::Sha256::new());
+    engine.precompile_compatibility_hash().hash(&mut hasher);
+    let settings = hasher.0.finalize();
+    hex_digest(&[
+        b"module",
+        executable_identity().as_bytes(),
+        &settings,
+        bytes,
+    ])
+}
+
+/// Cranelift's per-function cache (its key covers the function's IR and the
+/// compiler flags), kept as one file per function in the cache directory.
+#[derive(Debug)]
+struct FunctionCache(std::path::PathBuf);
+
+impl wasmtime::CacheStore for FunctionCache {
+    fn get(&self, key: &[u8]) -> Option<std::borrow::Cow<'_, [u8]>> {
+        std::fs::read(self.path(key)).ok().map(Into::into)
+    }
+    fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
+        store_atomically(&self.path(key), &value)
+    }
+}
+
+impl FunctionCache {
+    fn path(&self, key: &[u8]) -> std::path::PathBuf {
+        self.0.join(hex_digest(&[
+            b"function",
+            executable_identity().as_bytes(),
+            key,
+        ]))
+    }
+}
+
+/// Writes `bytes` to `path` through a temporary file and a rename, so that a
+/// reader never sees a partial entry. Failure leaves the entry unwritten.
+fn store_atomically(path: &std::path::Path, bytes: &[u8]) -> bool {
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    if std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let temporary = dir.join(format!(
+        ".tmp.{}.{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let stored =
+        std::fs::write(&temporary, bytes).is_ok() && std::fs::rename(&temporary, path).is_ok();
+    if !stored {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    stored
+}
+
+/// Compiles `bytes`, reusing machine code that an earlier process compiled
+/// from the same bytes with the same engine settings and executable.
+fn compiled_module(engine: &Engine, bytes: &[u8]) -> Result<Module> {
+    let Some(dir) = compile_cache_dir() else {
+        return Ok(Module::new(engine, bytes)?);
+    };
+    let path = dir.join(compile_cache_key(engine, bytes));
+    if path.is_file() {
+        // SAFETY: the file was written by `Module::serialize` of this same
+        // executable (its identity is part of the name) for these exact bytes
+        // and engine settings; Wasmtime checks its own version and settings
+        // again while loading it.
+        if let Ok(module) = unsafe { Module::deserialize_file(engine, &path) } {
+            return Ok(module);
+        }
+    }
+    let module = Module::new(engine, bytes)?;
+    store_atomically(&path, &module.serialize()?);
+    Ok(module)
+}
+
 impl Program {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let embedded = Abi::from_wasm(bytes)?;
@@ -867,10 +1001,14 @@ impl Program {
         let (collector, heap) = gc_settings()?;
         config.collector(collector);
         config.gc_heap_initial_size(heap);
+        if let Some(dir) = compile_cache_dir() {
+            config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(
+                dir.join("functions"),
+            )))?;
+        }
         let engine = Engine::new(&config)?;
-        let module = Module::new(&engine, bytes)
-            .map_err(anyhow::Error::from)
-            .context("compiling the i WebAssembly module")?;
+        let module =
+            compiled_module(&engine, bytes).context("compiling the i WebAssembly module")?;
         let has_macro_hooks = module
             .imports()
             .any(|import| import.module() == "ilang:macro/budget/v1");
