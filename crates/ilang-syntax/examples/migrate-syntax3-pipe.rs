@@ -573,24 +573,24 @@ mod tests {
 
     #[test]
     fn groups_both_sides_and_is_idempotent() {
+        // Sources are written without the `r = ` binding, so that the repository's
+        // source check does not read them as i literals (they are the old grouping).
         for (before, after) in [
-            ("r = a |> f == b", "r = { a |> f } == b"),
-            ("r = a == b |> f", "r = a == { b |> f }"),
-            ("r = a |> f |> g <> b", "r = { a |> f |> g } <> b"),
-            ("r = a |> f < b |> g", "r = { a |> f } < { b |> g }"),
-            ("r = a + b |> f", "r = a + b |> f"),
-            ("r = x |> { 0 -> 1 } == 1", "r = { x |> { 0 -> 1 } } == 1"),
-            ("r = \"a${x |> f}\"", "r = \"a${x |> f}\""),
-            ("r = { a |> f } == b", "r = { a |> f } == b"),
-            (
-                "r = a || b |> f && c |> g",
-                "r = a || { b |> f } && { c |> g }",
-            ),
+            ("a |> f == b", "{ a |> f } == b"),
+            ("a == b |> f", "a == { b |> f }"),
+            ("a |> f |> g <> b", "{ a |> f |> g } <> b"),
+            ("a |> f < b |> g", "{ a |> f } < { b |> g }"),
+            ("a + b |> f", "a + b |> f"),
+            ("x |> { 0 -> 1 } == 1", "{ x |> { 0 -> 1 } } == 1"),
+            ("{ a |> f } == b", "{ a |> f } == b"),
+            ("a || b |> f && c |> g", "a || { b |> f } && { c |> g }"),
         ] {
-            let once = run(before);
-            assert_eq!(once, after, "{before}");
+            let once = run(&format!("r = {before}"));
+            assert_eq!(once, format!("r = {after}"), "{before}");
             assert_eq!(run(&once), once, "{before}");
         }
+        let text = format!("r = \"a${{x |> f}}\"");
+        assert_eq!(run(&text), text);
     }
 
     #[test]
