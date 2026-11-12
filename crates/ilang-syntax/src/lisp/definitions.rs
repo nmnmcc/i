@@ -81,12 +81,13 @@ pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> O
         };
         let syntax = Syntax::written(node, scope, at);
         match syntax.node() {
-            Node::Up(name) if params.contains(&name.as_str()) => syntax
-                .with_scope_identity(ScopeIdentity::DefinitionParameter {
+            Node::Up(name) if params.contains(&name.as_str()) => {
+                syntax.with_scope_identity(ScopeIdentity::DefinitionParameter {
                     answer,
                     parameter: params.iter().position(|p| p == name).unwrap() as u32,
                     name: name.clone(),
-                }),
+                })
+            }
             Node::Up(name) => {
                 syntax.with_scope_identity(ScopeIdentity::Builtin { name: name.clone() })
             }

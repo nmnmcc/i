@@ -1278,8 +1278,7 @@ impl Checker<'_> {
             }
             // A type with one constructor is shown as that constructor:
             // `False`, `Some(..)` (syntax three: sums are unions of them).
-            Pat::Head(Head::Named(TypeRef::Custom(id)), _)
-                if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.len() == 1) =>
+            Pat::Head(Head::Named(TypeRef::Custom(id)), _) if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.len() == 1) =>
             {
                 let TypeBody::Custom(cs) = &self.p.ty(*id).body else {
                     unreachable!("checked above")

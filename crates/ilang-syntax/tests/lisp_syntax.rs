@@ -442,7 +442,15 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
     use ilang_syntax::lisp::syntax::{Node, Position, ScopeIdentity};
     let like = root("x");
     for name in [
-        "Bool", "True", "False", "Nil", "Result", "Ok", "Error", "Assert", "AssertionFailure",
+        "Bool",
+        "True",
+        "False",
+        "Nil",
+        "Result",
+        "Ok",
+        "Error",
+        "Assert",
+        "AssertionFailure",
     ] {
         let result = builtin_definition(name, like.scope(), like.span(), 3).unwrap();
         result.show_as(Position::Item).unwrap();

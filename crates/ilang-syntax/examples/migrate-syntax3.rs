@@ -110,6 +110,4 @@ fn usage() -> ! {
 }
 
 /// One row per subcommand.
-const SUBCOMMANDS: &[(&str, Migrate)] = &[
-    (types::NAME, types::run),
-];
+const SUBCOMMANDS: &[(&str, Migrate)] = &[(types::NAME, types::run)];

@@ -35,7 +35,14 @@ pub const NAME: &str = "types";
 
 /// Types built into the compiler; a new type with such a name would cover them.
 const BUILTIN: &[&str] = &[
-    "Int", "Float", "String", "List", "BitArray", "UtfCodepoint", "Never", "Boundary",
+    "Int",
+    "Float",
+    "String",
+    "List",
+    "BitArray",
+    "UtfCodepoint",
+    "Never",
+    "Boundary",
     "Continuation",
 ];
 
@@ -76,11 +83,21 @@ pub fn run(source: &Source) -> Outcome {
     // not take one (a parameter may not have the name of a type, E0231).
     let type_names: HashSet<&str> = defs
         .iter()
-        .flat_map(|(_, t)| std::iter::once(t.name.name.as_str()).chain(t.params.iter().map(|p| p.name.as_str())))
-        .chain(module.items.iter().flat_map(|i| match &i.kind {
-            ItemKind::Binding(b) => b.type_params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
-            ItemKind::Declaration { type_params, .. } => type_params.iter().map(|p| p.name.as_str()).collect(),
-            _ => Vec::new(),
+        .flat_map(|(_, t)| {
+            std::iter::once(t.name.name.as_str()).chain(t.params.iter().map(|p| p.name.as_str()))
+        })
+        .chain(module.items.iter().flat_map(|i| {
+            match &i.kind {
+                ItemKind::Binding(b) => b
+                    .type_params
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>(),
+                ItemKind::Declaration { type_params, .. } => {
+                    type_params.iter().map(|p| p.name.as_str()).collect()
+                }
+                _ => Vec::new(),
+            }
         }))
         .collect();
     let imported: HashSet<&str> = module
@@ -99,7 +116,11 @@ pub fn run(source: &Source) -> Outcome {
     let mut taken: HashSet<String> = HashSet::new();
     for (item, def) in &defs {
         let Some(ctors) = multi(def) else { continue };
-        let at = format!("{}:{}", source.path, source.line + src[..def.name.span.start as usize].matches('\n').count());
+        let at = format!(
+            "{}:{}",
+            source.path,
+            source.line + src[..def.name.span.start as usize].matches('\n').count()
+        );
         let mut problems = Vec::new();
         // The name of each constructor's new type: the constructor's name,
         // or `<name>Case` when that name is taken (§7.3 manual list).
@@ -126,7 +147,11 @@ pub fn run(source: &Source) -> Outcome {
             let mut t = n.to_string();
             let mut k = 1;
             while clash(&t) {
-                t = if k == 1 { format!("{n}Case") } else { format!("{n}Case{k}") };
+                t = if k == 1 {
+                    format!("{n}Case")
+                } else {
+                    format!("{n}Case{k}")
+                };
                 k += 1;
             }
             taken.insert(t.clone());
@@ -135,7 +160,10 @@ pub fn run(source: &Source) -> Outcome {
         let used: Vec<Vec<&str>> = ctors.iter().map(|c| used_params(src, def, c)).collect();
         for p in &def.params {
             if !used.iter().any(|u| u.contains(&p.name.as_str())) {
-                problems.push(format!("type parameter `{}` is used by no constructor", p.name));
+                problems.push(format!(
+                    "type parameter `{}` is used by no constructor",
+                    p.name
+                ));
             }
         }
         if !problems.is_empty() {
@@ -147,7 +175,11 @@ pub fn run(source: &Source) -> Outcome {
         }
         let start = def.name.span.start as usize;
         let end = item.span.end as usize;
-        edits.push((start, end, definitions(src, def, ctors, &type_of, &used, start)));
+        edits.push((
+            start,
+            end,
+            definitions(src, def, ctors, &type_of, &used, start),
+        ));
         migrated.push((def.name.name.as_str(), type_of));
     }
     if let Some(span) = module.exports_span {
@@ -249,7 +281,11 @@ fn definitions(
     };
     let params: Vec<&str> = def.params.iter().map(|p| p.name.as_str()).collect();
     let members: Vec<String> = type_of.iter().zip(used).map(|(t, u)| head(t, u)).collect();
-    let mut parts = vec![format!("{} = {}", head(&def.name.name, &params), members.join(" | "))];
+    let mut parts = vec![format!(
+        "{} = {}",
+        head(&def.name.name, &params),
+        members.join(" | ")
+    )];
     let open = src[start..].find('{').unwrap() + start;
     let mut prev = open + 1;
     for (c, member) in ctors.iter().zip(&members) {
@@ -270,7 +306,11 @@ fn definitions(
     }
     let close = src[..def_end(src, prev)].len();
     let trailing = comments(src, prev, close);
-    let sep = if multi_line { format!("\n\n{base}") } else { format!("\n{base}") };
+    let sep = if multi_line {
+        format!("\n\n{base}")
+    } else {
+        format!("\n{base}")
+    };
     let mut text = parts.join(&sep);
     for line in trailing {
         text.push('\n');
@@ -301,12 +341,22 @@ mod tests {
     use crate::common::Kind;
 
     fn migrate(path: &str, text: &str) -> Outcome {
-        run(&Source { path: path.into(), line: 1, kind: Kind::File, text: text.into(), start: 0, end: text.len() })
+        run(&Source {
+            path: path.into(),
+            line: 1,
+            kind: Kind::File,
+            text: text.into(),
+            start: 0,
+            end: text.len(),
+        })
     }
 
     #[test]
     fn splits_a_sum() {
-        let out = migrate("a.i", "(Option(..), T)\n\nOption(A) {\n\tSome(A)\n\t// none\n\tNone\n}\n\nT { X Y(a: Int) }\n");
+        let out = migrate(
+            "a.i",
+            "(Option(..), T)\n\nOption(A) {\n\tSome(A)\n\t// none\n\tNone\n}\n\nT { X Y(a: Int) }\n",
+        );
         assert_eq!(
             out.text.unwrap(),
             "(Option, Some(..), None(..), T, X, Y)\n\nOption(A) = Some(A) | None\n\nSome(A) {\n\tSome(A)\n}\n\n// none\nNone {\n\tNone\n}\n\nT = X | Y\nX { X }\nY { Y(a: Int) }\n"
@@ -315,7 +365,10 @@ mod tests {
 
     #[test]
     fn renames_clashing_constructor_types() {
-        let out = migrate("a.i", "Value { Int(Int) Name(String) }\nPaused { Paused(Paused) Done }\n");
+        let out = migrate(
+            "a.i",
+            "Value { Int(Int) Name(String) }\nPaused { Paused(Paused) Done }\n",
+        );
         assert_eq!(
             out.text.unwrap(),
             "Value = IntCase | Name\nIntCase { Int(Int) }\nName { Name(String) }\nPaused = PausedCase | Done\nPausedCase { Paused(Paused) }\nDone { Done }\n"

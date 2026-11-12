@@ -343,7 +343,15 @@ fn builtin(name: &str) -> bool {
     BuiltinType::ALL.into_iter().any(|b| b.name() == name)
         || matches!(
             name,
-            "Bool" | "True" | "False" | "Nil" | "Result" | "Ok" | "Error" | "Assert" | "AssertionFailure"
+            "Bool"
+                | "True"
+                | "False"
+                | "Nil"
+                | "Result"
+                | "Ok"
+                | "Error"
+                | "Assert"
+                | "AssertionFailure"
         )
 }
 fn error_id(query: &Syntax, kind: &str) -> DefinitionIdentity {

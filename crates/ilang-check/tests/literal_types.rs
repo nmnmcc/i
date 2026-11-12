@@ -574,8 +574,9 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
         "{lines:?}"
     );
     // §7.5: fitting does not narrow the original subject to a constructor.
-    let (ds, _) =
-        check("T = Yes | No\nYes { Yes(value: Int) }\nNo { No }\nf = (r: T) { r |> { Yes(_) | Yes(_) -> r.value } }\n");
+    let (ds, _) = check(
+        "T = Yes | No\nYes { Yes(value: Int) }\nNo { No }\nf = (r: T) { r |> { Yes(_) | Yes(_) -> r.value } }\n",
+    );
     assert!(ds.iter().any(|d| d.0 == "E0512"), "{ds:?}");
     // §4.8 / §6.12: opaque tests still constrain all values of that head.
     let (ds, _) = check(

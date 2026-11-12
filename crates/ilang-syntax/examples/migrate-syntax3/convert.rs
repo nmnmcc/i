@@ -269,4 +269,3 @@ pub fn convert_command(args: &[String]) -> i32 {
     }
     status
 }
-

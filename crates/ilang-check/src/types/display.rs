@@ -1969,7 +1969,9 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
                             id.0,
                         )
                     });
-                let Some((id, args, mut at)) = best else { break };
+                let Some((id, args, mut at)) = best else {
+                    break;
+                };
                 let folded = Ty::named(crate::hir::TypeRef::Custom(id), args);
                 if at.len() == xs.len() {
                     return folded;
