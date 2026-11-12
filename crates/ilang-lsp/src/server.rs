@@ -40,8 +40,8 @@ mod features;
 pub struct Options {
     /// How long to wait after a change before checking again.
     pub debounce: Duration,
-    /// Never use the network to get packages. Without it, only the first
-    /// check of a package may use it.
+    /// Whether the network may not be used to get packages. When it is not
+    /// set, only the first check of a package may use it.
     pub offline: bool,
 }
 
@@ -579,8 +579,8 @@ impl<'c> Server<'c> {
         }
     }
 
-    /// A job is done: keep the check of a package and publish its
-    /// problems, or answer the completion that it was for.
+    /// Handles a finished job: keeps the check of a package and publishes its
+    /// problems, or answers the completion that it was for.
     fn finished(&mut self, job: Job, analysis: Option<Analysis>) {
         self.running.retain(|(id, _)| *id != job.id);
         if let Some(patch) = job.patch {

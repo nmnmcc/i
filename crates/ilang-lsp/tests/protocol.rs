@@ -174,7 +174,7 @@ fn find(text: &str, needle: &str, nth: usize) -> (u32, u32) {
     (line, col)
 }
 
-/// Exact LSP diagnostic for an unused top-level binding.
+/// The exact LSP diagnostic for an unused top-level binding.
 fn unused_diagnostic(text: &str, name: &str, binding: &str) -> lsp::Diagnostic {
     let (line, col) = find(text, binding, 0);
     lsp::Diagnostic {
@@ -748,7 +748,7 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
 
 #[test]
 fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
-    // X4: every pattern head targets its existing type, at every depth.
+    // Every pattern head targets its existing type, at every depth.
     let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i")
         .replace("x: Item = 2", "x: Item = 1");
     let source = source.as_str();
