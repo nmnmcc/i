@@ -1,6 +1,6 @@
 name : (p: Cat | Dog) -> String
 value : (v: Num | Text) -> Int | String
-label : (p: Circle | Square | Cat) -> String
+label : (p: Shape | Cat) -> String
 generic : (b: Box(Int) | Num) -> Int
 position : (p: Pair | Cat) -> String
 missing : (p: Cat | Rock) -> Never
@@ -17,7 +17,7 @@ apply : (f: (Cat | Dog) -> (name: A) ^ E ! N, c: Cat | Dog) -> A ^ E ! N
 each : (xs: List(A), f: (A) -> B) -> List(B)
 checked : (rocks: List(Rock)) -> List(Int)
 wrong : (rocks: List(Rock)) -> List(Int)
-part : (t: (Int, String) | (Float, Bool, Int)) -> String | True | False
+part : (t: (Int, String) | (Float, Bool, Int)) -> String | Bool
 short : (t: (Int) | (Int, Int)) -> Never
 not_tuple : (t: (Int, Int) | Nil) -> Never
 46:16: error[E0512]: not every constructor of `Cat` has a field with the label `label` (§4.8 rule 13)

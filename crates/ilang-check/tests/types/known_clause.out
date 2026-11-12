@@ -1,8 +1,8 @@
-field : (v: A | B | S) -> Int
+field : (v: T | S) -> Int
 use_field : () -> Int
 field_rest : (v: C) -> Int
 use_rest : () -> (Int, Int)
-update : (v: A | B | S) -> T
+update : (v: T | S) -> T
 update_open : (v: C) -> T
 use_update : () -> T
 item : (b: Box(C)) -> C | 0
