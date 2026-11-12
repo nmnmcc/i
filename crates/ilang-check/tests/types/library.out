@@ -92,6 +92,9 @@ i/float_text.fraction_unit : 4503599627370496
 i/float_text.precise_limit : 4845873199050653696
 i/float_text.to_string : (x: Float) -> String
 i/float_text.positive : (bits: Int) -> List(String)
+i/float_text.floor_divide : (a: Int, b: Int) -> Int
+i/float_text.power_of_ten : (n: Int) -> Int
+i/float_text.power : (base: Int, n: Int, acc: Int) -> Int
 i/float_text.grow : (r: Int, s: Int, k: Int) -> (Int, Int)
 i/float_text.shrink : (r: Int, s: Int, minus: Int, plus: Int, k: Int) -> (Int, Int, Int, Int)
 i/float_text.generate : (r: Int, s: Int, minus: Int, plus: Int, inclusive: Bool, acc: List(Int), k: Int) -> (List(Int), Int)
