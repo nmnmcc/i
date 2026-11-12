@@ -146,6 +146,23 @@ No language or library surface was added, including state mechanisms.
   on the string-form corpus confirm raw and multiline delimiters, escapes,
   nested interpolation, and function/variable captures inside interpolation.
 
+- Later K4d/K4s/K4-lane and R2 observations had the same source/target
+  split and error-slot changes. Refreshed 81 complete observations only
+  after mechanically checking the full difference: 40 preserve target E0523
+  rejection, nine remove obsolete E0522 alongside unchanged source errors,
+  and 32 change only error-slot spelling or remove scope's accidental Root
+  requirement. All saved budgets and semantic requirements stay intact.
+
+- Reviewed the remaining historical observations: eight only rename
+  macro-generated test bindings, seven add the service to missing host import
+  errors, and 17 follow already-migrated test macros, source positions,
+  declared entry names, scope schemes or parser diagnostics. Runtime test
+  names, pass/fail counts, exit status and saved budgets are preserved.
+  Three old `mixed_install` cases now reach E0515/E0501 instead of the removed
+  built-in @test module restriction; they still reject. The cancelled-read
+  source now checks because `i/net` exports Stream/read; its startup tests
+  succeed at both levels. No semantic requirement was changed for these.
+
 ## Sources and interpretations
 
 - The ledger's USER decisions removing built-in `@main` and keeping named
@@ -168,23 +185,6 @@ No language or library surface was added, including state mechanisms.
   `scopeUse`): allocate the internal scope, provide it around the body, and
   always close it on exit. Used i's existing Owner and resource.ensure for
   the same lifetime pattern, with no new state API.
-
-- Later K4d/K4s/K4-lane and R2 observations had the same source/target
-  split and error-slot changes. Refreshed 81 complete observations only
-  after mechanically checking the full difference: 40 preserve target E0523
-  rejection, nine remove obsolete E0522 alongside unchanged source errors,
-  and 32 change only error-slot spelling or remove scope's accidental Root
-  requirement. All saved budgets and semantic requirements stay intact.
-
-- Reviewed the remaining historical observations: eight only rename
-  macro-generated test bindings, seven add the service to missing host import
-  errors, and 17 follow already-migrated test macros, source positions,
-  declared entry names, scope schemes or parser diagnostics. Runtime test
-  names, pass/fail counts, exit status and saved budgets are preserved.
-  Three old `mixed_install` cases now reach E0515/E0501 instead of the removed
-  built-in @test module restriction; they still reject. The cancelled-read
-  source now checks because `i/net` exports Stream/read; its startup tests
-  succeed at both levels. No semantic requirement was changed for these.
 
 ## Verification
 
@@ -221,30 +221,75 @@ Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
   permutations, 32 annotation removals, zero failures.
 - `UPDATE=1 scripts/review-corpus run --filter 10_macro_attr_tuple --binary
   target/debug/i`: passed, both rejected inputs retain their rejection.
+- `scripts/dev-verify rust`: passed, formatting, Clippy and workspace tests;
+  all 446 spec cases pass at O0/O2.
+- `scripts/dev-verify i`: passed, including 1,845 std, two hello and 15 bench
+  tests at each optimization level, both WASI engines, all 1,973 corpus cases
+  with no failures, and short generation's 32 cases, 64 permutations and
+  32 annotation removals. Existing censored classifications are preserved.
 - `scripts/dev-verify js`: passed, 104 Node tests and 60 browser tests across
   Chromium, Firefox and WebKit.
 - `scripts/dev-verify editors`: passed, including query compilation,
   repository parsing, generated parser equality and Zed cargo check.
 
-The exact supplied clean-worktree acceptance script runs after this report
-is committed. Its final combined output is captured in
-`/tmp/js-acceptance-final-green.log`;
-individual part outputs are `/tmp/dv-{rust,i,js,editors}.<shell-pid>`. It runs
-each part separately through the heavy wrapper, requires each exit status to
-be zero, compares the verification script against `lane/integ`, and checks
-that this report exists. No check or existing test was removed or disabled.
+The exact supplied clean-worktree acceptance script passed with exit 0 on
+code commit `f129c81b`. Each part ran separately through the required heavy
+wrapper. Combined output is `/tmp/js-acceptance-final-green.log`; individual
+outputs are `/tmp/dv-{rust,i,js,editors}.46266`. Its final lines are:
+
+```text
+dev-verify rust ok
+dev-verify i ok
+dev-verify js ok
+dev-verify editors ok
+ 1 file changed, 2 insertions(+)
+```
+
+The script also checked that this report exists. The worktree was clean at
+acceptance start. All existing verification commands and test cases remain;
+the local lint exceptions are justified above.
+
+Earlier `scripts/dev-verify rust` attempts failed with these lines, fixed as
+described above:
+
+```text
+error: this `if` statement can be collapsed
+error: mutable key type
+error: this function has too many arguments (8/7)
+error: the borrowed expression implements the required traits
+error: used `assert_eq!` with a literal bool
+```
 
 An extra full-corpus diagnostic run with the debug CLI was stopped after
 50 cases, then restarted with the release CLI used by the i gate. The
 per-case runtime budgets are unchanged; final verification runs the complete
 1973-case corpus with the release CLI.
 
-One intermediate overlapping Cargo run failed at doctests with
-`error[E0460]: found possibly newer version of crate ilang_check which
-ilang_macro depends on`. Another Cargo build had replaced artifacts while
-workspace tests were running. Final acceptance waits for that workspace
-command to finish and does not replace its debug artifacts during testing. No Cargo
-command was interrupted. Earlier bounded std and literal failures were
-`review-k4s/std: unclassified checker timeout` and
-`review-t1/stress-keys-2000: full output changed`; the fixes above retain
-their original limits and successful checker/runtime requirements.
+One intermediate overlapping Cargo run failed at doctests:
+
+```text
+error[E0460]: found possibly newer version of crate `ilang_check` which `ilang_macro` depends on
+```
+
+Another Cargo build had replaced artifacts while workspace tests were
+running. Final acceptance waited for that workspace command to finish and
+did not replace its debug artifacts during testing. No Cargo command was
+interrupted. Earlier bounded std and literal failures were:
+
+```text
+review-k4s/std: unclassified checker timeout
+review-t1/stress-keys-2000: full output changed
+```
+
+An additional i diagnostic run overlapped Rust's parallel spec suite and
+failed only mutual200's O2 phase at its ten-second cap:
+
+```text
+review-k4d/perf/mutual200: full output changed
+review-k4d/perf/mutual200: required accept
+```
+
+The required final sequential acceptance passed that source check and both
+runtime phases, and then the complete corpus, without changing any limit.
+
+Unfinished work for Step 03: none.
