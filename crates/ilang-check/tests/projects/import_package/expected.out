@@ -2,4 +2,3 @@ src/main.i:2:2: error[E0209]: `nothere` is not `i`, the name of this package, or
 src/main.i:3:2: error[E0209]: `check` is a dev-dependency, so only modules under `test/` may use it
 src/main.i:4:2: error[E0210]: there is no module `app/missing`
 src/main.i:5:2: error[E0210]: there is no module `i/nothing`
-src/main.i:6:2: error[E0210]: there is no module `i/prelude`
