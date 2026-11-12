@@ -24,7 +24,8 @@
 //! sections of the program, read exactly as [`Program::from_bytes`] reads
 //! them.
 //!
-//! Packages are built for the triple of the machine that builds them, with a
+//! Packages are built for the triple of the runner (statically linked, musl on
+//! Linux), with a
 //! fixed CPU feature baseline ([`BASELINE`]) rather than the features of the
 //! building machine's CPU.
 
@@ -74,8 +75,10 @@ const BASELINE_FLAGS: &[&str] = if cfg!(target_arch = "x86_64") {
     &[]
 };
 
-/// The target triple of this build of the host, which is the target of the
-/// packages it makes and the only one it loads.
+/// The target triple of this build of the host: a runner loads only code
+/// compiled for its own triple. `i build` compiles for the triple of the
+/// runner it carries, which is a static target (crates/ilang-cli/build.rs),
+/// not necessarily the triple of `i` itself.
 pub fn triple() -> String {
     target_lexicon::Triple::host().to_string()
 }
@@ -84,12 +87,12 @@ pub fn triple() -> String {
 /// Wasmtime version, target triple, CPU baseline, collector and engine
 /// tunables. `i build` writes it into the manifest, and the runner refuses a
 /// payload whose contract is not its own.
-pub fn contract(collector: Collector, gc_heap: u64) -> String {
+pub fn contract(target: &str, collector: Collector, gc_heap: u64) -> String {
     format!(
         "ilang-host {}; abi {}; wasmtime {WASMTIME}; target {}; cpu {BASELINE}; collector {}; gc heap {gc_heap}; wasm stack {}; thread stack {}; epochs off; fuel off",
         env!("CARGO_PKG_VERSION"),
         crate::ABI_VERSION,
-        triple(),
+        target,
         collector_name(collector),
         crate::WASM_STACK,
         crate::THREAD_STACK,
@@ -116,17 +119,17 @@ fn collector_of(name: &str) -> Result<Collector> {
 
 /// The engine configuration that both `i build` and the runner use; the
 /// compiler adds only settings of the compiler to it.
-fn config(collector: Collector, gc_heap: u64) -> Result<Config> {
+fn config(target: &str, collector: Collector, gc_heap: u64) -> Result<Config> {
     let mut config = runtime_config(collector, gc_heap);
     // An explicit target: Wasmtime then infers no CPU features of this
     // machine, so the baseline below is all the code uses.
-    config.target(&triple())?;
+    config.target(target)?;
     Ok(config)
 }
 
 #[cfg(feature = "compiler")]
-fn compiler_engine(collector: Collector, gc_heap: u64) -> Result<Engine> {
-    let mut config = config(collector, gc_heap)?;
+fn compiler_engine(target: &str, collector: Collector, gc_heap: u64) -> Result<Engine> {
+    let mut config = config(target, collector, gc_heap)?;
     config.parallel_compilation(true);
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
     for flag in BASELINE_FLAGS {
@@ -140,7 +143,7 @@ fn compiler_engine(collector: Collector, gc_heap: u64) -> Result<Engine> {
 }
 
 fn runtime_engine(collector: Collector, gc_heap: u64) -> Result<Engine> {
-    Ok(Engine::new(&config(collector, gc_heap)?)?)
+    Ok(Engine::new(&config(&triple(), collector, gc_heap)?)?)
 }
 
 /// The description of a payload, the first part of it.
@@ -287,12 +290,13 @@ pub fn host_options(args: Vec<String>, plan: &BindingPlan, trusted_package: &str
     options
 }
 
-/// Make a native package: `runner` followed by the payload of `wasm`,
-/// compiled for this machine's triple ([`contract`]). Fails when the module
+/// Make a native package: `runner`, built for the triple `target`, followed
+/// by the payload of `wasm`, compiled for that triple ([`contract`]). Fails when the module
 /// has no program entry, or imports a function the runner cannot give (N4).
 #[cfg(feature = "compiler")]
 pub fn package(
     runner: &[u8],
+    target: &str,
     name: &str,
     wasm: &[u8],
     plan: &BindingPlan,
@@ -347,7 +351,7 @@ pub fn package(
         &options.imports,
     )?;
     let (collector, gc_heap) = crate::gc_settings()?;
-    let code = compiler_engine(collector, gc_heap)?
+    let code = compiler_engine(target, collector, gc_heap)?
         .precompile_module(wasm)
         .map_err(anyhow::Error::from)
         .context("compiling the i WebAssembly module for the native package")?;
@@ -355,7 +359,7 @@ pub fn package(
     let payload = Payload {
         manifest: Manifest {
             format: FORMAT,
-            contract: contract(collector, gc_heap),
+            contract: contract(target, collector, gc_heap),
             collector: collector_name(collector).into(),
             gc_heap,
             name: name.into(),
@@ -379,7 +383,7 @@ pub fn load(file: &[u8]) -> Result<(Program, Manifest)> {
     let (_, payload) = Payload::decode(file)?;
     let manifest = payload.manifest;
     let collector = collector_of(&manifest.collector)?;
-    let expected = contract(collector, manifest.gc_heap);
+    let expected = contract(&triple(), collector, manifest.gc_heap);
     ensure!(
         manifest.contract == expected,
         "the program was compiled for another runner: it needs `{}`, and this runner is `{expected}`; build it again with the `i` of this runner",

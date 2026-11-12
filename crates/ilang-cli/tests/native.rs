@@ -292,7 +292,7 @@ fn another_contract_is_rejected() {
         p.manifest.contract = p
             .manifest
             .contract
-            .replace(&ilang_host::native::triple(), "riscv64gc-unknown-linux-gnu")
+            .replace(ilang_cli::RUNNER_TARGET, "riscv64gc-unknown-linux-gnu")
     });
     assert!(error.contains("compiled for another runner"), "{error}");
     // A collector the code was not compiled for: the contract names it, so
@@ -317,14 +317,19 @@ fn another_contract_is_rejected() {
 fn build_and_runner_share_one_contract() {
     // The runner and `i build` both use `ilang_host::native`; the payload
     // records the contract of the compiling side, and the runner accepted
-    // it in the tests above. Here: it is the contract of this host, and
-    // names the pinned Wasmtime of crates/ilang-host/Cargo.toml.
+    // it in the tests above. Here: it is the contract of the runner's
+    // target (not the target of `i`), and names the pinned Wasmtime of
+    // crates/ilang-host/Cargo.toml.
     let dir = tempfile::tempdir().unwrap();
     let exe = build(&example("hello"), dir.path(), "hello");
     let (_, payload) = ilang_host::native::Payload::decode(&std::fs::read(&exe).unwrap()).unwrap();
     assert_eq!(
         payload.manifest.contract,
-        ilang_host::native::contract(wasmtime::Collector::Copying, 256 << 20)
+        ilang_host::native::contract(
+            ilang_cli::RUNNER_TARGET,
+            wasmtime::Collector::Copying,
+            256 << 20
+        )
     );
     let manifest = std::fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../ilang-host/Cargo.toml"),
@@ -338,11 +343,77 @@ fn build_and_runner_share_one_contract() {
         payload
             .manifest
             .contract
-            .contains(&format!("target {}", ilang_host::native::triple()))
+            .contains(&format!("target {}", ilang_cli::RUNNER_TARGET))
     );
-    // The payload loads in this process too, with the runtime engine.
-    let (program, _) = ilang_host::native::load(&std::fs::read(&exe).unwrap()).unwrap();
-    assert!(program.abi().entry.is_some());
+    if cfg!(target_os = "linux") {
+        assert!(ilang_cli::RUNNER_TARGET.ends_with("-unknown-linux-musl"));
+        // `i` itself is not the runner's target, so it refuses to load the
+        // payload: the code is for the runner.
+        if ilang_host::native::triple() != ilang_cli::RUNNER_TARGET {
+            let error = ilang_host::native::load(&std::fs::read(&exe).unwrap())
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(error.contains("compiled for another runner"), "{error}");
+        }
+    }
+}
+
+/// The program headers of an ELF64 little-endian file: (type, offset, size).
+fn program_headers(bytes: &[u8]) -> Vec<(u32, usize, usize)> {
+    assert_eq!(&bytes[..4], b"\x7fELF");
+    assert_eq!(bytes[4], 2, "ELF64");
+    assert_eq!(bytes[5], 1, "little-endian");
+    let u16_at = |at: usize| u16::from_le_bytes(bytes[at..at + 2].try_into().unwrap()) as usize;
+    let u64_at = |at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap()) as usize;
+    let (offset, size, count) = (u64_at(0x20), u16_at(0x36), u16_at(0x38));
+    (0..count)
+        .map(|i| {
+            let at = offset + i * size;
+            let kind = u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+            (kind, u64_at(at + 8), u64_at(at + 32))
+        })
+        .collect()
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn packages_are_statically_linked() {
+    const PT_DYNAMIC: u32 = 2;
+    const PT_INTERP: u32 = 3;
+    const DT_NEEDED: u64 = 1;
+    let dir = tempfile::tempdir().unwrap();
+    let exe = build(&example("hello"), dir.path(), "hello");
+    let bytes = std::fs::read(&exe).unwrap();
+    let headers = program_headers(&bytes);
+    assert!(
+        !headers.iter().any(|(kind, _, _)| *kind == PT_INTERP),
+        "the package asks for a dynamic loader"
+    );
+    // A static PIE has a dynamic section for its own relocations, but
+    // needs no shared library.
+    for (_, offset, size) in headers.iter().filter(|(kind, _, _)| *kind == PT_DYNAMIC) {
+        for entry in bytes[*offset..offset + size].chunks_exact(16) {
+            let tag = u64::from_le_bytes(entry[..8].try_into().unwrap());
+            assert_ne!(tag, DT_NEEDED, "the package needs a shared library");
+        }
+    }
+    // It runs alone in an empty directory, with no environment at all (no
+    // PATH, no LD_LIBRARY_PATH) and no access to `i` or the build tree.
+    let alone = tempfile::tempdir().unwrap();
+    let copy = alone.path().join("hello");
+    std::fs::copy(&exe, &copy).unwrap();
+    let out = Command::new(&copy)
+        .current_dir(alone.path())
+        .env_clear()
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(out.stdout, b"Hello from i!\n");
 }
 
 #[test]
