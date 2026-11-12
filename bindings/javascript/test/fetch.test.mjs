@@ -12,13 +12,15 @@ const cli = resolve(root, 'target/debug/i');
 
 // Compile once, then exercise ordinary http functions through their JS provider plan.
 test('fetch provider: GET POST headers status timeout cancel refused streamed body', { timeout: 120000 }, async t => {
-  let aborted, streamResponse;
+  let aborted, bodyAborted, streamResponse;
   const wasAborted = new Promise(resolve => { aborted = resolve; });
+  const bodyWasAborted = new Promise(resolve => { bodyAborted = resolve; });
   const server = createServer(async (req, res) => {
     if (req.url === '/slow' || req.url === '/cancel') {
       res.on('close', () => { if (req.url === '/cancel') aborted(); });
       return;
     }
+    if (req.url === '/body-cancel') { res.on('close', bodyAborted); res.write('partial'); return; }
     if (req.url === '/stream') {
       streamResponse = res;
       res.writeHead(200, { 'x-provider': 'fetch' }); res.write('first'); return;
@@ -74,6 +76,7 @@ stream = (url: String) { checked(() {
     await t.test('non-2xx response is a response', async () => assert.equal(await guest.callAsync('app/main.status', [base + '/status']), 418n));
     await t.test('timeout aborts fetch', async () => assert.rejects(guest.callAsync('app/main.timeout', [base + '/slow']), e => e instanceof GuestError && e.value === 'Timeout'));
     await t.test('task cancel aborts fetch', async () => { assert.equal(await guest.callAsync('app/main.cancel', [base + '/cancel']), 'cancelled'); await wasAborted; });
+    await t.test('task cancel aborts a streamed response body', async () => { assert.equal(await guest.callAsync('app/main.cancel', [base + '/body-cancel']), 'cancelled'); await bodyWasAborted; });
     await t.test('connection refused', async () => {
       const closed = createServer(); closed.listen(0, '127.0.0.1'); await once(closed, 'listening');
       const port = closed.address().port; await new Promise(resolve => closed.close(resolve));

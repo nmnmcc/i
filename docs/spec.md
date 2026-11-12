@@ -2733,7 +2733,7 @@ are interpreted as pointers. Request operations return completed requests.
 | Clock | clock_time_get: private u64 timestamp; poll_oneoff: zeroed 48-byte clock subscription, 32-byte event and u32 count; check count/error and recheck the monotonic deadline |
 | Entropy | random_get: private byte allocation, size 0..16777216; return a copy |
 | Arguments / Environment | args_sizes_get/args_get and environ_sizes_get/environ_get: private u32 pointer vector and byte buffer, checked NUL-terminated UTF-8 extents; args excludes argv[0]; environment lookup validates its name |
-| Fs | fd_prestat_get/dir_name selects the longest matching preopen; path_open uses private UTF-8 path and u32 output; fd_read/write/sync/close; path_create_directory/unlink_file/remove_directory/rename/filestat_get; fd_readdir uses checked 24-byte dirents and cookies, retrying truncated entries |
+| Fs | fd_prestat_get/dir_name selects the longest matching preopen; path_open uses private UTF-8 path and u32 output; fd_read/write/close (flush validates the live handle; writes are unbuffered); path_create_directory/unlink_file/remove_directory/rename/filestat_get; fd_readdir uses checked 24-byte dirents and cookies, retrying truncated entries |
 
 Fs exposes fresh run-local Int tokens, never raw descriptors or addresses.
 Closed tokens never name a reused descriptor. Paths outside all preopens give
