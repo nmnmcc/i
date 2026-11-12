@@ -114,10 +114,6 @@ pub fn print_with_comments(source: &str, module: &Module) -> (String, Vec<Span>)
     render_comments(source, module, false, false)
 }
 
-pub(super) fn format_with_comments(source: &str, module: &Module) -> String {
-    render_comments(source, module, true, true).0
-}
-
 fn render_comments(
     source: &str,
     module: &Module,

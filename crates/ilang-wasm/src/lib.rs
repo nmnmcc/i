@@ -18,6 +18,7 @@ pub mod control;
 pub mod emit;
 pub mod ir;
 pub mod lower;
+pub mod numeric;
 pub mod runtime;
 
 use ilang_check::hir;
@@ -110,8 +111,9 @@ pub fn compile_with_bindings_numeric(
     typed: &Typed,
     options: CompilationOptions,
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
-    let (mut ir, bindings) = lower::lower_with_bindings(graph, program, typed, options.lower)
-        .map_err(Error::Diagnostics)?;
+    let (mut ir, bindings) =
+        lower::lower_tests_numeric(graph, program, typed, options.lower, &[], options.numeric)
+            .map_err(Error::Diagnostics)?;
     ir.numeric = options.numeric;
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
@@ -155,7 +157,7 @@ pub fn compile_tests_with_bindings_numeric(
     tests: &[(hir::DefId, String)],
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
     let (mut ir, bindings) =
-        lower::lower_tests_with_bindings(graph, program, typed, options.lower, tests)
+        lower::lower_tests_numeric(graph, program, typed, options.lower, tests, options.numeric)
             .map_err(Error::Diagnostics)?;
     ir.numeric = options.numeric;
     let mut wasm = wat::parse_str(emit::wat(&ir)).map_err(|e| Error::Internal(e.to_string()))?;
@@ -186,9 +188,16 @@ pub fn compile_selected_with_bindings_numeric(
     target: hir::DefId,
     export: &str,
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>, bool), Error> {
-    let (mut ir, bindings, is_async) =
-        lower::lower_selected_with_bindings(graph, program, typed, options.lower, target, export)
-            .map_err(Error::Diagnostics)?;
+    let (mut ir, bindings, is_async) = lower::lower_selected_numeric(
+        graph,
+        program,
+        typed,
+        options.lower,
+        target,
+        export,
+        options.numeric,
+    )
+    .map_err(Error::Diagnostics)?;
     ir.numeric = options.numeric;
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
@@ -214,7 +223,9 @@ pub fn compile_wat_numeric(
     typed: &Typed,
     options: CompilationOptions,
 ) -> Result<String, Error> {
-    let mut ir = lower::lower(graph, program, typed, options.lower).map_err(Error::Diagnostics)?;
+    let (mut ir, _) =
+        lower::lower_tests_numeric(graph, program, typed, options.lower, &[], options.numeric)
+            .map_err(Error::Diagnostics)?;
     ir.numeric = options.numeric;
     Ok(emit::wat(&ir))
 }

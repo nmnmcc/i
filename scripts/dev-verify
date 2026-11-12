@@ -4,9 +4,14 @@
 #
 #   scripts/dev-verify            rust, i, js and editors
 #   scripts/dev-verify rust       Rust formatting, Clippy and the workspace tests
+#                                 (rust-lint: formatting and Clippy; rust-test: the tests)
 #   scripts/dev-verify i          the release `i`, and with it the i sources
 #   scripts/dev-verify editors    VS Code tests, tree-sitter tests and Zed build
 #   scripts/dev-verify js         the JavaScript SDK and browser tests
+#
+# For CI, which builds once and runs the review corpus in shards:
+#   DEV_VERIFY_I_BINARY=path      the i part uses this `i` instead of building it
+#   DEV_VERIFY_SKIP_CORPUS=1      the i part leaves out the review corpus
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
@@ -15,17 +20,46 @@ binaryen() {
 }
 
 rust() {
+  rust-lint
+  rust-test
+}
+
+rust-lint() {
   binaryen
   cargo fmt --all -- --check
   cargo clippy --workspace --all-targets --locked -- -D warnings
-  cargo test --workspace --locked
+}
+
+# DEV_VERIFY_TEST_GROUP splits the tests for CI, where one job would take close to an hour:
+# value_types, spec, cli (the other tests of ilang-cli), rest (every other crate). Unset: all of them.
+rust-test() {
+  binaryen
+  case "${DEV_VERIFY_TEST_GROUP:-}" in
+    "") cargo test --workspace --locked ;;
+    value_types) cargo test -p ilang-cli --locked --test value_types --test value_type_performance ;;
+    spec) cargo test -p ilang-cli --locked --test spec ;;
+    cli)
+      targets=()
+      for file in crates/ilang-cli/tests/*.rs; do
+        name="$(basename "$file" .rs)"
+        case "$name" in value_types | value_type_performance | spec) ;; *) targets+=(--test "$name") ;; esac
+      done
+      cargo test -p ilang-cli --locked --bins "${targets[@]}"
+      ;;
+    rest) cargo test --workspace --exclude ilang-cli --locked ;;
+    *) echo "dev-verify: unknown DEV_VERIFY_TEST_GROUP '$DEV_VERIFY_TEST_GROUP'" >&2; exit 2 ;;
+  esac
 }
 
 i() {
-  binaryen
-  cargo build --release --locked -p ilang-cli
   local i
-  i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
+  if [[ -n "${DEV_VERIFY_I_BINARY:-}" ]]; then
+    i="$(realpath "$DEV_VERIFY_I_BINARY")"
+  else
+    binaryen
+    cargo build --release --locked -p ilang-cli
+    i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
+  fi
   "$i" fmt --check lib std bench examples
   for level in 0 2; do
     "$i" test --project std --opt "$level"
@@ -33,7 +67,9 @@ i() {
     "$i" test --project bench --opt "$level"
   done
   ./scripts/wasi-smoke "$i"
-  ./scripts/review-corpus run --binary "$i" --jobs 3
+  if [[ "${DEV_VERIFY_SKIP_CORPUS:-}" != 1 ]]; then
+    ./scripts/review-corpus run --binary "$i" --jobs 3
+  fi
   ./scripts/test-generation --mode short --binary "$i"
 }
 
@@ -78,7 +114,7 @@ parts=("$@")
 if [[ ${#parts[@]} -eq 0 ]]; then parts=(rust i js editors); fi
 for part in "${parts[@]}"; do
   case "$part" in
-    rust | i | js | editors) "$part" ;;
-    *) echo "dev-verify: unknown part '$part' (rust, i, js or editors)" >&2; exit 2 ;;
+    rust | rust-lint | rust-test | i | js | editors) "$part" ;;
+    *) echo "dev-verify: unknown part '$part' (rust, rust-lint, rust-test, i, js or editors)" >&2; exit 2 ;;
   esac
 done

@@ -138,7 +138,7 @@ control Root still count for ABI status 1. Snapshot runnable/running/claimed wor
 pending program deliveries and that program waitable set under the same lock
 (runtime §6.4; multicore §6). Atomic delivery publication prevents a false zero.
 
-**N9. IO values are private nominal wrappers over Int.** File, Listener, Stream and
+**N9. IO values are private nominal wrappers over Int.** File, Listener, Stream, Datagram and
 Child each have one private constructor containing an Int, defined in their ordinary
 modules. Raw request services take/return Int; wrappers unwrap/wrap and translate errors
 explicitly (runtime §7). §10.3 remains unchanged: a wrapper itself is not an ABI value.
@@ -1203,7 +1203,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > that object with closed unless their answer already committed. A concurrent
 > read and write are allowed. A second concurrent read, write, or accept on the
 > same direction/object gives busy, not an unspecified interleaving. There is no
-> TLS, UDP, HTTP, DNS, or cross-worker reference transfer in v1.
+> cross-worker reference transfer in v1. UDP is included by the 2026-11-12 USER delivery decision (runtime §7.3).
 
 - New sentence(s):
 
@@ -1260,7 +1260,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > that object with closed unless their answer already committed. A concurrent
 > read and write are allowed. A second concurrent read, write, or accept on the
 > same direction/object gives busy, not an unspecified interleaving. DNS is part
-> of i/net; TLS is i/tls (a later task); UDP is not in v1. Missing, closed, foreign-context or wrong-kind
+> of i/net; TLS is i/tls (a later task); UDP follows the same resource rules (runtime §7.3). Missing, closed, foreign-context or wrong-kind
 > numbers give closed; close gives Nil. Stream values can cross workers, while
 > their pending Request values cannot.
 
@@ -3343,7 +3343,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > claim that a mutex alone implements the scheduler. Replace the lock only after
 > measurements.
 >
-> **N9. IO values are private nominal wrappers over Int.** File, Listener, Stream and
+> **N9. IO values are private nominal wrappers over Int.** File, Listener, Stream, Datagram and
 > Child each have one private constructor containing an Int, defined in their ordinary
 > modules. Raw request services take/return Int; wrappers unwrap/wrap and translate errors
 > explicitly (runtime §7). §10.3 remains unchanged: a wrapper itself is not an ABI value.

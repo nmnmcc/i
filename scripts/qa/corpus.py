@@ -10,6 +10,7 @@ import re
 import runpy
 import shutil
 import signal
+import math
 import subprocess
 import tempfile
 import time
@@ -207,13 +208,22 @@ def import_reviews(args):
 
 
 def invoke(binary, project, command, bound):
+    # The bound is CPU time of the process, so a busy machine does not turn a slow case into a
+    # timeout. Wall time is only a backstop for a process that waits without using the CPU.
     argv = [str(binary), *command, '--offline', '--project', str(project)]
     started = time.monotonic()
-    env = dict(os.environ, NO_COLOR='1', TERM='dumb')
+    env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1')
+    # A slower machine (a CI runner) scales every bound; the expectations were recorded locally.
+    bound = bound * float(os.environ.get('CORPUS_BOUND_SCALE', '1'))
+    cpu = max(1, math.ceil(bound))
+    # `prlimit` sets the limit in the child; `preexec_fn` is not safe with the runner's threads.
+    argv = ['prlimit', f'--cpu={cpu}:{cpu + 1}', '--', *argv]
     with subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True) as process:
         try:
-            stdout, stderr = process.communicate(timeout=bound)
+            stdout, stderr = process.communicate(timeout=max(30, 6 * bound))
             code = process.returncode
+            if code == -signal.SIGXCPU:
+                code = 'timeout'
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
             stdout, stderr = process.communicate()
@@ -311,9 +321,21 @@ def select(args):
             raise SystemExit('unknown cases: ' + ', '.join(sorted(missing)))
         cases = [c for c in cases if c['id'] in names]
     cases = [c for c in cases if args.filter in c['id']]
+    if getattr(args, 'shard', None):
+        # Shard K of N takes every Nth case by ID, so the shards of one selection
+        # are disjoint and together are the whole selection.
+        index, count = args.shard
+        cases = [c for n, c in enumerate(sorted(cases, key=lambda c: c['id'])) if n % count == index - 1]
     if not cases:
         raise SystemExit('no cases selected')
     return cases
+
+
+def shard(text):
+    match = re.fullmatch(r'([0-9]+)/([0-9]+)', text)
+    if not match or not 1 <= int(match[1]) <= int(match[2]):
+        raise argparse.ArgumentTypeError('expected K/N with 1 <= K <= N')
+    return int(match[1]), int(match[2])
 
 
 def run_corpus(args):
@@ -321,6 +343,10 @@ def run_corpus(args):
     failures = []
     summary = collections.Counter()
     cases = select(args)
+    if args.list:
+        for case in cases:
+            print(case['id'])
+        return
     if args.missing_only:
         cases = [c for c in cases if not (ROOT / c['project'] / 'expected.json').exists()]
         if not cases:
@@ -329,6 +355,19 @@ def run_corpus(args):
     requirements = json.loads((CORPUS / 'requirements.json').read_text())
     binary_digest = sha(args.binary.read_bytes())
     revision = git('rev-parse', 'HEAD')
+    if args.compile_cache:
+        # Machine code compiled by one `i` process is reused by the next
+        # (ilang-host keys every entry by the Wasm bytes, the engine settings
+        # and the executable). The directory keeps the entries of one binary.
+        cache = Path(args.compile_cache).resolve()
+        stamp = cache / 'binary.sha256'
+        if cache.exists() and (not stamp.is_file() or stamp.read_text() != binary_digest):
+            shutil.rmtree(cache)
+        cache.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(binary_digest)
+        os.environ['ILANG_COMPILE_CACHE'] = str(cache)
+    else:
+        os.environ.pop('ILANG_COMPILE_CACHE', None)
     def comparable(outcome):
         # A killed child has no complete diagnostic/output to compare. Preserve
         # its raw partial output, but compare only its censored outcome.
@@ -421,7 +460,7 @@ def run_corpus(args):
             summary['checker-crash-or-timeout'] += 1
         if (n + 1) % 50 == 0:
             print(f'{n+1}/{len(cases)} {dict(summary)}', flush=True)
-    print(json.dumps({'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
+    print(json.dumps({**({'shard': '%d/%d' % args.shard} if args.shard else {}), 'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
     pool.shutdown()
     if failures:
         raise SystemExit(1)
@@ -696,6 +735,10 @@ def main():
     run.add_argument('--missing-only', action='store_true')
     run.add_argument('--keep-bounds', action='store_true', help='retain each saved observation budget during UPDATE=1')
     run.add_argument('--jobs', type=int, default=1)
+    run.add_argument('--compile-cache', default=str(ROOT / 'target/corpus-compile-cache'),
+                     help='directory of compiled code shared by the i processes; an empty value turns it off')
+    run.add_argument('--shard', type=shard, help='K/N: run only the cases whose index in ID order is K-1 modulo N')
+    run.add_argument('--list', action='store_true', help='print the selected case IDs and run nothing')
     sub.add_parser('parse-register')
     migration = sub.add_parser('migrate-k4')
     migration.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')

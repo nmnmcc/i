@@ -132,6 +132,23 @@ From this rule:
 
 One rule does not depend on lines: in the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `^`, `!`, `|`, `&`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
 
+`i fmt` formats `.i` and `.is` source files in their own surface, including
+both extensions by default in `src/`, `test/` and given directories;
+`--check` reports files that would change. Both surfaces use 80 columns. The
+normal surface indents with one tab per level. The Lisp surface is laid out
+by Lisp convention (cljfmt indentation): a datum that fits stays on one
+line; closing brackets never begin a line and are gathered at the end of the
+form's last line; indentation is with spaces. A broken block-like form (`=`,
+`->`, `|`, `.`, `@`, `:`, `!`) keeps its head and distinguished first parts
+on the head line and indents its body two spaces; another call either keeps
+its first argument on the head line and aligns the others under it, or puts
+its arguments under the head, one space in; `{`, `[` and `<<` align their
+parts under the first. Reader prefixes stay attached, strings are not split,
+comments keep their place (a line comment before closing brackets moves them
+to the next line), and at most one existing blank line separates top-level
+items. A single indivisible atom, string or comment may exceed the width.
+`i fmt --to is` uses that same layout.
+
 ## 2. Modules
 
 ### 2.1 Packages and modules
@@ -636,7 +653,7 @@ A **member** of a type (§4.4) is a type constructor, its type arguments, and a 
 
 ### 4.2 Built-in types
 
-These types may be used in every module:
+These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. The prelude custom types may be named through `i/prelude`.
 
 | Type | Values |
 |---|---|
@@ -1472,7 +1489,9 @@ The process module separates its capabilities as follows, keeping its existing o
 
 The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
-`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`; UDP is not in v1.
+`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`. UDP datagrams are part of `i/net`: `bind(address, port)` returns a private nominal `Datagram` over Int, `send_to(socket, address, port, bytes)` sends one datagram, and `receive_from(socket, max_bytes)` returns `(data: BitArray, address: String, port: Int)` with the numeric sender address and port. `local_address(socket)` and `local_port(socket)` return the bound numeric address and port; `close_datagram(socket)` closes it. Bind accepts IPv4, IPv6 and host names; port 0 asks the OS to choose a port. Send accepts a numeric address or host name and port 1..65535; addresses are resolved and tried in system order as for TCP. Receive requires a positive bound, capped at 65536 bytes; it consumes exactly one datagram and discards any excess bytes. An empty datagram is data, not EOF. Sends require whole bytes and are atomic; expected host failures give `NetError` values through the ordinary error axis. UDP provides no delivery or ordering guarantee.
+
+Datagrams follow TCP's resource identity, owner, creation guard, teardown and lease rules (native N9). One send and one receive may overlap; a second operation in the same direction gives `busy`. Close is idempotent and error-free and wakes a blocked receive with `closed` unless its answer already committed. Scope cancellation cancels an owned blocked receive and releases its lease, leaving the socket usable until close or entry teardown. The Rust host uses tokio and Node uses `node:dgram`; browser and WASI have no Net provider and compilation fails naming `i/net.Net`. No automatic unsupported provider is installed.
 
 ### 9.8 Keys
 
@@ -2180,8 +2199,13 @@ These ordinary functions use the services described in §9.7; their definitions 
 
 | Function | What it does |
 |---|---|
+| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). |
+| `send_to` | Send one datagram to an address and port. |
+| `receive_from` | Receive one datagram and its sender address and port. |
+| `local_address` | Read a datagram socket's numeric local address. |
+| `close_datagram` | Close a datagram socket. |
 | `listen` | Listen for TCP connections. |
-| `local_port` | Read the listener’s local port. |
+| `local_port` | Read a listener or datagram socket’s local port. |
 | `accept` | Accept a TCP connection. |
 | `connect` | Connect to a host and port. |
 | `resolve` | Resolve a host name to addresses. |
@@ -2513,6 +2537,8 @@ These names may be used in every module. Other names may cover them.
 These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/key` (§9.8), `i/task` (§9.9), `i/random` (§9.10), `i/request` (§9.11), `i/core` (§13), and `i/record` (§14) give the other names. The IO module list is extended with its service definitions.
 
 ## 13. The module `i/core`
+
+The module exports the built-in types `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`, `Record`, `Boundary`, `Continuation`, `Key`, `Keyed`, `Request`, and `Ticket`. These are the same types as the unqualified built-in names.
 
 These are normal functions: they are called, given, and compared like any other function. Only their bodies are not written in i. Most of them do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). Some, such as `index_of` and `bit_array_concat`, could be written in i, but the runtime does them much faster. They have no errors and need no environment.
 

@@ -272,6 +272,10 @@ impl<'a> Resolver<'a> {
         &self.p.module(m).path
     }
 
+    fn is_core(&self, m: ModuleId) -> bool {
+        self.p.module(m).package == self.graph.library && self.module_name(m) == "i/core"
+    }
+
     fn in_library(&self) -> bool {
         self.p.module(self.cur).package == self.graph.library
     }
@@ -1117,11 +1121,7 @@ impl<'a> Resolver<'a> {
         let path = format!("{}/{}", self.graph.packages[package].name, rest.join("/"));
         let written: Vec<&str> = item.path.iter().map(|p| p.name.as_str()).collect();
         let written = written.join("/");
-        let found = self
-            .by_path
-            .get(&(package, path))
-            .copied()
-            .filter(|&t| self.p.module(t).kind != ModuleKind::Prelude);
+        let found = self.by_path.get(&(package, path)).copied();
         let Some(target) = found else {
             self.error(
                 code::NO_MODULE,
@@ -1159,7 +1159,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn put_type(&mut self, scope: &mut Scope, name: &str, span: Span, t: TypeId) {
+    fn put_type(&mut self, scope: &mut Scope, name: &str, span: Span, t: TypeRef) {
         match scope.types.get(name) {
             Some((TypeRef::Custom(id), false))
                 if self.p.alias_patterns.iter().any(|p| p.binders.contains(id)) =>
@@ -1181,10 +1181,10 @@ impl<'a> Resolver<'a> {
                 format!("the type `{name}` is put in by more than one import"),
             ),
             None => {
-                scope
-                    .types
-                    .insert(name.to_string(), (TypeRef::Custom(t), true));
-                self.p.modules[self.cur.0 as usize].imported_types.push(t);
+                scope.types.insert(name.to_string(), (t, true));
+                if let TypeRef::Custom(id) = t {
+                    self.p.modules[self.cur.0 as usize].imported_types.push(id);
+                }
             }
         }
     }
@@ -1227,12 +1227,18 @@ impl<'a> Resolver<'a> {
             }
             return;
         }
+        if self.is_core(target)
+            && let Some(b) = BuiltinType::ALL.into_iter().find(|b| b.name() == n.name)
+        {
+            self.put_type(scope, &n.name, n.span, TypeRef::Builtin(b));
+            return;
+        }
         let ty = self.types_by_name[ti].get(&n.name).copied();
         let ctor = self.ctors_by_name[ti].get(&n.name).copied();
         let ty_ok = ty.filter(|t| self.p.ty(*t).exported);
         let ctor_ok = ctor.filter(|c| self.p.ty(c.ty).constructors_exported);
         if let Some(t) = ty_ok {
-            self.put_type(scope, &n.name, n.span, t);
+            self.put_type(scope, &n.name, n.span, TypeRef::Custom(t));
         }
         if let Some(c) = ctor_ok {
             self.put_value(scope, &n.name, n.span, Entry::Ctor(c));
@@ -1670,6 +1676,11 @@ impl<'a> Resolver<'a> {
             let target = self.module_of(m)?;
             let ti = target.0 as usize;
             let path = self.module_name(target).to_string();
+            if self.is_core(target)
+                && let Some(b) = BuiltinType::ALL.into_iter().find(|b| b.name() == name.name)
+            {
+                return Some(TypeRef::Builtin(b));
+            }
             return match self.types_by_name[ti].get(&name.name).copied() {
                 Some(t) if self.p.ty(t).exported || self.compiler_reference(m) => {
                     self.used_type(t, name.span);

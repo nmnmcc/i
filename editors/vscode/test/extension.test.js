@@ -84,6 +84,11 @@ test("starts `i lsp` from the configured path", async () => {
     { scheme: "file", language: "i-lisp" },
     { scheme: "untitled", language: "i-lisp" },
   ]);
+  // The server is told about changed and deleted modules of both surfaces.
+  assert.deepStrictEqual(
+    c.clientOptions.synchronize.fileEvents.map((w) => w.glob),
+    ["**/i.toml", "**/*.i", "**/*.is"],
+  );
 
   // A new path starts a new server.
   settings.path = "./target/debug/i";

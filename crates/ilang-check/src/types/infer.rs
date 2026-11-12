@@ -260,6 +260,7 @@ pub(crate) struct Checker<'a> {
     typed_depth: u16,
     typed_var_count: u32,
     typed_ty_var_count: u32,
+    pub(super) coverage: std::cell::RefCell<super::coverage::Searches>,
 }
 
 impl<'a> Checker<'a> {
@@ -327,6 +328,7 @@ impl<'a> Checker<'a> {
             typed_depth: 0,
             typed_var_count: p.var_count,
             typed_ty_var_count: p.ty_var_count,
+            coverage: Default::default(),
         }
     }
 
