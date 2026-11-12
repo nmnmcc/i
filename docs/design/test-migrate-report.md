@@ -138,3 +138,9 @@ No requested behavior remains deferred.
 
 The split runtime fixture initially used colliding `src/main.i` and `test/main.i`
 module paths (`error[E0624]`); its source helper is now `src/runtime.i`.
+
+The first full acceptance run found `hello_example_checks` feeding unexpanded
+macro tests to the core checker (`error[E0234]`). That checker-only example test
+now loads source without test modules; the CLI continues to execute both hello
+macro tests. This follows the same checker/expansion boundary as the runtime
+review fixture.

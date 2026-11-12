@@ -374,7 +374,14 @@ fn prelude_types() {
 #[test]
 fn hello_example_checks() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello");
-    let (graph, mut diags) = ilang_package::load(&dir);
+    // Macro tests run through the CLI's expansion pipeline; this checks source.
+    let (graph, mut diags) = ilang_package::load_with(
+        &dir,
+        &ilang_package::LoadOptions {
+            tests: false,
+            ..Default::default()
+        },
+    );
     let checked = ilang_check::check(&graph);
     diags.extend(checked.diags);
     assert!(diags.is_empty(), "{:#?}", graph.sources.render_all(&diags));
