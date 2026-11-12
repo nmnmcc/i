@@ -8,10 +8,10 @@
 )
 
 @external("test:math/v1", "add")
-add: (a: Int, b: Int) -> Int
+add: (Int, Int) -> Int
 
 @external("test:math/v1", "add")
-plus: (a: Int, b: Int) -> Int
+plus: (Int, Int) -> Int
 
 check = (c: Bool, what: String) {
 	c |> {

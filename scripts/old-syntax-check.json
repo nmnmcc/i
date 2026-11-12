@@ -108,6 +108,9 @@
   "crates/ilang-check/tests/types.rs:41a8b6c35fcc6353": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
   "crates/ilang-cli/src/main.rs:c6d9f1c6871f9ba9": {
     "not_source": "Host or test-runner diagnostic text"
   },

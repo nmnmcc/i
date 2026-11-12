@@ -4,5 +4,5 @@ run(E,N) = (body: () -> Nil ^ E ! N) { body() }
 S(N) { S(f: () -> Nil ! N, mark: (N) -> Nil) }
 use(N) = (s ! S(N)) { s.f() }
 
-main(N) = () { ! S(Dep) = S(() { get() }, (_: Dep) { Nil })
+main(N) = () { ! S(Dep) = S(f: () { get() }, mark: (_: Dep) { Nil })
 local = () { use() } local() }

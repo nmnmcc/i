@@ -33,18 +33,18 @@ AssertionFailure {
 }
 
 Assert {
-	Assert(fail: (failure: AssertionFailure) -> Never)
+	Assert(fail: (AssertionFailure) -> Never)
 }
 
 /// Stops the program with `panic: ` and the message (§11.7).
 @external("ilang:prelude", "panic")
-panic: (message: String) -> Never
+panic: (String) -> Never
 
 /// Reports a failure to `Assert` when `c` is `False` (§9.6).
 /// type: (c: Bool) -> Nil ! Assert
 assert = (c: Bool, a ! Assert) {
 	c |> {
 		True  -> Nil
-		False -> a.fail(AssertionFailure("assert"))
+		False -> a.fail(AssertionFailure(message: "assert"))
 	}
 }

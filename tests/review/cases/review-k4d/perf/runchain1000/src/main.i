@@ -1,6 +1,6 @@
 S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
 use(N) = (s ! S(N)) {
-  S(f, ..) = s
+  S(f = f, ..) = s
   f()
 }
 run(A, N) = (body: () -> A ! N) { body() }

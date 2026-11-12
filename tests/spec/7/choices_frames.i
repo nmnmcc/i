@@ -2,7 +2,7 @@
 // expect: stop "panic: inner choices"
 f = (s: String) -> Int {
     (a, b) = (1, 2)
-    ! Assert = Assert((_) { panic("inner choices") })
+    ! Assert = Assert(fail: (_) { panic("inner choices") })
     s |> { "a" | "c" -> a }
 }
 

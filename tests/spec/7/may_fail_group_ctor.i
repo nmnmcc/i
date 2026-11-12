@@ -14,6 +14,6 @@ pair = (No, () {
 
 
 main = () {
-	! Assert = Assert((_) { panic("caught group ctor") })
+	! Assert = Assert(fail: (_) { panic("caught group ctor") })
 	pair.1()
 }

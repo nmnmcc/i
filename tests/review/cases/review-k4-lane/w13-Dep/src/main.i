@@ -9,7 +9,7 @@ S(N) {
 }
 
 use(N) = (s ! S(N)) {
-	S(f, ..) = s
+	S(f = f, ..) = s
 	f()
 }
 
@@ -20,6 +20,6 @@ wrap = (body, svc) {
 
 
 main = () {
-	! Dep = Dep(7)
-	assert(wrap(() { use() }, S(() { get() }, (_: Dep) { Nil })) == 7)
+	! Dep = Dep(value: 7)
+	assert(wrap(() { use() }, S(f: () { get() }, m: (_: Dep) { Nil })) == 7)
 }

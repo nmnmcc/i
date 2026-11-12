@@ -8,7 +8,7 @@ needs_int = (s ! Sink(Int)) { s.put(1) }
 
 // Generalization must not turn the required Sink(Int) into Sink(Never).
 unsound = () {
-	! Sink(Never) = Sink((x: Never) { Nil })
+	! Sink(Never) = Sink(put: (x: Never) { Nil })
 	needs_int()
 }
 

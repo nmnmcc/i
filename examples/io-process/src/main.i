@@ -80,7 +80,7 @@ main = () {
 	})
 	assert(
 		fail.catch(() { process.wait(child) }) ==
-			Error(process.ProcessError("wait", "closed"))
+			Error(process.ProcessError(operation: "wait", code: "closed"))
 	)
 	assert(clock.monotonic_ns() - start < 2000000000)
 	start = clock.monotonic_ns()

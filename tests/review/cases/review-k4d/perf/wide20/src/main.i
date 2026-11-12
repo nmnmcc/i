@@ -1,101 +1,101 @@
 S0(N) { S0(f: () -> Int ! N, m: (N) -> Nil) }
 u0(N) = (s ! S0(N)) {
-  S0(f, ..) = s
+  S0(f = f, ..) = s
   f()
 }
 S1(N) { S1(f: () -> Int ! N, m: (N) -> Nil) }
 u1(N) = (s ! S1(N)) {
-  S1(f, ..) = s
+  S1(f = f, ..) = s
   f()
 }
 S2(N) { S2(f: () -> Int ! N, m: (N) -> Nil) }
 u2(N) = (s ! S2(N)) {
-  S2(f, ..) = s
+  S2(f = f, ..) = s
   f()
 }
 S3(N) { S3(f: () -> Int ! N, m: (N) -> Nil) }
 u3(N) = (s ! S3(N)) {
-  S3(f, ..) = s
+  S3(f = f, ..) = s
   f()
 }
 S4(N) { S4(f: () -> Int ! N, m: (N) -> Nil) }
 u4(N) = (s ! S4(N)) {
-  S4(f, ..) = s
+  S4(f = f, ..) = s
   f()
 }
 S5(N) { S5(f: () -> Int ! N, m: (N) -> Nil) }
 u5(N) = (s ! S5(N)) {
-  S5(f, ..) = s
+  S5(f = f, ..) = s
   f()
 }
 S6(N) { S6(f: () -> Int ! N, m: (N) -> Nil) }
 u6(N) = (s ! S6(N)) {
-  S6(f, ..) = s
+  S6(f = f, ..) = s
   f()
 }
 S7(N) { S7(f: () -> Int ! N, m: (N) -> Nil) }
 u7(N) = (s ! S7(N)) {
-  S7(f, ..) = s
+  S7(f = f, ..) = s
   f()
 }
 S8(N) { S8(f: () -> Int ! N, m: (N) -> Nil) }
 u8(N) = (s ! S8(N)) {
-  S8(f, ..) = s
+  S8(f = f, ..) = s
   f()
 }
 S9(N) { S9(f: () -> Int ! N, m: (N) -> Nil) }
 u9(N) = (s ! S9(N)) {
-  S9(f, ..) = s
+  S9(f = f, ..) = s
   f()
 }
 S10(N) { S10(f: () -> Int ! N, m: (N) -> Nil) }
 u10(N) = (s ! S10(N)) {
-  S10(f, ..) = s
+  S10(f = f, ..) = s
   f()
 }
 S11(N) { S11(f: () -> Int ! N, m: (N) -> Nil) }
 u11(N) = (s ! S11(N)) {
-  S11(f, ..) = s
+  S11(f = f, ..) = s
   f()
 }
 S12(N) { S12(f: () -> Int ! N, m: (N) -> Nil) }
 u12(N) = (s ! S12(N)) {
-  S12(f, ..) = s
+  S12(f = f, ..) = s
   f()
 }
 S13(N) { S13(f: () -> Int ! N, m: (N) -> Nil) }
 u13(N) = (s ! S13(N)) {
-  S13(f, ..) = s
+  S13(f = f, ..) = s
   f()
 }
 S14(N) { S14(f: () -> Int ! N, m: (N) -> Nil) }
 u14(N) = (s ! S14(N)) {
-  S14(f, ..) = s
+  S14(f = f, ..) = s
   f()
 }
 S15(N) { S15(f: () -> Int ! N, m: (N) -> Nil) }
 u15(N) = (s ! S15(N)) {
-  S15(f, ..) = s
+  S15(f = f, ..) = s
   f()
 }
 S16(N) { S16(f: () -> Int ! N, m: (N) -> Nil) }
 u16(N) = (s ! S16(N)) {
-  S16(f, ..) = s
+  S16(f = f, ..) = s
   f()
 }
 S17(N) { S17(f: () -> Int ! N, m: (N) -> Nil) }
 u17(N) = (s ! S17(N)) {
-  S17(f, ..) = s
+  S17(f = f, ..) = s
   f()
 }
 S18(N) { S18(f: () -> Int ! N, m: (N) -> Nil) }
 u18(N) = (s ! S18(N)) {
-  S18(f, ..) = s
+  S18(f = f, ..) = s
   f()
 }
 S19(N) { S19(f: () -> Int ! N, m: (N) -> Nil) }
 u19(N) = (s ! S19(N)) {
-  S19(f, ..) = s
+  S19(f = f, ..) = s
   f()
 }
 all = () { u0() + u1() + u2() + u3() + u4() + u5() + u6() + u7() + u8() + u9() + u10() + u11() + u12() + u13() + u14() + u15() + u16() + u17() + u18() + u19() }

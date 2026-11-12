@@ -13,12 +13,12 @@
 // host gives is checked with it.
 @host("test:async/v1", "async")
 Later {
-	Later(nan: () -> Float, echo: (text: String) -> String)
+	Later(nan: () -> Float, echo: (String) -> String)
 }
 
 @host("test:io/v1")
 Io {
-	Io(print: (text: String) -> Nil)
+	Io(print: (String) -> Nil)
 }
 
 take = (later ! Later, io ! Io) {
