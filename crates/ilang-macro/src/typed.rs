@@ -184,6 +184,7 @@ impl Expander for Driver {
                 &expr,
                 var_count,
                 ty_var_count,
+                &ilang_check::resolve::CheckedInputs::default(),
             )
             .map_err(|ds| {
                 ds.into_iter()
@@ -313,7 +314,91 @@ impl Expander for Driver {
         state.scoped.insert(module, scoped.clone());
         let mut parsed = self.parsed.clone();
         parsed[module.0 as usize].scoped = Some(scoped.clone());
-        let (mut expression, mut resolution) = ilang_check::resolve::typed_output(
+        let mut input_nodes = Vec::new();
+        let mut work = arguments.clone();
+        while let Some(s) = work.pop() {
+            work.extend(children(&s).iter().cloned());
+            input_nodes.push(s);
+        }
+        let mut original_nodes = HashMap::new();
+        for b in &program.module(module).bindings {
+            let mut e = b.binding.value.clone();
+            hir::visit_expr_mut(&mut e, &mut |e| {
+                original_nodes.insert(e.span, e.clone());
+                true
+            });
+        }
+
+        let mut checked = ilang_check::resolve::CheckedInputs::default();
+        let mut input_binders = HashMap::new();
+        for binding in &program.module(module).bindings {
+            for binder in hir::expression_binders(&binding.binding.value) {
+                input_binders.insert(binder.span, binder.var);
+            }
+        }
+        struct Inputs<'a> {
+            scoped: &'a ScopedSource,
+            inputs: &'a [Syntax],
+            query: &'a TypedMacroQuery,
+            originals: &'a HashMap<Span, hir::Expr>,
+            binders: &'a HashMap<Span, hir::VarId>,
+            caller: &'a Program,
+            module: ModuleId,
+            checked: &'a mut ilang_check::resolve::CheckedInputs,
+        }
+        impl Visitor for Inputs<'_> {
+            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
+                if enter
+                    && let Some(origin) = self.scoped.origin(e.span)
+                    && let Some(input) = self.inputs.iter().find(|s| s.same_input(&origin.syntax))
+                    && let Some(old) = self
+                        .query
+                        .input_span(input)
+                        .and_then(|span| self.originals.get(&span))
+                {
+                    self.checked.expressions.insert(e.span, old.clone());
+                }
+            }
+            fn span(&mut self, new: &mut Span) {
+                if let Some(origin) = self.scoped.origin(*new)
+                    && self
+                        .inputs
+                        .iter()
+                        .any(|input| input.same_input(&origin.syntax))
+                    && let Some((_, var)) = self.binders.iter().find(|(old, _)| {
+                        if let Some(original) = self
+                            .caller
+                            .module(self.module)
+                            .scoped
+                            .as_ref()
+                            .and_then(|s| s.origin(**old))
+                        {
+                            original.syntax.same_input(&origin.syntax)
+                        } else {
+                            **old == origin.syntax.span()
+                        }
+                    })
+                {
+                    self.checked.binders.insert(*new, *var);
+                }
+            }
+        }
+        syntax.clone().walk(&mut Inputs {
+            scoped: &scoped,
+            inputs: &input_nodes,
+            query: &query,
+            originals: &original_nodes,
+            binders: &input_binders,
+            caller: program,
+            module,
+            checked: &mut checked,
+        });
+        let holes = checked
+            .expressions
+            .values()
+            .map(|old| (old.span, old.span))
+            .collect();
+        let (expression, mut resolution) = ilang_check::resolve::typed_output(
             &self.graph,
             &parsed,
             program,
@@ -322,6 +407,7 @@ impl Expander for Driver {
             &syntax,
             var_count,
             ty_var_count,
+            &checked,
         )
         .map_err(|mut ds| {
             for d in &mut ds {
@@ -337,34 +423,6 @@ impl Expander for Driver {
             }
             ds
         })?;
-        let mut input_nodes = Vec::new();
-        let mut work = arguments.clone();
-        while let Some(s) = work.pop() {
-            work.extend(children(&s).iter().cloned());
-            input_nodes.push(s);
-        }
-        let mut original_nodes = HashMap::new();
-        for b in &program.module(module).bindings {
-            let mut e = b.binding.value.clone();
-            hir::visit_expr_mut(&mut e, &mut |e| {
-                original_nodes.insert(e.span, e.clone());
-                true
-            });
-        }
-        let mut holes = Vec::new();
-        hir::visit_expr_mut(&mut expression, &mut |e| {
-            if let Some(origin) = scoped.origin(e.span)
-                && let Some(input) = input_nodes.iter().find(|s| s.same_input(&origin.syntax))
-                && let Some(old) = query
-                    .input_span(input)
-                    .and_then(|span| original_nodes.get(&span))
-            {
-                holes.push((old.span, old.span));
-                *e = old.clone();
-                return false;
-            }
-            true
-        });
         struct Delayed<'a> {
             depth: usize,
             holes: &'a [(Span, Span)],

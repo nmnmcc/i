@@ -5,7 +5,6 @@ use super::{
     solve::{Pol, Solver},
 };
 use crate::hir::*;
-use ilang_package::Sources;
 use ilang_syntax::{
     lisp::{
         Datum, DatumKind,
@@ -14,14 +13,38 @@ use ilang_syntax::{
     span::Span,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::{
         Arc, Mutex, OnceLock,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
     },
 };
 
 static NEXT_SNAPSHOT: AtomicU64 = AtomicU64::new(1);
+#[derive(Clone)]
+pub(super) struct HandleArena {
+    id: u64,
+    next: Arc<AtomicU32>,
+    pub types: BTreeMap<u32, Ty>,
+}
+impl HandleArena {
+    pub fn new() -> Self {
+        Self {
+            id: NEXT_SNAPSHOT.fetch_add(1, Ordering::Relaxed),
+            next: Arc::new(AtomicU32::new(0)),
+            types: BTreeMap::new(),
+        }
+    }
+    fn intern(&mut self, t: &Ty) -> u32 {
+        if let Some((index, _)) = self.types.iter().find(|(_, old)| *old == t) {
+            return *index;
+        }
+        let index = self.next.fetch_add(1, Ordering::Relaxed);
+        assert!(index < 0x8000_0000, "typed handle identity space exhausted");
+        self.types.insert(index, t.clone());
+        index
+    }
+}
 type Parser = dyn Fn(&Syntax) -> Result<Type, String> + Send + Sync;
 pub struct TypedMacroQuery {
     pub(super) state: Mutex<QueryState>,
@@ -36,10 +59,9 @@ pub(super) struct QueryState {
     pub argument_order: Vec<u32>,
     pub substitution: HashMap<V, Ty>,
     observed: HashSet<V>,
-    pub handles: Vec<Ty>,
+    arena: HandleArena,
     answers: HashMap<u32, Syntax>,
     pub program: Arc<Program>,
-    pub sources: Sources,
     pub reads: super::value_types::Reads,
     pub tyvars: HashMap<TyVarId, Ty>,
     pub module: ModuleId,
@@ -191,6 +213,7 @@ impl TypedMacroQuery {
         fixed: HashSet<V>,
         span: Span,
         argument_types: &[Ty],
+        input_spans: &HashSet<Span>,
     ) -> Self {
         let mut observation = if let Ty::Fn(f) = &signature {
             f.as_ref().clone()
@@ -202,21 +225,21 @@ impl TypedMacroQuery {
             .extend(argument_types.iter().cloned().map(|t| (None, t)));
         let substitution = observe(&c.s, &signature, &fixed, Some(&observation));
         Self {
-            id: NEXT_SNAPSHOT.fetch_add(1, Ordering::Relaxed),
+            id: c.typed_handles.id,
             parser: OnceLock::new(),
             state: Mutex::new(QueryState {
                 solver: c.s.clone(),
                 signature,
                 expressions: expressions
                     .into_iter()
-                    .filter(|(s, _)| s.start >= span.start && s.end <= span.end)
+                    .filter(|(s, _)| input_spans.contains(s))
                     .collect(),
                 inputs: Vec::new(),
                 observed: variables(&Ty::Fn(Box::new(observation)))
                     .into_iter()
                     .collect(),
                 substitution,
-                handles: Vec::new(),
+                arena: c.typed_handles.clone(),
                 answers: HashMap::new(),
                 program: Arc::new(c.p.clone()),
                 fixed,
@@ -226,7 +249,6 @@ impl TypedMacroQuery {
                     .filter(|((m, _), _)| *m == c.module)
                     .map(|((_, s), t)| (*s, t.clone()))
                     .collect(),
-                sources: c.sources.clone(),
                 reads: c.reads.clone(),
                 tyvars: c.tyvars.clone(),
                 module: c.module,
@@ -356,10 +378,25 @@ impl TypedMacroQuery {
     }
     pub fn members(&self, syntax: &Syntax) -> Result<Vec<Syntax>, String> {
         let mut s = self.state.lock().expect("type query snapshot");
-        let t = self.read(&mut s, syntax)?;
+        let mut t = self.read(&mut s, syntax)?;
+        if variables(&t).is_empty() && !matches!(t, Ty::Graph(_)) {
+            let mut scratch = s.solver.clone();
+            scratch.freeze();
+            t = scratch.normalize_mode(t, super::solve::Mode::Value);
+            if !scratch.failures.is_empty() {
+                return Err("members needs a valid type".into());
+            }
+        }
         fn split(t: Ty, out: &mut Vec<Ty>) {
             match t {
                 Ty::Never => {}
+                Ty::Graph(g) if !g.record_only() => {
+                    if let Some(view) = g.view() {
+                        split(view, out);
+                    } else {
+                        out.push(Ty::Graph(g));
+                    }
+                }
                 Ty::Union(ts) => {
                     for t in ts {
                         split(t, out);
@@ -387,9 +424,9 @@ impl TypedMacroQuery {
         let mut work = vec![syntax];
         while let Some(node) = work.pop() {
             let stale = match node.node() {
-                Node::TypeView(h) => h.snapshot != self.id || h.index as usize >= s.handles.len(),
+                Node::TypeView(h) => h.snapshot != self.id || !s.arena.types.contains_key(&h.index),
                 _ => {
-                    matches!(node.scope_identity(),Some(ScopeIdentity::TypeVariable{variable,..}) if *variable>>32!=self.id || (*variable as u32) as usize>=s.handles.len())
+                    matches!(node.scope_identity(),Some(ScopeIdentity::TypeVariable{variable,..}) if *variable>>32!=self.id || !s.arena.types.contains_key(&(*variable as u32)))
                 }
             };
             if stale {
@@ -403,56 +440,17 @@ impl TypedMacroQuery {
             }
         }
         if let Node::TypeView(h) = syntax.node() {
-            if h.snapshot != self.id {
-                return Err("TypeView belongs to a different module-check snapshot".into());
-            }
-            return s
-                .handles
-                .get(h.index as usize)
-                .cloned()
-                .ok_or_else(|| "invalid TypeView handle".into());
+            return Ok(s.arena.types[&h.index].clone());
         }
         let ty = self
             .parser
             .get()
             .expect("typed runner installs its type parser")(syntax)?;
-        let mut invalid = false;
-        walk_type(&ty, &mut |t| {
-            invalid |= matches!(
-                t.kind,
-                TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. }
-            );
-        });
-        if invalid {
-            return Err("type query needs a correct type without _ or value-type reads".into());
-        }
-        let mut c = Checker::new(&s.program, &s.sources);
-        c.module = s.module;
-        c.s = s.solver.clone();
-        c.reads = s.reads.clone();
-        c.tyvars = s.tyvars.clone();
-        for (i, t) in s.handles.iter().enumerate() {
-            c.tyvars.insert(TyVarId(0x8000_0000 | i as u32), t.clone());
-        }
-        let t = c.conv(&ty, &HashMap::new());
-        if let Some(error) = c.diags.iter().find(|d| d.is_error()) {
-            return Err(error.message.clone());
-        }
-        if c.s.vars.len() != s.solver.vars.len() {
-            return Err(
-                "type query cannot introduce type variables or new fixation demands".into(),
-            );
-        }
-        Ok(t)
+        convert_query(s, &ty, &HashMap::new())
     }
+
     fn handle(&self, s: &mut QueryState, t: &Ty) -> u32 {
-        if let Some(i) = s.handles.iter().position(|x| x == t) {
-            i as u32
-        } else {
-            let i = s.handles.len() as u32;
-            s.handles.push(t.clone());
-            i
-        }
+        s.arena.intern(t)
     }
     fn syntax(&self, s: &mut QueryState, t: &Ty) -> Syntax {
         let scope = Scope {
@@ -684,7 +682,7 @@ impl TypedMacroQuery {
         expressions.sort_by_key(|(span, _)| (span.start, span.end));
         let mut roots = vec![s.signature.clone()];
         roots.extend(expressions.into_iter().map(|(_, ty)| ty.clone()));
-        roots.extend(s.handles.iter().cloned());
+        roots.extend(s.arena.types.values().cloned());
         let mut substitutions: Vec<_> = s.substitution.iter().collect();
         substitutions.sort_by_key(|(v, _)| v.0);
         roots.extend(substitutions.iter().map(|(_, t)| (*t).clone()));
@@ -710,15 +708,134 @@ impl TypedMacroQuery {
         fixed.sort_unstable();
         let mut observed: Vec<_> = s.observed.iter().map(|v| v.0).collect();
         observed.sort_unstable();
-        serde_json::json!({"version":1,"graph_bundle":serde_json::from_str::<serde_json::Value>(&graph).expect("scheme bundle JSON"),"fixed":fixed,"observed":observed,"substitutions":substitutions.iter().map(|(v,_)|v.0).collect::<Vec<_>>(),"handle_count":s.handles.len(),"variable_count":s.solver.vars.len()}).to_string()
+        serde_json::json!({"version":1,"graph_bundle":serde_json::from_str::<serde_json::Value>(&graph).expect("scheme bundle JSON"),"fixed":fixed,"observed":observed,"substitutions":substitutions.iter().map(|(v,_)|v.0).collect::<Vec<_>>(),"handle_indices":s.arena.types.keys().copied().collect::<Vec<_>>(),"variable_count":s.solver.vars.len()}).to_string()
     }
-    pub(crate) fn handles(&self) -> Vec<Ty> {
-        self.state
-            .lock()
-            .expect("type query snapshot")
-            .handles
-            .clone()
+    pub(super) fn arena(&self) -> HandleArena {
+        self.state.lock().expect("query snapshot").arena.clone()
     }
+}
+// Type queries denote sets. They do not create inference obligations or
+// residual variables while reading an intersection or difference.
+fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Result<Ty, String> {
+    let go = |t| convert_query(s, t, local);
+    Ok(match &t.kind {
+        TypeKind::Lit(lit) => Ty::literal(lit),
+        TypeKind::Var(v) => local
+            .get(v)
+            .or_else(|| s.tyvars.get(v))
+            .cloned()
+            .or_else(|| {
+                (v.0 & 0x8000_0000 != 0)
+                    .then(|| s.arena.types.get(&(v.0 & 0x7fff_ffff)).cloned())
+                    .flatten()
+            })
+            .ok_or_else(|| "type query refers to an unknown frozen variable".to_string())?,
+        TypeKind::Named { ty, args } => {
+            let args: Vec<_> = args.iter().map(go).collect::<Result<_, _>>()?;
+            if let TypeRef::Custom(id) = ty
+                && matches!(s.program.ty(*id).body, TypeBody::Alias(_))
+            {
+                let template = s
+                    .reads
+                    .templates
+                    .get(id)
+                    .ok_or_else(|| "type query needs an already completed alias".to_string())?;
+                if template.slots != template.params {
+                    return Err("type query alias contains an unspecified _".into());
+                }
+                template.apply(args, || {
+                    unreachable!("fully specified alias has no hole slots")
+                })
+            } else if *ty == TypeRef::Builtin(BuiltinType::Never) {
+                Ty::Never
+            } else {
+                Ty::named(*ty, args)
+            }
+        }
+        TypeKind::Tuple(parts) => Ty::tuple(parts.iter().map(go).collect::<Result<_, _>>()?),
+        TypeKind::Record {
+            base,
+            fields,
+            removed,
+        } => {
+            let labels = fields
+                .iter()
+                .map(|(label, _)| label)
+                .chain(removed)
+                .map(|label| super::records::written_label(label, s.solver.level))
+                .collect();
+            let fields = fields
+                .iter()
+                .map(|(label, t)| {
+                    Ok((super::records::written_label(label, s.solver.level), go(t)?))
+                })
+                .collect::<Result<_, String>>()?;
+            let record = s.solver.records.record(fields);
+            if let Some(base) = base {
+                let rest = s.solver.records.without(&go(base)?, labels);
+                s.solver.records.inter(&[rest, record])
+            } else {
+                record
+            }
+        }
+        TypeKind::Fn {
+            params,
+            ret,
+            err,
+            env,
+        } => Ty::Fn(Box::new(FnTy {
+            params: params
+                .iter()
+                .map(|p| Ok((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
+                .collect::<Result<_, String>>()?,
+            ret: go(ret)?,
+            err: err
+                .as_ref()
+                .map(|t| go(t))
+                .transpose()?
+                .unwrap_or(Ty::Never),
+            env: env
+                .as_ref()
+                .map(|t| go(t))
+                .transpose()?
+                .unwrap_or(Ty::Never),
+        })),
+        TypeKind::Union(parts) => {
+            let mut flat = Vec::new();
+            for part in parts {
+                let part = go(part)?;
+                super::solve::flatten_union(&[part], &mut flat);
+            }
+            let mut joined = super::solve::join_literals(flat);
+            joined.retain(|t| *t != Ty::Never);
+            if joined.iter().any(|t| matches!(t, Ty::Graph(_))) {
+                s.solver.records.union(&joined)
+            } else if joined.len() == 1 {
+                joined.pop().expect("one union member")
+            } else if joined.is_empty() {
+                Ty::Never
+            } else {
+                Ty::Union(joined)
+            }
+        }
+        TypeKind::Inter(parts) => Ty::Inter(parts.iter().map(go).collect::<Result<_, _>>()?),
+        TypeKind::Diff(parts) => {
+            let base = go(&parts[0])?;
+            let heads = parts[1..].iter().map(go).collect::<Result<Vec<_>, _>>()?;
+            let mut flattened = Vec::new();
+            super::solve::flatten_union(&heads, &mut flattened);
+            if flattened
+                .iter()
+                .any(|t| t.head().is_none() && *t != Ty::Never)
+            {
+                return Err("the right side of - needs members with a type constructor".into());
+            }
+            Ty::Diff(Box::new(base), flattened)
+        }
+        TypeKind::Hole | TypeKind::Error | TypeKind::Of { .. } => {
+            return Err("type query needs a correct type without _ or value-type reads".into());
+        }
+    })
 }
 pub(super) fn substitute(t: &Ty, sub: &HashMap<V, Ty>) -> Ty {
     super::alias::map_vars(t, &mut |v| sub.get(&v).cloned().unwrap_or(Ty::Var(v)))
@@ -947,10 +1064,13 @@ mod tests {
                 argument_order: Vec::new(),
                 substitution: HashMap::new(),
                 observed: HashSet::from([v]),
-                handles: vec![variable],
+                arena: {
+                    let mut arena = HandleArena::new();
+                    arena.intern(&variable);
+                    arena
+                },
                 answers: HashMap::new(),
                 program: Arc::new(Program::default()),
-                sources: Sources::default(),
                 reads: super::super::value_types::Reads::default(),
                 tyvars: HashMap::new(),
                 module: ModuleId(0),

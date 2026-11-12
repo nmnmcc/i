@@ -179,6 +179,7 @@ struct PendingTyped {
     span: Span,
     signature: Ty,
     argument_types: Vec<Ty>,
+    input_spans: HashSet<Span>,
     locals: HashMap<VarId, Scheme>,
     known: HashMap<VarId, Ty>,
 }
@@ -254,6 +255,7 @@ pub(crate) struct Checker<'a> {
     checked_holes: HashMap<Span, (Ty, Ty)>,
     expression_known: HashMap<(ModuleId, Span), Ty>,
     pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
+    pub(super) typed_handles: super::typed_macro::HandleArena,
     typed_generalized_roots: HashSet<super::V>,
     typed_depth: u16,
     typed_var_count: u32,
@@ -320,6 +322,7 @@ impl<'a> Checker<'a> {
             checked_holes: HashMap::new(),
             expression_known: HashMap::new(),
             expression_effects: HashMap::new(),
+            typed_handles: super::typed_macro::HandleArena::new(),
             typed_generalized_roots: HashSet::new(),
             typed_depth: 0,
             typed_var_count: p.var_count,
@@ -863,6 +866,7 @@ impl<'a> Checker<'a> {
                 fixed.clone(),
                 call.span,
                 &call.argument_types,
+                &call.input_spans,
             ));
             let output = match expander.expand(
                 crate::typed_macro::Invocation {
@@ -905,11 +909,16 @@ impl<'a> Checker<'a> {
             trial.numeric_handles = self.numeric_handles.clone();
             trial.numeric_param_handles = self.numeric_param_handles.clone();
             trial.expression_known = self.expression_known.clone();
+            trial.expression_effects = self.expression_effects.clone();
+            trial.query_binder_handles = self.query_binder_handles.clone();
             trial.label_declared_vars = self.label_declared_vars.clone();
             trial.label_key_slots = self.label_key_slots.clone();
             trial.label_key_values = self.label_key_values.clone();
-            for (i, t) in query.handles().into_iter().enumerate() {
-                trial.tyvars.insert(TyVarId(0x8000_0000 | i as u32), t);
+            trial.typed_handles = query.arena();
+            for (index, t) in &trial.typed_handles.types {
+                trial
+                    .tyvars
+                    .insert(TyVarId(0x8000_0000 | *index), t.clone());
             }
             trial.checked_holes = output
                 .holes
@@ -956,7 +965,10 @@ impl<'a> Checker<'a> {
             }
             trial.discharge_union_proofs();
             if !trial.pending_typed.is_empty() {
-                let nested_fixed = (0..boundary).map(|i| super::V(i as u32)).collect();
+                let nested_fixed = (0..boundary)
+                    .map(|i| super::V(i as u32))
+                    .chain(trial.typed_generalized_roots.iter().copied())
+                    .collect();
                 trial.expand_typed_calls(nested_fixed);
             }
             // Expansion diagnostics are attributed to the call; argument
@@ -991,6 +1003,7 @@ impl<'a> Checker<'a> {
                         note.clone(),
                     ));
                 }
+                self.typed_handles = trial.typed_handles;
                 self.out = trial.out;
                 self.numeric_handles = trial.numeric_handles;
                 self.numeric_param_handles = trial.numeric_param_handles;
@@ -2568,12 +2581,24 @@ impl<'a> Checker<'a> {
             }
         };
         if let Some(definition) = typed_definition {
+            let mut input_spans = HashSet::new();
+            for value in &values {
+                let mut e = (*value).clone();
+                visit_expr_mut(&mut e, &mut |e| {
+                    input_spans.insert(e.span);
+                    true
+                });
+                for binder in expression_binders(value) {
+                    input_spans.insert(binder.span);
+                }
+            }
             self.pending_typed.push(PendingTyped {
                 definition,
                 module: self.module,
                 span,
                 signature: typed_signature,
                 argument_types: typed_argument_types.expect("typed call arguments retained"),
+                input_spans,
                 locals: self.locals.clone(),
                 known: self.kvars.clone(),
             });

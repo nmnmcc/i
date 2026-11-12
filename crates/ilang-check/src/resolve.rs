@@ -46,6 +46,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         circular: HashSet::new(),
         pending: Vec::new(),
         reserved: Vec::new(),
+        checked_inputs: None,
     };
     r.create_modules();
     for m in 0..parsed.len() {
@@ -193,6 +194,7 @@ struct Resolver<'a> {
     circular: HashSet<TypeId>,
     pending: Vec<HashSet<NameKey>>,
     reserved: Vec<(usize, HashSet<NameKey>)>,
+    checked_inputs: Option<&'a CheckedInputs>,
 }
 
 fn is_upper(name: &str) -> bool {
@@ -2013,6 +2015,13 @@ impl<'a> Resolver<'a> {
                 },
             };
             if let Some(index) = handle {
+                if self.checked_inputs.is_none() {
+                    self.error(code::UNKNOWN_TYPE,t.span,"a frozen type handle is valid only during its module check's typed expansion");
+                    return Type {
+                        kind: TypeKind::Error,
+                        span: t.span,
+                    };
+                }
                 return Type {
                     kind: TypeKind::Var(TyVarId(0x8000_0000 | index)),
                     span: t.span,
@@ -3222,6 +3231,36 @@ impl<'a> Resolver<'a> {
 
     fn expr(&mut self, e: &ast::Expr) -> Expr {
         use ast::ExprKind as E;
+        if let Some(old) = self.checked_inputs.and_then(|c| c.expressions.get(&e.span)) {
+            let mut free = HashSet::new();
+            let mut tree = old.clone();
+            visit_expr_mut(&mut tree, &mut |e| {
+                if let ExprKind::Name(ValueRef::Local(v)) = e.kind {
+                    free.insert(v);
+                }
+                true
+            });
+            for binder in expression_binders(old) {
+                free.remove(&binder.var);
+            }
+            if free.iter().any(|v| {
+                !self.locals.iter().any(|frame| {
+                    frame.fn_only.is_none_or(|depth| self.fn_depth > depth)
+                        && frame.names.values().any(|w| w == v)
+                })
+            }) {
+                self.error(
+                    code::MACRO_RESERVED,
+                    e.span,
+                    "typed macro output cannot escape an argument binder",
+                );
+                return Expr {
+                    kind: ExprKind::Error,
+                    span: e.span,
+                };
+            }
+            return old.clone();
+        }
         if !self.p.typed_macros.is_empty()
             && matches!(
                 e.kind,
@@ -3575,7 +3614,11 @@ impl<'a> Resolver<'a> {
                         }
                         env_heads.push(head);
                     }
-                    let var = self.new_var();
+                    let var = self
+                        .checked_inputs
+                        .and_then(|c| c.binders.get(&name.span))
+                        .copied()
+                        .unwrap_or_else(|| self.new_var());
                     self.check_binder(&name.name, name.span, false, false);
                     self.param_name(&all, &name.name, name.span);
                     all.push(Binder {
@@ -3730,7 +3773,11 @@ impl<'a> Resolver<'a> {
         }
         let var = match shared.and_then(|s| s.get(&key)) {
             Some(v) => *v,
-            None => self.new_var(),
+            None => self
+                .checked_inputs
+                .and_then(|c| c.binders.get(&span))
+                .copied()
+                .unwrap_or_else(|| self.new_var()),
         };
         let b = Binder {
             var,
@@ -4472,6 +4519,11 @@ pub(crate) struct ExpansionNames {
     builtin_values: HashMap<String, Entry>,
     builtin_types: HashMap<String, TypeRef>,
 }
+#[derive(Default)]
+pub struct CheckedInputs {
+    pub expressions: HashMap<Span, Expr>,
+    pub binders: HashMap<Span, VarId>,
+}
 /// Resolve fresh output in the exact lexical scope captured before inference.
 #[allow(clippy::too_many_arguments)]
 pub fn typed_output(
@@ -4483,6 +4535,7 @@ pub fn typed_output(
     expression: &ast::Expr,
     var_count: u32,
     ty_var_count: u32,
+    checked: &CheckedInputs,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
     let names = original
         .expansion_names
@@ -4522,6 +4575,7 @@ pub fn typed_output(
         circular: HashSet::new(),
         pending: scope.pending.clone(),
         reserved: scope.reserved.clone(),
+        checked_inputs: Some(checked),
     };
     let result = r.expr(expression);
     if r.p.of_sites.len() != reads {

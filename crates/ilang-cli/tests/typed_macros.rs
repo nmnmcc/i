@@ -450,3 +450,71 @@ fn typed_macro_frozen_variable_is_legal_in_output_annotation() {
     )
     .unwrap();
 }
+
+#[test]
+fn typed_macro_members_accept_symbolic_difference_without_new_bounds() {
+    let m = declared(
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (= difference `(- ~t Int)) (| ((. syntax members) difference) { (-> [one] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"symbolic difference split\" value))) }) })",
+    );
+    checked(
+        &m,
+        "(m = app/macros)\nf = (x) { m.m(x) }\nmain = () { assert(f(42) == 42) }",
+    )
+    .unwrap();
+}
+
+#[test]
+fn typed_macro_forwarding_keeps_original_value_type_reads() {
+    checked(ID,"(m = app/macros)\nf = (x: Int) { m.identity(() -> x { x })() }\nmain = () { assert(f(42) == 42) }").unwrap();
+}
+#[test]
+fn typed_macro_argument_binder_cannot_escape() {
+    let m = declared(
+        "m (-> ((-> (Int) Int)) Int)",
+        "(-> (value) _ (| value { (-> `(-> (~parameter) ~ret {~body}) body) (-> _ value) }))",
+    );
+    reject(
+        &m,
+        "(m = app/macros)\nmain = () { m.m((x) { x }) }",
+        "cannot escape an argument binder",
+    );
+}
+#[test]
+fn typed_macro_partial_argument_rebuild_retains_original_binders() {
+    let m = declared(
+        "m (-> ((-> (Int) Int)) (-> (Int) Int))",
+        "(-> (value) _ (| value { (-> `(-> (~parameter) ~ret {~body}) `(-> (~parameter) ~ret {~body})) (-> _ value) }))",
+    );
+    checked(
+        &m,
+        "(m = app/macros)\nmain = () { f = m.m((x) { x }) assert(f(42) == 42) }",
+    )
+    .unwrap();
+}
+
+#[test]
+fn typed_macro_nested_queries_keep_parent_type_handles() {
+    let macros = r#"(, (= syntax (/ i syntax)))
+(, outer)
+(@ macro (: (outer A) (-> (A) A)))
+(@ macro (= outer (-> (value) _ {
+  (= t ((. syntax type_of) value))
+  `(inner { (= (: saved ~t) ~value) saved })
+})))
+(@ macro (: (inner A) (-> (A) A)))
+(@ macro (= inner (-> (value) _ (| value {
+  (-> `{ (= (: ~name ~annotation) ~arg) ~last }
+    { (= t ((. syntax type_of) arg))
+      (| ((. syntax subtype) annotation t) {
+        (-> (. syntax Yes) value)
+        (-> _ value) }) })
+  (-> _ value)
+}))))
+"#;
+    checked(
+        macros,
+        "(m = app/macros)\nf = (x) { m.outer(x) }\nmain = () { assert(f(42) == 42) }",
+    )
+    .unwrap();
+}

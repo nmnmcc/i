@@ -1075,3 +1075,79 @@ pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
         | ExprKind::Error => {}
     }
 }
+
+/// Binding identities introduced inside an expression, for checked-hole scope validation.
+pub fn expression_binders(expression: &Expr) -> Vec<Binder> {
+    fn pattern(p: &Pattern, out: &mut Vec<Binder>) {
+        match &p.kind {
+            PatternKind::Var(b) => out.push(b.clone()),
+            PatternKind::Typed { binder, .. } => out.extend(binder.iter().cloned()),
+            PatternKind::Named { binder, pattern: p } => {
+                out.push(binder.clone());
+                pattern(p, out);
+            }
+            PatternKind::Prefix { rest, .. } => out.extend(rest.iter().cloned()),
+            PatternKind::Quote { captures, .. } => {
+                for (_, p) in captures {
+                    pattern(p, out);
+                }
+            }
+            PatternKind::Constructor { args, .. }
+            | PatternKind::Tuple(args)
+            | PatternKind::Error(args) => {
+                for p in args {
+                    pattern(p, out);
+                }
+            }
+            PatternKind::List { items, rest } => {
+                for p in items {
+                    pattern(p, out);
+                }
+                if let Some(Some(b)) = rest {
+                    out.push(b.clone());
+                }
+            }
+            PatternKind::BitArray(segments) => {
+                for s in segments {
+                    pattern(&s.value, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    let mut e = expression.clone();
+    visit_expr_mut(&mut e, &mut |e| {
+        match &e.kind {
+            ExprKind::Fn(f) => {
+                for p in &f.params {
+                    match p {
+                        Param::Pattern { pattern: p, .. } => pattern(p, &mut out),
+                        Param::Env { var, name, .. } => out.push(Binder {
+                            var: *var,
+                            name: name.name.clone(),
+                            span: name.span,
+                        }),
+                    }
+                }
+            }
+            ExprKind::Block(b) => {
+                for s in &b.stmts {
+                    if let Stmt::Bind(b) = s {
+                        pattern(&b.pattern, &mut out);
+                    }
+                }
+            }
+            ExprKind::Case { clauses, .. } => {
+                for c in clauses {
+                    for p in &c.patterns {
+                        pattern(p, &mut out);
+                    }
+                }
+            }
+            _ => {}
+        }
+        true
+    });
+    out
+}
