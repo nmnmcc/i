@@ -4,6 +4,6 @@ app/main.shown : Shown
 app/main.far : app/deep/third.X
 app/main.hidden : () -> H
 app/main.local : () -> H
-app/other.mk : (n: Int) -> T
+app/other.mk : (n = Int) -> T
 app/other.far : () -> third.X
-src/main.i:33:1: error[E0227]: `hidden` is exported, but its inferred type uses the type `H` of this module, which is not exported (§2.4)
+src/main.i:29:1: error[E0227]: `hidden` is exported, but its inferred type uses the type `H` of this module, which is not exported (§2.4)

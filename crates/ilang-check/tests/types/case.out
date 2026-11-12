@@ -1,16 +1,16 @@
-digit : (x: 0 | 1) -> "one" | "zero"
-digit_or : (x: A) -> "other" | "zero"
-either : (r: Result(A, A)) -> A
-inner : (r: Result(A, B)) -> B | "one" | "other"
-swap : (t: (A, B)) -> (B, A)
-sum : (xs: List(Int)) -> Int
-sign : (n: Int) -> -1 | 0 | 1
-guarded_only : (x: A & 1) -> 1 | A - 1
-describe : (v: Int | String) -> String
-choice : (r: Result(A, A)) -> A
-mixed : (b: Bool) -> 1 | "no"
-named : (r: Result(A, B)) -> Result(A | 0, B)
-bad : (v: A) -> A
-first_one : (p: (A, B) | C - (_, B)) -> B | 0
-61:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-100:6: error[E0511]: in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)
+digit : (x = 0 | 1) -> "one" | "zero"
+digit_or : (x = A) -> "other" | "zero"
+either : (r = Result(A, A)) -> A
+inner : (r = Result(A, B)) -> B | "one" | "other"
+swap : (t = (A, B)) -> (B, A)
+sum : (xs = List(Int)) -> Int
+sign : (n = Int) -> -1 | 0 | 1
+guarded_only : (x = A & 1) -> 1 | A - 1
+describe : (v = Int | String) -> String
+choice : (r = Result(A, A)) -> A
+mixed : (b = Bool) -> 1 | "no"
+named : (r = Result(A, B)) -> Result(A | 0, B)
+bad : (v = A) -> A
+first_one : (p = (A, B) | C - (_, B)) -> B | 0
+22:40: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+37:28: error[E0511]: in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)

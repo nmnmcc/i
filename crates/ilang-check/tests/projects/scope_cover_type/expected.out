@@ -1,4 +1,3 @@
 src/n.i:7:5: error[E0207]: `m` is a local value here, not a module; a local name covers a module name (§2.3)
-src/n.i:12:4: error[E0207]: `m` is a local value here, not a module; a local name covers a module name (§2.3)
-src/n.i:13:11: error[E0207]: `m` is a local value here, not a module; a local name covers a module name (§2.3)
-src/n.i:23:5: error[E0207]: `m` is a local value here, not a module; a local name covers a module name (§2.3)
+src/n.i:13:17: error[E0207]: `m` is a local value here, not a module; a local name covers a module name (§2.3)
+src/n.i:24:5: error[E0207]: `m` is a local value here, not a module; a local name covers a module name (§2.3)

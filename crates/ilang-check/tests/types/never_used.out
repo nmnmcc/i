@@ -1,35 +1,35 @@
-after_all : (b: Bool) -> 1 | 2 | 3
-duplicate : (n: A) -> 1 | 2 | 3
-after_catch_all : (x: A) -> 1 | 2
-guarded_after : (b: Bool) -> 1 | 2
-guard_not_counted : (b: Bool) -> 1 | 2 | 3
-prefixes : (s: A) -> 1 | 2 | 3 | 4
-no_values : (v: Int) -> 1 | 2
-choices : (r: Result(A, B)) -> 1 | 2
-nested : (r: Result(Bool, Nil)) -> 1 | 2 | 3 | 4
-lists : (xs: List(A)) -> 0 | 1
-bits : (b: A) -> Int
-dead : (x: A) -> 1
-6:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-13:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-21:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-30:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-45:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-46:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-55:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-62:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-71:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-79:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-96:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+after_all : (b = Bool) -> 1 | 2 | 3
+duplicate : (n = A) -> 1 | 2 | 3
+after_catch_all : (x = A) -> 1 | 2
+guarded_after : (b = Bool) -> 1 | 2
+guard_not_counted : (b = Bool) -> 1 | 2 | 3
+prefixes : (s = A) -> 1 | 2 | 3 | 4
+no_values : (v = Int) -> 1 | 2
+choices : (r = Result(A, B)) -> 1 | 2
+nested : (r = Result(Bool, Nil)) -> 1 | 2 | 3 | 4
+lists : (xs = List(A)) -> 0 | 1
+bits : (b = A) -> Int
+dead : (x = A) -> 1
+2:62: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+4:37: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+6:43: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+10:47: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+17:27: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+17:42: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+21:47: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+23:50: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+26:66: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+29:54: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+35:32: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 2:1: warning[W0504]: top-level binding `after_all` is not used
-10:1: warning[W0504]: top-level binding `duplicate` is not used
-18:1: warning[W0504]: top-level binding `after_catch_all` is not used
-27:1: warning[W0504]: top-level binding `guarded_after` is not used
-34:1: warning[W0504]: top-level binding `guard_not_counted` is not used
-42:1: warning[W0504]: top-level binding `prefixes` is not used
-52:1: warning[W0504]: top-level binding `no_values` is not used
-59:1: warning[W0504]: top-level binding `choices` is not used
-66:1: warning[W0504]: top-level binding `nested` is not used
-75:1: warning[W0504]: top-level binding `lists` is not used
-84:1: warning[W0504]: top-level binding `bits` is not used
-93:1: warning[W0504]: top-level binding `dead` is not used
+4:1: warning[W0504]: top-level binding `duplicate` is not used
+6:1: warning[W0504]: top-level binding `after_catch_all` is not used
+10:1: warning[W0504]: top-level binding `guarded_after` is not used
+12:1: warning[W0504]: top-level binding `guard_not_counted` is not used
+16:1: warning[W0504]: top-level binding `prefixes` is not used
+21:1: warning[W0504]: top-level binding `no_values` is not used
+23:1: warning[W0504]: top-level binding `choices` is not used
+25:1: warning[W0504]: top-level binding `nested` is not used
+29:1: warning[W0504]: top-level binding `lists` is not used
+32:1: warning[W0504]: top-level binding `bits` is not used
+35:1: warning[W0504]: top-level binding `dead` is not used

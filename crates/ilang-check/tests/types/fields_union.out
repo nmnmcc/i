@@ -1,29 +1,29 @@
-name : (p: Cat | Dog) -> String
-value : (v: Num | Text) -> Int | String
-label : (p: Shape | Cat) -> String
-generic : (b: Box(Int) | Num) -> Int
-position : (p: Pair | Cat) -> String
-missing : (p: Cat | Rock) -> Never
-not_custom : (p: Cat | Int) -> Never
-opaque : (o: Opaque) -> Never
-no_known_type : (p: (name: A)) -> A
-known_ctor : (s: Shape) -> Float
-narrowed : (x: Cat | Rock) -> String
-make : (n: Int) -> Cat
+name : (p = Cat | Dog) -> String
+value : (v = Num | Text) -> Int | String
+label : (p = Shape | Cat) -> String
+generic : (b = Box(Int) | Num) -> Int
+position : (p = Pair | Cat) -> String
+missing : (p = Cat | Rock) -> Never
+not_custom : (p = Cat | Int) -> Never
+opaque : (o = Opaque) -> Never
+no_known_type : (p = (name = A)) -> A
+known_ctor : (s = Shape) -> Float
+narrowed : (x = Cat | Rock) -> String
+make : (n = Int) -> Cat
 from_call : () -> Int
-from_update : (c: Cat) -> Int
-local_call : (c: Cat | Dog) -> String
-apply : (f: (Cat | Dog) -> (name: A) ^ E ! N, c: Cat | Dog) -> A ^ E ! N
-each : (xs: List(A), f: (A) -> B) -> List(B)
-checked : (rocks: List(Rock)) -> List(Int)
-wrong : (rocks: List(Rock)) -> List(Int)
-part : (t: (Int, String) | (Float, Bool, Int)) -> String | Bool
-short : (t: (Int) | (Int, Int)) -> Never
-not_tuple : (t: (Int, Int) | Nil) -> Never
-41:16: error[E0512]: not every constructor of `Cat` has a field with the label `label` (§4.8 rule 13)
-58:31: error[E0512]: not every constructor of `Rock` has a field with the label `name` (§4.8 rule 13)
-60:33: error[E0512]: `.name` needs every member of the known type `Cat | Int` of its value to be a custom type (§6.7), but `Int` is not one
-62:26: error[E0512]: `Opaque` has no constructors, so its values have no fields
-106:14: error[E0501]: `Rock` is not a subtype of `Cat` (the type at 106:2 needs it)
-112:37: error[E0512]: the tuple has 1 part, so it has no part 1 (§6.4)
-114:39: error[E0512]: `.0` needs every member of the known type `(Int, Int) | Nil` of its value to be a tuple (§4.8 rule 13), but `Nil` is not one
+from_update : (c = Cat) -> Int
+local_call : (c = Cat | Dog) -> String
+apply : (f = (Cat | Dog) <- (Fail(E), ..N) -> (name = A), c = Cat | Dog) <- (Fail(E), ..N) -> A
+each : (xs = List(A), f = (A) -> B) -> List(B)
+checked : (rocks = List(Rock)) -> List(Int)
+wrong : (rocks = List(Rock)) -> List(Int)
+part : (t = (Int, String) | (Float, Bool, Int)) -> String | Bool
+short : (t = (Int) | (Int, Int)) -> Never
+not_tuple : (t = (Int, Int) | Nil) -> Never
+25:64: error[E0512]: not every constructor of `Cat` has a field with the label `label` (§4.8 rule 13)
+38:31: error[E0512]: not every constructor of `Rock` has a field with the label `name` (§4.8 rule 13)
+40:33: error[E0512]: `.name` needs every member of the known type `Cat | Int` of its value to be a custom type (§6.7), but `Int` is not one
+42:26: error[E0512]: `Opaque` has no constructors, so its values have no fields
+78:14: error[E0501]: `Rock` is not a subtype of `Cat` (the type at 78:2 needs it)
+84:37: error[E0512]: the tuple has 1 part, so it has no part 1 (§6.4)
+86:39: error[E0512]: `.0` needs every member of the known type `(Int, Int) | Nil` of its value to be a tuple (§4.8 rule 13), but `Nil` is not one
