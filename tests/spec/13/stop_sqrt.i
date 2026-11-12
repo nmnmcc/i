@@ -1,7 +1,7 @@
 // spec: 13, 11.3
 // expect: stop "float: result is not finite"
-// at: spec/main:11:14
-// at: spec/main:15:2
+// at: spec/main:10:14
+// at: spec/main:13:2
 (
 	i/core
 )

@@ -1,7 +1,7 @@
 // spec: B.2, B.5, 11.7
 // expect: stop "host: value is not correct"
-// at: spec/main:13:6
-// at: spec/main:19:2
+// at: spec/main:11:6
+// at: spec/main:16:2
 
 // The answer of an async function is checked with the frames of the call.
 @host("test:async/v1", "async")

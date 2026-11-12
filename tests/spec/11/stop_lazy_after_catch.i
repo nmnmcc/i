@@ -1,8 +1,8 @@
 // spec: 11.7, 9.4, 9.3
 // expect: stop "panic: after"
-// at: spec/main:36:3
-// at: spec/main:44:5
-// at: spec/main:48:18
+// at: spec/main:44:2
+// at: spec/main:51:3
+// at: spec/main:54:21
 (
 	i/control
 	i/core

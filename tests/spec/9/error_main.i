@@ -1,6 +1,6 @@
 // spec: 9.3, 10.2, 11.7
 // expect: stop "error: HttpError(500, 2)"
-// at: spec/main:20:1
+// at: spec/main:14:1
 (
 	i/fail
 )
