@@ -7,9 +7,9 @@
 )
 
 Found(A) = (A)
+
 Missing = ()
 Lookup(A) = Found(A) | Missing
-
 /// Makes a fresh identity key. A key's answer type is invariant.
 @external("ilang:key", "new")
 new: <A>() -> Key(A)

@@ -9,8 +9,8 @@
 )
 
 Proceed = (Keyed)
-StepAnswer = Proceed
 
+StepAnswer = Proceed
 Send = (Keyed)
 Receive = ()
 Command = Send | Receive

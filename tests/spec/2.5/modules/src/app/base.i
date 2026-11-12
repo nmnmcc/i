@@ -5,10 +5,10 @@
 )
 
 Red = ()
+
 Green = ()
 Blue = (level = Int)
 Color = Red | Green | Blue
-
 start = 40
 
 describe = (c: Color) {

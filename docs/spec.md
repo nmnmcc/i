@@ -1899,8 +1899,8 @@ constructor hidden, the error type below with its constructors, and these
 functions. The signatures describe bindings with bodies.
 
 ```i
-InvalidBound = (Int)
-InvalidPath = (List(Int))
+InvalidBound = { (Int) }
+InvalidPath = { (List(Int)) }
 RandomError = InvalidBound | InvalidPath
 ```
 
@@ -2279,7 +2279,7 @@ it is not a target-neutral foreign language feature.
 For example, an opaque type defined by a package needs no library rule:
 
 ```i
-Element = Opaque
+Element = { Opaque }
 @js("globalThis.document.body")
 body: Element
 ```
@@ -2761,16 +2761,17 @@ from the validated output; never re-infer the caller from its expansion.
 #### 15.7.4 Asking for types
 
 ```i
-Truth { Yes  No  NotKnown }
+Yes = ()
 
-Types {
-  Types(
-    type_of: (Syntax) -> Syntax ^ SyntaxError,
-    signature: () -> Syntax,
-    subtype: (Syntax, Syntax) -> Truth ^ SyntaxError,
-    members: (Syntax) -> List(Syntax) ^ SyntaxError,
-  )
-}
+No = ()
+NotKnown = ()
+Truth = Yes | No | NotKnown
+Types = (
+	type_of = (Syntax) <- (Fail(SyntaxError)) -> Syntax,
+	signature = () -> Syntax,
+	subtype = (Syntax, Syntax) <- (Fail(SyntaxError)) -> Truth,
+	members = (Syntax) <- (Fail(SyntaxError)) -> List(Syntax),
+)
 ```
 
 `Types` is a service type exported by `i/syntax`, with one function of `i/syntax` for each field, as `definition` is for `Definitions`. The compiler gives the service when it runs a typed macro.

@@ -1039,10 +1039,10 @@ The attribute adds request.Owner to callable fields (§5.2). Unwrapped wire
 results/errors obey §10.3; resources cross only as Int. Definitions include:
 
 ```i
-File = (Int)
-Listener = (Int)
-Stream = (Int)
-Child = (Int)
+File = { (Int) }
+Listener = { (Int) }
+Stream = { (Int) }
+Child = { (Int) }
 ```
 
 Each definition belongs to its respective module. Before resource IO, enforce

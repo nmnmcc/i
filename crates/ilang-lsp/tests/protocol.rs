@@ -565,7 +565,7 @@ fn completion_after_an_expression() {
 #[test]
 fn typed_macro_argument_completion_without_expansion() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "(m = app/macros)\nPoint { Point(x: Int, y: Int) }\nmain = () {\n  p = Point(1, 2)\n  m.broken(p.x)\n}\n";
+    let text = "(\n\tm = app/macros\n)\nPoint = (x = Int, y = Int)\nmain = () {\n\tp = Point(x = 1, y = 2)\n\tm.broken(p.x)\n}\n";
     let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: (broken A) (-> ((: value A)) A)))\n(@ macro (= broken (-> (value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
     package(
         dir.path(),

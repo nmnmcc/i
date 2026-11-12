@@ -11,9 +11,9 @@
 )
 
 Paused = (Continuation(Nil, Paused, Never, Never))
+
 Done = ()
 Paused = Paused | Done
-
 // A frame that waits inside `inner`, and one that waits outside it.
 in1 = (outer, inner) {
 	x = leaf(outer, inner)

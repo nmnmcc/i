@@ -1,11 +1,11 @@
-A = (f = Int)
-B = (g = String)
 // §7.5 with choices: `x` is known to be made by `C` only when every choice
 // binds `x` through `x = C(…)`. A choice that binds `x` as a catch-all, as
 // `x: T`, or as `x = _` may give it a value made by another constructor, so
 // every `.f` and record update below is a compile error (§6.7).
-T = A | B
+A = (f = Int)
 
+B = (g = String)
+T = A | B
 catch_all = (v: T) {
 	v |> (A(..) = x | x ? True) { x.f } | (_) { panic("unreachable") }
 }

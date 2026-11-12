@@ -1192,7 +1192,7 @@ have private constructors with one Int field, e.g. inside i/fs:
 	File
 )
 
-File = (Int)
+File = { (Int) }
 ```
 
 Raw resource services pass Int. No JS object or fd itself is an i IO resource.

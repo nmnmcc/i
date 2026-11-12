@@ -77,11 +77,11 @@
 )
 
 Debug = ()
+
 Info = ()
 Warning = ()
 Failure = ()
 Level = Debug | Info | Warning | Failure
-
 Entry = (
 	level = Level,
 	message = String,

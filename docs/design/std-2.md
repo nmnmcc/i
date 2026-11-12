@@ -812,7 +812,7 @@ this fix. The eventual positive regression must keep the unsafe-row negative
 case rejected:
 
 ```i
-Consumer(A) = ((A) -> Nil)
+Consumer(A) = { ((A) -> Nil) }
 
 bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }
 // Must reject: stored environments preserve exact service arguments.

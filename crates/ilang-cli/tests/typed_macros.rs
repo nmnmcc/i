@@ -120,7 +120,7 @@ fn typed_macro_labels_and_pipe() {
         "m (-> ((: left Int) (: right Int)) Int)",
         "(-> (x y) _ `(+ ~x ~y))",
     );
-    checked(&m,"(m = app/macros)\nmain = () { assert(m.m(right: 2, left: 1) == 3) assert({ 1 |> m.m(right: 2) } == 3) }").unwrap();
+    checked(&m,"(\n\tm = app/macros\n)\nmain = () {\n\tassert(m.m(right = 2, left = 1) == 3)\n\tassert({ 1 |> m.m(right = 2) } == 3)\n}").unwrap();
 }
 #[test]
 fn typed_macro_type_of_observes_literal() {
@@ -202,7 +202,7 @@ fn typed_macro_rejects_implementation_arity() {
 }
 #[test]
 fn typed_macro_forwarding_record_differential() {
-    let (_,c)=checked(ID,"(m = app/macros)\nf = (x: (a: Int, b: String)) { m.identity(x).a }\nmain = () { assert(f((a: 42, b: \"b\")) == 42) }").unwrap();
+    let (_,c)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x).a }\nmain = () { assert(f((a = 42, b = \"b\")) == 42) }").unwrap();
     assert_eq!(c.types.unwrap().typed_expansions.len(), 1);
 }
 #[test]
@@ -322,10 +322,10 @@ fn typed_macro_identity_principal_graph_differential() {
 }
 #[test]
 fn typed_macro_forwarding_principal_record_graph_differential() {
-    let (_,typed)=checked(ID,"(m = app/macros)\nf = (x: (a: Int, b: String)) { m.identity(x) }\nmain = () { f((a: 42, b: \"x\")) }").unwrap();
+    let (_,typed)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x) }\nmain = () { f((a = 42, b = \"x\")) }").unwrap();
     let (_, plain) = checked(
         ID,
-        "(m = app/macros)\nf = (x: (a: Int, b: String)) { x }\nmain = () { f((a: 42, b: \"x\")) }",
+        "(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { x }\nmain = () { f((a = 42, b = \"x\")) }",
     )
     .unwrap();
     same_principal(&typed, &plain, "f");
@@ -434,7 +434,7 @@ fn typed_macro_graph_members_keep_one_exact_record_graph() {
     );
     checked(
         &m,
-        "(m = app/macros)\nf = (x: (a: Int) | (b: String)) { m.m(x) }\nmain = () { f((a: 42)) }",
+        "(\n\tm = app/macros\n)\nf = (x: (a = Int) | (b = String)) { m.m(x) }\nmain = () { f((a = 42)) }",
     )
     .unwrap();
 }

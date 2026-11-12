@@ -10,9 +10,9 @@
 )
 
 Paused = (Continuation(Nil, Paused, Never, Never))
+
 Done = ()
 Paused = Paused | Done
-
 w1 = (b) {
 	x = w2(b)
 	x

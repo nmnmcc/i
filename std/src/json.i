@@ -27,6 +27,7 @@
 )
 
 Null = ()
+
 Boolean = (Bool)
 Integer = (Int)
 Number = (Float)
@@ -34,7 +35,6 @@ Text = (String)
 Array = (List(Json))
 Object = (List((String, Json)))
 Json = Null | Boolean | Integer | Number | Text | Array | Object
-
 JsonError = (offset = Int, reason = String)
 
 parse = (text: String) -> Result(Json, JsonError) {

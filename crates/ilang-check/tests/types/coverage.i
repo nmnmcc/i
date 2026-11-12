@@ -1,10 +1,10 @@
-Circle = (radius = Float)
-Square = (side = Float)
-Point = ()
 // §7.4: the clauses of a match must cover every value of the type of the
 // subject. A missing pattern is shown.
-Shape = Circle | Square | Point
+Circle = (radius = Float)
 
+Square = (side = Float)
+Point = ()
+Shape = Circle | Square | Point
 Flags = (admin = Bool, active = Bool)
 
 covered = (s: Shape) {

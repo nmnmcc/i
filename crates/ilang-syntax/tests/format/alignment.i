@@ -5,9 +5,9 @@ User = (
 	is_administrator = Bool,
 	created = Int,
 )
+
 Guest = ()
 User = User | Guest
-
 make = () {
 	user = User(
 		name = "a long name for the user",

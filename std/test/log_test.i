@@ -11,9 +11,9 @@
 )
 
 Sent = (log.Entry)
+
 Message = ()
 Event = Sent | Message
-
 Capture = (record = (Event) -> Nil)
 
 record = (event: Event) <- (capture: Capture) -> Nil { capture.record(event) }

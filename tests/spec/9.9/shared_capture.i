@@ -8,9 +8,9 @@
 )
 
 Tip(A) = (A)
+
 Node(A) = (Tree(A), Tree(A))
 Tree(A) = Tip(A) | Node(A)
-
 make = <A>(value: A, depth: Int) -> Tree(A) {
 	depth |>
 		(0) { Tip(value) }

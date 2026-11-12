@@ -58,7 +58,7 @@ from_outside = () {
 // An environment statement does not change which calls are in tail
 // position (§11.6). A million calls do not fit on the stack (32 MiB in the
 // Wasmtime host).
-count = (n, acc, name) {
+count = (n, acc, name: Name) {
 	n |> (0) { acc } | (_) { count(n - 1, acc + 1, name) } <- (name)
 }
 

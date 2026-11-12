@@ -1,8 +1,8 @@
-Circle = (radius = Float, label = String)
-Square = (side = Float, label = String)
 // §7.5: known constructors, used by `.f` and record updates (§6.7).
-Shape = Circle | Square
+Circle = (radius = Float, label = String)
 
+Square = (side = Float, label = String)
+Shape = Circle | Square
 // Inside a clause `C(…)`, the subject name is known to be made by `C`.
 radius = (s: Shape) { s |> (Circle(..)) { s.radius } | (Square(..)) { 0.0 } }
 

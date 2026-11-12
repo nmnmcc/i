@@ -859,8 +859,8 @@ fn two_types(w: &World, name: &str, api: &str) -> PathBuf {
         &[
             ("i.toml", "name = \"pub\"\n"),
             (".gitignore", "/build/\n"),
-            ("src/a.i", "(\n\tT(..)\n)\n\nT = (Int)\n"),
-            ("src/b.i", "(\n\tT(..)\n)\n\nT = (String)\n"),
+            ("src/a.i", "(\n\tT(..)\n)\n\nT = { (Int) }\n"),
+            ("src/b.i", "(\n\tT(..)\n)\n\nT = { (String) }\n"),
             ("src/api.i", api),
         ],
     );
@@ -876,11 +876,11 @@ fn two_types(w: &World, name: &str, api: &str) -> PathBuf {
 fn publish_compares_types_by_what_they_are_not_by_their_names() {
     let w = World::new();
     // A field whose type is another type of the same name.
-    let dir = two_types(&w, "field", "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = (a.T)\n");
+    let dir = two_types(&w, "field", "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = { (a.T) }\n");
     let (ok, out) = try_publish(
         &w,
         &dir,
-        &[("src/api.i", "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = (b.T)\n")],
+        &[("src/api.i", "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = { (b.T) }\n")],
         "1.0.1",
     );
     assert!(!ok, "{out}");
@@ -953,7 +953,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
             ("2.0.0", &[("i.toml", "name = \"dep\"\n"), ("src/v.i", &v2)]),
         ],
     );
-    let api = "(\n\tdep/v\n)\n\n(\n\tf\n\tW(..)\n)\n\nf = (x: v.V) { 1 }\n\nW = (v.V)\n";
+    let api = "(\n\tdep/v\n)\n\n(\n\tf\n\tW(..)\n)\n\nf = (x: v.V) { 1 }\n\nW = { (v.V) }\n";
     let dir = w.project(
         "pub",
         &[

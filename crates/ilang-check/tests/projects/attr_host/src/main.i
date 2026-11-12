@@ -1,8 +1,8 @@
 One = (f = () -> Nil)
+
 Other = (g = () -> Nil)
 @host("app:a/v1")
 Two = One | Other
-
 @host("app:a/v1")
 Unlabelled = (() -> Nil)
 

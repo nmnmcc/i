@@ -60,7 +60,7 @@ test("an_external_function_is_a_value", () {
 	)
 	f = add
 	check(
-		core.inspect(f(b = 1, a = 2)),
+		core.inspect(f(2, 1)),
 		"3",
 	)
 })

@@ -60,7 +60,7 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
     );
     bad("v=\"GET\"\nx:v=\"POST\"", code::TYPE_MISMATCH);
     bad(
-        "Box(A) = (A)\nv = Box(1)\nBox(Item) = v\nx: Item = 2",
+        "Box(A) = { (A) }\nv = Box(1)\nBox(Item) = v\nx: Item = 2",
         code::TYPE_MISMATCH,
     );
     bad(
@@ -168,7 +168,7 @@ fn j6_early_context_provenance_wins_over_literal_boundary_checks() {
         "v=1\nA=v\n@external(\"env\",\"f\")\nf:()->A",
         code::VALUE_TYPE_PLACE,
     );
-    bad("v = 1\nA = v\nT = (A)", code::VALUE_TYPE_PLACE);
+    bad("v = 1\nA = v\nT = { (A) }", code::VALUE_TYPE_PLACE);
     bad("v=1\nA=v\nf:()->Nil!A=(){Nil}", code::VALUE_TYPE_PLACE);
     // A scheme that already needs an environment can still be read normally.
     good("Env{Env}\nf=(e!Env){e}\ng:f=(e!Env){e}");
@@ -191,7 +191,7 @@ fn j7_invariant_scheme_reads_keep_fresh_instances_and_weak_sharing() {
 
 #[test]
 fn joint_queries_keep_full_literal_aliases_and_nested_head_targets() {
-    let source = "Box(A) = (A)\nv = Box(\"GET\")\nBox(Method) = v\nx: Method = \"GET\"";
+    let source = "Box(A) = { (A) }\nv = Box(\"GET\")\nBox(Method) = v\nx: Method = \"GET\"";
     let (g, c) = good(source);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");

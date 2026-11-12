@@ -11,9 +11,9 @@
 )
 
 Paused = (Continuation(Nil, Paused, Never, Never))
+
 Done = ()
 Paused = Paused | Done
-
 // Three frames that wait.
 f1 = (b) {
 	x = f2(b)

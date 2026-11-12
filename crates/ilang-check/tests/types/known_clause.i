@@ -1,11 +1,11 @@
-A = (f = Int, g = String)
-B = (h = Int)
 // §7.5: inside a clause `C(…)` on the subject name `v`, `v` is known to be
 // made by `C`. `.f` and a record update read the value through the pattern
 // type of the clause (rule 11), so the type of `v` is not changed outside
 // the clause: it keeps the values of the other clauses.
-T = A | B
+A = (f = Int, g = String)
 
+B = (h = Int)
+T = A | B
 S1 = (k = Int)
 S = S1
 

@@ -17,8 +17,8 @@
 )
 
 Pack(A) = (value = A, parts = (A, Int), read = () -> A)
-Secret(A) = Pack(A)
 
+Secret(A) = Pack(A)
 Left = (value = Int)
 Right = (value = Int)
 Choice = Left | Right

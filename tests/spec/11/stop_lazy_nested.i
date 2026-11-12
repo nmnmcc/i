@@ -16,9 +16,9 @@
 )
 
 Paused = (Continuation(Nil, Paused, Never, Never))
+
 Done = ()
 Paused = Paused | Done
-
 // Two frames that wait in the first computation.
 a1 = (b) {
 	x = a2(b)

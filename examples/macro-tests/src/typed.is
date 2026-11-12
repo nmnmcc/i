@@ -1,28 +1,29 @@
-// Ordinary library code: compile-time type dispatch, runtime conversion.
 (, (= syntax (/ i syntax)) (= fail (/ i fail)) (= core (/ i core)))
 (, to_text assert_eq)
-(= int_text (-> ((: value Int)) String {((. core inspect) value)}))
+(= int_text (-> (, (: value Int)) String ((. core inspect) value)))
 /// Convert an Int or String expression, checking its type at expansion time.
-(@ macro (: (to_text A) (-> ((: value A)) String)))
+(@ macro (: to_text (-> [A] (, A) String)))
 (@ macro
   (= to_text
-    (-> (value) _
+    (-> (, value) _
       {(= t ((. syntax type_of) value))
-       (| ((. syntax subtype) t `Int)
-         {(-> (. syntax Yes) `(int_text ~value))
-          (-> _
-            (| ((. syntax subtype) t `String)
-              {(-> (. syntax Yes) value)
-               (-> (. syntax NotKnown)
-                 ((. fail raise)
-                  ((. syntax SyntaxError)
-                   "typed to_text cannot choose inside a generic binding"
-                   value)))
-               (-> (. syntax No)
-                 ((. fail raise)
-                  ((. syntax SyntaxError)
-                   "typed to_text expects Int or String"
-                   value)))}))})})))
+       (|> ((. syntax subtype) t `Int)
+           (| (-> (, (. syntax Yes)) _ `(int_text ~value))
+             (-> (, _) _
+               (|>
+                ((. syntax subtype) t `String)
+                (| (-> (, (. syntax Yes)) _ value)
+                  (-> (, (. syntax NotKnown)) _
+                    ((. fail raise)
+                     ((. syntax SyntaxError)
+                      (= message
+                        "typed to_text cannot choose inside a generic binding")
+                      (= at value))))
+                  (-> (, (. syntax No)) _
+                    ((. fail raise)
+                     ((. syntax SyntaxError)
+                      (= message "typed to_text expects Int or String")
+                      (= at value)))))))))})))
 /// Compare two checked arguments using ordinary runtime assertion code.
-(@ macro (: (assert_eq A) (-> ((: left A) (: right A)) (! Nil Assert))))
-(@ macro (= assert_eq (-> (left right) _ {`(assert (== ~left ~right))})))
+(@ macro (: assert_eq (-> [A] (, A A) (<- Nil (, Assert)))))
+(@ macro (= assert_eq (-> (, left right) _ `(assert (== ~left ~right)))))

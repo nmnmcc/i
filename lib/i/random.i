@@ -17,11 +17,11 @@
 	at_path
 )
 
-Split = (Int, Int)
-Path = (Int, Int)
 // History is stored newest first. Each step keeps the preceding draw index.
-Step = Split | Path
+Split = (Int, Int)
 
+Path = (Int, Int)
+Step = Split | Path
 State = (Int, Int)
 
 Generator = (Int, State, List(Step), Int)

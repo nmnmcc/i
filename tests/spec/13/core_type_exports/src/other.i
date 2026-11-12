@@ -1,3 +1,8 @@
-((Int) = i/core)
-(identity)
+(
+	(Int) = i/core
+)
+
+(
+	identity
+)
 identity = (x: Int) -> Int { x }

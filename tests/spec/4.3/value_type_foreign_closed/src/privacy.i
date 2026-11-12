@@ -6,8 +6,8 @@
 )
 
 Hidden = (Int)
-Opaque = Hidden
 
+Opaque = Hidden
 value: Opaque = Hidden(1)
 
 Alias = value
