@@ -794,6 +794,9 @@ impl Cx<'_> {
     // ---- Statements ----
 
     fn binding(&mut self, b: &o::Binding) -> n::Binding {
+        if let Some(annotated) = annotated(b) {
+            return self.binding(&annotated);
+        }
         let saved = (self.vars.len(), self.absorbed.len());
         self.vars
             .extend(b.type_params.iter().map(|p| p.name.clone()));
@@ -839,16 +842,18 @@ impl Cx<'_> {
         if !kept.is_empty() {
             let generics: Vec<n::Ident> = kept.iter().map(|p| id(p)).collect();
             let mut placed = false;
-            if let n::ExprKind::Chain(fs) = &mut value.kind {
-                for f in fs {
-                    f.generics = generics.clone();
-                }
-                placed = true;
-            }
+            // On the written type when there is one (`id: <A>(A) -> A = …`),
+            // else on the function literal.
             if let n::PatternKind::Typed { ty, .. } = &mut pattern.kind
                 && let n::TypeKind::Fn(f) = &mut ty.kind
             {
-                f.generics = generics;
+                f.generics = generics.clone();
+                placed = true;
+            }
+            if !placed && let n::ExprKind::Chain(fs) = &mut value.kind {
+                for f in fs {
+                    f.generics = generics.clone();
+                }
                 placed = true;
             }
             if !placed {
@@ -2061,4 +2066,94 @@ fn type_names<'a>(t: &'a o::TypeExpr, out: &mut HashSet<&'a str>) {
     let mut all = Vec::new();
     all_type_names(t, &mut all);
     out.extend(all);
+}
+
+/// §7.3: "a written `! N` that is wider than what the body needs is kept as a
+/// type annotation on the binding". Without the checker the converter cannot
+/// compare, so it keeps the annotation where the need is certainly not the
+/// body's own: the written needs of the function have a row variable that a
+/// parameter's function type needs beside another service, which the
+/// function provides to that parameter (a handler or a generator). `f(A, N) = (g: () -> R ! X
+/// | N) -> T ! N { … }` becomes `f: <A, N>(() <- (X, ..N) -> R) <- N -> T =
+/// (g) { … }`.
+fn annotated(b: &o::Binding) -> Option<o::Binding> {
+    let o::PatternKind::Var(name) = &b.pattern.kind else {
+        return None;
+    };
+    let o::ExprKind::Fn(f) = &b.value.kind else {
+        return None;
+    };
+    let ret = f.ret.as_ref()?;
+    let env = ret.env.as_ref()?;
+    let mentions = |t: &o::TypeExpr, v: &str| format!("{t:?}").contains(&format!("name: {v:?}"));
+    let row = b
+        .type_params
+        .iter()
+        .find(|p| mentions(env, &p.name))?;
+    let mut types = Vec::new();
+    let mut params = Vec::new();
+    let mut provides = false;
+    for p in &f.params {
+        let o::Param::Pattern(o::Pattern {
+            kind: o::PatternKind::Typed { binder, ty },
+            span,
+        }) = p
+        else {
+            return None;
+        };
+        // The parameter needs a service besides the row: the function
+        // provides it (`body: () -> Nil ! Yield(A) | N`).
+        if let o::TypeKind::Fn { env: Some(inner), .. } = &ty.kind
+            && let o::TypeKind::Union(members) = &inner.kind
+            && members.len() >= 2
+            && mentions(inner, &row.name)
+        {
+            provides = true;
+        }
+        types.push(o::FnParamType {
+            label: None,
+            ty: ty.clone(),
+        });
+        let kind = if binder.discard {
+            o::PatternKind::Discard(binder.name.clone())
+        } else {
+            o::PatternKind::Var(binder.name.clone())
+        };
+        params.push(o::Param::Pattern(o::Pattern { kind, span: *span }));
+    }
+    if !provides {
+        return None;
+    }
+    let ty = o::TypeExpr {
+        kind: o::TypeKind::Fn {
+            params: types,
+            ret: Box::new(ret.value.clone()),
+            err: ret.err.clone().map(Box::new),
+            env: Some(Box::new(env.clone())),
+        },
+        span: b.value.span,
+    };
+    Some(o::Binding {
+        pattern: o::Pattern {
+            kind: o::PatternKind::Typed {
+                binder: o::Binder {
+                    name: name.clone(),
+                    discard: false,
+                    span: b.pattern.span,
+                },
+                ty,
+            },
+            span: b.pattern.span,
+        },
+        value: o::Expr {
+            kind: o::ExprKind::Fn(Box::new(o::Function {
+                params,
+                ret: None,
+                body: f.body.clone(),
+            })),
+            span: b.value.span,
+        },
+        span: b.span,
+        type_params: b.type_params.clone(),
+    })
 }
