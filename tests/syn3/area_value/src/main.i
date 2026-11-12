@@ -11,7 +11,13 @@ area =
 
 fs = [area]
 
+/// The type as it is written (§2.4).
+typed: List({ (Float) | (Float, Float) } -> Float) = [area]
+
+/// One shape with a label: the label is part of the type.
+scale = (x: Int, by = k: Int) -> Int { x * k }
+
 main = () <- (io: Io) {
-	_ = fs
+	_ = (fs, typed, scale(2, by = 3))
 	io.print("made")
 }

@@ -135,17 +135,27 @@ today's calls have no labels, so the shape is `positional(args.len())`, which
 is the `n` the back end already has at each of the 11 sites. The arguments
 are passed in canonical order.
 
-In the type checker, a multi-shape type is used where a one-shape function
-type is wanted (`{ (Int) | (Int, Int) } -> R <: (Int) -> R`) at one place:
-`Solver::constrain_fn_data` (`crates/ilang-check/src/types/groups.rs`), called by `constrain_in` for two function types, when the left one is multi-shape
-(`groups::is_multi`) and the right one is not. Stage 9 reports the temporary
-error `E0551` there ("a multi-shape function value can only be called
-directly by its name until the run time has multi-shape values"). **Stage 10
-lifts it by deleting that one `self.fail(…)` line** (marked `syn3-stage10` in
-`crates/ilang-check/src/types/groups.rs`); the constraint beside it (argument
-data against the member of the call's shape, results, needs) is already
-there. After that every closure call site can receive a `$multi` and needs
-the slow path of §6.4.
+In the type checker (`FnTy` has one data parameter since stage 7), a
+multi-shape function type is a `FnTy` whose `param` is a union of data of
+several shapes, or data of one shape with labels (`groups::is_multi`). It is
+used where a one-shape function type is wanted
+(`{ (Int) | (Int, Int) } -> R <: (Int) -> R`) by the ordinary rule
+`constrain(g.param, f.param)`. Stage 9 reports the temporary error `E0551`
+("a multi-shape function value can only be called directly by its name until
+the run time has multi-shape values") at two places, both marked
+`syn3-stage10`:
+
+- `Solver::multi_to_one_shape` in `crates/ilang-check/src/types/groups.rs`
+  (called by `constrain_in` for two function types): the one `self.fail(…)`;
+- the call rule in `crates/ilang-check/src/types/infer.rs` (`fn call`, the
+  arm for a callee whose type is itself a multi-shape function type): the one
+  `self.error(code::MULTI_VALUE_CALL, …)`.
+
+**Stage 10 lifts the error by deleting those two statements**; the
+constraints beside them are already the final ones. After that every closure
+call site can receive a `$multi` and needs the slow path of §6.4. The fixture
+`tests/syn3/multi_value_call` expects the error today; with stage 10 it
+becomes a running fixture (`f(2.0)` prints `12.0`).
 
 ## 6. What stage 10 does not need from the checker
 
