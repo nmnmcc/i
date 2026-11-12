@@ -785,9 +785,9 @@ pub struct SitePos {
 pub struct Program {
     /// Numeric code generation; reference lowering is the O0 oracle.
     pub numeric: crate::Numeric,
-    /// Facts for fresh local definitions, keyed by stable source function name.
+    /// Facts for fresh local definitions, keyed by code identity.
     pub numeric_locals: std::collections::HashMap<
-        String,
+        FuncId,
         std::collections::HashMap<Local, ilang_check::types::NumericFact>,
     >,
     /// Label bytes, by LabelConst. Labels are numbered, never WAT names.

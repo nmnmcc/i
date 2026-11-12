@@ -20,7 +20,9 @@ keeps the semantic IR and all control walkers on canonical values; explicit
 raw reads and materialization are generated at emission. This is the conservative
 interpretation of R1/R7 for this step, without extending continuation storage.
 Multi-definition locals remain Value, so branch-local facts cannot rewrite
-another incoming definition. Float parameters still arrive as eqref and are
+another incoming definition. Fact lookup uses `FuncId`, not debug names; changing
+all IR function names to the same text leaves executable WAT unchanged, covered
+by a regression test. Float parameters still arrive as eqref and are
 unboxed inside the reference entry using final checker facts. Every result and
 tail-call result convention remains eqref.
 

@@ -435,3 +435,46 @@ fn nonnumeric_emission_and_optimization_are_byte_equal() {
         }
     }
 }
+
+#[test]
+fn representation_facts_follow_code_identity_not_debug_names() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"identity\"\n[wasm]\nexports = [\"identity/functions.floating\", \"identity/functions.integer\"]\n").unwrap();
+    std::fs::write(dir.path().join("src/functions.i"), "(floating, integer)\nfloating = (x: Float) -> Float { x +. 1.0 }\ninteger = (x: Int) -> Int { x + 1 }\n").unwrap();
+    let (graph, diagnostics) = ilang_package::load(dir.path());
+    assert!(diagnostics.is_empty());
+    let checked = ilang_check::check(&graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error)
+    );
+    let mut ir = ilang_wasm::lower::lower(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        Options::default(),
+    )
+    .unwrap();
+    ir.numeric = Numeric::Scalars;
+    let before = ilang_wasm::emit::wat(&ir);
+    for function in &mut ir.funcs {
+        if let ilang_wasm::ir::FuncKind::Code(function) = function {
+            function.name = "same debug name".into();
+        }
+    }
+    let after = ilang_wasm::emit::wat(&ir);
+    let without_comments = |text: &str| {
+        text.lines()
+            .filter(|line| !line.trim_start().starts_with(";;"))
+            .map(|line| format!("{line}\n"))
+            .collect::<String>()
+    };
+    assert_eq!(
+        without_comments(&before),
+        without_comments(&after),
+        "debug names must not decide parameter/local representations"
+    );
+}

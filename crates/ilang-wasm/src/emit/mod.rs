@@ -108,7 +108,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         e.join(i as JoinId);
     }
     if let Some(start) = &p.start {
-        e.code("$start", start);
+        e.code("$start", start, None);
     }
     e.start();
     e.exports();
@@ -303,7 +303,7 @@ impl<'p> Emitter<'p> {
     fn func(&mut self, id: FuncId, f: &FuncKind) {
         let name = format!("$f{}", id.0);
         match f {
-            FuncKind::Code(func) => self.code(&name, func),
+            FuncKind::Code(func) => self.code(&name, func, Some(id)),
             // A constructor or a library function used as a value has a
             // frame too, so that it takes the tail site of a tail call
             // (§11.7).
@@ -358,11 +358,11 @@ impl<'p> Emitter<'p> {
         self.out.push('\n');
     }
 
-    fn code(&mut self, name: &str, f: &Func) {
+    fn code(&mut self, name: &str, f: &Func, id: Option<FuncId>) {
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
         self.header(name, f.arity, &f.locals);
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
-            numeric::Plan::for_func(f, self.p.numeric_locals.get(&f.name))
+            numeric::Plan::for_func(f, id.and_then(|id| self.p.numeric_locals.get(&id)))
         } else {
             numeric::Plan::default()
         };

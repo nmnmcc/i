@@ -1045,7 +1045,7 @@ impl<'a> Lowerer<'a> {
                 self.program.module(d.module).path,
                 self.program.def(d).name
             );
-            let func = self.function(b.module, f, &[], name);
+            let func = self.function(b.module, f, &[], name, id);
             self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         }
         self.out.constants = self.constants.iter().copied().collect();
@@ -2248,6 +2248,7 @@ impl<'a> Lowerer<'a> {
         f: &Function,
         captures: &[VarId],
         name: String,
+        id: FuncId,
     ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
@@ -2303,7 +2304,7 @@ impl<'a> Lowerer<'a> {
                 Param::Env { .. } => None,
             })
             .fold(block_values(&f.body), usize::max);
-        self.out.numeric_locals.insert(name.clone(), fx.numeric);
+        self.out.numeric_locals.insert(id, fx.numeric);
         Func {
             name,
             arity,
@@ -2784,7 +2785,7 @@ impl<'a> Lowerer<'a> {
         let captures = captures_of(f);
         let id = self.new_func();
         let name = format!("{}:fn{}", self.program.module(fx.module).path, id.0);
-        let func = self.function(fx.module, f, &captures, name);
+        let func = self.function(fx.module, f, &captures, name, id);
         self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         let mut atoms = Vec::new();
         let mut later = Vec::new();
