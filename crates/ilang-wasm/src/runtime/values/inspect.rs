@@ -178,12 +178,6 @@ pub fn wat() -> String {
         (br $next)))
     (call $string_concat (call $list_reverse (call $list_cons {{bits_close}} (local.get $out)))))
 
-  ;; The shapes with labels (syntax-3.md §6.4), by `id - 2^32`: each is the
-  ;; number of positions (an i31) and then the labels, in canonical order.
-  (global $shape_table (mut (ref null $values)) (ref.null $values))
-  (func $shapes_install (param $table (ref $values))
-    (global.set $shape_table (local.get $table)))
-
   ;; The parameter data of a function of the shape `shape`, `(a, b, port = c)`,
   ;; put in front of the reversed list `out`. Key i is named by the letter
   ;; a + (i mod 26), then i div 26 when i >= 26; a label key is written
@@ -192,15 +186,15 @@ pub fn wat() -> String {
     (local $n i32) (local $total i32) (local $i i32) (local $entry (ref null $values))
     (local.set $n (i32.wrap_i64 (local.get $shape)))
     (local.set $total (local.get $n))
+    ;; A shape with labels is `set << 32 | n`, its labels set `set` of
+    ;; `$shape_labels` (syntax-3.md §6.4).
     (if (i64.ge_u (local.get $shape) (i64.const 4294967296))
       (then
         (local.set $entry (ref.cast (ref $values) (array.get $values
-          (ref.as_non_null (global.get $shape_table))
-          (i32.wrap_i64 (i64.sub (local.get $shape) (i64.const 4294967296))))))
-        (local.set $n (i31.get_u (ref.cast (ref i31)
-          (array.get $values (ref.as_non_null (local.get $entry)) (i32.const 0)))))
-        (local.set $total (i32.sub (i32.add (local.get $n)
-          (array.len (ref.as_non_null (local.get $entry)))) (i32.const 1)))))
+          (ref.as_non_null (global.get $shape_labels))
+          (i32.sub (i32.wrap_i64 (i64.shr_u (local.get $shape) (i64.const 32))) (i32.const 1)))))
+        (local.set $total (i32.add (local.get $n)
+          (array.len (ref.as_non_null (local.get $entry)))))))
     (local.set $out (call $list_cons {{fn_paren}} (local.get $out)))
     (block $done
       (loop $next
@@ -209,7 +203,7 @@ pub fn wat() -> String {
         (if (i32.ge_u (local.get $i) (local.get $n))
           (then
             (local.set $out (call $list_cons (array.get $values (ref.as_non_null (local.get $entry))
-              (i32.add (i32.sub (local.get $i) (local.get $n)) (i32.const 1))) (local.get $out)))
+              (i32.sub (local.get $i) (local.get $n))) (local.get $out)))
             (local.set $out (call $list_cons {{label_eq}} (local.get $out)))))
         (local.set $out (call $list_cons
           (call $string_from_bytes (array.new_fixed $bytes 1
@@ -236,8 +230,7 @@ pub fn wat() -> String {
         (br_if $done (i32.ge_u (local.get $i) (array.len (ref.as_non_null (local.get $groups)))))
         (if (local.get $i) (then (local.set $out (call $list_cons {{fn_bar}} (local.get $out)))))
         (local.set $out (call $inspect_params
-          (struct.get $obj 2 (ref.cast (ref $obj)
-            (array.get $values (ref.as_non_null (local.get $groups)) (local.get $i))))
+          (array.get $shapes (struct.get $multi 8 (ref.cast (ref $multi) (local.get $obj))) (local.get $i))
           (local.get $out)))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $next)))

@@ -1136,24 +1136,6 @@ impl<'p> Emitter<'p> {
             names.len(),
             names.join(" ")
         );
-        if !self.p.shapes.is_empty() {
-            let mut entries = Vec::new();
-            for shape in &self.p.shapes {
-                let labels: Vec<String> = shape.labels.iter().map(|l| self.string(l)).collect();
-                entries.push(format!(
-                    "(array.new_fixed $values {} (ref.i31 (i32.const {})) {})",
-                    labels.len() + 1,
-                    shape.positions,
-                    labels.join(" ")
-                ));
-            }
-            let _ = writeln!(
-                self.out,
-                "(call $shapes_install (array.new_fixed $values {} {}))",
-                entries.len(),
-                entries.join(" ")
-            );
-        }
         if self.p.site_notes.iter().any(Option::is_some) {
             assert_eq!(self.p.site_notes.len(), self.p.sites.len());
             let notes: Vec<String> = self

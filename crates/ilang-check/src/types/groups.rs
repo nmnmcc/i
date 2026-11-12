@@ -17,7 +17,7 @@
 //! [`Solver::constrain_fns`] become the one rule
 //! `constrain(g.param, f.param)`.
 
-use super::solve::{FailKind, Solver};
+use super::solve::Solver;
 use super::{FnTy, ShapeId, Ty};
 
 /// The label that marks the one parameter of a multi-shape function type.
@@ -74,13 +74,7 @@ impl Solver {
     /// `f <: g` for two function types of which one at least is
     /// multi-shape: the parameter data of `g` goes to `f`. The results and
     /// the needs are constrained by the caller.
-    pub(super) fn constrain_fn_data(&mut self, f: &FnTy, g: &FnTy, l: &Ty, r: &Ty) {
-        if is_multi(f) && !is_multi(g) {
-            // syn3-stage10: a multi-shape value is called, or goes where a
-            // function of one shape is wanted. The run time cannot call it
-            // yet; delete this failure when it can.
-            self.fail(FailKind::MultiCall, l, r);
-        }
+    pub(super) fn constrain_fn_data(&mut self, f: &FnTy, g: &FnTy) {
         self.constrain(&param_data(g), &param_data(f));
     }
 }

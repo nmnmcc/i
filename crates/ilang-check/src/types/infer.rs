@@ -1047,12 +1047,6 @@ impl<'a> Checker<'a> {
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
             ),
-            FailKind::MultiCall => (
-                code::MULTI_VALUE_CALL,
-                format!(
-                    "a multi-shape function value `{l}` can only be called directly by its name until the run time has multi-shape values; here a function `{r}` is wanted"
-                ),
-            ),
             FailKind::Arity => (
                 code::FN_ARITY,
                 format!("the function types `{l}` and `{r}` have different numbers of parameters"),

@@ -1403,7 +1403,6 @@ fn definite_failure(solver: &Solver) -> bool {
                 FailKind::Mismatch
                     | FailKind::Values
                     | FailKind::Arity
-                    | FailKind::MultiCall
                     | FailKind::Invariant
                     | FailKind::EnvForms
             )

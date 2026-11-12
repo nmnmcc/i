@@ -113,9 +113,6 @@ pub(crate) enum FailKind {
     EnvForms,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
-    /// A multi-shape function value where a function of one shape is
-    /// wanted. Temporary, until the run time has multi-shape values.
-    MultiCall,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -965,7 +962,7 @@ impl Solver {
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
                 if super::groups::is_multi(f) || super::groups::is_multi(g) {
-                    self.constrain_fn_data(f, g, l, r);
+                    self.constrain_fn_data(f, g);
                 } else if f.params.len() != g.params.len() {
                     self.fail(FailKind::Arity, l, r);
                     return;

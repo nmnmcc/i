@@ -272,20 +272,16 @@ impl Op {
 }
 
 /// The run-time id of a shape of argument data (syntax-3.md §6.4): `n` for
-/// `n` positions, and [`LABELLED_SHAPES`] plus the index in
-/// [`Program::shapes`] for a shape with labels. A closure keeps the id of its
-/// shape in field 2 of its `$clo{n}`; a multi-shape value keeps one per group.
+/// `n` positions; for a shape with labels, `set << 32 | n`, where `set` is the
+/// index of its label set as data has it ([`Program::shapes`], from 1), so
+/// every such id is at least 2^32. A closure keeps the id of its shape in
+/// field 2 of its `$clo{n}`; a multi-shape value keeps one per group.
 pub type ShapeId = u64;
 
-/// The first id of a shape with labels.
-pub const LABELLED_SHAPES: ShapeId = 1 << 32;
-
-/// A shape with labels: the number of positions and the labels, sorted by
-/// their UTF-8 bytes. Its keys are the positions, then the labels.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Shape {
-    pub positions: u32,
-    pub labels: Vec<String>,
+/// The id of the shape of `positions` positions and the label set `set`
+/// (0 for none).
+pub fn shape_id(positions: u32, set: u32) -> ShapeId {
+    (ShapeId::from(set) << 32) | ShapeId::from(positions)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -838,8 +834,6 @@ pub struct Program {
     /// tuples and is not listed here, so set `i` is `shapes[i - 1]`.
     pub shapes: Vec<Vec<String>>,
     pub funcs: Vec<FuncKind>,
-    /// The shapes with labels, by `id - LABELLED_SHAPES` (syntax-3.md §6.4).
-    pub shapes: Vec<Shape>,
     /// The functions whose parameter data has labels, with their shape. Every
     /// other function of `n` parameters has the shape of `n` positions.
     pub func_shapes: std::collections::BTreeMap<FuncId, ShapeId>,
@@ -878,32 +872,22 @@ pub struct Program {
 }
 
 impl Program {
-    /// The id of the shape of `positions` positions and these labels,
-    /// interned in [`Program::shapes`] when it has labels.
+    /// The id of the shape of `positions` positions and these labels; the
+    /// label set is interned in [`Program::shapes`].
     pub fn shape(&mut self, positions: u32, labels: &[String]) -> ShapeId {
         if labels.is_empty() {
             return ShapeId::from(positions);
         }
         let mut labels = labels.to_vec();
         labels.sort_unstable_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
-        let shape = Shape { positions, labels };
-        let index = match self.shapes.iter().position(|s| *s == shape) {
+        let index = match self.shapes.iter().position(|s| *s == labels) {
             Some(i) => i,
             None => {
-                self.shapes.push(shape);
+                self.shapes.push(labels);
                 self.shapes.len() - 1
             }
         };
-        LABELLED_SHAPES + index as ShapeId
-    }
-
-    /// The number of keys of a shape: the parameters of its functions.
-    pub fn shape_keys(&self, id: ShapeId) -> u32 {
-        if id < LABELLED_SHAPES {
-            return id as u32;
-        }
-        let s = &self.shapes[(id - LABELLED_SHAPES) as usize];
-        s.positions + s.labels.len() as u32
+        shape_id(positions, index as u32 + 1)
     }
 
     /// The shape of a function used as a value.
