@@ -21,6 +21,7 @@
 
 (
 	Client(..)
+	Transport(..)
 	ResponseStream
 	native_client
 	fetch_client
@@ -1176,8 +1177,18 @@ ResponseStream = (
 	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
 )
 
-Client {
-	Client(
+ClientFunctions = (
+	stream: (
+		req: Request
+	) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	send: (
+		req: Request
+	) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+)
+
+Transport {
+	Transport(
 		stream: (
 			req: Request
 		) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
@@ -1188,47 +1199,65 @@ Client {
 	)
 }
 
+Client {
+	Client(
+		make: () -> Transport ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	)
+}
+
 native_client = (n ! net.Net, t ! tls.Tls) {
-	provider = network_client()
-	Client(stream: (req) {
-		! net.Net = n
-		! tls.Tls = t
-		res = provider.send(req)
-		cursor = task.ref(res.body)
-		(head: res, read: (max) {
-			{ max <= 0 } |> {
-				True  -> fail.raise(Protocol("invalid read size"))
-				False -> Nil
-			}
-			task.update(cursor, (body) {
-				size = bit_array.byte_size(body)
-				count = { max < size } |> {
-					True  -> max
-					False -> size
+	Client(make: () {
+		provider = network_client()
+		Transport(stream: (req) {
+			! net.Net = n
+			! tls.Tls = t
+			res = provider.send(req)
+			cursor = task.ref(res.body)
+			(head: res, read: (max) {
+				{ max <= 0 } |> {
+					True  -> fail.raise(Protocol("invalid read size"))
+					False -> Nil
 				}
-				body |> {
-					<<part:bytes(count), rest:bits>> -> (rest, part)
-					_                                -> panic("http: invalid buffered body extent")
-				}
-			})
-		}, close: () { Nil })
-	}, send: (req) {
-		! net.Net = n
-		! tls.Tls = t
-		// Keep the raw service bindings across suspension (spec 9.4).
-		res = provider.send(req)
-		res
-	}, close: () {
-		! net.Net = n
-		! tls.Tls = t
-		closed = provider.close()
-		closed
+				task.update(cursor, (body) {
+					size = bit_array.byte_size(body)
+					count = { max < size } |> {
+						True  -> max
+						False -> size
+					}
+					body |> {
+						<<part:bytes(count), rest:bits>> -> (rest, part)
+						_                                -> panic("http: invalid buffered body extent")
+					}
+				})
+			}, close: () { Nil })
+		}, send: (req) {
+			! net.Net = n
+			! tls.Tls = t
+			// Keep the raw service bindings across suspension (spec 9.4).
+			res = provider.send(req)
+			res
+		}, close: () {
+			! net.Net = n
+			! tls.Tls = t
+			closed = provider.close()
+			closed
+		})
 	})
 }
 
-client = (c ! Client) { (send: c.send, close: c.close) }
+client = (
+	c ! Client
+) -> ClientFunctions ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
+	t = c.make()
+	(stream: t.stream, send: t.send, close: t.close)
+}
 
-send = (req: Request, c ! Client) { c.send(req) }
+send = (
+	req: Request
+) -> Response ^ HttpError ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
+	provider = client()
+	resource.ensure(() { provider.send(req) }, provider.close)
+}
 
 fetch_error = (code: String) {
 	string.split(code, ":") |> {
@@ -1292,28 +1321,35 @@ fetch_stream = (req: Request, f ! fetch.Fetch) {
 }
 
 fetch_client = (f ! fetch.Fetch) {
-	Client(stream: (req) {
-		! fetch.Fetch = f
-		// Keep Fetch across suspension; task services still come from the caller.
-		reader = fetch_stream(req)
-		reader
-	}, send: (req) {
-		! fetch.Fetch = f
-		reader = fetch_stream(req)
-		resource.ensure(() {
-			h = reader.head
-			Response(
-				h.status
-				h.reason
-				h.headers
-				collect_body(reader, [])
-				h.trailers
-			)
-		}, reader.close)
-	}, close: () { Nil })
+	Client(make: () {
+		Transport(stream: (req) {
+			! fetch.Fetch = f
+			// Keep Fetch across suspension; task services still come from the caller.
+			reader = fetch_stream(req)
+			reader
+		}, send: (req) {
+			! fetch.Fetch = f
+			reader = fetch_stream(req)
+			resource.ensure(() {
+				h = reader.head
+				Response(
+					h.status
+					h.reason
+					h.headers
+					collect_body(reader, [])
+					h.trailers
+				)
+			}, reader.close)
+		}, close: () { Nil })
+	})
 }
 
-send_stream = (req: Request, c ! Client) { c.stream(req) }
+send_stream = (
+	req: Request
+) -> ResponseStream ^ HttpError ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
+	provider = client()
+	resource.ensure(() { provider.stream(req) }, provider.close)
+}
 
 /// A provider is a record containing a send function, so callers can replace it.
 network_client = () {
@@ -1376,9 +1412,16 @@ pool_take = (
 	}
 }
 
-get = (url: String) { send(request(Method("GET"), url)) }
+get = (
+	url: String
+) -> Response ^ HttpError ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
+	send(request(Method("GET"), url))
+}
 
-post = (url: String, body: BitArray) {
+post = (
+	url: String
+	body: BitArray
+) -> Response ^ HttpError ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
 	send(Request(Method("POST"), url, Headers([]), body, Headers([])))
 }
 

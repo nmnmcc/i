@@ -6,6 +6,13 @@ fn uses(p: &Program, namespace: &str) -> bool {
         .iter()
         .any(|x| x.kind == ImportKind::WasiAdapter && x.module == namespace)
 }
+pub(super) fn start(p: &Program) -> &'static str {
+    if uses(p, "i:clock/v1") {
+        "(call $wa_clock_start)"
+    } else {
+        ""
+    }
+}
 pub(super) fn teardown(p: &Program) -> &'static str {
     if uses(p, "i:fs/v1") {
         "(call $wa_fs_teardown)"
@@ -116,6 +123,7 @@ pub(super) fn runtime(p: &Program) -> String {
         s,
         &[
             ("invalid", "invalid"),
+            ("range", "range"),
             ("closed", "closed"),
             ("denied", "denied"),
             ("not_found", "not_found"),
@@ -169,17 +177,30 @@ const COMMON: &str = r#"
  (if (i64.ne (i64.and (call $bits_len64 (local.get $b)) (i64.const 7)) (i64.const 0)) (then (call $wa_fail {{invalid}}))))
 "#;
 const CLOCK: &str = r#"
+(global $wa_clock_origin (mut i64) (i64.const 0))
+(global $wa_clock_origin_error (mut i32) (i32.const 0))
+(func $wa_clock_start
+ (local $p i32)
+ (local.set $p (call $alloc (i32.const 8)))
+ (global.set $wa_clock_origin_error (call $wa_raw_clock_time_get (i32.const 1) (i64.const 1) (local.get $p)))
+ (if (i32.eqz (global.get $wa_clock_origin_error)) (then (global.set $wa_clock_origin (i64.load (local.get $p)))))
+ (call $free (local.get $p) (i32.const 8)))
 (func $wa_time (param $clock i32) (result eqref)
  (local $p i32) (local $e i32) (local $r eqref)
+ (if (i32.eq (local.get $clock) (i32.const 1)) (then (call $wa_errno (global.get $wa_clock_origin_error))))
  (local.set $p (call $alloc (i32.const 8)))
  (local.set $e (call $wa_raw_clock_time_get (local.get $clock) (i64.const 1) (local.get $p)))
- (if (i32.eqz (local.get $e)) (then (local.set $r (call $wa_u64_load (local.get $p)))))
+ (if (i32.eqz (local.get $e)) (then
+  (if (i32.eq (local.get $clock) (i32.const 1)) (then (i64.store (local.get $p) (i64.sub (i64.load (local.get $p)) (global.get $wa_clock_origin)))))
+  (local.set $r (call $wa_u64_load (local.get $p)))))
  (call $free (local.get $p) (i32.const 8)) (call $wa_errno (local.get $e)) (local.get $r))
 (func $wa_clock_monotonic_ns (result eqref) (call $wa_time (i32.const 1)))
 (func $wa_clock_unix_ns (result eqref) (call $wa_time (i32.const 0)))
 (func $wa_clock_sleep_ns (param $ns eqref) (result eqref)
  (local $duration i64) (local $start i64) (local $elapsed i64) (local $p i32) (local $e i32)
- (local.set $duration (call $wa_uint (local.get $ns) (i64.const 9223372036854775807)))
+ (if (i32.lt_s (call $int_sign (local.get $ns)) (i32.const 0)) (then (call $wa_fail {{invalid}})))
+ (if (i32.gt_s (call $int_compare (local.get $ns) (call $int_from_i64 (i64.const 9223372036854775807))) (i32.const 0)) (then (call $wa_fail {{range}})))
+ (local.set $duration (call $int_to_i64 (local.get $ns)))
  ;; subscription[48], event[32], count[4]. Recheck the monotonic deadline:
  ;; preview-1 runners may round relative timeout precision down.
  (local.set $p (call $alloc (i32.const 84))) (memory.fill (local.get $p) (i32.const 0) (i32.const 84))
@@ -189,7 +210,6 @@ const CLOCK: &str = r#"
  (i32.store offset=16 (local.get $p) (i32.const 1))
  (i64.store offset=32 (local.get $p) (i64.const 1))
  (block $done (loop $wait
-  (br_if $done (i64.ge_u (local.get $elapsed) (local.get $duration)))
   (i64.store offset=24 (local.get $p) (i64.sub (local.get $duration) (local.get $elapsed)))
   (local.set $e (call $wa_raw_poll_oneoff (local.get $p) (i32.add (local.get $p) (i32.const 48)) (i32.const 1) (i32.add (local.get $p) (i32.const 80))))
   (br_if $done (local.get $e))
@@ -199,6 +219,7 @@ const CLOCK: &str = r#"
   (local.set $e (call $wa_raw_clock_time_get (i32.const 1) (i64.const 1) (i32.add (local.get $p) (i32.const 48))))
   (br_if $done (local.get $e))
   (local.set $elapsed (i64.sub (i64.load offset=48 (local.get $p)) (local.get $start)))
+  (br_if $done (i64.ge_u (local.get $elapsed) (local.get $duration)))
   (br $wait)))
  (call $free (local.get $p) (i32.const 84)) (call $wa_errno (local.get $e)) (ref.null eq))
 "#;

@@ -31,8 +31,11 @@ for (const opt of [0, 2]) {
       await mkdir(join(dir, 'src'));
       await writeFile(join(dir, 'i.toml'), 'name = "app"\n');
       await writeFile(join(dir, 'src/main.i'), `
-(i/process, i/stdio, i/core, i/fail, i/fs)
+(i/process, i/stdio, i/core, i/fail, i/fs, i/clock)
 main = () {
+ clock.sleep_ns(0)
+ assert(fail.catch(() { clock.sleep_ns(-1) }) == Error(clock.ClockError("sleep_ns", "invalid")))
+ assert(fail.catch(() { clock.sleep_ns(core.shift_left(1, 100)) }) == Error(clock.ClockError("sleep_ns", "range")))
  assert(process.args() == ["alpha", "beta"])
  assert(process.env("I_WASI_TEST") == "value")
  assert(core.bit_size(process.entropy(32)) == 256)

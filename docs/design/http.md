@@ -57,8 +57,10 @@ most that many bytes, with empty bytes at EOF. The fetch provider delivers
 chunks incrementally as ReadableStream data arrives; the native provider
 exposes its buffered response through the same interface. Always close the
 reader, preferably through resource.ensure; the run context also owns fetch
-responses and closes them on teardown. Native Client instances share their
-connection pool across calls during an entry invocation.
+responses and closes them on teardown. Each native client() instance shares its connection pool across its own calls
+in the task run where it was created. The entry Client service captures only
+transport services; its make function creates the per-client pool in the
+caller's task run.
 
 Fetch uses the host's redirect and decompression policy, visible headers,
 CORS and forbidden-header restrictions; trailers are empty. Non-2xx status

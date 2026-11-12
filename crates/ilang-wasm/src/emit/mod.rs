@@ -207,7 +207,8 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         if let Some(entry) = &p.entry {
             let _ = writeln!(
                 m,
-                "(func (export \"_start\") (call $ilang_start) (call $entry_{}) {})",
+                "(func (export \"_start\") (call $ilang_start) {} (call $entry_{}) {})",
+                wasi::start(p),
                 export_id(entry),
                 wasi::teardown(p)
             );

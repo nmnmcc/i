@@ -8,7 +8,8 @@ Implemented:
 
 - `i deps --project examples/http-get --target js` selects
   std/http.fetch_client and i/fetch.Fetch, with no Net/Tls service. Native and
-  Node defaults capture Net/Tls and retain the native connection pool.
+  Node defaults capture Net/Tls; Client.make creates each native client pool
+  in its caller's task run. No task reference is captured at entry provisioning.
 - `http.get`, post, send and send_timeout use that ordinary Client service.
   Fetch sends method/URL/headers/body and provides status, visible headers,
   whole bodies and incremental send_stream readers. AbortController follows
@@ -71,11 +72,22 @@ Failures found and fixed during implementation:
   timeouts; the adapter now rechecks the monotonic deadline.
 - `provider target host ... app/main.S: UnknownModule`: macro compilation
   must discard all packages' runtime defaults, not only root/library plans.
+- `panic: task: handle of another run` in std/http_network_test.network_client:
+  defer pool creation to Client.make in the caller's task run. The provider
+  itself captures transport services only.
+- Reverse-order inference exposed noncanonical inferred callback-row display;
+  explicit closed public HTTP signatures preserve the same types in both orders.
+- `library_resolves_cleanly ... FAILED` / `library types differ`: add i/fetch
+  to the module inventory and its five wrapper signatures to library.out.
 - `trap: illegal cast` after a tail-call provider resumed: retain the raw
   service binding's frame as required by spec 9.4; native HTTPS and streaming
   now pass without changing continuation semantics.
 - `there is no package directory ../../../../../std`: corrected browser
   fixture's relative dependency path.
+
+WASI clocks additionally establish the monotonic origin at command entry, poll
+once for zero sleeps, reject negative durations with invalid and durations above
+2^63-1 nanoseconds with range. Both O0/O2 boundary tests passed.
 
 Full acceptance: pending execution on the committed tree. No requested
 implementation is left unfinished. Native send_stream is buffered; JS fetch
