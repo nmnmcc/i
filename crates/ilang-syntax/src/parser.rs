@@ -1072,7 +1072,7 @@ impl Parser<'_> {
                     ExprKind::Binary { .. } | ExprKind::Field { .. } | ExprKind::TupleIndex { .. }
                 ) && starts_with_clauses(&rhs)
                 {
-                    "a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+                    "`|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
                 } else {
                     "the right side of `|>` must be a name, a call, a function, or a clause block"
                 };

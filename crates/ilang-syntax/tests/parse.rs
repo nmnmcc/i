@@ -192,7 +192,7 @@ fn guards_and_pipe_binding_strength() {
             parse_module(src)
                 .1
                 .iter()
-                .any(|d| d.code == Code::PipeTarget && d.message.contains("level 6")),
+                .any(|d| d.code == Code::PipeTarget && d.message.contains("weakest operator")),
             "{src}"
         );
     }
