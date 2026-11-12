@@ -213,6 +213,8 @@ impl Expander for Driver {
             .unwrap_or_else(|| ScopedSource::new(self.graph.sources.get(p.source).text.clone()));
         let q = query.clone();
         let at = call.clone();
+        let unknown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let saw_unknown = unknown.clone();
         state.session.types = Some(Arc::new(move |operation, args| {
             let answer = match operation {
                 "type_of" => q.type_of(&args[0]).map(|s| vec![s]),
@@ -222,7 +224,10 @@ impl Expander for Driver {
                     let name = match truth {
                         MacroTruth::Yes => "Yes",
                         MacroTruth::No => "No",
-                        MacroTruth::NotKnown => "NotKnown",
+                        MacroTruth::NotKnown => {
+                            saw_unknown.store(true, std::sync::atomic::Ordering::Relaxed);
+                            "NotKnown"
+                        }
                     };
                     let d = ilang_syntax::lisp::parse(name).expect("truth atom");
                     vec![Syntax::from_datum(&d.datums[0], at.scope())]
@@ -269,7 +274,19 @@ impl Expander for Driver {
             .collect();
         let (result, budget, transactions) = engine
             .execute(&mac, args, &call, span, None, MacroPosition::Expression)
-            .map_err(|e| crate::diagnostics::body(p.source, e))?;
+            .map_err(|e| {
+                let mut ds = crate::diagnostics::body(p.source, e);
+                if unknown.load(std::sync::atomic::Ordering::Relaxed) {
+                    for d in ds.iter_mut().filter(|d| d.is_error()) {
+                        d.related.push(ilang_package::DiagnosticNote {
+                            source: p.source,
+                            span,
+                            message: "a typed macro cannot choose by the type inside a binding with type variables; a type query answered NotKnown here (§15.7.5)".into(),
+                        });
+                    }
+                }
+                ds
+            })?;
         let mut syntax = engine
             .scoped
             .expression_metered(&result, &call, |work, words| {

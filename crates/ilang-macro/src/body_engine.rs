@@ -205,7 +205,12 @@ impl<'a> BodyEngine<'a> {
         Error,
     > {
         if mac.definition.signature.is_some() && position != MacroPosition::Expression {
-            return Err(Error::InvalidItem(invocation_span,"a typed macro is allowed only as an expression call; it cannot make items or types".into()));
+            let message = if position == MacroPosition::Item {
+                "a typed macro cannot make items; use a syntax macro (§15.7.5)"
+            } else {
+                "a typed macro is allowed only as an expression call; it cannot give a type"
+            };
+            return Err(Error::InvalidItem(invocation_span, message.into()));
         }
         if mac.source == self.source {
             return Err(Error::SameModule(invocation_span));

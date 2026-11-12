@@ -102,7 +102,7 @@ fn typed_macro_output_cannot_change_result_type() {
     reject(
         &m,
         "(m = app/macros)\nmain = () { m.m(1) }",
-        "invalid typed macro expansion",
+        "cannot depend on its expansion",
     );
 }
 #[test]
@@ -111,7 +111,7 @@ fn typed_macro_result_only_variable_cannot_guess() {
     reject(
         &m,
         "(m = app/macros)\nf = () -> String { m.m() }\nmain = () { f() }",
-        "invalid typed macro expansion",
+        "result-only signature variable has no lower evidence",
     );
 }
 #[test]
@@ -163,7 +163,7 @@ fn typed_macro_rejects_type_position() {
     reject(
         ID,
         "(m = app/macros)\nAlias = m.identity(Int)\nmain = () { Nil }",
-        "only as an expression call",
+        "cannot give a type",
     );
 }
 #[test]
@@ -171,7 +171,7 @@ fn typed_macro_rejects_item_position() {
     reject(
         ID,
         "(m = app/macros)\nm.identity(1)\nmain = () { Nil }",
-        "only as an expression call",
+        "cannot make items",
     );
 }
 #[test]
@@ -517,4 +517,17 @@ fn typed_macro_nested_queries_keep_parent_type_handles() {
         "(m = app/macros)\nf = (x) { m.outer(x) }\nmain = () { assert(f(42) == 42) }",
     )
     .unwrap();
+}
+
+#[test]
+fn typed_macro_generic_choice_reports_restriction() {
+    let m = declared(
+        "(m A) (-> (A) Int)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax subtype) t `Int) { (-> (. syntax Yes) `7) (-> _ ((. fail raise) ((. syntax SyntaxError) \"no choice\" value))) }) })",
+    );
+    reject(
+        &m,
+        "(m = app/macros)\nf = (x) { m.m(x) }\nmain = () { f(1) }",
+        "cannot choose by the type inside a binding with type variables",
+    );
 }

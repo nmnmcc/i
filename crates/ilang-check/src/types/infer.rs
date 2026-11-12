@@ -940,7 +940,33 @@ impl<'a> Checker<'a> {
             let ty = trial.infer(&output.expression);
             let (err, env) = trial.pop_effects(call.span);
             if let Ty::Fn(f) = &call.signature {
+                let before = trial.diags.len();
                 trial.sub(&ty, &f.ret, call.span);
+                let mut input_vars = HashSet::new();
+                for (_, t) in &f.params {
+                    super::alias::map_vars(t, &mut |v| {
+                        input_vars.insert(v);
+                        Ty::Var(v)
+                    });
+                }
+                let mut result_only = false;
+                super::alias::map_vars(&f.ret, &mut |v| {
+                    result_only |= !input_vars.contains(&v);
+                    Ty::Var(v)
+                });
+                for d in trial.diags[before..].iter_mut().filter(|d| d.is_error()) {
+                    d.message = if result_only {
+                        format!(
+                            "a result-only signature variable has no lower evidence, so the output cannot choose its type (§15.7.5): {}",
+                            d.message
+                        )
+                    } else {
+                        format!(
+                            "the output does not have the declared result type; a call's type cannot depend on its expansion (§15.7.5): {}",
+                            d.message
+                        )
+                    };
+                }
                 trial.sub(&err, &f.err, call.span);
                 trial.s.constrain_env(&env, &f.env);
                 if !trial.s.failures.is_empty() {
