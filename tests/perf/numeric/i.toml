@@ -1,4 +1,7 @@
 name = "numeric"
 
 [wasm]
-exports = ["numeric/kernels.identity", "numeric/kernels.horner", "numeric/kernels.integer", "numeric/kernels.dot", "numeric/kernels.tuples", "numeric/kernels.closures"]
+exports = ["numeric/kernels.identity", "numeric/kernels.fast", "numeric/kernels.horner", "numeric/kernels.integer", "numeric/kernels.dot", "numeric/kernels.tuples", "numeric/kernels.closures"]
+
+[dependencies]
+std = { path = "../../../std" }

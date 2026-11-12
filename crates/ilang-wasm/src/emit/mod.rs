@@ -10,6 +10,7 @@ use std::fmt::Write as _;
 
 mod control;
 mod host;
+mod numeric;
 
 pub(super) const FIXED_MAX: usize = 10_000;
 
@@ -87,6 +88,8 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     let mut e = Emitter {
         p,
         metered,
+        numeric_enabled: false,
+        numeric_plan: numeric::Plan::default(),
         arities: BTreeSet::new(),
         ctors: BTreeSet::new(),
         strings: HashMap::new(),
@@ -285,6 +288,8 @@ fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
 struct Emitter<'p> {
     p: &'p Program,
     metered: bool,
+    numeric_enabled: bool,
+    numeric_plan: numeric::Plan,
     arities: BTreeSet<u32>,
     /// The constructors without fields that are used, as (constructor id,
     /// type id).
@@ -356,6 +361,19 @@ impl<'p> Emitter<'p> {
     fn code(&mut self, name: &str, f: &Func) {
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
         self.header(name, f.arity, &f.locals);
+        self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
+            numeric::Plan::for_func(f, self.p.numeric_locals.get(&f.name))
+        } else {
+            numeric::Plan::default()
+        };
+        self.out.push_str(&self.numeric_plan.declarations());
+        self.numeric_enabled =
+            self.p.numeric != crate::Numeric::Reference && numeric::has_float(&f.body);
+        if self.numeric_enabled {
+            self.out.push_str(
+                " (local $numeric_a f64) (local $numeric_b f64) (local $numeric_result f64)\n",
+            );
+        }
         if f.frame {
             // `$slot` keeps the slot of the frame for the frame records of
             // its points.
@@ -369,10 +387,13 @@ impl<'p> Emitter<'p> {
             }
             self.out.push_str("(call $shadow_enter_call)\n");
         }
+        self.out.push_str(&self.numeric_plan.parameters(f.arity));
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
         self.out.push_str(&body);
         self.out.push_str("(unreachable))\n");
+        self.numeric_enabled = false;
+        self.numeric_plan = numeric::Plan::default();
     }
 
     fn stmts(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
@@ -421,7 +442,9 @@ impl<'p> Emitter<'p> {
                 if let Some(site) = site {
                     let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
                 }
-                if let Value::Op(Op::Panic, args) = value {
+                if let Some(assignment) = self.scalar_assignment(*dst, value) {
+                    out.push_str(&assignment);
+                } else if let Value::Op(Op::Panic, args) = value {
                     let a = self.atom(&args[0]);
                     let _ = writeln!(out, "(call $panic {a}) (unreachable)");
                 } else if let Value::Op(Op::Raise, args) = value {
@@ -564,7 +587,16 @@ impl<'p> Emitter<'p> {
 
     fn atom(&mut self, a: &Atom) -> String {
         match a {
-            Atom::Local(l) => format!("(local.get $l{l})"),
+            Atom::Local(l) => match self.numeric_plan.locals.get(l) {
+                Some(numeric::Repr::Float) => {
+                    numeric::box_float(&format!("(local.get $numeric_f{l})"))
+                }
+                Some(numeric::Repr::Int) => format!(
+                    "(if (result eqref) (ref.is_null (local.get $l{l})) (then (ref.i31 (i32.wrap_i64 (local.get $numeric_i{l})))) (else (local.get $l{l})))"
+                ),
+                Some(numeric::Repr::Bool) => format!("(call $bool_new (local.get $numeric_c{l}))"),
+                None => format!("(local.get $l{l})"),
+            },
             Atom::Global(g) => format!("(global.get $g{})", g.0),
             Atom::Label(label) => self.label(*label),
             Atom::Func(f) => format!("(global.get $c{})", f.0),
@@ -692,6 +724,17 @@ impl<'p> Emitter<'p> {
             ),
             Value::Call { callee, args, env } => self.call(callee, args, false, &env_text(*env)),
             Value::Op(op, args) => {
+                if self.numeric_enabled
+                    && matches!(
+                        op,
+                        Op::FloatAdd | Op::FloatSub | Op::FloatMul | Op::FloatDiv | Op::FloatNeg
+                    )
+                {
+                    let args: Vec<_> = args.iter().map(|a| self.float_atom(a)).collect();
+                    return numeric::box_float(
+                        &numeric::float_op(*op, &args).expect("float operation"),
+                    );
+                }
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, "(local.get $env)")
             }
@@ -896,6 +939,15 @@ impl<'p> Emitter<'p> {
     }
 
     fn cond_leaf(&mut self, c: &Cond) -> String {
+        if let Cond::True(Atom::Local(local)) | Cond::Bool(Atom::Local(local), _) = c
+            && self.numeric_plan.locals.get(local) == Some(&numeric::Repr::Bool)
+        {
+            return if matches!(c, Cond::Bool(_, false)) {
+                format!("(i32.eqz (local.get $numeric_c{local}))")
+            } else {
+                format!("(local.get $numeric_c{local})")
+            };
+        }
         match c {
             Cond::True(a) => format!("(call $bool_get {})", self.atom(a)),
             Cond::Not(_) | Cond::And(_, _) | Cond::Or(_, _) => {
@@ -1354,7 +1406,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

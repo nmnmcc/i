@@ -223,6 +223,8 @@ pub(crate) struct Checker<'a> {
     group_defs: HashSet<DefId>,
     /// What the code generator needs, gathered while typing.
     pub out: Typed,
+    numeric_handles: HashMap<(ModuleId, Span), Ty>,
+    numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds (§4.8 rule 11).
     pub cases: Vec<super::pattern::PendingCase>,
@@ -283,6 +285,8 @@ impl<'a> Checker<'a> {
             kgen: HashSet::new(),
             group_defs: HashSet::new(),
             out: Typed::default(),
+            numeric_handles: HashMap::new(),
+            numeric_param_handles: HashMap::new(),
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
@@ -452,6 +456,28 @@ impl<'a> Checker<'a> {
         }
         if !self.recovery && !self.diags.iter().any(Diagnostic::is_error) {
             self.diags.extend(crate::unused::check(p, &test_shaped));
+        }
+        // Freeze only after all inference, completion, fixation, generalization,
+        // entry checks and deferred diagnostics have finished. This reads the
+        // original terms and never instantiates or constrains anything.
+        if !self.diags.iter().any(Diagnostic::is_error) {
+            for (handles, facts) in [
+                (&self.numeric_handles, &mut typed.numeric),
+                (&self.numeric_param_handles, &mut typed.numeric_params),
+            ] {
+                for (place, ty) in handles {
+                    if let Some(fact) = numeric_fact(ty) {
+                        let solved = display::shown(&self.s, ty, display::Opts::default())
+                            .expect("accepted numeric fact must coalesce");
+                        assert_eq!(
+                            numeric_fact(&solved),
+                            Some(fact),
+                            "numeric fact disagrees with solved type"
+                        );
+                        facts.insert(*place, fact);
+                    }
+                }
+            }
         }
         if self.keep_locals {
             // Query fallbacks are only recovery for a diagnosed program.
@@ -1670,6 +1696,13 @@ impl<'a> Checker<'a> {
     /// The type of `e`, and its known type (§4.8), `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
+        let result = self.infer_k_inner(e, expected);
+        self.numeric_handles
+            .insert((self.module, e.span), result.0.clone());
+        result
+    }
+
+    fn infer_k_inner(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
         let same = |t: Ty| (t.clone(), t);
         match &e.kind {
             ExprKind::Int(n) => same(known::scalar_literal(BuiltinType::Int, n.to_string())),
@@ -2931,6 +2964,8 @@ impl<'a> Checker<'a> {
                     // The values of a parameter come from the calls.
                     let start = self.s.vars.len();
                     let t = self.param(pattern);
+                    self.numeric_param_handles
+                        .insert((self.module, pattern.span), t.clone());
                     if key_binders(pattern).is_some_and(|(_, binders)| {
                         binders
                             .iter()
@@ -3575,5 +3610,33 @@ fn has_no_effect(e: &Expr) -> bool {
         | ExprKind::Case { .. }
         | ExprKind::RecordUpdate { .. }
         | ExprKind::Error => false,
+    }
+}
+
+/// Unknown solver handles deliberately remain Value. This first export uses
+/// only closed scalar terms; it does not turn a consumer's expected type into
+/// a fact about an expression, or guess at unions containing unknown members.
+fn numeric_fact(ty: &Ty) -> Option<super::NumericFact> {
+    use super::NumericFact;
+    match ty {
+        Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Float)), _, args) if args.is_empty() => {
+            Some(NumericFact::FiniteF64)
+        }
+        Ty::Con(Head::Named(TypeRef::Builtin(BuiltinType::Int)), values, args)
+            if args.is_empty() && values.is_finite() =>
+        {
+            let mut bounds: Option<(i32, i32)> = None;
+            for item in values.items() {
+                let value: i32 = item.parse().ok()?;
+                if !(-(1 << 30)..(1 << 30)).contains(&value) {
+                    return None;
+                }
+                bounds = Some(bounds.map_or((value, value), |(min, max)| {
+                    (min.min(value), max.max(value))
+                }));
+            }
+            bounds.map(|(min, max)| NumericFact::SmallInt { min, max })
+        }
+        _ => None,
     }
 }

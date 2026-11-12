@@ -396,11 +396,23 @@ pub enum Access {
     Part(u32),
 }
 
+/// Conservative, post-inference representation facts. Missing entries mean
+/// Value; an unconstrained or recursive solver variable never licenses a cast.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NumericFact {
+    FiniteF64,
+    SmallInt { min: i32, max: i32 },
+}
+
 /// The result of type checking: the shown types, and what the code
 /// generator needs. Places are keyed by the module and the span of the
 /// node in the HIR, which is unique among the nodes of one kind.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
+    /// Numeric expression facts, frozen after completion and deferred checks.
+    pub numeric: HashMap<(ModuleId, Span), NumericFact>,
+    /// Parameter-pattern facts from the same completed inference lifecycle.
+    pub numeric_params: HashMap<(ModuleId, Span), NumericFact>,
     /// Spans of empty record expressions reached by type inference.
     pub empty_records: std::collections::HashSet<(ModuleId, Span)>,
     /// Diagnostics retained when coalescing could not produce a finite

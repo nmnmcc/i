@@ -6,8 +6,11 @@
 //! Control flow is structured, as in Wasm: blocks that a `Break` leaves, `If`,
 //! and statements that end a function (`Return`, `TailCall`, `Unreachable`).
 //!
-//! Every value is an `eqref` (see `runtime/mod.rs`). A few locals hold `i64`
-//! or `i32` numbers, for positions and widths in bit array patterns.
+//! Semantic values and every call boundary use `eqref` (see `runtime/mod.rs`).
+//! At O2/O3, `emit::numeric` selects per-definition f64 and guarded i31 local
+//! encodings, with explicit materialization at reference uses. Functions with
+//! saved frames keep canonical values throughout. A few internal locals hold
+//! i64 or i32 positions and widths in bit array patterns.
 //!
 //! # Calling convention
 //!
@@ -780,6 +783,13 @@ pub struct SitePos {
 /// The whole program in the intermediate form.
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Numeric code generation; reference lowering is the O0 oracle.
+    pub numeric: crate::Numeric,
+    /// Facts for fresh local definitions, keyed by stable source function name.
+    pub numeric_locals: std::collections::HashMap<
+        String,
+        std::collections::HashMap<Local, ilang_check::types::NumericFact>,
+    >,
     /// Label bytes, by LabelConst. Labels are numbered, never WAT names.
     pub labels: Vec<String>,
     pub funcs: Vec<FuncKind>,

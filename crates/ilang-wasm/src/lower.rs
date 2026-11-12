@@ -172,6 +172,7 @@ struct Fx {
     /// Code of the library: it has no sites (§11.7).
     library: bool,
     locals: Vec<LocalType>,
+    numeric: HashMap<Local, ilang_check::types::NumericFact>,
     vars: HashMap<VarId, Local>,
     labels: u32,
     /// The names of the binding whose direct value is being lowered (§6.10).
@@ -188,6 +189,7 @@ impl Fx {
             module,
             library,
             locals: Vec::new(),
+            numeric: HashMap::new(),
             vars: HashMap::new(),
             labels: 0,
             pending: None,
@@ -2272,6 +2274,12 @@ impl<'a> Lowerer<'a> {
             match p {
                 Param::Pattern { pattern, .. } => {
                     let v = Atom::Local(next);
+                    if let Some(ilang_check::types::NumericFact::FiniteF64) =
+                        self.typed.numeric_params.get(&(module, pattern.span))
+                    {
+                        fx.numeric
+                            .insert(next, ilang_check::types::NumericFact::FiniteF64);
+                    }
                     next += 1;
                     self.bind_checked(&mut fx, &mut out, pattern, v, pattern.span.start);
                 }
@@ -2295,6 +2303,7 @@ impl<'a> Lowerer<'a> {
                 Param::Env { .. } => None,
             })
             .fold(block_values(&f.body), usize::max);
+        self.out.numeric_locals.insert(name.clone(), fx.numeric);
         Func {
             name,
             arity,
@@ -2549,8 +2558,17 @@ impl<'a> Lowerer<'a> {
     // ---- Expressions ----
 
     fn expr(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, e: &Expr) -> Atom {
-        self.lower(fx, out, e, false)
-            .expect("a value that is not in tail position")
+        let first = fx.locals.len() as Local;
+        let atom = self
+            .lower(fx, out, e, false)
+            .expect("a value that is not in tail position");
+        if let Atom::Local(local) = atom
+            && local >= first
+            && let Some(fact) = self.typed.numeric.get(&(fx.module, e.span))
+        {
+            fx.numeric.insert(local, *fact);
+        }
+        atom
     }
 
     /// Lowers `e`. In tail position, the statements end the function and

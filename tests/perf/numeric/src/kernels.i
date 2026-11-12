@@ -1,5 +1,6 @@
-(i/core)
-(identity, horner, integer, dot, tuples, closures)
+(i/core, math = numeric/math)
+(identity, fast, horner, integer, dot, tuples, closures)
+fast = (x: Float) -> Float { math.fast_sin(x) }
 identity = (x: Float) -> Float { x }
 horner = (x: Float) -> Float {
   a = 0.125 *. x +. 0.25

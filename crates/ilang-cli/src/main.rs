@@ -345,14 +345,19 @@ fn cmd_build(
         graph.entry = entry.map(str::to_owned);
         let checked = ilang_macro::project::check(&mut graph);
         if let (Some(p), Some(t)) = (&checked.program, &checked.types)
-            && let Ok(text) = ilang_wasm::compile_wat(
+            && let Ok(text) = ilang_wasm::compile_wat_numeric(
                 &graph,
                 p,
                 t,
                 ilang_wasm::Options {
                     tests: false,
                     target,
-                },
+                }
+                .numeric(if opt == 0 {
+                    ilang_wasm::Numeric::Reference
+                } else {
+                    ilang_wasm::Numeric::Scalars
+                }),
             )
         {
             std::fs::write(out.with_extension("wat"), text)?;
