@@ -7,15 +7,15 @@ sample(A) = (gen:Gen(A),size:Int,g:random.Generator) -> Option(Tree(A)) {
  Gen(f)=gen
  f({ size<0 } |> { True->0 False->size },g)
 }
-constant(A) = (a:A) -> Gen(A) { Gen((_,_) { Some(Tree(a,(){ [] })) }) }
+constant(A) = (a:A) -> Gen(A) { Gen((_,_) { Some(Tree(value: a,children: (){ [] })) }) }
 map_tree(A,B) = (t:Tree(A),f:(A)->B) -> Tree(B) {
- Tree(f(t.value),(){ list.map(t.children(),(c){map_tree(c,f)}) })
+ Tree(value: f(t.value),children: (){ list.map(t.children(),(c){map_tree(c,f)}) })
 }
 map(A,B) = (gen:Gen(A),f:(A)->B) -> Gen(B) {
  Gen((s,g){ sample(gen,s,g) |> { None->None Some(t)->Some(map_tree(t,f)) } })
 }
 bind_node(A,B) = (outer:Tree(A),inner:Tree(B),f:(A)->Gen(B),s:Int,g:random.Generator) -> Tree(B) {
- Tree(inner.value,(){
+ Tree(value: inner.value,children: (){
    a=list.filter_map(outer.children(),(c){bind_outer(c,f,s,g)})
    b=list.map(inner.children(),(c){bind_node(outer,c,f,s,g)})
    list.append(a,b)
@@ -31,7 +31,7 @@ flat_map(A,B) = (gen:Gen(A),f:(A)->Gen(B)) -> Gen(B) {
  })
 }
 int_tree = (x:Int,t:Int) -> Tree(Int) {
- Tree(x,(){
+ Tree(value: x,children: (){
    { x==t } |> {
     True->[]
     False->{

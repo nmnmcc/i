@@ -5,7 +5,7 @@ Dep { Dep(v: Int) }
 get = (d ! Dep) { d.v }
 S(N) { S(f: () -> Int ! N) }
 use(N) = (s ! S(N)) {
-  S(f) = s
+  S(f = f) = s
   f()
 }
 run(A, N) = (body: () -> A ! N) { body() }
@@ -22,11 +22,11 @@ tell = (x: Int) { x |> {
 
 
 main = (io ! Io) {
-  ! S(Dep) = S(() { get() })
-  ! Dep = Dep(2)
+  ! S(Dep) = S(f: () { get() })
+  ! Dep = Dep(v: 2)
   h = () { run(fr) }
   k = () { run(h) + fw() }
   io.print(tell(k()))
-  ! S(Never) = S(() { 1 })
+  ! S(Never) = S(f: () { 1 })
   io.print(tell(k() + fr()))
 }

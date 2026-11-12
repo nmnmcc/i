@@ -3,12 +3,12 @@ S(N) {
 }
 
 use(N) = (s ! S(N)) {
-	S(f, ..) = s
+	S(f = f, ..) = s
 	f()
 }
 
 wrap(N) = (body: () -> Int ! N | S(N)) {
-	! S(N) = S(() { 1 }, (_: N) { Nil })
+	! S(N) = S(f: () { 1 }, m: (_: N) { Nil })
 	body()
 }
 

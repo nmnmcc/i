@@ -46,7 +46,7 @@ Schema(D, E) {
 	Schema(decode: (String) -> D, encode: (E) -> String)
 }
 
-make(D, E) = (d: (String) -> D, e: (E) -> String) { Schema(d, e) }
+make(D, E) = (d: (String) -> D, e: (E) -> String) { Schema(decode: d, encode: e) }
 
 user = make(
 	(s: String) -> (String, Int) { (s, 1) }

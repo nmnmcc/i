@@ -105,7 +105,15 @@ Report(A) {
 }
 
 /// The default seed, success count, size, discard budget, and shrink budget.
-defaults = () -> Config { Config(0, 100, 100, 1000, 1000) }
+defaults = () -> Config {
+	Config(
+		seed:         0
+		cases:        100
+		max_size:     100
+		max_discards: 1000
+		max_shrinks:  1000
+	)
+}
 
 /// Stores a pure draw. None discards one attempt; there are no hidden retries.
 make(A) = (draw: (Int, random.Generator) -> Option(Tree(A))) -> Gen(A) {
@@ -131,16 +139,16 @@ nonnegative = (n: Int) -> Int {
 
 /// The root is computed now; children are deferred until requested.
 tree(A) = (value: A, children: () -> List(Tree(A))) -> Tree(A) {
-	Tree(value, children)
+	Tree(value: value, children: children)
 }
 
 /// A leaf, independent of size and random input.
 constant(A) = (value: A) -> Gen(A) {
-	Gen((_, _) { Some(Tree(value, () { [] })) })
+	Gen((_, _) { Some(Tree(value: value, children: () { [] })) })
 }
 
 map_tree(A, B) = (t: Tree(A), with: (A) -> B) -> Tree(B) {
-	Tree(with(t.value), () {
+	Tree(value: with(t.value), children: () {
 		lists.map(t.children(), (c) { map_tree(c, with) })
 	})
 }
@@ -162,7 +170,7 @@ bind_node(A, B) = (
 	size: Int
 	right: random.Generator
 ) -> Tree(B) {
-	Tree(inner.value, () {
+	Tree(value: inner.value, children: () {
 		outer_children = lists.filter_map(outer.children(), (c) {
 			bind_outer(c, with, size, right)
 		})
@@ -206,7 +214,7 @@ pair(A, B) = (first: Gen(A), second: Gen(B)) -> Gen((A, B)) {
 filter_tree(A) = (t: Tree(A), keeping: (A) -> Bool) -> Option(Tree(A)) {
 	keeping(t.value) |> {
 		False -> None
-		True -> Some(Tree(t.value, () {
+		True -> Some(Tree(value: t.value, children: () {
 			lists.filter_map(t.children(), (c) { filter_tree(c, keeping) })
 		}))
 	}
@@ -249,7 +257,7 @@ at_path = (g: random.Generator, path: List(Int)) -> Option(random.Generator) {
 }
 
 integer_tree = (x: Int, target: Int) -> Tree(Int) {
-	Tree(x, () {
+	Tree(value: x, children: () {
 		{ x == target } |> {
 			True -> []
 			False -> {
@@ -317,7 +325,7 @@ element(A) = (choices: List(A)) -> Result(Gen(A), BuildError) {
 }
 
 list_tree(A) = (items: List(Tree(A)), min: Int) -> Tree(List(A)) {
-	Tree(lists.map(items, (t) { t.value }), () {
+	Tree(value: lists.map(items, (t) { t.value }), children: () {
 		n = lists.length(items)
 		chunks = (k: Int, acc: List(Tree(List(A)))) -> List(Tree(List(A))) {
 			{ k == 0 } |> {
@@ -527,9 +535,9 @@ attempts(A) = (
 	discards: Int
 ) -> Report(A) {
 	{ successes == config.cases } |> {
-		True -> Passed(successes, discards)
+		True -> Passed(successes: successes, discards: discards)
 		False -> { discards > config.max_discards } |> {
-			True -> GaveUp(successes, discards)
+			True -> GaveUp(successes: successes, discards: discards)
 			False -> {
 				size = attempt % { config.max_size + 1 }
 				drawn = at_path(random.from_seed(seed), [attempt + 1]) |> {
@@ -576,15 +584,15 @@ attempts(A) = (
 							)
 							Falsified(
 								Failure(
-									seed
-									attempt
-									size
-									t.value
-									small.value
-									why
-									path
-									checked
-									limited
+									seed:     seed
+									attempt:  attempt
+									size:     size
+									original: t.value
+									smallest: small.value
+									reason:   why
+									path:     path
+									checked:  checked
+									limited:  limited
 								)
 							)
 						}
@@ -713,6 +721,6 @@ test(A) = (
 	})
 	report |> {
 		Passed(..) -> Nil
-		_          -> { a.fail(AssertionFailure(format(report, show))) }
+		_          -> { a.fail(AssertionFailure(message: format(report, show))) }
 	}
 }

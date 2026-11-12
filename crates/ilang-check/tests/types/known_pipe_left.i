@@ -17,11 +17,11 @@ map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
 
 flip(A, B) = (f: (A) -> B, xs: List(A)) -> List(B) { map(xs, f) }
 
-u = User("bob", 3)
+u = User(name: "bob", age: 3)
 
 left_fn = (u) { u.name } |> apply(u)
 
-left_fn_later = (u) { u.age } |> flip([User("ann", 4)])
+left_fn_later = (u) { u.age } |> flip([User(name: "ann", age: 4)])
 
 // A tuple on the left: its parts have the parts of the expected type.
 pair = (p: ((User) -> Int, Int)) { p }

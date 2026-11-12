@@ -26,9 +26,9 @@ make = () {
 
 main = () {
 	event = make()
-	! Name = Name("caller")
+	! Name = Name(text: "caller")
 	assert(task.sync(event) == (2, "caller"))
-	! Name = Name("other")
+	! Name = Name(text: "other")
 	assert(task.sync(event) == (2, "other"))
 	assert(task.sync(task.choose([task.always(3), task.choose([])])) == 3)
 }

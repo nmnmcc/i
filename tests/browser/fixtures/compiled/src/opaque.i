@@ -65,10 +65,10 @@ get_a: () -> A
 get_b: () -> B
 
 @external("app:opaque/v1", "echo")
-echo_a: (a: A) -> A
+echo_a: (A) -> A
 
 @external("app:opaque/v1", "echo")
-echo_b: (a: A) -> B
+echo_b: (A) -> B
 
 equal(X, Y) = (a: X, b: Y) { a == b }
 

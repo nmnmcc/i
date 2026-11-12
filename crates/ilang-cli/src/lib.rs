@@ -56,6 +56,27 @@ impl Built {
     }
 }
 
+/// The native runner (crates/ilang-runner), built for this `i` by build.rs.
+pub const RUNNER: &[u8] = include_bytes!(env!("ILANG_RUNNER"));
+
+/// The target triple of [`RUNNER`]: statically linked (musl) on Linux.
+pub const RUNNER_TARGET: &str = env!("ILANG_RUNNER_TARGET");
+
+impl Built {
+    /// A native package (docs/design/native.md, N2): a copy of [`RUNNER`]
+    /// with this module compiled for the runner's target triple.
+    pub fn native_package(&self, name: &str) -> anyhow::Result<Vec<u8>> {
+        ilang_host::native::package(
+            RUNNER,
+            RUNNER_TARGET,
+            name,
+            &self.wasm,
+            &self.binding_plan,
+            &self.trusted_package,
+        )
+    }
+}
+
 /// Why a build failed.
 #[derive(Debug)]
 pub enum BuildError {

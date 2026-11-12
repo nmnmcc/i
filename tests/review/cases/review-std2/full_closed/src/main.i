@@ -7,6 +7,6 @@ send: (Entry) -> Nil ^ String ! Sink(String,Never) = write
 
 example = () {
  ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
- Error("seen") = fail.catch(() { send(Entry("seen")) })
+ Error("seen") = fail.catch(() { send(Entry(message: "seen")) })
  Nil
 }

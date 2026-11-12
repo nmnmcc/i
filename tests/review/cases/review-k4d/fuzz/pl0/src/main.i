@@ -6,35 +6,35 @@ Cov(A) { Cov(f: () -> A) }
 askc(A) = (s ! Cov(A)) { s.f() }
 Cb(N) { Cb(f: () -> Int ! N, m: (N) -> Nil) }
 call(N) = (c: Cb(N)) {
-  Cb(f, ..) = c
+  Cb(f = f, ..) = c
   f()
 }
 run(A, N) = (body: () -> A ! N) { body() }
 twice(N) = (body: () -> Int ! N) { body() + body() }
 with_int = (body) {
-  ! Svc(Int) = Svc(() { 1 }, (_: Int) { Nil })
+  ! Svc(Int) = Svc(f: () { 1 }, m: (_: Int) { Nil })
   body()
 }
 with_dep = (body) {
-  ! Dep = Dep(5)
+  ! Dep = Dep(v: 5)
   body()
 }
 with_cov = (body, v) {
-  ! Cov(_) = Cov(() { v })
+  ! Cov(_) = Cov(f: () { v })
   body()
 }
 pick = (a, b) { [a, b] }
 h0 = () { 1 }
 h1 = () {
-  ! Cov(Int) = Cov(() { ask() + 1 + askc() })
-  ! Cov(Int) = Cov(() { askc() + call(Cb(() { ask() }, (_) { Nil })) + ask() })
+  ! Cov(Int) = Cov(f: () { ask() + 1 + askc() })
+  ! Cov(Int) = Cov(f: () { askc() + call(Cb(f: () { ask() }, m: (_) { Nil })) + ask() })
   run(() { ask() })
 }
 
 main = () {
-  ! Svc(Int) = Svc(() { get() }, (_: Int) { Nil })
-  ! Cov(Int) = Cov(() { 2 })
-  ! Dep = Dep(1)
+  ! Svc(Int) = Svc(f: () { get() }, m: (_: Int) { Nil })
+  ! Cov(Int) = Cov(f: () { 2 })
+  ! Dep = Dep(v: 1)
   h1()
   Nil
 }

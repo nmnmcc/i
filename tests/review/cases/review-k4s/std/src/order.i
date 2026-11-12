@@ -91,7 +91,7 @@ min = (a: Order, b: Order) -> Order {
 /// second.
 ///
 /// ```i
-/// order.break_tie(in: int.compare(1, 1), with: Less)  // Less
+/// order.break_tie(int.compare(1, 1), Less)  // Less
 /// ```
 break_tie = (in: Order, with: Order) -> Order {
 	in |> {

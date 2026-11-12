@@ -359,7 +359,7 @@ loosely_compare = (a: Float, with: Float, tolerating: Float) -> Order {
 /// `True` when the two Floats are no more than `tolerating` apart.
 ///
 /// ```i
-/// float.loosely_equals(0.1 +. 0.2, with: 0.3, tolerating: 1.0e-9)  // True
+/// float.loosely_equals(0.1 +. 0.2, 0.3, 1.0e-9)  // True
 /// ```
 loosely_equals = (a: Float, with: Float, tolerating: Float) -> Bool {
 	// `a -. with` is not finite when they are far apart, so it is not used.
@@ -474,8 +474,8 @@ to_precision = (x: Float, precision: Int) -> Float {
 /// is a Float.
 ///
 /// ```i
-/// float.power(2.0, of: 10)  // Ok(1024.0)
-/// float.power(-.2.0, of: -1)  // Ok(-.0.5)
+/// float.power(2.0, 10)  // Ok(1024.0)
+/// float.power(-.2.0, -1)  // Ok(-.0.5)
 /// ```
 power = (base: Float, of: Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |> {
@@ -550,7 +550,7 @@ divide = (a: Float, by: Float) -> Result(Float, Nil) {
 /// `by`, or `Error(Nil)` when `by` is `0.0`.
 ///
 /// ```i
-/// float.modulo(13.3, by: 3.3)  // Ok(0.10000000000000053)
+/// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
 /// ```
 modulo = (a: Float, by: Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> {
@@ -607,8 +607,8 @@ logarithm = (x: Float) -> Result(Float, Nil) {
 /// one unit in the last place of the exact power.
 ///
 /// ```i
-/// float.real_power(16.0, of: 0.5)  // Ok(4.0)
-/// float.real_power(-.8.0, of: 1.0 /. 3.0)  // Error(Nil)
+/// float.real_power(16.0, 0.5)  // Ok(4.0)
+/// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
 /// ```
 real_power = (base: Float, of: Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0

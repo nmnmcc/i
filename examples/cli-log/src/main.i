@@ -12,9 +12,17 @@ Options {
 
 options = () {
 	cli.map2(
-		cli.option(cli.Names("name", None), "Name to greet", cli.text)
-		cli.option(cli.Names("count", None), "Number of greetings", cli.integer)
-		(name, count) { Options(name, count) }
+		cli.option(
+			cli.Names(long: "name", short: None)
+			"Name to greet"
+			cli.text
+		)
+		cli.option(
+			cli.Names(long: "count", short: None)
+			"Number of greetings"
+			cli.integer
+		)
+		(name, count) { Options(name: name, count: count) }
 	)
 }
 
@@ -34,7 +42,16 @@ main = () {
 			stdio.StdioError
 			stdio.Stdio | request.Await | request.Owner
 		) = log.stderr()
-		log.write(log.timestamped(log.Entry(log.Info, "greeting", [], None)))
+		log.write(
+			log.timestamped(
+				log.Entry(
+					level:   log.Info
+					message: "greeting"
+					fields:  []
+					at:      None
+				)
+			)
+		)
 		greet(opts.name, opts.count)
 		stdio.print("cli ok")
 	})

@@ -480,7 +480,7 @@ hmac = (
 	}
 }
 
-/// RFC 4231 HMAC-SHA-256: `hmac_sha256(key: <<1>>, input: <<2>>)`.
+/// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.
 hmac_sha256 = (
 	key: BitArray
 	input: BitArray
@@ -563,7 +563,7 @@ hkdf_expand_sha512 = (
 	expand(prk, info, length, 64, 128, sha512)
 }
 
-/// Extracts then expands: `hkdf_sha256(input: key, salt: <<>>, info: <<>>, length: 32)`.
+/// Extracts then expands: `hkdf_sha256(key, <<>>, <<>>, 32)`.
 hkdf_sha256 = (
 	input: BitArray
 	salt: BitArray
@@ -598,7 +598,7 @@ xor_bits = (a: BitArray, b: BitArray) -> BitArray {
 }
 
 /// PBKDF2-HMAC-SHA-256, positive iteration count and 0..(2^32-1)*32 bytes.
-/// `pbkdf2_sha256(password: <<"password":utf8>>, salt: <<"salt":utf8>>, iterations: 1, length: 32)`.
+/// `pbkdf2_sha256(<<"password":utf8>>, <<"salt":utf8>>, 1, 32)`.
 pbkdf2_sha256 = (
 	password: BitArray
 	salt: BitArray
