@@ -90,6 +90,7 @@ test("pad_to_bytes_slice_test", () {
 })
 
 // https://github.com/gleam-lang/stdlib/issues/934
+
 test("pad_to_bytes_crash_test", () {
 	<<_:u3, rest:bits>> = <<0xAB, 0xB0>>
 	assert(bit_array.pad_to_bytes(rest) == <<93, 128>>)
@@ -104,10 +105,10 @@ test("not_equal_test", () {
 test("append_strings_test", () {
 	assert(
 		bit_array.append(
-			bit_array.from_string("Test"),
-			bit_array.from_string(" Me"),
+			bit_array.from_string("Test")
+			bit_array.from_string(" Me")
 		) ==
-			bit_array.from_string("Test Me"),
+			bit_array.from_string("Test Me")
 	)
 	Nil
 })
@@ -140,7 +141,7 @@ test("concat_multiple_test", () {
 test("concat_unaligned_test", () {
 	assert(
 		bit_array.concat([<<-1:u(32)>>, <<0:u1>>, <<0:u(0)>>]) ==
-			<<255, 255, 255, 255, 0:u1>>,
+			<<255, 255, 255, 255, 0:u1>>
 	)
 	Nil
 })
@@ -148,7 +149,7 @@ test("concat_unaligned_test", () {
 test("concat_complex_test", () {
 	assert(
 		bit_array.concat([<<-20:u6, 2>>, <<3:u4>>, <<7:u3>>, <<-1:u(64)>>]) ==
-			<<176, 8, 255, 255, 255, 255, 255, 255, 255, 255, 31:u5>>,
+			<<176, 8, 255, 255, 255, 255, 255, 255, 255, 255, 31:u5>>
 	)
 	Nil
 })
@@ -161,7 +162,7 @@ test("concat_unaligned_2_test", () {
 test("concat_unaligned_3_test", () {
 	assert(
 		bit_array.concat([<<-1:u(32)>>, <<0:u1>>, <<0:u(0)>>]) ==
-			<<255, 255, 255, 255, 0:u1>>,
+			<<255, 255, 255, 255, 0:u1>>
 	)
 	Nil
 })
@@ -175,43 +176,39 @@ test("concat_empty_list_test", () {
 test("concat_bits_test", () {
 	assert(bit_array.concat([<<1:u1>>, <<2:u2>>, <<255>>]) == <<223, 7:u3>>)
 	assert(
-		bit_array.concat([<<5:u3>>, <<5:u3>>, <<5:u3>>]) ==
-			<<5:u3, 5:u3, 5:u3>>,
+		bit_array.concat([<<5:u3>>, <<5:u3>>, <<5:u3>>]) == <<5:u3, 5:u3, 5:u3>>
 	)
 	assert(
 		bit_array.bit_size(bit_array.concat([<<0:u5>>, <<0:u5>>, <<0:u5>>])) ==
-			15,
+			15
 	)
 	Nil
 })
 
 test("concat_slices_test", () {
-	<<170, 85, 255>> |>
-		(<<_:u3, middle:bits(13), rest:bits>>) {
+	<<170, 85, 255>> |> {
+		<<_:u3, middle:bits(13), rest:bits>> -> {
 			assert(
 				bit_array.concat([middle, rest, middle]) ==
-					<<middle:bits, rest:bits, middle:bits>>,
+					<<middle:bits, rest:bits, middle:bits>>
 			)
 			Nil
 		}
-		| (_) { panic("no match") }
+		_ -> panic("no match")
+	}
 })
 
 test("concat_long_list_test", () {
 	parts = list.repeat(<<1:u1>>, 10_000)
-	assert(
-		bit_array.bit_size(bit_array.concat(parts)) == 10_000,
-	)
-	assert(
-		bit_array.concat(list.repeat(<<255>>, 3)) == <<255, 255, 255>>,
-	)
+	assert(bit_array.bit_size(bit_array.concat(parts)) == 10_000)
+	assert(bit_array.concat(list.repeat(<<255>>, 3)) == <<255, 255, 255>>)
 	Nil
 })
 
 test("concat_complex_2_test", () {
 	assert(
 		bit_array.concat([<<-20:u6, 2>>, <<3:u4>>, <<7:u3>>, <<-1:u(64)>>]) ==
-			<<176, 8, 255, 255, 255, 255, 255, 255, 255, 255, 31:u5>>,
+			<<176, 8, 255, 255, 255, 255, 255, 255, 255, 255, 31:u5>>
 	)
 	Nil
 })
@@ -252,16 +249,12 @@ test("slice_invalid_negative_test", () {
 })
 
 test("slice_negative_start_test", () {
-	assert(
-		bit_array.slice(bit_array.from_string("hello"), -1, 1) == Error(Nil),
-	)
+	assert(bit_array.slice(bit_array.from_string("hello"), -1, 1) == Error(Nil))
 	Nil
 })
 
 test("slice_length_too_long_test", () {
-	assert(
-		bit_array.slice(bit_array.from_string("hello"), 1, 6) == Error(Nil),
-	)
+	assert(bit_array.slice(bit_array.from_string("hello"), 1, 6) == Error(Nil))
 	Nil
 })
 
@@ -272,7 +265,7 @@ test("slice_chained_test", () {
 				|> bit_array.slice(1, 1)
 				|> result.then((b) { bit_array.slice(b, 0, 1) })
 		} ==
-			Ok(<<"b":utf8>>),
+			Ok(<<"b":utf8>>)
 	)
 	Nil
 })
@@ -285,11 +278,11 @@ test("slice_unaligned_error_test", () {
 test("slice_large_error_test", () {
 	assert(
 		bit_array.slice(
-			<<0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15>>,
-			8,
-			12,
+			<<0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15>>
+			8
+			12
 		) ==
-			Error(Nil),
+			Error(Nil)
 	)
 	Nil
 })
@@ -351,9 +344,7 @@ test("is_utf8_unicode_test", () {
 })
 
 test("is_utf8_invalid_test", () {
-	assert(
-		core.not(bit_array.is_utf8(<<255>>)),
-	)
+	assert(core.not(bit_array.is_utf8(<<255>>)))
 	Nil
 })
 
@@ -364,8 +355,7 @@ test("base64_encode_padded_test", () {
 
 test("base64_encode_padded_5_bytes_test", () {
 	assert(
-		bit_array.base64_encode(<<255, 127, 254, 252, 100>>, True) ==
-			"/3/+/GQ=",
+		bit_array.base64_encode(<<255, 127, 254, 252, 100>>, True) == "/3/+/GQ="
 	)
 	Nil
 })
@@ -392,10 +382,7 @@ test("base64_encode_large_test", () {
 				|> bit_array.from_string
 				|> bit_array.base64_encode(True)
 		} ==
-			string.repeat(
-				"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB",
-				1024 * 32,
-			),
+			string.repeat("QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB", 1024 * 32)
 	)
 	Nil
 })
@@ -412,7 +399,7 @@ test("base64_encode_unaligned_2_test", () {
 
 test("base64_encode_unaligned_3_test", () {
 	assert(
-		bit_array.base64_encode(<<0xFA, 0xBC, 0x6D, 1:u1>>, True) == "+rxtgA==",
+		bit_array.base64_encode(<<0xFA, 0xBC, 0x6D, 1:u1>>, True) == "+rxtgA=="
 	)
 	Nil
 })
@@ -449,14 +436,14 @@ test("base64_decode_invalid_padding_test", () {
 
 test("base64_url_encode_padded_test", () {
 	assert(
-		bit_array.base64_url_encode(<<255, 127, 254, 252>>, True) == "_3_-_A==",
+		bit_array.base64_url_encode(<<255, 127, 254, 252>>, True) == "_3_-_A=="
 	)
 	Nil
 })
 
 test("base64_url_encode_unpadded_test", () {
 	assert(
-		bit_array.base64_url_encode(<<255, 127, 254, 252>>, False) == "_3_-_A",
+		bit_array.base64_url_encode(<<255, 127, 254, 252>>, False) == "_3_-_A"
 	)
 	Nil
 })
@@ -473,7 +460,7 @@ test("base64_url_encode_empty_test", () {
 
 test("base64_url_decode_padded_test", () {
 	assert(
-		bit_array.base64_url_decode("_3_-_A==") == Ok(<<255, 127, 254, 252>>),
+		bit_array.base64_url_decode("_3_-_A==") == Ok(<<255, 127, 254, 252>>)
 	)
 	Nil
 })
@@ -501,9 +488,9 @@ test("base64_url_decode_invalid_test", () {
 test("base64_decode_crash_regression_1_test", () {
 	assert(
 		bit_array.base64_decode(
-			"aGktdGhlcmU.uWUWvrAleKQ2jsWcU97H-RPJ5qRRcE_s",
+			"aGktdGhlcmU.uWUWvrAleKQ2jsWcU97H-RPJ5qRRcE_s"
 		) ==
-			Error(Nil),
+			Error(Nil)
 	)
 	Nil
 })
@@ -546,7 +533,7 @@ test("base16_encode_foobar_test", () {
 test("base16_encode_binary_test", () {
 	assert(
 		bit_array.base16_encode(<<161, 178, 195, 212, 229, 246, 120, 145>>) ==
-			"A1B2C3D4E5F67891",
+			"A1B2C3D4E5F67891"
 	)
 	Nil
 })
@@ -609,7 +596,7 @@ test("base16_decode_foobar_test", () {
 test("base16_decode_binary_test", () {
 	assert(
 		bit_array.base16_decode("A1B2C3D4E5F67891") ==
-			Ok(<<161, 178, 195, 212, 229, 246, 120, 145>>),
+			Ok(<<161, 178, 195, 212, 229, 246, 120, 145>>)
 	)
 	Nil
 })
@@ -624,7 +611,7 @@ test("base16_decode_lowercase_test", () {
 	// Lowercase hex
 	assert(
 		bit_array.base16_decode("a1b2c3d4e5f67891") ==
-			Ok(<<161, 178, 195, 212, 229, 246, 120, 145>>),
+			Ok(<<161, 178, 195, 212, 229, 246, 120, 145>>)
 	)
 	Nil
 })
@@ -677,7 +664,7 @@ test("compare_lt_test", () {
 test("compare_equal_with_zero_test", () {
 	assert(
 		bit_array.compare(<<4:u5, 3:u3, 0:u(0)>>, <<4:u5, 3:u3, 0:u(0)>>) ==
-			Equal,
+			Equal
 	)
 	Nil
 })
@@ -685,7 +672,7 @@ test("compare_equal_with_zero_test", () {
 test("compare_different_sizes_gt_test", () {
 	assert(
 		bit_array.compare(<<0:u2, 3:u4, 0:u(0)>>, <<0:u2, 3:u3, 0:u(0)>>) ==
-			Greater,
+			Greater
 	)
 	Nil
 })
@@ -695,7 +682,7 @@ test("compare_different_values_lt_test", () {
 	// second is: <<35>>
 	assert(
 		bit_array.compare(<<4:u5, 3:u4, 0:u(0)>>, <<4:u5, 3:u3, 0:u(0)>>) ==
-			Less,
+			Less
 	)
 	Nil
 })
@@ -751,9 +738,7 @@ test("starts_with_nonempty_empty_test", () {
 })
 
 test("starts_with_empty_nonempty_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<>>, <<0>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<>>, <<0>>)))
 	Nil
 })
 
@@ -773,16 +758,12 @@ test("starts_with_full_match_test", () {
 })
 
 test("starts_with_longer_prefix_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<0, 1, 2>>, <<0, 1, 2, 3>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<0, 1, 2>>, <<0, 1, 2, 3>>)))
 	Nil
 })
 
 test("starts_with_wrong_prefix_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<0, 1, 2>>, <<1>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<0, 1, 2>>, <<1>>)))
 	Nil
 })
 
@@ -797,9 +778,7 @@ test("starts_with_one_bit_empty_test", () {
 })
 
 test("starts_with_one_bit_longer_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<1:u1>>, <<1:u2>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<1:u1>>, <<1:u2>>)))
 	Nil
 })
 
@@ -809,16 +788,12 @@ test("starts_with_long_test", () {
 })
 
 test("starts_with_long_longer_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<-1:u127>>, <<-1:u(128)>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<-1:u127>>, <<-1:u(128)>>)))
 	Nil
 })
 
 test("starts_with_different_values_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<0:u127>>, <<1:u127>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<0:u127>>, <<1:u127>>)))
 	Nil
 })
 
@@ -828,29 +803,28 @@ test("starts_with_partial_byte_match_test", () {
 })
 
 test("starts_with_partial_byte_no_match_test", () {
-	assert(
-		core.not(bit_array.starts_with(<<0xFF, 0x81>>, <<0xFF, 0:u1>>)),
-	)
+	assert(core.not(bit_array.starts_with(<<0xFF, 0x81>>, <<0xFF, 0:u1>>)))
 	Nil
 })
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
+
 test("base64_round_trip_test", () {
 	check = (bytes: BitArray) {
 		assert(
 			bit_array.base64_decode(bit_array.base64_encode(bytes, True)) ==
-				Ok(bytes),
+				Ok(bytes)
 		)
 		assert(
 			bit_array.base64_decode(bit_array.base64_encode(bytes, False)) ==
-				Ok(bytes),
+				Ok(bytes)
 		)
 		assert(
 			bit_array.base64_url_decode(
-				bit_array.base64_url_encode(bytes, True),
+				bit_array.base64_url_encode(bytes, True)
 			) ==
-				Ok(bytes),
+				Ok(bytes)
 		)
 	}
 	check(<<>>)
@@ -858,11 +832,7 @@ test("base64_round_trip_test", () {
 	check(<<255, 254>>)
 	check(<<1, 2, 3>>)
 	check(<<251, 255, 191, 0, 1>>)
-	check(
-		bit_array.concat(
-			list.map(list.range(0, 255), (i) { <<i>> }),
-		),
-	)
+	check(bit_array.concat(list.map(list.range(0, 255), (i) { <<i>> })))
 })
 
 test("base64_rfc4648_test", () {
@@ -908,6 +878,6 @@ test("concat_many_test", () {
 })
 
 test("slice_negative_take_test", () {
-	assert(bit_array.slice(<<1, 2, 3, 4>>, 3, -2) == Ok(<<2, 3>>))
-	assert(bit_array.slice(<<1, 2, 3, 4>>, 1, -2) == Error(Nil))
+	assert(bit_array.slice(<<1, 2, 3, 4>>, at: 3, take: -2) == Ok(<<2, 3>>))
+	assert(bit_array.slice(<<1, 2, 3, 4>>, at: 1, take: -2) == Error(Nil))
 })

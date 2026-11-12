@@ -43,7 +43,7 @@ test("async host services of a compiled module wait for the host", async () => {
 
 test("the module traps when the host answers a request it does not wait for", async () => {
   for (const [resume, args] of [
-    // The module waits for request 0 of `later`, not of `tick` (B.5).
+    // The module waits for request 0 of `later`, not of `tick`.
     ["tick", [0, 0, 0, 0]],
     // Nor for another id of `later`.
     ["later", [5, 0, 1, 0, 0]],
@@ -63,7 +63,7 @@ test("the module traps when the host answers a request it does not wait for", as
 
 test("an answer of the host that is not correct stops the program in the module", async () => {
   // By default the module checks the answer, and the stop has the position
-  // of the call (B.2, §11.7).
+  // of the call.
   const value = await guest([], { later: async () => NaN });
   await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:52:2");
   assert.ok(value.unusable);
@@ -83,7 +83,8 @@ test("an exception of a host function goes to the caller", async () => {
   assert.match(value.unusable, /the storage is gone/);
 });
 
-// Expected identity follows spec 4.1 and 11.4; display follows 11.8.
+// Distinct nominal constructors are different values, also when the host
+// passes one object through both declarations.
 test("compiled opaque imports and exports preserve nominal identity", async () => {
   const reference = {};
   for (const opaque of [reference, null]) {
@@ -92,8 +93,8 @@ test("compiled opaque imports and exports preserve nominal identity", async () =
   }
 });
 
-// Native 3.1 and N9.1/N9.5: consume the real compiler's separate plan, keep
-// restricted callbacks in one invocation, and dispose every created resource.
+// Consumes the real compiler's separate plan, keeps restricted callbacks in
+// one invocation, and disposes every created resource.
 test("compiler binding plan authorizes context registrations on the JS host", async () => {
   const { authorizeBindings } = await import("../ilang.mjs");
   const plan = JSON.parse(await readFile(new URL("../../../tests/browser/fixtures/compiled.bindings.json", import.meta.url), "utf8"));

@@ -16,6 +16,10 @@ legacy = []
 name = "migrate-syntax3"
 required-features = ["legacy"]
 
+[[example]]
+name = "migrate-syntax3-pipe"
+required-features = ["legacy"]
+
 [[test]]
 name = "syn3"
 required-features = ["legacy"]

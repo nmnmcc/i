@@ -10,12 +10,12 @@
 (main, User(..), Shape)
 
 /// A user.
-User = (name = String, age = Int)
+User { User(name: String, age: Int) }
 
-Shape(A) = <B>(A, B) <- (Fail(String), ..N) -> A | Nil
+Shape(A) = (A, A) -> A | Nil
 
 @host("console")
-Console = (print = (String) -> Nil)
+Console { Console(print: (String) -> Nil) }
 
 @external("env", "now")
 now: () -> Float
@@ -34,24 +34,26 @@ numbers = () {
 strings = "tab\t quote\" slash\\ \u{1F600} bad\q
 over two lines"
 
-floats = <A>(x: Float, y) -> Float {
+floats = (x: Float, y) -> Float ^ fail.Fail ! Nil {
   z = -.x *. y +. 1.5 /. 2.0 -. 0.5
-  z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 |>
-    (True) { z }
-    | (False) { 0.0 }
+  z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 |> {
+    True -> z
+    False -> 0.0
+  }
 }
 
-main = () <- (io: Console) {
+main = (io ! Console) {
   bits = <<1, 2: u16be, s: utf8, f: f64le, rest: bits>>
   [first, ..rest] = [1, 2, 3]
-  user = User(..base, name = "x")
+  user = User(..base, name: "x")
   label = user.name <> "!"
-  n = first |>
-    (0 | 1) { 1 }
-    | (n ? n > 10) { n % 3 }
-    | (_) { __ignored }
-  1 |> plus(2) == 3 != False
-  opt.map(Some(1), (x) { x * 2 }) <- (io)
+  n = first |> {
+    0 | 1 -> 1
+    n ? n > 10 -> n % 3
+    _ -> __ignored
+  }
+  { 1 |> plus(2) } == 3 != False
+  opt.map(Some(1), (x) { x * 2 })
 }
 
 test("adds", () { assert(plus(1, 2) == 3) })

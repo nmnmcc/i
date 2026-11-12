@@ -1,4 +1,5 @@
-//! Token ranges retain expression highlighting inside interpolated strings.
+//! Semantic tokens. The token ranges retain expression highlighting inside
+//! interpolated strings.
 use crate::position::LineIndex;
 use ilang_syntax::{
     lexer,

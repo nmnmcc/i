@@ -178,4 +178,5 @@ impl Diagnostic {
     }
 }
 
-mod walk;
+#[doc(hidden)]
+pub mod walk;

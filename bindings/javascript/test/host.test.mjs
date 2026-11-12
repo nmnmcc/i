@@ -253,7 +253,7 @@ test("GC, tail calls and exceptions remain available through the adapter", async
   assert.equal(value.exports.gc_sum(10_000), 50_005_000);
 });
 
-test("metadata that does not follow B.6 fails before instantiation", async () => {
+test("metadata that is not correct fails before instantiation", async () => {
   const module = await WebAssembly.compile(customFixture);
   const base = { version: 3, entry: null, tests: [], exports: {}, services: {}, externals: {} };
   assert.equal(readAbi(module, base).entry, null);
@@ -332,7 +332,7 @@ test("a service may not call the instance during the import", async () => {
         return inner instanceof Promise ? inner.then(() => x) : x;
       },
     });
-    await assert.rejects(value.callAsync("app/async.later", [1]), { message: "The instance is running Wasm; a host function may not call it (§B.3)" });
+    await assert.rejects(value.callAsync("app/async.later", [1]), { message: "The instance is running Wasm; a host function may not call it" });
     assert.equal(starts, 1);
     assert.ok(value.unusable);
     assert.throws(() => value.call("nil_roundtrip"), /make a new instance/);
@@ -595,10 +595,11 @@ test("a module without ilang_continue or an ilang_resume export breaks", async (
   const value = await guest([], { later: () => new Promise(() => {}) });
   void value.callAsync("app/async.later", [1]);
   assert.throws(() => value.exports.ilang_continue(), WebAssembly.RuntimeError);
-  // No answer may resume this instance after the raw trap (B.5).
+  // No answer may resume this instance after the raw trap.
 });
 
-// B.5 requires exports when a request starts or status 2 is returned,
+// A module must have the export that answers a request when a request starts,
+// or the export `ilang_continue` when status 2 is returned,
 // even when an answer is ready, the entry ends, or the request is cancelled.
 test("required exports are checked before delivery or drop", async () => {
   for (const [fixture, badResume] of [[noContinueFixture, "no_resume"], [wrongTypesFixture, "bad_resume"]]) {

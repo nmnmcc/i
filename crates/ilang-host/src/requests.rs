@@ -53,7 +53,7 @@ impl Future for Polling {
         }
         slot.waker = Some(context.waker().clone());
         // FuturesUnordered may revisit self-waking work within one poll.
-        // Give the executor a turn before polling that work again (H14).
+        // Give the executor a turn before polling that work again.
         if repeated {
             context.waker().wake_by_ref();
             return Poll::Pending;
@@ -80,7 +80,7 @@ pub(crate) struct Requests {
 
 impl Requests {
     /// Every import saves this flag, disables admission during its body,
-    /// then restores the saved value (H2).
+    /// then restores the saved value.
     pub fn take_accepting(&mut self) -> bool {
         std::mem::replace(&mut self.accepting, false)
     }
@@ -93,7 +93,8 @@ impl Requests {
         self.outstanding.is_empty()
     }
 
-    /// Check before calling the service's start closure (H1, H2).
+    /// Checks, before the service's start closure is called, that a request
+    /// may start now and that `id` is not outstanding.
     pub fn admit(&self, admitted: bool, id: i32) -> Result<u32> {
         if !admitted {
             bail!("the module started request {id} outside an async call");

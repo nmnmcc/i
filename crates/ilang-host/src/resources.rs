@@ -1,4 +1,4 @@
-//! Run-owned resources and host-wide, non-reusing Int identities (native N9).
+//! Run-owned resources and host-wide, non-reusing Int identities.
 //!
 //! Resource implementations own safe OS references. Cleanup starters must return
 //! promptly, arrange any asynchronous cleanup independently of request futures,
@@ -60,7 +60,7 @@ fn isolate_cleanup(errors: &CleanupErrors, phase: &'static str, action: impl FnO
     }
 }
 
-/// Reuse this host across programs, instances and tests. Clones share identities.
+/// Reuses this host across programs, instances and tests. Clones share identities.
 #[derive(Clone)]
 pub struct ResourceHost(Arc<Mutex<Allocator>>, CleanupErrors);
 struct Allocator {
@@ -79,7 +79,7 @@ impl Default for ResourceHost {
     }
 }
 impl ResourceHost {
-    /// Drain this host's cleanup diagnostics; cleanup itself remains error-free.
+    /// Drains this host's cleanup diagnostics; cleanup itself remains error-free.
     pub fn take_cleanup_errors(&self) -> Vec<CleanupFailure> {
         std::mem::take(&mut *self.1.lock().unwrap())
     }
@@ -224,7 +224,7 @@ impl ResourceContext {
         !self.table.lock().unwrap().ended
     }
 
-    /// Register a host-owned creation/cleanup job before starting OS work.
+    /// Registers a host-owned creation/cleanup job before starting OS work.
     /// Its independent owner keeps this token until even late-created resources
     /// have been cleaned. Teardown joins the receipt, not a request future.
     pub fn cleanup_job(&self) -> Result<CleanupDone, ResourceError> {
@@ -242,7 +242,7 @@ impl ResourceContext {
         })
     }
 
-    /// Insert before exposing a reply. On exhaustion or a late creation, cleanup
+    /// Inserts before exposing a reply. On exhaustion or a late creation, cleanup
     /// still starts and owns the resource, but no number is exposed or reused.
     pub fn insert<T: Any + Send + Sync>(
         &self,
@@ -325,7 +325,7 @@ impl ResourceContext {
         })
     }
 
-    /// Consume an idle resource atomically, for operations such as upgrading a
+    /// Consumes an idle resource atomically, for operations such as upgrading a
     /// TCP stream. Existing operations make the upgrade busy; after success no
     /// new operation can acquire the old identity.
     pub fn take_idle<T: Any + Send + Sync>(
@@ -406,7 +406,7 @@ impl ResourceContext {
         receipt
     }
 
-    /// Close admission synchronously and start all cleanup outside the lock.
+    /// Closes admission synchronously and starts all cleanup outside the lock.
     /// The returned receipts include cleanup that was already in progress.
     pub fn teardown(&self) -> Vec<CloseReceipt> {
         let mut table = self.table.lock().unwrap();
@@ -491,8 +491,8 @@ impl<T> Drop for Lease<T> {
     }
 }
 
-/// Own an undelivered creator reply. Publication explicitly disarms this guard;
-/// otherwise dropping the reply closes the resource (native N9.4).
+/// Owns an undelivered creator reply. Publication explicitly disarms this guard;
+/// otherwise dropping the reply closes the resource.
 pub struct ProvisionalResource {
     context: ResourceContext,
     id: BigInt,

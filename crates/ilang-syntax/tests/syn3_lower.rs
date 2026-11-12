@@ -92,7 +92,10 @@ fn type_parameters_and_row_variables() {
     );
     assert!(text.contains("map(A, B, N, N%E) ="), "{text}");
     assert!(text.contains("f: (A) -> B ^ N%E ! N"), "{text}");
-    assert!(text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"), "{text}");
+    assert!(
+        text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -103,7 +106,10 @@ fn several_positions() {
 
 #[test]
 fn forms_of_later_stages_are_errors() {
-    bad("area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n", "stage 9");
+    bad(
+        "area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n",
+        "stage 9",
+    );
     bad("keep = (f: Int) <- (..env: N) { f }\n", "stage E6");
     bad("f = (x) { g(x) <- env }\n", "stage E6");
 }

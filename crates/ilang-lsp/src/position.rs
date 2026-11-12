@@ -1,6 +1,6 @@
 //! Positions: LSP counts lines from 0 and characters in UTF-16 code units;
 //! the compiler counts bytes. `\r\n`, `\r`, and `\n` all end a line, both
-//! in LSP and in i (§1.1).
+//! in LSP and in i.
 
 use ilang_syntax::span::Span;
 use lsp_types::{Position, Range};

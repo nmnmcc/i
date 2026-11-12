@@ -1,9 +1,9 @@
-//! The lock file `i.lock` (§2.8) and the hash of a package.
+//! The lock file `i.lock` and the hash of a package.
 
 use crate::manifest::{Version, parse_version};
 use sha2::{Digest, Sha256};
 
-/// A file of a package, as git keeps it (§2.8).
+/// A file of a package, as git keeps it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackageFile {
     /// The path from the package directory, with `/` between the parts.
@@ -20,7 +20,7 @@ pub enum FileKind {
     Symlink,
 }
 
-/// The hash of a package (§2.8): `sha256-` and the lowercase hex SHA-256 of,
+/// Returns the hash of a package: `sha256-` and the lowercase hex SHA-256 of,
 /// for each file in the order of their paths as UTF-8 bytes, the path, a zero
 /// byte, the size as a decimal number, a zero byte, and the bytes.
 pub fn hash(files: &[PackageFile]) -> String {
@@ -73,7 +73,7 @@ pub struct Lock {
 /// A line of `i.lock` that is not correct.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LockError {
-    /// From 1.
+    /// The number of the line, counted from 1.
     pub line: usize,
     /// The byte offset of the line in the file.
     pub offset: usize,
@@ -154,7 +154,7 @@ impl Lock {
     }
 
     /// The text of `i.lock`: one line for each version, in the order of
-    /// locations and then versions as UTF-8 bytes (§2.8).
+    /// locations and then versions as UTF-8 bytes.
     pub fn render(&self) -> String {
         let mut lines: Vec<&LockLine> = self.lines.iter().collect();
         lines.sort_by(|a, b| a.sort_key().cmp(&b.sort_key()));

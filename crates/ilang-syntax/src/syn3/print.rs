@@ -643,7 +643,11 @@ impl Printer<'_> {
         match &b.value.kind {
             ExprKind::Chain(fs) if fs.len() > 1 => {
                 let branches = self.branches(fs);
-                group(cat(vec![pattern, t(" ="), nest(cat(vec![Doc::Line, branches]))]))
+                group(cat(vec![
+                    pattern,
+                    t(" ="),
+                    nest(cat(vec![Doc::Line, branches])),
+                ]))
             }
             _ => cat(vec![pattern, t(" = "), self.expr(&b.value, LOWEST)]),
         }
@@ -757,20 +761,18 @@ impl Printer<'_> {
     /// Data, or the data of a call. When `hug` is set and the last item is a
     /// function or a block, it begins on the line of the `(`.
     fn data(&mut self, items: &[DItem], hug: bool) -> Doc {
-        let hugged = hug
-            && match items.last() {
+        let hugged =
+            hug && match items.last() {
                 Some(DItem::Pos(e)) => match &e.kind {
                     ExprKind::Chain(fs) => fs.len() == 1,
                     ExprKind::Block(b) => b.stmts.len() > 1,
                     _ => false,
                 },
                 _ => false,
-            }
-            && !self.comment_before(match items.last() {
+            } && !self.comment_before(match items.last() {
                 Some(DItem::Pos(e)) => e.span.0.start,
                 _ => 0,
-            })
-            && items[..items.len() - 1].iter().all(|i| match i {
+            }) && items[..items.len() - 1].iter().all(|i| match i {
                 DItem::Pos(e) | DItem::Label(_, e) | DItem::Spread(e) => {
                     !matches!(e.kind, ExprKind::Chain(_) | ExprKind::Block(_))
                 }
@@ -839,7 +841,12 @@ impl Printer<'_> {
             out.push(t("()"));
         } else {
             inner.insert(0, Doc::Soft);
-            out.push(group(cat(vec![t("("), nest(cat(inner)), Doc::Soft, t(")")])));
+            out.push(group(cat(vec![
+                t("("),
+                nest(cat(inner)),
+                Doc::Soft,
+                t(")"),
+            ])));
         }
         if let Some(services) = &f.services {
             out.push(t(" <- "));
@@ -1094,9 +1101,7 @@ impl Printer<'_> {
                 } else {
                     self.written(p.span, |k| matches!(k, T::Int(x) if x == value))
                 };
-                t(text.unwrap_or_else(|| {
-                    format!("{}{value}", if *negative { "-" } else { "" })
-                }))
+                t(text.unwrap_or_else(|| format!("{}{value}", if *negative { "-" } else { "" })))
             }
             PatternKind::Float { negative, value } => t(format!(
                 "{}{}",

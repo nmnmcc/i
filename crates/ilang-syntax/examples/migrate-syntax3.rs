@@ -171,7 +171,8 @@ fn check(path: &Path, c: &Converted) -> Option<String> {
                 shown.trim()
             ));
         }
-        (module != c.module).then(|| format!("{what}: the tree read back is not the converted tree"))
+        (module != c.module)
+            .then(|| format!("{what}: the tree read back is not the converted tree"))
     };
     if is_lisp(path) {
         return reparse(&c.text, "lisp");
@@ -181,7 +182,10 @@ fn check(path: &Path, c: &Converted) -> Option<String> {
         .or_else(|| {
             let kept = ilang_syntax::lexer::lex3(&c.text).comments.len();
             (kept != c.comments).then(|| {
-                format!("the source has {} comments, the new text {kept}", c.comments)
+                format!(
+                    "the source has {} comments, the new text {kept}",
+                    c.comments
+                )
             })
         })
         .or_else(|| match syn3::format(&c.text) {
@@ -192,7 +196,9 @@ fn check(path: &Path, c: &Converted) -> Option<String> {
                     .zip(c.text.lines())
                     .find(|(a, b)| a != b)
                     .unwrap_or(("", ""));
-                Some(format!("the formatter changes its own text:\n      {b}\n      {a}"))
+                Some(format!(
+                    "the formatter changes its own text:\n      {b}\n      {a}"
+                ))
             }
             Err(_) => Some("the formatter rejects the new text".into()),
         })
@@ -228,7 +234,9 @@ fn ctor_table(files: &[PathBuf]) -> convert::Signatures {
 
 fn verify(dirs: &[String]) -> i32 {
     let dirs: Vec<String> = if dirs.is_empty() {
-        ["lib", "std", "examples", "tests"].map(String::from).to_vec()
+        ["lib", "std", "examples", "tests"]
+            .map(String::from)
+            .to_vec()
     } else {
         dirs.to_vec()
     };

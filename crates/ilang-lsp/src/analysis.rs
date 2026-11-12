@@ -238,7 +238,7 @@ fn analyze(job: &Job) -> (Analysis, bool) {
 }
 
 /// Adds the open documents under `src/` and `test/` of the package that
-/// are not files yet as its modules (§2.1), with their text.
+/// are not files yet as its modules, with their text.
 fn add_new_documents(
     docs: &HashMap<PathBuf, String>,
     graph: &mut PackageGraph,

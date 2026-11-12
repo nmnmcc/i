@@ -100,7 +100,10 @@ pub enum ItemKind {
     TypeDef(TypeDef),
     Bind(Binding),
     /// `name: Type` with no value (`@external`, `@js`).
-    Decl { name: Ident, ty: Type },
+    Decl {
+        name: Ident,
+        ty: Type,
+    },
     /// `[module.]name(data)` at the top level, kept for macros.
     Macro {
         module: Option<Ident>,
