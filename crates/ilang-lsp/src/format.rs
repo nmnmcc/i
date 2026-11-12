@@ -2,7 +2,7 @@
 //! the same formatter as `i fmt`. It gives no edit when the text has a
 //! syntax error.
 
-/// The formatter.
+/// Returns the formatter, a function from source text to formatted text.
 pub fn formatter() -> Option<fn(&str) -> Option<String>> {
     Some(format_source)
 }

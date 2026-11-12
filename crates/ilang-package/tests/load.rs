@@ -1,4 +1,4 @@
-//! Loading the package graph (§2.1, §2.6).
+//! Loading the package graph.
 
 use ilang_package::{ModuleKind, code, load};
 use std::fs;

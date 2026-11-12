@@ -1,0 +1,3 @@
+# spec: 15.7 7.5; typed macro typed no item position.
+# expect: compile-error E0234
+name = "spec"

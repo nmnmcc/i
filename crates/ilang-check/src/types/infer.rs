@@ -173,6 +173,17 @@ struct PendingFailure {
     span: Span,
 }
 
+struct PendingTyped {
+    definition: DefId,
+    module: ModuleId,
+    span: Span,
+    signature: Ty,
+    argument_types: Vec<Ty>,
+    input_spans: HashSet<Span>,
+    locals: HashMap<VarId, Scheme>,
+    known: HashMap<VarId, Ty>,
+}
+
 struct PendingUnion {
     failure: super::solve::Failure,
     module: ModuleId,
@@ -183,7 +194,7 @@ struct PendingUnion {
 
 pub(crate) struct Checker<'a> {
     pub p: &'a Program,
-    sources: &'a Sources,
+    pub(super) sources: &'a Sources,
     pub s: Solver,
     pub diags: Vec<Diagnostic>,
     /// The module whose code is being typed, for the place of problems.
@@ -225,6 +236,7 @@ pub(crate) struct Checker<'a> {
     pub out: Typed,
     numeric_handles: HashMap<(ModuleId, Span), Ty>,
     numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
+    pub(super) query_binder_handles: HashMap<(ModuleId, Span), Ty>,
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds (§4.8 rule 11).
     pub cases: Vec<super::pattern::PendingCase>,
@@ -239,6 +251,15 @@ pub(crate) struct Checker<'a> {
     pending_failures: Vec<PendingFailure>,
     pending_unions: Vec<PendingUnion>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
+    pending_typed: Vec<PendingTyped>,
+    checked_holes: HashMap<Span, (Ty, Ty)>,
+    expression_known: HashMap<(ModuleId, Span), Ty>,
+    pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
+    pub(super) typed_handles: super::typed_macro::HandleArena,
+    typed_generalized_roots: HashSet<super::V>,
+    typed_depth: u16,
+    typed_var_count: u32,
+    typed_ty_var_count: u32,
     pub(super) coverage: std::cell::RefCell<super::coverage::Searches>,
 }
 
@@ -288,6 +309,7 @@ impl<'a> Checker<'a> {
             out: Typed::default(),
             numeric_handles: HashMap::new(),
             numeric_param_handles: HashMap::new(),
+            query_binder_handles: HashMap::new(),
             cases: Vec::new(),
             keep_locals: false,
             field_ctors: HashMap::new(),
@@ -297,6 +319,15 @@ impl<'a> Checker<'a> {
             pending_failures: Vec::new(),
             pending_unions: Vec::new(),
             shared_fields: HashMap::new(),
+            pending_typed: Vec::new(),
+            checked_holes: HashMap::new(),
+            expression_known: HashMap::new(),
+            expression_effects: HashMap::new(),
+            typed_handles: super::typed_macro::HandleArena::new(),
+            typed_generalized_roots: HashSet::new(),
+            typed_depth: 0,
+            typed_var_count: p.var_count,
+            typed_ty_var_count: p.ty_var_count,
             coverage: Default::default(),
         }
     }
@@ -521,6 +552,7 @@ impl<'a> Checker<'a> {
     /// One group of top-level bindings (§4.7): typed together, then
     /// generalized together when every value is a direct value.
     fn group(&mut self, group: &[BindingRef]) {
+        let error_start = self.diags.len();
         if group.len() > 1 {
             for reference in group {
                 let binding = &self.p.binding(*reference).binding;
@@ -710,6 +742,27 @@ impl<'a> Checker<'a> {
         }
         self.finish_reads(group, &candidates);
         self.discharge_union_proofs();
+        if self.pending_typed.is_empty() {
+            // No typed call in this group: no barrier work.
+        } else if !self.diags[error_start..].iter().any(Diagnostic::is_error) {
+            let mut roots: Vec<_> = self
+                .tyvars
+                .values()
+                .flat_map(super::typed_macro::variables)
+                .collect();
+            roots.extend(self.kgen.iter().copied());
+            roots.extend(self.typed_generalized_roots.iter().copied());
+            for scheme in self.defs.values() {
+                roots.extend(super::typed_macro::variables(&scheme.ty));
+            }
+            for (_, _, t, _) in &types {
+                roots.extend(super::typed_macro::variables(t));
+            }
+            let fixed = super::typed_macro::reachable(&self.s, roots);
+            self.expand_typed_calls(fixed);
+        } else {
+            self.pending_typed.clear();
+        }
         self.group_level = None;
         for (d, _, t, span) in types {
             self.set_module(d.module);
@@ -761,6 +814,244 @@ impl<'a> Checker<'a> {
             let b = group[0];
             self.set_module(b.module);
             self.report_coalescing(p.binding(b).binding.span);
+        }
+    }
+
+    fn expand_typed_calls(&mut self, fixed: HashSet<super::V>) {
+        let Some(expander) = self.p.typed_expander.clone() else {
+            if let Some((module, span)) = self.pending_typed.first().map(|c| (c.module, c.span)) {
+                self.set_module(module);
+                self.error(
+                    code::MACRO_RESERVED,
+                    span,
+                    "a typed macro needs the compiler expansion driver",
+                );
+            }
+            return;
+        };
+        let mut calls = std::mem::take(&mut self.pending_typed);
+        calls.sort_by_key(|c| (c.module, c.span.start, std::cmp::Reverse(c.span.end)));
+        let snapshot = self.s.clone();
+        let mut expanded_ancestors: Vec<(ModuleId, Span, HashSet<Span>)> = Vec::new();
+        for call in calls {
+            if expanded_ancestors
+                .iter()
+                .rev()
+                .any(|(m, parent, retained)| {
+                    *m == call.module
+                        && parent.start <= call.span.start
+                        && call.span.end <= parent.end
+                        && !retained.contains(&call.span)
+                })
+            {
+                continue;
+            }
+            if self.typed_depth == 256 {
+                self.set_module(call.module);
+                self.error(
+                    code::MACRO_RESERVED,
+                    call.span,
+                    "typed macro expansion exceeds depth 256",
+                );
+                continue;
+            }
+            self.set_module(call.module);
+            let expressions = self
+                .numeric_handles
+                .iter()
+                .chain(&self.query_binder_handles)
+                .filter(|((m, _), _)| *m == call.module)
+                .map(|((_, span), ty)| (*span, ty.clone()))
+                .collect();
+            let query = std::sync::Arc::new(super::TypedMacroQuery::new(
+                self,
+                call.signature.clone(),
+                expressions,
+                fixed.clone(),
+                call.span,
+                &call.argument_types,
+                &call.input_spans,
+            ));
+            let output = match expander.expand(
+                crate::typed_macro::Invocation {
+                    program: self.p,
+                    module: call.module,
+                    span: call.span,
+                    definition: call.definition,
+                    var_count: self.typed_var_count,
+                    ty_var_count: self.typed_ty_var_count,
+                },
+                query.clone(),
+            ) {
+                Ok(o) => o,
+                Err(ds) => {
+                    self.diags.extend(ds);
+                    continue;
+                }
+            };
+            let mut trial = Checker::new(&output.resolution, self.sources);
+            trial.typed_depth = self.typed_depth + 1;
+            trial.typed_var_count = output.var_count;
+            trial.typed_ty_var_count = output.ty_var_count;
+            trial.module = call.module;
+            trial.s = snapshot.clone();
+            trial
+                .s
+                .vars
+                .extend(self.s.vars[snapshot.vars.len()..].iter().cloned());
+            trial.s.freeze();
+            let boundary = trial.s.vars.len();
+            trial.locals = call.locals;
+            trial.kvars = call.known;
+            trial.defs = self.defs.clone();
+            trial.tyvars = self.tyvars.clone();
+            trial.reads = self.reads.clone();
+            trial.known = self.known.clone();
+            trial.known_args = self.known_args.clone();
+            trial.kgen = self.kgen.clone();
+            trial.out = self.out.clone();
+            trial.numeric_handles = self.numeric_handles.clone();
+            trial.numeric_param_handles = self.numeric_param_handles.clone();
+            trial.expression_known = self.expression_known.clone();
+            trial.expression_effects = self.expression_effects.clone();
+            trial.query_binder_handles = self.query_binder_handles.clone();
+            trial.label_declared_vars = self.label_declared_vars.clone();
+            trial.label_key_slots = self.label_key_slots.clone();
+            trial.label_key_values = self.label_key_values.clone();
+            trial.typed_handles = query.arena();
+            for (index, t) in &trial.typed_handles.types {
+                trial
+                    .tyvars
+                    .insert(TyVarId(0x8000_0000 | *index), t.clone());
+            }
+            trial.checked_holes = output
+                .holes
+                .iter()
+                .filter_map(|(new, old)| {
+                    Some((
+                        *new,
+                        (
+                            self.numeric_handles.get(&(call.module, *old))?.clone(),
+                            self.expression_known
+                                .get(&(call.module, *old))
+                                .cloned()
+                                .unwrap_or(Ty::Top),
+                        ),
+                    ))
+                })
+                .collect();
+            trial.effects.push(Effects::default());
+            let ty = trial.infer(&output.expression);
+            let (err, env) = trial.pop_effects(call.span);
+            if let Ty::Fn(f) = &call.signature {
+                let before = trial.diags.len();
+                trial.sub(&ty, &f.ret, call.span);
+                let mut input_vars = HashSet::new();
+                for (_, t) in &f.params {
+                    super::alias::map_vars(t, &mut |v| {
+                        input_vars.insert(v);
+                        Ty::Var(v)
+                    });
+                }
+                let mut result_only = false;
+                super::alias::map_vars(&f.ret, &mut |v| {
+                    result_only |= !input_vars.contains(&v);
+                    Ty::Var(v)
+                });
+                for d in trial.diags[before..].iter_mut().filter(|d| d.is_error()) {
+                    d.message = if result_only {
+                        format!(
+                            "a result-only signature variable has no lower evidence, so the output cannot choose its type (§15.7.5): {}",
+                            d.message
+                        )
+                    } else {
+                        format!(
+                            "the output does not have the declared result type; a call's type cannot depend on its expansion (§15.7.5): {}",
+                            d.message
+                        )
+                    };
+                }
+                trial.sub(&err, &f.err, call.span);
+                trial.s.constrain_env(&env, &f.env);
+                if !trial.s.failures.is_empty() {
+                    trial.s.failures.clear();
+                    trial.error(
+                        code::TYPE_MISMATCH,
+                        call.span,
+                        "typed macro output needs an environment outside its signature",
+                    );
+                }
+                let (exposed, actual) = {
+                    let q = query.state.lock().expect("query snapshot");
+                    (
+                        super::typed_macro::substitute(&f.ret, &q.substitution),
+                        super::typed_macro::substitute(&ty, &q.substitution),
+                    )
+                };
+                trial.sub(&actual, &exposed, call.span);
+            }
+            for pending in std::mem::take(&mut trial.cases) {
+                trial.check_case(pending);
+            }
+            trial.discharge_union_proofs();
+            if !trial.pending_typed.is_empty() {
+                let nested_fixed = (0..boundary)
+                    .map(|i| super::V(i as u32))
+                    .chain(trial.typed_generalized_roots.iter().copied())
+                    .collect();
+                trial.expand_typed_calls(nested_fixed);
+            }
+            // Expansion diagnostics are attributed to the call; argument
+            // warnings already came from the signature check.
+            let mut errors: Vec<_> = trial
+                .diags
+                .into_iter()
+                .filter(Diagnostic::is_error)
+                .collect();
+            for error in &mut errors {
+                if let Some(origin) = output.scoped.origin(error.span) {
+                    error.related.push(ilang_package::DiagnosticNote {
+                        source: ilang_package::SourceId(origin.syntax.scope().module),
+                        span: origin.syntax.span(),
+                        message: "typed output originates here".into(),
+                    });
+                }
+                error.span = call.span;
+                error.message = format!("invalid typed macro expansion: {}", error.message);
+            }
+            if errors.is_empty() {
+                assert_eq!(
+                    &trial.s.vars[..boundary],
+                    &self.s.vars[..boundary],
+                    "typed output changed a snapshot variable"
+                );
+                self.s.vars.extend(trial.s.vars.into_iter().skip(boundary));
+                for note in &output.notes {
+                    self.diags.push(Diagnostic::note(
+                        Some(self.p.module(call.module).source),
+                        call.span,
+                        note.clone(),
+                    ));
+                }
+                self.typed_handles = trial.typed_handles;
+                self.out = trial.out;
+                self.numeric_handles = trial.numeric_handles;
+                self.numeric_param_handles = trial.numeric_param_handles;
+                self.typed_var_count = trial.typed_var_count;
+                self.typed_ty_var_count = trial.typed_ty_var_count;
+                let mut retained = HashSet::new();
+                let mut tree = output.expression.clone();
+                visit_expr_mut(&mut tree, &mut |e| {
+                    retained.insert(e.span);
+                    true
+                });
+                expanded_ancestors.push((call.module, call.span, retained));
+                self.out
+                    .typed_expansions
+                    .insert((call.module, call.span), output);
+            } else {
+                self.diags.extend(errors);
+            }
         }
     }
 
@@ -1698,7 +1989,25 @@ impl<'a> Checker<'a> {
     /// The type of `e`, and its known type (§4.8), `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
+        if let Some((ty, known)) = self.checked_holes.get(&e.span).cloned() {
+            return (ty, known);
+        }
+        // A frame per node retains the argument's effects independently of
+        // where an expansion later places or drops that checked node.
+        let observe = !self.p.typed_macros.is_empty();
+        if observe {
+            self.effects.push(Effects::default());
+        }
         let result = self.infer_k_inner(e, expected);
+        if observe {
+            let effects = self.pop_effects(e.span);
+            self.add_err(effects.0.clone());
+            self.add_env(effects.1.clone());
+            self.expression_effects
+                .insert((self.module, e.span), effects);
+            self.expression_known
+                .insert((self.module, e.span), result.1.clone());
+        }
         self.numeric_handles
             .insert((self.module, e.span), result.0.clone());
         result
@@ -1726,6 +2035,13 @@ impl<'a> Checker<'a> {
                 (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
             }
             ExprKind::Name(ValueRef::Def(d)) => {
+                if self.p.typed_macros.contains(d) && !self.label_callee {
+                    self.error(
+                        code::MACRO_RESERVED,
+                        e.span,
+                        "a typed macro is allowed only as an expression call, not as a value",
+                    );
+                }
                 let scheme = self.defs.get(d).cloned();
                 let k = match self.p.def(*d).kind {
                     // §4.8: an imported name, and a member `m.x` of an
@@ -2129,6 +2445,11 @@ impl<'a> Checker<'a> {
         self.label_callee = true;
         let (mut f, mut kf) = self.infer_k(callee, &Ty::Top);
         self.label_callee = was_callee;
+        let typed_definition = match callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) if self.p.typed_macros.contains(&d) => Some(d),
+            _ => None,
+        };
+        let typed_signature = f.clone();
         let mut kfn = known::one_fn(&kf);
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
@@ -2244,6 +2565,8 @@ impl<'a> Checker<'a> {
             }
             _ => Ty::Top,
         };
+        let typed_argument_types =
+            typed_definition.map(|_| placed.iter().map(|(t, _)| t.clone()).collect());
         let t = match &f {
             Ty::Fn(ft) if ft.params.len() == placed.len() => {
                 for ((t, s), (_, p)) in placed.iter().zip(&ft.params) {
@@ -2287,6 +2610,29 @@ impl<'a> Checker<'a> {
                 r
             }
         };
+        if let Some(definition) = typed_definition {
+            let mut input_spans = HashSet::new();
+            for value in &values {
+                let mut e = (*value).clone();
+                visit_expr_mut(&mut e, &mut |e| {
+                    input_spans.insert(e.span);
+                    true
+                });
+                for binder in expression_binders(value) {
+                    input_spans.insert(binder.span);
+                }
+            }
+            self.pending_typed.push(PendingTyped {
+                definition,
+                module: self.module,
+                span,
+                signature: typed_signature,
+                argument_types: typed_argument_types.expect("typed call arguments retained"),
+                input_spans,
+                locals: self.locals.clone(),
+                known: self.kvars.clone(),
+            });
+        }
         (t, known)
     }
 
@@ -3223,6 +3569,13 @@ impl<'a> Checker<'a> {
     }
 
     fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+        if !self.p.typed_macros.is_empty() {
+            self.typed_generalized_roots.extend(
+                super::typed_macro::variables(t)
+                    .into_iter()
+                    .filter(|v| self.s.vars[v.0 as usize].level > level),
+            );
+        }
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
             Err(()) => {

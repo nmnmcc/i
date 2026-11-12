@@ -1676,13 +1676,13 @@ Operators are part of the syntax. They are not functions, and they may not be us
 
 | Level | Operators | Operand type | Result type |
 |---|---|---|---|
-| 1 | `\|\|` | Bool | Bool |
-| 2 | `&&` | Bool | Bool |
-| 3 | `==` `!=` | Any two types; see below | Bool |
-| 4 | `<` `<=` `>` `>=` | Int | Bool |
-| 4 | `<.` `<=.` `>.` `>=.` | Float | Bool |
-| 5 | `<>` | String | String |
-| 6 | `\|>` | See below | |
+| 1 | `\|>` | See below | |
+| 2 | `\|\|` | Bool | Bool |
+| 3 | `&&` | Bool | Bool |
+| 4 | `==` `!=` | Any two types; see below | Bool |
+| 5 | `<` `<=` `>` `>=` | Int | Bool |
+| 5 | `<.` `<=.` `>.` `>=.` | Float | Bool |
+| 6 | `<>` | String | String |
 | 7 | `+` `-` | Int | Int |
 | 7 | `+.` `-.` | Float | Float |
 | 8 | `*` `/` `%` | Int | Int |
@@ -1694,9 +1694,9 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 - Int and Float have different operators. One is never changed into the other without a function such as `core.to_float` (§13).
 - `a |> f` is `f(a)`, and `a |> f(b, …)` is `f(a, b, …)`. The right side of `|>` must be a name, a call, a function, or a clause block.
-- `|>` is weaker than `+` and stronger than the operators of levels 1 to 5: `||`, `&&`, `==`, `!=`, comparisons, and `<>`. So the left side of `|>` that is made with those operators is put in a group: `{ a == b } |> { True -> …  False -> … }`.
+- `|>` is the weakest operator, below `||`, and goes from left to right. Its whole left expression is its left operand: `a == b |> f` is `{ a == b } |> f`, and `a |> f |> g` is `{ a |> f } |> g`. Its right side is made with stronger operators only, so `x |> g == 2` is a compile error; the group is written: `{ x |> g } == 2`.
 - `e |> { … }`, where the right side is a clause block, is a match (§6.12).
-- A match is an operation at level 6, so an operator of level 7 or 8, `.f`, `.k`, or a call after the clause block is part of the right side: in `n |> { 0 -> 1  _ -> 2 } * 10`, the right side is `{ 0 -> 1  _ -> 2 } * 10`, and in `opt |> { … }.name`, it is `{ … }.name`. In the same way, the left side of `1 + n |> { … }` is `1 + n`, as in `{ 1 + n } |> { … }`, and the left side of `-n |> { … }` is `-n`. So a match that is an operand of such an operator or of `-` or `-.`, or that has `.f`, `.k`, or a call after it, is put in a group: `{ n |> { 0 -> 1  _ -> 2 } } * 10`, `1 + { n |> { … } }`, `-{ n |> { … } }`, `{ opt |> { … } }.name`.
+- A match is an operation at level 1, so an operator, `.f`, `.k`, or a call after the clause block is part of the right side: in `n |> { 0 -> 1  _ -> 2 } * 10`, the right side is `{ 0 -> 1  _ -> 2 } * 10`, and in `opt |> { … }.name`, it is `{ … }.name`. In the same way, the left side of `1 + n |> { … }` is `1 + n`, as in `{ 1 + n } |> { … }`, and the left side of `-n |> { … }` is `-n`. So a match that is an operand of such an operator or of `-` or `-.`, or that has `.f`, `.k`, or a call after it, is put in a group: `{ n |> { 0 -> 1  _ -> 2 } } * 10`, `1 + { n |> { … } }`, `-{ n |> { … } }`, `{ opt |> { … } }.name`.
 - When both sides of `==` or `!=` have known types (§4.8), and these are disjoint (§4.5 rule 3), the compiler gives warning W0503, showing both types: the two sides can never be equal. The comparison is well defined and has type `Bool`: `==` is always `False` and `!=` is always `True`. A member of a known type that is `_` or a type variable is never disjoint from anything. Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s: String) { s == 1 }` give the warning, but `(s: String) { s == "a" }`, `(m: "a" | "b") { m == "b" }`, `x == Nil` with `x: Int | Nil`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` do not. Only the top members of the two types are compared (§4.5 rule 3), so `(1, 2) == (3, 4)` and `Some(1) == Some(2)` give no warning, though they are always `False`. Literal types are not widened. The warning adds no narrowing fact. A clause guard `? x == 2` with `x: 1` is always false; coverage treats it as any guard (§7.4). What `==` does is in §11.4.
 
 ### 6.10 Blocks and bindings
@@ -4559,6 +4559,8 @@ A **typed macro** is a declaration and a binding with one name in a `.is` file, 
 
 For type checking, a call of a typed macro is a call of a function with the signature's type: the types of the code around it never depend on what the macro gives, and whether a binding is a direct value and how it is generalized are decided before expansion. The calls of a group of bindings (§4.7) are expanded after the group is inferred, against one unchanged snapshot of its types. The result is checked against the instantiated signature without adding bounds to any type variable of the snapshot, and a result that cannot be proved to fit is a compile error at the call. A generic binding is expanded once, not once per instance.
 
+**Expansion.** A binding group is inferred once, with each typed call standing for its signature; when the group has an error, none of its typed calls is expanded. Its types are kept as a snapshot that every typed call of the group sees, and outer calls are expanded before inner ones. A type variable of the caller is **closed** when it is local to the group, not generalized, and reachable from no published scheme, declared type parameter, generalized variable or non-generalized top-level value; every other variable is **fixed**. For the queries only, a closed variable that occurs only in output places of the instantiated signature is given as the union of its lower bounds (`Never` when there are none), one that occurs only in input places and has upper bounds as their intersection, and any other as one opaque variable; one variable gets the same answer in every query of a run. The result is checked apart from the caller: no variable of the snapshot gains a bound, only new variables of the result do, and an obligation on a variable of the snapshot must be proved from the bounds it already has, or the expansion is rejected. An argument that the result keeps whole keeps its type and the definitions its names resolve to; a binder of the result may not capture a free name of an argument. A new value reference in the result must be to the group itself, to a group it depends on, or to an imported module; a new direct read of a value type is a compile error; and the result may not contribute items, exports or collection entries. An argument that the result drops is still diagnosed from the first check, and no warning is given twice.
+
 ```i
 Truth { Yes  No  NotKnown }
 
@@ -4577,9 +4579,9 @@ Types {
 | `type_of(s)` | The type of `s`, an argument of this run or an expression or bound name inside one |
 | `signature()` | The type of the call as a function type |
 | `subtype(a, b)` | `Yes` when `a <: b` is proved, `No` when it is false and neither has a type variable, `NotKnown` otherwise |
-| `members(t)` | The members of `t` (§4.4); a member of `Int` or `String` with a finite value set gives one literal type per value |
+| `members(t)` | The members of `t` (§4.4), in the order of their `show` text; a member of `Int` or `String` with a finite value set gives one literal type per value, and `A & Int` or `A - U` with a fixed `A` is one member |
 
-A type variable of the snapshot is given as an `Up` node with a scope of its own that only names that variable. A variable that occurs only in the result of the signature has no evidence, so a typed macro cannot choose by the type that its call is expected to have. A typed macro cannot delay an argument that has errors or needs an environment, and it cannot make items.
+A type is a set of values that may be written in several ways, so a macro asks `subtype` and `members` instead of matching the `Syntax` of a type. A type that cannot be written in the type syntax is given as a `TypeView`, which `subtype` accepts and `show` prints as a token that is not source text. A fixed type variable is given as an `Up` node with a scope of its own that only names that variable; it may be written in the result without a declaration, but not in a type test. A variable that occurs only in the result of the signature has no evidence, so a typed macro cannot choose by the type that its call is expected to have. A typed macro cannot delay an argument that has errors or needs an environment, and it cannot make items.
 
 ### 14.9 Running macros
 
@@ -4588,6 +4590,8 @@ The macros of a module run in a program made of that module and the modules it i
 A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full needs (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
 
 An error in expanded code is reported at the span of the code; code from a template is reported at the macro call, with the template as a note. Warnings are given only for code whose span is in the module being compiled.
+
+`i fmt` formats a file in its own surface without expanding macros. `i expand` writes a module after expansion, in the surface that is asked for; a module with quotes can only be written in the Lisp surface, and `i expand --trace` also writes each run with its macro, arguments and result. The language server shows the expansion of a macro call, gives types and completion in the arguments of a typed macro call from its signature, and goes from a name in expanded code to its definition by its span.
 
 <!-- /syn3-old -->
 <!-- syn3-new -->
@@ -4811,6 +4815,8 @@ A **typed macro** is a declaration and a binding with one name in a `.is` file, 
 
 For type checking, a call of a typed macro is a call of a function with the signature's type: the types of the code around it never depend on what the macro gives, and whether a binding is a direct value and how it is generalized are decided before expansion. The calls of a group of bindings (§4.7) are expanded after the group is inferred, against one unchanged snapshot of its types. The result is checked against the instantiated signature without adding bounds to any type variable of the snapshot, and a result that cannot be proved to fit is a compile error at the call. A generic binding is expanded once, not once per instance.
 
+**Expansion.** A binding group is inferred once, with each typed call standing for its signature; when the group has an error, none of its typed calls is expanded. Its types are kept as a snapshot that every typed call of the group sees, and outer calls are expanded before inner ones. A type variable of the caller is **closed** when it is local to the group, not generalized, and reachable from no published scheme, declared type parameter, generalized variable or non-generalized top-level value; every other variable is **fixed**. For the queries only, a closed variable that occurs only in output places of the instantiated signature is given as the union of its lower bounds (`Never` when there are none), one that occurs only in input places and has upper bounds as their intersection, and any other as one opaque variable; one variable gets the same answer in every query of a run. The result is checked apart from the caller: no variable of the snapshot gains a bound, only new variables of the result do, and an obligation on a variable of the snapshot must be proved from the bounds it already has, or the expansion is rejected. An argument that the result keeps whole keeps its type and the definitions its names resolve to; a binder of the result may not capture a free name of an argument. A new value reference in the result must be to the group itself, to a group it depends on, or to an imported module; a new direct read of a value type is a compile error; and the result may not contribute items, exports or collection entries. An argument that the result drops is still diagnosed from the first check, and no warning is given twice.
+
 ```i future-SYN3
 Yes = ()
 No = ()
@@ -4830,9 +4836,9 @@ Types = (
 | `type_of(s)` | The type of `s`, an argument of this run or an expression or bound name inside one |
 | `signature()` | The type of the call as a function type |
 | `subtype(a, b)` | `Yes` when `a <: b` is proved, `No` when it is false and neither has a type variable, `NotKnown` otherwise |
-| `members(t)` | The members of `t` (§4.4); a member of `Int` or `String` with a finite value set gives one literal type per value |
+| `members(t)` | The members of `t` (§4.4), in the order of their `show` text; a member of `Int` or `String` with a finite value set gives one literal type per value, and `A & Int` or `A - U` with a fixed `A` is one member |
 
-A type variable of the snapshot is given as an `Up` node with a scope of its own that only names that variable. A variable that occurs only in the result of the signature has no evidence, so a typed macro cannot choose by the type that its call is expected to have. A typed macro cannot delay an argument that has a need, and it cannot make items.
+A type is a set of values that may be written in several ways, so a macro asks `subtype` and `members` instead of matching the `Syntax` of a type. A type that cannot be written in the type syntax is given as a `TypeView`, which `subtype` accepts and `show` prints as a token that is not source text. A fixed type variable is given as an `Up` node with a scope of its own that only names that variable; it may be written in the result without a declaration, but not in a type test. A variable that occurs only in the result of the signature has no evidence, so a typed macro cannot choose by the type that its call is expected to have. A typed macro cannot delay an argument that has a need, and it cannot make items.
 
 ### 14.9 Running macros
 
@@ -4841,6 +4847,8 @@ The macros of a module run in a program made of that module and the modules it i
 A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full dependencies (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
 
 An error in expanded code is reported at the span of the code; code from a template is reported at the macro call, with the template as a note. Warnings are given only for code whose span is in the module being compiled.
+
+`i fmt` formats a file in its own surface without expanding macros. `i expand` writes a module after expansion, in the surface that is asked for; a module with quotes can only be written in the Lisp surface, and `i expand --trace` also writes each run with its macro, arguments and result. The language server shows the expansion of a macro call, gives types and completion in the arguments of a typed macro call from its signature, and goes from a name in expanded code to its definition by its span.
 
 <!-- /syn3-new -->
 

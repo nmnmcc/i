@@ -497,6 +497,7 @@ impl Printable for syntax::Syntax {
             Quote(x) => View::Prefix("`", x),
             Unquote(x) => View::Prefix("~", x),
             Splice(x) => View::Prefix("~..", x),
+            TypeView(_) => View::Atom("#<type-view>"),
         }
     }
 }

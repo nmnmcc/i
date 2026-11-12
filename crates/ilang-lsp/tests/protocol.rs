@@ -174,7 +174,7 @@ fn find(text: &str, needle: &str, nth: usize) -> (u32, u32) {
     (line, col)
 }
 
-/// Exact LSP diagnostic for an unused top-level binding.
+/// The exact LSP diagnostic for an unused top-level binding.
 fn unused_diagnostic(text: &str, name: &str, binding: &str) -> lsp::Diagnostic {
     let (line, col) = find(text, binding, 0);
     lsp::Diagnostic {
@@ -555,6 +555,33 @@ fn completion_after_an_expression() {
     c.shutdown();
 }
 
+/// Completion inside a typed macro argument comes from the signature check,
+/// also when the macro itself fails to expand.
+#[test]
+fn typed_macro_argument_completion_without_expansion() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = "(m = app/macros)\nPoint { Point(x: Int, y: Int) }\nmain = () {\n  p = Point(1, 2)\n  m.broken(p.x)\n}\n";
+    let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: (broken A) (-> ((: value A)) A)))\n(@ macro (= broken (-> (value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
+    package(
+        dir.path(),
+        &[("src/main.i", text), ("src/macros.is", macros)],
+    );
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    let ds = c.diagnostics(&main);
+    assert!(
+        ds.iter().any(|d| d.message.contains("never expands")),
+        "{ds:?}"
+    );
+    let typing = text.replace("p.x)", "p.)");
+    c.change(&main, 2, &typing);
+    let (l, ch) = find(&typing, "p.)", 0);
+    let r = c.request::<lsp::request::Completion>(position_params(&main, l, ch + 2));
+    assert_eq!(labels(&r), vec!["x", "y"]);
+    c.shutdown();
+}
+
 fn labels(r: &Value) -> Vec<&str> {
     r.as_array()
         .unwrap()
@@ -748,7 +775,7 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
 
 #[test]
 fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
-    // X4: every pattern head targets its existing type, at every depth.
+    // Every pattern head targets its existing type, at every depth.
     let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i")
         .replace("x: Item = 2", "x: Item = 1");
     let source = source.as_str();
@@ -789,7 +816,7 @@ fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
 
 #[test]
 fn disjoint_comparison_is_a_warning_at_the_comparison() {
-    // W520/§6.9 keeps the comparison span and shows both types.
+    // W520 keeps the comparison span and shows both types.
     let source = "x = 1 == 2\n";
     let dir = tempfile::tempdir().unwrap();
     package(dir.path(), &[("src/main.i", source)]);
@@ -870,6 +897,41 @@ fn semantic_tokens_and_hover_inside_raw_interpolation() {
             .is_some_and(|s| s.contains("name:")),
         "{hover:?}"
     );
+}
+
+#[test]
+fn typed_macro_hover_and_definition_through_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
+    let macros = "(, (= syntax (/ i syntax)))\n(, pass)\n/// A typed forwarding macro.\n(@ macro (: (pass A) (-> ((: value A)) A)))\n(@ macro (= pass (-> (value) _ value)))\n";
+    package(
+        dir.path(),
+        &[("src/main.i", source), ("src/macros.is", macros)],
+    );
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mac = file_uri(&dir.path().join("src/macros.is"));
+    let mut client = Client::start();
+    client.open(&main, source);
+    let ds = client.diagnostics(&main);
+    assert!(
+        !ds.iter()
+            .any(|d| d.severity == Some(lsp::DiagnosticSeverity::ERROR)),
+        "{ds:?}"
+    );
+    let (line, column) = find(source, "pass(x)", 0);
+    let hover =
+        client.request::<lsp::request::HoverRequest>(position_params(&main, line, column + 5));
+    assert!(
+        hover["contents"]["value"]
+            .as_str()
+            .is_some_and(|s| s.contains("x: 42")),
+        "{hover:?}"
+    );
+    let definition =
+        client.request::<lsp::request::GotoDefinition>(position_params(&main, line, column + 1));
+    assert_eq!(definition["uri"], mac);
+    // The definition is the binding of the macro, as for any name that also has a declaration.
+    assert_eq!(definition["range"]["start"]["line"], 4);
 }
 
 // ---- Features over a package with modules, tests, and a dependency ----
@@ -2808,7 +2870,8 @@ fn raw_request(c: &mut Client, method: &str, params: Value) {
     }
 }
 
-const BROKEN: &str = /* old-syntax-check: E0010,E0010,E0101,E0010,E0101,E0010,E0002 */ "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
+const BROKEN: &str = /* old-syntax-check: E0010,E0010,E0101,E0010,E0101,E0010,E0002 */
+    "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
 
 #[test]
 fn lsp_every_offset_of_correct_files() {

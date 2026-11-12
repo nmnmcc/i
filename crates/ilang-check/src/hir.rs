@@ -54,6 +54,13 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    pub typed_macros: std::collections::HashSet<DefId>,
+    pub typed_expander: Option<std::sync::Arc<dyn crate::typed_macro::Expander>>,
+    pub(crate) expansion_names: Option<std::sync::Arc<crate::resolve::ExpansionNames>>,
+    pub(crate) expansion_scopes:
+        std::collections::HashMap<(ModuleId, Span), crate::resolve::ExpansionScope>,
+    /// Original calls survive consumer-selected rechecking.
+    pub typed_originals: std::collections::HashMap<(ModuleId, Span), Expr>,
     /// Reads in invalid dependency components, before query recovery.
     pub failed_reads: std::collections::HashSet<OfId>,
     /// Expression SCC members invalidated by a type-dependency cycle.
@@ -949,4 +956,198 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
     }
     pattern(&b.pattern, f);
     expr(&b.value, f);
+}
+
+/// Visit expressions in evaluation syntax order; returning false preserves a checked hole.
+pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
+    if !visit(e) {
+        return;
+    }
+    fn block(b: &mut Block, f: &mut impl FnMut(&mut Expr) -> bool) {
+        for s in &mut b.stmts {
+            match s {
+                Stmt::Bind(b) => visit_expr_mut(&mut b.value, f),
+                Stmt::Env { value, .. } | Stmt::Expr(value) => visit_expr_mut(value, f),
+            }
+        }
+    }
+    fn pattern(p: &mut Pattern, f: &mut impl FnMut(&mut Expr) -> bool) {
+        match &mut p.kind {
+            PatternKind::Quote { captures, .. } => {
+                for (_, p) in captures {
+                    pattern(p, f);
+                }
+            }
+            PatternKind::Named { pattern: p, .. } => pattern(p, f),
+            PatternKind::Constructor { args, .. }
+            | PatternKind::Tuple(args)
+            | PatternKind::Error(args)
+            | PatternKind::List { items: args, .. } => {
+                for p in args {
+                    pattern(p, f);
+                }
+            }
+            PatternKind::BitArray(ss) => {
+                for s in ss {
+                    pattern(&mut s.value, f);
+                    if let Some(x) = s.format.as_mut().and_then(|x| x.arg.as_mut()) {
+                        visit_expr_mut(x, f);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    match &mut e.kind {
+        ExprKind::Tuple(xs) => {
+            for x in xs {
+                visit_expr_mut(x, visit);
+            }
+        }
+        ExprKind::Record { base, fields } => {
+            if let Some(x) = base {
+                visit_expr_mut(x, visit);
+            }
+            for (_, x) in fields {
+                visit_expr_mut(x, visit);
+            }
+        }
+        ExprKind::List { items, rest } => {
+            for x in items {
+                visit_expr_mut(x, visit);
+            }
+            if let Some(x) = rest {
+                visit_expr_mut(x, visit);
+            }
+        }
+        ExprKind::BitArray(ss) => {
+            for s in ss {
+                visit_expr_mut(&mut s.value, visit);
+                if let Some(x) = s.format.as_mut().and_then(|x| x.arg.as_mut()) {
+                    visit_expr_mut(x, visit);
+                }
+            }
+        }
+        ExprKind::Block(b) => block(b, visit),
+        ExprKind::Fn(f) => {
+            for p in &mut f.params {
+                if let Param::Pattern { pattern: p, .. } = p {
+                    pattern(p, visit);
+                }
+            }
+            block(&mut f.body, visit);
+        }
+        ExprKind::Case { subject, clauses } => {
+            visit_expr_mut(subject, visit);
+            for c in clauses {
+                for p in &mut c.patterns {
+                    pattern(p, visit);
+                }
+                if let Some(g) = &mut c.guard {
+                    visit_expr_mut(g, visit);
+                }
+                visit_expr_mut(&mut c.body, visit);
+            }
+        }
+        ExprKind::Call { callee, args } => {
+            visit_expr_mut(callee, visit);
+            for a in args {
+                visit_expr_mut(&mut a.value, visit);
+            }
+        }
+        ExprKind::Field { target, .. }
+        | ExprKind::TupleIndex { target, .. }
+        | ExprKind::Unary { expr: target, .. } => visit_expr_mut(target, visit),
+        ExprKind::RecordUpdate { base, fields, .. } => {
+            visit_expr_mut(base, visit);
+            for (_, x) in fields {
+                visit_expr_mut(x, visit);
+            }
+        }
+        ExprKind::Binary { lhs, rhs, .. } => {
+            visit_expr_mut(lhs, visit);
+            visit_expr_mut(rhs, visit);
+        }
+        ExprKind::Int(_)
+        | ExprKind::Float(_)
+        | ExprKind::String(_)
+        | ExprKind::Name(_)
+        | ExprKind::Error => {}
+    }
+}
+
+/// Binding identities introduced inside an expression, for checked-hole scope validation.
+pub fn expression_binders(expression: &Expr) -> Vec<Binder> {
+    fn pattern(p: &Pattern, out: &mut Vec<Binder>) {
+        match &p.kind {
+            PatternKind::Var(b) => out.push(b.clone()),
+            PatternKind::Typed { binder, .. } => out.extend(binder.iter().cloned()),
+            PatternKind::Named { binder, pattern: p } => {
+                out.push(binder.clone());
+                pattern(p, out);
+            }
+            PatternKind::Prefix { rest, .. } => out.extend(rest.iter().cloned()),
+            PatternKind::Quote { captures, .. } => {
+                for (_, p) in captures {
+                    pattern(p, out);
+                }
+            }
+            PatternKind::Constructor { args, .. }
+            | PatternKind::Tuple(args)
+            | PatternKind::Error(args) => {
+                for p in args {
+                    pattern(p, out);
+                }
+            }
+            PatternKind::List { items, rest } => {
+                for p in items {
+                    pattern(p, out);
+                }
+                if let Some(Some(b)) = rest {
+                    out.push(b.clone());
+                }
+            }
+            PatternKind::BitArray(segments) => {
+                for s in segments {
+                    pattern(&s.value, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    let mut e = expression.clone();
+    visit_expr_mut(&mut e, &mut |e| {
+        match &e.kind {
+            ExprKind::Fn(f) => {
+                for p in &f.params {
+                    match p {
+                        Param::Pattern { pattern: p, .. } => pattern(p, &mut out),
+                        Param::Env { var, name, .. } => out.push(Binder {
+                            var: *var,
+                            name: name.name.clone(),
+                            span: name.span,
+                        }),
+                    }
+                }
+            }
+            ExprKind::Block(b) => {
+                for s in &b.stmts {
+                    if let Stmt::Bind(b) = s {
+                        pattern(&b.pattern, &mut out);
+                    }
+                }
+            }
+            ExprKind::Case { clauses, .. } => {
+                for c in clauses {
+                    for p in &c.patterns {
+                        pattern(p, &mut out);
+                    }
+                }
+            }
+            _ => {}
+        }
+        true
+    });
+    out
 }

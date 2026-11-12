@@ -1,4 +1,4 @@
-//! Packages with a location (§2.6–§2.8), got from local bare repositories
+//! Packages with a location, got from local bare repositories
 //! through `file://` URLs. Nothing here uses the network.
 
 use ilang_package::git::{Git, cache_dir, escape, parse_url_map};

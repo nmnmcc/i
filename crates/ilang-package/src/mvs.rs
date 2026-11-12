@@ -1,4 +1,4 @@
-//! Minimal version selection (§2.7).
+//! Minimal version selection.
 //!
 //! A package with a location is a location and a major version. Starting
 //! from the requirements of the compiled package, every version that is
@@ -12,7 +12,7 @@
 use crate::manifest::Version;
 use std::collections::{BTreeMap, HashSet};
 
-/// A package with a location (§2.7): the location, with its `//dir`, and the
+/// A package with a location: the location, with its `//dir`, and the
 /// major version.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PackageKey {
@@ -59,7 +59,7 @@ impl<F> Selection<F> {
     }
 }
 
-/// Chooses a version for each package that `roots` reach (§2.7).
+/// Chooses a version for each package that `roots` reach.
 ///
 /// `dependencies` reads the `i.toml` of a package at a version, and gives
 /// its dependencies with their lowest versions. It is called once for each

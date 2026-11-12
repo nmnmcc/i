@@ -1143,8 +1143,8 @@ impl<'a> Formatter<'a> {
             if token.span == e.span && matches!(token.kind, T::Interpolated(_)) {
                 return text(f.slice(e.span));
             }
-            // A match is an operation at level 6 (§6.9).
-            if level(e) < min || is_match(e) && min > 6 {
+            // A match is an operation at level 1 (§6.9).
+            if level(e) < min || is_match(e) && min > 1 {
                 let before = f.hard;
                 let body = f.expr_raw(e);
                 if f.hard == before {
@@ -1242,7 +1242,7 @@ impl<'a> Formatter<'a> {
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
             ExprKind::Case { subject, clauses } => {
-                let subject_doc = self.expr(subject, 6);
+                let subject_doc = self.expr(subject, 1);
                 let op = self.tok_after(subject.span.end);
                 let open = self.tok_after(op.span.end).span.start;
                 let body = self.clause_block(open, span.end - 1, clauses);
