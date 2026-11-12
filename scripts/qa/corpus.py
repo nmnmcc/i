@@ -320,9 +320,21 @@ def select(args):
             raise SystemExit('unknown cases: ' + ', '.join(sorted(missing)))
         cases = [c for c in cases if c['id'] in names]
     cases = [c for c in cases if args.filter in c['id']]
+    if getattr(args, 'shard', None):
+        # Shard K of N takes every Nth case by ID, so the shards of one selection
+        # are disjoint and together are the whole selection.
+        index, count = args.shard
+        cases = [c for n, c in enumerate(sorted(cases, key=lambda c: c['id'])) if n % count == index - 1]
     if not cases:
         raise SystemExit('no cases selected')
     return cases
+
+
+def shard(text):
+    match = re.fullmatch(r'([0-9]+)/([0-9]+)', text)
+    if not match or not 1 <= int(match[1]) <= int(match[2]):
+        raise argparse.ArgumentTypeError('expected K/N with 1 <= K <= N')
+    return int(match[1]), int(match[2])
 
 
 def run_corpus(args):
@@ -330,6 +342,10 @@ def run_corpus(args):
     failures = []
     summary = collections.Counter()
     cases = select(args)
+    if args.list:
+        for case in cases:
+            print(case['id'])
+        return
     if args.missing_only:
         cases = [c for c in cases if not (ROOT / c['project'] / 'expected.json').exists()]
         if not cases:
@@ -430,7 +446,7 @@ def run_corpus(args):
             summary['checker-crash-or-timeout'] += 1
         if (n + 1) % 50 == 0:
             print(f'{n+1}/{len(cases)} {dict(summary)}', flush=True)
-    print(json.dumps({'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
+    print(json.dumps({**({'shard': '%d/%d' % args.shard} if args.shard else {}), 'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
     pool.shutdown()
     if failures:
         raise SystemExit(1)
@@ -705,6 +721,8 @@ def main():
     run.add_argument('--missing-only', action='store_true')
     run.add_argument('--keep-bounds', action='store_true', help='retain each saved observation budget during UPDATE=1')
     run.add_argument('--jobs', type=int, default=1)
+    run.add_argument('--shard', type=shard, help='K/N: run only the cases whose index in ID order is K-1 modulo N')
+    run.add_argument('--list', action='store_true', help='print the selected case IDs and run nothing')
     sub.add_parser('parse-register')
     migration = sub.add_parser('migrate-k4')
     migration.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
