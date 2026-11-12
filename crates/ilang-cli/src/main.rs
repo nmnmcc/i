@@ -552,11 +552,14 @@ fn cmd_test(
             }
         }
     }
+    let stage = ilang_syntax::trace::stage("Wasmtime compile");
     let program = b.host_program()?;
+    drop(stage);
     let mut failed = 0;
     let mut passed = 0;
     let mut skipped = 0;
     {
+        let _stage = ilang_syntax::trace::stage("run tests");
         for entry in entries {
             let get = |key: &str| {
                 entry
