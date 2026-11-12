@@ -1029,6 +1029,12 @@ impl Checker<'_> {
         Some(w)
     }
 
+    /// The values of `t` are known, and none has the head `h`.
+    pub(crate) fn never_made_by(&self, t: &Ty, h: Head) -> bool {
+        let vals = self.col_values(&Col::of(t.clone()));
+        !vals.other && !vals.heads.is_empty() && !vals.has(h)
+    }
+
     fn col_values(&self, col: &Col) -> Vals {
         match col {
             Col::Any => Vals::any(),

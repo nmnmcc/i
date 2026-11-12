@@ -153,8 +153,33 @@ impl Checker<'_> {
 
     /// Fits `q` to `b` (§4.8): a catch-all gives its names `b`; any other
     /// pattern needs `b <: Q`, with its parts fitted to the parts of `Q`.
+    ///
+    /// A constructor pattern `C(…)` (also as `x = C(…)`) with pattern type
+    /// `Q` may fail: it needs `b <: Q | r - Q` with a new variable `r`, not
+    /// `b <: Q`, so that a value of `b` made by another constructor is a
+    /// failure to match that reports to `Assert` (§4.8, syntax three D4).
+    /// When no value of `b` is made by `C`, the pattern never matches: a
+    /// warning.
     pub fn fit(&mut self, q: &Pattern, b: &Ty) {
-        self.fit_in(q, b, false);
+        let Some(ctor) = top_ctor(q) else {
+            self.fit_in(q, b, false);
+            return;
+        };
+        let t = self.pat(q, false);
+        let r = self.s.fresh();
+        let rest = self.s.diff(r, vec![t.clone()]);
+        self.sub(b, &Ty::Union(vec![t, rest]), q.span);
+        let head = Head::Named(TypeRef::Custom(ctor.ty));
+        if self.never_made_by(b, head) {
+            let name = &self.p.ty(ctor.ty).name;
+            self.warning(
+                code::PATTERN_DISJOINT,
+                q.span,
+                format!(
+                    "this pattern never matches: no value of this type is made by `{name}` (§4.8)"
+                ),
+            );
+        }
     }
 
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
