@@ -177,6 +177,9 @@ impl Checker<'_> {
                     }
                     self.out.alias_types.insert(id, shown);
                 }
+                if let Some(fold) = super::display::AliasFold::new(id, &template) {
+                    std::sync::Arc::make_mut(&mut self.s.alias_folds).push(fold);
+                }
                 self.reads.templates.insert(id, template);
                 self.reads.aliases.insert(id, Some(()));
             } else {
