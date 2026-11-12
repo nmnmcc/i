@@ -154,9 +154,8 @@ main = () { ! S(Dependency) = S(() { read() }) apply() }";
         } else {
             "app/main.main : () -> Nil ! Dependency\n"
         };
-        assert_eq!(
+        assert!(
             out.status.success(),
-            true,
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
@@ -332,7 +331,7 @@ fn migration_flags_are_removed() {
 fn disjoint_comparisons_are_warnings_in_check_and_test() {
     // W520/§6.9: warning-only programs succeed; both comparisons have Bool.
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/comparison.i"),

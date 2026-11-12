@@ -66,7 +66,7 @@ def literal_case(seed, *, value_types, rng=None):
     declarations.append(f'f = (x: {domain}) {{ x |> {{\n{clauses}\n}} }}')
     if covered:
         assertions = '\n'.join(f'  assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items())
-        declarations.append('@main\nmain = () {\n' + assertions + '\n  Nil\n}')
+        declarations.append('main = () {\n' + assertions + '\n  Nil\n}')
     return {'name': ('literal-value-guard-' if value_types else 't1-finite-') + str(seed),
             'declarations': declarations, 'accept': covered, 'rows': rows,
             'model': [{'string': v, 'bool': b, 'result': i} for (v, b), i in expected.items()],
@@ -78,7 +78,7 @@ def alias_case(seed):
     n = rng.randint(3, 20)
     declarations = ['value: Int = 1', 'A0 = value']
     declarations += [f'A{i} = A{i-1}' for i in range(1, n)]
-    declarations += [f'pass = (x: A{n-1}) -> Int {{ x }}', '@main\nmain = () { assert(pass(2) == 2) Nil }']
+    declarations += [f'pass = (x: A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2) Nil }']
     return {'name': f't2-alias-{seed}', 'declarations': declarations, 'accept': True,
             'annotation': (f'pass = (x: A{n-1}) -> Int {{ x }}', 'pass = (x) { x }')}
 
@@ -92,7 +92,7 @@ def service_case(seed):
                     'pass = (x: Int) -> Int { x }',
                     'h0 = () { ask() }']
     declarations += [f'h{i} = () {{ run(() {{ h{i-1}() }}) }}' for i in range(1, n)]
-    declarations += [f'@main\nmain = () {{\n ! Svc(Int) = Svc(() {{ 7 }}, (_: Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7)\n Nil\n}}']
+    declarations += [f'main = () {{\n ! Svc(Int) = Svc(() {{ 7 }}, (_: Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7)\n Nil\n}}']
     return {'name': f'k4-services-{seed}', 'declarations': declarations, 'accept': True,
             'annotation': ('pass = (x: Int) -> Int { x }', 'pass = (x) { x }')}
 
@@ -161,12 +161,12 @@ def rebuild(case, rows):
     expected = evaluate(rows)
     candidate['accept'] = all(v is not None for v in expected.values())
     candidate['model'] = [{'string': v, 'bool': b, 'result': i} for (v, b), i in expected.items()]
-    declarations = [d for d in case['declarations'] if not d.startswith(('f = ', '@main'))]
+    declarations = [d for d in case['declarations'] if not d.startswith(('f = ', 'main = '))]
     domain = 'Input' if any(d == 'Input = domain' for d in declarations) else '("a" | "ab" | "b" | "c" | "", Bool)'
     clauses = '\n'.join(f'({PATTERNS[p]}, {BOOLS[q]})' + (' ? False' if guard else '') + f' -> {i}' for i, (p, q, guard) in enumerate(rows))
     declarations.append(f'f = (x: {domain}) {{ x |> {{\n{clauses}\n}} }}')
     if candidate['accept']:
-        declarations.append('@main\nmain = () {\n' + '\n'.join(f' assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items()) + '\n Nil\n}')
+        declarations.append('main = () {\n' + '\n'.join(f' assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items()) + '\n Nil\n}')
     candidate['declarations'] = declarations
     return candidate
 

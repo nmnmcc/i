@@ -56,7 +56,7 @@ fn build_generated_tests(project: &std::path::Path, opt: ilang_cli::Level) -> il
 #[test]
 fn syntax_library_round_trips_through_the_host() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
@@ -140,7 +140,7 @@ test("exercise", () -> Nil ^ syntax.SyntaxError ! Assert {
 #[test]
 fn compiler_operations_are_limited_to_compiler_instances() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/helper.i"),
@@ -293,7 +293,7 @@ fn syntax_values_cross_export_boundary() {
 #[test]
 fn compiler_templates_rebuild_through_wasm() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
@@ -363,7 +363,7 @@ test("exercise", () {
 #[test]
 fn compiler_quote_patterns_capture_nested_nodes_and_splices() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
@@ -426,7 +426,7 @@ fn compiler_definition_service_returns_and_aborts_at_the_query() {
     use ilang_host::syntax::{DefinitionAbort, DefinitionContext, DefinitionReply};
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
@@ -590,7 +590,7 @@ fn compiler_items_service_buffers_valid_requests_and_rejects_bad_ones() {
     };
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
@@ -767,7 +767,7 @@ fn compiler_service_budgets_stop_before_observable_contributions() {
         atomic::{AtomicUsize, Ordering},
     };
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
@@ -854,7 +854,7 @@ test("item", () -> Nil ^ syntax.SyntaxError {
 #[test]
 fn compiler_syntax_helpers_are_private_to_generated_code() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
