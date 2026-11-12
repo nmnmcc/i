@@ -185,7 +185,11 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     let whole = [own, "\nwhole = (value: size) {value}".into()].concat();
     recovery_order_invariant(&[("src/main.i", &whole)]);
     bad(&whole, code::VALUE_TYPE_NOT_FIXED);
-    let lib = lib.replacen("(\n\tCodec\n\tsize\n)", "(\n\tCodec\n\tsize\n\tLocalSize\n)", 1);
+    let lib = lib.replacen(
+        "(\n\tCodec\n\tsize\n)",
+        "(\n\tCodec\n\tsize\n\tLocalSize\n)",
+        1,
+    );
     recovery_order_invariant(&[("src/lib.i", &lib), ("src/client.i", client)]);
     let closed_wrapped = lib.replace("size = id", "size: Codec(Int,Int) = id");
     let (_, c) = checked(&[("src/lib.i", &closed_wrapped), ("src/client.i", client)]);
@@ -217,7 +221,10 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     assert!(!ds.iter().any(Diagnostic::is_error));
     // R7's guidance should prefer an exported transitive alias over a private one.
     let lib = [
-        lib.replace("(\n\tCodec\n\tsize\n\tLocalSize\n)", "(\n\tCodec\n\tsize\n\tPublicSize\n)"),
+        lib.replace(
+            "(\n\tCodec\n\tsize\n\tLocalSize\n)",
+            "(\n\tCodec\n\tsize\n\tPublicSize\n)",
+        ),
         "\nPublicSize = LocalSize".into(),
     ]
     .concat();
@@ -489,7 +496,9 @@ fn every_bad_dependency_component_recovers_without_publishing_aliases() {
 #[test]
 fn alias_formals_and_written_holes_are_instantiated_per_use() {
     // R2 closes the Of part; ordinary written formals/holes keep their rules.
-    good("port: Int = 1\nT = { (port, _) }\nf = () {\n\ta: T = (1, \"s\")\n\tb: T = (2, 3)\n\t(a, b)\n}");
+    good(
+        "port: Int = 1\nT = { (port, _) }\nf = () {\n\ta: T = (1, \"s\")\n\tb: T = (2, 3)\n\t(a, b)\n}",
+    );
     let prefix =
         "Cell(A) = (get = () -> A, set = (A) -> Nil)\nport: Int = 1\nT(A) = Cell(A) | Cell(port)\n";
     // Invariant same-head union still requires equal arguments after substitution.
@@ -806,8 +815,9 @@ fn invalid_components_fail_dependents_without_cascading_diagnostics() {
 #[test]
 fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
     // R2/P4: a skip can leave a quantified part alone only at own completion.
-    let (_, c) =
-        good("id = (x) { x }\nPair(A, B) = { (A, B) }\none: Int = 1\nv = (id, one)\nPair(_, Number) = v");
+    let (_, c) = good(
+        "id = (x) { x }\nPair(A, B) = { (A, B) }\none: Int = 1\nv = (id, one)\nPair(_, Number) = v",
+    );
     assert_eq!(alias(&c, "Number"), "Int");
     let lib = "(v)\nid = (x) {x}\nv = (id,1)";
     let (_, c) = checked(&[
@@ -841,8 +851,9 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
         code::VALUE_TYPE_NOT_FIXED,
     );
     // A closed function constant is permitted inside an otherwise linear head.
-    let (_, c) =
-        good("Fixed(A) = { (() -> Int, A) }\nv: (() -> Int, String) = (() { 1 }, \"s\")\nFixed(Text) = v");
+    let (_, c) = good(
+        "Fixed(A) = { (() -> Int, A) }\nv: (() -> Int, String) = (() { 1 }, \"s\")\nFixed(Text) = v",
+    );
     assert_eq!(alias(&c, "Text"), "String");
 }
 

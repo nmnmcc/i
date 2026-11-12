@@ -761,7 +761,9 @@ impl Query<'_> {
                     Some(d) => self.def_type(d),
                     None => self.local_type(m, *v, callee.span.start),
                 };
-                t.as_deref().and_then(split_fn_type_need).map(need_and_result)
+                t.as_deref()
+                    .and_then(split_fn_type_need)
+                    .map(need_and_result)
             }
             _ => None,
         };

@@ -78,7 +78,9 @@ fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
     good(
         "Box(A) = (value = A)\ncopy = (s: String) {\n\tx = \"a\" = s\n\tp = (Box(value = x), 0).0.value\n\tq: p = \"b\"\n\tq\n}\nanswer = () { copy(\"a\") }",
     );
-    good("apply = <A, B>(x: A, f: (A) -> B) { f(x) }\nf = () {\n\tapply(\"a\", (x) {\n\t\ty: x = \"b\"\n\t\ty\n\t})\n}");
+    good(
+        "apply = <A, B>(x: A, f: (A) -> B) { f(x) }\nf = () {\n\tapply(\"a\", (x) {\n\t\ty: x = \"b\"\n\t\ty\n\t})\n}",
+    );
     bad(
         "Sink(A) = (put = (A) -> Nil)\nsink: Sink(\"GET\" | \"POST\") = Sink(put = (x: \"GET\" | \"POST\") { Nil })\nbad = () { sink.put(\"DELETE\") }",
         code::TYPE_MISMATCH,
@@ -106,7 +108,9 @@ fn j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not() {
         "only = (x: \"a\") -> \"a\" { x }\nread = (s: String) {\n\ts |> (other: String - \"a\") { 0 } | (key) {\n\t\tv = only(key)\n\t\tsame: v = \"b\"\n\t\t1\n\t}\n}",
         code::TYPE_MISMATCH,
     );
-    good("read = (s: String) {\n\ts |> (other: String - \"a\") { 0 } | (key) {\n\t\tsame: s = \"b\"\n\t\t1\n\t}\n}");
+    good(
+        "read = (s: String) {\n\ts |> (other: String - \"a\") { 0 } | (key) {\n\t\tsame: s = \"b\"\n\t\t1\n\t}\n}",
+    );
 }
 
 #[test]
@@ -169,7 +173,10 @@ fn j6_early_context_provenance_wins_over_literal_boundary_checks() {
         code::VALUE_TYPE_PLACE,
     );
     bad("v = 1\nA = v\nT = (A)", code::VALUE_TYPE_PLACE);
-    bad("v=1\nA=v\nf: () <- (A) -> Nil = () { Nil }", code::VALUE_TYPE_PLACE);
+    bad(
+        "v=1\nA=v\nf: () <- (A) -> Nil = () { Nil }",
+        code::VALUE_TYPE_PLACE,
+    );
     // A scheme that already needs an environment can still be read normally.
     good("Env = (value = Int)\nf = () <- (e: Env) { e }\ng: f = () <- (e: Env) { e }");
 }

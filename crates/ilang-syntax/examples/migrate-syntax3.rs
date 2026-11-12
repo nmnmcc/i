@@ -310,10 +310,20 @@ fn convert_command(args: &[String]) -> i32 {
     let ctors = ctor_table(&all);
     let mut status = 0;
     let force: Vec<PathBuf> = std::env::var("SYN3_FROM_OLD")
-        .map(|v| v.split(':').filter(|p| !p.is_empty()).map(PathBuf::from).collect())
+        .map(|v| {
+            v.split(':')
+                .filter(|p| !p.is_empty())
+                .map(PathBuf::from)
+                .collect()
+        })
         .unwrap_or_default();
     let keep: Vec<PathBuf> = std::env::var("SYN3_KEEP")
-        .map(|v| v.split(':').filter(|p| !p.is_empty()).map(PathBuf::from).collect())
+        .map(|v| {
+            v.split(':')
+                .filter(|p| !p.is_empty())
+                .map(PathBuf::from)
+                .collect()
+        })
         .unwrap_or_default();
     let (mut converted, mut already, mut failed) = (0usize, 0usize, 0usize);
     for path in &files {
@@ -326,7 +336,11 @@ fn convert_command(args: &[String]) -> i32 {
             }
         };
         let forced = force.iter().any(|f| path.ends_with(f));
-        match if forced { Reading::Old } else { reading(path, &source, &ctors) } {
+        match if forced {
+            Reading::Old
+        } else {
+            reading(path, &source, &ctors)
+        } {
             Reading::New => {
                 already += 1;
                 // Formatted, so that the layout is the formatter's everywhere.
@@ -403,7 +417,10 @@ fn convert_command(args: &[String]) -> i32 {
             }
             Err(diags) => {
                 for d in diags {
-                    eprintln!("{}: FAILED: the current parser rejects it: {d}", path.display());
+                    eprintln!(
+                        "{}: FAILED: the current parser rejects it: {d}",
+                        path.display()
+                    );
                 }
                 failed += 1;
                 status = 1;
@@ -427,7 +444,10 @@ fn snippets_command(args: &[String]) -> i32 {
     let mut it = args.iter();
     while let Some(a) = it.next() {
         if a == "--ctors" {
-            sources(Path::new(it.next().expect("--ctors needs a directory")), &mut all);
+            sources(
+                Path::new(it.next().expect("--ctors needs a directory")),
+                &mut all,
+            );
         }
     }
     let ctors = ctor_table(&all);
@@ -448,7 +468,9 @@ fn snippets_command(args: &[String]) -> i32 {
                 // A dropped part of a snippet is not silent: it is listed.
                 Ok(c) if c.notes.iter().any(|n| n.kind == "type-params") => format!(
                     "failed {}",
-                    hex("type parameters of a binding that is not a function are dropped; rewrite the snippet by hand")
+                    hex(
+                        "type parameters of a binding that is not a function are dropped; rewrite the snippet by hand"
+                    )
                 ),
                 Ok(c) => match check(path, &c) {
                     None => format!("old {}", hex(&c.text)),

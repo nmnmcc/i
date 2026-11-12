@@ -304,8 +304,7 @@ fn conversion_preserves_comments_before_items_and_statements() {
 
 #[test]
 fn lisp_formatter_keeps_all_comments_and_is_idempotent() {
-    let source =
-        "// before\n(= f (-> (, x) _ // trailing\n (+ x // inside\n 1)))\n// end\n";
+    let source = "// before\n(= f (-> (, x) _ // trailing\n (+ x // inside\n 1)))\n// end\n";
     let formatted = ilang_syntax::lisp::format(source).unwrap();
     for comment in ["// before", "// trailing", "// inside", "// end"] {
         assert!(formatted.contains(comment), "{formatted}");
@@ -433,7 +432,10 @@ fn check_corpus(dir: &std::path::Path) {
             let text = ilang_syntax::syn3::lisp::to_lisp(&tree);
             let (read, errors) = ilang_syntax::syn3::lisp::from_lisp(&text);
             if !errors.is_empty() || ilang_syntax::syn3::lisp::to_lisp(&read) != text {
-                failures.push(format!("{}: syntax-three Lisp {errors:?}\n{text}", path.display()));
+                failures.push(format!(
+                    "{}: syntax-three Lisp {errors:?}\n{text}",
+                    path.display()
+                ));
             }
             continue;
             #[allow(unreachable_code)]
@@ -455,4 +457,3 @@ fn check_corpus(dir: &std::path::Path) {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
-

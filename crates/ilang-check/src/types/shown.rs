@@ -249,7 +249,11 @@ pub(crate) fn need_text(mut items: Vec<String>) -> String {
     if items.is_empty() {
         return String::new();
     }
-    items.sort_by(|a, b| (a.starts_with("..")).cmp(&b.starts_with("..")).then(a.cmp(b)));
+    items.sort_by(|a, b| {
+        (a.starts_with(".."))
+            .cmp(&b.starts_with(".."))
+            .then(a.cmp(b))
+    });
     items.dedup();
     if let [one] = items.as_slice()
         && let Some(row) = one.strip_prefix("..")

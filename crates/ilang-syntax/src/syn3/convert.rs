@@ -2142,10 +2142,7 @@ fn annotated(b: &o::Binding) -> Option<o::Binding> {
     let ret = f.ret.as_ref()?;
     let env = ret.env.as_ref()?;
     let mentions = |t: &o::TypeExpr, v: &str| format!("{t:?}").contains(&format!("name: {v:?}"));
-    let row = b
-        .type_params
-        .iter()
-        .find(|p| mentions(env, &p.name))?;
+    let row = b.type_params.iter().find(|p| mentions(env, &p.name))?;
     let mut types = Vec::new();
     let mut params = Vec::new();
     let mut provides = false;
@@ -2159,7 +2156,9 @@ fn annotated(b: &o::Binding) -> Option<o::Binding> {
         };
         // The parameter needs a service besides the row: the function
         // provides it (`body: () -> Nil ! Yield(A) | N`).
-        if let o::TypeKind::Fn { env: Some(inner), .. } = &ty.kind
+        if let o::TypeKind::Fn {
+            env: Some(inner), ..
+        } = &ty.kind
             && let o::TypeKind::Union(members) = &inner.kind
             && members.len() >= 2
             && mentions(inner, &row.name)

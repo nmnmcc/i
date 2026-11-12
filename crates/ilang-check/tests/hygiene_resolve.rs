@@ -712,7 +712,8 @@ fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
 #[test]
 fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
     use ilang_syntax::lisp::syntax::ScopeIdentity;
-    let (mut graph, _, _) = common::check_files(&[("src/main.i", "Ok = ()\nOption = Ok\nf = () { 0 }\n")]);
+    let (mut graph, _, _) =
+        common::check_files(&[("src/main.i", "Ok = ()\nOption = Ok\nf = () { 0 }\n")]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
     let caller = parsed

@@ -84,6 +84,9 @@ fn invalid_macro_definitions_are_reported() {
         diags.iter().any(|e| e.contains("cannot be put on a macro")),
         "{diags:?}"
     );
-    let diags = errors(&[("src/main.is", "(@ bogus (@ macro (= expand (-> (,) _ `x))))")]);
+    let diags = errors(&[(
+        "src/main.is",
+        "(@ bogus (@ macro (= expand (-> (,) _ `x))))",
+    )]);
     assert!(diags.iter().any(|e| e.contains("@bogus")), "{diags:?}");
 }

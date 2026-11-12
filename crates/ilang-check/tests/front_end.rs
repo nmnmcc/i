@@ -59,11 +59,7 @@ fn declared_external_variables_are_general_in_library_declarations() {
         .find(|m| m.path == "i/core")
         .unwrap()
         .source;
-    let text = graph
-        .sources
-        .get(source)
-        .text
-        .clone();
+    let text = graph.sources.get(source).text.clone();
     // The library already declares `inspect: <A>(A) -> String` (§2.16).
     assert!(text.contains("inspect: <A>(A) -> String"));
     graph.sources.set_text(source, text);

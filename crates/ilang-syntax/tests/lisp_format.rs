@@ -119,7 +119,8 @@ fn repository_surfaces_have_pretty_lisp_layout() {
             if !errors.is_empty() {
                 continue;
             } // Syntax-error fixtures have no core tree.
-            let lisp = ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(&source).0);
+            let lisp =
+                ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(&source).0);
             eprintln!("Converted {}", relative.display());
             let out = check(&lisp);
             let _ = &module;
@@ -130,10 +131,7 @@ fn repository_surfaces_have_pretty_lisp_layout() {
         }
     }
     eprintln!("checked {native} Lisp files and {converted} converted normal files");
-    assert!(
-        converted > 500,
-        "{native} native, {converted} converted"
-    );
+    assert!(converted > 500, "{native} native, {converted} converted");
 }
 
 #[test]

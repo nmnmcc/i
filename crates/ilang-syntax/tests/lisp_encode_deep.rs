@@ -350,9 +350,9 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
                 // The independent printer is only a reference where its own
                 // output decodes to the same tree (it predates the service
                 // forms of syntax three).
-                if ilang_syntax::lisp::parse_module(&parsed)
-                    .is_ok_and(|back| ilang_syntax::shape::canon(&back) != ilang_syntax::shape::canon(&expected))
-                    || ilang_syntax::lisp::parse_module(&parsed).is_err()
+                if ilang_syntax::lisp::parse_module(&parsed).is_ok_and(|back| {
+                    ilang_syntax::shape::canon(&back) != ilang_syntax::shape::canon(&expected)
+                }) || ilang_syntax::lisp::parse_module(&parsed).is_err()
                 {
                     continue;
                 }
@@ -505,7 +505,8 @@ fn direct_charge_events(
 #[test]
 fn charge_plan_matches_each_event_without_building_the_answer() {
     use ilang_syntax::lisp::SourceEncoder;
-    let source = "Item(A) = (label = A, number = 123456789012345678901234567890)\nThing(A) = Item(A)\n";
+    let source =
+        "Item(A) = (label = A, number = 123456789012345678901234567890)\nThing(A) = Item(A)\n";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();

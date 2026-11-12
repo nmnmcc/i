@@ -246,14 +246,16 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
 #[test]
 fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
     // §5.3: shared places get whole scalars; a once-occurring Some(A) keeps literals.
-    let (ds, lines) =
-        check("(\n\t(Option, Some, None) = std/option\n)\nk = (Some(\"a\")) { 1 } | (None) { 2 }\n");
+    let (ds, lines) = check(
+        "(\n\t(Option, Some, None) = std/option\n)\nk = (Some(\"a\")) { 1 } | (None) { 2 }\n",
+    );
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
         lines.iter().any(|l| l.contains("Option(\"a\")")),
         "{lines:?}"
     );
-    let (ds, _) = check("k = (xs) { xs |> ([]) { 0 } | ([\"a\", ..]) { 1 } | ([\"b\", ..]) { 2 } }\n");
+    let (ds, _) =
+        check("k = (xs) { xs |> ([]) { 0 } | ([\"a\", ..]) { 1 } | ([\"b\", ..]) { 2 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
     assert!(
@@ -579,12 +581,15 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
     let (ds, lines) = check("f = (0 | 1) { 2 }\n");
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : (Int) <- (Assert) -> 2")),
+        lines
+            .iter()
+            .any(|l| l.ends_with("f : (Int) <- (Assert) -> 2")),
         "{lines:?}"
     );
     // §7.5: fitting does not narrow the original subject to a constructor.
-    let (ds, _) =
-        check("Yes = (value = Int)\nNo = ()\nT = Yes | No\nf = (r: T) { r |> (Yes(_) | Yes(_)) { r.value } }\n");
+    let (ds, _) = check(
+        "Yes = (value = Int)\nNo = ()\nT = Yes | No\nf = (r: T) { r |> (Yes(_) | Yes(_)) { r.value } }\n",
+    );
     assert!(ds.iter().any(|d| d.0 == "E0512"), "{ds:?}");
     // §4.8 / §6.12: opaque tests still constrain all values of that head.
     let (ds, _) = check(
@@ -592,9 +597,8 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
     );
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     // §6.12: fitting binds a monotype, without the binding's generalization.
-    let (ds, _) = check(
-        "id = <A>(x: A) { x }\nf = () { id |> (g | g) { (g(1) + 1, g(\"a\") <> \"b\") } }\n",
-    );
+    let (ds, _) =
+        check("id = <A>(x: A) { x }\nf = () { id |> (g | g) { (g(1) + 1, g(\"a\") <> \"b\") } }\n");
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
 }
 
@@ -662,6 +666,8 @@ fn disjoint_guards_do_not_narrow_or_cover() {
         "{lines:?}"
     );
     // The impossible guard does not let an invalid body escape checking.
-    let (ds, _) = check("f = (x: 1) {\n\tx |>\n\t\t(_ ? x == 2) {\n\t\t\ty: 2 = x\n\t\t\ty\n\t\t}\n\t\t| (_) { 0 }\n}\n");
+    let (ds, _) = check(
+        "f = (x: 1) {\n\tx |>\n\t\t(_ ? x == 2) {\n\t\t\ty: 2 = x\n\t\t\ty\n\t\t}\n\t\t| (_) { 0 }\n}\n",
+    );
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
 }

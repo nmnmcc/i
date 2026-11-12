@@ -723,7 +723,10 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("k ="), "k: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> B");
+    assert_eq!(
+        hover("k ="),
+        "k: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> B"
+    );
     assert_eq!(hover("y ="), "y: B");
     assert_eq!(hover("f, x"), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(hover("g) {"), "g: (B) <- (Fail(E2), ..N2) -> C");
@@ -950,7 +953,8 @@ const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n
 
 const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(\n\tmain\n)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius = 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
 
-const APP_TEST: &str = "(\n\tapp/shapes\n)\n\n_check = () { shapes.area(shapes.Circle(radius = 1)) }\n";
+const APP_TEST: &str =
+    "(\n\tapp/shapes\n)\n\n_check = () { shapes.area(shapes.Circle(radius = 1)) }\n";
 
 /// A workspace with the package `app`, which depends on the package `lib`
 /// next to it. With `lisp`, `src/main` of `app` is in the Lisp surface.
@@ -1338,7 +1342,10 @@ fn lsp_rename_top_level_across_files() {
     );
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    assert!(shapes.contains("\tShape(..)\n\tsurface\n\torigin"), "{shapes}");
+    assert!(
+        shapes.contains("\tShape(..)\n\tsurface\n\torigin"),
+        "{shapes}"
+    );
     assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
@@ -2692,7 +2699,10 @@ fn lsp_diagnostics_only_affected_packages_are_checked_again() {
     assert!(!c.has_diagnostics(&other_main));
     // A change of `lib`, which `app` uses, checks `app` again.
     let lib = file_uri(&lib_dir.join("src/text.i"));
-    c.open(&lib, &LIB_TEXT.replace("(\n\tshout\n\tTone(..)\n)", "(\n\tTone(..)\n)"));
+    c.open(
+        &lib,
+        &LIB_TEXT.replace("(\n\tshout\n\tTone(..)\n)", "(\n\tTone(..)\n)"),
+    );
     let diags = c.diagnostics(&ws.main);
     assert!(
         diags

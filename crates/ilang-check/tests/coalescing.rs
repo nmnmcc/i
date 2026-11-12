@@ -264,6 +264,9 @@ helper = <N>() {
         index: index as u32,
     };
     let names = ilang_check::types::type_names(&program, module);
-    assert_eq!(types.scheme_types[&id].text(&names), "() <- (S(N), ..N) -> Nil");
+    assert_eq!(
+        types.scheme_types[&id].text(&names),
+        "() <- (S(N), ..N) -> Nil"
+    );
     assert_eq!(types.schemes[&id], "() <- (S(N), ..N) -> Nil");
 }

@@ -427,13 +427,25 @@ fn types_of_parameters_that_share_a_type_variable() {
         f.hover("app/main", "h3", 0),
         "h3: (f = (A) <- (Fail(E), ..N) -> Int, x = A) <- (Fail(E), ..N) -> Int"
     );
-    assert_eq!(f.hover("app/main", "f, x", 0), "f: (A) <- (Fail(E), ..N) -> Int");
-    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (A) <- (Fail(E), ..N) -> Int");
+    assert_eq!(
+        f.hover("app/main", "f, x", 0),
+        "f: (A) <- (Fail(E), ..N) -> Int"
+    );
+    assert_eq!(
+        f.hover("app/main", "f(x)", 0),
+        "f: (A) <- (Fail(E), ..N) -> Int"
+    );
     assert_eq!(f.hover("app/main", "x)", 0), "x: A");
-    assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(
+        f.hover("app/main", "f, v", 0),
+        "f: (A) <- (Fail(E), ..N) -> B"
+    );
     assert_eq!(f.hover("app/main", "v)", 0), "v: A");
     // Not shared: as before.
-    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) <- (Fail(E), ..N) -> A");
+    assert_eq!(
+        f.hover("app/main", "f) {", 0),
+        "f: (1) <- (Fail(E), ..N) -> A"
+    );
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
 }
 
@@ -466,10 +478,19 @@ fn local_types_use_the_names_of_the_scheme() {
         "compose: (f = (A) <- (Fail(E), ..N) -> B, g = (B) <- (Fail(E2), ..N2) -> C) -> \
          (x = A) <- (Fail(E | E2), ..N, ..N2) -> C"
     );
-    assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) <- (Fail(E), ..N) -> B");
-    assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) <- (Fail(E2), ..N2) -> C");
+    assert_eq!(
+        f.hover("app/main", "f, g", 0),
+        "f: (A) <- (Fail(E), ..N) -> B"
+    );
+    assert_eq!(
+        f.hover("app/main", "g) {", 0),
+        "g: (B) <- (Fail(E2), ..N2) -> C"
+    );
     assert_eq!(f.hover("app/main", "x) { g", 0), "x: A");
-    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (B) <- (Fail(E2), ..N2) -> C");
+    assert_eq!(
+        f.hover("app/main", "g(f(x))", 0),
+        "g: (B) <- (Fail(E2), ..N2) -> C"
+    );
     // The names of the parameters are not the names of their types.
     assert_eq!(
         f.hover("app/main", "pairup", 0),
@@ -543,7 +564,10 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
         "f: (A) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: A");
-    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(
+        f.hover("app/main", "f(x)\n  Nil", 0),
+        "f: (A) <- (Fail(E), ..N) -> B"
+    );
     assert_eq!(f.hover("app/main", "r = ", 0), "r: B");
 }
 

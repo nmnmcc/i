@@ -674,7 +674,10 @@ fn publish_compares_the_interface() {
             "add = (a: Int, b: Int) { a + b }",
             "add = (a: Int, b: Int, c: Int) { a + b + c }",
         )
-        .replace("Shape = Circle | Square\n", "Dot = ()\nShape = Circle | Square | Dot\n");
+        .replace(
+            "Shape = Circle | Square\n",
+            "Dot = ()\nShape = Circle | Square | Dot\n",
+        );
     write(&dir, &[("src/api.i", &changed)]);
     commit(&dir, "change");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
@@ -694,9 +697,7 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0");
 
     // Removing a name, or hiding constructors, is incompatible too.
-    let hidden = changed
-        .replace("Shape(..)", "Shape")
-        .replace("\ttwo\n", "");
+    let hidden = changed.replace("Shape(..)", "Shape").replace("\ttwo\n", "");
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
@@ -876,11 +877,18 @@ fn two_types(w: &World, name: &str, api: &str) -> PathBuf {
 fn publish_compares_types_by_what_they_are_not_by_their_names() {
     let w = World::new();
     // A field whose type is another type of the same name.
-    let dir = two_types(&w, "field", "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = { (a.T) }\n");
+    let dir = two_types(
+        &w,
+        "field",
+        "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = { (a.T) }\n",
+    );
     let (ok, out) = try_publish(
         &w,
         &dir,
-        &[("src/api.i", "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = { (b.T) }\n")],
+        &[(
+            "src/api.i",
+            "(\n\tpub/a\n\tpub/b\n)\n\n(\n\tW(..)\n)\n\nW = { (b.T) }\n",
+        )],
         "1.0.1",
     );
     assert!(!ok, "{out}");
@@ -1051,8 +1059,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let project = dir.display().to_string();
     w.ok(&["publish", "1.0.0", "--project", &project]);
 
-    let printing =
-        "(\n\t(Io) = i/io\n)\n\n(\n\tf\n\tsay\n)\n\nf = () { 1 }\n\nsay = () <- (io: Io) { io.print(\"one\") }\n";
+    let printing = "(\n\t(Io) = i/io\n)\n\n(\n\tf\n\tsay\n)\n\nf = () { 1 }\n\nsay = () <- (io: Io) { io.print(\"one\") }\n";
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(

@@ -2324,10 +2324,12 @@ mod value_type_interfaces {
     #[test]
     fn exported_record_schemes_compare_labels_and_value_types() {
         let a = interface("(\n\tf\n)\nf = <K>(r: (k = Int), key: K) -> Int { 1 }");
-        let same =
-            interface("(\n\tf\n)\nf = <LabelName>(r: (labelname = Int), key: LabelName) -> Int { 1 }");
-        let changed =
-            interface("(\n\tf\n)\nf = <LabelName>(r: (labelname = String), key: LabelName) -> Int { 1 }");
+        let same = interface(
+            "(\n\tf\n)\nf = <LabelName>(r: (labelname = Int), key: LabelName) -> Int { 1 }",
+        );
+        let changed = interface(
+            "(\n\tf\n)\nf = <LabelName>(r: (labelname = String), key: LabelName) -> Int { 1 }",
+        );
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
     }
@@ -2343,8 +2345,9 @@ mod value_type_interfaces {
 
     #[test]
     fn key_parameter_and_field_type_parameter_are_compared_together() {
-        let generic =
-            interface("(\n\ti/record\n)\n\n(\n\tf\n)\nf = <K, V>(r: (k = V), key: K) -> V { record.get(r, key) }");
+        let generic = interface(
+            "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <K, V>(r: (k = V), key: K) -> V { record.get(r, key) }",
+        );
         let concrete = interface(
             "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <K>(r: (k = Int), key: K) -> Int { record.get(r, key) }",
         );
@@ -2375,7 +2378,8 @@ mod value_type_interfaces {
 
     #[test]
     fn key_parameter_can_collide_with_a_written_record_field() {
-        let both = interface("(\n\tf\n)\nf = <K>(r: (k = Int, fixed = String), key: K) -> Int { 1 }");
+        let both =
+            interface("(\n\tf\n)\nf = <K>(r: (k = Int, fixed = String), key: K) -> Int { 1 }");
         let override_field =
             interface("(\n\tf\n)\nf = <K>(r: (fixed = String), key: K) -> Int { 1 }");
         assert!(
@@ -2388,7 +2392,8 @@ mod value_type_interfaces {
 
     #[test]
     fn distinct_key_parameters_may_receive_the_same_string() {
-        let both = interface("(\n\tf\n)\nf = <K, J>(r: (k = Int, j = String), k: K, j: J) -> Int { 1 }");
+        let both =
+            interface("(\n\tf\n)\nf = <K, J>(r: (k = Int, j = String), k: K, j: J) -> Int { 1 }");
         let override_field =
             interface("(\n\tf\n)\nf = <K, J>(r: (j = String), k: K, j: J) -> Int { 1 }");
         assert!(

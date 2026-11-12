@@ -163,7 +163,10 @@ fn codegen_data() {
     // Which patterns of bindings and parameters may fail (§7.3).
     assert_eq!(by_text(&typed.may_fail, m, "Ok(v)"), &true);
     assert_eq!(by_text(&typed.may_fail, m, "(a, b)"), &false);
-    assert_eq!(by_text(&typed.may_fail, m, "Cat(name = name, lives = l)"), &false);
+    assert_eq!(
+        by_text(&typed.may_fail, m, "Cat(name = name, lives = l)"),
+        &false
+    );
     // A host export, with its errors in the canonical order (B.2).
     let sigs: Vec<(&DefId, &HostSignature)> = typed.host_exports.iter().collect();
     assert_eq!(sigs.len(), 1);

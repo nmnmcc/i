@@ -107,7 +107,8 @@ fn quote_capture_must_be_a_pattern_for_syntax() {
 
 #[test]
 fn fitted_quote_patterns_are_refutable() {
-    let source = "(, (= syntax (/ i syntax)))\n(= choose (-> (, `(f ~item)) (. syntax Syntax) item))\n";
+    let source =
+        "(, (= syntax (/ i syntax)))\n(= choose (-> (, `(f ~item)) (. syntax Syntax) item))\n";
     let (graph, _, _) = common::check_files(&[("src/main.is", source)]);
     let (mut parsed, _) = ilang_check::parse(&graph);
     let mut templates = Vec::new();

@@ -69,8 +69,7 @@ fn run(wasm: &[u8], limits: Limits) -> (Result<Outcome, anyhow::Error>, MacroBud
 
 #[test]
 fn charges_are_identical_before_and_after_optimization() {
-    let source =
-        "f = (n) { n |> (0) { [\"end\"] } | (_) { [\"x\", ..f(n - 1)] } }\n\nmain = () {\n\tf(5)\n\tNil\n}\n";
+    let source = "f = (n) { n |> (0) { [\"end\"] } | (_) { [\"x\", ..f(n - 1)] } }\n\nmain = () {\n\tf(5)\n\tNil\n}\n";
     let a = compile(source, false);
     let b = compile(source, true);
     let (out_a, count_a) = run(&a, Limits::default());
@@ -84,8 +83,7 @@ fn charges_are_identical_before_and_after_optimization() {
 
 #[test]
 fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
-    let source =
-        "(\n\tmeasure\n)\nmeasure = (n: Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
+    let source = "(\n\tmeasure\n)\nmeasure = (n: Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
     let manifest = "name = \"app\"\n[wasm]\nexports = [\"app/main.measure\"]\n";
     let native = compile_project(source, manifest, false, ilang_wasm::Target::Native);
     let wasi = compile_project(source, manifest, false, ilang_wasm::Target::Wasi);

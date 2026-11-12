@@ -19,13 +19,13 @@
 //! line it is in, with what comes after it one level in, and other comments
 //! on their own lines.
 
+use super::parser::parse_module_legacy as parse_module;
+use crate::Diagnostic;
 use crate::ast::*;
 use crate::lexer::{Comment, lex};
 use crate::print::{is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
-use super::parser::parse_module_legacy as parse_module;
-use crate::Diagnostic;
 
 /// The width that the layout tries to keep to.
 pub use crate::format::WIDTH;
