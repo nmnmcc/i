@@ -154,8 +154,7 @@ test("token scopes of sample.i", async () => {
   for (const op of ["<.", "<=.", ">.", ">=."]) {
     has(op, "keyword.operator.comparison.float.i");
   }
-  has("^", "keyword.operator.error.i");
-  has("!", "keyword.operator.environment.i");
+  has("<-", "keyword.operator.provide.i");
   has("->", "keyword.operator.arrow.i");
   has("|>", "keyword.operator.pipe.i");
   has("..", "keyword.operator.spread.i");
@@ -195,7 +194,7 @@ new = (name = "i")
 run: () <- (Fail(String), Console) -> Record
 `);
   const has = (text, scope) => assert.ok(scopesOf(tokens, text).some((s) => s.includes(scope)));
-  has("^", "keyword.operator.error.i");
+  has("<-", "keyword.operator.provide.i");
   has("Record", "support.type.builtin.i");
   has("name", "variable.parameter.i");
   has("rule", "storage.type.annotation.i");
