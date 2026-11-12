@@ -185,6 +185,9 @@ pub(crate) struct Solver {
     cache: HashSet<(Ty, Ty, Mode)>,
     /// The variables that got a bound, in order, for the occurs check.
     pub touched: Vec<V>,
+    /// Counts the changes of bounds and inputs that `touched` does not
+    /// record.
+    pub rewrites: u64,
     /// The variables of the cycles that the occurs check has reported.
     reported: HashSet<V>,
     /// The pairs of bounds whose parts `add_bound` has put together.
@@ -198,6 +201,9 @@ pub(crate) struct Solver {
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
     pub type_names: Vec<String>,
+    /// The declared aliases whose expansion is a union, to show such a
+    /// union by its name.
+    pub alias_folds: std::sync::Arc<Vec<super::display::AliasFold>>,
     /// A failed coalescence is diagnostic recovery, never an unknown type
     /// that may silently make a program pass. The checker drains this at
     /// binding and artifact boundaries, including known-type conversions.
@@ -240,6 +246,7 @@ impl Solver {
         snapshot.row_params = self.row_params.clone();
         snapshot.has_handlers = self.has_handlers;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
+        snapshot.alias_folds = self.alias_folds.clone();
         snapshot
     }
     pub fn record(&mut self, mut fields: Vec<(super::records::Label, Ty)>) -> Ty {
@@ -273,6 +280,7 @@ impl Solver {
             cache: HashSet::default(),
             compared: HashSet::default(),
             touched: Vec::new(),
+            rewrites: 0,
             reported: HashSet::default(),
             variance,
             comparison_wrappers: HashSet::default(),
@@ -280,6 +288,7 @@ impl Solver {
             has_handlers: false,
             failures: Vec::new(),
             type_names,
+            alias_folds: Default::default(),
         }
     }
 
@@ -287,6 +296,7 @@ impl Solver {
     pub fn for_closed_types(&self) -> Solver {
         let mut solver = Solver::new(self.variance.clone(), self.type_names.clone());
         solver.row_params = self.row_params.clone();
+        solver.alias_folds = self.alias_folds.clone();
         solver
     }
 
@@ -343,6 +353,7 @@ impl Solver {
 
     /// Marks the variables made since `start` as inputs.
     pub fn mark_inputs(&mut self, start: usize) {
+        self.rewrites += 1;
         for v in &mut self.vars[start..] {
             v.input = true;
         }
@@ -2368,6 +2379,7 @@ impl Solver {
                 changed |= self.var(v).upper.len() != before;
             }
         }
+        self.rewrites += u64::from(changed);
         changed
     }
 

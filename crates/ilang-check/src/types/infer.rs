@@ -239,6 +239,7 @@ pub(crate) struct Checker<'a> {
     pending_failures: Vec<PendingFailure>,
     pending_unions: Vec<PendingUnion>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
+    pub(super) coverage: std::cell::RefCell<super::coverage::Searches>,
 }
 
 impl<'a> Checker<'a> {
@@ -296,6 +297,7 @@ impl<'a> Checker<'a> {
             pending_failures: Vec::new(),
             pending_unions: Vec::new(),
             shared_fields: HashMap::new(),
+            coverage: Default::default(),
         }
     }
 
