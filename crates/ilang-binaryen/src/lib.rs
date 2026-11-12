@@ -1,4 +1,4 @@
-//! Optimize WasmGC modules with Binaryen, linked into the compiler as a
+//! Optimizes WasmGC modules with Binaryen, linked into the compiler as a
 //! library.
 //!
 //! The i compiler emits simple, unoptimized Wasm and leaves optimization to
@@ -16,12 +16,12 @@ use std::sync::Mutex;
 /// How much to optimize.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
-    /// Do not optimize: the module is given back as it is.
+    /// No optimization: the module is given back as it is.
     O0,
-    /// Optimize for speed, as `wasm-opt -O2`, but with the inlining of
+    /// Optimizes for speed, as `wasm-opt -O2`, but with the inlining of
     /// [`ALWAYS_INLINE`].
     O2,
-    /// Optimize more, as `wasm-opt -O3`, with the same inlining.
+    /// Optimizes more, as `wasm-opt -O3`, with the same inlining.
     O3,
 }
 
@@ -69,7 +69,7 @@ fn features() -> ffi::BinaryenFeatures {
     }
 }
 
-/// Optimize `wasm` at `level`.
+/// Optimizes `wasm` at `level`.
 ///
 /// The optimizer is run in closed-world mode: only numbers, buffers in linear
 /// memory, and `externref` values cross the host boundary, so no GC type is
@@ -146,7 +146,7 @@ unsafe extern "C" {
     fn libc_free(pointer: *mut std::ffi::c_void);
 }
 
-/// Split a module into its bytes without the `ilang.*` custom sections, and
+/// Splits a module into its bytes without the `ilang.*` custom sections, and
 /// those sections, each as a complete section with its header.
 fn split_custom_sections(wasm: &[u8]) -> Result<(Vec<u8>, Vec<Vec<u8>>), Error> {
     const HEADER: usize = 8;

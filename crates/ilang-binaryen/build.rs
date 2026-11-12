@@ -1,4 +1,4 @@
-//! Build the vendored Binaryen (a git submodule at `binaryen/`) as a static
+//! Builds the vendored Binaryen (a git submodule at `binaryen/`) as a static
 //! library, so the `i` binary needs nothing else installed.
 
 fn main() {
