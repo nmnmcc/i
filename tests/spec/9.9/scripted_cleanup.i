@@ -10,25 +10,25 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out {
+	Out(print: (String) -> Nil)
+}
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text: String, out ! Out) { out.print(text) }
+
 
 main = () {
 	result = fail.catch(() {
 		task.test(random.from_seed(7), [[1], [1], [999]], () {
-			resource.ensure(
-				() {
-					task.yield()
-					task.yield()
-					1
-				},
-				() {
-					task.yield()
-					print("script-final")
-				},
-			)
+			resource.ensure(() {
+				task.yield()
+				task.yield()
+				1
+			}, () {
+				task.yield()
+				print("script-final")
+			})
 		})
 	})
-	assert(result == Error(task.NotRunnable(path = [999])))
+	assert(result == Error(task.NotRunnable(path: [999])))
 }

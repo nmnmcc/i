@@ -1,9 +1,9 @@
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-use = <N>() <- (s: S(N)) {
-	S(f = f, ..) = s
-	f()
+S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
+use(N) = (s ! S(N)) {
+  S(f = f, ..) = s
+  f()
 }
-run = <A, N>(body: () <- N -> A) { body() }
+run(A, N) = (body: () -> A ! N) { body() }
 f0 = () { use() }
 f1 = () { f0() + f0() + use() }
 f2 = () { f1() + f1() + use() }

@@ -1,6 +1,8 @@
 // §7.3 with rules 4 and 10: a binding or a parameter needs `Assert` exactly
 // when its pattern may fail for the type of its value.
-User = (name = String, age = Int)
+User {
+	User(name: String, age: Int)
+}
 
 // Bindings.
 pair = (t) {
@@ -90,7 +92,7 @@ float = (f) {
 }
 
 // Parameters.
-type_var = <A>(x: A) -> A { x }
+type_var(A) = (x: A) -> A { x }
 
 param_tuple = ((a, b)) { a }
 

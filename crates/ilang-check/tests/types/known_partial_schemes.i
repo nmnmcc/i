@@ -1,13 +1,18 @@
 // §4.8: a generalized local binding whose type scheme has a type variable
 // that is not generalized (from a name outside it): that variable is
 // replaced by the matching part of the known type of the value.
-User = (name = String, age = Int)
-
-map = <A, B>(xs: List(A), f: (A) -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
+User {
+	User(name: String, age: Int)
 }
 
-users = [User(name = "bob", age = 3)]
+map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
+	xs |> {
+		[]          -> []
+		[x, ..rest] -> [f(x), ..map(rest, f)]
+	}
+}
+
+users = [User(name: "bob", age: 3)]
 
 name = map(users, (p) {
 	q = p

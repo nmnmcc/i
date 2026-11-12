@@ -9,43 +9,48 @@
 	i/core
 )
 
-Name = (value = String)
-
-read_name = () <- (name: Name) { name.value }
-
-main = () {
-	{
-		callback = task.keep((x: Int) {
-			task.yield()
-			task.yield()
-			task.yield()
-			(read_name(), task.path(), x)
-		})
-		task.scope((s) {
-			t = task.go(s, () {
-				{
-					answer = callback(7)
-					assert(read_name() == "caller")
-					answer
-				} <- (Name(value = "caller"))
-			})
-			assert(task.join(t) == ("saved", [1], 7))
-		})
-		assert(read_name() == "saved")
-		pure = task.keep((_: Nil) { 1 })
-		assert(core.portable(pure))
-		control.boundary((b) {
-			task.scope((s) {
-				t = task.go(s, () {
-					task.yield()
-					saved = task.keep((_: Nil) { 1 })
-					core.not(core.portable(saved))
-				})
-				assert(core.portable(t))
-				assert(task.join(t))
-			}) <- (Name(value = "saved"), Marker(b))
-		})
-	} <- (Name(value = "saved"))
+Name {
+	Name(value: String)
 }
 
-Marker = (Boundary(Nil, Never, task.Scheduler | Assert | request.Root))
+read_name = (name ! Name) { name.value }
+
+
+main = () {
+	! Name = Name(value: "saved")
+	callback = task.keep((x: Int) {
+		task.yield()
+		task.yield()
+		task.yield()
+		(read_name(), task.path(), x)
+	})
+	task.scope((s) {
+		t = task.go(s, () {
+			! Name = Name(value: "caller")
+			answer = callback(7)
+			assert(read_name() == "caller")
+			answer
+		})
+		assert(task.join(t) == ("saved", [1], 7))
+	})
+	assert(read_name() == "saved")
+	pure = task.keep((_: Nil) { 1 })
+	assert(core.portable(pure))
+	control.boundary((b) {
+		! Name = Name(value: "saved")
+		! Marker = Marker(b)
+		task.scope((s) {
+			t = task.go(s, () {
+				task.yield()
+				saved = task.keep((_: Nil) { 1 })
+				core.not(core.portable(saved))
+			})
+			assert(core.portable(t))
+			assert(task.join(t))
+		})
+	})
+}
+
+Marker {
+	Marker(Boundary(Nil, Never, task.Scheduler | Assert | request.Root))
+}

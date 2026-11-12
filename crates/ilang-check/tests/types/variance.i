@@ -1,22 +1,32 @@
 // §4.5 rules 6 and 7: variance from the definitions.
-Box(A) = (value = A)
+Box(A) {
+	Box(value: A)
+}
 
-Sink(A) = (put = (A) -> Nil)
+Sink(A) {
+	Sink(put: (A) -> Nil)
+}
 
-Cell(A) = (get = () -> A, set = (A) -> Nil)
+Cell(A) {
+	Cell(get: () -> A, set: (A) -> Nil)
+}
 
-Wrap(A) = (inner = Box(A))
+Wrap(A) {
+	Wrap(inner: Box(A))
+}
 
-Back(A) = (sink = Sink(Sink(A)))
+Back(A) {
+	Back(sink: Sink(Sink(A)))
+}
 
 // Covariant: two forms are put together by union.
-boxes = [Box(value = 1), Box(value = "a")]
+boxes = [Box(value: 1), Box(value: "a")]
 
 // Contravariant: by intersection.
 sinks = (s1: Sink(Int), s2: Sink(String)) { [s1, s2] }
 
 // Through other definitions.
-wraps = [Wrap(inner = Box(value = 1)), Wrap(inner = Box(value = "a"))]
+wraps = [Wrap(inner: Box(value: 1)), Wrap(inner: Box(value: "a"))]
 
 backs = (b1: Back(Int), b2: Back(String)) { [b1, b2] }
 

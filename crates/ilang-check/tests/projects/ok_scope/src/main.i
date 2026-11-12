@@ -9,12 +9,19 @@ c = (1, d)
 
 d = () { c }
 
-wrapped = Wrap(f = (n) { wrapped })
+wrapped = Wrap(f: (n) { wrapped })
 
-Wrap = (f = (Int) -> Wrap)
+Wrap {
+	Wrap(f: (Int) -> Wrap)
+}
 
 local = () {
-	fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
+	fact = (n) {
+		n |> {
+			0 -> 1
+			_ -> n * fact(n - 1)
+		}
+	}
 	grouped = { (n) { grouped(n) } }
 	x = 1
 	x = x + 1
@@ -26,7 +33,7 @@ local = () {
 }
 
 // Type variables: `a` in the inner binding is the variable of `outer`.
-outer = <A>(x: A) -> A {
+outer(A) = (x: A) -> A {
 	inner: (A) -> A = (y) { y }
 	inner(x)
 }

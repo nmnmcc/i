@@ -12,40 +12,40 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out {
+	Out(print: (String) -> Nil)
+}
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text: String, out ! Out) { out.print(text) }
+
 
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(
-					() {
-						task.send(armed, Nil)
-						task.sync(task.never())
-					},
-					() {
-						inner = fail.catch(() {
-							task.scope((cleanup) {
-								target = task.go(cleanup, () {
-									resource.ensure(
-										() { task.sync(task.never()) },
-										() {
-											task.yield()
-											print("cleanup-child-final")
-										},
-									)
-								})
-								task.go(cleanup, () { fail.raise("cleanup") })
-								task.join(target)
+				resource.ensure(() {
+					task.send(armed, Nil)
+					task.sync(task.never())
+				}, () {
+					inner = fail.catch(() {
+						task.scope((cleanup) {
+							target = task.go(cleanup, () {
+								resource.ensure(
+									() { task.sync(task.never()) }
+									() {
+										task.yield()
+										print("cleanup-child-final")
+									}
+								)
 							})
+							task.go(cleanup, () { fail.raise("cleanup") })
+							task.join(target)
 						})
-						assert(inner == Error("cleanup"))
-						print("outer-final")
-					},
-				)
+					})
+					assert(inner == Error("cleanup"))
+					print("outer-final")
+				})
 			})
 			task.receive(armed)
 			fail.raise("outer")

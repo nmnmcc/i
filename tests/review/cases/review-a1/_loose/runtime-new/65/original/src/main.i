@@ -1,7 +1,5 @@
-User = (name = String)
-f = () { (u) { u.name } |> (g: (User) -> String) { g(User(name = "yes")) } }
+User { User(name: String) }
+f = () { (u) { u.name } |> { g: (User) -> String -> g(User(name: "yes")) } }
 
-main = () {
-	assert(f() == "yes")
-	Nil
-}
+
+main = () { assert(f() == "yes") Nil }

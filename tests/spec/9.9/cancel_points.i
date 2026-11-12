@@ -16,26 +16,25 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out {
+	Out(print: (String) -> Nil)
+}
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text: String, out ! Out) { out.print(text) }
 
-probe = (label: String, wait: () <- (task.Scheduler, request.Root) -> Nil) {
+probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(
-					() {
-						task.send(armed, Nil)
-						wait()
-						panic("cancelled body continued")
-					},
-					() {
-						task.yield()
-						print(label)
-					},
-				)
+				resource.ensure(() {
+					task.send(armed, Nil)
+					wait()
+					panic("cancelled body continued")
+				}, () {
+					task.yield()
+					print(label)
+				})
 			})
 			task.go(s, () {
 				task.receive(armed)
@@ -47,33 +46,29 @@ probe = (label: String, wait: () <- (task.Scheduler, request.Root) -> Nil) {
 	assert(result == Error("boom"))
 }
 
+
 main = () {
 	probe("yield", () { task.yield() })
 	c: task.Channel(Nil) = task.channel()
 	probe("send", () { task.send(c, Nil) })
 	probe("receive", () { task.receive(c) })
 	probe("sync", () {
-		task.sync(
-			task.map(task.always(Nil), (_) {
-				panic("map ran after cancellation")
-			}),
-		)
+		task.sync(task.map(task.always(Nil), (_) {
+			panic("map ran after cancellation")
+		}))
 	})
 	result = fail.catch(() {
 		task.scope((s) {
 			target = task.go(s, () { task.sync(task.never()) })
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(
-					() {
-						task.send(armed, Nil)
-						task.join(target)
-					},
-					() {
-						task.yield()
-						print("join")
-					},
-				)
+				resource.ensure(() {
+					task.send(armed, Nil)
+					task.join(target)
+				}, () {
+					task.yield()
+					print("join")
+				})
 			})
 			task.go(s, () {
 				task.receive(armed)

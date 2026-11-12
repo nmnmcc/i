@@ -1,12 +1,16 @@
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) {
+	S(f: () -> Int ! N, m: (N) -> Nil)
+}
 
-use = <N>() <- (s: S(N)) {
+use(N) = (s ! S(N)) {
 	S(f = f, ..) = s
 	f()
 }
 
-wrap: <N>(() <- (S(N), ..N) -> Int) <- N -> Int = (body) {
-	body() <- (S(f = () { 1 }, m = (_: N) { Nil }))
+wrap(N) = (body: () -> Int ! N | S(N)) -> Int ! N {
+	! S(N) = S(f: () { 1 }, m: (_: N) { Nil })
+	body()
 }
+
 
 main = () { assert(wrap(() { use() }) == 1) }

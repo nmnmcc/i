@@ -2,6 +2,14 @@
 // expect: stop "panic: caught group match"
 
 // literal-types §5.3: deferred fitted failure in its own effect frame.
-pair = ("b", () { pair |> (("a", _)) { 1 } })
+pair = ("b", () {
+	pair |> {
+		("a", _) -> 1
+	}
+})
 
-main = () { pair.1() <- (Assert(fail = (_) { panic("caught group match") })) }
+
+main = () {
+	! Assert = Assert(fail: (_) { panic("caught group match") })
+	pair.1()
+}

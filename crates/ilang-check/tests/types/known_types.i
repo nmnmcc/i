@@ -5,9 +5,13 @@
 	i/core
 )
 
-User = (name = String, age = Int)
+User {
+	User(name: String, age: Int)
+}
 
-Box(A) = (value = A)
+Box(A) {
+	Box(value: A)
+}
 
 // Literals; a bit array; a tuple, with `_` for a part with no known type;
 // a list, with `List(_)` when a part has no known type; `[]`.
@@ -37,21 +41,35 @@ op_neg = (a) { -.a == 1 }
 op_pipe = () { { 1 |> core.to_float } == 1 }
 
 // A a match has the union of its clause expressions, when they all have one.
-case_union = (b: Bool) { { b |> (True) { 1 } | (False) { "a" } } == 1.0 }
+case_union = (b: Bool) {
+	{
+		b |> {
+			True  -> 1
+			False -> "a"
+		}
+	} == 1.0
+}
 
-case_unknown = (b: Bool, x) { { b |> (True) { 1 } | (False) { x } } == "a" }
+case_unknown = (b: Bool, x) {
+	{
+		b |> {
+			True  -> 1
+			False -> x
+		}
+	} == "a"
+}
 
 // A record update is the call of its constructor.
-update = (b: Box(Int)) { Box(..b, value = "a") == 1 }
+update = (b: Box(Int)) { Box(..b, value: "a") == 1 }
 
-update_rest = (u: User) { User(..u, age = 2) == 1 }
+update_rest = (u: User) { User(..u, age: 2) == 1 }
 
 // Parameters: `x: T` gives `T`; no type gives none; `x ! T` gives `T`.
 param_typed = (s: String) { s == 1 }
 
 param_untyped = (s) { s == 1 }
 
-param_env = () <- (u: User) { u == 1 }
+param_env = (u ! User) { u == 1 }
 
 // Names with a type scheme, simplified: built-in, imported, a module member,
 // and a generalized binding outside its own value and group.
@@ -81,12 +99,13 @@ fn_body = () { (x: Int, y) { x } == 1 }
 
 // Inside its own value, and in its group, a name has only what is written.
 own = (n: Int) {
-	n |>
-		(0) { 0 }
-		| (_) {
+	n |> {
+		0 -> 0
+		_ -> {
 			own == 1
 			0
 		}
+	}
 }
 
 group_a = (n: Int) -> Int {
@@ -109,28 +128,38 @@ call = () { id(1) == "a" }
 
 call_unknown = (x) { id(x) == "a" }
 
-call_ctor = () { Box(value = 1) == 1 }
+call_ctor = () { Box(value: 1) == 1 }
 
 // Matching a union: the type variable gets what the other members do not
 // take. `_` matches nothing.
-unwrap = <A>(x: A | Nil) -> A { x |> (Nil) { panic("nil") } | (y) { y } }
+unwrap(A) = (x: A | Nil) -> A {
+	x |> {
+		Nil -> panic("nil")
+		y   -> y
+	}
+}
 
 call_union = (u: User | Nil) { unwrap(u) == 1 }
 
 call_union_field = (u: User | Nil) { unwrap(u).name }
 
-first = <A, B>(p: (A, B)) -> A { p.0 }
+first(A, B) = (p: (A, B)) -> A { p.0 }
 
 call_hole = (x) { first((x, 1)) == 1 }
 
 // A type variable that gets more than one type gets their union.
-either = <A>(x: A, y: A) -> A { x }
+either(A) = (x: A, y: A) -> A { x }
 
 call_join = () { either(1, "a") == 1.0 }
 
 // Differences and intersections in a scheme: the types are put in, and the
 // result is worked out again (§4.4).
-drop_nil = (x) { x |> (Nil) { panic("nil") } | (y) { y } }
+drop_nil = (x) {
+	x |> {
+		Nil -> panic("nil")
+		y   -> y
+	}
+}
 
 call_diff = (u: User | Nil) { drop_nil(u) == 1 }
 
@@ -153,8 +182,7 @@ block = () {
 	{
 		x = 1
 		x
-	} ==
-		"a"
+	} == "a"
 }
 
 // Names in patterns.
@@ -179,20 +207,28 @@ pattern_annotation = (x) {
 }
 
 pattern_list = (xs: List(String)) {
-	xs |> ([x, ..rest]) { x == 1 || rest == 1 } | ([]) { False }
+	xs |> {
+		[x, ..rest] -> x == 1 || rest == 1
+		[]          -> False
+	}
 }
 
 pattern_case_part = (b: Box(Int | String)) {
-	b |>
-		(Box(value = value) ? True) { value == 1.0 }
-		| (_) { panic("unreachable") }
+	b |> {
+		Box(value = value) ? True -> value == 1.0
+		_                 -> panic("unreachable")
+	}
 }
 
 // A catch-all gets `B` less the members that rule 12 takes out.
 pattern_narrowed = (x: Int | String | Nil) {
-	x |>
-		(_: Nil) { 0 }
-		| (other) { { other == Nil } |> (True) { 1 } | (False) { 2 } }
+	x |> {
+		_: Nil -> 0
+		other -> { other == Nil } |> {
+			True  -> 1
+			False -> 2
+		}
+	}
 }
 
 // A name that is not generalized gets its known type from its value.
@@ -201,19 +237,23 @@ not_general = () {
 	y == "a"
 }
 
-Some(A) = (A)
-None = ()
 // The examples of §4.8: a parameter with no type has no known type, but a
 // name in a clause pattern gets the known part type.
-Option(A) = Some(A) | None
+Option(A) {
+	Some(A)
+	None
+}
 
 untyped_field = (u) { u.name }
 
 option_name = (opt: Option(User)) {
-	opt |> (Some(u)) { u.name } | (None) { "" }
+	opt |> {
+		Some(u) -> u.name
+		None    -> ""
+	}
 }
 
 // An annotation label wins over the label of the value.
 annotated: (Int) -> Int = (y) { y }
 
-annotated_call = annotated(x = 1)
+annotated_call = annotated(1)

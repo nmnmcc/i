@@ -2,12 +2,22 @@
 	testlib = (test) = std/test
 )
 
-S(A) = (value = A)
+S(A) {
+	S(value: A)
+}
 
-one = () <- (s: S(Int)) { s.value + 1 }
+one = (s ! S(Int)) { s.value + 1 }
 
-run = <N>(f: () <- N -> Int, x: N) { f() }
+run(N) = (f: () -> Int ! N, x: N) { f() }
 
-bad = () { run(() { one() }, S(value = "hi")) <- (S(value = "bad")) }
+bad = () {
+	! S(String) = S(value: "bad")
+	run(() { one() }, S(value: "hi"))
+}
 
-test("example", () { bad() |> (2) { Nil } | (other) { panic(other) } })
+test("example", () {
+	bad() |> {
+		2     -> Nil
+		other -> panic(other)
+	}
+})

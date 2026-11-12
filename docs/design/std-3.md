@@ -193,18 +193,11 @@ written recursive result types, never polymorphic recursion. An ordinary client:
 )
 
 test("reverse_twice", () {
-	Ok(item) = property.int(-100, 100)
-	Ok(items) = property.list(item, 0, 50)
-	property.test(
-		items,
-		property.defaults(),
-		(xs) {
-			assert(
-				list.reverse(list.reverse(xs)) == xs,
-			)
-		},
-		core.inspect,
-	)
+  Ok(item) = property.int(-100, 100)
+  Ok(items) = property.list(item, 0, 50)
+  property.test(items, property.defaults(), (xs) {
+    assert(list.reverse(list.reverse(xs)) == xs)
+  }, core.inspect)
 })
 ```
 

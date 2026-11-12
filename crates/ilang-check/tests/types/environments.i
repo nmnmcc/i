@@ -4,60 +4,59 @@
 	i/control
 )
 
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) {
+	Yield(emit: (A) -> Nil)
+}
 
-Source(A) = (next = () -> A)
+Source(A) {
+	Source(next: () -> A)
+}
 
-collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 	control.boundary((b) {
-		{
-			body()
-			[]
-		} <- (
-			Yield(
-				emit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
-				},
-			),
-		)
+		! Yield(A) = Yield(emit: (x) {
+			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+		})
+		body()
+		[]
 	})
 }
 
 // The hole of contravariance: `a` must be `Int`, not `Never`.
 numbers = () {
-	collect(() <- (y: Yield(Int)) {
+	collect((y ! Yield(Int)) {
 		y.emit(1)
 		y.emit(2)
 	})
 }
 
 // Without an annotation, the argument comes from the service type.
-inferred = <A>() { collect(() <- (y: Yield(A)) { y.emit("s") }) }
+inferred(A) = () { collect((y ! Yield(A)) { y.emit("s") }) }
 
 // A function that needs `Yield(Int)` may not be given `Yield(Never)`.
-run_never = (body: () <- (Yield(Never)) -> Nil) { 1 }
+run_never = (body: () -> Nil ! Yield(Never)) { 1 }
 
-bad_never = () { run_never(() <- (y: Yield(Int)) { y.emit(1) }) }
+bad_never = () { run_never((y ! Yield(Int)) { y.emit(1) }) }
 
 // Equal arguments are fine.
-run_int = (body: () <- (Yield(Int)) -> Nil) { 1 }
+run_int = (body: () -> Nil ! Yield(Int)) { 1 }
 
-good_int = () { run_int(() <- (y: Yield(Int)) { y.emit(1) }) }
+good_int = () { run_int((y ! Yield(Int)) { y.emit(1) }) }
 
 // Merging: two forms of one type constructor in an environment are a
 // compile error, also for a contravariant or a covariant service.
-emit_int = () <- (y: Yield(Int)) { y.emit(1) }
+emit_int = (y ! Yield(Int)) { y.emit(1) }
 
-emit_string = () <- (y: Yield(String)) { y.emit("a") }
+emit_string = (y ! Yield(String)) { y.emit("a") }
 
 both_yields = () {
 	emit_int()
 	emit_string()
 }
 
-next_int = () <- (s: Source(Int)) { s.next() + 1 }
+next_int = (s ! Source(Int)) { s.next() + 1 }
 
-next_string = () <- (s: Source(String)) { s.next() <> "" }
+next_string = (s ! Source(String)) { s.next() <> "" }
 
 both_sources = () {
 	next_int()
@@ -68,12 +67,20 @@ both_sources = () {
 both_fns = [() { emit_int() }, () { emit_string() }]
 
 // In a written environment.
-written = () <- (y: Yield(Int), z: Source(Int)) -> Nil { y.emit(z.next()) }
+written = (y ! Yield(Int), z ! Source(Int)) -> Nil ! Yield(Int) | Source(Int) {
+	y.emit(z.next())
+}
 
 // Rule 9: the member that an environment statement takes out must be equal
 // to the service it gives.
-emit_any = () <- (y: Yield(Int | String)) { y.emit(1) }
+emit_any = (y ! Yield(Int | String)) { y.emit(1) }
 
-given_narrow = () { emit_any() <- (Yield(emit = (x) { Nil })) }
+given_narrow = () {
+	! Yield(Int) = Yield(emit: (x) { Nil })
+	emit_any()
+}
 
-given_same = () { emit_any() <- (Yield(emit = (x) { Nil })) }
+given_same = () {
+	! Yield(Int | String) = Yield(emit: (x) { Nil })
+	emit_any()
+}

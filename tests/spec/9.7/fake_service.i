@@ -9,24 +9,30 @@
 )
 
 @host("test:kv/v1")
-Kv = (get = (String) <- (Fail(String)) -> String)
-
-@host("test:async/v1", "async")
-Later = (echo = (String) -> String)
-
-greeting = () <- (kv: Kv, later: Later) {
-	later.echo("hello " <> kv.get("name"))
+Kv {
+	Kv(get: (String) -> String ^ String)
 }
 
+@host("test:async/v1", "async")
+Later {
+	Later(echo: (String) -> String)
+}
+
+greeting = (kv ! Kv, later ! Later) { later.echo("hello " <> kv.get("name")) }
+
 test("with_fakes", () {
-	greeting() |> ("hello fake name!") { Nil } | (other) { panic(other) } <- (
-		Kv(get = (key) { "fake " <> key }),
-		Later(echo = (text) { text <> "!" }),
-	)
+	! Kv = Kv(get: (key) { "fake " <> key })
+	! Later = Later(echo: (text) { text <> "!" })
+	greeting() |> {
+		"hello fake name!" -> Nil
+		other              -> panic(other)
+	}
 })
 
-test("with_the_host", () <- (later: Later) {
-	greeting() |> ("hello name") { Nil } | (other) { panic(other) } <- (
-		Kv(get = (key) { key }),
-	)
+test("with_the_host", (later ! Later) {
+	! Kv = Kv(get: (key) { key })
+	greeting() |> {
+		"hello name" -> Nil
+		other        -> panic(other)
+	}
 })

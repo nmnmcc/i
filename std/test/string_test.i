@@ -75,15 +75,14 @@ test("reverse_skin_tone_roundtrip_test", () {
 test("split_comma_test", () {
 	assert(
 		string.split("Gleam,Erlang,Elixir", ",") ==
-			["Gleam", "Erlang", "Elixir"],
+			["Gleam", "Erlang", "Elixir"]
 	)
 	Nil
 })
 
 test("split_comma_space_test", () {
 	assert(
-		string.split("Gleam, Erlang,Elixir", ", ") ==
-			["Gleam", "Erlang,Elixir"],
+		string.split("Gleam, Erlang,Elixir", ", ") == ["Gleam", "Erlang,Elixir"]
 	)
 	Nil
 })
@@ -91,7 +90,7 @@ test("split_comma_space_test", () {
 test("split_empty_test", () {
 	assert(
 		string.split("Gleam On Beam", "") ==
-			["G", "l", "e", "a", "m", " ", "O", "n", " ", "B", "e", "a", "m"],
+			["G", "l", "e", "a", "m", " ", "O", "n", " ", "B", "e", "a", "m"]
 	)
 	Nil
 })
@@ -99,7 +98,7 @@ test("split_empty_test", () {
 test("split_once_ok_test", () {
 	assert(
 		string.split_once("Gleam,Erlang,Elixir", ",") ==
-			Some(("Gleam", "Erlang,Elixir")),
+			Some(("Gleam", "Erlang,Elixir"))
 	)
 	Nil
 })
@@ -117,7 +116,7 @@ test("split_once_empty_test", () {
 test("replace_test", () {
 	assert(
 		string.replace("Gleam,Erlang,Elixir", ",", "++") ==
-			"Gleam++Erlang++Elixir",
+			"Gleam++Erlang++Elixir"
 	)
 	Nil
 })
@@ -158,9 +157,7 @@ test("contains_present_test", () {
 })
 
 test("contains_absent_test", () {
-	assert(
-		core.not(string.contains("gleam", "x")),
-	)
+	assert(core.not(string.contains("gleam", "x")))
 	Nil
 })
 
@@ -176,7 +173,7 @@ test("concat_test", () {
 
 test("concat_emoji_test", () {
 	assert(
-		string.concat(["💃🏿", "💇🏼‍♀️", "🧔‍♂️", "🧑‍🦼‍➡️"]) == "💃🏿💇🏼‍♀️🧔‍♂️🧑‍🦼‍➡️",
+		string.concat(["💃🏿", "💇🏼‍♀️", "🧔‍♂️", "🧑‍🦼‍➡️"]) == "💃🏿💇🏼‍♀️🧔‍♂️🧑‍🦼‍➡️"
 	)
 	Nil
 })
@@ -244,14 +241,14 @@ test("join_2_dash_test", () {
 test("join_3_test", () {
 	assert(
 		string.join(["Hello", "there", "world!"], ", ") ==
-			"Hello, there, world!",
+			"Hello, there, world!"
 	)
 	Nil
 })
 
 test("join_3_dash_test", () {
 	assert(
-		string.join(["Hello", "there", "world!"], "-") == "Hello-there-world!",
+		string.join(["Hello", "there", "world!"], "-") == "Hello-there-world!"
 	)
 	Nil
 })
@@ -303,6 +300,7 @@ test("trim_whole_string_test", () {
 })
 
 // unicode whitespaces
+
 test("trim_horizontal_tab_test", () {
 	assert(string.trim("hats\u{0009}") == "hats")
 	Nil
@@ -424,6 +422,7 @@ test("trim_ideographic_space_test", () {
 })
 
 // related unicode non-whitespaces
+
 test("trim_mongolian_vowel_separator_test", () {
 	assert(string.trim("hats\u{180E}") == "hats\u{180E}")
 	Nil
@@ -470,16 +469,12 @@ test("starts_with_match_test", () {
 })
 
 test("starts_with_no_match_test", () {
-	assert(
-		core.not(string.starts_with("theory", "ory")),
-	)
+	assert(core.not(string.starts_with("theory", "ory")))
 	Nil
 })
 
 test("starts_with_longer_test", () {
-	assert(
-		core.not(string.starts_with("theory", "theory2")),
-	)
+	assert(core.not(string.starts_with("theory", "theory2")))
 	Nil
 })
 
@@ -494,16 +489,12 @@ test("ends_with_match_test", () {
 })
 
 test("ends_with_no_match_test", () {
-	assert(
-		core.not(string.ends_with("theory", "the")),
-	)
+	assert(core.not(string.ends_with("theory", "the")))
 	Nil
 })
 
 test("ends_with_longer_test", () {
-	assert(
-		core.not(string.ends_with("theory", "theory2")),
-	)
+	assert(core.not(string.ends_with("theory", "theory2")))
 	Nil
 })
 
@@ -701,7 +692,7 @@ test("to_codepoint_strings_empty_test", () {
 test("to_codepoint_strings_escape_chars_test", () {
 	assert(
 		string.to_codepoint_strings("\n\t\r\"\\") ==
-			["\n", "\t", "\r", "\"", "\\"],
+			["\n", "\t", "\r", "\"", "\\"]
 	)
 	Nil
 })
@@ -732,19 +723,16 @@ test("to_utf_codepoints_empty_test", () {
 })
 
 test("to_utf_codepoints_basic_test", () {
-	assert(
-		string.to_codepoints("gleam") ==
-			{
-				(Ok(g), Ok(l), Ok(e), Ok(a), Ok(m)) = (
-					string.utf_codepoint(103),
-					string.utf_codepoint(108),
-					string.utf_codepoint(101),
-					string.utf_codepoint(97),
-					string.utf_codepoint(109),
-				)
-				[g, l, e, a, m]
-			},
-	)
+	assert(string.to_codepoints("gleam") == {
+		(Ok(g), Ok(l), Ok(e), Ok(a), Ok(m)) = (
+			string.utf_codepoint(103)
+			string.utf_codepoint(108)
+			string.utf_codepoint(101)
+			string.utf_codepoint(97)
+			string.utf_codepoint(109)
+		)
+		[g, l, e, a, m]
+	})
 	Nil
 })
 
@@ -752,15 +740,15 @@ test("to_utf_codepoints_rainbow_flag_test", () {
 	// ["🏳", "️", "‍", "🌈"]
 	expected = {
 		(
-			Ok(waving_white_flag),
-			Ok(variant_selector_16),
-			Ok(zero_width_joiner),
-			Ok(rainbow),
+			Ok(waving_white_flag)
+			Ok(variant_selector_16)
+			Ok(zero_width_joiner)
+			Ok(rainbow)
 		) = (
-			string.utf_codepoint(127_987),
-			string.utf_codepoint(65_039),
-			string.utf_codepoint(8205),
-			string.utf_codepoint(127_752),
+			string.utf_codepoint(127_987)
+			string.utf_codepoint(65_039)
+			string.utf_codepoint(8205)
+			string.utf_codepoint(127_752)
 		)
 		[waving_white_flag, variant_selector_16, zero_width_joiner, rainbow]
 	}
@@ -776,31 +764,27 @@ test("from_utf_codepoints_empty_test", () {
 
 test("from_utf_codepoints_basic_test", () {
 	assert(
-		{ "gleam" |> string.to_codepoints |> string.from_codepoints } ==
-			"gleam",
+		{ "gleam" |> string.to_codepoints |> string.from_codepoints } == "gleam"
 	)
 	Nil
 })
 
 test("from_utf_codepoints_emoji_test", () {
 	assert(
-		{ "🏳️‍🌈" |> string.to_codepoints |> string.from_codepoints } == "🏳️‍🌈",
+		{ "🏳️‍🌈" |> string.to_codepoints |> string.from_codepoints } == "🏳️‍🌈"
 	)
 	Nil
 })
 
 test("from_utf_codepoints_abc_test", () {
-	assert(
-		string.from_codepoints({
-			(Ok(a), Ok(b), Ok(c)) = (
-				string.utf_codepoint(97),
-				string.utf_codepoint(98),
-				string.utf_codepoint(99),
-			)
-			[a, b, c]
-		}) ==
-			"abc",
-	)
+	assert(string.from_codepoints({
+		(Ok(a), Ok(b), Ok(c)) = (
+			string.utf_codepoint(97)
+			string.utf_codepoint(98)
+			string.utf_codepoint(99)
+		)
+		[a, b, c]
+	}) == "abc")
 	Nil
 })
 
@@ -871,13 +855,10 @@ test("bit_array_utf_codepoint_test", () {
 })
 
 test("utf_codepoint_to_int_test", () {
-	assert(
-		string.utf_codepoint_to_int({
-			Ok(ordinal_value) = string.utf_codepoint(128_013)
-			ordinal_value
-		}) ==
-			128_013,
-	)
+	assert(string.utf_codepoint_to_int({
+		Ok(ordinal_value) = string.utf_codepoint(128_013)
+		ordinal_value
+	}) == 128_013)
 	Nil
 })
 
@@ -977,10 +958,11 @@ test("capitalise_unicode_test", () {
 	Nil
 })
 
-InspectTypeZero = ()
-InspectTypeOne(A) = (A)
-InspectTypeTwo(A, B) = (A, B)
-InspectType(A, B) = InspectTypeZero | InspectTypeOne(A) | InspectTypeTwo(A, B)
+InspectType(A, B) {
+	InspectTypeZero
+	InspectTypeOne(A)
+	InspectTypeTwo(A, B)
+}
 
 test("inspect_0_test", () {
 	assert(string.inspect(True) == "True")
@@ -1315,7 +1297,7 @@ test("inspect_260_test", () {
 test("inspect_264_test", () {
 	assert(
 		string.inspect("around-single-quotes'around-single-quotes") ==
-			"\"around-single-quotes'around-single-quotes\"",
+			"\"around-single-quotes'around-single-quotes\""
 	)
 	Nil
 })
@@ -1323,7 +1305,7 @@ test("inspect_264_test", () {
 test("inspect_269_test", () {
 	assert(
 		string.inspect("'between-single-quotes'") ==
-			"\"'between-single-quotes'\"",
+			"\"'between-single-quotes'\""
 	)
 	Nil
 })
@@ -1416,7 +1398,7 @@ test("inspect_338_test", () {
 test("inspect_342_test", () {
 	assert(
 		string.inspect(([1, 2, 3], "🌈", "🏳️‍🌈", (1, "1", True))) ==
-			"([1, 2, 3], \"🌈\", \"🏳️‍🌈\", (1, \"1\", True))",
+			"([1, 2, 3], \"🌈\", \"🏳️‍🌈\", (1, \"1\", True))"
 	)
 	Nil
 })
@@ -1499,7 +1481,7 @@ test("inspect_403_test", () {
 test("inspect_407_test", () {
 	assert(
 		string.inspect(InspectTypeOne(([1], "a"))) ==
-			"InspectTypeOne(([1], \"a\"))",
+			"InspectTypeOne(([1], \"a\"))"
 	)
 	Nil
 })
@@ -1537,7 +1519,7 @@ test("inspect_432_test", () {
 test("inspect_436_test", () {
 	assert(
 		string.inspect((_: Int, _: String) -> Bool { False }) ==
-			"//fn(a, b) { ... }",
+			"//fn(a, b) { ... }"
 	)
 	Nil
 })
@@ -1545,7 +1527,7 @@ test("inspect_436_test", () {
 test("inspect_441_test", () {
 	assert(
 		string.inspect((InspectTypeOne, InspectTypeTwo)) ==
-			"(//fn(a) { ... }, //fn(a, b) { ... })",
+			"(//fn(a) { ... }, //fn(a, b) { ... })"
 	)
 	Nil
 })
@@ -1553,7 +1535,7 @@ test("inspect_441_test", () {
 test("inspect_446_test", () {
 	assert(
 		string.inspect(InspectTypeOne(InspectTypeZero)) ==
-			"InspectTypeOne(InspectTypeZero)",
+			"InspectTypeOne(InspectTypeZero)"
 	)
 	Nil
 })
@@ -1565,104 +1547,105 @@ test("inspect_451_test", () {
 
 test("inspect_charlist_test", () {
 	list = [
-		70,
-		97,
-		105,
-		108,
-		101,
-		100,
-		32,
-		116,
-		111,
-		32,
-		108,
-		111,
-		97,
-		100,
-		32,
-		78,
-		73,
-		70,
-		32,
-		108,
-		105,
-		98,
-		114,
-		97,
-		114,
-		121,
-		58,
-		32,
-		39,
-		47,
-		114,
-		117,
-		110,
-		47,
-		99,
-		117,
-		114,
-		114,
-		101,
-		110,
-		116,
-		45,
-		115,
-		121,
-		115,
-		116,
-		101,
-		109,
-		47,
-		115,
-		119,
-		47,
-		115,
-		104,
-		97,
-		114,
-		101,
-		47,
-		110,
-		105,
-		120,
-		45,
-		108,
-		100,
-		47,
-		108,
-		105,
-		98,
-		47,
-		108,
-		105,
-		98,
-		99,
-		114,
-		121,
-		112,
-		116,
-		111,
-		46,
-		115,
-		111,
-		46,
-		51,
+		70
+		97
+		105
+		108
+		101
+		100
+		32
+		116
+		111
+		32
+		108
+		111
+		97
+		100
+		32
+		78
+		73
+		70
+		32
+		108
+		105
+		98
+		114
+		97
+		114
+		121
+		58
+		32
+		39
+		47
+		114
+		117
+		110
+		47
+		99
+		117
+		114
+		114
+		101
+		110
+		116
+		45
+		115
+		121
+		115
+		116
+		101
+		109
+		47
+		115
+		119
+		47
+		115
+		104
+		97
+		114
+		101
+		47
+		110
+		105
+		120
+		45
+		108
+		100
+		47
+		108
+		105
+		98
+		47
+		108
+		105
+		98
+		99
+		114
+		121
+		112
+		116
+		111
+		46
+		115
+		111
+		46
+		51
 	]
 	// A Wasm List(Int) remains a list even when every value is printable.
 	assert(
 		string.inspect(list) ==
-			"[70, 97, 105, 108, 101, 100, 32, 116, 111, 32, 108, 111, 97, 100, 32, 78, 73, 70, 32, 108, 105, 98, 114, 97, 114, 121, 58, 32, 39, 47, 114, 117, 110, 47, 99, 117, 114, 114, 101, 110, 116, 45, 115, 121, 115, 116, 101, 109, 47, 115, 119, 47, 115, 104, 97, 114, 101, 47, 110, 105, 120, 45, 108, 100, 47, 108, 105, 98, 47, 108, 105, 98, 99, 114, 121, 112, 116, 111, 46, 115, 111, 46, 51]",
+			"[70, 97, 105, 108, 101, 100, 32, 116, 111, 32, 108, 111, 97, 100, 32, 78, 73, 70, 32, 108, 105, 98, 114, 97, 114, 121, 58, 32, 39, 47, 114, 117, 110, 47, 99, 117, 114, 114, 101, 110, 116, 45, 115, 121, 115, 116, 101, 109, 47, 115, 119, 47, 115, 104, 97, 114, 101, 47, 110, 105, 120, 45, 108, 100, 47, 108, 105, 98, 47, 108, 105, 98, 99, 114, 121, 112, 116, 111, 46, 115, 111, 46, 51]"
 	)
 	Nil
 })
 
 // WasmGC carries distinct runtime tags for tuples, constructors, floats,
 // strings and bit arrays; these assertions replace duplicated host branches.
+
 test("target_inspect_tuple_test", () {
 	assert(
 		string.inspect((InspectTypeZero, InspectTypeZero)) ==
-			"(InspectTypeZero, InspectTypeZero)",
+			"(InspectTypeZero, InspectTypeZero)"
 	)
 	Nil
 })
@@ -1775,6 +1758,7 @@ test("remove_suffix_test", () {
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
+
 test("split_more_test", () {
 	assert(string.split("a,b,,c", ",") == ["a", "b", "", "c"])
 	assert(string.split("", ",") == [""])
@@ -1825,21 +1809,15 @@ test("contains_more_test", () {
 	assert(string.contains("theory", "ory"))
 	assert(string.contains("abc", ""))
 	assert(string.contains("", ""))
-	assert(
-		core.not(string.contains("", "a")),
-	)
-	assert(
-		core.not(string.contains("ab", "abc")),
-	)
+	assert(core.not(string.contains("", "a")))
+	assert(core.not(string.contains("ab", "abc")))
 	assert(string.contains("héllo", "é"))
 	assert(string.contains("aé", "é"))
 })
 
 test("contains_and_crop_test", () {
 	assert(string.contains("aaaaaaab", "aaab"))
-	assert(
-		core.not(string.contains("aaaaaaa", "aaab")),
-	)
+	assert(core.not(string.contains("aaaaaaa", "aaab")))
 	assert(string.contains("𐐨𐐩", "𐐩"))
 	assert(string.crop("héllo wörld", "wö") == "wörld")
 	assert(string.crop("aaab", "ab") == "ab")
@@ -1851,25 +1829,21 @@ test("search_long_test", () {
 	assert(string.contains(text, "abc"))
 	assert(
 		string.split_once(text, "abc") ==
-			Some((string.repeat("ab", 50_000), "")),
+			Some((string.repeat("ab", 50_000), ""))
 	)
 	assert(
 		string.replace(string.repeat("x,", 50_000), ",", "") ==
-			string.repeat("x", 50_000),
+			string.repeat("x", 50_000)
 	)
 })
 
 test("starts_ends_test", () {
 	assert(string.starts_with("héllo", "hé"))
-	assert(
-		core.not(string.starts_with("héllo", "e")),
-	)
+	assert(core.not(string.starts_with("héllo", "e")))
 	assert(string.starts_with("abc", ""))
 	assert(string.ends_with("héllo", "llo"))
 	assert(string.ends_with("abc", ""))
-	assert(
-		core.not(string.ends_with("bc", "abc")),
-	)
+	assert(core.not(string.ends_with("bc", "abc")))
 })
 
 test("slice_more_test", () {
@@ -1907,9 +1881,7 @@ test("case_one_codepoint_for_one_test", () {
 	assert(string.to_upper("ı") == "I")
 	assert(string.to_lower("I") == "i")
 	assert(string.to_lower("İ") == "i")
-	assert(
-		string.length(string.to_upper("ßŉǰ")) == 3,
-	)
+	assert(string.length(string.to_upper("ßŉǰ")) == 3)
 })
 
 test("case_outside_the_basic_plane_test", () {
@@ -1949,12 +1921,8 @@ test("codepoints_test", () {
 	assert(list.map(cps, string.utf_codepoint_to_int) == [104, 233, 128512])
 	assert(string.from_codepoints(cps) == "hé😀")
 	assert(string.to_codepoint_strings("hé😀") == ["h", "é", "😀"])
-	assert(
-		result.is_error(string.utf_codepoint(0xD800)),
-	)
-	assert(
-		result.is_ok(string.utf_codepoint(0x10FFFF)),
-	)
+	assert(result.is_error(string.utf_codepoint(0xD800)))
+	assert(result.is_ok(string.utf_codepoint(0x10FFFF)))
 })
 
 test("compare_more_test", () {
@@ -1967,7 +1935,7 @@ test("compare_more_test", () {
 	assert(string.compare("Z", "a") == Less)
 	assert(
 		list.sort(["pear", "apple", "fig", "Apple"], string.compare) ==
-			["Apple", "apple", "fig", "pear"],
+			["Apple", "apple", "fig", "pear"]
 	)
 })
 
@@ -1988,12 +1956,8 @@ test("drop_more_test", () {
 })
 
 test("length_long_test", () {
-	assert(
-		string.length(string.repeat("é", 1_000_000)) == 1_000_000,
-	)
-	assert(
-		string.byte_size(string.repeat("é", 1_000_000)) == 2_000_000,
-	)
+	assert(string.length(string.repeat("é", 1_000_000)) == 1_000_000)
+	assert(string.byte_size(string.repeat("é", 1_000_000)) == 2_000_000)
 })
 
 test("join_long_test", () {

@@ -9,6 +9,7 @@
 )
 
 // The fixed cases below are S1–S7 and the independent review's string table.
+
 test("access_and_taking", () {
 	assert(string.at("aé😀", 1) == Some("é"))
 	assert(string.at("aé😀", -1) == Some("😀"))
@@ -32,12 +33,14 @@ test("access_and_taking", () {
 			assert(string.drop_end(s, k) <> string.take_end(s, k) == s)
 		})
 		list.each(list.range(-n - 1, n + 1), (i) {
-			normalized = { i < 0 } |> (True) { n + i } | (False) { i }
-			{ normalized >= 0 && normalized < n } |>
-				(True) {
-					assert(string.at(s, i) == Some(string.slice(s, i, 1)))
-				}
-				| (False) { assert(string.at(s, i) == None) }
+			normalized = { i < 0 } |> {
+				True  -> n + i
+				False -> i
+			}
+			{ normalized >= 0 && normalized < n } |> {
+				True  -> assert(string.at(s, i) == Some(string.slice(s, i, 1)))
+				False -> assert(string.at(s, i) == None)
+			}
 		})
 	})
 })
@@ -85,16 +88,17 @@ test("count_replacement_and_last_split", () {
 		list.each(["", "a", "aa", "é", "😀"], (needle) {
 			assert(
 				string.replace_n(
-					s,
-					needle,
-					"aaé",
-					string.count(s, needle) + 1,
+					s
+					needle
+					"aaé"
+					string.count(s, needle) + 1
 				) ==
-					string.replace(s, needle, "aaé"),
+					string.replace(s, needle, "aaé")
 			)
-			string.split_once_last(s, needle) |>
-				(None) { Nil }
-				| (Some((left, right))) { assert(left <> needle <> right == s) }
+			string.split_once_last(s, needle) |> {
+				None                -> Nil
+				Some((left, right)) -> assert(left <> needle <> right == s)
+			}
 		})
 	})
 })
@@ -104,11 +108,11 @@ test("scalar_traversals", () {
 	assert(string.words("a\u{a0}b") == ["a\u{a0}b"])
 	assert(
 		string.words("\u{85}a\u{200e}b\u{200f}c\u{2028}d\u{2029}") ==
-			["a", "b", "c", "d"],
+			["a", "b", "c", "d"]
 	)
 	assert(
 		string.split_when(",,a,,,b,", (c) { core.codepoint_to_int(c) == 44 }) ==
-			["a", "b"],
+			["a", "b"]
 	)
 	assert(string.split_when("", (_) { panic("empty split callback") }) == [])
 	assert(string.map("", (_) { panic("empty map callback") }) == "")
@@ -120,42 +124,39 @@ test("scalar_traversals", () {
 		string.fold("aé😀", [], (acc, c) {
 			list.append(acc, [core.codepoint_to_int(c)])
 		}) ==
-			[97, 233, 128512],
+			[97, 233, 128512]
 	)
 })
 
-Calls = (call = (Int) -> Nil)
+Calls {
+	Calls(call: (Int) -> Nil)
+}
 
-observe = (body: () <- (Calls, Assert) -> Nil) -> List(Int) {
+observe = (body: () -> Nil ! Calls | Assert) -> List(Int) ! Assert {
 	control.boundary((b) {
-		{
-			body()
-			[]
-		} <- (
-			Calls(
-				call = (n) {
-					control.suspend(b, (k) { [n, ..control.resume(k, Nil)] })
-				},
-			),
-		)
+		! Calls = Calls(call: (n) {
+			control.suspend(b, (k) { [n, ..control.resume(k, Nil)] })
+		})
+		body()
+		[]
 	})
 }
 
 test("callbacks_run_once_in_order_and_stop_on_error", () {
 	run = (
-		action: ((UtfCodepoint) <- (Fail(String), Calls) -> UtfCodepoint) <- (
-			Fail(String),
-			Calls,
-		) -> String
-	) -> Nil {
+		action: (
+			(UtfCodepoint) -> UtfCodepoint ^ String ! Calls
+		) -> String ^ String ! Calls
+	) -> Nil ! Assert {
 		seen = observe(() {
 			result = fail.catch(() {
-				action((c) <- (calls: Calls) {
+				action((c, calls ! Calls) {
 					n = core.codepoint_to_int(c)
 					calls.call(n)
-					{ n == 233 } |>
-						(True) { fail.raise("second") }
-						| (False) { c }
+					{ n == 233 } |> {
+						True  -> fail.raise("second")
+						False -> c
+					}
 				})
 			})
 			assert(result == Error("second"))
@@ -173,13 +174,10 @@ test("callbacks_run_once_in_order_and_stop_on_error", () {
 		})
 	})
 	seen = observe(() {
-		assert(
-			string.map("aé😀", (c) <- (calls: Calls) {
-				calls.call(core.codepoint_to_int(c))
-				c
-			}) ==
-				"aé😀",
-		)
+		assert(string.map("aé😀", (c, calls ! Calls) {
+			calls.call(core.codepoint_to_int(c))
+			c
+		}) == "aé😀")
 	})
 	assert(seen == [97, 233, 128512])
 })

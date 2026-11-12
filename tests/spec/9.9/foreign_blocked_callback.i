@@ -11,9 +11,12 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out {
+	Out(print: (String) -> Nil)
+}
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text: String, out ! Out) { out.print(text) }
+
 
 main = () {
 	callback = control.keep_env((work: (() -> Nil, () -> Nil) -> Nil) {
@@ -30,35 +33,27 @@ main = () {
 			work(() { arm(Nil) }, () { park(Nil) })
 		})
 	})
-	assert(
-		task.run(() {
-			work = control.keep_env((callbacks: (() -> Nil, () -> Nil)) {
-				(arm, park) = callbacks
-				task.scope((inner) {
-					child = task.go(inner, () {
-						resource.ensure(
-							() {
-								arm()
-								park()
-								panic("blocked callback returned")
-							},
-							() {
-								task.yield()
-								print("blocked-final")
-							},
-						)
+	assert(task.run(() {
+		work = control.keep_env((callbacks: (() -> Nil, () -> Nil)) {
+			(arm, park) = callbacks
+			task.scope((inner) {
+				child = task.go(inner, () {
+					resource.ensure(() {
+						arm()
+						park()
+						panic("blocked callback returned")
+					}, () {
+						task.yield()
+						print("blocked-final")
 					})
-					task.join(child)
 				})
+				task.join(child)
 			})
-			assert(
-				fail.catch(() {
-					callback((arm, park) { work((arm, park)) })
-				}) ==
-					Error("callback"),
-			)
-			42
-		}) ==
-			42,
-	)
+		})
+		assert(
+			fail.catch(() { callback((arm, park) { work((arm, park)) }) }) ==
+				Error("callback")
+		)
+		42
+	}) == 42)
 }

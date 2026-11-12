@@ -1,6 +1,6 @@
-S(N) = (f = () <- N -> Int)
-use = <N>() <- (s: S(N)) {
-	S(f = f) = s
-	f()
+S(N) { S(f: () -> Int ! N) }
+use(N) = (s ! S(N)) {
+  S(f = f) = s
+  f()
 }
-fw = <N>() <- (s: S(N)) -> Int { use() }
+fw(N) = (s ! S(N)) -> Int ! N | S(N) { use() }

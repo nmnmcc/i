@@ -4,29 +4,44 @@
 )
 
 // §9.2: environment parameters and environment statements (rule 9).
-Clock = (now = () -> Int)
+Clock {
+	Clock(now: () -> Int)
+}
 
-Log = (write = (String) -> Nil)
+Log {
+	Log(write: (String) -> Nil)
+}
 
-elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
+elapsed = (start: Int, clock ! Clock) { clock.now() - start }
 
-fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
+fixed = () {
+	! Clock = Clock(now: () { 42 })
+	elapsed(40)
+}
 
-logged = () <- (log: Log) {
+logged = (log ! Log) {
 	log.write("start")
 	elapsed(1)
 }
 
 // Only Clock is given; Log is still needed.
-half = () { logged() <- (Clock(now = () { 1 })) }
+half = () {
+	! Clock = Clock(now: () { 1 })
+	logged()
+}
 
 // A service may be any value of its type.
-given = (c: Clock) { elapsed(0) <- (c) }
+given = (c: Clock) {
+	! Clock = c
+	elapsed(0)
+}
 
 // §9.3: errors come together by union.
-Http = (get = (String) <- (Fail(Int)) -> String)
+Http {
+	Http(get: (String) -> String ^ Int)
+}
 
-fetch = (url) <- (http: Http) { http.get(url) }
+fetch = (url, http ! Http) { http.get(url) }
 
 two = () {
 	a = fetch("a")

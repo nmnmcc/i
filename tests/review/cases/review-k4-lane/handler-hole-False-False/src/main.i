@@ -1,9 +1,13 @@
-Svc(A) = (f = () -> A)
-
-use = () <- (s: Svc(Int)) { s.f() }
-
-wrap: <N>(() <- (Svc(Int), ..N) -> Int, Svc(Int)) <- N -> Int = (body, svc) {
-	body() <- (svc)
+Svc(A) {
+	Svc(f: () -> A)
 }
 
-main = () { assert(wrap(use, Svc(f = () { 6 })) == 6) }
+use = (s ! Svc(Int)) { s.f() }
+
+wrap(N) = (body: () -> Int ! N | Svc(Int), svc: Svc(Int)) -> Int ! N {
+	! Svc(Int) = svc
+	body()
+}
+
+
+main = () { assert(wrap(use, Svc(f: () { 6 })) == 6) }

@@ -3,4 +3,4 @@
 @external("test:math/v1", "add")
 add: (Int, Int) -> 1 | 2
 
-main = () { add(2, 3) |> (1) { Nil } | (2) { Nil } }
+main = () { add(2, 3) |> { 1 -> Nil  2 -> Nil } }

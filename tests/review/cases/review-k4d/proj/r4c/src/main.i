@@ -1,32 +1,29 @@
 (
 	(Io) = i/io
 )
-Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-use = <N>() <- (s: S(N)) { s.f() }
-run = <A, N>(body: () <- N -> A) { body() }
+Dep { Dep(v: Int) }
+get = (d ! Dep) { d.v }
+S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
+use(N) = (s ! S(N)) { s.f() }
+run(A, N) = (body: () -> A ! N) { body() }
 fw = () { use() }
 fr = () { run(() { use() }) }
-tell = (x: Int) {
-	x |>
-		(0) { "zero" }
-		| (1) { "one" }
-		| (2) { "two" }
-		| (3) { "three" }
-		| (4) { "four" }
-		| (_) { "many" }
-}
+tell = (x: Int) { x |> {
+  0 -> "zero"
+  1 -> "one"
+  2 -> "two"
+  3 -> "three"
+  4 -> "four"
+  _ -> "many"
+} }
 
-main = () <- (io: Io) {
-	{
-		h = () { run(fr) }
-		k = () { run(h) + fw() }
-		io.print(
-			tell(k()),
-		)
-		io.print(
-			tell(k() + fr()),
-		) <- (S(f = () { 1 }, m = (_: Never) { Nil }))
-	} <- (S(f = () { get() }, m = (_: Dep) { Nil }), Dep(v = 2))
+
+main = (io ! Io) {
+  ! S(Dep) = S(f: () { get() }, m: (_: Dep) { Nil })
+  ! Dep = Dep(v: 2)
+  h = () { run(fr) }
+  k = () { run(h) + fw() }
+  io.print(tell(k()))
+  ! S(Never) = S(f: () { 1 }, m: (_: Never) { Nil })
+  io.print(tell(k() + fr()))
 }

@@ -10,11 +10,15 @@
 	control = i/control
 )
 
-Box(A) = (value = A)
+Box(A) {
+	Box(value: A)
+}
 
-Sink(A) = (put = (A) -> Nil)
+Sink(A) {
+	Sink(put: (A) -> Nil)
+}
 
-capture = <A>(x: A, f: ((A) -> Nil) -> Nil) -> A {
+capture(A) = (x: A, f: ((A) -> Nil) -> Nil) -> A {
 	control.boundary((b) {
 		f((a) {
 			control.suspend(b, (k) {
@@ -26,15 +30,17 @@ capture = <A>(x: A, f: ((A) -> Nil) -> Nil) -> A {
 	})
 }
 
-capture2 = <A>(x: A, f: (Sink(A)) -> Nil) -> A {
-	capture(x, (k) { f(Sink(put = k)) })
+capture2(A) = (x: A, f: (Sink(A)) -> Nil) -> A {
+	capture(x, (k) { f(Sink(put: k)) })
 }
 
-make = <S>(init: S) { (f: (S) -> S) { f(init) } }
+make(S) = (init: S) { (f: (S) -> S) { f(init) } }
 
-State(S) = (get = () -> S)
+State(S) {
+	State(get: () -> S)
+}
 
-cur = <S>(seed: S) <- (st: State(S)) { st.get() }
+cur(S) = (seed: S, st ! State(S)) { st.get() }
 
 test("hidden", () {
 	assert(capture(0, (k) { k(5) }) == 5)
@@ -45,82 +51,85 @@ test("hidden", () {
 	assert(make((0, 0))((p) { (p.0 + 1, p.1) }).0 == 1)
 	g = make(0)
 	assert(g((n) { n + 1 }) == 1)
-	assert(cur(0) == 5) <- (State(get = () { 5 }))
+	! State(Int) = State(get: () { 5 })
+	assert(cur(0) == 5)
 })
 
 test("folds", () {
 	xs = [3, 4, 5, 6, 7]
-	assert(
-		list.fold(xs, 0, (n, _) {
-			{ n == 3 } |> (True) { n } | (False) { n + 1 }
-		}) ==
-			3,
-	)
-	assert(
-		list.fold(
-			xs,
-			0,
-			{ (n, _) { { n == 3 } |> (True) { n } | (False) { n + 1 } } },
-		) ==
-			3,
-	)
+	assert(list.fold(xs, 0, (n, _) {
+		{ n == 3 } |> {
+			True  -> n
+			False -> n + 1
+		}
+	}) == 3)
+	assert(list.fold(xs, 0, {
+		(n, _) {
+			{ n == 3 } |> {
+				True  -> n
+				False -> n + 1
+			}
+		}
+	}) == 3)
 	flag = True
-	assert(
-		list.fold(
-			xs,
-			0,
-			flag |>
-				(True) {
-					(n, _) { { n == 3 } |> (True) { n } | (False) { n + 1 } }
-				}
-				| (False) { (n, _) { n + 1 } },
-		) ==
-			3,
-	)
-	assert(
-		list.fold(xs, (0, 0), (p, x) {
-			{ p.0 == 3 } |> (True) { p } | (False) { (p.0 + 1, x) }
-		}).0 ==
-			3,
-	)
-	assert(
-		list.fold(xs, Box(value = 0), (s, _) {
-			Box(value = s.value + 1)
-		}).value ==
-			5,
-	)
+	assert(list.fold(xs, 0, flag |> {
+		True -> (n, _) {
+			{ n == 3 } |> {
+				True  -> n
+				False -> n + 1
+			}
+		}
+		False -> (n, _) { n + 1 }
+	}) == 3)
+	assert(list.fold(xs, (0, 0), (p, x) {
+		{ p.0 == 3 } |> {
+			True  -> p
+			False -> (p.0 + 1, x)
+		}
+	}).0 == 3)
+	assert(list.fold(xs, Box(value: 0), (s, _) { Box(value: s.value + 1) }).value == 5)
 	acc = list.fold([3, 4, 5], [], (acc, x) {
-		acc |>
-			([h, ..]) { { h == 3 } |> (True) { acc } | (False) { [x, ..acc] } }
-			| ([]) { [x] }
+		acc |> {
+			[h, ..] -> { h == 3 } |> {
+				True  -> acc
+				False -> [x, ..acc]
+			}
+			[] -> [x]
+		}
 	})
 	assert(acc == [3])
-	assert(
-		list.fold(xs, None, (acc, x) {
-			acc |>
-				(Some(p: (Int, Int))) { Some((p.0 + 1, x)) }
-				| (None) { Some((0, x)) }
-		}) ==
-			Some((4, 7)),
-	)
+	assert(list.fold(xs, None, (acc, x) {
+		acc |> {
+			Some(p: (Int, Int)) -> Some((p.0 + 1, x))
+			None                -> Some((0, x))
+		}
+	}) == Some((4, 7)))
 	assert(result.unwrap(Ok(1), 50) == 1)
 })
 
 // Decision 7: a service argument and a parameter of a parameter are hidden.
-Feed(A) = (put = (A) -> Nil)
-
-with_feed = <A>(seed: A, body: () <- (Feed(A)) -> Nil) -> A {
-	capture(seed, (put) { body() <- (Feed(put = put)) })
+Feed(A) {
+	Feed(put: (A) -> Nil)
 }
 
-loop = <S>(init: S, body: (S, (S) -> Nil) -> Nil) -> Nil {
+with_feed(A) = (seed: A, body: () -> Nil ! Feed(A)) -> A {
+	capture(seed, (put) {
+		! Feed(A) = Feed(put: put)
+		body()
+	})
+}
+
+loop(S) = (init: S, body: (S, (S) -> Nil) -> Nil) -> Nil {
 	again = (s: S) { body(s, again) }
 	again(init)
 }
 
 test("hidden_service_and_setter", () {
-	assert(with_feed(0, () <- (feed: Feed(Int)) { feed.put(5) }) == 5)
+	assert(with_feed(0, (feed ! Feed(Int)) { feed.put(5) }) == 5)
 	loop(0, (n, again) {
-		{ n == 3 } |> (True) { Nil } | (False) { again(n + 1) }
+		{ n == 3 } |> {
+			True  -> Nil
+			False -> again(n + 1)
+		}
 	})
 })

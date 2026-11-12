@@ -1,10 +1,12 @@
-Handle = Opaque
+Handle {}
 
 H = Handle
 
 Id(X) = X
 
-Wrap = (Int)
+Wrap {
+	Wrap(Int)
+}
 
 // Types the host can take (§10.3), also through aliases.
 @external("a", "ok1")
@@ -22,7 +24,7 @@ f5: Int
 f2: (_) -> Int
 
 @external("a", "f3")
-f3: <A>(A) -> A
+f3(A): (A) -> A
 
 @external("a", "f7")
 f7: (List(_)) -> Int
@@ -42,7 +44,7 @@ f9: (Int | String, (Int, Int)) -> Int
 
 // No errors and no environment.
 @external("a", "f4")
-f4: () <- (Fail(String)) -> Int
+f4: () -> Int ^ String
 
 @external("a", "f10")
-f10: () <- (Fail(Int), Assert) -> Int
+f10: () -> Int ^ Int ! Assert

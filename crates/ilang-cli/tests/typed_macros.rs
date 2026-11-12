@@ -120,7 +120,11 @@ fn typed_macro_labels_and_pipe() {
         "m (-> ((: left Int) (: right Int)) Int)",
         "(-> (x y) _ `(+ ~x ~y))",
     );
-    checked(&m,"(\n\tm = app/macros\n)\nmain = () {\n\tassert(m.m(right = 2, left = 1) == 3)\n\tassert({ 1 |> m.m(right = 2) } == 3)\n}").unwrap();
+    checked(
+        &m,
+        "(m = app/macros)\nmain = () { assert(m.m(1, 2) == 3) assert({ 1 |> m.m(2) } == 3) }",
+    )
+    .unwrap();
 }
 #[test]
 fn typed_macro_type_of_observes_literal() {

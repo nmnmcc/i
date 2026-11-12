@@ -1,9 +1,4 @@
-State(A) = (get = () -> A)
-cur = <A>(seed: A) <- (st: State(A)) { st.get() }
+State(A) { State(get: () -> A) }
+cur(A) = (seed: A, st ! State(A)) { st.get() }
 
-main = () {
-	{
-		assert(cur(0) == 5)
-		Nil
-	} <- (State(get = () { 5 }))
-}
+main = () { ! State(Int) = State(get: () { 5 }) assert(cur(0)==5) Nil }

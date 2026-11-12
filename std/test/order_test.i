@@ -83,9 +83,7 @@ test("compare_gt_gt_test", () {
 })
 
 test("reverse_test", () {
-	assert(
-		list.sort([4, 5, 1], order.reverse(int.compare)) == [5, 4, 1],
-	)
+	assert(list.sort([4, 5, 1], order.reverse(int.compare)) == [5, 4, 1])
 	Nil
 })
 
@@ -131,7 +129,7 @@ test("lazy_break_tie_eq_eq_test", () {
 
 test("lazy_break_tie_gt_lazy_test", () {
 	assert(
-		order.lazy_break_tie(Greater, () { panic("unreachable") }) == Greater,
+		order.lazy_break_tie(Greater, () { panic("unreachable") }) == Greater
 	)
 	Nil
 })
@@ -150,20 +148,14 @@ test("min_max_test", () {
 
 test("is_test", () {
 	assert(order.is_less(Less))
-	assert(
-		core.not(order.is_less(Equal)),
-	)
+	assert(core.not(order.is_less(Equal)))
 	assert(order.is_equal(Equal))
 	assert(order.is_greater(Greater))
-	assert(
-		core.not(order.is_greater(Less)),
-	)
+	assert(core.not(order.is_greater(Less)))
 })
 
 test("reverse_sort_test", () {
-	assert(
-		list.sort([2, 3, 1], order.reverse(int.compare)) == [3, 2, 1],
-	)
+	assert(list.sort([2, 3, 1], order.reverse(int.compare)) == [3, 2, 1])
 })
 
 test("break_tie_sort_test", () {
@@ -172,6 +164,6 @@ test("break_tie_sort_test", () {
 		order.break_tie(int.compare(x.1, y.1), string.compare(x.0, y.0))
 	}
 	assert(
-		list.sort(people, by_age_then_name) == [("c", 1), ("a", 2), ("b", 2)],
+		list.sort(people, by_age_then_name) == [("c", 1), ("a", 2), ("b", 2)]
 	)
 })

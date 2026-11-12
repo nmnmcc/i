@@ -6,7 +6,7 @@ port: Int = 1
 
 Port = port
 
-Pair(A, B) = { (A, B) }
+Pair(A, B) = (A, B)
 
 parts: (Int, String) = (1, "s")
 
@@ -14,7 +14,12 @@ Pair(Number, Text) = parts
 
 id = (x) { x }
 
-match_alias = (v: Int | String) { v |> (n: Port) { n + 1 } | (_) { 0 } }
+match_alias = (v: Int | String) {
+	v |> {
+		n: Port -> n + 1
+		_       -> 0
+	}
+}
 
 test("alias_tests", () {
 	assert(match_alias(2) == 3)
@@ -37,15 +42,15 @@ test("inferred_not_known", () {
 	assert(copy("a") == "b")
 })
 
-Schema(D, E) = (decode = (String) -> D, encode = (E) -> String)
-
-make = <D, E>(d: (String) -> D, e: (E) -> String) {
-	Schema(decode = d, encode = e)
+Schema(D, E) {
+	Schema(decode: (String) -> D, encode: (E) -> String)
 }
 
+make(D, E) = (d: (String) -> D, e: (E) -> String) { Schema(decode: d, encode: e) }
+
 user = make(
-	(s: String) -> (String, Int) { (s, 1) },
-	(v: (String, Int)) -> String { v.0 },
+	(s: String) -> (String, Int) { (s, 1) }
+	(v: (String, Int)) -> String { v.0 }
 )
 
 Schema(User, _) = user

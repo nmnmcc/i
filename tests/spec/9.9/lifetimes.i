@@ -9,21 +9,21 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out {
+	Out(print: (String) -> Nil)
+}
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text: String, out ! Out) { out.print(text) }
+
 
 main = () {
-	assert(
-		task.scope((s) {
-			task.go(s, () {
-				task.yield()
-				print("child")
-			})
-			print("body")
-			42
-		}) ==
-			42,
-	)
+	assert(task.scope((s) {
+		task.go(s, () {
+			task.yield()
+			print("child")
+		})
+		print("body")
+		42
+	}) == 42)
 	print("after")
 }

@@ -1,17 +1,13 @@
-S(A) = (value = A)
-G(N) = (() <- N -> Nil, (N) -> Nil)
-use = <N>() <- (s: G(N)) {
-	G(f, _) = s
-	f()
-}
+S(A) { S(value: A) }
+G(N) { G(() -> Nil ! N, (N) -> Nil) }
+use(N) = (s ! G(N)) { G(f, _) = s f() }
 run = (f) { f() }
-with = <A, R, N>(x: A, f: () <- N -> R) { f() <- (S(value = x)) }
-read = () <- (s: S(String)) { s.value <> "!" }
+with(A, R, N) = (x: A, f: () -> R ! N) { ! S(A) = S(value: x) f() }
+read = (s ! S(String)) { s.value <> "!" }
 
 main = () {
-	{
-		run(() { use() })
-		with(1, read)
-		Nil
-	} <- (G(() { Nil }, (_: Never) { Nil }))
+ ! G(Never) = G(() { Nil }, (_: Never) { Nil })
+ run(() { use() })
+ with(1, read)
+ Nil
 }

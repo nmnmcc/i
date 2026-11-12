@@ -1,6 +1,9 @@
 # Standard capabilities are registered explicitly; absent target cells are unsupplied.
+# The host column (--target host/ilang) is an embedding host of ABI v3, which gives
+# the standard host services as i run does; it rejects only imports it cannot supply.
 [providers."i/io.Io"]
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 js = {host=true}
 wasi = {host=true}
@@ -8,50 +11,60 @@ wasi = {host=true}
 [providers."i/clock.Clock"]
 wasi = {host=true}
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 js = {host=true}
 
 [providers."i/stdio.Stdio"]
 wasi = {host=true}
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 js = {host=true}
 
 [providers."i/fs.Fs"]
 wasi = {host=true}
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/net.Net"]
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/tls.Tls"]
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.Arguments"]
 wasi = {host=true}
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.Environment"]
 wasi = {host=true}
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.WorkingDirectory"]
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.Entropy"]
 wasi = {host=true}
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 js = {host=true}
 
 [providers."i/process.Process"]
 native = {host=true}
+host = {host=true}
 nodejs = {host=true}
 
 [providers."i/request.Root"]

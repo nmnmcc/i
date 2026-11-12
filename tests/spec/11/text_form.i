@@ -6,16 +6,21 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |>
-		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+	{ got == want } |> {
+		True  -> Nil
+		False -> panic(got <> " is not " <> want)
+	}
 }
 
 show = (x) { core.inspect(x) }
 
-User = (name = String, age = Int)
+User {
+	User(name: String, age: Int)
+}
 
-Unit = ()
+Unit {
+	Unit
+}
 
 test("ints", () {
 	check(show(0), "0")
@@ -24,12 +29,12 @@ test("ints", () {
 	check(show(1073741823), "1073741823")
 	check(show(-1073741824), "-1073741824")
 	check(
-		show(123456789012345678901234567890),
-		"123456789012345678901234567890",
+		show(123456789012345678901234567890)
+		"123456789012345678901234567890"
 	)
 	check(
-		show(-123456789012345678901234567890),
-		"-123456789012345678901234567890",
+		show(-123456789012345678901234567890)
+		"-123456789012345678901234567890"
 	)
 })
 
@@ -62,8 +67,8 @@ test("strings", () {
 	check(show("a\"b\\c"), "\"a\\\"b\\\\c\"")
 	check(show("\n\r\t\f"), "\"\\n\\r\\t\\f\"")
 	check(
-		show("\u{0}\u{1F}\u{7F}\u{80}\u{9F}"),
-		"\"\\u{0000}\\u{001F}\\u{007F}\\u{0080}\\u{009F}\"",
+		show("\u{0}\u{1F}\u{7F}\u{80}\u{9F}")
+		"\"\\u{0000}\\u{001F}\\u{007F}\\u{0080}\\u{009F}\""
 	)
 	check(show("é\u{A0}😀"), "\"é\u{A0}😀\"")
 })
@@ -83,7 +88,7 @@ test("custom", () {
 	check(show(Nil), "Nil")
 	check(show(Ok(1)), "Ok(1)")
 	check(show(Error("e")), "Error(\"e\")")
-	check(show(User(name = "ann", age = 3)), "User(\"ann\", 3)")
+	check(show(User(name: "ann", age: 3)), "User(\"ann\", 3)")
 	check(show(Unit), "Unit")
 	check(show(Ok(Error(Ok(Nil)))), "Ok(Error(Ok(Nil)))")
 })
@@ -96,42 +101,39 @@ test("bit_arrays", () {
 })
 
 codepoints = () {
-	check(
-		show(core.codepoints("aé")),
-		"[//utfcodepoint(a), //utfcodepoint(é)]",
-	)
+	check(show(core.codepoints("aé")), "[//utfcodepoint(a), //utfcodepoint(é)]")
 }
 
 test("codepoints", () { codepoints() })
 
 wide = (
-	p0,
-	p1,
-	p2,
-	p3,
-	p4,
-	p5,
-	p6,
-	p7,
-	p8,
-	p9,
-	p10,
-	p11,
-	p12,
-	p13,
-	p14,
-	p15,
-	p16,
-	p17,
-	p18,
-	p19,
-	p20,
-	p21,
-	p22,
-	p23,
-	p24,
-	p25,
-	p26,
+	p0
+	p1
+	p2
+	p3
+	p4
+	p5
+	p6
+	p7
+	p8
+	p9
+	p10
+	p11
+	p12
+	p13
+	p14
+	p15
+	p16
+	p17
+	p18
+	p19
+	p20
+	p21
+	p22
+	p23
+	p24
+	p25
+	p26
 	p27
 ) { p0 }
 
@@ -140,8 +142,8 @@ test("functions", () {
 	check(show((a, b) { a }), "//fn(a, b) { ... }")
 	check(show(show), "//fn(a) { ... }")
 	check(
-		show(wide),
-		"//fn(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, a1, b1) { ... }",
+		show(wide)
+		"//fn(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, a1, b1) { ... }"
 	)
 	check(show(Ok), "//fn(a) { ... }")
 	check(show(User), "//fn(a, b) { ... }")

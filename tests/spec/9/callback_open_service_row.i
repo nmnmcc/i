@@ -1,19 +1,24 @@
 // spec: 4.5, 9.2
 // expect: pass
 // N <: First | (N - First) must not close an inferred record callback row.
-First = (run = () -> Nil)
+First {
+	First(run: () -> Nil)
+}
 
-Second = (run = () -> Nil)
+Second {
+	Second(run: () -> Nil)
+}
 
-operation = () <- (second: Second) { second.run() }
+operation = (second ! Second) { second.run() }
 
-handle = <A, N>(body: () <- N -> A) -> A { body() }
+handle(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! First | N - First {
+	body()
+}
 
 wrapper = (p) { handle(() { p.send() }) }
 
 main = () {
-	wrapper((send = () { operation() })) <- (
-		First(run = () { Nil }),
-		Second(run = () { Nil }),
-	)
+	! First = First(run: () { Nil })
+	! Second = Second(run: () { Nil })
+	wrapper((send: () { operation() }))
 }

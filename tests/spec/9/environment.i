@@ -6,147 +6,152 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |>
-		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+	{ got == want } |> {
+		True  -> Nil
+		False -> panic(got <> " is not " <> want)
+	}
 }
 
 show = (x) { core.inspect(x) }
 
 // The example of §9.2.
-Clock = (now = () -> Int)
+Clock {
+	Clock(now: () -> Int)
+}
 
-elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
+elapsed = (start: Int, clock ! Clock) { clock.now() - start }
 
-fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
+fixed = () {
+	! Clock = Clock(now: () { 42 })
+	elapsed(40)
+}
 
-Name = (text = String)
+Name {
+	Name(text: String)
+}
 
-name = () <- (n: Name) { n.text }
+name = (n ! Name) { n.text }
 
 // Two services in one environment, and an environment parameter used
 // with a parameter pattern.
-both = ((a, b)) <- (clock: Clock, n: Name) { (a + b + clock.now(), n.text) }
+both = ((a, b), clock ! Clock, n ! Name) { (a + b + clock.now(), n.text) }
 
 // A closure made in one place gets its services from the place where it is
 // called (§9.2), not from where it was made.
-made_here = () { () { name() } <- (Name(text = "maker")) }
+made_here = () {
+	! Name = Name(text: "maker")
+	() { name() }
+}
 
-call_elsewhere = (f) { f() <- (Name(text = "caller")) }
+call_elsewhere = (f) {
+	! Name = Name(text: "caller")
+	f()
+}
 
 // An environment statement changes the environment of the rest of its
 // block only.
 scoped = () {
-	{
-		inner = { name() <- (Name(text = "inner")) }
-		(inner, name())
-	} <- (Name(text = "outer"))
+	! Name = Name(text: "outer")
+	inner = {
+		! Name = Name(text: "inner")
+		name()
+	}
+	(inner, name())
 }
 
 // A later environment statement for the same type constructor takes the
 // place of an earlier one.
-shadowed = () { name() <- (Name(text = "first"), Name(text = "second")) }
+shadowed = () {
+	! Name = Name(text: "first")
+	! Name = Name(text: "second")
+	name()
+}
 
 // The value of an environment statement uses the environment from outside
 // the statement (§4.8 rule 9).
 from_outside = () {
-	name() <- (Name(text = name() <> "c")) <- (Name(text = name() <> "b")) <- (
-		Name(text = "a"),
-	)
+	! Name = Name(text: "a")
+	! Name = Name(text: name() <> "b")
+	! Name = Name(text: name() <> "c")
+	name()
 }
 
 // An environment statement does not change which calls are in tail
 // position (§11.6). A million calls do not fit on the stack (32 MiB in the
 // Wasmtime host).
-count = (n, acc, name: Name) {
-	n |> (0) { acc } | (_) { count(n - 1, acc + 1, name) } <- (name)
+count = (n, acc, name) {
+	! Name = name
+	n |> {
+		0 -> acc
+		_ -> count(n - 1, acc + 1, name)
+	}
 }
 
 // The environment of a tail call through a value.
-deep = (n) <- (k: Name) {
-	n |>
-		(0) { k.text }
-		| (1) { apply(deep, 0) <- (Name(text = "last")) }
-		| (_) { apply(deep, n - 1) <- (k) }
+deep = (n, k ! Name) {
+	n |> {
+		0 -> k.text
+		1 -> {
+			! Name = Name(text: "last")
+			apply(deep, 0)
+		}
+		_ -> {
+			! Name = k
+			apply(deep, n - 1)
+		}
+	}
 }
 
 apply = (f, n) { f(n) }
 
 // A service is a normal value: it may be stored and given.
-stored = () <- (clock: Clock) { clock }
+stored = (clock ! Clock) { clock }
 
 // A generic service.
-State(S) = (get = () -> S)
+State(S) {
+	State(get: () -> S)
+}
 
-read = <S>() <- (st: State(S)) { st.get() }
+read(S) = (st ! State(S)) { st.get() }
 
 test("example", () {
-	check(
-		show(fixed()),
-		"2",
-	)
-	{
-		check(
-			show(elapsed(1)),
-			"99",
-		)
-		check(
-			show(fixed()),
-			"2",
-		)
-		check(
-			show(elapsed(1)),
-			"99",
-		)
-	} <- (Clock(now = () { 100 }))
+	check(show(fixed()), "2")
+	! Clock = Clock(now: () { 100 })
+	check(show(elapsed(1)), "99")
+	check(show(fixed()), "2")
+	check(show(elapsed(1)), "99")
 })
 
 test("parameters", () {
-	{
-		check(
-			show(both((2, 3))),
-			"(6, \"n\")",
-		)
-		c = stored()
-		check(
-			show(c.now()),
-			"1",
-		)
-	} <- (Clock(now = () { 1 }), Name(text = "n"))
+	! Clock = Clock(now: () { 1 })
+	! Name = Name(text: "n")
+	check(show(both((2, 3))), "(6, \"n\")")
+	c = stored()
+	check(show(c.now()), "1")
 })
 
 test("dynamic_scoping", () {
 	f = made_here()
 	check(call_elsewhere(f), "caller")
-	{
-		check(f(), "here")
-		check(call_elsewhere(() { name() }), "caller")
-	} <- (Name(text = "here"))
+	! Name = Name(text: "here")
+	check(f(), "here")
+	check(call_elsewhere(() { name() }), "caller")
 })
 
 test("blocks", () {
-	check(
-		show(scoped()),
-		"(\"inner\", \"outer\")",
-	)
+	check(show(scoped()), "(\"inner\", \"outer\")")
 	check(shadowed(), "second")
 	check(from_outside(), "abc")
 })
 
 test("tail_calls", () {
-	check(
-		show(count(1000000, 0, Name(text = "count"))),
-		"1000000",
-	)
-	{
-		check(deep(100000), "last")
-		check(deep(0), "start")
-	} <- (Name(text = "start"))
+	check(show(count(1000000, 0, Name(text: "count"))), "1000000")
+	! Name = Name(text: "start")
+	check(deep(100000), "last")
+	check(deep(0), "start")
 })
 
 test("generic", () {
-	check(
-		show(read() + 1),
-		"8",
-	) <- (State(get = () { 7 }))
+	! State(Int) = State(get: () { 7 })
+	check(show(read() + 1), "8")
 })

@@ -2,15 +2,20 @@
 	i/fail
 )
 
-Entry = (message = String)
+Entry {
+	Entry(message: String)
+}
 
-Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) {
+	Sink((Entry) -> Nil ^ E ! N, (N) -> Nil)
+}
 
-write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) -> Nil {
+write(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ^ E ! N | Sink(E, N) {
 	Sink(send, _) = sink
 	send(entry)
 }
 
-example = () { fail.catch(() { write(Entry(message = "seen")) }) }
+example = () { fail.catch(() { write(Entry(message: "seen")) }) }
+
 
 main = () { example() }

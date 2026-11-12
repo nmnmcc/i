@@ -2,12 +2,13 @@
 // expect: stop "panic: caught group tuple"
 
 // literal-types §5.3: deferred fitted failure in its own effect frame.
-pair = (
-	"b",
-	() {
-		("a", _) = pair
-		1
-	},
-)
+pair = ("b", () {
+	("a", _) = pair
+	1
+})
 
-main = () { pair.1() <- (Assert(fail = (_) { panic("caught group tuple") })) }
+
+main = () {
+	! Assert = Assert(fail: (_) { panic("caught group tuple") })
+	pair.1()
+}
