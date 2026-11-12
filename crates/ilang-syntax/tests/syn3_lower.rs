@@ -101,9 +101,29 @@ fn several_positions() {
     assert!(text.contains("(%arg1, %arg2)"), "{text}");
 }
 
+/// Stage 9: a chain with several shape groups, or with a label in its
+/// shape, is one hidden binding for each group and then the name, bound to
+/// the transition form of the multi-shape value. The parts of a shape are
+/// in canonical order: the positions, then the labels by name.
+#[test]
+fn shape_groups() {
+    let text = shown(
+        "area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n\nopen = (host: String, port = p: Int, addr = a: String) { p }\n",
+    );
+    let bindings: Vec<&str> = text.lines().filter(|l| !l.starts_with(['\t', '}']) && l.contains(" = ")).collect();
+    assert_eq!(bindings.len(), 5, "{text}");
+    assert!(bindings[0].starts_with("area%g0 = (r: Float)"), "{text}");
+    assert!(bindings[1].starts_with("area%g1 = (w: Float, h: Float)"), "{text}");
+    assert!(bindings[2].starts_with("area = %multi(1: area%g0, 2: area%g1)"), "{text}");
+    assert!(bindings[3].starts_with("open%g0 = (host: String, a: String, p: Int)"), "{text}");
+    assert!(bindings[4].starts_with("open = %multi(1,addr,port: open%g0)"), "{text}");
+    // A chain that is not bound to a name has its group functions in place.
+    let text = shown("fs = [(a) { a } | (a, b) { b }]\n");
+    assert!(text.contains("%multi(1: (a) {") && text.contains("2: (a, b) {"), "{text}");
+}
+
 #[test]
 fn forms_of_later_stages_are_errors() {
-    bad("area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n", "stage 9");
     bad("keep = (f: Int) <- (..env: N) { f }\n", "stage E6");
     bad("f = (x) { g(x) <- env }\n", "stage E6");
 }
