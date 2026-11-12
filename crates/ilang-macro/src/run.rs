@@ -85,7 +85,7 @@ pub fn compile(
     graph.entry = None;
     // Compiler wrappers install the sandbox capabilities lexically. Runtime
     // target plans belong to the user program, not this separate compiler
-    // program and its deliberately restricted import closure (§8).
+    // program and its deliberately restricted import closure.
     for package in &mut graph.packages {
         package.provider_plan = Default::default();
     }

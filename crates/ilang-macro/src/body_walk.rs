@@ -41,8 +41,9 @@ pub trait Hook {
         fn_depth: u32,
     ) -> Result<ast::TypeExpr, Self::Error>;
     fn depth_error(&mut self, span: Span) -> Self::Error;
-    /// Whether a binding has a direct value (§6.10); module-qualified names
-    /// require the same scope-aware lookup used by name resolution.
+    /// Whether a binding has a direct value (one made without running any
+    /// code); module-qualified names require the same scope-aware lookup used
+    /// by name resolution.
     fn is_direct(&mut self, expression: &Expr, locals: &[Local], fn_depth: u32) -> bool;
 }
 

@@ -17,7 +17,8 @@ use ilang_syntax::lisp::{
 };
 
 /// A step either finishes an ordinary item or replaces it with the returned
-/// items. `retained` is the written type definition protected by §4.3.
+/// items. `retained` is the written type definition: a macro on a type
+/// definition adds items beside it and never replaces it.
 pub enum Step {
     Finished(Item),
     Expanded {
