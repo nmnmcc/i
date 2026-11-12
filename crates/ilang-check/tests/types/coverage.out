@@ -22,16 +22,19 @@ empty : 0
 any : (x: Int) -> 1
 unknown : (f: () -> Bool ^ E ! N) -> 1 | 2 ^ E ! N
 no_error : () -> 1
-22:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`
-29:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(False)`
-36:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `0`
-43:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Flags(admin = False, active = False)`
-59:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `False`
-74:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
-88:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `""`
-103:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
-110:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
-118:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[]`
-125:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[_, _, ..]`
-140:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[False, ..]`
-148:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(False, False)`
+30:2: error[E0501]: `Point` is not a subtype of `Circle | Square`
+30:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`
+37:2: error[E0501]: `False` is not a subtype of `True`
+37:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(False)`
+44:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `0`
+51:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Flags(admin = False, active = False)`
+67:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `False`
+82:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
+96:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `""`
+111:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
+118:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
+126:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[]`
+133:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[_, _, ..]`
+148:2: error[E0501]: `False` is not a subtype of `True`
+148:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[False, ..]`
+156:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(False, False)`

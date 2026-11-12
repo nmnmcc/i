@@ -1,6 +1,6 @@
 pair : (t: (A, B)) -> A
 pair_written : (t: (Int, String)) -> String
-first : (r: Result(A, B)) -> A ! Assert
+first : (r: Ok(A)) -> A
 annotated : () -> Int
 literal : (n: A & Int) -> A ! Assert
 single : (u: User) -> String
@@ -11,14 +11,14 @@ list : (xs: List(A)) -> A ! Assert
 list_rest : (xs: List(A)) -> List(A)
 prefix : (s: String) -> String
 prefix_some : (s: String) -> String ! Assert
-named : (r: Result(A, B)) -> Result(A, B) ! Assert
+named : (r: Ok(A)) -> Ok(A)
 typed_part : (p: (Int, A)) -> A
 bits : (b: BitArray) -> Int ! Assert
 float : (f: A & Float) -> A ! Assert
 type_var : (x: A) -> A
 param_tuple : ((A, B)) -> A
 param_user : (User) -> String
-param_ctor : (Result(A, B)) -> A ! Assert
+param_ctor : (Ok(A)) -> A
 param_literal : (Int) -> 1 ! Assert
 param_list : (List(A)) -> 1 ! Assert
 8:1: warning[W0504]: top-level binding `pair` is not used

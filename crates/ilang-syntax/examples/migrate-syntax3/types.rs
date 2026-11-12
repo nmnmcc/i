@@ -72,7 +72,17 @@ pub fn run(source: &Source) -> Outcome {
         return Outcome::default();
     }
     let prelude = source.path == "lib/prelude.i";
-    let type_names: HashSet<&str> = defs.iter().map(|(_, t)| t.name.name.as_str()).collect();
+    // Type names and type parameter names of the module: a new type may
+    // not take one (a parameter may not have the name of a type, E0231).
+    let type_names: HashSet<&str> = defs
+        .iter()
+        .flat_map(|(_, t)| std::iter::once(t.name.name.as_str()).chain(t.params.iter().map(|p| p.name.as_str())))
+        .chain(module.items.iter().flat_map(|i| match &i.kind {
+            ItemKind::Binding(b) => b.type_params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+            ItemKind::Declaration { type_params, .. } => type_params.iter().map(|p| p.name.as_str()).collect(),
+            _ => Vec::new(),
+        }))
+        .collect();
     let imported: HashSet<&str> = module
         .imports
         .iter()

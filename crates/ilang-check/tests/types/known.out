@@ -6,11 +6,11 @@ from_binding : (s: Shape) -> Float ! Assert
 later : (s: Shape) -> () -> Float
 label : (s: Shape) -> String
 choice : (s: Shape) -> String
-not_known : (s: Shape) -> Shape
+not_known : (s: Shape) -> Circle
 wrong_ctor : (s: Shape) -> Shape
 no_field : (s: Shape) -> Float
 choice_field : (s: Shape) -> Never
-63:26: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
-67:17: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
-74:19: error[E0512]: the constructor `Square`, which made this value (§7.5), has no field with the label `radius` (§4.8 rule 13)
-81:47: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
+68:35: error[E0501]: `Square` is not a subtype of `Circle`
+72:26: error[E0501]: `Square` is not a subtype of `Circle`
+79:19: error[E0512]: the constructor `Square`, which made this value (§7.5), has no field with the label `radius` (§4.8 rule 13)
+86:47: error[E0512]: not every constructor of `Square` has a field with the label `radius` (§4.8 rule 13)

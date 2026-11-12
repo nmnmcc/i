@@ -9,7 +9,7 @@ guarded_only : (x: A & 1) -> 1 | A - 1
 describe : (v: Int | String) -> String
 choice : (r: Result(A, A)) -> A
 mixed : (b: Bool) -> 1 | "no"
-named : (r: Result(A, B)) -> Result(A | 0, B)
+named : (r: Result(A, B)) -> Ok(A | 0)
 bad : (v: A) -> A
 first_one : (p: (A, B) | C - (_, B)) -> B | 0
 61:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)

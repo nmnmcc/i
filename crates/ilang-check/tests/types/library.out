@@ -155,8 +155,8 @@ i/task.yield : () -> Nil ! Scheduler
 i/task.top : (seed: rng.Generator) -> Runner ! Runner
 i/task.observe_change : (root: Key(Nil)) -> Request(Nil)
 i/task.has_work : (ticket: Ticket) -> Bool
-i/task.wait_root : (_run: Key(Nil), root: request.Root, tickets: List(Ticket)) -> RunControl
-i/task.root_poll : (_run: Key(Nil), tickets: List(Ticket), runnable: Bool) -> RunControl
+i/task.wait_root : (_run: Key(Nil), root: request.Root, tickets: List(Ticket)) -> ContinueRun
+i/task.root_poll : (_run: Key(Nil), tickets: List(Ticket), runnable: Bool) -> ContinueRun
 i/task.root_forget : (_run: Key(Nil)) -> Nil
 i/task.root_allocate : () -> List(Int)
 i/task.initial : (root: request.Root) -> Runner
@@ -275,7 +275,7 @@ i/task._entry : (body: () -> A ^ E ! N) -> A ^ E ! N - Scheduler - Runner - requ
 i/task.scope_call : (body: (Scope(A)) -> B ^ A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ^ A ! N
 i/task.execute : (body: () -> A ^ E ! N, runner: Runner, seed: rng.Generator, policy: Policy) -> Result(Result(A, E), ScheduleError) ! N - Scheduler - Runner - request.Await - request.Owner - request.Root
 i/task.sync : (e: Event(A, B, C)) -> A ^ B ! C | Scheduler
-i/task.root_active : (_run: Key(Nil), _active: Active) -> RunControl
+i/task.root_active : (_run: Key(Nil), _active: Active) -> ContinueRun
 i/task.cause_allowed : (s: State, t: TaskState, cause: Cause) -> Bool
 i/task.frame_abort : (frames: List(Frame)) -> Maybe(() -> Never)
 i/task.effective_active : (s: State, t: TaskState) -> Active

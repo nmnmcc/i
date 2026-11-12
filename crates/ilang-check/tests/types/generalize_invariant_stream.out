@@ -2,5 +2,5 @@ new : () -> Stream(Never, Never, A)
 needs_bias : () -> Stream(Int, Never, Bias)
 make : (pull: () -> Step(A, B, C) ^ B ! C) -> Stream(A, B, C)
 biased : () -> Stream(Int, Never, Bias)
-20:1: warning[W0504]: top-level binding `needs_bias` is not used
-27:1: warning[W0504]: top-level binding `biased` is not used
+25:1: warning[W0504]: top-level binding `needs_bias` is not used
+32:1: warning[W0504]: top-level binding `biased` is not used

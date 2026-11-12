@@ -55,10 +55,10 @@ update_open = (v) {
 use_update = () { update_open(1) }
 
 // With a type parameter: the field has the argument of the pattern type.
-Box(A) = Full(A) | Empty
+Box(X) = Full(X) | Empty
 
-Full(A) {
-	Full(item: A)
+Full(X) {
+	Full(item: X)
 }
 
 Empty {
