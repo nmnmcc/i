@@ -20,7 +20,8 @@ eval =
 	| (Mul(a, b)) { eval(a) * eval(b) }
 
 main = () {
-	expr = Mul(Add(Num(1), Num(5)), Num(7))
+	sum = Add(Num(1), Num(5))
+	expr = Mul(sum, Num(7))
 	expr |> eval |> int.to_string |> stdio.print
 }
 ```
@@ -50,7 +51,8 @@ test("a test gives its own clock", () {
 	{
 		assert(remaining(42) == 2)
 		late = fail.catch(() { remaining(30) })
-		assert(late == Error(Late(by = 10)))
+		expected = Error(Late(by = 10))
+		assert(late == expected)
 	} <- (Clock(now = () { 40 }))
 })
 ```
@@ -86,11 +88,13 @@ echo = (stream) {
 		}
 }
 
+handle = (stream) {
+	resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
+}
+
 serve = (listener, scope) {
 	stream = net.accept(listener)
-	task.go(scope, () {
-		resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
-	})
+	task.go(scope, () { handle(stream) })
 	serve(listener, scope)
 }
 

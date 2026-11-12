@@ -17,11 +17,13 @@ echo = (stream) {
 	}
 }
 
+handle = (stream) {
+	resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
+}
+
 serve = (listener, scope) {
 	stream = net.accept(listener)
-	task.go(scope, () {
-		resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
-	})
+	task.go(scope, () { handle(stream) })
 	serve(listener, scope)
 }
 

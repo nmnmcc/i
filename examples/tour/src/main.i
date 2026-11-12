@@ -19,6 +19,7 @@ eval = (e) {
 }
 
 main = () {
-	expr = Mul(Add(Num(1), Num(5)), Num(7))
+	sum = Add(Num(1), Num(5))
+	expr = Mul(sum, Num(7))
 	expr |> eval |> int.to_string |> stdio.print
 }

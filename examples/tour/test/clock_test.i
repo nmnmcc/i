@@ -23,5 +23,6 @@ test("a test gives its own clock", () {
 	! Clock = Clock(now: () { 40 })
 	assert(remaining(42) == 2)
 	late = fail.catch(() { remaining(30) })
-	assert(late == Error(Late(by: 10)))
+	expected = Error(Late(by: 10))
+	assert(late == expected)
 })
