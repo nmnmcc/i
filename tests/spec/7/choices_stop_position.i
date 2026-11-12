@@ -1,7 +1,7 @@
 // spec: 6.12, 7.3, 11.7
 // expect: stop "assertion failed: pattern 0 | 1 did not match 2"
-// at: spec/main:7:7
-// at: spec/main:9:13
+// at: spec/main:7:6
+// at: spec/main:10:2
 
 // §6.12: a fitted clause reports its first pattern, like a parameter.
 f = (0 | 1) { 2 }

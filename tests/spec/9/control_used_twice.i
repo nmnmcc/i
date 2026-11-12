@@ -1,7 +1,7 @@
 // spec: 9.4, 11.7
 // expect: stop "control: continuation was already used"
-// at: spec/main:15:4
-// at: spec/main:12:2
+// at: spec/main:14:4
+// at: spec/main:11:2
 (
 	i/control
 )

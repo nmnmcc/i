@@ -1,9 +1,9 @@
 // spec: 11.7
 // expect: stop "panic: deep"
-// at: spec/main:17:19
-// at: spec/main:25:13
-// at: spec/main:34:4
-// at: spec/main:43:2
+// at: spec/main:14:49
+// at: spec/main:21:13
+// at: spec/main:30:4
+// at: spec/main:37:2
 (
 	i/core
 )

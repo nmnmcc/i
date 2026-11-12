@@ -1,11 +1,11 @@
 // spec: 11.7, 9.4
 // expect: stop "panic: after"
-// at: spec/main:31:3
-// at: spec/main:25:7
-// at: spec/main:20:7
-// at: spec/main:15:7
-// at: spec/main:39:5
-// at: spec/main:43:18
+// at: spec/main:35:2
+// at: spec/main:29:6
+// at: spec/main:24:6
+// at: spec/main:19:6
+// at: spec/main:42:3
+// at: spec/main:45:21
 (
 	i/control
 )
