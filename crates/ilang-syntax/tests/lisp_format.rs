@@ -156,6 +156,8 @@ fn comments_stay_between_the_same_datums_and_blank_lines_collapse() {
     assert_eq!(tokens(source), tokens(&out));
     assert!(!out.contains("\n\n\n"), "{out}");
     assert!(out.contains("\n\n// before next\n\n/// second\n"), "{out}");
+    // A line comment before closing brackets moves them to the next line.
+    assert!(out.contains("// statement\n     }))"), "{out}");
 }
 
 #[test]
@@ -167,12 +169,39 @@ fn heads_lists_blocks_and_prefixes() {
     let out = check(
         "(= f (-> (x) _ {(= a `[one two three four five six seven eight nine ten eleven twelve thirteen fourteen]) (| x {(-> 0 `(~..a)) (-> _ `(~x))})}))\n",
     );
-    assert!(out.starts_with("(= f\n\t(-> (x)\n"), "{out}");
-    assert!(out.contains("\n\t\t\t\t\t(-> 0"), "{out}");
+    assert!(
+        out.starts_with("(= f\n  (-> (x) _\n    {(= a\n       `[one\n         two\n"),
+        "{out}"
+    );
+    assert!(
+        out.ends_with("fourteen])\n     (| x {(-> 0 `(~..a)) (-> _ `(~x))})}))\n"),
+        "{out}"
+    );
     assert!(out.contains("`["));
     assert!(out.contains("~..a"));
     let datum = lisp::parse("`(long ~name ~..[one two])").unwrap();
     assert_eq!(lisp::show(&datum[0]), "`(long ~name ~..[one two])");
+}
+
+#[test]
+fn lisp_convention_gathers_closers_and_aligns_arguments() {
+    let out = check(
+        "(= main (-> () _ {(print_all_of_these first_argument second_argument third_argument fourth)}))\n",
+    );
+    assert_eq!(
+        out,
+        "(= main\n  (-> () _\n    {(print_all_of_these first_argument\n                         second_argument\n                         third_argument\n                         fourth)}))\n"
+    );
+    let out = check(
+        "(= x ((. items add) first_argument_is_long second_argument_is_long third_argument_is_long))\n",
+    );
+    assert_eq!(
+        out,
+        "(= x\n  ((. items add)\n   first_argument_is_long\n   second_argument_is_long\n   third_argument_is_long))\n"
+    );
+    for line in out.lines() {
+        assert!(!line.trim_start().starts_with([')', ']', '}']) && !line.contains('\t'));
+    }
 }
 
 #[test]

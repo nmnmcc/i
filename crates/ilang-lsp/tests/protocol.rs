@@ -3010,7 +3010,7 @@ fn lsp_completion_constructors_lisp_surface() {
 #[test]
 fn formats_lisp_documents_with_the_source_formatter() {
     let dir = tempfile::tempdir().unwrap();
-    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (+ first second)}))\n";
+    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
     package(dir.path(), &[("src/main.is", source)]);
     let main = file_uri(&dir.path().join("src/main.is"));
     let mut client = Client::start();
@@ -3020,7 +3020,7 @@ fn formats_lisp_documents_with_the_source_formatter() {
         "options": { "tabSize": 4, "insertSpaces": false }
     }));
     let expected = ilang_syntax::lisp::format(source).unwrap();
-    assert!(expected.lines().count() >= 6);
+    assert!(expected.lines().count() >= 3);
     assert_eq!(edits[0]["newText"], expected);
     client.change(&main, 2, &expected);
     let edits = client.request::<lsp::request::Formatting>(json!({

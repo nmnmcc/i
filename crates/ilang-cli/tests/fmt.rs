@@ -108,9 +108,12 @@ fn files_with_errors_are_left_as_they_are() {
 
 #[test]
 fn lisp_files_are_formatted_in_default_roots_and_given_paths() {
-    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (+ first second)}))\n";
+    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
     let pretty = ilang_syntax::lisp::format(source).unwrap();
-    assert!(pretty.lines().count() >= 6, "{pretty}");
+    assert_eq!(
+        pretty,
+        "// keep\n(= main\n  (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n"
+    );
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
         ("src/main.is", source),
@@ -137,7 +140,8 @@ fn lisp_files_are_formatted_in_default_roots_and_given_paths() {
 
 #[test]
 fn conversion_to_lisp_uses_pretty_layout() {
-    let source = "// keep\nmain = () {\n first = 1\n second = 2\n first + second\n}\n";
+    let source =
+        "// keep\nmain = () {\n first = 1\n second = 2\n third = 3\n first + second + third\n}\n";
     let dir = package(&[("src/main.i", source)]);
     let out = fmt(&["--to", "is"], dir.path());
     assert!(
@@ -148,7 +152,11 @@ fn conversion_to_lisp_uses_pretty_layout() {
     assert!(!dir.path().join("src/main.i").exists());
     let converted = read(dir.path(), "src/main.is");
     assert!(
-        converted.lines().count() >= 6 && converted.contains("// keep"),
+        converted.lines().count() >= 3
+            && converted.contains("// keep")
+            && converted
+                .lines()
+                .all(|l| !l.trim_start().starts_with([')', '}']) && !l.contains('\t')),
         "{converted}"
     );
     assert_eq!(ilang_syntax::lisp::format(&converted).unwrap(), converted);
