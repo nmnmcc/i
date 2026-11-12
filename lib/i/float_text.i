@@ -26,23 +26,26 @@
 /// ```
 to_string = (x: Float) -> String {
 	bits = core.float_to_bits(x)
-	// 2^63 is the sign bit. The numbers are written out in place: a
-	// top-level value is worked out at start, in the frame of every program.
-	(sign, magnitude) = { bits >= 9223372036854775808 } |> {
-		True  -> ("-", bits - 9223372036854775808)
-		False -> ("", bits)
+	// The fields of the bits are taken apart with shifts and masks, so that
+	// every number below stays under 2^62 for ordinary Floats, where the
+	// runtime does the arithmetic in 64 bits. Bit 63 is the sign; the
+	// numbers are written out in place, because a top-level value is
+	// worked out at start, in the frame of every program.
+	sign = { core.shift_right(bits, 63) == 1 } |> {
+		True  -> "-"
+		False -> ""
 	}
-	{ magnitude == 0 } |> {
+	encoded = core.bit_and(core.shift_right(bits, 52), 2047)
+	fraction = core.bit_and(bits, 4503599627370495)
+	{ encoded == 0 && fraction == 0 } |> {
 		True  -> core.concat([sign, "0.0"])
-		False -> core.concat([sign, ..positive(magnitude)])
+		False -> core.concat([sign, ..positive(encoded, fraction)])
 	}
 }
 
-// The pieces of the text of the positive Float with these bits.
-positive = (bits: Int) -> List(String) {
-	// 2^52 is the lowest bit of the exponent.
-	encoded = bits / 4503599627370496
-	fraction = bits % 4503599627370496
+// The pieces of the text of the positive Float with this exponent field and
+// fraction.
+positive = (encoded: Int, fraction: Int) -> List(String) {
 	// v = r / s × 2^e, with the midpoint distances minus / s and plus / s.
 	// At an exact normal power of two the binade below has half the spacing.
 	(mantissa, r, minus, plus, e) = { encoded == 0 } |> {
@@ -80,9 +83,9 @@ positive = (bits: Int) -> List(String) {
 	(r, minus, plus, k) = shrink(r, s, minus, plus, k)
 	(reversed, k) = generate(r, s, minus, plus, inclusive, [], k)
 	digits = reverse_onto(trim(reversed), [])
-	// 4845873199050653696 is the bits of 2^53, the first Float whose whole
+	// 1076 is the exponent field of 2^53, the first Float whose whole
 	// digits imply more precision than a Float has.
-	layout(digits, length(digits, 0), k, bits >= 4845873199050653696)
+	layout(digits, length(digits, 0), k, encoded >= 1076)
 }
 
 // floor(a / b) for b > 0.
