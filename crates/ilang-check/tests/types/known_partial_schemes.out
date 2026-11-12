@@ -4,9 +4,5 @@ name : List(String)
 part : List(String)
 thunk : List(Int)
 tuple_pattern : List(String)
-unknown : (p: (name: A)) -> A
-17:1: warning[W0504]: top-level binding `name` is not used
-22:1: warning[W0504]: top-level binding `part` is not used
-27:1: warning[W0504]: top-level binding `thunk` is not used
-32:1: warning[W0504]: top-level binding `tuple_pattern` is not used
-38:1: warning[W0504]: top-level binding `unknown` is not used
+unknown : (p: A) -> Never
+40:4: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

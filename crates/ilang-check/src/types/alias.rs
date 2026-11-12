@@ -20,7 +20,7 @@ fn has_algebra(t: &Ty) -> bool {
         Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
         Ty::Fn(f) => {
-            f.params.iter().any(|(_, t)| has_algebra(t))
+            has_algebra(&f.param)
                 || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra)
         }
         Ty::Both(a, b) => has_algebra(a) || has_algebra(b),
@@ -32,7 +32,7 @@ fn has_record(t: &Ty) -> bool {
     match t {
         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
         Ty::Fn(f) => {
-            f.params.iter().any(|(_, t)| has_record(t))
+            has_record(&f.param)
                 || [&f.ret, &f.err, &f.env].into_iter().any(has_record)
         }
         Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),
@@ -58,11 +58,8 @@ pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
             ts.iter().map(|t| map_vars(t, f)).collect(),
         ),
         Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
-            params: g
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), map_vars(t, f)))
-                .collect(),
+            param: map_vars(&g.param, f),
+            labels: g.labels.clone(),
             ret: map_vars(&g.ret, f),
             err: map_vars(&g.err, f),
             env: map_vars(&g.env, f),
@@ -233,15 +230,10 @@ impl Checker<'_> {
                 ret,
                 err,
                 env,
-            } => Ty::Fn(Box::new(FnTy {
-                params: ps
+            } => Ty::Fn(Box::new(FnTy::new(ps
                     .iter()
                     .map(|p| Some((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
-                    .collect::<Option<_>>()?,
-                ret: go(ret)?,
-                err: err.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
-                env: env.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
-            })),
+                    .collect::<Option<_>>()?, go(ret)?, err.as_ref().map_or(Some(Ty::Never), |t| go(t))?, env.as_ref().map_or(Some(Ty::Never), |t| go(t))?))),
         })
     }
 
@@ -289,12 +281,7 @@ impl Checker<'_> {
         let go = |t| self.normalize_known_alias(t);
         match t {
             Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
-            Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
-                ret: go(f.ret),
-                err: go(f.err),
-                env: go(f.env),
-            })),
+            Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: go(f.param), labels: f.labels, ret: go(f.ret), err: go(f.err), env: go(f.env) })),
             Ty::Union(ts) => self.kunion(ts.into_iter().map(go).collect()),
             Ty::Inter(ts) => super::display::known_inter(&self.s, ts.into_iter().map(go).collect()),
             Ty::Diff(t, ts) => {

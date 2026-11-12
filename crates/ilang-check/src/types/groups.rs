@@ -1,87 +1,56 @@
 //! Shape groups of functions (syntax three §2.5, §2.6).
 //!
-//! A function takes one data value. Until `FnTy` holds that data type as
-//! its one parameter, this module is the only place that knows how a
-//! parameter list stands for it:
-//!
-//! - an ordinary `FnTy` with `n` parameters has the parameter data type of
-//!   shape "`n` positions" with the parameter types as its parts
-//!   ([`param_data`]);
-//! - a **multi-shape** `FnTy` has exactly one parameter, marked with the
-//!   reserved label [`DATA`], whose type is the parameter data type itself:
-//!   a union of data types of different shapes, or one data type whose
-//!   shape has labels ([`multi`]).
-//!
-//! With one data parameter in `FnTy`, `param_data(f)` is `f.param` for
-//! every function, the mark goes away, and the two cases of
-//! [`Solver::constrain_fns`] become the one rule
-//! `constrain(g.param, f.param)`.
+//! A function takes one data value: `FnTy::param` is its parameter data
+//! type. A function of one shape with no labels has data of that shape
+//! there. A **multi-shape** function type has a union of data types of
+//! different shapes, or one data type whose shape has labels ([`with_data`]).
 
 use super::solve::{FailKind, Solver};
-use super::{FnTy, ShapeId, Ty};
+use super::{FnTy, Head, ShapeId, Ty};
 
-/// The label that marks the one parameter of a multi-shape function type.
-/// It cannot be written in source.
+/// The label of the one parameter of a multi-shape function type in the
+/// transition syntax tree (`syn3/lower.rs`): its type is the parameter data
+/// type itself.
 pub(crate) const DATA: &str = "%data";
 
 /// The function type takes data of several shapes, or of a shape with
 /// labels.
 pub(crate) fn is_multi(f: &FnTy) -> bool {
-    matches!(f.params.as_slice(), [(Some(l), _)] if l == DATA)
-}
-
-/// The parameter data type of a function type.
-pub(crate) fn param_data(f: &FnTy) -> Ty {
-    if is_multi(f) {
-        f.params[0].1.clone()
-    } else {
-        Ty::tuple(f.params.iter().map(|p| p.1.clone()).collect())
+    match &f.param {
+        Ty::Con(Head::Shape(s), _, _) => s.has_labels(),
+        Ty::Union(ms) => ms.iter().filter(|m| matches!(m, Ty::Con(Head::Shape(_), _, _))).count() > 1,
+        _ => false,
     }
 }
 
 /// The function type whose parameter data type is `param`.
 pub(crate) fn with_data(param: Ty, ret: Ty, err: Ty, env: Ty) -> FnTy {
     FnTy {
-        params: vec![(Some(DATA.to_string()), param)],
+        param,
+        labels: Vec::new(),
         ret,
         err,
         env,
     }
 }
 
-/// A function type in the multi-shape form.
-pub(crate) fn as_multi(f: FnTy) -> FnTy {
-    if is_multi(&f) {
-        f
-    } else {
-        let param = param_data(&f);
-        with_data(param, f.ret, f.err, f.env)
-    }
-}
-
 /// The parameter data type of one shape group: the group's function takes
 /// the parts of `shape` in canonical order.
-pub(crate) fn group_data(shape: ShapeId, f: &FnTy) -> Ty {
-    assert_eq!(
-        shape.len(),
-        f.params.len(),
-        "a group function takes the parts of its shape"
-    );
-    Ty::data(shape, f.params.iter().map(|p| p.1.clone()).collect())
+pub(crate) fn group_data(shape: ShapeId, parts: &[Ty]) -> Ty {
+    assert_eq!(shape.len(), parts.len(), "a group function takes the parts of its shape");
+    Ty::data(shape, parts.to_vec())
 }
 
 impl Solver {
-    /// `f <: g` for two function types of which one at least is
-    /// multi-shape: the parameter data of `g` goes to `f`. The results and
-    /// the needs are constrained by the caller.
-    pub(super) fn constrain_fn_data(&mut self, f: &FnTy, g: &FnTy, l: &Ty, r: &Ty) {
-        if is_multi(f) && !is_multi(g) {
+    /// `f <: g` for two function types: before the parameter data of `g`
+    /// goes to `f`, a multi-shape `f` where `g` has one shape is refused.
+    pub(super) fn multi_to_one_shape(&mut self, f: &FnTy, g: &FnTy, l: &Ty, r: &Ty) {
+        if is_multi(f) && !is_multi(g) && matches!(g.param, Ty::Con(..)) {
             // syn3-stage10: a multi-shape value is called, or goes where a
             // function of one shape is wanted. The run time cannot call it
             // yet; delete this failure when it can.
             self.fail(FailKind::MultiCall, l, r);
         }
-        self.constrain(&param_data(g), &param_data(f));
     }
 }
 
@@ -308,12 +277,13 @@ impl Checker<'_> {
         let [Ty::Fn(f), Ty::Con(_, _, rets)] = parts.as_slice() else {
             return None;
         };
-        if is_multi(f) || f.params.len() != table.arity {
+        if f.arity() != Some(table.arity) {
             return None;
         }
         let ret = self.union(selected.iter().map(|i| rets[*i].clone()).collect(), span);
         Some(FnTy {
-            params: f.params.clone(),
+            param: f.param.clone(),
+            labels: f.labels.clone(),
             ret,
             err: f.err.clone(),
             env: f.env.clone(),
@@ -359,14 +329,14 @@ impl Checker<'_> {
         let ExprKind::Name(r) = &e.kind else {
             return None;
         };
-        let want = match known::members(expected).as_slice() {
-            [Ty::Fn(want)] if !is_multi(want) => (**want).clone(),
+        let want: Vec<Ty> = match known::members(expected).as_slice() {
+            [Ty::Fn(want)] if !is_multi(want) => want.parts()?.to_vec(),
             _ => return None,
         };
         if let ValueRef::Def(d) = r
             && let Some(groups) = self.chain_groups(*d)
         {
-            let shape = ShapeId::positional(want.params.len() as u32);
+            let shape = ShapeId::positional(want.len() as u32);
             let (_, group) = groups.iter().find(|(s, _)| *s == shape)?;
             let group = ValueRef::Def(*group);
             self.out.selected_names.insert((self.module, e.span), group);
@@ -377,11 +347,10 @@ impl Checker<'_> {
             return Some(self.infer_k(&name, expected));
         }
         let table = self.branch_table(e)?;
-        if want.params.len() != table.arity {
+        if want.len() != table.arity {
             return None;
         }
-        let known: Vec<Ty> = want.params.iter().map(|p| p.1.clone()).collect();
-        let selected = self.select(&table, &known);
+        let selected = self.select(&table, &want);
         if selected.is_empty() || selected.len() == table.rows.len() {
             return None;
         }

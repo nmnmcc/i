@@ -240,15 +240,8 @@ impl Prover<'_> {
                 Ok(true)
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if f.params.len() != g.params.len() {
-                    return Ok(false);
-                }
-                for (p, q) in f.params.iter().zip(&g.params) {
-                    if !self.sub(&q.1, &p.1, Mode::Value)? {
-                        return Ok(false);
-                    }
-                }
-                Ok(self.sub(&f.ret, &g.ret, Mode::Value)?
+                Ok(self.sub(&g.param, &f.param, Mode::Value)?
+                    && self.sub(&f.ret, &g.ret, Mode::Value)?
                     && self.sub(&f.err, &g.err, Mode::Row)?
                     && self.sub(&f.env, &g.env, Mode::Env)?)
             }

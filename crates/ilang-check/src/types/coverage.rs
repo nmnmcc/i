@@ -323,13 +323,12 @@ fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
             heads: vec![(*h, set.clone(), args.clone(), mode)],
             other: false,
         },
-        // The parameter types stand for the arguments of the head: only
-        // their number is used.
+        // The parameter type stands for the one argument of the head.
         Ty::Fn(f) => Vals {
             heads: vec![(
                 Head::Fn,
                 ValueSet::ALL,
-                f.params.iter().map(|p| p.1.clone()).collect(),
+                vec![f.param.clone()],
                 mode,
             )],
             other: false,

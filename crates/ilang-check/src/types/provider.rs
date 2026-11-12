@@ -44,12 +44,16 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
             Box::new(concrete(a)?),
             xs.iter().map(concrete).collect::<Result<_, _>>()?,
         ),
+        ShownType::Fn(f) if f.group => Ty::Fn(Box::new(FnTy {
+            param: concrete(&f.params[0].1)?,
+            labels: Vec::new(),
+            ret: concrete(&f.ret)?,
+            err: f.err.as_ref().map(concrete).transpose()?.unwrap_or(Ty::Never),
+            env: f.env.as_ref().map(concrete).transpose()?.unwrap_or(Ty::Never),
+        })),
         ShownType::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(l, t)| Ok((l.clone(), concrete(t)?)))
-                .collect::<Result<_, String>>()?,
+            param: Ty::tuple(f.params.iter().map(|(_, t)| concrete(t)).collect::<Result<_, _>>()?),
+            labels: f.params.iter().map(|(l, _)| l.clone()).collect(),
             ret: concrete(&f.ret)?,
             err: f
                 .err
@@ -97,7 +101,7 @@ impl Typed {
         let Ty::Fn(f) = ty else {
             return Err("factory must be an ordinary function".into());
         };
-        if f.params.len() != args.len() {
+        if f.arity() != Some(args.len()) {
             return Err("factory argument count does not match generated arguments".into());
         }
         let service = concrete(service)?;
@@ -123,7 +127,7 @@ impl Typed {
         if !s.failures.is_empty() {
             return Err("factory has uncaught typed errors".into());
         }
-        for ((_, param), arg) in f.params.iter().zip(args) {
+        for (param, arg) in f.parts().expect("checked arity").iter().zip(args) {
             s.constrain(&concrete(arg)?, param);
         }
         if !s.failures.is_empty() {
@@ -180,20 +184,10 @@ impl Typed {
         let supplied = s.env_union(supplies);
         let available = s.env_union(vec![env.clone(), supplied]);
         let body_env = s.inter(vec![n, available]);
-        let body = Ty::Fn(Box::new(FnTy {
-            params: vec![],
-            ret: a.clone(),
-            err: e.clone(),
-            env: body_env,
-        }));
+        let body = Ty::Fn(Box::new(FnTy::new(vec![], a.clone(), e.clone(), body_env)));
         let scheme = Scheme {
             level: 0,
-            ty: Ty::Fn(Box::new(FnTy {
-                params: vec![(Some("body".into()), body)],
-                ret: a,
-                err: e,
-                env,
-            })),
+            ty: Ty::Fn(Box::new(FnTy::new(vec![(Some("body".into()), body)], a, e, env))),
         };
         let expected = SchemeArtifact {
             scheme: scheme.clone(),
@@ -220,11 +214,8 @@ impl Typed {
             let shallow = match ty {
                 Ty::Con(h, vs, args) => Ty::Con(*h, vs.clone(), all(args, false, f)),
                 Ty::Fn(fun) => Ty::Fn(Box::new(FnTy {
-                    params: fun
-                        .params
-                        .iter()
-                        .map(|(l, p)| (l.clone(), map_nodes(p, false, f)))
-                        .collect(),
+                    param: map_nodes(&fun.param, false, f),
+                    labels: fun.labels.clone(),
                     ret: map_nodes(&fun.ret, false, f),
                     err: map_nodes(&fun.err, false, f),
                     env: map_nodes(&fun.env, true, f),
@@ -312,8 +303,8 @@ impl Typed {
                 t.constrain(&e, &actual.scheme.ty);
                 let leak = t.freshen(&actual.scheme.ty, actual.scheme.level, &mut Default::default());
                 match &leak {
-                    Ty::Fn(f) => match f.params.as_slice() {
-                        [(_, Ty::Fn(body))] => {
+                    Ty::Fn(f) => match f.parts() {
+                        Some([Ty::Fn(body)]) => {
                             t.constrain_env(&supplied_only, &body.env);
                             t.constrain_env(&f.env, &required);
                         }
@@ -362,7 +353,7 @@ impl Typed {
         let Ty::Fn(f) = display::both(&ty) else {
             return Err("factory must be an ordinary function".into());
         };
-        if f.params.len() != args.len() {
+        if f.arity() != Some(args.len()) {
             return Err("factory argument count does not match generated arguments".into());
         }
         let params = (0..arity).map(|_| s.fresh_input()).collect();
@@ -375,7 +366,7 @@ impl Typed {
         if !s.failures.is_empty() {
             return Err("factory has uncaught typed errors".into());
         }
-        for ((_, param), arg) in f.params.iter().zip(args) {
+        for (param, arg) in f.parts().expect("checked arity").iter().zip(args) {
             let actual = match arg {
                 Argument::Seed => Ty::named(
                     TypeRef::Builtin(hir::BuiltinType::List),

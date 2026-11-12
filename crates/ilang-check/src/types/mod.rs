@@ -91,13 +91,57 @@ pub(crate) enum Ty {
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Ty>() <= 48);
 
+/// A function type with one data parameter (syntax-3 §6.1).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct FnTy {
-    /// Labels have no effect on subtyping (§4.6).
-    pub params: Vec<(Option<String>, Ty)>,
+    /// The argument data: data of one shape, a union of data of several
+    /// shapes, `Never` (no call is possible), or a type variable.
+    pub param: Ty,
+    /// The labels of the positions of the parameter, for labelled calls and
+    /// display only: they have no effect on subtyping (§4.6).
+    pub labels: Vec<Option<String>>,
     pub ret: Ty,
     pub err: Ty,
     pub env: Ty,
+}
+
+impl FnTy {
+    /// A function type whose parameter is a tuple of these parts.
+    pub fn new(params: Vec<(Option<String>, Ty)>, ret: Ty, err: Ty, env: Ty) -> FnTy {
+        // The transition tree writes a multi-shape function type as one
+        // parameter with the reserved label `%data`: its type is the
+        // parameter data type itself.
+        if matches!(params.as_slice(), [(Some(l), _)] if l == groups::DATA) {
+            let param = params.into_iter().next().unwrap().1;
+            return groups::with_data(param, ret, err, env);
+        }
+        let (labels, parts): (Vec<_>, Vec<_>) = params.into_iter().unzip();
+        FnTy {
+            param: Ty::tuple(parts),
+            labels,
+            ret,
+            err,
+            env,
+        }
+    }
+
+    /// The parts of the parameter, when it is data of one shape.
+    pub fn parts(&self) -> Option<&[Ty]> {
+        match &self.param {
+            Ty::Con(Head::Shape(_), _, parts) => Some(parts),
+            _ => None,
+        }
+    }
+
+    /// The number of parts of the parameter, when it is data of one shape.
+    pub fn arity(&self) -> Option<usize> {
+        self.parts().map(<[Ty]>::len)
+    }
+
+    /// The label of part `i`, when the parameter has one.
+    pub fn label(&self, i: usize) -> Option<String> {
+        self.labels.get(i).cloned().flatten()
+    }
 }
 
 impl Ty {
@@ -245,8 +289,7 @@ pub(crate) fn boundary_type(
                 ret,
                 err,
                 env,
-            } => Ty::Fn(Box::new(FnTy {
-                params: params
+            } => Ty::Fn(Box::new(FnTy::new(params
                     .iter()
                     .map(|part| {
                         Some((
@@ -254,17 +297,13 @@ pub(crate) fn boundary_type(
                             convert(s, &part.ty, p, expand)?,
                         ))
                     })
-                    .collect::<Option<_>>()?,
-                ret: convert(s, ret, p, expand)?,
-                err: match err {
+                    .collect::<Option<_>>()?, convert(s, ret, p, expand)?, match err {
                     Some(t) => convert(s, t, p, expand)?,
                     None => Ty::Never,
-                },
-                env: match env {
+                }, match env {
                     Some(t) => convert(s, t, p, expand)?,
                     None => Ty::Never,
-                },
-            })),
+                }))),
             TypeKind::Union(ts) | TypeKind::Inter(ts) => {
                 let ms = ts
                     .iter()
