@@ -1745,6 +1745,16 @@ impl<'a> Checker<'a> {
     fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
         let (f, kf) = self.infer_k(callee, &Ty::Top);
         let kfn = known::one_fn(&kf).filter(|k| !groups::is_multi(k));
+        // Syntax three §2.6.5: a call with labels through a value constrains
+        // the argument data, whose shape is read from the call, against the
+        // member of that shape.
+        if kfn.is_none()
+            && args.iter().any(|a| a.label.is_some())
+            && ilang_syntax::syn3::enabled()
+            && !matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
+        {
+            return self.shaped_call(&f, first, args, span);
+        }
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
@@ -1882,6 +1892,55 @@ impl<'a> Checker<'a> {
             }
         };
         (t, known)
+    }
+
+    /// A call through a value with labelled arguments: the argument data
+    /// has the shape that the call writes, with its parts in canonical
+    /// order.
+    fn shaped_call(&mut self, f: &Ty, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+        let mut positions: Vec<Ty> = Vec::new();
+        let mut labelled: Vec<(String, Ty)> = Vec::new();
+        if let Some(first) = first {
+            positions.push(self.infer_k(first, &Ty::Top).0);
+        }
+        for a in args {
+            let t = self.infer_k(&a.value, &Ty::Top).0;
+            match &a.label {
+                None => positions.push(t),
+                Some(l) if labelled.iter().any(|(g, _)| *g == l.name) => {
+                    self.error(
+                        code::CALL_LABELS,
+                        l.span,
+                        format!("the label `{}` is given twice", l.name),
+                    );
+                }
+                Some(l) => labelled.push((l.name.clone(), t)),
+            }
+        }
+        // syn3-stage10: the run time cannot make this call yet. Delete this
+        // error when it can.
+        self.error(
+            code::MULTI_VALUE_CALL,
+            span,
+            "a call with labels through a function value is not possible until the run time has multi-shape values; call the function directly by its name",
+        );
+        labelled.sort_by(|a, b| a.0.cmp(&b.0));
+        let shape = super::ShapeId::new(
+            positions.len() as u32,
+            labelled.iter().map(|(l, _)| l.clone()),
+        );
+        let mut parts = positions;
+        parts.extend(labelled.into_iter().map(|(_, t)| t));
+        let (r, e, n) = (
+            self.s.fresh_input(),
+            self.s.fresh_input(),
+            self.s.fresh_input(),
+        );
+        let want = groups::with_data(groups::group_data(shape, &parts), r.clone(), e.clone(), n.clone());
+        self.sub(f, &Ty::Fn(Box::new(want)), span);
+        self.add_err(e);
+        self.add_env(n);
+        (r, Ty::Top)
     }
 
     /// A multi-shape function value (syntax three §2.6.4, §2.6.5). With an

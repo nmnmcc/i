@@ -151,7 +151,16 @@ the run time has multi-shape values") at two places, both marked
   arm for a callee whose type is itself a multi-shape function type): the one
   `self.error(code::MULTI_VALUE_CALL, …)`.
 
-**Stage 10 lifts the error by deleting those two statements**; the
+A third place, added after stage 10 began: `fn shaped_call` in `infer.rs`
+types a call **with labels through a value** (`c("b.com", port = 8080)` with
+`c` a parameter or any value with no selection table). The argument data has
+the shape read from the call (`ShapeId::new(positions, labels)`, parts in
+canonical order) and is constrained against the callee's parameter. It
+reports `E0551` unconditionally (marked `syn3-stage10`), because this lane's
+back end cannot make the call; nothing but the labels of `ExprKind::Call`'s
+`args` is needed to lower it.
+
+**Stage 10 lifts the error by deleting those statements**; the
 constraints beside them are already the final ones. After that every closure
 call site can receive a `$multi` and needs the slow path of §6.4. The fixture
 `tests/syn3/multi_value_call` expects the error today; with stage 10 it
