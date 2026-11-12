@@ -2651,7 +2651,7 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         r#"(, (= syntax (/ i syntax)))
 (, deep)
 (= nest (-> ((: n Int) (: x (. syntax Syntax))) (^ (. syntax Syntax) (. syntax SyntaxError))
-  (| n { (-> 0 x) (-> _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) (: like x)))) })))
+  (| n { (-> 0 x) (-> _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) x))) })))
 (@ macro (= deep (-> (x) _ (nest 10000 x))))
 "#,
     )

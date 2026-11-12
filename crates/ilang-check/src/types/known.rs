@@ -889,9 +889,7 @@ pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
                 }
             }
             Ty::Fn(f) => {
-                for p in [&f.param] {
-                    walk(s, p, !given, false, out);
-                }
+                walk(s, &f.param, !given, false, out);
                 walk(s, &f.ret, given, false, out);
                 walk(s, &f.err, given, false, out);
                 walk(s, &f.env, true, false, out);
@@ -915,9 +913,7 @@ pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
         }
     }
     let mut out = Vec::new();
-    for p in [&f.param] {
-        walk(s, p, true, true, &mut out);
-    }
+    walk(s, &f.param, true, true, &mut out);
     walk(s, &f.ret, false, false, &mut out);
     walk(s, &f.env, true, false, &mut out);
     out

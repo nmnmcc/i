@@ -4,7 +4,7 @@ Sink(A) {
 }
 
 // §4.7: a variable only in input places has no effect on the meaning.
-new = () { Sink((_) { Nil }) }
+new = () { Sink(put: (_) { Nil }) }
 
 int_sink = () -> Sink(Int) { new() }
 
@@ -15,7 +15,7 @@ Back(A) {
 	Back(sink: Sink(A))
 }
 
-make(A) = (s: Sink(A)) { Back(s) }
+make(A) = (s: Sink(A)) { Back(sink: s) }
 
 // The shared variable must remain when it relates an input to an output.
-wrap = (f) { Sink(f) }
+wrap = (f) { Sink(put: f) }

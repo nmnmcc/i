@@ -11,7 +11,7 @@
 
 @host("test:io/v1")
 Out {
-	Out(print: (text: String) -> Nil)
+	Out(print: (String) -> Nil)
 }
 
 print = (text: String, out ! Out) { out.print(text) }
@@ -30,5 +30,5 @@ main = () {
 			})
 		})
 	})
-	assert(result == Error(task.NotRunnable([999])))
+	assert(result == Error(task.NotRunnable(path: [999])))
 }

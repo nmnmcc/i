@@ -2081,8 +2081,17 @@ impl<'a> Checker<'a> {
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
+        let ctor = matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)));
+        if !ctor && let Some(a) = args.iter().find_map(|a| a.label.as_ref()) {
+            self.error(
+                code::CALL_LABELS,
+                a.span,
+                "an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)",
+            );
+        }
         let to: Option<Vec<usize>> = if args.iter().any(|a| a.label.is_some()) {
             match &kfn {
+                None if !ctor => None,
                 None => {
                     self.error(
                         code::NEEDS_KNOWN_TYPE,
@@ -2153,6 +2162,11 @@ impl<'a> Checker<'a> {
         let Some(to) = to else {
             return (self.s.fresh(), Ty::Top);
         };
+        if crate::syn3_facts::on()
+            && let Some(k) = &kfn
+        {
+            self.syn3_call_fact(callee, first, args, span, ctor, k, &to);
+        }
         // `order[p]` is the argument that goes to the parameter `p`.
         let mut order = vec![0u32; n];
         for (g, p) in to.iter().enumerate() {
@@ -2345,6 +2359,51 @@ impl<'a> Checker<'a> {
         }
         let param = if data.len() == 1 { data.pop().unwrap() } else { Ty::Union(data) };
         (Ty::Fn(Box::new(groups::with_data(param, ret, err, env))), Ty::Top)
+    }
+
+    /// Records a call for the syntax-three label migration (`syn3_facts`).
+    #[allow(clippy::too_many_arguments)]
+    fn syn3_call_fact(
+        &self,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[Arg],
+        span: Span,
+        ctor: bool,
+        k: &FnTy,
+        to: &[usize],
+    ) {
+        use crate::syn3_facts::{ArgFact, Fact, direct, record};
+        let params: Vec<Option<String>> = (0..k.arity().unwrap_or(0)).map(|i| k.label(i)).collect();
+        let skip = usize::from(first.is_some());
+        let wanted = if ctor {
+            args.iter().enumerate().any(|(i, a)| {
+                a.label.is_none() && params.get(to[skip + i]).is_some_and(Option::is_some)
+            })
+        } else {
+            args.iter().any(|a| a.label.is_some())
+        };
+        if !wanted || to.len() != params.len() {
+            return;
+        }
+        record(Fact::Call {
+            file: crate::syn3_facts::File::of(self.sources, self.p.module(self.module).source),
+            span,
+            callee: callee.span,
+            callee_direct: direct(callee) || matches!(callee.kind, ExprKind::Field { .. }),
+            ctor,
+            first: first.map(|f| (f.span, direct(f))),
+            args: args
+                .iter()
+                .map(|a| ArgFact {
+                    label: a.label.as_ref().map(|l| l.span),
+                    value: a.value.span,
+                    direct: direct(&a.value),
+                })
+                .collect(),
+            params,
+            to: to.to_vec(),
+        });
     }
 
     /// §6.6: arguments by position go to the first parameters, and

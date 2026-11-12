@@ -1,4 +1,0 @@
-(, (= syntax (/ i syntax)))
-(, m)
-(@ macro (: (m A) (-> (A) A)))
-(@ macro (= m (-> (value) _ ((. syntax type_of) value))))

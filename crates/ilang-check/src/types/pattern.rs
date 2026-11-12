@@ -392,6 +392,24 @@ impl Checker<'_> {
                     }
                 }
             };
+            if j >= unlabeled.len()
+                && let Some(i) = field
+                && crate::syn3_facts::on()
+                && let PatternKind::Var(Binder { name, .. })
+                | PatternKind::Typed {
+                    binder: Some(Binder { name, .. }),
+                    ..
+                } = &a.kind
+            {
+                crate::syn3_facts::record(crate::syn3_facts::Fact::PatternPart {
+                    file: crate::syn3_facts::File::of(
+                        self.sources,
+                        self.p.module(self.module).source,
+                    ),
+                    span: a.span,
+                    label: fields[i].0.clone().unwrap_or_else(|| name.clone()),
+                });
+            }
             indices.push(field.map_or(u32::MAX, |i| i as u32));
             if let Some(i) = field {
                 if out.iter().any(|o| o.1 == i) {

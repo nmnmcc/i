@@ -920,9 +920,6 @@ impl Norm<'_> {
         // each head, including distinct invariant service instantiations.
         let mut by_head: HashMap<Option<Head>, Vec<usize>> = HashMap::default();
         for m in flat {
-            let m = match m {
-                m => m,
-            };
             let head = m.head();
             let positions = by_head.entry(head).or_default();
             if m == Ty::Never || positions.iter().any(|&i| out[i] == m) {
@@ -1406,9 +1403,7 @@ impl Norm<'_> {
                     }
                 }
                 Ty::Fn(f) => {
-                    for p in [&f.param] {
-                        self.walk(p, !pos, occ, order, false);
-                    }
+                    self.walk(&f.param, !pos, occ, order, false);
                     self.walk(&f.ret, pos, occ, order, false);
                     self.walk(&f.err, pos, occ, order, true);
                     self.walk(&f.env, pos, occ, order, true);

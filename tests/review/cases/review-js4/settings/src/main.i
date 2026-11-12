@@ -18,9 +18,9 @@ use = (settings ! Settings) { settings.read() }
 main = () {
   ! Await = Await
   ! Owner = Owner
-  ! Fs = Fs(() { <<1, 2>> })
+  ! Fs = Fs(read: () { <<1, 2>> })
   ! Settings = filesystem()
-  ! Fs = Fs(() { <<3>> })
+  ! Fs = Fs(read: () { <<3>> })
   assert(use() == <<1, 2>>)
   ! Settings = fallback()
   assert(use() == <<>>)

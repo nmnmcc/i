@@ -3,6 +3,6 @@
 apply = (g) { g() |> { "a" | "c" -> 1 } }
 
 main = () {
-    ! Assert = Assert((_) { panic("unknown return caught") })
+    ! Assert = Assert(fail: (_) { panic("unknown return caught") })
     apply(() { "b" })
 }

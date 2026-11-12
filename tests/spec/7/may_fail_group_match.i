@@ -10,6 +10,6 @@ pair = ("b", () {
 
 
 main = () {
-	! Assert = Assert((_) { panic("caught group match") })
+	! Assert = Assert(fail: (_) { panic("caught group match") })
 	pair.1()
 }

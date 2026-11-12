@@ -10,12 +10,12 @@
 
 @host("test:kv/v1")
 Kv {
-	Kv(get: (key: String) -> String ^ String)
+	Kv(get: (String) -> String ^ String)
 }
 
 @host("test:async/v1", "async")
 Later {
-	Later(echo: (text: String) -> String)
+	Later(echo: (String) -> String)
 }
 
 greeting = (kv ! Kv, later ! Later) { later.echo("hello " <> kv.get("name")) }

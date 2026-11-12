@@ -1630,9 +1630,7 @@ impl Checker<'_> {
                     }
                 }
                 Ty::Fn(f) => {
-                    for t in [&f.param] {
-                        collect(t, out);
-                    }
+                    collect(&f.param, out);
                     for t in [&f.ret, &f.err, &f.env] {
                         collect(t, out);
                     }

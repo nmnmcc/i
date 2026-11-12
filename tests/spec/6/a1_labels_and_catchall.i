@@ -9,8 +9,8 @@ guarded = (value: (Int) -> Int) {
 
 
 main = () {
-  assert(identity(n: "value") == "value")
-  assert(identity(n: 12) == 12)
+  assert(identity("value") == "value")
+  assert(identity(12) == 12)
   assert(classify(0) == "zero")
   assert(classify("value") == "other")
   assert(guarded((n) { n + 1 }) == 4)

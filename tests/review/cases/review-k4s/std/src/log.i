@@ -126,7 +126,7 @@ lazy(E, F, N) = (
 ) {
 	Sink(accept, send, _) = sink
 	accept(level) |> {
-		True  -> send(Entry(level, message(), [], None))
+		True  -> send(Entry(level: level, message: message(), fields: [], at: None))
 		False -> Nil
 	}
 }

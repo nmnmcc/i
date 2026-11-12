@@ -3,6 +3,6 @@ Clock { Clock(now: () -> Int) }
 now = (clock ! Clock) { clock.now() }
 
 main = () {
-  ! Clock = Clock(() { 42 })
+  ! Clock = Clock(now: () { 42 })
   assert(now() == 42)
 }

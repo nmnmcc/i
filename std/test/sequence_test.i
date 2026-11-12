@@ -124,7 +124,7 @@ test("sequence_walks", () {
 	check(source, [1, 2, 3])
 	// Nested boundaries record a trace through a pure supplied service.
 	trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		sequence.each(source, visit)
@@ -363,7 +363,7 @@ Box {
 
 observe = (body: () -> Nil ! Trace | Assert) -> List(Int) ! Assert {
 	control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		body()
@@ -373,23 +373,23 @@ observe = (body: () -> Nil ! Trace | Assert) -> List(Int) ! Assert {
 
 test("sequence_callback_types_and_order", () {
 	xs = numbers(300)
-	s = sequence.from_list(items: xs)
+	s = sequence.from_list(xs)
 	assert(observe(() {
-		mapped = sequence.map(over: s, with: (x) {
+		mapped = sequence.map(s, (x) {
 			visit(x)
 			x + 1
 		})
 		assert(sequence.length(mapped) == 300)
 	}) == xs)
 	assert(observe(() {
-		n = sequence.fold(over: s, from: 0, with: (a, x) {
+		n = sequence.fold(s, 0, (a, x) {
 			visit(x)
 			a + 1
 		})
 		assert(n == 300)
 	}) == xs)
-	assert(observe(() { sequence.each(over: s, with: visit) }) == xs)
-	boxes = sequence.map(s, (x) { Box(x) })
+	assert(observe(() { sequence.each(s, visit) }) == xs)
+	boxes = sequence.map(s, (x) { Box(value: x) })
 	check(sequence.map(boxes, (b: Box) { b.value }), xs)
 	assert(
 		sequence.to_list(sequence.map(sequence.from_list(["a", "é"]), (x) {

@@ -56,7 +56,7 @@ impl Solver {
 
 // ---- Selection of branches (syntax three §2.6.2 to §2.6.7) ----
 
-use super::coverage::{Col, Pat};
+use super::coverage::{Col, Ctor, Lit, Pat};
 use super::infer::{Checker, Scheme};
 use super::known;
 use crate::code;
@@ -123,22 +123,80 @@ pub(crate) fn group_case(value: &Expr) -> Option<(Span, bool, usize)> {
     }
 }
 
-/// A known type as the type of a column: a part that is not known (a type
-/// variable, `_`) may be any value, so it never rules a branch out.
-fn facts(k: &Ty) -> Ty {
-    match k {
-        Ty::Con(h, values, args) => Ty::Con(*h, values.clone(), args.iter().map(facts).collect()),
-        Ty::Union(ms) => {
-            let ms: Vec<Ty> = ms.iter().map(facts).collect();
-            if ms.iter().any(|m| matches!(m, Ty::Top)) {
-                Ty::Top
-            } else {
-                Ty::Union(ms)
-            }
-        }
-        Ty::Fn(_) | Ty::Never => k.clone(),
-        Ty::Var(_) | Ty::Inter(_) | Ty::Diff(..) | Ty::Top | Ty::Both(..) => Ty::Top,
+/// The alternatives of a pattern.
+fn alternatives<'p>(p: &'p Pat, out: &mut Vec<&'p Pat>) {
+    match p {
+        Pat::Or(ps) => ps.iter().for_each(|x| alternatives(x, out)),
+        _ => out.push(p),
     }
+}
+
+/// The rows of a branch over the keys of its group: one pattern for each
+/// key, for each choice of the branch.
+fn key_rows(row: &Pat, single: bool, arity: usize) -> Vec<Vec<Pat>> {
+    if single {
+        return vec![vec![row.clone()]];
+    }
+    let mut choices = Vec::new();
+    alternatives(row, &mut choices);
+    choices
+        .into_iter()
+        .map(|c| match c {
+            Pat::Ctor(Ctor::Shape(_), parts) if parts.len() == arity => parts.clone(),
+            // A catch-all for the whole argument data.
+            _ => vec![Pat::Wild(None); arity],
+        })
+        .collect()
+}
+
+/// The type constructor of a written pattern that is not a catch-all.
+fn head_of(a: &Pat) -> Option<Head> {
+    match a {
+        Pat::Head(h, _) | Pat::Except(h, _) => Some(*h),
+        Pat::Ctor(c, _) => Some(c.head()),
+        Pat::Wild(_) | Pat::Or(_) => None,
+    }
+}
+
+fn same_candidate(x: &Pat, y: &Pat) -> bool {
+    match (x, y) {
+        (Pat::Head(a, _), Pat::Head(b, _)) => a == b,
+        (Pat::Ctor(a, _), Pat::Ctor(b, _)) => a == b,
+        _ => false,
+    }
+}
+
+/// The values of the written pattern `a` that are values of the candidate
+/// `c`, as a pattern.
+fn meet(a: &Pat, c: &Pat) -> Option<Pat> {
+    if matches!(a, Pat::Wild(_)) {
+        return Some(c.clone());
+    }
+    match c {
+        Pat::Head(h, _) => (head_of(a) == Some(*h)).then(|| a.clone()),
+        Pat::Ctor(lit @ Ctor::Lit(Lit::Int(v) | Lit::Str(v)), _) => match a {
+            Pat::Ctor(other, _) => (other == lit).then(|| a.clone()),
+            Pat::Head(h, _) => (*h == lit.head()).then(|| c.clone()),
+            Pat::Except(h, set) => (*h == lit.head() && set.contains(v)).then(|| c.clone()),
+            Pat::Wild(_) | Pat::Or(_) => None,
+        },
+        _ => unreachable!("a candidate is a head or a literal"),
+    }
+}
+
+/// The values of the type constructor `head` that the written pattern `a`
+/// has in its pattern type: every value for a constructor or a type test.
+fn values_of(a: &Pat, head: Head) -> Option<super::lits::ValueSet> {
+    if head_of(a) != Some(head) {
+        return None;
+    }
+    Some(match a {
+        Pat::Except(_, set) => set.clone(),
+        Pat::Ctor(Ctor::Lit(Lit::Int(v) | Lit::Str(v)), _) => {
+            super::lits::ValueSet::only([std::sync::Arc::from(v.as_str())]).unwrap()
+        }
+        _ => super::lits::ValueSet::ALL,
+    })
 }
 
 impl Checker<'_> {
@@ -238,29 +296,124 @@ impl Checker<'_> {
         }
     }
 
-    /// §2.6.2 step 4: the branches that the known type `known` of the
-    /// argument parts does not rule out. A branch is ruled out when no
-    /// value of the known type makes it the first match (§2.6.6): every
-    /// such value that its pattern matches is matched by an earlier branch
-    /// without a guard. Guarded branches take nothing.
+    /// §2.6.2 step 4: the branches that the known types of the argument
+    /// parts do not skip. Branch `i` is skipped when at some key `k` the
+    /// known type `K_k` and `W_i,k - T_i,k` are disjoint (spec §4.5 rule
+    /// 3): `W_i,k` is the written pattern type of the branch at `k` and
+    /// `T_i,k` the members taken there by the earlier branches without a
+    /// guard. A part with no known type skips nothing; guarded branches are
+    /// selected like the others and take nothing.
     fn select(&mut self, table: &BranchTable, known: &[Ty]) -> Vec<usize> {
-        let k = if table.single {
-            facts(&known[0])
-        } else {
-            Ty::tuple(known.iter().map(facts).collect())
-        };
-        let col = [Col::of(k)];
         let mut earlier: Vec<Vec<Pat>> = Vec::new();
         let mut selected = Vec::new();
         for (i, (row, guarded)) in table.rows.iter().enumerate() {
-            if self.useful(&earlier, std::slice::from_ref(row), &col).is_some() {
+            // A branch with alternatives is one row for each way to take
+            // one alternative of each item.
+            let choices = key_rows(row, table.single, table.arity);
+            if choices.iter().any(|c| !self.skipped(c, &earlier, known)) {
                 selected.push(i);
             }
             if !guarded {
-                earlier.push(vec![row.clone()]);
+                earlier.extend(choices);
             }
         }
         selected
+    }
+
+    /// The row `choice` (one pattern for each key) is skipped for these
+    /// known types.
+    fn skipped(&mut self, choice: &[Pat], earlier: &[Vec<Pat>], known: &[Ty]) -> bool {
+        (0..choice.len()).any(|k| self.key_disjoint(choice, k, earlier, &known[k]))
+    }
+
+    /// `K_k` and `W_k - T_k` are disjoint at the key `k` of the row.
+    fn key_disjoint(&mut self, choice: &[Pat], k: usize, earlier: &[Vec<Pat>], known: &Ty) -> bool {
+        let members = known::members(known);
+        if members.is_empty() || members.iter().any(|m| m.head().is_none()) {
+            return false;
+        }
+        let mut own = Vec::new();
+        alternatives(&choice[k], &mut own);
+        let catch_all = own.iter().any(|a| matches!(a, Pat::Wild(_)));
+        // The candidates (§2.6.2 "Taken"): the type constructors, the
+        // literal values and the type-test members written here or at this
+        // key in an earlier branch without a guard.
+        let mut candidates: Vec<Pat> = Vec::new();
+        let mut written: Vec<&Pat> = own.clone();
+        for row in earlier {
+            alternatives(&row[k], &mut written);
+        }
+        for a in written {
+            if let Some(c) = self.candidate(a)
+                && !candidates.iter().any(|x| same_candidate(x, &c))
+            {
+                candidates.push(c);
+            }
+        }
+        // A candidate is taken when every value that the row matches with
+        // a value of the candidate at `k` is matched by an earlier row.
+        let cols = vec![Col::Any; choice.len()];
+        let mut taken_heads: Vec<Head> = Vec::new();
+        let mut taken_values: Vec<(Head, super::lits::ValueSet)> = Vec::new();
+        for c in &candidates {
+            let here: Vec<Pat> = own.iter().filter_map(|a| meet(a, c)).collect();
+            if here.is_empty() {
+                continue;
+            }
+            let mut q = choice.to_vec();
+            q[k] = Pat::Or(here);
+            if self.useful(earlier, &q, &cols).is_none() {
+                match c {
+                    Pat::Ctor(ctor @ Ctor::Lit(Lit::Int(v) | Lit::Str(v)), _) => taken_values.push((
+                        ctor.head(),
+                        super::lits::ValueSet::only([std::sync::Arc::from(v.as_str())]).unwrap(),
+                    )),
+                    Pat::Head(h, _) => taken_heads.push(*h),
+                    _ => unreachable!("a candidate is a head or a literal"),
+                }
+            }
+        }
+        // Some member of the known type has values in `W - T`.
+        let overlaps = members.iter().any(|m| {
+            let head = m.head().unwrap();
+            if taken_heads.contains(&head) {
+                return false;
+            }
+            let mut left = if catch_all {
+                Some(super::lits::ValueSet::ALL)
+            } else {
+                own.iter()
+                    .filter_map(|a| values_of(a, head))
+                    .reduce(|x, y| x.union(&y))
+            };
+            for (h, values) in &taken_values {
+                if *h == head {
+                    left = left.and_then(|l| l.minus(values));
+                }
+            }
+            left.is_some_and(|l| !m.values().disjoint(&l))
+        });
+        !overlaps
+    }
+
+    /// The candidate that a written pattern gives: its literal value, or
+    /// its type constructor.
+    fn candidate(&self, a: &Pat) -> Option<Pat> {
+        Some(match a {
+            Pat::Wild(_) | Pat::Or(_) => return None,
+            Pat::Head(h, n) => Pat::Head(*h, *n),
+            Pat::Except(h, _) => Pat::Head(*h, 0),
+            Pat::Ctor(Ctor::Lit(Lit::Int(_) | Lit::Str(_)), _) => a.clone(),
+            Pat::Ctor(c, _) => Pat::Head(
+                c.head(),
+                match c {
+                    Ctor::Custom(r) => self.p.ty(r.ty).params.len(),
+                    Ctor::Shape(shape) => shape.len(),
+                    Ctor::Nil | Ctor::Cons => 1,
+                    Ctor::Lit(_) => 0,
+                },
+            ),
+        })
     }
 
     /// `F_sel` (§2.6.2 step 6) over the selected branches: an instance of

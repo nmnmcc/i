@@ -4,7 +4,7 @@ User {
 
 f = () {
 	(u) { u.name } |> {
-		g: (User) -> String -> g(User("yes"))
+		g: (User) -> String -> g(User(name: "yes"))
 	}
 }
 

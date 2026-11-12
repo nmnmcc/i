@@ -87,7 +87,7 @@ test("folds", () {
 			False -> (p.0 + 1, x)
 		}
 	}).0 == 3)
-	assert(list.fold(xs, Box(0), (s, _) { Box(s.value + 1) }).value == 5)
+	assert(list.fold(xs, Box(value: 0), (s, _) { Box(value: s.value + 1) }).value == 5)
 	acc = list.fold([3, 4, 5], [], (acc, x) {
 		acc |> {
 			[h, ..] -> { h == 3 } |> {
