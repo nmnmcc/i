@@ -1,4 +1,4 @@
-//! Check every written macro, including ones that are not called.
+//! Checks every written macro, including ones that are not called.
 use crate::{
     prepare::{self, MacroPosition},
     run::{self, CompileError},
@@ -7,7 +7,7 @@ use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
 use ilang_syntax::lisp::expansion;
 
-/// Check all macro signatures and capabilities of one module under the full
+/// Checks all macro signatures and capabilities of one module under the full
 /// compiler environment available in item position. Dependencies must have
 /// completed expansion before this is called.
 pub fn module(

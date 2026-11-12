@@ -1,4 +1,4 @@
-//! Prepare a macro module's parsed import closure for compiler execution.
+//! Prepares a macro module's parsed import closure for compiler execution.
 use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph};
 use ilang_syntax::lisp::{expansion, quote_lower, syntax::Syntax};
@@ -17,8 +17,8 @@ pub struct Prepared {
     pub templates: Vec<Syntax>,
 }
 
-/// Validate macro declarations, remove their phase markers for the compiler
-/// program, and lower quotes. `parsed` is the exact import closure selected by
+/// Validates macro declarations, removes their phase markers for the compiler
+/// program, and lowers quotes. `parsed` is the exact import closure selected by
 /// the caller; source identities remain stable when different closures are selected.
 pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, Vec<Diagnostic>> {
     let mut found = Vec::new();
@@ -66,7 +66,7 @@ pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, 
     })
 }
 
-/// Select exactly a macro module and the modules it imports, together with the
+/// Selects exactly a macro module and the modules it imports, together with the
 /// implicit prelude and compiler syntax module. Preserve the original order so
 /// source and module positions are deterministic.
 pub fn import_closure(
@@ -193,7 +193,7 @@ pub enum MacroPosition {
     Type,
 }
 
-/// Add a compiler-owned, host-compatible entry for a macro. The wrapper
+/// Adds a compiler-owned, host-compatible entry for a macro. The wrapper
 /// supplies compiler services, translates SyntaxError through the compiler
 /// context, and keeps all user code in its original module.
 pub fn add_wrapper(

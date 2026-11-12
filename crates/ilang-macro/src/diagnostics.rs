@@ -1,4 +1,4 @@
-//! Turn expansion failures into ordinary, source-located compiler diagnostics.
+//! Turns expansion failures into ordinary, source-located compiler diagnostics.
 use crate::{body_engine::Error, session::Failure};
 use ilang_host::syntax::DefinitionAbort;
 use ilang_package::{Diagnostic, SourceId};

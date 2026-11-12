@@ -47,7 +47,7 @@ pub trait Hook {
     fn is_direct(&mut self, expression: &Expr, locals: &[Local], fn_depth: u32) -> bool;
 }
 
-/// Expand one module's expression positions. A returned macro expression is
+/// Expands one module's expression positions. A returned macro expression is
 /// visited before any of its children, so an outer macro sees written arguments.
 pub fn expressions<H: Hook>(module: &mut ast::Module, hook: &mut H) -> Result<(), H::Error> {
     let mut walker = Walker {
@@ -71,7 +71,7 @@ pub fn expressions<H: Hook>(module: &mut ast::Module, hook: &mut H) -> Result<()
     Ok(())
 }
 
-/// Expand type-position macros in one written type definition during the item
+/// Expands type-position macros in one written type definition during the item
 /// phase. Bindings, declarations and their type positions are left for bodies.
 pub fn type_definition<H: Hook>(
     definition: &mut ast::TypeDef,
