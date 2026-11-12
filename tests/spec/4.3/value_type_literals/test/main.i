@@ -6,7 +6,7 @@
 // Joint §4: the completed literal fields survive a package boundary.
 Remote = api.config
 
-same: Remote = api.Config("GET", 8080)
+same: Remote = api.Config(method: "GET", port: 8080)
 
 test("value_annotation", () {
 	method = "GET"
@@ -20,7 +20,7 @@ test("literal_pattern_and_union", () {
 })
 
 test("literal_fields_from_a_value", () {
-	value: api.ConfigType = api.Config("GET", 8080)
+	value: api.ConfigType = api.Config(method: "GET", port: 8080)
 	assert(value.method == "GET")
 	assert(value.port == 8080)
 	assert(same == value)
@@ -48,7 +48,7 @@ Box(A) {
 test("inferred_access_is_distinct_from_known_facts", () {
 	copy = (s: String) {
 		x = "a" = s
-		p = (Box(x), 0).0.value
+		p = (Box(value: x), 0).0.value
 		q: p = "b"
 		q
 	}

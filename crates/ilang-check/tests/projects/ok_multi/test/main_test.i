@@ -3,4 +3,4 @@
 	i/assertion
 )
 
-pair_works = () { assert(main.Pair(1, 2) == main.Pair(1, 2)) }
+pair_works = () { assert(main.Pair(left: 1, right: 2) == main.Pair(left: 1, right: 2)) }

@@ -9,6 +9,6 @@ pair = ((x) { x }, () {
 
 
 main = () {
-	! Assert = Assert((_) { panic("caught group call") })
+	! Assert = Assert(fail: (_) { panic("caught group call") })
 	pair.1()
 }

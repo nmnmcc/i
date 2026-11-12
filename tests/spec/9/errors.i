@@ -95,17 +95,17 @@ ParseError {
 }
 
 Http {
-	Http(get: (id: String) -> String ^ HttpError)
+	Http(get: (String) -> String ^ HttpError)
 }
 
-default_user = User("default")
+default_user = User(name: "default")
 
 http_get = (id: String, http ! Http) { http.get(id) }
 
 parse_user = (text: String) {
 	text |> {
-		"user " <> name -> User(name)
-		_               -> fail.raise(ParseError(0))
+		"user " <> name -> User(name: name)
+		_               -> fail.raise(ParseError(at: 0))
 	}
 }
 
@@ -119,11 +119,11 @@ safe = (id) {
 	}
 }
 
-fake = Http((id) {
+fake = Http(get: (id) {
 	id |> {
 		"1" -> "user ann"
 		"2" -> "garbage"
-		_   -> fail.raise(HttpError(404))
+		_   -> fail.raise(HttpError(status: 404))
 	}
 })
 

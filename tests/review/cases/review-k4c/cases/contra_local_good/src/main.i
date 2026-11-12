@@ -3,4 +3,4 @@ use(A) = (x: A, s ! S(A)) { s.f(x) }
 wrap(A) = (x: A) { local = () { use(x) } local() }
 
 
-main = () { ! S(Int) = S((x: Int) { x + 1 }) wrap(1) Nil }
+main = () { ! S(Int) = S(f: (x: Int) { x + 1 }) wrap(1) Nil }

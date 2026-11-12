@@ -88,7 +88,7 @@ test("custom", () {
 	check(show(Nil), "Nil")
 	check(show(Ok(1)), "Ok(1)")
 	check(show(Error("e")), "Error(\"e\")")
-	check(show(User("ann", 3)), "User(\"ann\", 3)")
+	check(show(User(name: "ann", age: 3)), "User(\"ann\", 3)")
 	check(show(Unit), "Unit")
 	check(show(Ok(Error(Ok(Nil)))), "Ok(Error(Ok(Nil)))")
 })

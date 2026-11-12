@@ -21,15 +21,15 @@ at_path = random.at_path
 
 // §9.10's parameter labels and the absence of a service are public contracts.
 // This top-level call needs no runner or host import.
-initial = from_seed(seed: 1337)
+initial = from_seed(1337)
 
-first = word(g: initial)
+first = word(initial)
 
 test("public_api", () {
 	assert(first.0 == 0xb5c19e300e8b07b3)
-	assert(int(g: initial, below: 1).0 == 0)
-	assert(float(g: initial).1 == first.1)
-	assert(split(g: initial).0 != split(g: initial).1)
-	assert(at_path(g: initial, path: []) == initial)
+	assert(int(initial, 1).0 == 0)
+	assert(float(initial).1 == first.1)
+	assert(split(initial).0 != split(initial).1)
+	assert(at_path(initial, []) == initial)
 	Nil
 })

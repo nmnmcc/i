@@ -27,12 +27,12 @@ length = (xs, n) {
 
 // The example of §9.4.
 Yield(A) {
-	Yield(emit: (value: A) -> Nil)
+	Yield(emit: (A) -> Nil)
 }
 
 collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 	control.boundary((b) {
-		! Yield(A) = Yield((x) {
+		! Yield(A) = Yield(emit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		body()
@@ -180,22 +180,22 @@ Name {
 name = (n ! Name) { n.text }
 
 deep = (b) {
-	! Name = Name("deep")
+	! Name = Name(text: "deep")
 	control.suspend(b, (k) {
-		! Name = Name("resumer")
+		! Name = Name(text: "resumer")
 		control.resume(k, Nil)
 	})
 	name()
 }
 
 test("environment", () {
-	! Name = Name("outside")
+	! Name = Name(text: "outside")
 	r = control.boundary((b) {
 		before = name()
 		inner = {
-			! Name = Name("inside")
+			! Name = Name(text: "inside")
 			control.suspend(b, (k) {
-				! Name = Name("resumer")
+				! Name = Name(text: "resumer")
 				control.resume(k, Nil)
 			})
 			name()
@@ -207,7 +207,7 @@ test("environment", () {
 	check(show(s), "(\"deep\", \"resumer\")")
 	// `f(k)` gets the environment of the place of the boundary.
 	t = control.boundary((b) {
-		! Name = Name("inside")
+		! Name = Name(text: "inside")
 		control.suspend(b, (k) { name() })
 	})
 	check(t, "outside")

@@ -18,13 +18,13 @@ either(A, B) = (r1: Ref(A), r2: Ref(B), c: Bool) {
 }
 
 make_int = (x) {
-	Ref(() { x }, (y) {
+	Ref(get: () { x }, set: (y) {
 		y + 1
 		Nil
 	})
 }
 
-make_any = (x) { Ref(() { x }, (y) { Nil }) }
+make_any = (x) { Ref(get: () { x }, set: (y) { Nil }) }
 
 // Written variables on one side only are taken out.
 one_side(A) = (x: A) -> Int { x }

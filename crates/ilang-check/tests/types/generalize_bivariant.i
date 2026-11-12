@@ -4,7 +4,7 @@ Phantom(A) {
 	Phantom(next: () -> Phantom(A))
 }
 
-new(A) = () -> Phantom(A) { Phantom(new) }
+new(A) = () -> Phantom(A) { Phantom(next: new) }
 
 // §4.7: removing this argument variable does not change accepted programs.
 int_phantom = () -> Phantom(Int) { new() }

@@ -2,9 +2,9 @@ make : (name: String, age: Int) -> User
 by_label : User
 mixed : User
 ctor : User
-annotated : (x: Int) -> Int
+annotated : (Int) -> Int
 call_annotated : Int
-relabel : (z: Int) -> Int
+relabel : (Int) -> Int
 local : () -> String
 age : (u: User) -> Int
 names : (u: User) -> (String, String, Int)
@@ -15,22 +15,25 @@ param : (f: A) -> Never
 bad_pattern : (u: User) -> Never
 id : (x: A) -> A
 through : () -> User
-holes : (f: (x: 1) -> Int) -> Int
+holes : (f: (1) -> Int) -> Int
 minus : (a: Int, b: Int) -> Int
 piped : Int
 walk : (n: Int) -> Node
 walk_unwritten : (n: Int) -> Node
 ping : (n: Int) -> 0
 pong : (m: Int) -> 0
-wins : (x: Int) -> Int
+wins : (Int) -> Int
 wins_ok : Int
 wins_value : Never
 direct : String
+39:16: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 39:16: error[E0507]: the function has no parameter with the label `height`
+41:19: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 41:19: error[E0507]: the parameter `name` gets more than one argument
-43:11: error[E0507]: every parameter must get one argument (§6.6), but `age` gets none
-45:15: error[E0506]: a call with an argument by label needs a known function type for the function (§6.6, §4.8); write the type of the function, or give the arguments by position
+43:11: error[E0502]: this call gives 1 argument, but the function has 2 parameters (§6.6)
+45:17: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 48:7: error[E0510]: the constructor has no field with the label `n` (§7.1)
 48:10: error[E0510]: the constructor has no field with the label `a` (§7.1)
-84:35: error[E0506]: `.value` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+81:1: error[E0501]: `Node` is not a subtype of `(value: _)`
+103:19: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 103:19: error[E0507]: the function has no parameter with the label `y`

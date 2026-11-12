@@ -81,67 +81,69 @@ print(A, E) = (schema: Schema(A, E), value: A) -> String {
 	json.print(encode(schema, value))
 }
 
-error = (expected: String) -> SchemaError { SchemaError([], expected) }
-
-at = (part: Path, e: SchemaError) -> SchemaError {
-	SchemaError([part, ..e.path], e.expected)
+error = (expected: String) -> SchemaError {
+	SchemaError(path: [], expected: expected)
 }
 
-int = Schema((x) {
+at = (part: Path, e: SchemaError) -> SchemaError {
+	SchemaError(path: [part, ..e.path], expected: e.expected)
+}
+
+int = Schema(read: (x) {
 	x |> {
 		json.Integer(n) -> Ok(n)
 		_               -> Error(error("int"))
 	}
-}, (x) { json.Integer(x) })
+}, write: (x) { json.Integer(x) })
 
-float = Schema((x) {
+float = Schema(read: (x) {
 	x |> {
 		json.Number(n) -> Ok(n)
 		_              -> Error(error("float"))
 	}
-}, (x) { json.Number(x) })
+}, write: (x) { json.Number(x) })
 
-string = Schema((x) {
+string = Schema(read: (x) {
 	x |> {
 		json.Text(n) -> Ok(n)
 		_            -> Error(error("string"))
 	}
-}, (x) { json.Text(x) })
+}, write: (x) { json.Text(x) })
 
-bool = Schema((x) {
+bool = Schema(read: (x) {
 	x |> {
 		json.Boolean(n) -> Ok(n)
 		_               -> Error(error("bool"))
 	}
-}, (x) { json.Boolean(x) })
+}, write: (x) { json.Boolean(x) })
 
-null = Schema((x) {
+null = Schema(read: (x) {
 	x |> {
 		json.Null -> Ok(())
 		_         -> Error(error("null"))
 	}
-}, (_) { json.Null })
+}, write: (_) { json.Null })
 
 literal_string(K) = (value: K) -> Schema(K, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Text(s) ? s == value -> Ok(value)
 			_                         -> Error(error(value))
 		}
-	}, (x) { json.Text(x) })
+	}, write: (x) { json.Text(x) })
 }
 
 literal_int(K) = (value: K) -> Schema(K, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Integer(n) ? n == value -> Ok(value)
 			_                            -> Error(error("literal int"))
 		}
-	}, (x) { json.Integer(x) })
+	}, write: (x) { json.Integer(x) })
 }
 
 nullable(A) = (s: Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Null -> Ok(None)
 			_ -> decode(s, x) |> {
@@ -149,7 +151,7 @@ nullable(A) = (s: Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 				Error(e) -> Error(e)
 			}
 		}
-	}, (x) {
+	}, write: (x) {
 		x |> {
 			None    -> json.Null
 			Some(v) -> encode(s, v)
@@ -160,12 +162,12 @@ nullable(A) = (s: Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 optional = nullable
 
 list(A) = (s: Schema(A, SchemaError)) -> Schema(List(A), SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Array(xs) -> read_list(s, xs, 0)
 			_              -> Error(error("array"))
 		}
-	}, (xs) { json.Array(ls.map(xs, (v) { encode(s, v) })) })
+	}, write: (xs) { json.Array(ls.map(xs, (v) { encode(s, v) })) })
 }
 
 read_list(A) = (
@@ -188,12 +190,12 @@ read_list(A) = (
 dict(A) = (
 	s: Schema(A, SchemaError)
 ) -> Schema(ds.Dict(String, A), SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Object(xs) -> read_dict(s, xs)
 			_               -> Error(error("object"))
 		}
-	}, (xs) {
+	}, write: (xs) {
 		json.Object(ls.map(ds.to_list(xs), (entry) {
 			(k, v) = entry
 			(k, encode(s, v))
@@ -221,7 +223,7 @@ tuple(A, B) = (
 	a: Schema(A, SchemaError)
 	b: Schema(B, SchemaError)
 ) -> Schema((A, B), SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Array([one, two]) -> decode(a, one) |> {
 				Error(e) -> Error(at(Index(0), e))
@@ -232,19 +234,19 @@ tuple(A, B) = (
 			}
 			_ -> Error(error("pair"))
 		}
-	}, (x) {
+	}, write: (x) {
 		(v, w) = x
 		json.Array([encode(a, v), encode(b, w)])
 	})
 }
 
 object(A) = (empty: A) -> Schema(A, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		x |> {
 			json.Object(_) -> Ok(empty)
 			_              -> Error(error("object"))
 		}
-	}, (_) { json.Object([]) })
+	}, write: (_) { json.Object([]) })
 }
 
 field(A, V) = (
@@ -254,7 +256,7 @@ field(A, V) = (
 	get: (A) -> V
 	put: (A, V) -> A
 ) -> Schema(A, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		decode(base, x) |> {
 			Error(e) -> Error(e)
 			Ok(r) -> json.field(x, key) |> {
@@ -265,7 +267,7 @@ field(A, V) = (
 				}
 			}
 		}
-	}, (r) {
+	}, write: (r) {
 		encode(base, r) |> {
 			json.Object(entries) -> json.Object(
 				ls.append(entries, [(key, encode(value, get(r)))])
@@ -282,7 +284,7 @@ optional_field(A, V) = (
 	get: (A) -> Option(V)
 	put: (A, Option(V)) -> A
 ) -> Schema(A, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		decode(base, x) |> {
 			Error(e) -> Error(e)
 			Ok(r) -> json.field(x, key) |> {
@@ -293,7 +295,7 @@ optional_field(A, V) = (
 				}
 			}
 		}
-	}, (r) {
+	}, write: (r) {
 		encode(base, r) |> {
 			json.Object(entries) -> get(r) |> {
 				None -> json.Object(entries)
@@ -311,12 +313,12 @@ map(A, B) = (
 	forward: (A) -> B
 	backward: (B) -> A
 ) -> Schema(B, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		decode(s, x) |> {
 			Ok(v)    -> Ok(forward(v))
 			Error(e) -> Error(e)
 		}
-	}, (x) { encode(s, backward(x)) })
+	}, write: (x) { encode(s, backward(x)) })
 }
 
 transform = map
@@ -326,7 +328,7 @@ refine(A) = (
 	predicate: (A) -> Bool
 	message: String
 ) -> Schema(A, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		decode(s, x) |> {
 			Error(e) -> Error(e)
 			Ok(v) -> predicate(v) |> {
@@ -334,18 +336,18 @@ refine(A) = (
 				False -> Error(error(message))
 			}
 		}
-	}, (x) { encode(s, x) })
+	}, write: (x) { encode(s, x) })
 }
 
 lazy(A) = (get: () -> Schema(A, SchemaError)) -> Schema(A, SchemaError) {
-	Schema((x) { decode(get(), x) }, (x) { encode(get(), x) })
+	Schema(read: (x) { decode(get(), x) }, write: (x) { encode(get(), x) })
 }
 
 union(A) = (
 	schemas: List(Schema(A, SchemaError))
 	choose: (A) -> Int
 ) -> Schema(A, SchemaError) {
-	Schema((x) { read_union(schemas, x) }, (x) {
+	Schema(read: (x) { read_union(schemas, x) }, write: (x) {
 		ls.at(schemas, choose(x)) |> {
 			Some(s) -> encode(s, x)
 			None    -> panic("schema: union selector")
@@ -371,7 +373,7 @@ tagged_union(A) = (
 	cases: List((String, Schema(A, SchemaError)))
 	tag: (A) -> String
 ) -> Schema(A, SchemaError) {
-	Schema((x) {
+	Schema(read: (x) {
 		json.field(x, key) |> {
 			Some(json.Text(name)) -> ls.find_map(cases, (entry) {
 				(k, s) = entry
@@ -385,7 +387,7 @@ tagged_union(A) = (
 			}
 			_ -> Error(at(Field(key), error("tag")))
 		}
-	}, (x) {
+	}, write: (x) {
 		ls.find_map(cases, (entry) {
 			(k, s) = entry
 			{ k == tag(x) } |> {

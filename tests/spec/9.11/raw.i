@@ -4,7 +4,7 @@
 // Closing a group cancels Waiting members and preserves detached Ready answers.
 (i/request)
 @host("test:async/v1", "request")
-Later { Later(double: (n: Int) -> Request(Result(Int, String)), echo: (text: String) -> Request(String)) }
+Later { Later(double: (Int) -> Request(Result(Int, String)), echo: (String) -> Request(String)) }
 
 main = (later ! Later, root ! request.Root, owner ! request.Owner) {
   a = later.double(21)

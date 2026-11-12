@@ -4,7 +4,7 @@
 // outstanding work; an old alias cannot cancel a reused host slot.
 (i/request)
 @host("test:async/v1", "request")
-Later { Later(echo: (text: String) -> Request(String)) }
+Later { Later(echo: (String) -> Request(String)) }
 
 main = (later ! Later, owner ! request.Owner, root ! request.Root) {
   old = later.echo("old")

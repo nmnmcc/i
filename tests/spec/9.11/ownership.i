@@ -4,12 +4,12 @@
 // cancelling await_owned cancels the producer before the unwind returns.
 (i/request, i/control)
 @host("test:async/v1", "request")
-Later { Later(echo: (text: String) -> Request(String)) }
+Later { Later(echo: (String) -> Request(String)) }
 
 main = (later ! Later) {
   borrowed = later.echo("borrowed")
   control.boundary((b) {
-    ! request.Await = request.Await((_) {
+    ! request.Await = request.Await(wait: (_) {
       control.suspend(b, (k) { control.cancel(k) })
     })
     request.await(borrowed)
@@ -19,7 +19,7 @@ main = (later ! Later) {
   request.cancel(request.ticket(borrowed))
   owned = later.echo("owned")
   control.boundary((b) {
-    ! request.Await = request.Await((_) {
+    ! request.Await = request.Await(wait: (_) {
       control.suspend(b, (k) { control.cancel(k) })
     })
     request.await_owned(owned)

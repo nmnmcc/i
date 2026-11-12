@@ -3,6 +3,6 @@
 f = { 0 | 1 -> 2 }
 
 main = () {
-    ! Assert = Assert((_) { panic("fitted choices") })
+    ! Assert = Assert(fail: (_) { panic("fitted choices") })
     f(2)
 }

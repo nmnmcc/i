@@ -7,7 +7,7 @@ T(N) {
 }
 
 merge(N, M) = (a: T(N), b: T(M)) {
-	T(() {
+	T(f: () {
 		a.f()
 		b.f()
 	})
@@ -20,6 +20,6 @@ two = (s ! S(Int)) { Nil }
 
 main = () {
 	! S(Int) = S(1)
-	used = merge(T(one), T(two))
+	used = merge(T(f: one), T(f: two))
 	used.f()
 }

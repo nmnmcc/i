@@ -15,13 +15,13 @@ test("file_operations", () {
 	assert(fs.read(f, 10) == <<>>)
 	assert(
 		fail.catch(() { fs.read(f, 0) }) ==
-			Error(fs.FsError("read", "", "invalid"))
+			Error(fs.FsError(operation: "read", path: "", code: "invalid"))
 	)
 	fs.close(f)
 	fs.close(f)
 	assert(
 		fail.catch(() { fs.read(f, 1) }) ==
-			Error(fs.FsError("read", "", "closed"))
+			Error(fs.FsError(operation: "read", path: "", code: "closed"))
 	)
 	assert(fs.read_lines(path) == ["a", "b"])
 	f2 = fs.open(path, fs.Append)
