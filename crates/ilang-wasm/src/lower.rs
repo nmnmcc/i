@@ -800,6 +800,10 @@ struct Lowerer<'a> {
     /// The function of each external function outside the library (§10.1),
     /// or `None` when it has a problem, which is told one time.
     external_funcs: HashMap<DefId, Option<FuncId>>,
+    /// The content hash of each package that declares an import, computed
+    /// once: hashing every source of the package per import was measured at
+    /// a twentieth of a test build.
+    package_hashes: HashMap<PackageId, String>,
     out: ir::Program,
     diags: Vec<Diagnostic>,
 }
@@ -839,6 +843,7 @@ impl<'a> Lowerer<'a> {
             import_sites: Vec::new(),
             bindings: Vec::new(),
             external_funcs: HashMap::new(),
+            package_hashes: HashMap::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
         };
@@ -1083,6 +1088,7 @@ impl<'a> Lowerer<'a> {
                     index: di as u32,
                 };
                 if matches!(d.kind, DefKind::External { .. })
+                    && !self.program.typed_macros.contains(&id)
                     && reachable.as_ref().is_none_or(|set| set.contains(&id))
                 {
                     self.external_func(id);
@@ -2042,24 +2048,34 @@ impl<'a> Lowerer<'a> {
                     .as_bytes()
                     .to_vec(),
             };
-            let mut files: Vec<_> = package
-                .modules
-                .iter()
-                .map(|m| PackageFile {
-                    path: m.path.clone(),
-                    kind: FileKind::Regular,
-                    bytes: self.graph.sources.get(m.source).text.as_bytes().to_vec(),
-                })
-                .collect();
-            if let Some(source) = package.manifest_source {
-                files.push(PackageFile {
-                    path: "i.toml".into(),
-                    kind: FileKind::Regular,
-                    bytes: self.graph.sources.get(source).text.as_bytes().to_vec(),
-                });
-            }
+            let package_hash = match &package.location {
+                Some(location) => location.hash.clone(),
+                None => self
+                    .package_hashes
+                    .entry(source_module.package)
+                    .or_insert_with(|| {
+                        let mut files: Vec<_> = package
+                            .modules
+                            .iter()
+                            .map(|m| PackageFile {
+                                path: m.path.clone(),
+                                kind: FileKind::Regular,
+                                bytes: self.graph.sources.get(m.source).text.as_bytes().to_vec(),
+                            })
+                            .collect();
+                        if let Some(source) = package.manifest_source {
+                            files.push(PackageFile {
+                                path: "i.toml".into(),
+                                kind: FileKind::Regular,
+                                bytes: self.graph.sources.get(source).text.as_bytes().to_vec(),
+                            });
+                        }
+                        hash(&files)
+                    })
+                    .clone(),
+            };
             let binding = serde_json::json!({
-                "package": package.location.as_ref().map(|p| p.hash.clone()).unwrap_or_else(|| hash(&files)),
+                "package": package_hash,
                 "module": source_module.path,
                 "module_digest": hash(&[module_file]),
                 "declaration": declaration,

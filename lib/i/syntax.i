@@ -6,6 +6,7 @@
 (
 	Syntax
 	Node(..)
+	TypeHandle
 	Position(..)
 	SyntaxError(..)
 	Definitions(..)
@@ -17,6 +18,12 @@
 	show_as
 	Items(..)
 	Diagnostics(..)
+	Types(..)
+	Truth(..)
+	type_of
+	signature
+	subtype
+	members
 )
 
 Syntax {}
@@ -35,7 +42,10 @@ ItemMetadata {}
 
 ItemResult {}
 
+TypeHandle {}
+
 Node {
+	TypeView(TypeHandle)
 	Name(String)
 	Discard(String)
 	Up(String)
@@ -372,6 +382,7 @@ node = (syntax: Syntax) -> Node {
 		11 -> Quote(raw_child(syntax, 0))
 		12 -> Unquote(raw_child(syntax, 0))
 		13 -> Splice(raw_child(syntax, 0))
+		14 -> TypeView(raw_type_handle(syntax))
 		_  -> panic("syntax: invalid node kind")
 	}
 }
@@ -389,7 +400,16 @@ _rebuild = (template: Syntax, children: List(Syntax)) -> Syntax {
 }
 
 /// Makes syntax at the span and scope of `like`.
+@external("i:compiler/syntax/v1", "type_handle")
+raw_type_handle: (Syntax) -> TypeHandle
+
 make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
+	node |> {
+		TypeView(_) -> fail.raise(
+			SyntaxError("make cannot construct a TypeView", like)
+		)
+		_ -> Nil
+	}
 	result = node |> {
 		Name(value)    -> raw_make_text(0, value, like)
 		Discard(value) -> raw_make_text(1, value, like)
@@ -421,6 +441,7 @@ make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
 		Quote(item)   -> raw_make_one(11, item, like)
 		Unquote(item) -> raw_make_one(12, item, like)
 		Splice(item)  -> raw_make_one(13, item, like)
+		TypeView(_)   -> panic("TypeView make invariant")
 	}
 	raw_syntax_ok(result) |> {
 		True  -> raw_syntax_value(result)
@@ -465,4 +486,112 @@ show_as = (syntax: Syntax, position: Position) -> String ^ SyntaxError {
 			SyntaxError(raw_text_error(result), raw_text_error_at(result))
 		)
 	}
+}
+
+/// Frozen type observations supplied only to typed macro implementations.
+Truth {
+	Yes
+	No
+	NotKnown
+}
+
+Types {
+	Types(
+		type_of:   (Syntax) -> Syntax ^ SyntaxError
+		signature: () -> Syntax
+		subtype:   (Syntax, Syntax) -> Truth ^ SyntaxError
+		members:   (Syntax) -> List(Syntax) ^ SyntaxError
+	)
+}
+
+TypeResult {}
+
+@external("i:compiler/syntax/v1", "type_of")
+raw_type_of: (Syntax) -> TypeResult
+
+@external("i:compiler/syntax/v1", "signature")
+raw_signature: () -> TypeResult
+
+@external("i:compiler/syntax/v1", "subtype")
+raw_subtype: (Syntax, Syntax) -> TypeResult
+
+@external("i:compiler/syntax/v1", "members")
+raw_members: (Syntax) -> TypeResult
+
+@external("i:compiler/syntax/v1", "type_ok")
+raw_type_ok: (TypeResult) -> Bool
+
+@external("i:compiler/syntax/v1", "type_value")
+raw_type_value: (TypeResult) -> Syntax
+
+@external("i:compiler/syntax/v1", "type_truth")
+raw_type_truth: (TypeResult) -> Int
+
+@external("i:compiler/syntax/v1", "type_len")
+raw_type_len: (TypeResult) -> Int
+
+@external("i:compiler/syntax/v1", "type_child")
+raw_type_child: (TypeResult, Int) -> Syntax
+
+@external("i:compiler/syntax/v1", "type_message")
+raw_type_message: (TypeResult) -> String
+
+@external("i:compiler/syntax/v1", "type_at")
+raw_type_at: (TypeResult) -> Syntax
+
+type_result = (r: TypeResult) -> Syntax ^ SyntaxError {
+	raw_type_ok(r) |> {
+		True  -> raw_type_value(r)
+		False -> fail.raise(SyntaxError(raw_type_message(r), raw_type_at(r)))
+	}
+}
+
+type_members = (r: TypeResult, index: Int, count: Int) -> List(Syntax) {
+	{ index >= count } |> {
+		True  -> []
+		False -> [raw_type_child(r, index), ..type_members(r, index + 1, count)]
+	}
+}
+
+_types = () -> Types {
+	Types(
+		(s) -> Syntax ^ SyntaxError { type_result(raw_type_of(s)) }
+		() -> Syntax { raw_type_value(raw_signature()) }
+		(a, b) -> Truth ^ SyntaxError {
+			r = raw_subtype(a, b)
+			raw_type_ok(r) |> {
+				False -> fail.raise(
+					SyntaxError(raw_type_message(r), raw_type_at(r))
+				)
+				True -> raw_type_truth(r) |> {
+					0 -> Yes
+					1 -> No
+					_ -> NotKnown
+				}
+			}
+		}
+		(s) -> List(Syntax) ^ SyntaxError {
+			r = raw_members(s)
+			raw_type_ok(r) |> {
+				False -> fail.raise(
+					SyntaxError(raw_type_message(r), raw_type_at(r))
+				)
+				True -> type_members(r, 0, raw_type_len(r))
+			}
+		}
+	)
+}
+
+type_of = (s: Syntax, types ! Types) -> Syntax ^ SyntaxError ! Types {
+	types.type_of(s)
+}
+
+signature = (types ! Types) -> Syntax ! Types { types.signature() }
+
+subtype = (a: Syntax, b: Syntax, types ! Types) -> Truth ^ SyntaxError ! Types {
+	types.subtype(a, b)
+}
+
+members = (s: Syntax, types ! Types) -> List(Syntax) ^ SyntaxError ! Types {
+	types.members(s)
 }

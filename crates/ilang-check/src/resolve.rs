@@ -46,6 +46,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         circular: HashSet::new(),
         pending: Vec::new(),
         reserved: Vec::new(),
+        checked_inputs: None,
     };
     r.create_modules();
     for m in 0..parsed.len() {
@@ -71,6 +72,22 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     }
     r.environment_reads();
     r.program_rules();
+    r.p.typed_expander = parsed.iter().find_map(|p| p.typed_macros.clone());
+    if !r.p.typed_macros.is_empty() {
+        r.p.expansion_names = Some(std::sync::Arc::new(ExpansionNames {
+            generated_values: r.generated_values,
+            generated_types: r.generated_types,
+            defs_by_name: r.defs_by_name,
+            macros_by_name: r.macros_by_name,
+            types_by_name: r.types_by_name,
+            ctors_by_name: r.ctors_by_name,
+            slots: r.slots,
+            scopes: r.scopes,
+            by_path: r.by_path,
+            builtin_values: r.builtin_values,
+            builtin_types: r.builtin_types,
+        }));
+    }
     (r.p, r.diags)
 }
 
@@ -90,7 +107,7 @@ enum Entry {
 
 /// The top-level names of a module: its own and the imported ones. The
 /// `bool` says that the name is imported.
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 struct Scope {
     values: HashMap<String, (Entry, bool)>,
     types: HashMap<String, (TypeRef, bool)>,
@@ -99,7 +116,7 @@ struct Scope {
 }
 
 /// What an item of a module became in phase 1.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Slot {
     Type(TypeId),
     Pattern(ProjectionId),
@@ -116,6 +133,7 @@ struct NameKey {
     identity: Option<ScopeIdentity>,
 }
 
+#[derive(Clone, Debug)]
 struct Frame {
     names: HashMap<NameKey, VarId>,
     /// `Some(d)`: the names may only be used inside function bodies that
@@ -123,6 +141,7 @@ struct Frame {
     fn_only: Option<u32>,
 }
 
+#[derive(Clone, Debug)]
 struct TyFrame {
     names: HashMap<NameKey, TyVarId>,
 }
@@ -175,6 +194,7 @@ struct Resolver<'a> {
     circular: HashSet<TypeId>,
     pending: Vec<HashSet<NameKey>>,
     reserved: Vec<(usize, HashSet<NameKey>)>,
+    checked_inputs: Option<&'a CheckedInputs>,
 }
 
 fn is_upper(name: &str) -> bool {
@@ -250,6 +270,10 @@ impl<'a> Resolver<'a> {
 
     fn module_name(&self, m: ModuleId) -> &str {
         &self.p.module(m).path
+    }
+
+    fn is_core(&self, m: ModuleId) -> bool {
+        self.p.module(m).package == self.graph.library && self.module_name(m) == "i/core"
     }
 
     fn in_library(&self) -> bool {
@@ -448,11 +472,19 @@ impl<'a> Resolver<'a> {
             }
         }
         let placeholder_var = VarId(u32::MAX);
+        let typed: HashSet<_> = ilang_syntax::lisp::expansion::definitions(ast, lisp)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|d| d.signature.is_some())
+            .map(|d| d.name)
+            .collect();
         for item in &ast.items {
+            let typed_declaration = matches!(&item.kind, ast::ItemKind::Declaration { name, .. } if typed.contains(&name.name));
             if item
                 .attributes
                 .iter()
                 .any(|a| a.module.is_none() && a.name.name == "macro")
+                && !typed_declaration
             {
                 let mut remaining = item.clone();
                 remaining.attributes.retain(|attribute| {
@@ -475,7 +507,7 @@ impl<'a> Resolver<'a> {
                     let mut names = Vec::new();
                     ast_binders(&binding.pattern, &mut names);
                     for (name, span) in names {
-                        if self.value_free(m, &name, span) {
+                        if !typed.contains(&name) && self.value_free(m, &name, span) {
                             self.macros_by_name[m.0 as usize].insert(name, false);
                         }
                     }
@@ -483,7 +515,14 @@ impl<'a> Resolver<'a> {
                 self.slots[m.0 as usize].push(Slot::None);
                 continue;
             }
-            let mut attrs = self.attributes(item);
+            let mut attrs = if typed_declaration {
+                Attrs {
+                    external: Some(("ilang:typed-macro".into(), "".into())),
+                    ..Attrs::default()
+                }
+            } else {
+                self.attributes(item)
+            };
             let here = self.p.module(m);
             let root = self.graph.root == Some(here.package);
             if root && let ast::ItemKind::Binding(b) = &item.kind {
@@ -616,6 +655,12 @@ impl<'a> Resolver<'a> {
                     let before = self.p.module(m).defs.len();
                     self.add_def(m, &name.name, name.span, kind, &attrs);
                     if self.p.module(m).defs.len() > before {
+                        if typed_declaration {
+                            self.p.typed_macros.insert(DefId {
+                                module: m,
+                                index: before as u32,
+                            });
+                        }
                         Slot::Decl(before as u32)
                     } else {
                         Slot::None
@@ -1076,11 +1121,7 @@ impl<'a> Resolver<'a> {
         let path = format!("{}/{}", self.graph.packages[package].name, rest.join("/"));
         let written: Vec<&str> = item.path.iter().map(|p| p.name.as_str()).collect();
         let written = written.join("/");
-        let found = self
-            .by_path
-            .get(&(package, path))
-            .copied()
-            .filter(|&t| self.p.module(t).kind != ModuleKind::Prelude);
+        let found = self.by_path.get(&(package, path)).copied();
         let Some(target) = found else {
             self.error(
                 code::NO_MODULE,
@@ -1118,7 +1159,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn put_type(&mut self, scope: &mut Scope, name: &str, span: Span, t: TypeId) {
+    fn put_type(&mut self, scope: &mut Scope, name: &str, span: Span, t: TypeRef) {
         match scope.types.get(name) {
             Some((TypeRef::Custom(id), false))
                 if self.p.alias_patterns.iter().any(|p| p.binders.contains(id)) =>
@@ -1140,10 +1181,10 @@ impl<'a> Resolver<'a> {
                 format!("the type `{name}` is put in by more than one import"),
             ),
             None => {
-                scope
-                    .types
-                    .insert(name.to_string(), (TypeRef::Custom(t), true));
-                self.p.modules[self.cur.0 as usize].imported_types.push(t);
+                scope.types.insert(name.to_string(), (t, true));
+                if let TypeRef::Custom(id) = t {
+                    self.p.modules[self.cur.0 as usize].imported_types.push(id);
+                }
             }
         }
     }
@@ -1186,12 +1227,18 @@ impl<'a> Resolver<'a> {
             }
             return;
         }
+        if self.is_core(target)
+            && let Some(b) = BuiltinType::ALL.into_iter().find(|b| b.name() == n.name)
+        {
+            self.put_type(scope, &n.name, n.span, TypeRef::Builtin(b));
+            return;
+        }
         let ty = self.types_by_name[ti].get(&n.name).copied();
         let ctor = self.ctors_by_name[ti].get(&n.name).copied();
         let ty_ok = ty.filter(|t| self.p.ty(*t).exported);
         let ctor_ok = ctor.filter(|c| self.p.ty(c.ty).constructors_exported);
         if let Some(t) = ty_ok {
-            self.put_type(scope, &n.name, n.span, t);
+            self.put_type(scope, &n.name, n.span, TypeRef::Custom(t));
         }
         if let Some(c) = ctor_ok {
             self.put_value(scope, &n.name, n.span, Entry::Ctor(c));
@@ -1629,6 +1676,11 @@ impl<'a> Resolver<'a> {
             let target = self.module_of(m)?;
             let ti = target.0 as usize;
             let path = self.module_name(target).to_string();
+            if self.is_core(target)
+                && let Some(b) = BuiltinType::ALL.into_iter().find(|b| b.name() == name.name)
+            {
+                return Some(TypeRef::Builtin(b));
+            }
             return match self.types_by_name[ti].get(&name.name).copied() {
                 Some(t) if self.p.ty(t).exported || self.compiler_reference(m) => {
                     self.used_type(t, name.span);
@@ -1961,6 +2013,32 @@ impl<'a> Resolver<'a> {
 
     fn ty(&mut self, t: &ast::TypeExpr) -> Type {
         use ast::TypeKind as T;
+        if let Some(origin) = self.parsed[self.cur.0 as usize]
+            .scoped
+            .as_ref()
+            .and_then(|s| s.origin(t.span))
+        {
+            let handle = match origin.syntax.node() {
+                ilang_syntax::lisp::syntax::Node::TypeView(h) => Some(h.index),
+                _ => match origin.syntax.scope_identity() {
+                    Some(ScopeIdentity::TypeVariable { variable, .. }) => Some(*variable as u32),
+                    _ => None,
+                },
+            };
+            if let Some(index) = handle {
+                if self.checked_inputs.is_none() {
+                    self.error(code::UNKNOWN_TYPE,t.span,"a frozen type handle is valid only during its module check's typed expansion");
+                    return Type {
+                        kind: TypeKind::Error,
+                        span: t.span,
+                    };
+                }
+                return Type {
+                    kind: TypeKind::Var(TyVarId(0x8000_0000 | index)),
+                    span: t.span,
+                };
+            }
+        }
         let kind = match &t.kind {
             T::Lit(v) => TypeKind::Lit(v.clone()),
             T::Named { module, name, args } => {
@@ -2565,7 +2643,10 @@ impl<'a> Resolver<'a> {
                     let t = self.ty(ty);
                     self.ty_frames.pop();
                     // Intrinsic library operations are not host imports (§2.1).
-                    let intrinsic = self.in_library()
+                    let intrinsic = self.p.typed_macros.contains(&DefId {
+                        module: m,
+                        index: d,
+                    }) || self.in_library()
                         && matches!(&self.p.modules[m.0 as usize].defs[d as usize].kind,
                             DefKind::External { module, .. } if module.starts_with("ilang:"));
                     if !intrinsic {
@@ -3161,6 +3242,57 @@ impl<'a> Resolver<'a> {
 
     fn expr(&mut self, e: &ast::Expr) -> Expr {
         use ast::ExprKind as E;
+        if let Some(old) = self.checked_inputs.and_then(|c| c.expressions.get(&e.span)) {
+            let mut free = HashSet::new();
+            let mut tree = old.clone();
+            visit_expr_mut(&mut tree, &mut |e| {
+                if let ExprKind::Name(ValueRef::Local(v)) = e.kind {
+                    free.insert(v);
+                }
+                true
+            });
+            for binder in expression_binders(old) {
+                free.remove(&binder.var);
+            }
+            if free.iter().any(|v| {
+                !self.locals.iter().any(|frame| {
+                    frame.fn_only.is_none_or(|depth| self.fn_depth > depth)
+                        && frame.names.values().any(|w| w == v)
+                })
+            }) {
+                self.error(
+                    code::MACRO_RESERVED,
+                    e.span,
+                    "typed macro output cannot escape an argument binder",
+                );
+                return Expr {
+                    kind: ExprKind::Error,
+                    span: e.span,
+                };
+            }
+            return old.clone();
+        }
+        if !self.p.typed_macros.is_empty()
+            && matches!(
+                e.kind,
+                E::Call { .. }
+                    | E::Binary {
+                        op: ast::BinOp::Pipe,
+                        ..
+                    }
+            )
+        {
+            self.p.expansion_scopes.insert(
+                (self.cur, e.span),
+                ExpansionScope {
+                    locals: self.locals.clone(),
+                    ty_frames: self.ty_frames.clone(),
+                    fn_depth: self.fn_depth,
+                    pending: self.pending.clone(),
+                    reserved: self.reserved.clone(),
+                },
+            );
+        }
         let kind = match &e.kind {
             E::Quote(_) => {
                 self.error(
@@ -3173,7 +3305,28 @@ impl<'a> Resolver<'a> {
             E::Int(n) => ExprKind::Int(n.clone()),
             E::Float(f) => ExprKind::Float(*f),
             E::String(s) => ExprKind::String(s.clone()),
-            E::Name { module, name } => self.name(module.as_ref(), name),
+            E::Name { module, name } => {
+                if self.parsed[self.cur.0 as usize]
+                    .scoped
+                    .as_ref()
+                    .and_then(|s| s.origin(e.span))
+                    .is_some_and(|o| {
+                        matches!(
+                            o.syntax.node(),
+                            ilang_syntax::lisp::syntax::Node::TypeView(_)
+                        )
+                    })
+                {
+                    self.error(
+                        code::MACRO_RESERVED,
+                        e.span,
+                        "a TypeView is valid only in type position",
+                    );
+                    ExprKind::Error
+                } else {
+                    self.name(module.as_ref(), name)
+                }
+            }
             E::Tuple(items) => ExprKind::Tuple(items.iter().map(|x| self.expr(x)).collect()),
             E::Record { base, fields } => ExprKind::Record {
                 base: base.as_ref().map(|b| Box::new(self.expr(b))),
@@ -3398,7 +3551,10 @@ impl<'a> Resolver<'a> {
                 }
                 ast::Stmt::Env { ty, value, span } => {
                     let ty = self.ty(ty);
-                    self.env_type(&ty);
+                    // `_`: the key is read from the value (syntax three).
+                    if !matches!(ty.kind, TypeKind::Hole) {
+                        self.env_type(&ty);
+                    }
                     let value = self.expr(value);
                     Stmt::Env {
                         ty,
@@ -3472,7 +3628,11 @@ impl<'a> Resolver<'a> {
                         }
                         env_heads.push(head);
                     }
-                    let var = self.new_var();
+                    let var = self
+                        .checked_inputs
+                        .and_then(|c| c.binders.get(&name.span))
+                        .copied()
+                        .unwrap_or_else(|| self.new_var());
                     self.check_binder(&name.name, name.span, false, false);
                     self.param_name(&all, &name.name, name.span);
                     all.push(Binder {
@@ -3627,7 +3787,11 @@ impl<'a> Resolver<'a> {
         }
         let var = match shared.and_then(|s| s.get(&key)) {
             Some(v) => *v,
-            None => self.new_var(),
+            None => self
+                .checked_inputs
+                .and_then(|c| c.binders.get(&span))
+                .copied()
+                .unwrap_or_else(|| self.new_var()),
         };
         let b = Binder {
             var,
@@ -4344,5 +4508,100 @@ fn projectable_body(
         | TypeKind::Hole
         | TypeKind::Error
         | TypeKind::Of { .. } => None,
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ExpansionScope {
+    locals: Vec<Frame>,
+    ty_frames: Vec<TyFrame>,
+    fn_depth: u32,
+    pending: Vec<HashSet<NameKey>>,
+    reserved: Vec<(usize, HashSet<NameKey>)>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct ExpansionNames {
+    generated_values: Vec<HashMap<NameKey, Entry>>,
+    generated_types: Vec<HashMap<NameKey, TypeId>>,
+    defs_by_name: Vec<HashMap<String, u32>>,
+    macros_by_name: Vec<HashMap<String, bool>>,
+    types_by_name: Vec<HashMap<String, TypeId>>,
+    ctors_by_name: Vec<HashMap<String, CtorRef>>,
+    slots: Vec<Vec<Slot>>,
+    scopes: Vec<Scope>,
+    by_path: HashMap<(PackageId, String), ModuleId>,
+    builtin_values: HashMap<String, Entry>,
+    builtin_types: HashMap<String, TypeRef>,
+}
+#[derive(Default)]
+pub struct CheckedInputs {
+    pub expressions: HashMap<Span, Expr>,
+    pub binders: HashMap<Span, VarId>,
+}
+/// Resolve fresh output in the exact lexical scope captured before inference.
+#[allow(clippy::too_many_arguments)]
+pub fn typed_output(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    original: &Program,
+    module: ModuleId,
+    call: Span,
+    expression: &ast::Expr,
+    var_count: u32,
+    ty_var_count: u32,
+    checked: &CheckedInputs,
+) -> Result<(Expr, Program), Vec<Diagnostic>> {
+    let names = original
+        .expansion_names
+        .as_ref()
+        .expect("typed module has resolution tables");
+    let scope = original
+        .expansion_scopes
+        .get(&(module, call))
+        .expect("typed call has lexical scope");
+    let mut p = original.clone();
+    p.var_count = var_count;
+    p.ty_var_count = ty_var_count;
+    p.ty_var_names
+        .resize_with(ty_var_count as usize, || "Output".into());
+    let reads = p.of_sites.len();
+    let mut r = Resolver {
+        graph,
+        parsed,
+        p,
+        diags: Vec::new(),
+        generated_values: names.generated_values.clone(),
+        generated_types: names.generated_types.clone(),
+        defs_by_name: names.defs_by_name.clone(),
+        macros_by_name: names.macros_by_name.clone(),
+        types_by_name: names.types_by_name.clone(),
+        ctors_by_name: names.ctors_by_name.clone(),
+        slots: names.slots.clone(),
+        scopes: names.scopes.clone(),
+        by_path: names.by_path.clone(),
+        builtin_values: names.builtin_values.clone(),
+        builtin_types: names.builtin_types.clone(),
+        cur: module,
+        locals: scope.locals.clone(),
+        fn_depth: scope.fn_depth,
+        ty_frames: scope.ty_frames.clone(),
+        ty_def: None,
+        circular: HashSet::new(),
+        pending: scope.pending.clone(),
+        reserved: scope.reserved.clone(),
+        checked_inputs: Some(checked),
+    };
+    let result = r.expr(expression);
+    if r.p.of_sites.len() != reads {
+        r.error(
+            code::VALUE_TYPE_PLACE,
+            expression.span,
+            "a typed macro result cannot add a direct value-type read (T5)",
+        );
+    }
+    if r.diags.iter().any(Diagnostic::is_error) {
+        Err(r.diags)
+    } else {
+        Ok((result, r.p))
     }
 }

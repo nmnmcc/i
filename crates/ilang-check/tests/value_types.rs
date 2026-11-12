@@ -565,18 +565,112 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
     assert_eq!(normal.alias_types, reversed.alias_types);
 }
 
-#[test]
-fn spec_corpus_reverse_order_and_recovery() {
-    // Checklist 9.11: compare real corpus inference, including recovery paths.
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+/// Outcome of one spec case in `spec_corpus_reverse_order_and_recovery`.
+enum SpecCase {
+    Compared,
+    Rejected,
+}
+
+/// Checks one spec case (a `.i` file or a project directory) in normal and
+/// reversed type-tie order. Each case is loaded into its own package graph, so
+/// the result does not depend on any other case.
+fn spec_case_reverse_order_and_recovery(path: &std::path::Path) -> Result<SpecCase, String> {
     let options = ilang_package::LoadOptions {
         write_lock: false,
         offline: true,
         ..Default::default()
     };
-    let mut count = 0;
-    let mut rejected = 0;
-    let mut discovered = 0;
+    let temp = tempfile::tempdir().unwrap();
+    let project = if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        std::fs::write(temp.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+        std::fs::create_dir(temp.path().join("test")).unwrap();
+        std::fs::copy(
+            path,
+            temp.path().join("test").join(path.file_name().unwrap()),
+        )
+        .unwrap();
+        temp.path().to_path_buf()
+    };
+    let header = std::fs::read_to_string(if path.is_dir() {
+        path.join("i.toml")
+    } else {
+        path.to_path_buf()
+    })
+    .unwrap();
+    let expects_compile_error = header.lines().any(|line| {
+        line.starts_with("// expect: compile-error") || line.starts_with("# expect: compile-error")
+    });
+    let (g, load_diags) = ilang_package::load_with(&project, &options);
+    if load_diags.iter().any(Diagnostic::is_error) {
+        if !expects_compile_error {
+            return Err(format!("unexpected load failure: {load_diags:?}"));
+        }
+        return Ok(SpecCase::Rejected);
+    }
+    let (p, resolve_diags) = ilang_check::resolve_program(&g);
+    // Parser-rejected cases have no inference graph to permute.
+    let Some(mut p) = p else {
+        if !expects_compile_error {
+            return Err(format!("unexpected parse failure: {resolve_diags:?}"));
+        }
+        return Ok(SpecCase::Rejected);
+    };
+    let prior_errors = resolve_diags.iter().any(Diagnostic::is_error);
+    let (normal, ds) = types::check_keeping_locals_with_errors(&p, &g.sources, prior_errors);
+    let init = p.order.init.clone();
+    order::reverse_type_ties(&mut p);
+    let (reverse, rs) = types::check_keeping_locals_with_errors(&p, &g.sources, prior_errors);
+    let diagnostics = |ds: Vec<Diagnostic>| {
+        let mut ds = ds
+            .into_iter()
+            .map(|d| format!("{:?}", d))
+            .collect::<Vec<_>>();
+        ds.sort();
+        ds
+    };
+    let mut failures = Vec::new();
+    if init != p.order.init {
+        failures.push(format!(
+            "init order changed: {:?} != {:?}",
+            init, p.order.init
+        ));
+    }
+    let (ds, rs) = (diagnostics(ds), diagnostics(rs));
+    if ds != rs {
+        failures.push(format!(
+            "diagnostics differ:\n  normal:  {ds:?}\n  reverse: {rs:?}"
+        ));
+    }
+    if normal.schemes != reverse.schemes {
+        failures.push(format!(
+            "schemes differ:\n  normal:  {:?}\n  reverse: {:?}",
+            normal.schemes, reverse.schemes
+        ));
+    }
+    if normal.alias_types != reverse.alias_types {
+        failures.push(format!(
+            "alias types differ:\n  normal:  {:?}\n  reverse: {:?}",
+            normal.alias_types, reverse.alias_types
+        ));
+    }
+    if failures.is_empty() {
+        Ok(SpecCase::Compared)
+    } else {
+        Err(failures.join("\n"))
+    }
+}
+
+#[test]
+fn spec_corpus_reverse_order_and_recovery() {
+    // Checklist 9.11: compare real corpus inference, including recovery paths.
+    // The property is per case (each case is its own package graph), so the
+    // cases run in parallel on `available_parallelism()` scoped threads that
+    // take the next case from a shared index. Every failure is collected with
+    // its path and reported together at the end.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+    let mut cases = Vec::new();
     for section in std::fs::read_dir(root).unwrap() {
         let section = section.unwrap().path();
         if !section.is_dir() {
@@ -584,82 +678,66 @@ fn spec_corpus_reverse_order_and_recovery() {
         }
         for path in std::fs::read_dir(section).unwrap() {
             let path = path.unwrap().path();
-            let temp = tempfile::tempdir().unwrap();
-            let project = if path.is_dir() {
-                path.clone()
-            } else if path.extension().is_some_and(|x| x == "i") {
-                std::fs::write(temp.path().join("i.toml"), "name = \"spec\"\n").unwrap();
-                std::fs::create_dir(temp.path().join("test")).unwrap();
-                std::fs::copy(
-                    &path,
-                    temp.path().join("test").join(path.file_name().unwrap()),
-                )
-                .unwrap();
-                temp.path().to_path_buf()
-            } else {
-                continue;
-            };
-            discovered += 1;
-            let header = std::fs::read_to_string(if path.is_dir() {
-                path.join("i.toml")
-            } else {
-                path.clone()
-            })
-            .unwrap();
-            let expects_compile_error = header.lines().any(|line| {
-                line.starts_with("// expect: compile-error")
-                    || line.starts_with("# expect: compile-error")
-            });
-            let (g, load_diags) = ilang_package::load_with(&project, &options);
-            if load_diags.iter().any(Diagnostic::is_error) {
-                assert!(
-                    expects_compile_error,
-                    "unexpected load failure: {}: {:?}",
-                    path.display(),
-                    load_diags
-                );
-                rejected += 1;
-                continue;
+            if path.is_dir() || path.extension().is_some_and(|x| x == "i") {
+                cases.push(path);
             }
-            let (p, resolve_diags) = ilang_check::resolve_program(&g);
-            // Parser-rejected cases have no inference graph to permute.
-            let Some(mut p) = p else {
-                assert!(
-                    expects_compile_error,
-                    "unexpected parse failure: {}: {:?}",
-                    path.display(),
-                    resolve_diags
-                );
-                rejected += 1;
-                continue;
-            };
-            let prior_errors = resolve_diags.iter().any(Diagnostic::is_error);
-            let (normal, ds) =
-                types::check_keeping_locals_with_errors(&p, &g.sources, prior_errors);
-            let init = p.order.init.clone();
-            order::reverse_type_ties(&mut p);
-            let (reverse, rs) =
-                types::check_keeping_locals_with_errors(&p, &g.sources, prior_errors);
-            assert_eq!(init, p.order.init, "{}", path.display());
-            let diagnostics = |ds: Vec<Diagnostic>| {
-                let mut ds = ds
-                    .into_iter()
-                    .map(|d| format!("{:?}", d))
-                    .collect::<Vec<_>>();
-                ds.sort();
-                ds
-            };
-            assert_eq!(diagnostics(ds), diagnostics(rs), "{}", path.display());
-            assert_eq!(normal.schemes, reverse.schemes, "{}", path.display());
-            assert_eq!(
-                normal.alias_types,
-                reverse.alias_types,
-                "{}",
-                path.display()
-            );
-            count += 1;
         }
     }
+    cases.sort();
+    let discovered = cases.len();
+    let workers = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .min(discovered.max(1));
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results = std::thread::scope(|scope| {
+        let handles = (0..workers)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut out = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(path) = cases.get(i) else { break };
+                        let result =
+                            std::panic::catch_unwind(|| spec_case_reverse_order_and_recovery(path))
+                                .unwrap_or_else(|panic| {
+                                    let message = panic
+                                        .downcast_ref::<String>()
+                                        .cloned()
+                                        .or_else(|| {
+                                            panic.downcast_ref::<&str>().map(|s| s.to_string())
+                                        })
+                                        .unwrap_or_else(|| "non-string panic".into());
+                                    Err(format!("panicked: {message}"))
+                                });
+                        out.push((path, result));
+                    }
+                    out
+                })
+            })
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    let mut count = 0;
+    let mut rejected = 0;
+    let mut failures = Vec::new();
+    for (path, result) in &results {
+        match result {
+            Ok(SpecCase::Compared) => count += 1,
+            Ok(SpecCase::Rejected) => rejected += 1,
+            Err(e) => failures.push(format!("{}: {e}", path.display())),
+        }
+    }
+    failures.sort();
+    assert!(
+        failures.is_empty(),
+        "{} of {} spec cases failed:\n{}",
+        failures.len(),
+        discovered,
+        failures.join("\n")
+    );
     assert!(count > 0, "no resolved spec cases");
     assert_eq!(count + rejected, discovered);
     eprintln!(
@@ -919,9 +997,10 @@ fn review_declaration_permutations_are_identical() {
     let mut programs = Vec::new();
     permutations(&mut items, 0, &mut programs);
     assert_eq!(programs.len(), 120);
-    let mut expected = None;
-    for src in programs {
-        let (_, c) = good(&src);
+    // Each permutation is checked independently, so they run on scoped
+    // threads; every permutation must equal the first one's schemes.
+    let schemes_of = |src: &String| {
+        let (_, c) = good(src);
         let p = c.program.as_ref().unwrap();
         let m = common::module(p, "app/main");
         let t = c.types.as_ref().unwrap();
@@ -941,13 +1020,24 @@ fn review_declaration_permutations_are_identical() {
                 )
             })
             .collect::<std::collections::BTreeMap<_, _>>();
-        assert_eq!(alias(&c, "Left"), "Int");
-        assert_eq!(alias(&c, "Right"), "String");
-        if let Some(expected) = &expected {
-            assert_eq!(expected, &schemes);
-        } else {
-            expected = Some(schemes);
-        }
+        assert_eq!(alias(&c, "Left"), "Int", "{src}");
+        assert_eq!(alias(&c, "Right"), "String", "{src}");
+        schemes
+    };
+    let workers = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let chunk = programs.len().div_ceil(workers);
+    let results = std::thread::scope(|scope| {
+        let handles = programs
+            .chunks(chunk)
+            .map(|part| scope.spawn(move || part.iter().map(schemes_of).collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    for (src, schemes) in programs.iter().zip(&results) {
+        assert_eq!(&results[0], schemes, "{src}");
     }
 }
 

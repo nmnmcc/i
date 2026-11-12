@@ -1,4 +1,4 @@
-//! Manifest representation of target provider plans (§2.6.1).
+//! The representation of target provider plans in the package file.
 use crate::{Diagnostic, code, is_name};
 use ilang_syntax::span::Span;
 use std::collections::BTreeMap;
@@ -392,7 +392,7 @@ pub struct SelectedRow<'a> {
     pub cells: BTreeMap<Target, SelectedCell<'a>>,
 }
 impl crate::PackageGraph {
-    /// Select explicit root cells over inherited cells. Resolution of names to
+    /// Selects explicit root cells over inherited cells. Resolution of names to
     /// nominal identities and access checking belongs to the provider checker.
     pub fn selected_provider_rows(&self) -> Vec<SelectedRow<'_>> {
         let mut rows: Vec<SelectedRow<'_>> = Vec::new();

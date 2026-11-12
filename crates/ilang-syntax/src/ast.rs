@@ -197,12 +197,12 @@ impl BinOp {
     pub fn level(self) -> u8 {
         use BinOp::*;
         match self {
-            Or => 1,
-            And => 2,
-            Eq | NotEq => 3,
-            Lt | LtEq | Gt | GtEq | LtFloat | LtEqFloat | GtFloat | GtEqFloat => 4,
-            Concat => 5,
-            Pipe => 6,
+            Pipe => 1,
+            Or => 2,
+            And => 3,
+            Eq | NotEq => 4,
+            Lt | LtEq | Gt | GtEq | LtFloat | LtEqFloat | GtFloat | GtEqFloat => 5,
+            Concat => 6,
             Add | Sub | AddFloat | SubFloat => 7,
             Mul | Div | Rem | MulFloat | DivFloat => 8,
         }

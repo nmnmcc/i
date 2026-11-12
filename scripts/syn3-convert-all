@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Converts lib, std, examples and tests to syntax three in place
+# (docs/design/syntax-3.md §7.2 stage 8), with `migrate-syntax3 convert --write`.
+#
+#   scripts/syn3-convert-all [ROOT]
+#
+# ROOT (default: the repository) is the directory that holds `lib`, `std`,
+# `examples` and `tests`; pass a scratch copy to try the conversion without
+# touching the tree. The migrator is built from this repository.
+#
+# After the conversion the tree is read with the transition switch:
+#   I_SYNTAX=3 I_SYNTAX3_LIB=ROOT/lib i check --project ROOT/std
+set -euo pipefail
+repo=$(cd "$(dirname "$0")/.." && pwd)
+root=$(cd "${1:-$repo}" && pwd)
+bin=${SYN3_MIGRATE:-}
+if [ -z "$bin" ]; then
+	(cd "$repo" && cargo build --release -p ilang-syntax --example migrate-syntax3)
+	bin=$repo/target/release/examples/migrate-syntax3
+fi
+dirs=()
+for d in lib std examples tests; do
+	[ -d "$root/$d" ] && dirs+=("$root/$d")
+done
+ctors=()
+for d in "${dirs[@]}"; do ctors+=(--ctors "$d"); done
+# Every `.i` and `.is` source; generated and vendored trees are left alone.
+mapfile -d '' files < <(find "${dirs[@]}" \( -name target -o -name node_modules -o -name .git \) -prune \
+	-o -type f \( -name '*.i' -o -name '*.is' \) -print0 | sort -z)
+"$bin" convert --write "${ctors[@]}" "${files[@]}" 2> "$root/syn3-convert-notes.txt" || true
+echo "converted ${#files[@]} files under $root; notes: $root/syn3-convert-notes.txt ($(wc -l < "$root/syn3-convert-notes.txt") lines)"
+# The hand rewrites (§7.3) that the migrator cannot do from the text.
+"$repo/scripts/syn3-hand-rewrites" "$root"
