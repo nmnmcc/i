@@ -59,4 +59,4 @@ callback(A) = (value: Secret(A)) { value.read }
 
 raw = Raw(() { 42 })
 
-open = Open(11)
+open: Open = Open(11)

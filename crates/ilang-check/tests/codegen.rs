@@ -39,7 +39,7 @@ env = (c ! Watch) {
 }
 mono = minus(1, 2)
 age = (Cat(name, l = lives)) { l }
-first = (r) {
+first(A, E) = (r: Result(A, E)) {
   Ok(v) = r
   v
 }

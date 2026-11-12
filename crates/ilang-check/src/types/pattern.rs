@@ -1369,17 +1369,21 @@ Solo(A) { Solo(A, Int) }
             },
             1
         ));
-        assert!(c.field_shared(
+        // One constructor per type (syntax three): `Start` and `Stop` are
+        // no longer one family, so their fields are not shared.
+        assert!(!c.field_shared(
             CtorRef {
-                ty: id("Event"),
+                ty: id("Start"),
                 index: 0
             },
             0
         ));
-        assert!(c.field_shared(
+        // One constructor per type (syntax three): `Start` and `Stop` are
+        // no longer one family, so their fields are not shared.
+        assert!(!c.field_shared(
             CtorRef {
-                ty: id("Event"),
-                index: 1
+                ty: id("Stop"),
+                index: 0
             },
             0
         ));
