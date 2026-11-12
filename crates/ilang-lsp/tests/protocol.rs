@@ -174,7 +174,7 @@ fn find(text: &str, needle: &str, nth: usize) -> (u32, u32) {
     (line, col)
 }
 
-/// Exact LSP diagnostic for an unused top-level binding.
+/// The exact LSP diagnostic for an unused top-level binding.
 fn unused_diagnostic(text: &str, name: &str, binding: &str) -> lsp::Diagnostic {
     let (line, col) = find(text, binding, 0);
     lsp::Diagnostic {
@@ -775,7 +775,7 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
 
 #[test]
 fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
-    // X4: every pattern head targets its existing type, at every depth.
+    // Every pattern head targets its existing type, at every depth.
     let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i")
         .replace("x: Item = 2", "x: Item = 1");
     let source = source.as_str();
@@ -816,7 +816,7 @@ fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
 
 #[test]
 fn disjoint_comparison_is_a_warning_at_the_comparison() {
-    // W520/§6.9 keeps the comparison span and shows both types.
+    // W520 keeps the comparison span and shows both types.
     let source = "x = 1 == 2\n";
     let dir = tempfile::tempdir().unwrap();
     package(dir.path(), &[("src/main.i", source)]);
@@ -2870,7 +2870,8 @@ fn raw_request(c: &mut Client, method: &str, params: Value) {
     }
 }
 
-const BROKEN: &str = /* old-syntax-check: E0010,E0010,E0101,E0010,E0101,E0010,E0002 */ "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
+const BROKEN: &str = /* old-syntax-check: E0010,E0010,E0101,E0010,E0101,E0010,E0002 */
+    "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
 
 #[test]
 fn lsp_every_offset_of_correct_files() {

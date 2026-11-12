@@ -79,7 +79,7 @@ fn insert_stream(
     )
 }
 
-/// Consume an idle TCP stream so a transport such as TLS can own the socket.
+/// Consumes an idle TCP stream so a transport such as TLS can own the socket.
 pub(super) fn take_stream(
     context: &ResourceContext,
     id: &crate::BigInt,

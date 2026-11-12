@@ -483,7 +483,7 @@ impl Server<'_> {
         Some(lsp::WorkspaceSymbolResponse::Flat(out))
     }
 
-    /// `completionItem/resolve`: the documentation of the item.
+    /// Answers `completionItem/resolve` with the documentation of the item.
     pub(super) fn resolve_completion(&self, mut item: lsp::CompletionItem) -> lsp::CompletionItem {
         let Some(data) = item.data.take() else {
             return item;

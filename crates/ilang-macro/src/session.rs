@@ -54,7 +54,7 @@ pub struct Session {
     depth: u16,
     pub(crate) types: Option<Arc<ilang_host::syntax::TypeCallback>>,
     /// Imported macro definitions are stable after dependency-ordered expansion.
-    /// Share compiled code across caller modules; each invocation still starts
+    /// Compiled code is shared across caller modules; each invocation still starts
     /// a fresh guest instance and receives its own budget and resolver.
     pub(crate) compiled:
         std::collections::HashMap<(u32, String, u8), Arc<crate::body_engine::Compiled>>,
@@ -64,7 +64,7 @@ impl Session {
     pub(crate) fn next_mark(&self) -> u64 {
         self.next_mark
     }
-    /// Expand one call and recursively expand its result while this run still
+    /// Expands one call and recursively expands its result while this run still
     /// occupies an expansion-depth frame. A retried call obtains a new mark.
     #[allow(clippy::too_many_arguments)]
     pub fn run(

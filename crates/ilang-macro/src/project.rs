@@ -24,7 +24,7 @@ pub struct Expanded {
 }
 
 impl Expanded {
-    /// Lower source quotations only after expansion has finished. The original
+    /// Lowers source quotations only after expansion has finished. The original
     /// expanded tree remains available to callers such as `i expand` until
     /// this method is called.
     pub fn lower_quotes(&mut self) {
@@ -38,7 +38,7 @@ impl Expanded {
     }
 }
 
-/// Parse and expand each module after its dependencies. On failure the
+/// Parses and expands each module after its dependencies. On failure the
 /// diagnostics are returned without publishing partial output to the checker.
 pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
     let (mut parsed, mut diagnostics) = ilang_check::parse(graph);
@@ -267,17 +267,17 @@ pub struct ProjectChecked {
     pub templates: Vec<ilang_syntax::lisp::syntax::Syntax>,
 }
 
-/// Expand and type-check a project through the same path used by builds.
+/// Expands and type-checks a project through the same path used by builds.
 pub fn check(graph: &mut PackageGraph) -> ProjectChecked {
     check_project(graph, false)
 }
 
-/// Check collection contributions before selecting an execution root.
+/// Checks collection contributions before selecting an execution root.
 pub fn check_for_tools(graph: &mut PackageGraph) -> ProjectChecked {
     check_project(graph, true)
 }
 
-/// Expand and check a package with all targets of one test collection as roots.
+/// Expands and checks a package with all targets of one test collection as roots.
 pub fn check_tests(graph: &mut PackageGraph, collection: Option<&str>) -> ProjectChecked {
     match expand(graph) {
         Ok(mut expanded) => {

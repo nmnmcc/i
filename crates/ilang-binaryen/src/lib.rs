@@ -1,11 +1,11 @@
-//! Optimize WasmGC modules with Binaryen, linked into the compiler as a
+//! Optimizes WasmGC modules with Binaryen, linked into the compiler as a
 //! library.
 //!
 //! The i compiler emits simple, unoptimized Wasm and leaves optimization to
 //! Binaryen. Only the few C API calls that this needs are bound here.
 //!
 //! Custom sections whose names start with `ilang.` (the binary interface
-//! metadata of Appendix B of the spec) are taken out before Binaryen reads the
+//! metadata of a compiled module) are taken out before Binaryen reads the
 //! module and are put back, unchanged and in order, at the end of the result.
 //! So the optimizer can never change or lose them.
 
@@ -16,12 +16,12 @@ use std::sync::Mutex;
 /// How much to optimize.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
-    /// Do not optimize: the module is given back as it is.
+    /// No optimization: the module is given back as it is.
     O0,
-    /// Optimize for speed, as `wasm-opt -O2`, but with the inlining of
+    /// Optimizes for speed, as `wasm-opt -O2`, but with the inlining of
     /// [`ALWAYS_INLINE`].
     O2,
-    /// Optimize more, as `wasm-opt -O3`, with the same inlining.
+    /// Optimizes more, as `wasm-opt -O3`, with the same inlining.
     O3,
 }
 
@@ -51,7 +51,7 @@ pub const ALWAYS_INLINE: u32 = 20;
 static BINARYEN: Mutex<()> = Mutex::new(());
 
 /// The Wasm features that i programs may use: GC with typed function
-/// references, tail calls, and exception handling (spec, Appendix B.1), and
+/// references, tail calls, and exception handling, and
 /// the small features that every engine with these also has.
 fn features() -> ffi::BinaryenFeatures {
     // SAFETY: these functions only return constants.
@@ -69,12 +69,12 @@ fn features() -> ffi::BinaryenFeatures {
     }
 }
 
-/// Optimize `wasm` at `level`.
+/// Optimizes `wasm` at `level`.
 ///
 /// The optimizer is run in closed-world mode: only numbers, buffers in linear
 /// memory, and `externref` values cross the host boundary, so no GC type is
 /// seen from outside. Traps are never assumed away, because a trap is how a
-/// program stops (spec §11.7).
+/// program stops.
 pub fn optimize(wasm: &[u8], level: Level) -> Result<Vec<u8>, Error> {
     let (module, kept) = split_custom_sections(wasm)?;
     if level == Level::O0 {
@@ -146,7 +146,7 @@ unsafe extern "C" {
     fn libc_free(pointer: *mut std::ffi::c_void);
 }
 
-/// Split a module into its bytes without the `ilang.*` custom sections, and
+/// Splits a module into its bytes without the `ilang.*` custom sections, and
 /// those sections, each as a complete section with its header.
 fn split_custom_sections(wasm: &[u8]) -> Result<(Vec<u8>, Vec<Vec<u8>>), Error> {
     const HEADER: usize = 8;
