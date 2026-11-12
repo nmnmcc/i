@@ -322,8 +322,8 @@ impl BuiltinType {
     pub fn arity(self) -> usize {
         match self {
             BuiltinType::List | BuiltinType::Key | BuiltinType::Request => 1,
-            BuiltinType::Boundary => 3,
-            BuiltinType::Continuation => 4,
+            BuiltinType::Boundary => 2,
+            BuiltinType::Continuation => 3,
             _ => 0,
         }
     }

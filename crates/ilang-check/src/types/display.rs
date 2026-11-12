@@ -1045,6 +1045,9 @@ impl Norm<'_> {
     fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
         let mut out: Vec<Ty> = Vec::new();
         for m in ms {
+            if self.s.vacuous(&m) {
+                continue;
+            }
             let directed = |t: &Ty| match t {
                 Ty::Con(h, _, xs) if !xs.is_empty() => self
                     .s

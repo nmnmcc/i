@@ -163,6 +163,7 @@ pub(super) struct Builtins {
     pub bool_: TypeRef,
     pub nil: TypeRef,
     pub assert: TypeRef,
+    pub fail: TypeRef,
 }
 
 struct PendingFailure {
@@ -276,6 +277,7 @@ impl<'a> Checker<'a> {
             bool_: find("Bool"),
             nil: find("Nil"),
             assert: find("Assert"),
+            fail: find("Fail"),
         };
         let mut solver = Solver::new(variances(p), Vec::new());
         solver.row_params = row_parameters(p);
@@ -1172,7 +1174,16 @@ impl<'a> Checker<'a> {
                 );
             }
         }
-        let error_members = known::members(&f.err);
+        // §2.10.11: the errors of a host export are the argument of the
+        // `Fail` of its need.
+        let fail = known::members(&f.env).into_iter().find_map(|m| match m {
+            Ty::Con(Head::Named(r), _, xs) if r == self.b.fail && xs.len() == 1 => {
+                Some(xs[0].clone())
+            }
+            _ => None,
+        });
+        let fail = fail.unwrap_or(Ty::Never);
+        let error_members = known::members(&fail);
         let errors_ok = error_members.iter().all(|m| {
             matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
@@ -1201,7 +1212,7 @@ impl<'a> Checker<'a> {
             );
         }
         if !errors_ok {
-            let e = show(self, &f.err);
+            let e = show(self, &fail);
             self.error(
                 code::ENTRY_TYPE,
                 span,
@@ -3864,11 +3875,9 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
                 let modes = match ty {
                     TypeRef::Custom(id) => table[id].clone(),
                     TypeRef::Builtin(BuiltinType::Continuation) => {
-                        vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                        vec![Mode::Value, Mode::Value, Mode::Env]
                     }
-                    TypeRef::Builtin(BuiltinType::Boundary) => {
-                        vec![Mode::Value, Mode::Row, Mode::Env]
-                    }
+                    TypeRef::Builtin(BuiltinType::Boundary) => vec![Mode::Value, Mode::Env],
                     _ => vec![Mode::Value; args.len()],
                 };
                 for (a, mode) in args.iter().zip(modes) {

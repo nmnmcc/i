@@ -656,10 +656,10 @@ impl Solver {
                 |ms| ParamModes::from_slice(ms),
             ),
             Head::Named(TypeRef::Builtin(BuiltinType::Continuation)) => {
-                ParamModes::from_slice(&[Mode::Value, Mode::Value, Mode::Row, Mode::Env])
+                ParamModes::from_slice(&[Mode::Value, Mode::Value, Mode::Env])
             }
             Head::Named(TypeRef::Builtin(BuiltinType::Boundary)) => {
-                ParamModes::from_slice(&[Mode::Value, Mode::Row, Mode::Env])
+                ParamModes::from_slice(&[Mode::Value, Mode::Env])
             }
             _ => ParamModes::repeated(Mode::Value, n),
         }
@@ -2142,7 +2142,7 @@ impl Solver {
         }
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
-            if matches!(m, Ty::Never) || out.contains(&m) {
+            if matches!(m, Ty::Never) || out.contains(&m) || (mode == Mode::Env && self.vacuous(&m)) {
                 continue;
             }
             if matches!(m, Ty::Top) {
@@ -2186,6 +2186,22 @@ impl Solver {
     /// (§4.4). `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
         self.normalize_mode(Ty::Inter(ms), Mode::Value)
+    }
+
+    /// A need entry that every form of its constructor meets, as
+    /// `Fail(Never)`: nothing can use it, so a need drops it.
+    pub(crate) fn vacuous(&self, t: &Ty) -> bool {
+        let Ty::Con(h, values, args) = t else {
+            return false;
+        };
+        !args.is_empty()
+            && values.is_all()
+            && self.variances(*h, args.len()).zip(args).all(|(v, a)| match v {
+                Variance::Contra => matches!(a, Ty::Never),
+                Variance::Co => matches!(a, Ty::Top),
+                Variance::Bi => true,
+                Variance::Inv => false,
+            })
     }
 
     fn inter_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
@@ -3068,8 +3084,8 @@ fn builtin_variance_values(b: BuiltinType) -> &'static [Variance] {
     match b {
         BuiltinType::List | BuiltinType::Request => &[Co],
         BuiltinType::Key => &[Inv],
-        BuiltinType::Boundary => &[Inv, Inv, Inv],
-        BuiltinType::Continuation => &[Contra, Co, Co, Co],
+        BuiltinType::Boundary => &[Inv, Inv],
+        BuiltinType::Continuation => &[Contra, Co, Co],
         _ => &[],
     }
 }

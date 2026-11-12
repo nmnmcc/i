@@ -438,7 +438,7 @@ fn members(p: &Program, ty: &ShownType) -> Result<Vec<Service>, String> {
     for x in xs {
         let s = service(p, x)?;
         if p.module(p.ty(s.constructor).module).kind == ModuleKind::Prelude
-            && p.ty(s.constructor).name == "Assert"
+            && matches!(p.ty(s.constructor).name.as_str(), "Assert" | "Fail")
         {
             continue;
         }
