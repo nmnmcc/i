@@ -139,7 +139,7 @@ jobs:
       fail-fast: false
       matrix:
         # The groups of DEV_VERIFY_TEST_GROUP in scripts/dev-verify.
-        group: [value_types, spec, cli, rest]
+        group: [check, spec, cli, rest]
     env:
       DEV_VERIFY_TEST_GROUP: ${{ matrix.group }}
     steps:
