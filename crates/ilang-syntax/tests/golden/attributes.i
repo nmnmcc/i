@@ -11,5 +11,5 @@ main = () { Nil }
 @host("app:storage/v1", "async")
 Storage { Storage(read: (key: String) -> String ^ String) }
 
-@test
+@custom
 test_it = () { assert(True) }

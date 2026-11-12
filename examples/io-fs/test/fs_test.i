@@ -1,12 +1,12 @@
 (
+	testlib = (test) = std/test
 	i/fs
 	i/fail
 	i/clock
 	i/core
 )
 
-@test
-file_operations = () {
+test("file_operations", () {
 	path = fs.temp_dir() <> "/i-fs-test-" <> core.inspect(clock.monotonic_ns())
 	fs.write_file(path, <<"a\nb\n":utf8>>)
 	f = fs.open(path, fs.ReadOnly)
@@ -30,4 +30,4 @@ file_operations = () {
 	assert(fs.read_file(path) == <<"a\nb\nc":utf8>>)
 	fs.remove(path)
 	Nil
-}
+})

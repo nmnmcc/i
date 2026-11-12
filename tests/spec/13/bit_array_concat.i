@@ -1,6 +1,7 @@
 // spec: 13
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -18,15 +19,13 @@ same = (got: String, want: String) {
 	}
 }
 
-@test
-whole_bytes = () {
+test("whole_bytes", () {
 	check(core.bit_array_concat([]), <<>>)
 	check(core.bit_array_concat([<<1>>]), <<1>>)
 	check(core.bit_array_concat([<<1>>, <<2, 3>>, <<>>, <<4>>]), <<1, 2, 3, 4>>)
-}
+})
 
-@test
-parts_that_are_not_whole_bytes = () {
+test("parts_that_are_not_whole_bytes", () {
 	check(
 		core.bit_array_concat([<<1:u1>>, <<2:u2>>, <<255>>])
 		<<1:u1, 2:u2, 255>>
@@ -47,10 +46,9 @@ parts_that_are_not_whole_bytes = () {
 		)
 		"15"
 	)
-}
+})
 
-@test
-slices = () {
+test("slices", () {
 	<<170, 85, 255>> |> {
 		<<_:u3, middle:bits(13), rest:bits>> -> {
 			check(
@@ -64,4 +62,4 @@ slices = () {
 		}
 		_ -> panic("no")
 	}
-}
+})

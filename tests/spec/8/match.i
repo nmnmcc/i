@@ -1,6 +1,7 @@
 // spec: 8.4
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -26,8 +27,7 @@ ints = (b: BitArray) {
 	}
 }
 
-@test
-integers = () {
+test("integers", () {
 	check(ints(<<>>), "empty")
 	check(ints(<<255>>), "minus one")
 	check(ints(<<7>>), "byte 7")
@@ -36,7 +36,7 @@ integers = () {
 	check(ints(<<254, 255, 127>>), "i24le 8388606")
 	check(ints(<<18, 3:u3>>), "nibbles (1, 2, 3)")
 	check(ints(<<1, 2, 3, 4>>), "other")
-}
+})
 
 lengths = (b: BitArray) {
 	b |> {
@@ -45,8 +45,7 @@ lengths = (b: BitArray) {
 	}
 }
 
-@test
-dynamic_lengths = () {
+test("dynamic_lengths", () {
 	check(lengths(<<2, 10, 20, 30>>), "(2, <<10, 20>>, <<30>>)")
 	check(lengths(<<0>>), "(0, <<>>, <<>>)")
 	check(lengths(<<5, 1>>), "no")
@@ -64,17 +63,16 @@ dynamic_lengths = () {
 		)
 		_ -> panic("no")
 	}
-}
+})
 
-@test
-bytes_need_whole = () {
+test("bytes_need_whole", () {
 	r = <<1, 2:u4>> |> {
 		<<_, rest:bytes>> -> "bytes " <> show(rest)
 		<<_, rest:bits>>  -> "bits " <> show(rest)
 		_                 -> "no"
 	}
 	check(r, "bits <<2:u4>>")
-}
+})
 
 floats = (b: BitArray) {
 	b |> {
@@ -85,8 +83,7 @@ floats = (b: BitArray) {
 	}
 }
 
-@test
-float_segments = () {
+test("float_segments", () {
 	check(floats(<<1.5:f64be>>), "one and a half")
 	check(floats(<<2.0:f32le>>), "f32le 2.0")
 	check(floats(<<60, 0>>), "f16be 1.0")
@@ -94,7 +91,7 @@ float_segments = () {
 	check(floats(<<0, 0, 128, 127>>), "other")
 	check(floats(<<124, 0>>), "other")
 	check(floats(<<126, 0>>), "other")
-}
+})
 
 texts = (b: BitArray) {
 	b |> {
@@ -109,8 +106,7 @@ texts = (b: BitArray) {
 	}
 }
 
-@test
-string_segments = () {
+test("string_segments", () {
 	check(texts(<<"hi!":utf8>>), "hi then <<33>>")
 	check(texts(<<0, 233>>), "é in utf16be")
 	check(texts(<<120, 0, 0, 0>>), "x in utf32le")
@@ -128,10 +124,9 @@ string_segments = () {
 		<<c:utf32be_codepoint>> -> check(show(c), "//utfcodepoint(😀)")
 		_                       -> panic("no")
 	}
-}
+})
 
-@test
-not_enough_bits = () {
+test("not_enough_bits", () {
 	r = <<1>> |> {
 		<<_:u16be>> -> "yes"
 		<<_:u4>>    -> "not all bits used"
@@ -145,4 +140,4 @@ not_enough_bits = () {
 		_                      -> "no"
 	}
 	check(r2, "no")
-}
+})

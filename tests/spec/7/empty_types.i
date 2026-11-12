@@ -3,6 +3,10 @@
 // Custom types with no constructors all count as one type constructor for
 // a type test, so a test of `Window` would also take a `Socket`.
 
+(
+	testlib = (test) = std/test
+)
+
 Window {}
 
 Socket {}
@@ -14,5 +18,4 @@ kind = (h: Window | Socket) {
 	}
 }
 
-@test
-t = () { Nil }
+test("t", () { Nil })

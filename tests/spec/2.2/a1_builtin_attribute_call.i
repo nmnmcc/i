@@ -1,5 +1,9 @@
 // spec: 2.2
-// expect: compile-error E0302
-(main)
+// expect: compile-error E0301
+// test-macro-migrate: reject
+(
+	main
+)
+
 @test()
 main = () { Nil }

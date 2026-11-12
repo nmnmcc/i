@@ -3,6 +3,10 @@
 // A type test of a custom type with no constructors, when it is the only
 // one at its place, or tested together with the others.
 
+(
+	testlib = (test) = std/test
+)
+
 Window {}
 
 Socket {}
@@ -21,10 +25,9 @@ both = (h: Window | Socket | Int) {
 	}
 }
 
-@test
-t = () {
+test("t", () {
 	(kind(1), both(2)) |> {
 		("other", "other") -> Nil
 		_                  -> panic("no")
 	}
-}
+})

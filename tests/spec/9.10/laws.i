@@ -2,14 +2,15 @@
 // expect: pass
 
 (
+	testlib = (test) = std/test
 	i/random
 	i/fail
 	i/core
 )
 
 // §9.10: immutable reuse, normalized seeds, and the complete logical identity.
-@test
-identity = () {
+
+test("identity", () {
 	g = random.from_seed(0)
 	w = 0x1_0000_0000_0000_0000
 	assert(g == random.from_seed(w))
@@ -24,11 +25,11 @@ identity = () {
 	assert(random.split(next) != random.split(g))
 	assert(random.at_path(next, [1]) != random.at_path(g, [1]))
 	Nil
-}
+})
 
 // §9.10: InvalidPath contains the whole input, including after a valid prefix.
-@test
-invalid = () {
+
+test("invalid", () {
 	g = random.from_seed(19)
 	assert(fail.catch(() { random.int(g, 0) }) == Error(random.InvalidBound(0)))
 	assert(
@@ -45,11 +46,11 @@ invalid = () {
 	)
 	assert(random.word(g) == random.word(random.from_seed(19)))
 	Nil
-}
+})
 
 // §9.10: successive path components compose; P and S histories stay distinct.
-@test
-paths = () {
+
+test("paths", () {
 	g = random.from_seed(7)
 	(a, b) = random.split(g)
 	assert(a != b)
@@ -74,7 +75,7 @@ paths = () {
 	assert(random.word(p1) == random.word(random.word(p).1))
 	assert(random.word(q1) == random.word(random.word(q).1))
 	Nil
-}
+})
 
 advance = (g: random.Generator, n: Int) -> random.Generator {
 	{ n == 0 } |> {
@@ -84,8 +85,8 @@ advance = (g: random.Generator, n: Int) -> random.Generator {
 }
 
 // §9.10: k is at least one, even for bound 1; W uses one word, W+1 two.
-@test
-boundaries = () {
+
+test("boundaries", () {
 	g = random.from_seed(0)
 	w = core.shift_left(1, 64)
 	assert(random.int(g, 1) == (0, advance(g, 1)))
@@ -96,7 +97,7 @@ boundaries = () {
 	// Powers of W accept every group; the word order is least significant first.
 	assert(random.int(g, w * w) == (u + v * w, next))
 	Nil
-}
+})
 
 check_range = (
 	g: random.Generator
@@ -115,15 +116,14 @@ check_range = (
 	}
 }
 
-@test
-ranges = () {
+test("ranges", () {
 	g = random.from_seed(-19)
 	check_range(g, 1, 100)
 	check_range(g, 10, 1000)
 	check_range(g, core.shift_left(1, 63) + 1, 100)
 	check_range(g, core.shift_left(1, 193) + 123, 100)
 	Nil
-}
+})
 
 // §9.10: exactly 53 high bits and exactly one draw are used for each Float.
 check_float = (g: random.Generator, count: Int) -> Nil ! Assert {
@@ -142,8 +142,7 @@ check_float = (g: random.Generator, count: Int) -> Nil ! Assert {
 	}
 }
 
-@test
-floats = () { check_float(random.from_seed(1337), 1000) }
+test("floats", () { check_float(random.from_seed(1337), 1000) })
 
 // A deterministic smoke check of small-bound frequencies. This is not a proof
 // of independence; the exact rejection and uniform-residue proof are separate.
@@ -167,14 +166,13 @@ histogram = (
 	}
 }
 
-@test
-small_bound_frequencies = () {
+test("small_bound_frequencies", () {
 	(a, b, c) = histogram(random.from_seed(42), 12000, 0, 0, 0)
 	assert(a > 3600 && a < 4400)
 	assert(b > 3600 && b < 4400)
 	assert(c > 3600 && c < 4400)
 	Nil
-}
+})
 
 walk = (g: random.Generator, count: Int) -> random.Generator {
 	{ count == 0 } |> {
@@ -183,10 +181,9 @@ walk = (g: random.Generator, count: Int) -> random.Generator {
 	}
 }
 
-@test
-deep_splits = () {
+test("deep_splits", () {
 	g = random.from_seed(0)
 	assert(walk(walk(g, 64), 64) == walk(g, 128))
 	assert(walk(g, 128) != walk(g, 127))
 	Nil
-}
+})

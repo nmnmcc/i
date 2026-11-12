@@ -5,6 +5,10 @@
 // the places of the fields that it leaves out. So the guard on the first
 // clause does not leave `age` and `name` with no values.
 
+(
+	testlib = (test) = std/test
+)
+
 User {
 	User(name: String, age: Int)
 }
@@ -23,8 +27,7 @@ label = (u: User) {
 	}
 }
 
-@test
-spread_is_a_catch_all = () {
+test("spread_is_a_catch_all", () {
 	(kind(User("a", 20)), kind(User("b", 5))) |> {
 		(1, 2) -> Nil
 		_      -> panic("kind")
@@ -33,4 +36,4 @@ spread_is_a_catch_all = () {
 		("a", "young b") -> Nil
 		_                -> panic("label")
 	}
-}
+})

@@ -9,6 +9,7 @@
 // output: echo after
 // output: 4 Error("negative") 10
 (
+	testlib = (test) = std/test
 	i/control
 	i/core
 	i/fail
@@ -31,7 +32,6 @@ Io {
 
 twice = (n: Int, later ! Later) { later.double(later.double(n)) }
 
-
 main = (later ! Later, io ! Io) {
 	a = twice(1)
 	b = later.echo(core.inspect(a))
@@ -49,10 +49,10 @@ main = (later ! Later, io ! Io) {
 }
 
 // A test that may call an async function is async too.
-@test
-async_test = (later ! Later) {
+
+test("async_test", (later ! Later) {
 	later.double(21) |> {
 		42 -> Nil
 		n  -> panic(core.inspect(n))
 	}
-}
+})

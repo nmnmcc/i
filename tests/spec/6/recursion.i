@@ -1,6 +1,7 @@
 // spec: 6.10, 2.5
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -27,8 +28,7 @@ is_odd = (n) {
 	}
 }
 
-@test
-local_recursion = () {
+test("local_recursion", () {
 	fact = (n) {
 		n |> {
 			0 -> 1
@@ -43,10 +43,9 @@ local_recursion = () {
 		}
 	}
 	check(show(fib(20)), "6765")
-}
+})
 
-@test
-local_mutual_recursion = () {
+test("local_mutual_recursion", () {
 	(even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
 	check(show(even(10)), "True")
 	check(show(odd(7)), "True")
@@ -64,10 +63,9 @@ local_mutual_recursion = () {
 		}
 	})
 	check(show(down(5)), "3")
-}
+})
 
-@test
-top_level_mutual_recursion = () {
+test("top_level_mutual_recursion", () {
 	check(show(is_even(1001)), "False")
 	check(show(is_odd(1001)), "True")
-}
+})

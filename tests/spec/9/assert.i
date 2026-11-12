@@ -1,6 +1,7 @@
 // spec: 9.6, 6.10, 6.11
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/assertion
 	i/core
 )
@@ -14,13 +15,11 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-@test
-assert_true = () {
+test("assert_true", () {
 	assert(True)
 	assert(1 + 1 == 2)
-}
+})
 
-@test
 catch_assert = () {
 	check(show(assertion.catch(() { 1 })), "Ok(1)")
 	check(
@@ -33,6 +32,8 @@ catch_assert = () {
 	})), "Ok(2)")
 }
 
+test("catch_assert", () { catch_assert() })
+
 first = (r) {
 	Ok(v) = r
 	v
@@ -40,7 +41,6 @@ first = (r) {
 
 param = (Ok(v), (a, b)) { v + a + b }
 
-@test
 failing_patterns = () {
 	check(show(first(Ok(1))), "1")
 	check(
@@ -78,6 +78,8 @@ failing_patterns = () {
 	check(show(nested((Ok(1), 2))), "(1, (Ok(1), 2))")
 }
 
+test("failing_patterns", () { failing_patterns() })
+
 // A pattern that can not fail for its type needs no `Assert` (§7.3).
 Pair {
 	Pair(Int, Int)
@@ -85,15 +87,14 @@ Pair {
 
 add = (Pair(a, b)) { a + b }
 
-@test
-can_not_fail = () {
+test("can_not_fail", () {
 	check(show(add(Pair(1, 2))), "3")
 	(a, [..rest]) = (1, [2, 3])
 	check(show((a, rest)), "(1, [2, 3])")
-}
+})
 
 // Any code may give its own `Assert` (§9.6).
-@test
+
 own_assert = () {
 	// Nested: the inner `catch` takes the failures of its body.
 	nested = assertion.catch(() {
@@ -113,3 +114,5 @@ own_assert = () {
 	})
 	check(show(outer), "Error(AssertionFailure(\"assert\"))")
 }
+
+test("own_assert", () { own_assert() })

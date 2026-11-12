@@ -1,6 +1,10 @@
 // spec: 9.7, 10.3
 // expect: compile-error E0320
 
+(
+	testlib = (test) = std/test
+)
+
 Handle {}
 
 // An error type that the host can take is a union of `Nil`, `Bool`, `Int`,
@@ -10,5 +14,4 @@ Kv {
 	Kv(get: (key: String) -> String ^ Handle)
 }
 
-@test
-t = () { Nil }
+test("t", () { Nil })

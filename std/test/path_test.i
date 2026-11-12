@@ -1,12 +1,13 @@
 (
+	testlib = (test) = std/test
 	path = std/path
 	list = std/list
 	string = std/string
 )
 
 // Expected spellings in these tables are the examples and rules of std-1 §5.
-@test
-path_clean_examples = () {
+
+test("path_clean_examples", () {
 	list.each(
 		[
 			("", ".")
@@ -35,10 +36,9 @@ path_clean_examples = () {
 	assert(path.join(["a", "/b", "..", "c"]) == "a/c")
 	assert(path.join(["", "/", "", "a"]) == "/a")
 	Nil
-}
+})
 
-@test
-path_parts_examples = () {
+test("path_parts_examples", () {
 	assert(path.split("a//b/") == ("a//b/", ""))
 	assert(path.split("a//b") == ("a//", "b"))
 	assert(path.split("") == ("", ""))
@@ -58,10 +58,9 @@ path_parts_examples = () {
 	assert(path.is_absolute("C:/a") == False)
 	assert(path.is_absolute("") == False)
 	Nil
-}
+})
 
-@test
-path_relative_examples = () {
+test("path_relative_examples", () {
 	assert(path.relative("/a/b", "/a/c") == Ok("../c"))
 	assert(path.relative("../a", "../b") == Ok("../b"))
 	assert(path.relative("..", "../a") == Ok("a"))
@@ -73,7 +72,7 @@ path_relative_examples = () {
 	assert(path.relative(".", "../é") == Ok("../é"))
 	assert(path.relative("../../a", "../a") == Error(path.UnknownParent))
 	Nil
-}
+})
 
 short_paths = (depth: Int) -> List(String) {
 	depth |> {
@@ -85,8 +84,8 @@ short_paths = (depth: Int) -> List(String) {
 }
 
 // §5.3: clean idempotence, exact raw split, and the successful relative law.
-@test
-path_exhaustive_laws = () {
+
+test("path_exhaustive_laws", () {
 	paths = short_paths(4)
 	list.each(paths, (p) {
 		assert(path.clean(path.clean(p)) == path.clean(p))
@@ -105,11 +104,11 @@ path_exhaustive_laws = () {
 		})
 	})
 	Nil
-}
+})
 
 // §5.3 calls for 100,000 segments, multibyte names, and long dot/parent runs.
-@test
-path_long_inputs = () {
+
+test("path_long_inputs", () {
 	names = list.repeat("é猫", 100000)
 	long = string.join(names, "/")
 	assert(path.clean(long) == long)
@@ -129,4 +128,4 @@ path_long_inputs = () {
 	assert(path.split(name) == ("", name))
 	assert(path.relative(long, long) == Ok("."))
 	Nil
-}
+})

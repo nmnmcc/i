@@ -1,3 +1,4 @@
+// test-macro-migrate: reject
 @test
 works = () { assert(True) }
 

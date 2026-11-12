@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/fail
 	i/control
 	i/resource
@@ -76,8 +77,7 @@ check_laws = (xs: List(Int), ys: List(Int), zs: List(Int)) -> Nil ! Assert {
 	Nil
 }
 
-@test
-stream_laws = () {
+test("stream_laws", () {
 	lists = [[], [1], [1, 2, 3], [3, -1, 3, 0]]
 	list.each(lists, (xs) {
 		list.each(lists, (ys) {
@@ -90,11 +90,11 @@ stream_laws = () {
 		stream.to_list(stream.append(stream.new(), stream.wrap("x"))) == ["x"]
 	)
 	Nil
-}
+})
 
 // S1-S7 example table: failure is distinct from end, with no tail prefetch.
-@test
-stream_examples = () {
+
+test("stream_examples", () {
 	assert(stream.to_list(stream.defer(() { stream.wrap(7) })) == [7])
 	assert(stream.to_list(stream.map(source([1, 2]), (x) { x * 2 })) == [2, 4])
 	assert(stream.to_list(stream.drop(source([1, 2, 3]), 2)) == [3])
@@ -159,7 +159,7 @@ stream_examples = () {
 	assert(stream.to_list(stream.attempt(source([1, 2]))) == [Ok(1), Ok(2)])
 	assert(stream.to_list(stream.attempt(broken())) == [Error("bad")])
 	Nil
-}
+})
 
 Trace {
 	Trace(visit: (Int) -> Nil)
@@ -182,8 +182,7 @@ traced = (xs: List(Int)) -> stream.Stream(Int, Never, Trace) {
 	})
 }
 
-@test
-stream_demand = () {
+test("stream_demand", () {
 	trace = control.boundary((b) {
 		! Trace = Trace((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
@@ -225,10 +224,9 @@ stream_demand = () {
 	})
 	assert(zip_trace == [1, 9, 2, 0])
 	Nil
-}
+})
 
-@test
-stream_replay_and_services = () {
+test("stream_replay_and_services", () {
 	s = positive()
 	assert({
 		! Bias = Bias(10)
@@ -261,7 +259,7 @@ stream_replay_and_services = () {
 	assert(head(adapted) == Some(10))
 	assert(head(adapted) == Some(10))
 	Nil
-}
+})
 
 Scale {
 	Scale(value: Int)
@@ -275,14 +273,13 @@ common = () -> stream.Stream(Int, Never, Bias | Scale) {
 	)
 }
 
-@test
-stream_common_environment = () {
+test("stream_common_environment", () {
 	s = stream.map(common(), (x: Int, scale ! Scale) { x * scale.value })
 	! Bias = Bias(10)
 	! Scale = Scale(3)
 	assert(stream.to_list(s) == [30])
 	Nil
-}
+})
 
 OuterError {
 	OuterError
@@ -296,8 +293,7 @@ CallbackError {
 	CallbackError
 }
 
-@test
-stream_error_positions = () {
+test("stream_error_positions", () {
 	prefix = stream.append(source([1, 2]), broken())
 	assert(
 		stream.to_list(stream.attempt(prefix)) == [Ok(1), Ok(2), Error("bad")]
@@ -351,10 +347,9 @@ stream_error_positions = () {
 			[Error("runner")]
 	)
 	Nil
-}
+})
 
-@test
-stream_long_searches = () {
+test("stream_long_searches", () {
 	numbers = stream.unfold(0, (n: Int) { Some((n, n + 1)) })
 	assert(stream.to_list(stream.take(numbers, 3)) == [0, 1, 2])
 	assert(
@@ -383,11 +378,11 @@ stream_long_searches = () {
 			[0, 1, 2]
 	)
 	Nil
-}
+})
 
 // S2: each attempted pull, including Done and repeated positions, reruns runner.
-@test
-stream_runner_demand = () {
+
+test("stream_runner_demand", () {
 	trace = control.boundary((b) {
 		! Trace = Trace((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
@@ -407,7 +402,7 @@ stream_runner_demand = () {
 	})
 	assert(trace == [99, 99, 99, 99])
 	Nil
-}
+})
 
 reject = (x: Int) -> Int ^ String {
 	{ x == 2 } |> {
@@ -416,8 +411,7 @@ reject = (x: Int) -> Int ^ String {
 	}
 }
 
-@test
-stream_callback_failures = () {
+test("stream_callback_failures", () {
 	s = source([1, 2, 3])
 	assert(
 		stream.to_list(stream.attempt(stream.filter(s, (x) {
@@ -484,11 +478,11 @@ stream_callback_failures = () {
 			[Error("source")]
 	)
 	Nil
-}
+})
 
 // S3/S6: callbacks run in order, and no callback after a failing one is called.
-@test
-stream_callback_order = () {
+
+test("stream_callback_order", () {
 	trace = control.boundary((b) {
 		! Trace = Trace((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
@@ -502,12 +496,12 @@ stream_callback_order = () {
 	})
 	assert(trace == [1, 11, 2, 12])
 	Nil
-}
+})
 
 // S8: the caller keeps the scope through consumption; early termination does
 // not close a resource itself. S7: attempt does not intercept Assert failures.
-@test
-stream_resource_scope = () {
+
+test("stream_resource_scope", () {
 	trace = control.boundary((b) {
 		! Trace = Trace((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
@@ -533,7 +527,7 @@ stream_resource_scope = () {
 		Ok(_)    -> False
 	})
 	Nil
-}
+})
 
 Item {
 	Item(value: Int)
@@ -543,8 +537,7 @@ Count {
 	Count(total: Int)
 }
 
-@test
-stream_nominal_callbacks = () {
+test("stream_nominal_callbacks", () {
 	s: stream.Stream(Item, Never, Never) = stream.from_list([Item(2), Item(3)])
 	assert(stream.to_list(stream.map(s, (x) { x.value })) == [2, 3])
 	assert(
@@ -560,7 +553,7 @@ stream_nominal_callbacks = () {
 		}
 	})) == [Item(0), Item(1), Item(2)])
 	Nil
-}
+})
 
 // Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions
 // to this owned test file, never failing std tests. Each must report E0501;
@@ -595,8 +588,8 @@ stream_nominal_callbacks = () {
 //|     path.write_text(original)
 
 // S1/S2/S7: defer and unfold run only on pulls; retry explicitly repeats work.
-@test
-stream_factory_demand = () {
+
+test("stream_factory_demand", () {
 	trace = control.boundary((b) {
 		! Trace = Trace((x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
@@ -627,4 +620,4 @@ stream_factory_demand = () {
 	})
 	assert(trace == [99, 99, 0, 1, 2, 88, 88])
 	Nil
-}
+})

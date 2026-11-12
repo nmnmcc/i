@@ -3,6 +3,7 @@
 //// suspend should take the same time at every depth (docs/performance.md).
 
 (
+	testlib = (test) = std/test
 	i/control
 	i/core
 )
@@ -66,11 +67,8 @@ run = (depth) {
 	check(got == 5_000_050_000, "the sum of 1 to rounds is wrong")
 }
 
-@test
-resume_depth_10 = () { run(10) }
+test("resume_depth_10", () { run(10) })
 
-@test
-resume_depth_100 = () { run(100) }
+test("resume_depth_100", () { run(100) })
 
-@test
-resume_depth_1000 = () { run(1000) }
+test("resume_depth_1000", () { run(1000) })

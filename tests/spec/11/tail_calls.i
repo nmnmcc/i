@@ -1,6 +1,7 @@
 // spec: 11.6
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -66,17 +67,15 @@ piped = (n) {
 	}
 }
 
-@test
-deep = () {
+test("deep", () {
 	check(show(count(1000000, 0)), "1000000")
 	check(ping(1000001), "pong")
 	check(show(loop_block(1000000, 0)), "2000000")
 	check(show(via(1000000)), "0")
 	check(piped(1000000), "done")
-}
+})
 
-@test
-local_functions = () {
+test("local_functions", () {
 	step = 3
 	go = (n, acc) {
 		n |> {
@@ -97,4 +96,4 @@ local_functions = () {
 		}
 	})
 	check(a(1000000), "a")
-}
+})

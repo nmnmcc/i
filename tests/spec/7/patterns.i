@@ -1,6 +1,7 @@
 // spec: 7.1, 7.2, 6.12
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -66,8 +67,7 @@ list = (xs) {
 	}
 }
 
-@test
-literals = () {
+test("literals", () {
 	check(literal(0), "zero")
 	check(literal(-1), "minus one")
 	check(literal(100000000000000000000), "big")
@@ -90,19 +90,17 @@ literals = () {
 	check(string("éa"), "starts with é")
 	check(string("xyz"), "xyz/yz")
 	check(string("ab"), "other")
-}
+})
 
-@test
-lists = () {
+test("lists", () {
 	check(list([]), "empty")
 	check(list([7]), "one 7")
 	check(list([7, 8]), "two (7, 8)")
 	check(list([1, 2, 3]), "starts with 1")
 	check(list([2, 3, 4, 5]), "rest [4, 5]")
-}
+})
 
-@test
-constructors = () {
+test("constructors", () {
 	u = User("ann", 30)
 	u |> {
 		User(age, name) -> check(name <> show(age), "ann30")
@@ -140,10 +138,9 @@ constructors = () {
 		(True, False, Nil) -> Nil
 		_                  -> panic("no")
 	}
-}
+})
 
-@test
-named_and_tuples = () {
+test("named_and_tuples", () {
 	(1, (2, 3)) |> {
 		(a, inner = (b, c)) -> check(
 			show((a, inner, b, c))
@@ -153,7 +150,7 @@ named_and_tuples = () {
 	(Nil, (1)) |> {
 		(Nil, (x)) -> check(show(x), "1")
 	}
-}
+})
 
 kind = (v: Int | String | List(Int) | (Int, Int) | Nil | Bool | Float) {
 	v |> {
@@ -167,8 +164,7 @@ kind = (v: Int | String | List(Int) | (Int, Int) | Nil | Bool | Float) {
 	}
 }
 
-@test
-type_tests = () {
+test("type_tests", () {
 	check(kind(1), "int 1")
 	check(kind(100000000000000000000), "int 100000000000000000000")
 	check(kind("s"), "string s")
@@ -178,7 +174,7 @@ type_tests = () {
 	check(kind(Nil), "nil")
 	check(kind(False), "bool False")
 	check(kind(1.5), "float 1.5")
-}
+})
 
 choices = (x) {
 	x |> {
@@ -202,8 +198,7 @@ positive = (p) {
 	}
 }
 
-@test
-choices_and_guards = () {
+test("choices_and_guards", () {
 	check(choices(1), "small")
 	check(choices(2), "small")
 	check(choices(3), "other")
@@ -223,7 +218,7 @@ choices_and_guards = () {
 		_         -> "less"
 	}
 	check(r, "between")
-}
+})
 
 guarded = (x: Option(Int)) {
 	x |> {
@@ -234,13 +229,12 @@ guarded = (x: Option(Int)) {
 	}
 }
 
-@test
-guards = () {
+test("guards", () {
 	check(guarded(Some(3)), "positive")
 	check(guarded(Some(0)), "zero")
 	check(guarded(Some(-3)), "negative")
 	check(guarded(None), "none")
-}
+})
 
 either = (v: Result(Int, String | Nil)) {
 	v |> {
@@ -250,15 +244,13 @@ either = (v: Result(Int, String | Nil)) {
 	}
 }
 
-@test
-narrowing = () {
+test("narrowing", () {
 	check(either(Ok(1)), "1")
 	check(either(Error(Nil)), "nil")
 	check(either(Error("bad")), "error bad")
-}
+})
 
-@test
-nested_case = () {
+test("nested_case", () {
 	v = [1, 2] |> {
 		[a, b] -> { a < b } |> {
 			True  -> "lt"
@@ -267,4 +259,4 @@ nested_case = () {
 		_ -> "no"
 	}
 	check(v, "lt")
-}
+})

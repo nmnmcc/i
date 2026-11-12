@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/fail
 	i/control
 	sequence = std/sequence
@@ -16,8 +17,8 @@ check = (s: sequence.Sequence(Int), xs: List(Int)) -> Nil ! Assert {
 }
 
 // std-1 §4.3's example table, Q1 and Q2, including saved source versions.
-@test
-sequence_examples = () {
+
+test("sequence_examples", () {
 	empty = sequence.new()
 	assert(sequence.first(empty) == None)
 	assert(sequence.last(empty) == None)
@@ -54,7 +55,7 @@ sequence_examples = () {
 		[3, 2, 1]
 	)
 	Nil
-}
+})
 
 // §4.3 laws compare observable elements, never private representation equality.
 check_laws = (xs: List(Int), ys: List(Int), zs: List(Int)) -> Nil ! Assert {
@@ -98,15 +99,14 @@ check_laws = (xs: List(Int), ys: List(Int), zs: List(Int)) -> Nil ! Assert {
 	Nil
 }
 
-@test
-sequence_small_exhaustive = () {
+test("sequence_small_exhaustive", () {
 	list.each(list.range(0, 20), (n) {
 		list.each(list.range(0, 20), (m) {
 			check_laws(numbers(n), list.map(numbers(m), (x) { 100 + x }), [999])
 		})
 	})
 	Nil
-}
+})
 
 // A service observes callback order without putting mutable state in sequences.
 Trace {
@@ -115,8 +115,7 @@ Trace {
 
 visit = (x: Int, trace ! Trace) -> Nil ! Trace { trace.visit(x) }
 
-@test
-sequence_walks = () {
+test("sequence_walks", () {
 	source = sequence.from_list([1, 2, 3])
 	assert(sequence.to_list(sequence.map(source, (x) { x * 2 })) == [2, 4, 6])
 	assert(sequence.fold(source, 0, (a, x) { a + x }) == 6)
@@ -133,7 +132,7 @@ sequence_walks = () {
 	})
 	assert(trace == [1, 2, 3])
 	Nil
-}
+})
 
 reject_two = (x: Int) -> Int ^ String {
 	x |> {
@@ -143,8 +142,7 @@ reject_two = (x: Int) -> Int ^ String {
 	}
 }
 
-@test
-sequence_callback_errors = () {
+test("sequence_callback_errors", () {
 	s = sequence.from_list([1, 2, 3])
 	assert(fail.catch(() { sequence.map(s, reject_two) }) == Error("two"))
 	assert(
@@ -154,7 +152,7 @@ sequence_callback_errors = () {
 	assert(fail.catch(() { sequence.each(s, reject_two) }) == Error("two"))
 	check(s, [1, 2, 3])
 	Nil
-}
+})
 
 // A fixed generator branches from retained versions, as required by §4.3.
 prng = (seed: Int) -> Int { { seed * 1664525 + 1013904223 } % 4294967296 }
@@ -225,8 +223,7 @@ model = (
 	}
 }
 
-@test
-sequence_persistent_model = () {
+test("sequence_persistent_model", () {
 	list.each([1, 7, 42, 123456], (seed) {
 		model(
 			seed
@@ -238,7 +235,7 @@ sequence_persistent_model = () {
 		)
 	})
 	Nil
-}
+})
 
 // Traverse all the way through middle borrowing/collapse, alternating ends.
 drain = (s: sequence.Sequence(Int), low: Int, high: Int) -> Nil ! Assert {
@@ -259,8 +256,7 @@ drain = (s: sequence.Sequence(Int), low: Int, high: Int) -> Nil ! Assert {
 	}
 }
 
-@test
-sequence_large_boundaries = () {
+test("sequence_large_boundaries", () {
 	sizes = [
 		0
 		1
@@ -352,7 +348,7 @@ sequence_large_boundaries = () {
 		check(s, xs)
 	})
 	Nil
-}
+})
 
 numbers = (n: Int) -> List(Int) {
 	{ n <= 0 } |> {
@@ -375,8 +371,7 @@ observe = (body: () -> Nil ! Trace | Assert) -> List(Int) ! Assert {
 	})
 }
 
-@test
-sequence_callback_types_and_order = () {
+test("sequence_callback_types_and_order", () {
 	xs = numbers(300)
 	s = sequence.from_list(items: xs)
 	assert(observe(() {
@@ -417,12 +412,12 @@ sequence_callback_types_and_order = () {
 			Error("other")
 	)
 	Nil
-}
+})
 
 // Q4 and §4.3: unrelated shapes compare by elements. Both repeated insertion
 // directions exercise full digits, promoted middle nodes, and retained roots.
-@test
-sequence_independent_histories = () {
+
+test("sequence_independent_histories", () {
 	xs = numbers(512)
 	back = list.fold(xs, sequence.new(), (s, x) { sequence.push_back(s, x) })
 	front = list.fold(list.reverse(xs), sequence.new(), (s, x) {
@@ -451,7 +446,7 @@ sequence_independent_histories = () {
 		check(s, model)
 	})
 	Nil
-}
+})
 
 // Development checks for std-1 §4.3. The Python program below temporarily adds
 // private rank/cache audits, then counts helper entries as node work. It restores

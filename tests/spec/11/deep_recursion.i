@@ -1,6 +1,7 @@
 // spec: 11.6, 11.7
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -20,8 +21,7 @@ depth = (n) {
 	}
 }
 
-@test
-deep = () {
+test("deep", () {
 	check(core.inspect(depth(100000)), "100000")
 	check(core.inspect(depth(300000)), "300000")
-}
+})

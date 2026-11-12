@@ -1,6 +1,7 @@
 // spec: 13, 11.8
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -13,27 +14,24 @@ build = (n: Int, acc: List(Int)) -> List(Int) {
 	}
 }
 
-@test
-inspect_long_list = () {
+test("inspect_long_list", () {
 	// "[" and "]", one digit and ", " for each part but the last.
 	core.byte_size(core.inspect(build(100000, []))) |> {
 		300000 -> Nil
 		n      -> panic(core.inspect(n))
 	}
-}
+})
 
-@test
-hash_long_list = () {
+test("hash_long_list", () {
 	{ core.hash(build(300000, [])) == core.hash(build(300000, [])) } |> {
 		True  -> Nil
 		False -> panic("hash")
 	}
-}
+})
 
-@test
-inspect_nested = () {
+test("inspect_nested", () {
 	core.inspect([(1, "a\n"), (-2, "b")]) |> {
 		"[(1, \"a\\n\"), (-2, \"b\")]" -> Nil
 		s                              -> panic(s)
 	}
-}
+})

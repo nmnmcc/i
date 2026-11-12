@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/net
 	i/task
 	i/core
@@ -37,8 +38,7 @@ handle = (req: http.Request) {
 	}
 }
 
-@test
-network_client = () {
+test("network_client", () {
 	listener = net.listen("127.0.0.1", 0)
 	url = "http://127.0.0.1:" <> core.inspect(net.local_port(listener))
 	task.run(() {
@@ -53,10 +53,9 @@ network_client = () {
 		})
 	})
 	net.close_listener(listener)
-}
+})
 
-@test
-client_timeout = () {
+test("client_timeout", () {
 	result = task.run(() {
 		provider = (send: (_: http.Request) { task.sync(task.never()) })
 		fail.catch(() {
@@ -68,4 +67,4 @@ client_timeout = () {
 		})
 	})
 	assert(result == Error(http.Timeout))
-}
+})

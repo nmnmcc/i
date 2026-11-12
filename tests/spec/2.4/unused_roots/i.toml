@@ -4,3 +4,9 @@ name = "app"
 
 [wasm]
 exports = ["app/host.run"]
+
+[dependencies]
+std = { path = "../../../../std" }
+
+[test]
+collection = "std/test.tests"

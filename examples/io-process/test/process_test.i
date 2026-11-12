@@ -1,12 +1,12 @@
 (
+	testlib = (test) = std/test
 	i/process
 	i/request
 	i/fail
 	i/core
 )
 
-@test
-fake_capabilities = () {
+test("fake_capabilities", () {
 	! process.Arguments = process.Arguments(() {
 		request.ready(Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>))
 	})
@@ -25,10 +25,9 @@ fake_capabilities = () {
 	})
 	assert(process.cwd() == "/fake")
 	Nil
-}
+})
 
-@test
-host_capabilities = () {
+test("host_capabilities", () {
 	assert(core.bit_size(process.entropy(16)) == 128)
 	assert(
 		fail.catch(() { process.entropy(-1) }) ==
@@ -43,4 +42,4 @@ host_capabilities = () {
 			Error(process.ProcessError("wait", "closed"))
 	)
 	Nil
-}
+})

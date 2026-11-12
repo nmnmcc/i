@@ -1,7 +1,7 @@
-// spec: 10.2, B.5
-// expect: compile-error E0305
+// spec: 10.2, 2.2
+// expect: compile-error E0301
+// test-macro-migrate: reject
 
-// This function is not the default entry, and tests belong under test/.
-
+// Test attributes have no built-in meaning, including on the default entry.
 @test
 main = () { Nil }

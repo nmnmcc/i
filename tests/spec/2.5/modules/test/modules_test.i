@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/core
 	app/app/top
 	app/app/base
@@ -11,11 +12,10 @@ check = (got: String, want: String) {
 	}
 }
 
-@test
-across_modules = () {
+test("across_modules", () {
 	check(core.inspect(top.answer), "42")
 	check(core.inspect(top.colors), "[Red, Blue(0), Green]")
-}
+})
 
 each = (xs: List(base.Color)) {
 	xs |> {
@@ -24,7 +24,6 @@ each = (xs: List(base.Color)) {
 	}
 }
 
-@test
-constructors_of_another_module = () {
+test("constructors_of_another_module", () {
 	check(core.inspect(each(top.colors)), "[\"red\", \"blue 0\", \"green\"]")
-}
+})

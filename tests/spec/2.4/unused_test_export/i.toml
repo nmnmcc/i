@@ -1,3 +1,9 @@
 # spec: 2.4.1; test exports need reachable uses from this package.
 # expect: warning W0504
 name = "app"
+
+[dependencies]
+std = { path = "../../../../std" }
+
+[test]
+collection = "std/test.tests"

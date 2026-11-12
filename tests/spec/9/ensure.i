@@ -1,6 +1,7 @@
 // spec: 9.5
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 	i/fail
 	i/resource
@@ -17,8 +18,7 @@ show = (x) { core.inspect(x) }
 
 nothing = () { Nil }
 
-@test
-values_and_errors_go_through = () {
+test("values_and_errors_go_through", () {
 	check(show(resource.ensure(() { 1 }, nothing)), "1")
 	r = fail.catch(() { resource.ensure(() { fail.raise("e") }, nothing) })
 	check(show(r), "Error(\"e\")")
@@ -31,9 +31,8 @@ values_and_errors_go_through = () {
 	check(show(nested), "Error(1)")
 	// After an error has gone through `ensure`, the program goes on.
 	check(show(resource.ensure(() { 2 }, nothing)), "2")
-}
+})
 
-@test
 acquire = () {
 	v = resource.acquire(() { 10 }, (r) { Nil }, (r) { r + 1 })
 	check(show(v), "11")
@@ -51,3 +50,5 @@ acquire = () {
 	})
 	check(show(o), "Error(\"open\")")
 }
+
+test("acquire", () { acquire() })

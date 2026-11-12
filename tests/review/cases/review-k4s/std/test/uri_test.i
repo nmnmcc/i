@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	std/uri
 	std/list
 	std/string
@@ -20,8 +21,7 @@ parse_good = (s: String) -> uri.Uri ! Assert {
 	u
 }
 
-@test
-uri_raw_parts = () {
+test("uri_raw_parts", () {
 	xs = [
 		""
 		"?"
@@ -67,11 +67,11 @@ uri_raw_parts = () {
 			Error(uri.InvalidUtf8)
 	)
 	Nil
-}
+})
 
 // U1/U8 selection and translation, including byte counts rather than codepoints.
-@test
-uri_parse_errors = () {
+
+test("uri_parse_errors", () {
 	cases = [
 		("a b", uri.UriError(uri.WholePart, 1, uri.BadCharacter))
 		("a%2", uri.UriError(uri.WholePart, 1, uri.BadPercent))
@@ -103,10 +103,9 @@ uri_parse_errors = () {
 		assert(uri.parse(text) == Error(expected))
 	})
 	Nil
-}
+})
 
-@test
-uri_build_errors = () {
+test("uri_build_errors", () {
 	blank = uri.Parts(None, None, "", None, None)
 	cases = [
 		(
@@ -209,11 +208,11 @@ uri_build_errors = () {
 		assert(uri.build(p) == Error(expected))
 	})
 	Nil
-}
+})
 
 // RFC 3986 §5.4 normal and abnormal examples; strict http:g behavior.
-@test
-uri_rfc_resolution = () {
+
+test("uri_rfc_resolution", () {
 	base = parse_good("http://a/b/c/d;p?q")
 	cases = [
 		("g:h", "g:h")
@@ -277,10 +276,9 @@ uri_rfc_resolution = () {
 	assert(uri.to_string(v) == "x:a")
 	round_trip(v)
 	Nil
-}
+})
 
-@test
-uri_resolution_validation = () {
+test("uri_resolution_validation", () {
 	base = parse_good("x:a")
 	bad = Error(uri.UriError(uri.PathPart, 0, uri.BadPath))
 	list.each(["/.//h", "/a/..//h", "/.//a:b", "x:/.//h"], (s) {
@@ -298,10 +296,9 @@ uri_resolution_validation = () {
 	assert(uri.to_string(u) == "x://host//h")
 	round_trip(u)
 	Nil
-}
+})
 
-@test
-uri_ip_literals = () {
+test("uri_ip_literals", () {
 	valid = [
 		"::"
 		"::1"
@@ -347,10 +344,9 @@ uri_ip_literals = () {
 		)
 	})
 	Nil
-}
+})
 
-@test
-uri_codecs = () {
+test("uri_codecs", () {
 	assert(uri.encode_component("é /+%") == "%C3%A9%20%2F%2B%25")
 	assert(uri.encode_component("AZaz09-._~") == "AZaz09-._~")
 	assert(uri.decode_component("%252F+") == Ok("%2F+"))
@@ -383,10 +379,9 @@ uri_codecs = () {
 		assert(uri.decode_component(uri.encode_component(s)) == Ok(s))
 	})
 	Nil
-}
+})
 
-@test
-uri_forms = () {
+test("uri_forms", () {
 	assert(
 		uri.parse_query("a+b=c%2Bd&k&k=&a=2") ==
 			Ok([("a b", "c+d"), ("k", ""), ("k", ""), ("a", "2")])
@@ -412,12 +407,12 @@ uri_forms = () {
 		})
 	})
 	Nil
-}
+})
 
 // Generated valid Parts use U4's preservation law; short arbitrary ASCII
 // strings use U1/U3, without treating self-produced expectations as grammar.
-@test
-uri_generated_round_trips = () {
+
+test("uri_generated_round_trips", () {
 	schemes = [None, Some("x"), Some("HTTP+1.-")]
 	authorities = [
 		None
@@ -475,10 +470,9 @@ uri_generated_round_trips = () {
 		})
 	})
 	Nil
-}
+})
 
-@test
-uri_long_inputs = () {
+test("uri_long_inputs", () {
 	long = string.repeat("a", 20000)
 	text = string.concat([
 		"x://"
@@ -501,4 +495,4 @@ uri_long_inputs = () {
 	pairs = [(long, long), ("", long)]
 	assert(uri.parse_query(uri.build_query(pairs)) == Ok(pairs))
 	Nil
-}
+})

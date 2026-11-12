@@ -2,3 +2,6 @@ name = "bench"
 
 [dependencies]
 std = { path = "../std" }
+
+[test]
+collection = "std/test.tests"

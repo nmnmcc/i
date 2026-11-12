@@ -1,6 +1,7 @@
 // spec: 9.1, 9.3
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 	i/fail
 )
@@ -14,8 +15,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-@test
-raise_and_catch = () {
+test("raise_and_catch", () {
 	check(show(fail.catch(() { 1 })), "Ok(1)")
 	check(show(fail.catch(() { fail.raise("e") })), "Error(\"e\")")
 	check(show(fail.catch(() { 1 + fail.raise(2) })), "Error(2)")
@@ -41,9 +41,8 @@ raise_and_catch = () {
 		}
 	})
 	check(show(again), "Error(\"xy\")")
-}
+})
 
-@test
 from_result = () {
 	check(show(fail.catch(() { fail.from_result(Ok(3)) })), "Ok(3)")
 	check(
@@ -52,13 +51,16 @@ from_result = () {
 	)
 }
 
-@test
+test("from_result", () { from_result() })
+
 map_error = () {
 	m = fail.catch(() { fail.map_error(() { fail.raise(2) }, (e) { e * 10 }) })
 	check(show(m), "Error(20)")
 	ok = fail.catch(() { fail.map_error(() { 5 }, (e) { e }) })
 	check(show(ok), "Ok(5)")
 }
+
+test("map_error", () { map_error() })
 
 // §9.1: retrying is a normal function.
 retry(A, E, N) = (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N {
@@ -71,14 +73,13 @@ retry(A, E, N) = (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N {
 	}
 }
 
-@test
-retrying = () {
+test("retrying", () {
 	check(
 		show(fail.catch(() { retry(3, () { fail.raise("down") }) }))
 		"Error(\"down\")"
 	)
 	check(show(fail.catch(() { retry(3, () { "up" }) })), "Ok(\"up\")")
-}
+})
 
 // The example of §9.3, with `http_get` and `parse_user` given by a service.
 User {
@@ -126,17 +127,16 @@ fake = Http((id) {
 	}
 })
 
-@test
-safe_example = () {
+test("safe_example", () {
 	! Http = fake
 	check(show(fail.catch(() { safe("1") })), "Ok(User(\"ann\"))")
 	check(show(fail.catch(() { safe("2") })), "Ok(User(\"default\"))")
 	check(show(fail.catch(() { safe("3") })), "Error(HttpError(404))")
-}
+})
 
 // A deep error goes out through many frames, and the frames are gone.
-@test
-deep_unwinding = () {
+
+test("deep_unwinding", () {
 	down = (n) {
 		n |> {
 			0 -> fail.raise(n)
@@ -153,4 +153,4 @@ deep_unwinding = () {
 		}
 	}
 	each(1000)
-}
+})

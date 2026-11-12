@@ -3,3 +3,9 @@
 name = "app"
 [providers."i/clock.Clock"]
 native = "app/main.fake"
+
+[dependencies]
+std = { path = "../../../../std" }
+
+[test]
+collection = "std/test.tests"

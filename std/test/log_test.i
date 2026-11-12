@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/control
 	i/fail
 	i/stdio
@@ -45,8 +46,8 @@ unreachable = (level: log.Level) -> Bool { unreachable(level) }
 entry = (level: log.Level) -> log.Entry { log.Entry(level, "hello", [], None) }
 
 // L1/L2 and the sequential service law: entry fields and timestamps are data.
-@test
-log_delivery = () {
+
+test("log_delivery", () {
 	original = log.Entry(
 		log.Info
 		"hello"
@@ -71,11 +72,11 @@ log_delivery = () {
 	})
 	assert(trace == [Sent(original), Sent(entry(log.Warning))])
 	Nil
-}
+})
 
 // L3: rejection suppresses both callbacks; eager arguments still evaluate.
-@test
-log_lazy = () {
+
+test("log_lazy", () {
 	trace = control.boundary((b) {
 		! Capture = Capture((event) {
 			control.suspend(b, (k) { [event, ..control.resume(k, Nil)] })
@@ -112,11 +113,11 @@ log_lazy = () {
 			]
 	)
 	Nil
-}
+})
 
 // L4 and both filter laws: thresholds follow L1's four explicitly ordered levels.
-@test
-log_filters = () {
+
+test("log_filters", () {
 	levels = [log.Debug, log.Info, log.Warning, log.Failure]
 	cases = [
 		(log.Debug, levels)
@@ -181,7 +182,7 @@ log_filters = () {
 	)
 	assert(query(log.Info) == False)
 	Nil
-}
+})
 
 DeliveryError {
 	DeliveryError(String)
@@ -193,8 +194,8 @@ broken_deliver: (log.Entry) -> Nil ^ DeliveryError ! Capture | log.Sink(
 ) = log.write
 
 // L2/L5: a custom error is preserved, with no retry or swallowed failure.
-@test
-log_errors = () {
+
+test("log_errors", () {
 	trace = control.boundary((b) {
 		! Capture = Capture((event) {
 			control.suspend(b, (k) { [event, ..control.resume(k, Nil)] })
@@ -214,11 +215,11 @@ log_errors = () {
 	})
 	assert(trace == [Sent(entry(log.Info))])
 	Nil
-}
+})
 
 // L6: fixed expected bytes derive from the format rule, not core.inspect.
-@test
-log_format = () {
+
+test("log_format", () {
 	assert(
 		log.format(
 			log.Entry(log.Info, "a\nb", [("k", "v"), ("k", "")], None)
@@ -250,7 +251,7 @@ log_format = () {
 	assert(log.format(entry(log.Failure)) == "failure \"hello\"")
 	assert(log.format(log.Entry(log.Info, "", [], None)) == "info \"\"")
 	Nil
-}
+})
 
 GateSink(E, N) {
 	GateSink((log.Level) -> Bool, (log.Entry) -> Nil ^ E ! N, (N) -> Nil)
@@ -278,8 +279,7 @@ gate_use(N) = (s ! GateS(N)) {
 
 gate_run(N) = (body: () -> Nil ! N) { body() }
 
-@test
-gate_annotated_write = () {
+test("gate_annotated_write", () {
 	! GateSink(String, Never) = GateSink(
 		(_: log.Level) { True }
 		(e) { fail.raise(e.message) }
@@ -287,25 +287,22 @@ gate_annotated_write = () {
 	)
 	assert(fail.catch(() { gate_write(entry(log.Info)) }) == Error("hello"))
 	Nil
-}
+})
 
-@test
-gate_annotated_service = () {
+test("gate_annotated_service", () {
 	! GateS(Never) = GateS(() { Nil }, (_: Never) { Nil })
 	gate_use()
-}
+})
 
-@test
-gate_generic_write = () {
+test("gate_generic_write", () {
 	! log.Sink(String, Never) = log.make((_: log.Level) { True }, (e) {
 		fail.raise(e.message)
 	})
 	assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
 	Nil
-}
+})
 
-@test
-gate_generic_lazy = () {
+test("gate_generic_lazy", () {
 	! log.Sink(String, Never) = log.silent()
 	assert(
 		fail.catch(() {
@@ -314,16 +311,14 @@ gate_generic_lazy = () {
 			Ok(Nil)
 	)
 	Nil
-}
+})
 
-@test
-gate_invariant_client = () {
+test("gate_invariant_client", () {
 	! GateS(Never) = GateS(() { Nil }, (_: Never) { Nil })
 	gate_run(() { gate_use() })
-}
+})
 
-@test
-stderr_sink_reports_failures = () {
+test("stderr_sink_reports_failures", () {
 	! stdio.Stdio = stdio.Stdio(
 		(_) { request.ready(Ok(<<>>)) }
 		(_) { request.ready(Ok(Nil)) }
@@ -340,4 +335,4 @@ stderr_sink_reports_failures = () {
 			Error(stdio.StdioError("write_error", "failed"))
 	)
 	Nil
-}
+})

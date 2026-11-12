@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Rewrite legacy test attributes using parser spans, preserving untouched text."""
 import argparse
+import runpy
+import textwrap
 import json
 import os
 from pathlib import Path
@@ -20,8 +22,37 @@ def package_of(path):
     return None
 
 
+def rewrite(source, result):
+    data = source.encode()
+    edits = []
+    for test in result['tests']:
+        name = test['name']
+        a, b = test['attr_start'], test['attr_end']
+        start, end = test['binding_start'], test['binding_end']
+        value_start, value_end = test['value_start'], test['value_end']
+        edits.append((a, b, b''))
+        if test['referenced'] or b'AssertionFailure(' in data[value_start:value_end]:
+            edits.append((end, end, f'\n\ntest({json.dumps(name)}, () {{ {name}() }})'.encode()))
+        else:
+            edits.append((start, value_start, f'test({json.dumps(name)}, '.encode()))
+            edits.append((value_end, value_end, b')'))
+    imports = result['imports']
+    if not result['has_test_import']:
+        if imports:
+            edits.append((imports[0] + 1, imports[0] + 1, b'\n\ttestlib = (test) = std/test\n\t'))
+        else:
+            prefix = re.match(r'(?:(?:[ \t]*//[^\n]*|[ \t]*)\n)*', source).group()
+            at = len(prefix.encode())
+            edits.append((at, at, b'(testlib = (test) = std/test)\n\n'))
+    for start, end, replacement in sorted(edits, reverse=True):
+        data = data[:start] + replacement + data[end:]
+    return data.decode()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--embedded', action='store_true', help='also rewrite Rust/JS literals and Markdown i fences')
+    parser.add_argument('--standalone', action='store_true', help='allow standalone editor/parser fixtures without a manifest')
     parser.add_argument('paths', nargs='+', type=Path)
     args = parser.parse_args()
     if not BINARY.exists() or BINARY.stat().st_mtime < (ROOT / 'crates/ilang-syntax/examples/migrate-tests.rs').stat().st_mtime:
@@ -30,55 +61,88 @@ def main():
             heavy, shell = ROOT / '.rd/cache/heavy', ROOT
         subprocess.run([str(heavy), 'direnv', 'exec', str(shell),
                         'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked'], cwd=ROOT, check=True)
-    files = sorted({f for p in args.paths for f in (p.rglob('*.i') if p.is_dir() else [p]) if f.suffix == '.i' and f.is_file()})
-    sources = [f.read_text() for f in files]
-    process = subprocess.run([str(BINARY)], input=''.join(json.dumps(s, ensure_ascii=False) + '\n' for s in sources), text=True, capture_output=True, check=True)
-    results = [json.loads(line) for line in process.stdout.splitlines()]
-    assert len(results) == len(files), 'parser result count mismatch'
-    failures, packages, count = [], {}, 0
-    for path, source, result in zip(files, sources, results):
-        if 'error' in result:
-            if re.search(r'(?m)^\s*@test\b', source):
-                failures.append(f'{path}: {result["error"]}')
-            continue
-        tests = result['tests']
-        if not tests:
-            continue
-        if result['has_test_import'] or result['test_name_taken']:
-            failures.append(f'{path}: existing test name or std/test import requires review')
-            continue
-        package = package_of(path)
-        if package is None and not re.search(r'(?m)^// spec:', source):
-            failures.append(f'{path}: no package manifest')
-            continue
-        data = source.encode()
-        edits = []
-        for test in tests:
-            name = test['name']
-            a, b = test['attr_start'], test['attr_end']
-            start, end = test['binding_start'], test['binding_end']
-            value_start, value_end = test['value_start'], test['value_end']
-            if test['referenced'] or b'AssertionFailure(' in data[value_start:value_end]:
-                edits.append((a, b, b''))
-                edits.append((end, end, f'\n\ntest({json.dumps(name)}, () {{ {name}() }})'.encode()))
-            else:
-                edits.append((a, b, b''))
-                edits.append((start, value_start, f'test({json.dumps(name)}, '.encode()))
-                edits.append((value_end, value_end, b')'))
-        imports = result['imports']
-        if imports:
-            edits.append((imports[0] + 1, imports[0] + 1, b'\n\ttestlib = (test) = std/test\n\t'))
+    extract = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
+    allowed = {'.i', '.is'} | ({'.rs', '.js', '.mjs', '.md', '.txt'} if args.embedded else set())
+    files = sorted({f for p in args.paths for f in (p.rglob('*') if p.is_dir() else [p])
+                    if f.suffix in allowed and f.is_file()
+                    and not {'target', 'node_modules', '.git'}.intersection(f.parts)})
+    snippets = []
+    for path in files:
+        host = path.read_text()
+        if path.suffix in {'.i', '.is'}:
+            snippets.append((path, host, 0, len(host), host, 'file', False, ''))
+        elif path.suffix == '.md':
+            for m in re.finditer(r'(?m)^([ \t]*)```i[^\n]*\n(.*?)^\1```[ \t]*$', host, re.S):
+                source = textwrap.dedent(m[2])
+                snippets.append((path, host, m.start(2), m.end(2), source, 'markdown', False, m[1]))
+        elif path.suffix == '.txt':
+            # Tree-sitter corpus sections have source followed by a tree.
+            for m in re.finditer(r'(?m)^={3,}\n[^\n]*\n={3,}\n(.*?)^-{3,}\n', host, re.S):
+                snippets.append((path, host, m.start(1), m.end(1), m[1], 'corpus', False, ''))
         else:
-            prefix = re.match(r'(?:(?:[ \t]*//[^\n]*|[ \t]*)\n)*', source).group()
-            at = len(prefix.encode())
-            edits.append((at, at, b'(testlib = (test) = std/test)\n\n'))
-        for start, end, replacement in sorted(edits, reverse=True):
-            data = data[:start] + replacement + data[end:]
-        path.write_bytes(data)
-        if package is not None:
-            source_module = path.resolve().is_relative_to(package / "src")
+            read = extract['rust_strings'] if path.suffix == '.rs' else extract['js_strings']
+            for start, end, value in read(host):
+                formatted = path.suffix == '.rs' and bool(re.search(r'format!\(\s*$', host[max(0, start-100):start]))
+                source = value.replace('{{', '{').replace('}}', '}') if formatted else value
+                snippets.append((path, host, start, end, source, 'embedded', formatted, ''))
+    snippets = [s for s in snippets if re.search(r'(?m)^\s*@test\b', s[4])
+                and 'test-macro-migrate: reject' not in s[4]
+                and re.search(r'(?s)@test\b.*?=', s[4])]
+    process = subprocess.run([str(BINARY)], input=''.join(json.dumps(re.sub(r'\{([a-z_]\w*)\}', lambda m: m[1] + '__', s[4]) if s[6] else s[4], ensure_ascii=False) + '\n' for s in snippets), text=True, capture_output=True, check=True)
+    results = [json.loads(line) for line in process.stdout.splitlines()]
+    assert len(results) == len(snippets), 'parser result count mismatch'
+    failures, packages, count, changes = [], {}, 0, {}
+    classifications = ROOT / 'scripts/old-syntax-check.json'
+    config = json.loads(classifications.read_text())
+    for (path, host, start, end, source, kind, formatted, indent), result in zip(snippets, results):
+        label = f'{path}:{host[:start].count(chr(10)) + 1}'
+        if 'error' in result:
+            failures.append(f'{label}: {result["error"]}')
+            continue
+        if not result['tests']:
+            continue
+        if result['test_name_taken'] or (result['has_test_import'] and not re.search(r'\(test(?:[,)]|\s)', source)):
+            failures.append(f'{label}: existing test name or std/test import requires review')
+            continue
+        package = package_of(path) if kind == 'file' else None
+        if kind == 'file' and package is None and not args.standalone and not re.search(r'(?m)^// spec:', source):
+            failures.append(f'{label}: no package manifest')
+            continue
+        rewritten = rewrite(source, result)
+        replacement = rewritten
+        if kind == 'embedded':
+            if formatted:
+                replacement = replacement.replace('{', '{{').replace('}', '}}')
+                for placeholder in re.findall(r'(?<!\{)\{([a-z_]\w*)\}(?!\})', source):
+                    replacement = replacement.replace('{{' + placeholder + '}}', '{' + placeholder + '}')
+            literal = host[start:end]
+            if path.suffix == '.rs' and literal.startswith('r'):
+                hashes = re.match(r'r(#+)?"', literal)[1] or ''
+                replacement = 'r' + hashes + '"' + replacement + '"' + hashes
+            elif path.suffix in {'.js', '.mjs'} and literal.startswith('`'):
+                replacement = '`' + replacement.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${') + '`'
+            else:
+                replacement = json.dumps(replacement, ensure_ascii=False)
+        elif kind == 'markdown':
+            replacement = textwrap.indent(replacement, indent)
+        changes.setdefault(path, []).append((start, end, replacement))
+        if kind == 'file' and package is not None:
+            source_module = path.resolve().is_relative_to(package / 'src')
             packages[package] = packages.get(package, False) or source_module
-        count += len(tests)
+        relative = str(path.resolve().relative_to(ROOT)) if path.resolve().is_relative_to(ROOT) else None
+        if relative:
+            original = source.replace('{', '{{').replace('}', '}}') if formatted else source
+            new = rewritten.replace('{', '{{').replace('}', '}}') if formatted else rewritten
+            old_key = extract['identity'](relative, original)
+            if old_key in config:
+                config[extract['identity'](relative, new)] = config.pop(old_key)
+        count += len(result['tests'])
+    for path, edits in changes.items():
+        host = path.read_text()
+        for start, end, replacement in sorted(edits, reverse=True):
+            host = host[:start] + replacement + host[end:]
+        path.write_text(host)
+    classifications.write_text(json.dumps(config, indent=2, ensure_ascii=False) + '\n')
     for package, source_module in packages.items():
         manifest = package / 'i.toml'
         text = manifest.read_text()

@@ -3,10 +3,13 @@
 
 // The parameters of a function of a host service are types that the host
 // can take.
+(
+	testlib = (test) = std/test
+)
+
 @host("test:kv/v1")
 Kv {
 	Kv(get: (keys: List(String)) -> String)
 }
 
-@test
-t = () { Nil }
+test("t", () { Nil })

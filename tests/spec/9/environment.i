@@ -1,6 +1,7 @@
 // spec: 9.2, 6.10, 6.11, 4.8
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -113,50 +114,44 @@ State(S) {
 
 read(S) = (st ! State(S)) { st.get() }
 
-@test
-example = () {
+test("example", () {
 	check(show(fixed()), "2")
 	! Clock = Clock(now: () { 100 })
 	check(show(elapsed(1)), "99")
 	check(show(fixed()), "2")
 	check(show(elapsed(1)), "99")
-}
+})
 
-@test
-parameters = () {
+test("parameters", () {
 	! Clock = Clock(now: () { 1 })
 	! Name = Name("n")
 	check(show(both((2, 3))), "(6, \"n\")")
 	c = stored()
 	check(show(c.now()), "1")
-}
+})
 
-@test
-dynamic_scoping = () {
+test("dynamic_scoping", () {
 	f = made_here()
 	check(call_elsewhere(f), "caller")
 	! Name = Name("here")
 	check(f(), "here")
 	check(call_elsewhere(() { name() }), "caller")
-}
+})
 
-@test
-blocks = () {
+test("blocks", () {
 	check(show(scoped()), "(\"inner\", \"outer\")")
 	check(shadowed(), "second")
 	check(from_outside(), "abc")
-}
+})
 
-@test
-tail_calls = () {
+test("tail_calls", () {
 	check(show(count(1000000, 0, Name("count"))), "1000000")
 	! Name = Name("start")
 	check(deep(100000), "last")
 	check(deep(0), "start")
-}
+})
 
-@test
-generic = () {
+test("generic", () {
 	! State(Int) = State(() { 7 })
 	check(show(read() + 1), "8")
-}
+})

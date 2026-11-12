@@ -1,6 +1,7 @@
 // spec: 13
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -13,8 +14,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-@test
-booleans_and_numbers = () {
+test("booleans_and_numbers", () {
 	check(show(core.not(True)), "False")
 	check(show(core.not(False)), "True")
 	check(show(core.to_float(3)), "3.0")
@@ -35,10 +35,9 @@ booleans_and_numbers = () {
 		show(core.float_from_bits(18446744073709551616 + 4607182418800017408))
 		"1.0"
 	)
-}
+})
 
-@test
-bits = () {
+test("bits", () {
 	check(show(core.bit_and(12, 10)), "8")
 	check(show(core.bit_or(12, 10)), "14")
 	check(show(core.bit_xor(12, 10)), "6")
@@ -55,10 +54,9 @@ bits = () {
 	check(show(core.shift_right(-7, 1)), "-4")
 	check(show(core.shift_right(7, 1)), "3")
 	check(show(core.shift_right(1, -3)), "8")
-}
+})
 
-@test
-strings = () {
+test("strings", () {
 	check(core.concat(["a", "bc", "", "d"]), "abcd")
 	check(core.concat([]), "")
 	check(show(core.byte_size("héllo")), "6")
@@ -80,31 +78,28 @@ strings = () {
 	check(show(core.int_to_codepoint(55296)), "Error(Nil)")
 	check(show(core.int_to_codepoint(1114112)), "Error(Nil)")
 	check(show(core.int_to_codepoint(-1)), "Error(Nil)")
-}
+})
 
-@test
-bit_arrays = () {
+test("bit_arrays", () {
 	check(show(core.bit_size(<<1:u3>>)), "3")
 	check(show(core.bit_size(<<>>)), "0")
 	check(show(core.bit_array_to_string(<<104, 105>>)), "Ok(\"hi\")")
 	check(show(core.bit_array_to_string(<<255>>)), "Error(Nil)")
 	check(show(core.bit_array_to_string(<<104, 1:u1>>)), "Error(Nil)")
-}
+})
 
 in_range = (h: Int) { h >= 0 && h < 4294967296 }
 
-@test
-inspect_and_hash = () {
+test("inspect_and_hash", () {
 	check(core.inspect(Ok([1])), "Ok([1])")
 	check(show(core.hash([1, 2]) == core.hash([1, 2])), "True")
 	check(show(core.hash(0.0) == core.hash(-.0.0)), "True")
 	check(show(core.hash("é") == core.hash("é")), "True")
 	check(show(in_range(core.hash(123456789012345678901234567890))), "True")
 	check(show(in_range(core.hash((1, "a", <<1:u3>>)))), "True")
-}
+})
 
-@test
-as_values = () {
+test("as_values", () {
 	fs = [core.not, core.not]
 	fs |> {
 		[f, _] -> check(show(f(True)), "False")
@@ -113,4 +108,4 @@ as_values = () {
 	apply = (f, x) { f(x) }
 	check(apply(core.inspect, 1), "1")
 	check(show(apply(core.byte_size, "ab")), "2")
-}
+})

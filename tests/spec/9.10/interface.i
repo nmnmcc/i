@@ -2,6 +2,7 @@
 // expect: pass
 
 (
+	testlib = (test) = std/test
 	i/random
 )
 
@@ -24,12 +25,11 @@ initial = from_seed(seed: 1337)
 
 first = word(g: initial)
 
-@test
-public_api = () {
+test("public_api", () {
 	assert(first.0 == 0xb5c19e300e8b07b3)
 	assert(int(g: initial, below: 1).0 == 0)
 	assert(float(g: initial).1 == first.1)
 	assert(split(g: initial).0 != split(g: initial).1)
 	assert(at_path(g: initial, path: []) == initial)
 	Nil
-}
+})

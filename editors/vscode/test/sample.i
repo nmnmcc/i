@@ -56,8 +56,7 @@ main = (io ! Console) {
   opt.map(Some(1), (x) { x * 2 })
 }
 
-@test
-adds = () { assert(plus(1, 2) == 3) }
+test("adds", () { assert(plus(1, 2) == 3) })
 
 identity(A) = (x: A) { x }
 import = (x) { x }

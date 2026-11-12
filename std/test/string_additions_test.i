@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/core
 	i/fail
 	i/control
@@ -8,8 +9,8 @@
 )
 
 // The fixed cases below are S1–S7 and the independent review's string table.
-@test
-access_and_taking = () {
+
+test("access_and_taking", () {
 	assert(string.at("aé😀", 1) == Some("é"))
 	assert(string.at("aé😀", -1) == Some("😀"))
 	assert(string.at("aé😀", -3) == Some("a"))
@@ -42,10 +43,9 @@ access_and_taking = () {
 			}
 		})
 	})
-}
+})
 
-@test
-search_bounds_and_overlaps = () {
+test("search_bounds_and_overlaps", () {
 	assert(string.index_of("ééx", "x", 0) == Some(2))
 	assert(string.last_index_of("aaa", "aa", 3) == Some(1))
 	assert(string.last_index_of("aaa", "aa", 0) == Some(0))
@@ -67,10 +67,9 @@ search_bounds_and_overlaps = () {
 		})
 		assert(string.index_of(s, "longer than the haystack", 0) == None)
 	})
-}
+})
 
-@test
-count_replacement_and_last_split = () {
+test("count_replacement_and_last_split", () {
 	assert(string.count("aaaa", "aa") == 2)
 	assert(string.count("aaa", "aa") == 1)
 	assert(string.count("abc", "") == 0)
@@ -102,10 +101,9 @@ count_replacement_and_last_split = () {
 			}
 		})
 	})
-}
+})
 
-@test
-scalar_traversals = () {
+test("scalar_traversals", () {
 	assert(string.words(" a\t\n b ") == ["a", "b"])
 	assert(string.words("a\u{a0}b") == ["a\u{a0}b"])
 	assert(
@@ -128,7 +126,7 @@ scalar_traversals = () {
 		}) ==
 			[97, 233, 128512]
 	)
-}
+})
 
 Calls {
 	Calls(call: (Int) -> Nil)
@@ -144,8 +142,7 @@ observe = (body: () -> Nil ! Calls | Assert) -> List(Int) ! Assert {
 	})
 }
 
-@test
-callbacks_run_once_in_order_and_stop_on_error = () {
+test("callbacks_run_once_in_order_and_stop_on_error", () {
 	run = (
 		action: (
 			(UtfCodepoint) -> UtfCodepoint ^ String ! Calls
@@ -183,4 +180,4 @@ callbacks_run_once_in_order_and_stop_on_error = () {
 		}) == "aé😀")
 	})
 	assert(seen == [97, 233, 128512])
-}
+})

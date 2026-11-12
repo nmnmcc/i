@@ -1,6 +1,7 @@
 // spec: 6.6, 6.11
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -25,8 +26,7 @@ User {
 
 relabel = (x = first: Int, (a, b), last: Int) { x + first + a + b + last }
 
-@test
-labels = () {
+test("labels", () {
 	check(show(span(1, 10)), "9")
 	check(show(span(to: 10, from: 1)), "9")
 	check(show(span(from: 1, to: 10)), "9")
@@ -37,14 +37,13 @@ labels = () {
 	check(show(User("x", age: 3)), "User(\"x\", 3)")
 	check(show(relabel(1, (10, 20), last: 100)), "132")
 	check(show(1 |> relabel((10, 20), last: 100)), "132")
-}
+})
 
-@test
-pipes = () {
+test("pipes", () {
 	check(show(1 |> span(10)), "9")
 	check(show(1 |> span(to: 10)), "9")
 	check("ann" |> describe(city: "oslo", age: 3), "ann/3/oslo")
 	check(show([1, 2] |> core.inspect |> core.byte_size), "6")
 	check(show(5 |> (n) { n * 2 }), "10")
 	check(show("x" |> User(age: 1)), "User(\"x\", 1)")
-}
+})

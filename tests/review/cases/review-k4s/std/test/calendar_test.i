@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	std/calendar
 	std/time
 	std/list
@@ -32,8 +33,8 @@ valid_offset = (minutes: Int) -> calendar.Offset ! Assert {
 }
 
 // C1/C2: validate in component order, without normalization.
-@test
-calendar_validation = () {
+
+test("calendar_validation", () {
 	list.each(
 		[(1900, False), (2000, True), (0, True), (-100, False), (-400, True)]
 		(pair) {
@@ -81,11 +82,11 @@ calendar_validation = () {
 	assert(calendar.days_in_month(2000, -1) == Error(calendar.BadMonth))
 	assert(calendar.days_in_month(2000, 13) == Error(calendar.BadMonth))
 	Nil
-}
+})
 
 // Review's independent day table follows C1/C3 and C4's weekday origin.
-@test
-calendar_known_days = () {
+
+test("calendar_known_days", () {
 	cases = [
 		(-400, 2, 29, -865566, calendar.Tuesday)
 		(-100, 3, 1, -755993, calendar.Thursday)
@@ -115,7 +116,7 @@ calendar_known_days = () {
 			1
 	)
 	Nil
-}
+})
 
 // Independent January-based oracle from the review. The production algorithm
 // instead decomposes March-based 400-year eras (note §4.3). C3 requires floor
@@ -155,8 +156,8 @@ oracle_day = (year: Int, month: Int, day: Int) -> Int {
 // C3: both inverse laws, independent reference, negative quotients and all
 // century/era boundaries in this range. Equality alone of two inverses would
 // miss a common shift; oracle_day establishes the required epoch separately.
-@test
-calendar_day_laws = () {
+
+test("calendar_day_laws", () {
 	list.each(list.range(-800, 800), (year) {
 		list.each(list.range(1, 12), (month) {
 			length = calendar.days_in_month(year, month) |> {
@@ -203,11 +204,11 @@ calendar_day_laws = () {
 			-calendar.days_between(first, last)
 	)
 	Nil
-}
+})
 
 // C4: floor splitting for negative epoch nanoseconds and extreme offsets.
-@test
-calendar_civil_boundaries = () {
+
+test("calendar_civil_boundaries", () {
 	epoch = time.from_unix_nanoseconds(0)
 	before = calendar.at(time.from_unix_nanoseconds(-1), calendar.utc())
 	assert(calendar.date_parts(before.date) == (1969, 12, 31))
@@ -257,11 +258,11 @@ calendar_civil_boundaries = () {
 		)
 	})
 	Nil
-}
+})
 
 // C5/C6: canonical expanded years, fractions, and zero offsets.
-@test
-calendar_text = () {
+
+test("calendar_text", () {
 	cases = [
 		("1970-01-01T00:00:00.1+00:00", "1970-01-01T00:00:00.1Z")
 		("1970-01-01T00:00:00.000000001Z", "1970-01-01T00:00:00.000000001Z")
@@ -332,7 +333,7 @@ calendar_text = () {
 		assert(calendar.parse(text) == Error(calendar.BadText))
 	})
 	Nil
-}
+})
 
 // C1 and spec §2.4 require constructor and constructor-update
 // privacy. Run these negative checks with the exact lane compiler, restoring

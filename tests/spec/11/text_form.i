@@ -1,6 +1,7 @@
 // spec: 11.8
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -21,8 +22,7 @@ Unit {
 	Unit
 }
 
-@test
-ints = () {
+test("ints", () {
 	check(show(0), "0")
 	check(show(42), "42")
 	check(show(-42), "-42")
@@ -36,10 +36,9 @@ ints = () {
 		show(-123456789012345678901234567890)
 		"-123456789012345678901234567890"
 	)
-}
+})
 
-@test
-floats = () {
+test("floats", () {
 	check(show(0.0), "0.0")
 	check(show(-.0.0), "-0.0")
 	check(show(1.0), "1.0")
@@ -60,10 +59,9 @@ floats = () {
 	check(show(5.0e-324), "5.0e-324")
 	check(show(1.7976931348623157e308), "1.7976931348623157e308")
 	check(show(0.30000000000000004), "0.30000000000000004")
-}
+})
 
-@test
-strings = () {
+test("strings", () {
 	check(show(""), "\"\"")
 	check(show("abc"), "\"abc\"")
 	check(show("a\"b\\c"), "\"a\\\"b\\\\c\"")
@@ -73,20 +71,18 @@ strings = () {
 		"\"\\u{0000}\\u{001F}\\u{007F}\\u{0080}\\u{009F}\""
 	)
 	check(show("é\u{A0}😀"), "\"é\u{A0}😀\"")
-}
+})
 
-@test
-collections = () {
+test("collections", () {
 	check(show([]), "[]")
 	check(show([1]), "[1]")
 	check(show([1, 2, 3]), "[1, 2, 3]")
 	check(show(()), "()")
 	check(show((1)), "(1)")
 	check(show((1, "a", [2.0])), "(1, \"a\", [2.0])")
-}
+})
 
-@test
-custom = () {
+test("custom", () {
 	check(show(True), "True")
 	check(show(False), "False")
 	check(show(Nil), "Nil")
@@ -95,20 +91,20 @@ custom = () {
 	check(show(User("ann", 3)), "User(\"ann\", 3)")
 	check(show(Unit), "Unit")
 	check(show(Ok(Error(Ok(Nil)))), "Ok(Error(Ok(Nil)))")
-}
+})
 
-@test
-bit_arrays = () {
+test("bit_arrays", () {
 	check(show(<<>>), "<<>>")
 	check(show(<<82, 2:u2>>), "<<82, 2:u2>>")
 	check(show(<<1:u1>>), "<<1:u1>>")
 	check(show(<<0, 255>>), "<<0, 255>>")
-}
+})
 
-@test
 codepoints = () {
 	check(show(core.codepoints("aé")), "[//utfcodepoint(a), //utfcodepoint(é)]")
 }
+
+test("codepoints", () { codepoints() })
 
 wide = (
 	p0
@@ -141,8 +137,7 @@ wide = (
 	p27
 ) { p0 }
 
-@test
-functions = () {
+test("functions", () {
 	check(show(() { 1 }), "//fn() { ... }")
 	check(show((a, b) { a }), "//fn(a, b) { ... }")
 	check(show(show), "//fn(a) { ... }")
@@ -155,4 +150,4 @@ functions = () {
 	check(show(core.bit_and), "//fn(a, b) { ... }")
 	check(show(panic), "//fn(a) { ... }")
 	check(show([show]), "[//fn(a) { ... }]")
-}
+})

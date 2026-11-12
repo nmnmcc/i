@@ -1,6 +1,7 @@
 // spec: 2.5
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -34,9 +35,8 @@ apply_all = (fs, x) {
 	}
 }
 
-@test
-values = () {
+test("values", () {
 	check(core.inspect(total), "42")
 	check(core.inspect(apply_all(table, 3)), "[13, 30]")
 	check(core.inspect((first, second)), "(21, \"two\")")
-}
+})

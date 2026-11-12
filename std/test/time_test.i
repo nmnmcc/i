@@ -1,12 +1,13 @@
 (
+	testlib = (test) = std/test
 	std/time
 	std/list
 	(Less, Equal, Greater) = std/order
 )
 
 // T1 requires every signed Int and exact unit multipliers.
-@test
-time_units = () {
+
+test("time_units", () {
 	list.each(
 		[-100000000000000000000, -2, -1, 0, 1, 2, 100000000000000000000]
 		(n) {
@@ -21,11 +22,11 @@ time_units = () {
 	)
 	assert(time.to_nanoseconds(time.seconds(-2)) == -2000000000)
 	Nil
-}
+})
 
 // T2 explicitly uses truncating division, for either sign of the divisor.
-@test
-time_arithmetic = () {
+
+test("time_arithmetic", () {
 	assert(time.divide(time.nanoseconds(-5), 2) == Ok(time.nanoseconds(-2)))
 	assert(time.divide(time.nanoseconds(5), -2) == Ok(time.nanoseconds(-2)))
 	assert(time.divide(time.nanoseconds(-5), -2) == Ok(time.nanoseconds(2)))
@@ -49,11 +50,11 @@ time_arithmetic = () {
 	assert(time.compare(time.seconds(1), time.milliseconds(1000)) == Equal)
 	assert(time.compare(time.seconds(1), time.nanoseconds(1)) == Greater)
 	Nil
-}
+})
 
 // T3's epoch and inverse laws apply to negative and arbitrarily large counts.
-@test
-time_instants = () {
+
+test("time_instants", () {
 	epoch = time.from_unix_nanoseconds(0)
 	assert(
 		time.shift(time.from_unix_nanoseconds(-1), time.nanoseconds(1)) == epoch
@@ -84,11 +85,11 @@ time_instants = () {
 		time.compare_instants(time.from_unix_nanoseconds(1), epoch) == Greater
 	)
 	Nil
-}
+})
 
 // §3.4 specifically requires hours(10^100), and spec §11.2 forbids overflow.
-@test
-time_huge_counts = () {
+
+test("time_huge_counts", () {
 	huge = 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 	duration = time.hours(huge)
 	start = time.from_unix_nanoseconds(-1)
@@ -111,7 +112,7 @@ time_huge_counts = () {
 			9223372036854775808
 	)
 	Nil
-}
+})
 
 // T1/T3 nominal separation and §3.2 hidden constructors. These negative cases
 // are temporarily appended to this owned file; each must fail checking, and

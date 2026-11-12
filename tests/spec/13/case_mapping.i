@@ -1,6 +1,7 @@
 // spec: 13
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -11,16 +12,14 @@ check = (got: String, want: String) {
 	}
 }
 
-@test
-ascii = () {
+test("ascii", () {
 	check(core.to_upper("Hello, World 42!"), "HELLO, WORLD 42!")
 	check(core.to_lower("Hello, World 42!"), "hello, world 42!")
 	check(core.to_upper(""), "")
 	check(core.to_lower(""), "")
-}
+})
 
-@test
-greek_and_cyrillic = () {
+test("greek_and_cyrillic", () {
 	check(core.to_upper("αβγ ωμέγα"), "ΑΒΓ ΩΜΈΓΑ")
 	check(core.to_lower("ΑΒΓ ΩΜΈΓΑ"), "αβγ ωμέγα")
 	// Final sigma has the simple uppercase mapping of sigma.
@@ -28,10 +27,9 @@ greek_and_cyrillic = () {
 	check(core.to_lower("Σ"), "σ")
 	check(core.to_upper("привет, мир"), "ПРИВЕТ, МИР")
 	check(core.to_lower("ПРИВЕТ, МИР"), "привет, мир")
-}
+})
 
-@test
-one_character_for_one = () {
+test("one_character_for_one", () {
 	// ß has no simple uppercase mapping; capital ẞ maps down to it.
 	check(core.to_upper("straße"), "STRAßE")
 	check(core.to_lower("ẞ"), "ß")
@@ -49,13 +47,12 @@ one_character_for_one = () {
 	check(core.to_upper("ⱥ"), "Ⱥ")
 	check(core.to_lower("Ⱥ"), "ⱥ")
 	check(core.inspect(core.byte_size(core.to_lower("ȺȺ"))), "6")
-}
+})
 
-@test
-outside_the_basic_plane = () {
+test("outside_the_basic_plane", () {
 	// Deseret.
 	check(core.to_upper("𐐨𐐩𐐪"), "𐐀𐐁𐐂")
 	check(core.to_lower("𐐀𐐁𐐂"), "𐐨𐐩𐐪")
 	check(core.to_upper("a😀b"), "A😀B")
 	check(core.to_lower("日本"), "日本")
-}
+})

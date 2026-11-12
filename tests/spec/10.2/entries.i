@@ -1,6 +1,7 @@
 // spec: 10.2, B.5
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -20,8 +21,6 @@ main = () {
 	core.inspect(counter)
 }
 
-@test
-first = () { check(core.inspect(counter), "[1, 2, 3]") }
+test("first", () { check(core.inspect(counter), "[1, 2, 3]") })
 
-@test
-second = () { check(core.inspect(main()), "\"[1, 2, 3]\"") }
+test("second", () { check(core.inspect(main()), "\"[1, 2, 3]\"") })

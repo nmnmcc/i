@@ -1,1 +1,4 @@
 name = "std"
+
+[test]
+collection = "std/test.tests"

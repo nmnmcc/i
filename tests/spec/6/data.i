@@ -1,6 +1,7 @@
 // spec: 6.4, 6.5, 6.7, 4.3
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -31,8 +32,7 @@ Point {
 	Point(Int, Int, label: String)
 }
 
-@test
-tuples = () {
+test("tuples", () {
 	t = (1, "two", (3.0, [4]))
 	check(show(t), "(1, \"two\", (3.0, [4]))")
 	check(show(t.0), "1")
@@ -42,10 +42,9 @@ tuples = () {
 	check(show(()), "()")
 	check(show((1)), "(1)")
 	check(show((7)), "(7)")
-}
+})
 
-@test
-lists = () {
+test("lists", () {
 	xs = [1, 2, 3]
 	check(show(xs), "[1, 2, 3]")
 	check(show([0, ..xs]), "[0, 1, 2, 3]")
@@ -53,10 +52,9 @@ lists = () {
 	check(show([]), "[]")
 	check(show([[], [1]]), "[[], [1]]")
 	check(show([1, "a"]), "[1, \"a\"]")
-}
+})
 
-@test
-custom = () {
+test("custom", () {
 	u = User("ann", 31)
 	check(show(u), "User(\"ann\", 31)")
 	check(u.name, "ann")
@@ -70,15 +68,14 @@ custom = () {
 	p = Point(1, 2, label: "p")
 	check(p.label, "p")
 	check(show(Point(..p, label: "q")), "Point(1, 2, \"q\")")
-}
+})
 
 Box {
 	Wide(width: Float, depth: Float)
 	Thin(width: Float)
 }
 
-@test
-fields_on_unions = () {
+test("fields_on_unions", () {
 	boxes = [Wide(2.0, 3.0), Thin(4.0)]
 	boxes |> {
 		[r, s] -> {
@@ -88,7 +85,7 @@ fields_on_unions = () {
 		}
 		_ -> panic("no")
 	}
-}
+})
 
 Sized {
 	Small(size: Int)
@@ -103,13 +100,11 @@ sizes = (xs: List(Sized)) -> List(Int) {
 	}
 }
 
-@test
-fields_by_constructor = () {
+test("fields_by_constructor", () {
 	check(show(sizes([Small(1), Big("b", 2), Small(3)])), "[1, 2, 3]")
-}
+})
 
-@test
-known_constructor = () {
+test("known_constructor", () {
 	s = Rect(1.0, 2.0)
 	s |> {
 		Rect(..) -> check(show(Rect(..s, height: 9.0)), "Rect(1.0, 9.0)")
@@ -119,4 +114,4 @@ known_constructor = () {
 		c = Circle(..) -> check(show(c.radius), "1.5")
 		_              -> panic("no")
 	}
-}
+})

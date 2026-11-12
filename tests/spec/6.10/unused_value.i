@@ -3,9 +3,12 @@
 
 // `assert 1 + 1 == 2` is the two statements `assert` and `1 + 1 == 2`: the
 // first does nothing, so the compiler warns about it.
-@test
-two_statements = () {
+(
+	testlib = (test) = std/test
+)
+
+test("two_statements", () {
 	assert
 	1 + 1 == 2
 	Nil
-}
+})

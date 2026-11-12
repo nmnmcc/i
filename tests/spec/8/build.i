@@ -1,6 +1,7 @@
 // spec: 8.1, 8.2, 8.3
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -13,8 +14,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-@test
-integers = () {
+test("integers", () {
 	check(show(<<>>), "<<>>")
 	check(show(<<1, 2, 255>>), "<<1, 2, 255>>")
 	check(show(<<256>>), "<<0>>")
@@ -34,20 +34,18 @@ integers = () {
 	check(show(<<3:u(n)>>), "<<0, 3:u4>>")
 	check(show(<<-1:i(n - 2)>>), "<<255, 3:u2>>")
 	check(show(<<7:u(0)>>), "<<>>")
-}
+})
 
-@test
-floats = () {
+test("floats", () {
 	check(show(<<1.5:f64be>>), "<<63, 248, 0, 0, 0, 0, 0, 0>>")
 	check(show(<<1.5:f64le>>), "<<0, 0, 0, 0, 0, 0, 248, 63>>")
 	check(show(<<1.0:f32be>>), "<<63, 128, 0, 0>>")
 	check(show(<<-.2.0:f32le>>), "<<0, 0, 0, 192>>")
 	check(show(<<1.0:f16be>>), "<<60, 0>>")
 	check(show(<<0.1:f16be>>), "<<46, 102>>")
-}
+})
 
-@test
-bits_and_bytes = () {
+test("bits_and_bytes", () {
 	b = <<1, 2, 3>>
 	check(show(<<b:bits>>), "<<1, 2, 3>>")
 	check(show(<<b:bits(12)>>), "<<1, 0:u4>>")
@@ -55,10 +53,9 @@ bits_and_bytes = () {
 	check(show(<<b:bytes>>), "<<1, 2, 3>>")
 	check(show(<<1:u1, b:bits>>), "<<128, 129, 1, 1:u1>>")
 	check(show(<<b:bits(0)>>), "<<>>")
-}
+})
 
-@test
-strings = () {
+test("strings", () {
 	check(show(<<"hé":utf8>>), "<<104, 195, 169>>")
 	check(show(<<"hé":utf16be>>), "<<0, 104, 0, 233>>")
 	check(show(<<"h":utf16le>>), "<<104, 0>>")
@@ -74,10 +71,9 @@ strings = () {
 		}
 		_ -> panic("no")
 	}
-}
+})
 
-@test
-order = () {
+test("order", () {
 	x = 5
 	check(show(<<x, x + 1, { x * 2 }:u16be>>), "<<5, 6, 0, 10>>")
-}
+})

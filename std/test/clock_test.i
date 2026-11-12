@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/clock
 	i/request
 	i/fail
@@ -8,8 +9,7 @@
 	(Some) = std/option
 )
 
-@test
-clock_fake = () {
+test("clock_fake", () {
 	! clock.Clock = clock.Clock(
 		() { request.ready(Ok(42)) }
 		() { request.ready(Ok(-7)) }
@@ -40,4 +40,4 @@ clock_fake = () {
 			Error(clock.ClockError("sleep_ns", "invalid"))
 	)
 	Nil
-}
+})

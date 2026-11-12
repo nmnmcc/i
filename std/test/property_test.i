@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	i/core
 	i/random
 	i/fail
@@ -41,8 +42,7 @@ find_ten = (gen: property.Gen(Int), seed: Int) -> property.Tree(Int) ! Assert {
 	}
 }
 
-@test
-sampling_and_map_laws = () {
+test("sampling_and_map_laws", () {
 	leaf = root(property.constant(7), -5, 42)
 	assert(leaf.value == 7)
 	assert(leaf.children() == [])
@@ -68,10 +68,9 @@ sampling_and_map_laws = () {
 	})
 	mapped = root(property.map(duplicates, (x) { x * x }), 0, 0)
 	assert(list.map(mapped.children(), (c) { c.value }) == [1, 1])
-}
+})
 
-@test
-integer_rules = () {
+test("integer_rules", () {
 	assert(property.int(3, 2) == Error(property.InvalidRange(3, 2)))
 	assert(property.element([]) == Error(property.EmptyChoice))
 	assert(
@@ -116,7 +115,7 @@ integer_rules = () {
 			None    -> False
 		})
 	}
-}
+})
 
 valid_dependent = (t: property.Tree((Int, Int)), depth: Int) -> Nil ! Assert {
 	assert(t.value.1 >= 0 && t.value.1 <= t.value.0)
@@ -126,8 +125,7 @@ valid_dependent = (t: property.Tree((Int, Int)), depth: Int) -> Nil ! Assert {
 	}
 }
 
-@test
-dependent_and_size = () {
+test("dependent_and_size", () {
 	Ok(outer) = property.int(0, 5)
 	dependent = property.flat_map(outer, (n) {
 		property.int(0, n) |> {
@@ -151,10 +149,9 @@ dependent_and_size = () {
 		property.map(sizes, (y) { (x, y) })
 	})
 	assert(snapshot(root(pair, 4, 19), 4) == snapshot(root(explicit, 4, 19), 4))
-}
+})
 
-@test
-filter_prunes_whole_subtrees = () {
+test("filter_prunes_whole_subtrees", () {
 	gen = property.make((_, _) {
 		Some(property.tree(4, () {
 			[
@@ -173,10 +170,9 @@ filter_prunes_whole_subtrees = () {
 		) ==
 			property.GaveUp(0, 1)
 	)
-}
+})
 
-@test
-greedy_path_budget_and_replay = () {
+test("greedy_path_budget_and_replay", () {
 	Ok(ints) = property.int(0, 10)
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
@@ -233,10 +229,9 @@ greedy_path_budget_and_replay = () {
 	assert(property.replay(gen, 0, 0, 0, [-1]) == None)
 	assert(property.replay(gen, 0, 0, 0, [99]) == None)
 	assert(property.replay(property.make((_, _) { None }), 0, 0, 0, []) == None)
-}
+})
 
-@test
-structural_shrinking = () {
+test("structural_shrinking", () {
 	Ok(ints) = property.int(0, 10)
 	ten = find_ten(ints, 0)
 	gen = property.map(property.make((_, _) { Some(ten) }), (x) { 100 - x })
@@ -246,10 +241,9 @@ structural_shrinking = () {
 		(_) { property.Fail("all") }
 	)
 	assert(f.original == 90 && f.smallest == 100)
-}
+})
 
-@test
-config_and_protocol = () {
+test("config_and_protocol", () {
 	invalid = property.make((_, _) { panic("invalid config called generator") })
 	predicate = (_) { panic("invalid config called predicate") }
 	assert(property.defaults() == property.Config(0, 100, 100, 1000, 1000))
@@ -289,10 +283,9 @@ config_and_protocol = () {
 		property.format(report, core.inspect) ==
 			"std/property v1: falsified\nseed: 0\nattempt: 1\nsize: 2\npath: [2, 1]\nchecked: 8\nlimited: False\noriginal: 10\nsmallest: 6\nreason: why\nnext"
 	)
-}
+})
 
-@test
-attempt_streams_seed_and_prefixes = () {
+test("attempt_streams_seed_and_prefixes", () {
 	gen = property.make((s, g) {
 		Some(property.tree((s, random.word(g).0), () { [] }))
 	})
@@ -321,10 +314,9 @@ attempt_streams_seed_and_prefixes = () {
 			False -> property.Discard
 		}
 	}) == property.Passed(3, 6))
-}
+})
 
-@test
-list_order_and_generated_bounds = () {
+test("list_order_and_generated_bounds", () {
 	Ok(gen) = property.list(property.constant(7), 0, 4)
 	find_four = (seed: Int) -> property.Tree(List(Int)) ! Assert {
 		assert(seed < 1000)
@@ -357,10 +349,9 @@ list_order_and_generated_bounds = () {
 			Error(_) -> property.constant([])
 		}, 1, random.from_seed(0)) == None
 	)
-}
+})
 
-@test
-finite_and_scalar_generators = () {
+test("finite_and_scalar_generators", () {
 	floats = property.float()
 	scalars = property.utf_codepoint()
 	Ok(strings) = property.string(5)
@@ -378,10 +369,9 @@ finite_and_scalar_generators = () {
 		assert(c >= 0 && c <= 0x10ffff && { c < 0xd800 || c > 0xdfff })
 		assert(string.length(root(strings, 3, seed).value) <= 3)
 	})
-}
+})
 
-@test
-assertion_adapter_and_clients = () {
+test("assertion_adapter_and_clients", () {
 	report = assertion.catch(() {
 		property.test(
 			property.constant(1)
@@ -412,10 +402,9 @@ assertion_adapter_and_clients = () {
 		(s) { assert(core.from_codepoints(core.codepoints(s)) == s) }
 		core.inspect
 	)
-}
+})
 
-@test
-negative_integer_boolean_element_and_list_element_order = () {
+test("negative_integer_boolean_element_and_list_element_order", () {
 	Ok(negative) = property.int(-10, 0)
 	find = (seed: Int) -> property.Tree(Int) ! Assert {
 		assert(seed < 1000)
@@ -461,10 +450,9 @@ negative_integer_boolean_element_and_list_element_order = () {
 	Ok(fixed) = property.list(hand, 2, 2)
 	t = root(fixed, 0, 0)
 	assert(list.map(t.children(), (c) { c.value }) == [[0, 1], [1, 0]])
-}
+})
 
-@test
-budget_prefixes_and_discarded_children = () {
+test("budget_prefixes_and_discarded_children", () {
 	Ok(ints) = property.int(0, 10)
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
@@ -496,10 +484,9 @@ budget_prefixes_and_discarded_children = () {
 		assert((f.path, f.smallest) == pair)
 	})
 	Nil
-}
+})
 
-@test
-dependent_branch_pruning_and_inner_alternatives = () {
+test("dependent_branch_pruning_and_inner_alternatives", () {
 	outer = property.make((_, _) {
 		Some(property.tree(2, () {
 			[
@@ -528,4 +515,4 @@ dependent_branch_pruning_and_inner_alternatives = () {
 	// The failed n=1 branch's n=0 grandchild is not promoted; only the second
 	// outer child appears. The inner shrink keeps this current outer alternative.
 	assert(list.length(children) == 2)
-}
+})

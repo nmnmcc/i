@@ -5,6 +5,7 @@
 // output: no x
 // output: Error(Nil) Error(200) Error("negative") Ok(42)
 (
+	testlib = (test) = std/test
 	i/core
 	i/fail
 )
@@ -40,7 +41,6 @@ each = (xs: List(Int), f: (Int) -> String) -> String {
 	}
 }
 
-
 main = (kv ! Kv) {
 	say("hello")
 	say(kv.get("name"))
@@ -53,11 +53,11 @@ main = (kv ! Kv) {
 }
 
 // A service is a normal value (§9.2).
-@test
-services_are_values = (kv ! Kv) {
+
+test("services_are_values", (kv ! Kv) {
 	get = kv.get
 	get("lang") |> {
 		"i language" -> Nil
 		other        -> panic(other)
 	}
-}
+})

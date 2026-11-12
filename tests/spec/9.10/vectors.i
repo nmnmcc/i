@@ -5,6 +5,7 @@
 // The pinned source supplies constants and seed-1337 doctest words.
 // Other values are independently computed from spec §9.10; see reference.py.
 (
+	testlib = (test) = std/test
 	i/random
 	i/core
 )
@@ -16,8 +17,7 @@ advance = (g: random.Generator, n: Int) -> random.Generator {
 	}
 }
 
-@test
-words_0 = () {
+test("words_0", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.word(g0)
 	assert(u0 == 0x9474f0eb06d79fd8)
@@ -36,10 +36,9 @@ words_0 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0xcb358522e017f69f)
 	Nil
-}
+})
 
-@test
-words_1 = () {
+test("words_1", () {
 	g0 = random.from_seed(42)
 	(u0, g1) = random.word(g0)
 	assert(u0 == 0x11b3a82dc43ce230)
@@ -58,10 +57,9 @@ words_1 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x59853d1343651e17)
 	Nil
-}
+})
 
-@test
-words_2 = () {
+test("words_2", () {
 	g0 = random.from_seed(1337)
 	(u0, g1) = random.word(g0)
 	assert(u0 == 0xb5c19e300e8b07b3)
@@ -80,10 +78,9 @@ words_2 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x1133d31d01e3294b)
 	Nil
-}
+})
 
-@test
-words_3 = () {
+test("words_3", () {
 	g0 = random.from_seed(-1)
 	(u0, g1) = random.word(g0)
 	assert(u0 == 0xb089e30c676d082d)
@@ -102,10 +99,9 @@ words_3 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0xb635a23579d0573e)
 	Nil
-}
+})
 
-@test
-words_4 = () {
+test("words_4", () {
 	g0 = random.from_seed(
 		-1606938044258990275541962092341162602522202993782792835301393
 	)
@@ -126,10 +122,9 @@ words_4 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x7ba3fe61550385e3)
 	Nil
-}
+})
 
-@test
-words_5 = () {
+test("words_5", () {
 	g0 = random.from_seed(-11400714819323198485)
 	(u0, g1) = random.word(g0)
 	assert(u0 == 0xb0362bf786765814)
@@ -148,10 +143,9 @@ words_5 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x98c29ffdb1b5f766)
 	Nil
-}
+})
 
-@test
-words_6 = () {
+test("words_6", () {
 	g0 = random.from_seed(12)
 	(u0, g1) = random.word(g0)
 	assert(u0 == 0x4ab49a1a080b9dba)
@@ -170,10 +164,9 @@ words_6 = () {
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0xfcfb942820f2f06d)
 	Nil
-}
+})
 
-@test
-tree_s1 = () {
+test("tree_s1", () {
 	g = random.from_seed(0)
 	h0 = random.split(g).0
 	(u0, h1) = random.word(h0)
@@ -185,10 +178,9 @@ tree_s1 = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x9cfd728563402f02)
 	Nil
-}
+})
 
-@test
-tree_s2 = () {
+test("tree_s2", () {
 	g = random.from_seed(0)
 	h0 = random.split(g).1
 	(u0, h1) = random.word(h0)
@@ -200,10 +192,9 @@ tree_s2 = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0xf67b3a1c20bfee2b)
 	Nil
-}
+})
 
-@test
-tree_p1 = () {
+test("tree_p1", () {
 	g = random.from_seed(0)
 	h0 = random.at_path(g, [1])
 	(u0, h1) = random.word(h0)
@@ -215,10 +206,9 @@ tree_p1 = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x6e33f1757366b224)
 	Nil
-}
+})
 
-@test
-tree_p2 = () {
+test("tree_p2", () {
 	g = random.from_seed(0)
 	h0 = random.at_path(g, [2])
 	(u0, h1) = random.word(h0)
@@ -230,10 +220,9 @@ tree_p2 = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x2d7f0d49269a03ab)
 	Nil
-}
+})
 
-@test
-tree_p3 = () {
+test("tree_p3", () {
 	g = random.from_seed(0)
 	h0 = random.at_path(g, [3])
 	(u0, h1) = random.word(h0)
@@ -245,10 +234,9 @@ tree_p3 = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x71efd03352840d1f)
 	Nil
-}
+})
 
-@test
-tree_mixed = () {
+test("tree_mixed", () {
 	g = random.from_seed(0)
 	h0 = random.at_path(random.split(g).0, [2, 1])
 	(u0, h1) = random.word(h0)
@@ -260,10 +248,9 @@ tree_mixed = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x8d2242d7f41e9383)
 	Nil
-}
+})
 
-@test
-tree_drawn = () {
+test("tree_drawn", () {
 	g = random.from_seed(0)
 	h0 = random.split(random.word(g).1).1
 	(u0, h1) = random.word(h0)
@@ -275,10 +262,9 @@ tree_drawn = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0xec222548e8e94523)
 	Nil
-}
+})
 
-@test
-tree_large = () {
+test("tree_large", () {
 	g = random.from_seed(0)
 	h0 = random.at_path(
 		g
@@ -293,10 +279,9 @@ tree_large = () {
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0xedbee6c66ce7298f)
 	Nil
-}
+})
 
-@test
-bounded_0 = () {
+test("bounded_0", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 1)
 	assert(u0 == 0)
@@ -311,10 +296,9 @@ bounded_0 = () {
 	assert(u3 == 0)
 	assert(g4 == advance(g3, 1))
 	Nil
-}
+})
 
-@test
-bounded_1 = () {
+test("bounded_1", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 3)
 	assert(u0 == 0)
@@ -329,10 +313,9 @@ bounded_1 = () {
 	assert(u3 == 1)
 	assert(g4 == advance(g3, 1))
 	Nil
-}
+})
 
-@test
-bounded_2 = () {
+test("bounded_2", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 18446744073709551615)
 	assert(u0 == 10697439907134545880)
@@ -347,10 +330,9 @@ bounded_2 = () {
 	assert(u3 == 8417835797766134635)
 	assert(g4 == advance(g3, 1))
 	Nil
-}
+})
 
-@test
-bounded_3 = () {
+test("bounded_3", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 18446744073709551616)
 	assert(u0 == 10697439907134545880)
@@ -365,10 +347,9 @@ bounded_3 = () {
 	assert(u3 == 8417835797766134635)
 	assert(g4 == advance(g3, 1))
 	Nil
-}
+})
 
-@test
-bounded_4 = () {
+test("bounded_4", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 18446744073709551617)
 	assert(u0 == 11229413415724350161)
@@ -383,10 +364,9 @@ bounded_4 = () {
 	assert(u3 == 3132626309612102880)
 	assert(g4 == advance(g3, 2))
 	Nil
-}
+})
 
-@test
-bounded_5 = () {
+test("bounded_5", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 9223372036854775809)
 	assert(u0 == 8417835797766134635)
@@ -401,10 +381,9 @@ bounded_5 = () {
 	assert(u3 == 2148765519230078135)
 	assert(g4 == advance(g3, 3))
 	Nil
-}
+})
 
-@test
-bounded_6 = () {
+test("bounded_6", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(g0, 170141183460469231731687303715884105729)
 	assert(u0 == 155281662615902559726591261265454985112)
@@ -419,10 +398,9 @@ bounded_6 = () {
 	assert(u3 == 82371065690874325537675670535210007912)
 	assert(g4 == advance(g3, 2))
 	Nil
-}
+})
 
-@test
-bounded_7 = () {
+test("bounded_7", () {
 	g0 = random.from_seed(0)
 	(u0, g1) = random.int(
 		g0
@@ -449,4 +427,4 @@ bounded_7 = () {
 	assert(u3 == 9797747885538933057562846062264665699895629081307663015611)
 	assert(g4 == advance(g3, 4))
 	Nil
-}
+})

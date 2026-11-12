@@ -1,6 +1,7 @@
 // spec: 9.4, 6.12
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/control
 	i/core
 )
@@ -214,10 +215,9 @@ suspending = (x) {
 
 plain = (x) { f((v) { v }, x) }
 
-@test
-many_points = () {
+test("many_points", () {
 	check(core.inspect(suspending(0)), core.inspect(plain(0)))
 	check(core.inspect(suspending(1)), core.inspect(plain(1)))
 	check(core.inspect(suspending(2)), core.inspect(plain(2)))
 	check(core.inspect(suspending(17)), core.inspect(plain(17)))
-}
+})

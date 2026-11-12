@@ -1,6 +1,7 @@
 // spec: 6.12
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -30,8 +31,7 @@ tag = (v) {
 	}
 }
 
-@test
-choices = () {
+test("choices", () {
 	check(pick((11, 20)), "big 11")
 	check(pick((1, 20)), "big 20")
 	check(pick((1, 2)), "small")
@@ -39,4 +39,4 @@ choices = () {
 	check(tag(Error(1)), "one")
 	check(tag(Ok(2)), "ok")
 	check(tag(Error(2)), "error")
-}
+})

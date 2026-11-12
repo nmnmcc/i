@@ -2,6 +2,7 @@
 //// The spawn case includes scope creation/retirement and a join; the channel
 //// case includes both peers and their switches. These are aggregate costs.
 (
+	testlib = (test) = std/test
 	i/task
 )
 
@@ -47,18 +48,15 @@ receives = (c: task.Channel(Int), n: Int, total: Int) -> Int ! task.Scheduler {
 	}
 }
 
-@test
-r2_spawn_join_1000 = () { assert(spawns(rounds, 0) == rounds) }
+test("r2_spawn_join_1000", () { assert(spawns(rounds, 0) == rounds) })
 
-@test
-r2_switch_1000 = () { assert(switches(rounds, 0) == rounds) }
+test("r2_switch_1000", () { assert(switches(rounds, 0) == rounds) })
 
-@test
-r2_channel_1000 = () {
+test("r2_channel_1000", () {
 	result = task.scope((s) {
 		c: task.Channel(Int) = task.channel()
 		task.go(s, () { sends(c, rounds) })
 		receives(c, rounds, 0)
 	})
 	assert(result == 500_500)
-}
+})

@@ -3,6 +3,7 @@
 //// result, so that no work can be left out.
 
 (
+	testlib = (test) = std/test
 	i/core
 	dict = std/dict
 	int = std/int
@@ -34,32 +35,28 @@ check = (ok: Bool, what: String) -> Nil {
 	}
 }
 
-@test
-list_build = () {
+test("list_build", () {
 	xs = list.range(1, size)
 	check(list.length(xs) == size, "length")
-}
+})
 
-@test
-list_map = () {
+test("list_map", () {
 	xs = list.map(list.range(1, size), with: (x) { x + 1 })
 	check(list.first(xs) == Some(2), "first")
-}
+})
 
-@test
-list_reverse = () {
+test("list_reverse", () {
 	xs = list.range(1, size)
 	ys = list.reverse(
 		list.reverse(list.reverse(list.reverse(list.reverse(xs))))
 	)
 	check(list.first(ys) == Some(size), "first")
-}
+})
 
-@test
-list_sort = () {
+test("list_sort", () {
 	xs = list.sort(randoms(size), by: int.compare)
 	check(list.length(xs) == size, "length")
-}
+})
 
 // A merge of two sorted lists, written out.
 merge = (xs: List(Int), ys: List(Int), acc: List(Int)) -> List(Int) {
@@ -75,16 +72,14 @@ merge = (xs: List(Int), ys: List(Int), acc: List(Int)) -> List(Int) {
 	}
 }
 
-@test
-list_merge = () {
+test("list_merge", () {
 	evens = list.map(list.range(0, size - 1), with: (x) { x * 2 })
 	odds = list.map(list.range(0, size - 1), with: (x) { x * 2 + 1 })
 	xs = merge(evens, odds, [])
 	check(list.length(xs) == 2 * size, "length")
-}
+})
 
-@test
-closures = () {
+test("closures", () {
 	adders = list.map(list.range(1, 100), with: (k) { (x) { x + k } })
 	total = list.fold(list.range(1, 10_000), from: 0, with: (acc, x) {
 		list.fold(adders, from: acc, with: (a, f) {
@@ -93,9 +88,8 @@ closures = () {
 		})
 	})
 	check(total >= 0, "total")
-}
+})
 
-@test
 inspect = () {
 	text = core.inspect(list.map(list.range(1, 200_000), with: (x) {
 		(x, [x, x + 1])
@@ -103,16 +97,16 @@ inspect = () {
 	check(core.byte_size(text) > 0, "text")
 }
 
-@test
-dict_insert = () {
+test("inspect", () { inspect() })
+
+test("dict_insert", () {
 	d = list.fold(randoms(200_000), from: dict.new(), with: (d, x) {
 		dict.insert(d, x, x + 1)
 	})
 	check(dict.size(d) > 0, "size")
-}
+})
 
-@test
-equality = () {
+test("equality", () {
 	xs = list.map(list.range(1, 100_000), with: (x) { (x, "a") })
 	ys = list.map(list.range(1, 100_000), with: (x) { (x, "a") })
 	n = list.fold(list.range(1, 20), from: 0, with: (acc, _) {
@@ -122,4 +116,4 @@ equality = () {
 		}
 	})
 	check(n == 20, "equal")
-}
+})

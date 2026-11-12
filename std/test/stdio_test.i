@@ -1,11 +1,11 @@
 (
+	testlib = (test) = std/test
 	i/stdio
 	i/request
 	i/fail
 )
 
-@test
-stdio_fake = () {
+test("stdio_fake", () {
 	! stdio.Stdio = stdio.Stdio((n) {
 		request.ready({ n > 0 } |> {
 			True  -> Ok(<<>>)
@@ -30,4 +30,4 @@ stdio_fake = () {
 	stdio.print("hello")
 	stdio.print_error("error")
 	Nil
-}
+})

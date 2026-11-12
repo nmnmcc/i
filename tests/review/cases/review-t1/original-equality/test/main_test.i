@@ -1,6 +1,7 @@
 // spec: 11.4
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -30,8 +31,7 @@ alias = top
 
 make = () { (x) { x } }
 
-@test
-values = () {
+test("values", () {
 	yes(1 == 1)
 	no(1 == 2)
 	yes(100000000000000000000 == 100000000000000000000)
@@ -46,10 +46,9 @@ values = () {
 	no(<<1:u1>> == <<1:u2>>)
 	yes(<<1, 2>> == <<1, 2>>)
 	yes(core.codepoints("a") == core.codepoints("a"))
-}
+})
 
-@test
-structures = () {
+test("structures", () {
 	yes((1, "a") == (1, "a"))
 	no((1, "a") == (1, "b"))
 	yes([1, 2, 3] == [1, 2, 3])
@@ -66,19 +65,17 @@ structures = () {
 	yes(True == True)
 	no(True == False)
 	yes(Nil == Nil)
-}
+})
 
 mixed = (x: Int | String | Nil) { x == Nil }
 
-@test
-different_types = () {
+test("different_types", () {
 	yes(mixed(Nil))
 	no(mixed(1))
 	no(mixed(""))
-}
+})
 
-@test
-functions = () {
+test("functions", () {
 	// A top-level function is one value (§2.5).
 	yes(top == top)
 	yes(alias == top)
@@ -99,4 +96,4 @@ functions = () {
 	no(core.not == core.inspect)
 	yes([top, f] == [top, f])
 	no((f, 1) == (h, 1))
-}
+})

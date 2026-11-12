@@ -1,6 +1,7 @@
 // spec: 6.10, 5
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/core
 )
 
@@ -15,8 +16,7 @@ show = (x) { core.inspect(x) }
 
 pair = (a, b) { (a, b) }
 
-@test
-shadowing = () {
+test("shadowing", () {
 	x = 1
 	x = x + 1
 	y = {
@@ -29,10 +29,9 @@ shadowing = () {
 		True  -> panic("no")
 		False -> Nil
 	}
-}
+})
 
-@test
-values_in_every_place = () {
+test("values_in_every_place", () {
 	n = 3
 	check(show(pair(n |> {
 		3 -> "three"
@@ -52,10 +51,9 @@ values_in_every_place = () {
 		_      -> ""
 	}
 	check(s, "xx")
-}
+})
 
-@test
-recursion_inside_closures = () {
+test("recursion_inside_closures", () {
 	outer = (limit) {
 		// A direct binding inside a function body, whose names are used inside
 		// its own function bodies.
@@ -72,10 +70,9 @@ recursion_inside_closures = () {
 	check(show(f(1)), "[2, 2]")
 	check(show(f == f), "True")
 	check(show(outer(2) == outer(2)), "False")
-}
+})
 
-@test
-parameters_that_name_the_whole_value = () {
+test("parameters_that_name_the_whole_value", () {
 	g = (all = (a, b), c: Int) { show((all, a + b + c)) }
 	check(g((1, 2), 3), "((1, 2), 6)")
-}
+})

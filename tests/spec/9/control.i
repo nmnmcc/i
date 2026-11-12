@@ -1,6 +1,7 @@
 // spec: 9.4, 9.2, 9.3, 9.5, 11.6
 // expect: pass
 (
+	testlib = (test) = std/test
 	i/assertion
 	i/control
 	i/core
@@ -51,8 +52,7 @@ count = (from, to) {
 	}
 }
 
-@test
-generator = () {
+test("generator", () {
 	check(show(collect(() {
 		emit(1)
 		emit(2)
@@ -69,13 +69,13 @@ generator = () {
 		emit(collect(() { emit("c") }))
 	})
 	check(show(nested), "[[\"a\", \"b\"], [\"c\"]]")
-}
+})
 
 // §9.4 rules 2 and 3: `f(k)` gives the value of the boundary, and the
 // value that the resumed computation has at the boundary is the value of
 // `resume`.
-@test
-values = () {
+
+test("values", () {
 	r = control.boundary((b) {
 		x = control.suspend(b, (k) { control.resume(k, 10) * 2 })
 		x + 1
@@ -88,12 +88,12 @@ values = () {
 	)
 	// Without a suspend, the value of the body.
 	check(show(control.boundary((b) { 7 })), "7")
-}
+})
 
 // After `resume`, the computation may suspend again: each time, `f` is done
 // in the place of the boundary, which is now the place of `resume`.
-@test
-again = () {
+
+test("again", () {
 	r = control.boundary((b) {
 		a = control.suspend(b, (k) { control.resume(k, 1) + 100 })
 		c = control.suspend(b, (k) { control.resume(k, a + 1) + 1000 })
@@ -101,12 +101,12 @@ again = () {
 		a + c + d
 	})
 	check(show(r), "11106")
-}
+})
 
 // A suspend to an outer boundary goes through the inner one, which is
 // paused with it and active again after `resume`.
-@test
-nested_boundaries = () {
+
+test("nested_boundaries", () {
 	r = control.boundary((outer) {
 		v = control.boundary((inner) {
 			x = control.suspend(outer, (k) { control.resume(k, 5) * 10 })
@@ -121,10 +121,10 @@ nested_boundaries = () {
 		control.boundary((inner) { control.suspend(inner, (k) { 3 }) }) + 1
 	})
 	check(show(s), "4")
-}
+})
 
 // §9.4 rule 4: `cancel` gives `Nil`.
-@test
+
 cancel = () {
 	r = control.boundary((b) {
 		x = control.suspend(b, (k) { show(control.cancel(k)) <> "!" })
@@ -133,11 +133,13 @@ cancel = () {
 	check(r, "Nil!")
 }
 
+test("cancel", () { cancel() })
+
 // `cancel` runs the final functions of the paused computation (§9.5). Here
 // the final function suspends to an outer boundary, which shows that it
 // runs, and goes on when it is resumed.
-@test
-cancel_runs_final_functions = () {
+
+test("cancel_runs_final_functions", () {
 	r = control.boundary((outer) {
 		control.boundary((b) {
 			resource.ensure(() {
@@ -167,7 +169,7 @@ cancel_runs_final_functions = () {
 		})
 	})
 	check(s, "final, resumed")
-}
+})
 
 // §9.4 rule 3: the paused part keeps the environment statements that were
 // inside it; for the rest, it gets the environment of the place of `resume`.
@@ -186,8 +188,7 @@ deep = (b) {
 	name()
 }
 
-@test
-environment = () {
+test("environment", () {
 	! Name = Name("outside")
 	r = control.boundary((b) {
 		before = name()
@@ -210,12 +211,12 @@ environment = () {
 		control.suspend(b, (k) { name() })
 	})
 	check(t, "outside")
-}
+})
 
 // A paused `fail.catch` takes the errors raised after `resume`, and an
 // error that no paused handler takes goes out of `resume`.
-@test
-errors = () {
+
+test("errors", () {
 	r = control.boundary((b) {
 		fail.catch(() {
 			x = control.suspend(b, (k) { control.resume(k, 1) })
@@ -230,7 +231,7 @@ errors = () {
 		})
 	})
 	check(show(e), "Error(3)")
-}
+})
 
 // A generator that is pulled one value at a time: the continuation is a
 // value, and it is resumed later from other places.
@@ -271,8 +272,7 @@ sum = (step, acc) {
 	}
 }
 
-@test
-pulled = () {
+test("pulled", () {
 	check(show(take(numbers(1, 10), 3, [])), "[3, 2, 1]")
 	check(show(take(numbers(1, 2), 5, [])), "[2, 1]")
 	// The last continuation is dropped, or cancelled.
@@ -280,7 +280,7 @@ pulled = () {
 		More(_, k) -> check(show(control.cancel(k)), "Nil")
 		Done       -> panic("no value")
 	}
-}
+})
 
 loop = (n, acc) {
 	n |> {
@@ -291,28 +291,28 @@ loop = (n, acc) {
 
 // Tail calls stay tail calls inside a boundary, and in a resumed
 // computation (§11.6). A million calls do not fit on the stack.
-@test
-tail_calls = () {
+
+test("tail_calls", () {
 	check(show(control.boundary((b) { loop(1000000, 0) })), "1000000")
 	r = control.boundary((b) {
 		x = control.suspend(b, (k) { control.resume(k, 1000000) })
 		loop(x, 0)
 	})
 	check(show(r), "1000000")
-}
+})
 
 // Deep generators: 100000 values. The generator of §9.4 needs one frame of
 // `f` for each value; a pulled generator needs none.
-@test
-deep_generators = () {
+
+test("deep_generators", () {
 	check(show(length(collect(() { count(1, 100000) }), 0)), "100000")
 	check(show(sum(numbers(1, 100000), 0)), "5000050000")
-}
+})
 
 // Suspends in the clauses of a match, in guards, and on the right of `&&`:
 // the rest of the function goes on after each of them.
-@test
-in_branches = () {
+
+test("in_branches", () {
 	r = control.boundary((b) {
 		x = 1 |> {
 			1 -> control.suspend(b, (k) { control.resume(k, 10) })
@@ -342,12 +342,12 @@ in_branches = () {
 		add(fact(x))
 	})
 	check(show(s), "25")
-}
+})
 
 // Frames that are rebuilt by `resume` may be paused again: code, `fail.catch`,
 // `resource.ensure`, and an inner boundary.
-@test
-paused_again = () {
+
+test("paused_again", () {
 	a = control.boundary((b) {
 		fail.catch(() {
 			x = control.suspend(b, (k) { control.resume(k, 1) })
@@ -373,7 +373,7 @@ paused_again = () {
 		})
 	})
 	check(show(n), "11106")
-}
+})
 
 // A producer that is not tail recursive: the paused part has many frames.
 walk = (n) {
@@ -387,16 +387,15 @@ walk = (n) {
 	}
 }
 
-@test
-deep_paused_part = () {
+test("deep_paused_part", () {
 	check(show(collect(() { walk(3) })), "[1, 2, 1, 3, 1, 2, 1]")
 	check(show(length(collect(() { walk(12) }), 0)), "4095")
-}
+})
 
 // `cancel` unwinds through an inner boundary, and an error goes out
 // through one.
-@test
-through_inner_boundaries = () {
+
+test("through_inner_boundaries", () {
 	r = control.boundary((outer) {
 		control.boundary((inner) {
 			control.suspend(outer, (k) {
@@ -415,11 +414,11 @@ through_inner_boundaries = () {
 		})
 	})
 	check(show(e), "Error(7)")
-}
+})
 
 // `assertion.catch` is written with a boundary (§9.6): a generator inside
 // it suspends through it, and its failures still go to it after `resume`.
-@test
+
 assertions_in_generators = () {
 	r = collect(() {
 		a = assertion.catch(() {
@@ -438,3 +437,5 @@ assertions_in_generators = () {
 	})
 	check(show(c), "Error(AssertionFailure(\"assert\"))")
 }
+
+test("assertions_in_generators", () { assertions_in_generators() })

@@ -1,4 +1,5 @@
 (
+	testlib = (test) = std/test
 	std/cli
 	std/list
 	std/string
@@ -32,8 +33,8 @@ name = () -> cli.Parser(String) {
 options = () -> cli.Parser(Options) { cli.map2(jobs(), verbose(), Options) }
 
 // A2/A3/A6/A7: the note's complete typed description and integer examples.
-@test
-cli_options = () {
+
+test("cli_options", () {
 	assert(
 		cli.parse(options(), ["--verbose", "--jobs=4"]) == Ok(Options(4, True))
 	)
@@ -67,11 +68,11 @@ cli_options = () {
 	assert(cli.parse(jobs(), []) == Error(cli.MissingArgument("--jobs")))
 	assert(cli.parse(verbose(), []) == Ok(False))
 	Nil
-}
+})
 
 // A1: validate spelling before duplicate names, then positional placement.
-@test
-cli_definition_errors = () {
+
+test("cli_definition_errors", () {
 	stop_int = (_: String) -> Result(Int, String) {
 		panic("reader called during validation")
 	}
@@ -184,11 +185,11 @@ cli_definition_errors = () {
 			Ok(Pair(3, "x"))
 	)
 	Nil
-}
+})
 
 // A2/A3: token spelling, separator ownership and values independent of readers.
-@test
-cli_token_ownership = () {
+
+test("cli_token_ownership", () {
 	list.each([["--jobs"], ["--jobs", "--"], ["-j"], ["-j", "--"]], (args) {
 		assert(cli.parse(jobs(), args) == Error(cli.MissingValue(0, "--jobs")))
 	})
@@ -262,11 +263,11 @@ cli_token_ownership = () {
 			Ok(-2)
 	)
 	Nil
-}
+})
 
 // A4: repetition precedes arity checking and aliases identify the same leaf.
-@test
-cli_repetition = () {
+
+test("cli_repetition", () {
 	assert(
 		cli.parse(verbose(), ["--verbose=false"]) ==
 			Error(cli.UnexpectedValue(0, "--verbose"))
@@ -301,11 +302,11 @@ cli_repetition = () {
 		cli.parse(m, ["-n", "a", "--name=", "-n", "é"]) == Ok(["a", "", "é"])
 	)
 	Nil
-}
+})
 
 // A5/A6: allocation is completed before any missing/conversion callback runs.
-@test
-cli_error_order = () {
+
+test("cli_error_order", () {
 	assert(
 		cli.parse(jobs(), ["--unknown"]) ==
 			Error(cli.UnknownOption(0, "--unknown"))
@@ -390,11 +391,11 @@ cli_error_order = () {
 			Error(cli.InvalidArgument(0, "--first", "x", "first"))
 	)
 	Nil
-}
+})
 
 // A5: optional absence and caller-supplied defaults; ordered positional rest.
-@test
-cli_allocation = () {
+
+test("cli_allocation", () {
 	o = cli.optional(cli.Names("jobs", Some("j")), "", cli.integer)
 	assert(cli.parse(o, []) == Ok(None))
 	assert(cli.parse(o, ["-j", "2"]) == Ok(Some(2)))
@@ -427,11 +428,11 @@ cli_allocation = () {
 			Error(cli.ExtraArgument(2, "c"))
 	)
 	Nil
-}
+})
 
 // A7: exactly std/int.parse's signed ASCII decimal grammar, with fixed error.
-@test
-cli_converters = () {
+
+test("cli_converters", () {
 	list.each(
 		[
 			("0", 0)
@@ -452,11 +453,11 @@ cli_converters = () {
 		assert(cli.text(value) == Ok(value))
 	})
 	Nil
-}
+})
 
 // A6 and the observation laws: heterogeneous types and every bucket consumed.
-@test
-cli_composition_laws = () {
+
+test("cli_composition_laws", () {
 	assert(
 		cli.parse(cli.map2(cli.pure(2), cli.pure("x"), Pair), []) ==
 			Ok(Pair(2, "x"))
@@ -503,11 +504,11 @@ cli_composition_laws = () {
 		cli.parse(mixed, ["--jobs=3", "-v"]) == Ok(Triple(3, "prefix", True))
 	)
 	Nil
-}
+})
 
 // A8: byte-exact help, all display forms, verbatim content, no callbacks.
-@test
-cli_help = () {
+
+test("cli_help", () {
 	assert(
 		cli.help(
 			cli.optional(cli.Names("jobs", Some("j")), "Workers", cli.integer)
@@ -574,11 +575,11 @@ cli_help = () {
 			Ok(True)
 	)
 	Nil
-}
+})
 
 // A2/A4 and §5.4: reverse accumulators preserve large inputs without suffix copies.
-@test
-cli_long_inputs = () {
+
+test("cli_long_inputs", () {
 	value = string.repeat("é", 20000)
 	assert(cli.parse(name(), ["--name=" <> value]) == Ok(value))
 	values = list.map(list.range(0, 1000), (n) {
@@ -599,7 +600,7 @@ cli_long_inputs = () {
 			}))
 	)
 	Nil
-}
+})
 
 // §5.4: check the private decoder by compiling the production source as this
 // test module, with an internal test appended. This verifies supplied empty

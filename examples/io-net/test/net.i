@@ -1,11 +1,11 @@
 (
+	testlib = (test) = std/test
 	i/net
 	i/task
 	i/fail
 )
 
-@test
-network = () {
+test("network", () {
 	assert(
 		fail.catch(() { net.listen("localhost", 0) }) ==
 			Error(net.NetError("listen", "localhost", "invalid"))
@@ -55,10 +55,9 @@ network = () {
 			Error(net.NetError("local_port", "", "closed"))
 	)
 	Nil
-}
+})
 
-@test
-pending_accept_is_exclusive_and_closed = () {
+test("pending_accept_is_exclusive_and_closed", () {
 	listener = net.listen("127.0.0.1", 0)
 	task.run(() {
 		task.scope((scope) {
@@ -79,10 +78,9 @@ pending_accept_is_exclusive_and_closed = () {
 		})
 	})
 	Nil
-}
+})
 
-@test
-pending_read_allows_write_and_close_wakes_it = () {
+test("pending_read_allows_write_and_close_wakes_it", () {
 	listener = net.listen("127.0.0.1", 0)
 	client = net.connect("localhost", net.local_port(listener))
 	peer = net.accept(listener)
@@ -108,4 +106,4 @@ pending_read_allows_write_and_close_wakes_it = () {
 	net.close_stream(peer)
 	net.close_listener(listener)
 	Nil
-}
+})
