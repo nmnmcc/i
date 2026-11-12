@@ -2863,34 +2863,30 @@ impl<'a> Checker<'a> {
                     // Syntax three, `r <- (e1)` (§2.10.2): the key is the
                     // type constructor of the known type of `e1`.
                     let (v, k) = self.infer_k(value, &Ty::Top);
-                    let t = match (k.head(), v.head()) {
-                        (_, Some(super::Head::Named(_))) => v.clone(),
-                        (Some(super::Head::Named(r)), _) => {
-                            // The arguments are those of the value.
-                            let args = match &k {
-                                Ty::Con(_, _, args) => args.len(),
-                                _ => 0,
-                            };
-                            let t = Ty::named(r, (0..args).map(|_| self.s.fresh()).collect());
-                            self.sub2(&v, &t, value.span, value.span);
-                            t
-                        }
-                        _ => {
-                            self.error(
-                                code::ENV_TYPE,
-                                value.span,
-                                "a provided service is keyed by its type, and the type of this value is not known to be one service type: give it a written type (syntax-3 §2.10.2)",
-                            );
-                            Ty::Never
-                        }
+                    let head = [&v, &k].into_iter().find_map(|t| match t {
+                        Ty::Con(super::Head::Named(r), _, args) => Some((*r, args.len())),
+                        _ => None,
+                    });
+                    let Some((r, args)) = head else {
+                        self.error(
+                            code::ENV_TYPE,
+                            value.span,
+                            "a provided service is keyed by its type, and the type of this value is not known to be one service type: give it a written type (syntax-3 §2.10.2)",
+                        );
+                        return self.block(&stmts[i + 1..], *span, expected);
                     };
-                    if let Some(super::Head::Named(r)) = t.head() {
-                        self.out.services.insert((self.module, *span), r);
-                    }
+                    self.out.services.insert((self.module, *span), r);
                     self.effects.push(Effects::default());
                     let a = self.block(&stmts[i + 1..], *span, expected);
                     let (err, env) = self.pop_effects(*span);
                     self.add_err(err);
+                    // The service type is the need of the rest for this
+                    // key, when the rest writes one; else its arguments are
+                    // left open, and the value and the rest fix them.
+                    let t = self.s.env_need(&env, super::Head::Named(r)).unwrap_or_else(|| {
+                        Ty::named(r, (0..args).map(|_| self.s.fresh()).collect())
+                    });
+                    self.sub2(&v, &t, value.span, value.span);
                     let rest = self.s.env_diff(env, vec![t]);
                     self.flush(*span, None);
                     self.add_env(rest);

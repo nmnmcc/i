@@ -75,9 +75,13 @@ fn services_and_needs() {
 
 #[test]
 fn provides() {
-    same(
+    // `! _ = e` is not written in today's syntax: only the front makes it.
+    let text = shown(
         "check = () {\n\t{\n\t\tu = find_user(\"1\")\n\t\tassert(u.name == \"ada\")\n\t} <- (fake_db, quiet_log)\n}\n\nn = () { 1 + f(2) <- (s) }\n",
-        "check = () {\n\t! _ = fake_db\n\t! _ = quiet_log\n\tu = find_user(\"1\")\n\tassert(u.name == \"ada\")\n}\n\nn = () {\n\t! _ = s\n\t1 + f(2)\n}\n",
+    );
+    assert_eq!(
+        text,
+        "check = () {\n  ! _ = fake_db\n  ! _ = quiet_log\n  u = find_user(\"1\")\n  assert(u.name == \"ada\")\n}\n\nn = () {\n  ! _ = s\n  1 + f(2)\n}\n"
     );
 }
 
@@ -102,4 +106,30 @@ fn forms_of_later_stages_are_errors() {
     bad("area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n", "stage 9");
     bad("keep = (f: Int) <- (..env: N) { f }\n", "stage E6");
     bad("f = (x) { g(x) <- env }\n", "stage E6");
+}
+
+/// The Lisp surface: `std/src/test.is`, converted and read back, is the
+/// tree that the file gives today (quotes included).
+#[test]
+fn lisp_surface_round_trip() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../std/src/test.is");
+    let source = std::fs::read_to_string(path).unwrap();
+    // The repository file is in today's rows until the conversion commit,
+    // and in the rows of syntax three after it.
+    let Ok(document) = ilang_syntax::lisp::parse(&source) else {
+        return;
+    };
+    let Ok(old) = ilang_syntax::lisp::parse_module(&document) else {
+        return;
+    };
+    let (converted, _) = syn3::convert::convert(&old, None, &syn3::convert::Signatures::default());
+    let text = syn3::lisp::to_lisp(&converted);
+    let (lowered, diags) = syn3::parse_lisp_lowered(&text);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let shown = |m: &ilang_syntax::ast::Module| ilang_syntax::lisp::print_module(m);
+    let (a, b) = (shown(&old), shown(&lowered));
+    for (x, y) in a.lines().zip(b.lines()) {
+        assert_eq!(x, y);
+    }
+    assert_eq!(a.lines().count(), b.lines().count());
 }

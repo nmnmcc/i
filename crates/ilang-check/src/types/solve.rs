@@ -2116,6 +2116,26 @@ impl Solver {
         self.diff_mode(a, h, Mode::Value)
     }
 
+    /// The member of the environment `env` whose type constructor is
+    /// `head`, read also through the lower bounds of row variables. Used by
+    /// a provide of syntax three, whose service type is not written.
+    pub fn env_need(&self, env: &Ty, head: Head) -> Option<Ty> {
+        let mut seen = HashSet::default();
+        let mut todo = vec![env.clone()];
+        while let Some(t) = todo.pop() {
+            match &t {
+                Ty::Con(h, ..) if *h == head => return Some(t),
+                Ty::Union(ms) => todo.extend(ms.iter().cloned()),
+                Ty::Diff(a, _) => todo.push((**a).clone()),
+                Ty::Var(v) if seen.insert(*v) => {
+                    todo.extend(self.var(*v).lower.iter().cloned())
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// `M - T` for an environment `M` (§4.8 rule 9): the member of `M` that
     /// is taken out must be equal to its member of `T` (§9.2).
     pub fn env_diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {

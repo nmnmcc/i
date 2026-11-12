@@ -32,7 +32,18 @@ use std::collections::{HashMap, HashSet};
 
 /// Lowers a module of syntax three to the current tree.
 pub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
+    lower_surface(m, false)
+}
+
+/// Lowers a module read from the Lisp surface. There a match is today's
+/// pipe into a clause block, as the Lisp rows of today read it.
+pub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
+    lower_surface(m, true)
+}
+
+fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
     let mut cx = Cx {
+        lisp,
         errors: Vec::new(),
         rows: Vec::new(),
         fresh: 0,
@@ -78,10 +89,71 @@ pub fn lower_items(items: &[n::Item]) -> Result<Vec<o::Item>, Diagnostic> {
 
 struct Row {
     name: String,
+    /// The signature of the binding writes no `Fail` beside this row
+    /// variable, so the row variable carries the errors.
+    carries: bool,
     used: bool,
 }
 
+/// The row variables that a type writes beside a `Fail` entry.
+fn fail_rows(t: &n::Type, out: &mut HashSet<String>) {
+    let each = |ts: &[n::Type], out: &mut HashSet<String>| ts.iter().for_each(|t| fail_rows(t, out));
+    match &t.kind {
+        n::TypeKind::Named { args, .. } | n::TypeKind::Call { args, .. } => each(args, out),
+        n::TypeKind::Union(ts) | n::TypeKind::Inter(ts) | n::TypeKind::Diff(ts) => each(ts, out),
+        n::TypeKind::Data(items) => {
+            for i in items {
+                match i {
+                    n::TItem::Pos(t) | n::TItem::Label(_, t) | n::TItem::Spread(t) => fail_rows(t, out),
+                }
+            }
+        }
+        n::TypeKind::Fn(f) => {
+            fail_rows(&f.param, out);
+            fail_rows(&f.ret, out);
+            if let Some(s) = &f.services {
+                fail_rows(s, out);
+                if let n::TypeKind::Data(items) = &s.kind {
+                    let fail = items.iter().any(|i| {
+                        matches!(i, n::TItem::Pos(t)
+                            if matches!(&t.kind, n::TypeKind::Named { module: None, name, .. } if name.name == "Fail"))
+                    });
+                    if fail {
+                        for i in items {
+                            if let n::TItem::Spread(t) = i
+                                && let n::TypeKind::Named { name, .. } = &t.kind
+                            {
+                                out.insert(name.name.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        n::TypeKind::Lit(_) | n::TypeKind::ValueOf { .. } | n::TypeKind::Hole => {}
+    }
+}
+
+fn pattern_fail_rows(p: &n::Pattern, out: &mut HashSet<String>) {
+    match &p.kind {
+        n::PatternKind::Typed { ty, .. } => fail_rows(ty, out),
+        n::PatternKind::Ctor { args: Some(items), .. } | n::PatternKind::Data(items) => {
+            for i in items {
+                match i {
+                    n::DPItem::Pos(p) | n::DPItem::Key(_, p) => pattern_fail_rows(p, out),
+                    n::DPItem::Rest(_) => {}
+                }
+            }
+        }
+        n::PatternKind::List { items, .. } | n::PatternKind::And(items) => {
+            items.iter().for_each(|p| pattern_fail_rows(p, out))
+        }
+        _ => {}
+    }
+}
+
 struct Cx {
+    lisp: bool,
     errors: Vec<Diagnostic>,
     /// The type parameters of the bindings around, for the error parameter
     /// that a row variable carries.
@@ -170,6 +242,7 @@ fn member_name(t: &n::Type) -> Option<&str> {
 impl Cx {
     fn plain() -> Cx {
         Cx {
+            lisp: false,
             errors: Vec::new(),
             rows: Vec::new(),
             fresh: 0,
@@ -458,9 +531,25 @@ impl Cx {
                 }
             }
         }
+        let mut with_fail = HashSet::new();
+        pattern_fail_rows(&b.pattern, &mut with_fail);
+        if let n::ExprKind::Chain(fs) = &b.value.kind {
+            for f in fs {
+                for p in &f.params {
+                    p.choices.iter().for_each(|c| pattern_fail_rows(c, &mut with_fail));
+                }
+                for s in f.services.iter().flatten() {
+                    fail_rows(&s.ty, &mut with_fail);
+                }
+                if let Some(r) = &f.ret {
+                    fail_rows(r, &mut with_fail);
+                }
+            }
+        }
         let mark = self.rows.len();
         self.rows.extend(generics.iter().map(|g| Row {
             name: g.name.clone(),
+            carries: !with_fail.contains(&g.name),
             used: false,
         }));
         let pattern = match (&b.pattern.kind, typed_fn) {
@@ -905,7 +994,8 @@ impl Cx {
             n::ExprKind::Pipe { lhs, rhs } => match &rhs.kind {
                 // A match (§2.11): one position per branch.
                 n::ExprKind::Chain(fs)
-                    if fs.iter().all(|f| {
+                    if !self.lisp
+                        && fs.iter().all(|f| {
                         f.params.len() == 1
                             && f.services.is_none()
                             && f.ret.is_none()
@@ -1190,6 +1280,7 @@ impl Cx {
         if err.is_none()
             && let Some(row) = row
             && let Some(found) = self.rows.iter_mut().rev().find(|r| r.name == row)
+            && found.carries
         {
             found.used = true;
             err = Some(ty(

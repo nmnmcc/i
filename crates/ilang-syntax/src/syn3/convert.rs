@@ -813,6 +813,12 @@ impl Cx<'_> {
             let mut gone: HashMap<&str, usize> = HashMap::new();
             let mut carried: HashMap<&str, usize> = HashMap::new();
             signature_uses(b, &self.vars, &mut gone, &mut carried);
+            // A row variable carries the errors only when every function
+            // type of the signature that has it also has a `^` part: beside
+            // `(R) -> Nil ! N`, the `E` of `() -> R ^ E ! N` stays written.
+            if bare_row(b, &self.vars) {
+                carried.clear();
+            }
             for p in &b.type_params {
                 let total = count.0.get(p.name.as_str()).copied().unwrap_or(0);
                 let own = gone.get(p.name.as_str()).copied().unwrap_or(0);
@@ -1934,6 +1940,53 @@ fn signature_uses<'a>(
             }
         }
     }
+}
+
+/// Whether the written signature of a binding has a function type with a
+/// row variable and no `^` part.
+fn bare_row(b: &o::Binding, vars: &[String]) -> bool {
+    fn ty(t: &o::TypeExpr, vars: &[String], found: &mut bool) {
+        if let o::TypeKind::Fn { err: None, env: Some(env), .. } = &t.kind
+            && match &env.kind {
+                o::TypeKind::Union(ms) => ms.iter().any(|m| is_var(vars, m)),
+                _ => is_var(vars, env),
+            }
+        {
+            *found = true;
+        }
+        for_each_type_child(t, &mut |c| ty(c, vars, found));
+    }
+    fn pattern(p: &o::Pattern, vars: &[String], found: &mut bool) {
+        match &p.kind {
+            o::PatternKind::Typed { ty: t, .. } => ty(t, vars, found),
+            o::PatternKind::Named { pattern: inner, .. } => pattern(inner, vars, found),
+            o::PatternKind::Constructor { args, .. } | o::PatternKind::Tuple(args) => {
+                for a in args {
+                    pattern(a, vars, found);
+                }
+            }
+            o::PatternKind::List { items, .. } => {
+                for a in items {
+                    pattern(a, vars, found);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut found = false;
+    pattern(&b.pattern, vars, &mut found);
+    if let o::ExprKind::Fn(f) = &b.value.kind {
+        for p in &f.params {
+            match p {
+                o::Param::Pattern(p) => pattern(p, vars, &mut found),
+                o::Param::Env { ty: t, .. } => ty(t, vars, &mut found),
+            }
+        }
+        if let Some(r) = &f.ret {
+            ty(&r.value, vars, &mut found);
+        }
+    }
+    found
 }
 
 /// Every unqualified `UpName` in a type, once for each place it is written.

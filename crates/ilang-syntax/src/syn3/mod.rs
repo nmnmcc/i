@@ -34,7 +34,7 @@ pub fn parse_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic
 /// Reads a Lisp-surface file of syntax three into the current tree.
 pub fn parse_lisp_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic>) {
     let (module, mut diags) = lisp::from_lisp(source);
-    let (lowered, more) = lower::lower(&module);
+    let (lowered, more) = lower::lower_lisp(&module);
     diags.extend(more);
     diags.sort_by_key(|d| (d.span.start, d.span.end));
     (lowered, diags)

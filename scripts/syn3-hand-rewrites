@@ -19,4 +19,14 @@ def rewrite(path, edits):
             sys.exit(f"syn3-hand-rewrites: {path}: expected text not found: {old!r}")
         text = text.replace(old, new)
     p.write_text(text)
+
+# §7.3, "a written `! N` that is wider than what the body needs is kept as a
+# type annotation on the binding": the migrator drops the needs of every
+# function literal. This generator provides `Yield` to a body whose need has
+# a row variable, and today's checker cannot show the inferred type (E0515),
+# so the type is written on the binding.
+rewrite("std/test/list_test.i", [(
+    "collect = <A, N>(body: () <- (Yield(A), ..N) -> Nil) -> List(A) {",
+    "collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {",
+)])
 PY
