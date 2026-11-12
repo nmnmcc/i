@@ -6,14 +6,14 @@ src/main.i:15:15: error[E0202]: the type `A1` is not defined; to use a type para
 src/main.i:17:1: error[E0223]: the alias `A` uses itself, directly or through other aliases
 src/main.i:19:1: error[E0223]: the alias `B` uses itself, directly or through other aliases
 src/main.i:21:1: error[E0223]: the alias `C` uses itself, directly or through other aliases
-src/main.i:31:9: error[E0224]: the type `List` has 1 type parameter, but 0 are given
-src/main.i:35:9: error[E0224]: the type `Int` has 0 type parameters, but 1 is given
-src/main.i:39:9: error[E0224]: the type `Result` has 2 type parameters, but 1 is given
-src/main.i:43:9: error[E0224]: the type `Box` has 1 type parameter, but 0 are given
-src/main.i:47:34: error[E0224]: the type `Continuation` has 4 type parameters, but 1 is given
-src/main.i:51:10: error[E0202]: the type `Nothing` is not defined; to use a type parameter, declare it in the head, as in `Box(A) { … }`
-src/main.i:64:24: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
-src/main.i:64:31: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
-src/main.i:64:42: error[E0228]: two environment parameters of this function have the type constructor `Clock` (§9.2)
-src/main.i:66:4: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
-src/main.i:67:4: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:36:9: error[E0224]: the type `List` has 1 type parameter, but 0 are given
+src/main.i:40:9: error[E0224]: the type `Int` has 0 type parameters, but 1 is given
+src/main.i:44:9: error[E0224]: the type `Result` has 2 type parameters, but 1 is given
+src/main.i:48:9: error[E0224]: the type `Box` has 1 type parameter, but 0 are given
+src/main.i:52:34: error[E0224]: the type `Continuation` has 4 type parameters, but 1 is given
+src/main.i:56:10: error[E0202]: the type `Nothing` is not defined; to use a type parameter, declare it in the head, as in `Box(A) { … }`
+src/main.i:69:24: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:69:31: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:69:42: error[E0228]: two environment parameters of this function have the type constructor `Clock` (§9.2)
+src/main.i:71:4: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
+src/main.i:72:4: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
