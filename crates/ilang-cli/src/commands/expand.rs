@@ -60,6 +60,11 @@ pub fn run(
     // leave a partial source document on stdout.
     let mut output = String::new();
     for module in modules {
+        if ilang_syntax::syn3::enabled() {
+            let text = ilang_syntax::syn3::print_current(&module.ast, to == "is");
+            output.push_str(&format!("// {}\n{text}\n", module.path));
+            continue;
+        }
         let lisp = ilang_syntax::lisp::print_module(&module.ast);
         let text = if to == "is" {
             ilang_syntax::lisp::format(&lisp).expect("expanded AST prints valid Lisp")

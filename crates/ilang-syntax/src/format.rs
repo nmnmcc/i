@@ -34,6 +34,9 @@ pub const TAB_WIDTH: usize = 4;
 
 /// Formats a source file. Syntax errors leave the source untouched.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
+    if crate::syn3::enabled() {
+        return crate::syn3::format(source);
+    }
     let (module, diags) = parse_module(source);
     if !diags.is_empty() {
         return Err(diags);

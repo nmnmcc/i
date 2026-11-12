@@ -249,6 +249,12 @@ _entry = ({parameters}) -> syntax.Syntax {{
 "#,
         binding.module, binding.name
     );
+    // Transition to syntax three: the wrapper is written in today's syntax.
+    let source = if ilang_syntax::syn3::enabled() {
+        ilang_syntax::syn3::convert_source(&source)
+    } else {
+        source
+    };
     let (ast, diagnostics) = ilang_syntax::parse_module(&source);
     assert!(
         diagnostics.is_empty(),

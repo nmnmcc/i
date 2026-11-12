@@ -14,6 +14,7 @@ pub mod print;
 #[doc(hidden)]
 pub mod shape;
 pub mod span;
+pub mod syn3;
 pub mod token;
 
 use span::Span;
