@@ -39,7 +39,13 @@ first = (r) {
 	v
 }
 
-param = (Ok(v), (a, b)) { v + a + b }
+// A constructor parameter takes only its own type's values (syntax three
+// §2.12 with D4 only when other constructors' values are known), so the
+// refutable pattern is a binding of a parameter of the union type.
+param = (r: Result(Int, Int), (a, b)) {
+	Ok(v) = r
+	v + a + b
+}
 
 failing_patterns = () {
 	check(show(first(Ok(1))), "1")
