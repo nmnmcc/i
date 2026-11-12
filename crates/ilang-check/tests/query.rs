@@ -200,7 +200,7 @@ fn type_of_local_names() {
     // A parameter of any type.
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
     assert_eq!(f.hover("app/main", "label = ", 0), "label: String");
-    assert_eq!(f.hover("app/main", "v) -> v", 0), "v: A");
+    assert_eq!(f.hover("app/main", "v)) { v }", 0), "v: A");
     assert_eq!(f.hover("app/main", "o) {", 0), "o: Option(A)");
 }
 
@@ -208,7 +208,7 @@ fn type_of_local_names() {
 fn type_of_other_things() {
     let f = fixture();
     assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Option(A)");
-    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(A)");
+    assert_eq!(f.hover("app/main", "None)", 0), "None: Option(A)");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -237,7 +237,7 @@ fn definitions() {
         (main.clone(), "y".into())
     );
     assert_eq!(
-        f.definition("app/main", "v\n", 0),
+        f.definition("app/main", "v } |", 0),
         (main.clone(), "v".into())
     );
     // A top-level name of this module and of others.
@@ -387,7 +387,7 @@ fn symbols_of_a_module() {
     let option = &syms[4];
     let ctors: Vec<&str> = option.children.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(ctors, vec!["Some", "None"]);
-    assert_eq!(syms[0].detail.as_deref(), Some("(x: Int, y: Int) -> Int"));
+    assert_eq!(syms[0].detail.as_deref(), Some("(x = Int, y = Int) -> Int"));
     // The span is the whole item; the name span is the name.
     let text = f.text("app/main");
     let s = &syms[1];
@@ -463,8 +463,8 @@ fn local_types_use_the_names_of_the_scheme() {
     let compose = f.hover("app/main", "compose", 0);
     assert_eq!(
         compose,
-        "compose: (f: (A) -> B ^ E ! N, g: (B) -> C ^ E2 ! N2) -> \
-         (x: A) -> C ^ E | E2 ! N | N2"
+        "compose: (f = (A) <- (Fail(E), ..N) -> B, g = (B) <- (Fail(E2), ..N2) -> C) -> \
+         (x = A) <- (Fail(E | E2), ..N, ..N2) -> C"
     );
     assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) <- (Fail(E2), ..N2) -> C");
@@ -480,18 +480,18 @@ fn local_types_use_the_names_of_the_scheme() {
     assert_eq!(f.hover("app/main", "b, a)", 0), "b: B");
     assert_eq!(
         f.hover("app/main", "twice", 0),
-        "twice: (f = (A | B) -> B & C ^ E ! N) -> (z = A) <- (Fail(E), ..N) -> C"
+        "twice: (f = (A | B) <- (Fail(E), ..N) -> B & C) -> (z = A) <- (Fail(E), ..N) -> C"
     );
     assert_eq!(f.hover("app/main", "z) {", 0), "z: A");
     assert_eq!(
         f.hover("app/main", "f(f(z))", 0),
-        "f: (A | B) -> B & C ^ E ! N"
+        "f: (A | B) <- (Fail(E), ..N) -> B & C"
     );
     // `w` is generalized in the block: its own variable is not one of the
     // scheme, and has a name that is not used there.
     assert_eq!(
         f.hover("app/main", "both = ", 0),
-        "both: (f = (A) <- (Fail(E), ..N) -> B, x = A) -> (B, (q = C) -> (C, A)) ^ E ! N"
+        "both: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> (B, (q = C) -> (C, A))"
     );
     assert_eq!(f.hover("app/main", "w = ", 0), "w: (q = D) -> (D, A)");
     assert_eq!(f.hover("app/main", "q) {", 0), "q: D");
@@ -602,7 +602,7 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     assert!(!subject.iter().any(|(n, _)| n == "f"), "{subject:?}");
     let body = fixture.completions("app/main", "f(local)", 0);
     assert!(body.iter().any(|(n, _)| n == "f"), "{body:?}");
-    for needle in ["{ 0 ->", ",{ 0 ->"] {
+    for needle in ["(0) { 1 } | (_) { 2 }\n", ", (0) { 1 }"] {
         let at = fixture.at("app/main", needle, 0, 0);
         let query = fixture.query();
         let module = fixture.module("app/main");
@@ -694,7 +694,7 @@ fn query_references_follow_identity_across_modules() {
     assert_eq!(refs.iter().filter(|r| r.definition).count(), 1);
     // A field: the label of the definition, the labels of the calls, and
     // the pattern part, which also binds a local.
-    let at = f.at("app/main", "radius: 2", 0, 0);
+    let at = f.at("app/main", "radius = 2", 0, 0);
     let (owner, _, target) = q.target_at_offset(m, at).unwrap();
     let refs = q.references(&target, owner, &q.own_modules());
     assert_eq!(refs.len(), 4, "{:?}", texts_of(&f, &refs));
@@ -714,7 +714,7 @@ fn query_rename_checks_kind_and_scope() {
     assert_eq!(edits.len(), 2);
     assert!(edits.iter().all(|e| e.text == "disk"));
     // A constructor, in both modules.
-    let at = f.at("app/main", "Circle(radius: 2)", 0, 0);
+    let at = f.at("app/main", "Circle(radius = 2)", 0, 0);
     let edits = q.rename(m, at, "Disk").unwrap();
     assert_eq!(edits.len(), 5, "{edits:?}");
     // Refused for the library.
@@ -741,7 +741,7 @@ fn query_missing_clauses_of_a_match() {
     assert_eq!(c.patterns, vec!["Circle(..)", "Line"]);
     assert_eq!(
         c.edit.text,
-        "    Circle(..) -> panic(\"todo\")\n    Line -> panic(\"todo\")\n"
+        " | (Circle(..)) { panic(\"todo\") } | (Line) { panic(\"todo\") } "
     );
 }
 
@@ -761,7 +761,7 @@ fn query_type_definition_signature_and_hints() {
     let s = q
         .signature_help(m, f.at("app/main", "area(c)", 0, 5))
         .unwrap();
-    assert_eq!(s.label, "area(s: Shape) -> Int");
+    assert_eq!(s.label, "area(s = Shape) -> Int");
     assert_eq!(s.active, Some(0));
     let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
     assert_eq!(hints.len(), 1, "{hints:?}");
@@ -778,7 +778,7 @@ fn query_completion_context() {
         q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)),
         CompletionContext::Type
     );
-    match q.completion_context(shapes, f.at("app/shapes", "Dot -> 0", 0, 0)) {
+    match q.completion_context(shapes, f.at("app/shapes", "Dot) { 0 }", 0, 0)) {
         CompletionContext::Pattern { types } => assert_eq!(types.len(), 1),
         other => panic!("{other:?}"),
     }
@@ -788,7 +788,7 @@ fn query_completion_context() {
         CompletionContext::Import { names_of: None, .. }
     ));
     assert!(matches!(
-        q.completion_context(main, f.at("app/main", "radius: 2", 0, 0)),
+        q.completion_context(main, f.at("app/main", "radius = 2", 0, 0)),
         CompletionContext::Expression { call: Some(_) }
     ));
 }
