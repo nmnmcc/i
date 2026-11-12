@@ -237,12 +237,6 @@ impl Checker<'_> {
             let v = self.s.fresh();
             self.bind_catch_all(q, &v, in_case);
             v
-        } else if top_ctor(q).is_some() && !in_case {
-            // A constructor parameter is fitted and may fail (syntax three
-            // §2.12, D4): `(Ok(v)) { … }` takes every `Result`, as before
-            // `Result` was a union.
-            let t = self.pat(q, in_case);
-            self.with_rest(t)
         } else {
             self.pat(q, in_case)
         }
