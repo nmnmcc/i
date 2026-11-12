@@ -1021,12 +1021,12 @@ fn publish_sees_what_the_host_must_give() {
     let (ok, out) = try_publish(
         &w,
         &dir,
-        &[("src/api.i", &api.replace("print:", "show:"))],
+        &[("src/api.i", &api.replace("print =", "show ="))],
         "1.0.2",
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed constructors api.Io: Io(print: (text: String) -> Nil)"),
+        out.contains("changed constructors api.Io: Io(print: (String) -> Nil)"),
         "{out}"
     );
 }
@@ -1056,7 +1056,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("added host \"i:io/v1\": (print: (text: String) -> Nil)"),
+        out.contains("added host \"i:io/v1\": (print: (String) -> Nil)"),
         "{out}"
     );
     assert!(out.contains("a new minor version"), "{out}");
@@ -1180,7 +1180,7 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
         &dir,
         &[(
             "src/api.i",
-            &api.replace("now: () -> Int", "now: (n: Int) -> Int")
+            &api.replace("now: () -> Int", "now: (Int) -> Int")
                 .replace("now()", "now(1)"),
         )],
         "1.0.2",
@@ -1195,16 +1195,16 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
     let (ok, out) = try_publish(
         &w,
         &dir,
-        &[("src/api.i", &api.replace("print:", "show:"))],
+        &[("src/api.i", &api.replace("print =", "show ="))],
         "1.0.2",
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed host \"pub:io/v1\": (print: (text: String) -> Nil)"),
+        out.contains("changed host \"pub:io/v1\": (print: (String) -> Nil)"),
         "{out}"
     );
     assert!(
-        out.contains("to host \"pub:io/v1\": (show: (text: String) -> Nil)"),
+        out.contains("to host \"pub:io/v1\": (show: (String) -> Nil)"),
         "{out}"
     );
 }
