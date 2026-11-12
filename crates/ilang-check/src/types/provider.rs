@@ -292,9 +292,28 @@ impl Typed {
         let name = |r: TypeRef| format!("{r:?}");
         match actual.compare(&expected, &mut |r| name(r), &mut |r| name(r))? {
             SchemeComparison::Equivalent(_) => Ok(()),
-            other => Err(format!(
-                "adapter must have the generalized structured body/result/error/environment type ({other:?})"
-            )),
+            other => {
+                // The solver's own subtype check, both ways, each side
+                // instantiated fresh (simplification U4).
+                let mut t = expected
+                    .catalog
+                    .solver
+                    .lock()
+                    .expect("adapter scheme snapshot")
+                    .clone();
+                t.level = 1;
+                let a = t.freshen(&actual.scheme.ty, actual.scheme.level, &mut Default::default());
+                t.constrain(&a, &expected.scheme.ty);
+                let e = t.freshen(&expected.scheme.ty, 0, &mut Default::default());
+                t.constrain(&e, &actual.scheme.ty);
+                if t.failures.is_empty() {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "adapter must have the generalized structured body/result/error/environment type ({other:?})"
+                    ))
+                }
+            }
         }
     }
 }

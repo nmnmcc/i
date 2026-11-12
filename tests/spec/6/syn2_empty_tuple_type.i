@@ -1,4 +1,4 @@
-// old-syntax-check: E0101
 // spec: 3, 6.4
-// expect: compile-error E0101
+// expect: pass
+// Syntax three stage 6: `()` is the empty data type.
 Unit = ()

@@ -1529,6 +1529,26 @@ impl SchemeArtifact {
         for (id, values) in left_solver.row_params.clone() {
             right_solver.row_params.insert(id, values);
         }
+        let raw_left = left_solver.scheme_snapshot();
+        let raw_right = right_solver.scheme_snapshot();
+        let tag_base = next;
+        let cover = || {
+            let mut demand = prove::Demand::new(prove::Demand::LIMIT);
+            let left = CoverSide {
+                solver: &raw_left,
+                root: &left_type,
+                metadata: &left_bundle.variables,
+            };
+            let right = CoverSide {
+                solver: &raw_right,
+                root: &right_type,
+                metadata: &right_bundle.variables,
+            };
+            if !find_cover(left, right, tag_base, &mut demand)? {
+                return Ok(false);
+            }
+            find_cover(right, left, tag_base, &mut demand)
+        };
         let mut tags = HashMap::new();
         let left_root = tag_scheme_solver(&mut left_solver, &left_type, &mut tags, &mut next);
         let right_root = tag_scheme_solver(&mut right_solver, &right_type, &mut tags, &mut next);
@@ -1539,7 +1559,11 @@ impl SchemeArtifact {
             right_solver.comparison_wrappers.insert(*id);
         }
         if left_bundle.variables.len() != right_bundle.variables.len() {
-            return Ok(SchemeComparison::Unknown);
+            return Ok(match cover() {
+                Ok(true) => SchemeComparison::Equivalent(vec![vec![]]),
+                Err(()) => SchemeComparison::ResourceLimit,
+                Ok(false) => SchemeComparison::Unknown,
+            });
         }
         let count = left_bundle.variables.len();
         let mut candidates = Vec::with_capacity(count);
@@ -1665,7 +1689,11 @@ impl SchemeArtifact {
             }
         }
         if solutions.is_empty() {
-            Ok(SchemeComparison::Unknown)
+            Ok(match cover() {
+                Ok(true) => SchemeComparison::Equivalent(vec![vec![]]),
+                Err(()) => SchemeComparison::ResourceLimit,
+                Ok(false) => SchemeComparison::Unknown,
+            })
         } else {
             Ok(SchemeComparison::Equivalent(solutions))
         }
@@ -2101,3 +2129,268 @@ fn substitute_exact_variables(
     }
 }
 
+
+/// Every part of `ty`, `ty` included.
+fn subterms(ty: &Ty, out: &mut Vec<Ty>) {
+    map_types(ty, &mut |t| {
+        if !out.contains(&t) {
+            out.push(t.clone());
+        }
+        t
+    });
+}
+
+#[derive(Clone, Copy)]
+struct CoverSide<'a> {
+    solver: &'a Solver,
+    root: &'a Ty,
+    metadata: &'a [Variable],
+}
+
+/// Whether some instantiation of the variables of `cover` with parts of
+/// `subject` meets the bounds of `cover` and makes its root a subtype of
+/// the root of `subject`.
+fn find_cover(
+    cover: CoverSide<'_>,
+    subject: CoverSide<'_>,
+    tag_base: u32,
+    demand: &mut prove::Demand,
+) -> Result<bool, ()> {
+    let CoverSide {
+        solver: cover,
+        root: cover_root,
+        metadata: cover_meta,
+    } = cover;
+    let CoverSide {
+        solver: subject,
+        root: subject_root,
+        metadata: subject_meta,
+    } = subject;
+    if cover_meta
+        .iter()
+        .chain(subject_meta)
+        .any(|v| v.depth.is_none() || (v.difference && v.handled == 0))
+    {
+        return Ok(false);
+    }
+    let mut candidates = vec![Ty::Never, Ty::Top];
+    for ty in std::iter::once(subject_root).chain(
+        subject
+            .vars
+            .iter()
+            .flat_map(|s| s.lower.iter().chain(&s.upper)),
+    ) {
+        subterms(ty, &mut candidates);
+    }
+    // Closed pieces of the covering scheme and Boolean combinations of
+    // subject atoms are valid instantiation expressions even when they do
+    // not occur verbatim in the subject root.
+    let mut closed = Vec::new();
+    for ty in std::iter::once(cover_root).chain(
+        cover
+            .vars
+            .iter()
+            .flat_map(|s| s.lower.iter().chain(&s.upper)),
+    ) {
+        subterms(ty, &mut closed);
+    }
+    for candidate in closed {
+        if variables(&candidate).is_empty() && !candidates.contains(&candidate) {
+            candidates.push(candidate);
+        }
+    }
+    let atoms: Vec<_> = candidates
+        .iter()
+        .filter(|ty| match ty {
+            Ty::Var(_) => true,
+            Ty::Con(Head::Named(_), _, args) => args.is_empty(),
+            _ => false,
+        })
+        .cloned()
+        .collect();
+    for i in 0..atoms.len() {
+        for j in i + 1..atoms.len() {
+            demand.charge()?;
+            for candidate in [
+                Ty::Union(vec![atoms[i].clone(), atoms[j].clone()]),
+                Ty::Inter(vec![atoms[i].clone(), atoms[j].clone()]),
+            ] {
+                if !candidates.contains(&candidate) {
+                    candidates.push(candidate);
+                }
+            }
+        }
+    }
+    let subject_vars: Vec<_> = atoms
+        .iter()
+        .filter(|ty| matches!(ty, Ty::Var(_)))
+        .cloned()
+        .collect();
+    if subject_vars.len() > 2 {
+        for candidate in [Ty::Union(subject_vars.clone()), Ty::Inter(subject_vars)] {
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        }
+    }
+    let mut choices = Vec::with_capacity(cover.vars.len());
+    for state in &cover.vars {
+        if state.row != Mode::Value {
+            let options = candidates
+                .iter()
+                .filter(|ty| row_candidate(subject, ty, state.row))
+                .cloned()
+                .collect::<Vec<_>>();
+            if options.is_empty() {
+                return Ok(false);
+            }
+            choices.push(options);
+        } else {
+            choices.push(candidates.clone());
+        }
+    }
+    let count = cover.vars.len();
+    let mut positions = vec![0usize; count];
+    let mut depth = 0usize;
+    loop {
+        demand.charge()?;
+        if depth == count {
+            let substitute = |ty: &Ty| {
+                super::alias::map_vars(ty, &mut |v| {
+                    choices[v.0 as usize][positions[v.0 as usize]].clone()
+                })
+            };
+            let mut valid = true;
+            'vars: for (i, state) in cover.vars.iter().enumerate() {
+                let value = &choices[i][positions[i]];
+                for lower in &state.lower {
+                    if !proves(subject, &substitute(lower), value, state.row, demand)? {
+                        valid = false;
+                        break 'vars;
+                    }
+                }
+                for upper in &state.upper {
+                    if !proves(subject, value, &substitute(upper), state.row, demand)? {
+                        valid = false;
+                        break 'vars;
+                    }
+                }
+                for from in &state.from {
+                    let from = &choices[from.0 as usize][positions[from.0 as usize]];
+                    if !proves(subject, from, value, state.row, demand)? {
+                        valid = false;
+                        break 'vars;
+                    }
+                }
+                for into in &state.into {
+                    let into = &choices[into.0 as usize][positions[into.0 as usize]];
+                    if !proves(subject, value, into, state.row, demand)? {
+                        valid = false;
+                        break 'vars;
+                    }
+                }
+                for handler in &state.handled {
+                    if !handler_entailed(subject, value, &substitute(handler), state.row, demand)? {
+                        valid = false;
+                        break 'vars;
+                    }
+                }
+            }
+            if valid {
+                let target = substitute(cover_root);
+                let mut solver = subject.scheme_snapshot();
+                let mut tags = HashMap::new();
+                let mut next = tag_base;
+                let left = tag_scheme_type(&target, &mut tags, &mut next);
+                let right = tag_scheme_type(subject_root, &mut tags, &mut next);
+                for id in tags.values() {
+                    solver.variance.insert(*id, vec![Variance::Co]);
+                    solver.comparison_wrappers.insert(*id);
+                }
+                if proves(&solver, &left, &right, Mode::Value, demand)? {
+                    return Ok(true);
+                }
+            }
+            if depth == 0 {
+                return Ok(false);
+            }
+            depth -= 1;
+            positions[depth] += 1;
+            continue;
+        }
+        if positions[depth] >= choices[depth].len() {
+            positions[depth] = 0;
+            if depth == 0 {
+                return Ok(false);
+            }
+            depth -= 1;
+            positions[depth] += 1;
+        } else {
+            depth += 1;
+            if depth < count {
+                positions[depth] = 0;
+            }
+        }
+    }
+}
+
+/// A row candidate: only `Never`, row variables of this mode, and their
+/// unions and intersections.
+fn row_candidate(solver: &Solver, ty: &Ty, mode: Mode) -> bool {
+    match ty {
+        Ty::Never => true,
+        Ty::Var(v) => solver.vars[v.0 as usize].row == mode,
+        Ty::Union(xs) | Ty::Inter(xs) => xs.iter().all(|x| row_candidate(solver, x, mode)),
+        _ => false,
+    }
+}
+
+/// Prove a retained same-form handler for a candidate row without installing
+/// it into the subject. Every union branch must retain the obligation.
+fn handler_entailed(
+    subject: &Solver,
+    value: &Ty,
+    handler: &Ty,
+    mode: Mode,
+    demand: &mut prove::Demand,
+) -> Result<bool, ()> {
+    Ok(match value {
+        Ty::Never => true,
+        Ty::Var(v) => {
+            let state = &subject.vars[v.0 as usize];
+            let mut found = false;
+            for own in &state.handled {
+                if proves(subject, own, handler, mode, demand)?
+                    && proves(subject, handler, own, mode, demand)?
+                {
+                    found = true;
+                    break;
+                }
+            }
+            found
+        }
+        Ty::Con(..) | Ty::Fn(_) if value.value_head() != handler.value_head() => true,
+        Ty::Con(..) | Ty::Fn(_) => {
+            proves(subject, value, handler, mode, demand)?
+                && proves(subject, handler, value, mode, demand)?
+        }
+        Ty::Union(xs) => {
+            for x in xs {
+                if !handler_entailed(subject, x, handler, mode, demand)? {
+                    return Ok(false);
+                }
+            }
+            true
+        }
+        Ty::Inter(xs) => {
+            for x in xs {
+                if handler_entailed(subject, x, handler, mode, demand)? {
+                    return Ok(true);
+                }
+            }
+            false
+        }
+        Ty::Diff(base, _) => handler_entailed(subject, base, handler, mode, demand)?,
+        _ => false,
+    })
+}

@@ -1524,7 +1524,9 @@ impl<'a> Checker<'a> {
                         None => Ty::Top,
                     };
                     let (ty, known) = self.infer_k(value, &expected_field);
-                    given.push((name.name.clone(), ty, known));
+                    if !given.iter().any(|(g, _, _)| *g == name.name) {
+                        given.push((name.name.clone(), ty, known));
+                    }
                 }
                 let (mut keys, mut types, mut knowns): (Vec<Option<String>>, Vec<Ty>, Vec<Ty>) =
                     (Vec::new(), Vec::new(), Vec::new());

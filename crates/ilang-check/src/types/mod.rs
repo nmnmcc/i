@@ -167,8 +167,10 @@ impl Ty {
     }
 
     /// Data with these labelled parts, in any order.
+    /// A repeated label has been reported; its first part is kept.
     pub fn record(mut fields: Vec<(String, Ty)>) -> Ty {
         fields.sort_by(|a, b| a.0.cmp(&b.0));
+        fields.dedup_by(|a, b| a.0 == b.0);
         let shape = ShapeId::new(0, fields.iter().map(|(l, _)| l.clone()));
         Ty::data(shape, fields.into_iter().map(|(_, t)| t).collect())
     }
