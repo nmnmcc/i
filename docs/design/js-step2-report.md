@@ -89,9 +89,42 @@ WASI clocks additionally establish the monotonic origin at command entry, poll
 once for zero sleeps, reject negative durations with invalid and durations above
 2^63-1 nanoseconds with range. Both O0/O2 boundary tests passed.
 
-Full acceptance: pending execution on the committed tree. No requested
-implementation is left unfinished. Native send_stream is buffered; JS fetch
-streams incrementally, as required by this step.
+Full acceptance: **passed** on committed implementation 7a8c7fe1. Ran the
+user-provided acceptance commands in /tmp/js-step2-acceptance.sh; final output:
 
-Branch: lane/js. Implementation commit: 3935d22a; see the final verification
-commit for the report's completed acceptance results.
+```text
+std: 1845 passed, 0 failed
+acceptance passed
+```
+
+- Heavy-wrapper `cargo build --release --locked -p ilang-cli`: passed.
+- `i deps --project examples/http-get --target js`: fetch provider present,
+  no Net/Tls service. `i build --project examples/io-fs --target wasi`: passed.
+  `i build --project examples/io-net --target wasi`: expected compile failure,
+  `provider target wasi entry io_net/main.main: missing service i/net.Net`.
+- `cd bindings/javascript && direnv exec /home/agent/Programming/i npm test`:
+  104 passed, 0 failed, 0 skipped. Includes body cancellation after headers.
+- Heavy-wrapper `cargo test --workspace --locked`: passed, including the
+  full spec corpus and reverse-order checks. No test expectations were weakened.
+- `i test --project std --opt 0`: 1845 passed, 0 failed.
+- `timeout 90 i run --project examples/http-get`: http ok over native HTTPS.
+- `scripts/old-syntax-check`: 4624 extracted literals/blocks passed; its three
+  pre-existing future-track entries remain.
+- `npm run test:browser -- tests/browser/fetch.spec.mjs`: 3 passed, 0 skipped
+  (Chromium, Firefox, WebKit), using separate output artifacts per engine.
+- Wasmtime `run -W gc=y -W tail-call=y -W exceptions=y` on the final O2 hello,
+  io-clock and io-fs artifacts (with `--dir /tmp` for fs): passed, printing
+  Hello from i!, clock ok, and fs ok respectively. The Node preview-1 runner
+  additionally checked args/env/entropy and boundaries at O0 and O2.
+
+Acceptance logs: /tmp/js-acceptance-complete.log and
+/tmp/js-accept-{build,npm,workspace,syntax}.log. Earlier acceptance attempts
+stopped on the stale inventories and the inference-order issue listed above;
+these were corrected before the successful frozen-source run.
+
+Not finished: nothing in the requested step. Native send_stream is buffered;
+JS fetch streams incrementally, as required by this step. The public Wasi root
+interface remains a separate design item, as explained in the interpretation.
+
+Branch: lane/js. Verified implementation: 7a8c7fe1; the final commit only
+records these verification results.
