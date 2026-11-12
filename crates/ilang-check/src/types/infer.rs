@@ -740,7 +740,9 @@ impl<'a> Checker<'a> {
         }
         self.finish_reads(group, &candidates);
         self.discharge_union_proofs();
-        if !self.diags[error_start..].iter().any(Diagnostic::is_error) {
+        if self.pending_typed.is_empty() {
+            // No typed call in this group: no barrier work.
+        } else if !self.diags[error_start..].iter().any(Diagnostic::is_error) {
             let mut roots: Vec<_> = self
                 .tyvars
                 .values()
@@ -2001,9 +2003,9 @@ impl<'a> Checker<'a> {
             self.add_env(effects.1.clone());
             self.expression_effects
                 .insert((self.module, e.span), effects);
+            self.expression_known
+                .insert((self.module, e.span), result.1.clone());
         }
-        self.expression_known
-            .insert((self.module, e.span), result.1.clone());
         self.numeric_handles
             .insert((self.module, e.span), result.0.clone());
         result
