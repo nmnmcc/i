@@ -209,7 +209,7 @@ fn type_of_local_names() {
 #[test]
 fn type_of_other_things() {
     let f = fixture();
-    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Option(A)");
+    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Some(A)");
     assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(A)");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
@@ -377,6 +377,8 @@ fn symbols_of_a_module() {
             ("describe", SymbolKind::Function),
             ("first", SymbolKind::Function),
             ("Option", SymbolKind::Type),
+            ("Some", SymbolKind::Type),
+            ("None", SymbolKind::Type),
             ("total", SymbolKind::Value),
         ]
     );
