@@ -1129,6 +1129,10 @@ impl<'a> Formatter<'a> {
     /// `e` where an expression of at least level `min` is needed (§6.9).
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
+            let token = &f.toks[f.tok_index(e.span.start)];
+            if token.span == e.span && matches!(token.kind, T::Interpolated(_)) {
+                return text(f.slice(e.span));
+            }
             // A match is an operation at level 6 (§6.9).
             if level(e) < min || is_match(e) && min > 6 {
                 let before = f.hard;
@@ -1316,6 +1320,7 @@ impl<'a> Formatter<'a> {
         let mut first = e;
         while let ExprKind::Binary { op, lhs, rhs } = &first.kind
             && op.level() == lvl
+            && !matches!(&self.toks[self.tok_index(first.span.start)], Token { span, kind: T::Interpolated(_), .. } if *span == first.span)
         {
             rest.push((*op, &**rhs));
             first = lhs;
@@ -1516,10 +1521,7 @@ impl<'a> Formatter<'a> {
                 self.literal_before(span.end)
             )),
             PatternKind::String(_) => text(self.slice(span)),
-            PatternKind::Prefix { rest, .. } => {
-                let prefix = self.slice(self.toks[self.tok_index(span.start)].span);
-                text(format!("{prefix} <> {}", rest.name))
-            }
+            PatternKind::Prefix { .. } => text(self.slice(span)),
             PatternKind::Constructor {
                 module,
                 name,

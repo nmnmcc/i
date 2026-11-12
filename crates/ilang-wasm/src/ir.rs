@@ -316,8 +316,8 @@ pub enum Value {
     Field(Atom, u32),
     ListHead(Atom),
     ListTail(Atom),
-    /// The string after its first `bytes` bytes.
-    StringSuffix(Atom, u32),
+    /// The string after removing its prefix and suffix byte counts.
+    StringSuffix(Atom, u32, u32),
     // Making bit arrays (§8.3). Widths are in bits.
     BitsEmpty,
     BitsConcat(Atom, Atom),
@@ -428,7 +428,7 @@ pub enum Cond {
     IsInt(Atom, BigInt),
     IsFloat(Atom, f64),
     IsString(Atom, String),
-    StartsWith(Atom, Atom),
+    StartsWith(Atom, Atom, Atom),
     /// The `i32` local is not 0.
     I32(Local),
     NumLt(Num, Num),

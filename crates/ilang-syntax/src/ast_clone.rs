@@ -246,8 +246,13 @@ async fn cp<'a>(s: Scheduler<'a>, p: &'a Pattern) -> Pattern {
             value: *value,
         },
         K::String(x) => K::String(x.clone()),
-        K::Prefix { prefix, rest } => K::Prefix {
+        K::Prefix {
+            prefix,
+            suffix,
+            rest,
+        } => K::Prefix {
             prefix: prefix.clone(),
+            suffix: suffix.clone(),
             rest: rest.clone(),
         },
         K::Constructor {

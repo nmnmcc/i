@@ -3329,15 +3329,28 @@ impl<'a> Lowerer<'a> {
                 guard(out, Cond::IsFloat(v, x), fail);
             }
             PatternKind::String(s) => guard(out, Cond::IsString(v, s.clone()), fail),
-            PatternKind::Prefix { prefix, rest } => {
+            PatternKind::Prefix {
+                prefix,
+                suffix,
+                rest,
+            } => {
                 guard(out, Cond::Tag(v.clone(), 3), fail);
                 guard(
                     out,
-                    Cond::StartsWith(v.clone(), Atom::String(prefix.clone())),
+                    Cond::StartsWith(
+                        v.clone(),
+                        Atom::String(prefix.clone()),
+                        Atom::String(suffix.clone()),
+                    ),
                     fail,
                 );
                 if let Some(b) = rest {
-                    let r = let_value(fx, out, Value::StringSuffix(v, prefix.len() as u32), None);
+                    let r = let_value(
+                        fx,
+                        out,
+                        Value::StringSuffix(v, prefix.len() as u32, suffix.len() as u32),
+                        None,
+                    );
                     Self::bind_var(fx, out, b, r);
                 }
             }

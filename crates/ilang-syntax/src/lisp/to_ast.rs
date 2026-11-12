@@ -358,15 +358,38 @@ async fn pattern_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Pattern> {
                     value: n,
                 }
             }
-            [h, x, rest] if symbol(h, "<>") => {
-                let K::String(x) = &x.kind else {
-                    return Err(bad(d, "a prefix pattern"));
-                };
-                PatternKind::Prefix {
-                    prefix: x.clone(),
+            [h, x, rest] if symbol(h, "<>") => match (&x.kind, &rest.kind) {
+                (K::String(prefix), _) => PatternKind::Prefix {
+                    prefix: prefix.clone(),
+                    suffix: String::new(),
                     rest: binder(rest)?,
+                },
+                (_, K::String(suffix)) => {
+                    let (prefix, rest) = match &x.kind {
+                        K::Round(parts) => match parts.as_slice() {
+                            [h, p, r] if symbol(h, "<>") => {
+                                let K::String(prefix) = &p.kind else {
+                                    return Err(bad(d, "one binder between string literals"));
+                                };
+                                (prefix.clone(), binder(r)?)
+                            }
+                            _ => return Err(bad(d, "a string prefix or suffix pattern")),
+                        },
+                        _ => (String::new(), binder(x)?),
+                    };
+                    PatternKind::Prefix {
+                        prefix,
+                        suffix: suffix.clone(),
+                        rest,
+                    }
                 }
-            }
+                _ => {
+                    return Err(bad(
+                        d,
+                        "a string prefix or suffix pattern with exactly one binder",
+                    ));
+                }
+            },
             [h, ps @ ..] if symbol(h, ",") && !ps.is_empty() => {
                 PatternKind::Tuple(patterns(s, ps).await?)
             }

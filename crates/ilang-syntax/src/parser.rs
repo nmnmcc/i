@@ -8,7 +8,7 @@
 use crate::ast::*;
 use crate::lexer::{DocComment, lex};
 use crate::span::Span;
-use crate::token::{Token, TokenKind as T};
+use crate::token::{StringPart, Token, TokenKind as T};
 use crate::{Code, Diagnostic};
 use std::collections::HashMap;
 
@@ -234,6 +234,13 @@ impl Parser<'_> {
     }
 
     fn error<X>(&self, expected: &str) -> PResult<X> {
+        if matches!(self.kind(), T::Interpolated(_)) {
+            return Err(Diagnostic::new(
+                Code::Unexpected,
+                self.tok().span,
+                "string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns",
+            ));
+        }
         let found = if self.tok().brk {
             format!("a line break before {}", self.kind())
         } else {
@@ -747,6 +754,18 @@ impl Parser<'_> {
         let mut args = Vec::new();
         let mut call = None;
         if self.at_joined(&T::LParen) {
+            let open_index = self.pos;
+            if let Some(close) = self.close[open_index]
+                && let Some(token) = self.toks[open_index..=close as usize]
+                    .iter()
+                    .find(|t| matches!(t.kind, T::Interpolated(_)))
+            {
+                return Err(Diagnostic::new(
+                    Code::Unexpected,
+                    token.span,
+                    "string interpolation is not allowed in attribute arguments",
+                ));
+            }
             let open = self.bump().start;
             let list = self.args()?;
             let span = self.span_from(open);
@@ -1144,6 +1163,62 @@ impl Parser<'_> {
         })
     }
 
+    fn interpolation(&mut self, parts: Vec<StringPart>, span: Span) -> PResult<Expr> {
+        let mut expressions = Vec::new();
+        for part in parts {
+            match part {
+                StringPart::Text(s) if !s.is_empty() => expressions.push(Expr {
+                    kind: ExprKind::String(s),
+                    span,
+                }),
+                StringPart::Text(_) => {}
+                StringPart::Expr(tokens) => {
+                    let close = crate::lexer::pair_brackets(&tokens, &mut self.diags);
+                    let mut child = Parser {
+                        toks: &tokens,
+                        close: &close,
+                        docs: &[],
+                        doc_pos: 0,
+                        pos: 0,
+                        diags: Vec::new(),
+                        guard: false,
+                        decided: HashMap::new(),
+                        decisions: 0,
+                        tuple_type: false,
+                        cache: self.cache,
+                    };
+                    let expression = child.expr()?;
+                    child.expect(&T::Eof)?;
+                    self.diags.extend(child.diags);
+                    expressions.push(expression);
+                }
+            }
+        }
+        if expressions.len() == 1 {
+            expressions.insert(
+                0,
+                Expr {
+                    kind: ExprKind::String(String::new()),
+                    span,
+                },
+            );
+        }
+        let mut iter = expressions.into_iter();
+        let mut result = iter.next().expect("interpolation has an expression");
+        for rhs in iter {
+            result = Expr {
+                kind: ExprKind::Binary {
+                    op: BinOp::Concat,
+                    lhs: Box::new(result),
+                    rhs: Box::new(rhs),
+                },
+                span,
+            };
+        }
+        result.span = span;
+        Ok(result)
+    }
+
     fn primary(&mut self) -> PResult<Expr> {
         let start = self.start();
         let kind = match self.kind().clone() {
@@ -1158,6 +1233,10 @@ impl Parser<'_> {
             T::Str(s) => {
                 self.bump();
                 ExprKind::String(s)
+            }
+            T::Interpolated(parts) => {
+                let span = self.bump();
+                return self.interpolation(parts, span);
             }
             T::Name(_) | T::UpName(_) => {
                 let module = self.qualifier()?;
@@ -1219,7 +1298,10 @@ impl Parser<'_> {
     /// after its `)`; a tuple when not (§6.1, §1.7). In a guard, `->` does not
     /// count.
     fn label_start(&self) -> bool {
-        matches!(self.kind(), T::Name(_) | T::UpName(_) | T::Str(_)) && *self.nth(1) == T::Colon
+        matches!(
+            self.kind(),
+            T::Name(_) | T::UpName(_) | T::Str(_) | T::Interpolated(_)
+        ) && *self.nth(1) == T::Colon
     }
 
     fn mixed(&self) -> Diagnostic {
@@ -1267,7 +1349,8 @@ impl Parser<'_> {
                 fields: Vec::new(),
             }
         } else if self.at(&T::DotDot)
-            || matches!(self.kind(), T::Name(_) | T::Str(_)) && *self.nth(1) == T::Colon
+            || matches!(self.kind(), T::Name(_) | T::Str(_) | T::Interpolated(_))
+                && *self.nth(1) == T::Colon
         {
             self.record_expr(T::RParen)?
         } else {
@@ -1559,6 +1642,25 @@ impl Parser<'_> {
         })
     }
 
+    fn pattern_string(&mut self) -> PResult<String> {
+        match self.kind().clone() {
+            T::Str(s) => {
+                self.bump();
+                Ok(s)
+            }
+            T::Interpolated(_) => {
+                let span = self.bump();
+                self.diags.push(Diagnostic::new(
+                    Code::Unexpected,
+                    span,
+                    "string interpolation is not allowed in patterns",
+                ));
+                Ok(String::new())
+            }
+            _ => self.error("a string literal in a string pattern"),
+        }
+    }
+
     /// `PrefixPat | Atom`.
     fn pattern_atom(&mut self, segment: bool) -> PResult<Pattern> {
         let start = self.start();
@@ -1566,7 +1668,19 @@ impl Parser<'_> {
             T::Name(_) if self.at_qualified() => self.constructor_pattern()?,
             T::Name(_) | T::Discard(_) => {
                 let binder = self.binder()?;
-                if !segment && self.eat(&T::Colon) {
+                if self.eat(&T::LtGt) {
+                    let suffix = self.pattern_string()?;
+                    if self.eat(&T::LtGt) {
+                        let extra = self.binder()?;
+                        self.diags.push(Diagnostic::new(Code::BadPattern, extra.span,
+                            "a string pattern has exactly one binder; two binders around a literal are not allowed"));
+                    }
+                    PatternKind::Prefix {
+                        prefix: String::new(),
+                        suffix,
+                        rest: binder,
+                    }
+                } else if !segment && self.eat(&T::Colon) {
                     self.tuple_type |= self.at(&T::LParen);
                     PatternKind::Typed {
                         binder,
@@ -1617,12 +1731,28 @@ impl Parser<'_> {
                     }
                 }
             }
+            T::Interpolated(_) => {
+                let span = self.bump();
+                self.diags.push(Diagnostic::new(
+                    Code::Unexpected,
+                    span,
+                    "string interpolation is not allowed in patterns",
+                ));
+                PatternKind::String(String::new())
+            }
             T::Str(prefix) => {
                 self.bump();
                 if self.eat(&T::LtGt) {
+                    let rest = self.binder()?;
+                    let suffix = if self.eat(&T::LtGt) {
+                        self.pattern_string()?
+                    } else {
+                        String::new()
+                    };
                     PatternKind::Prefix {
                         prefix,
-                        rest: self.binder()?,
+                        suffix,
+                        rest,
                     }
                 } else {
                     PatternKind::String(prefix)
@@ -1863,8 +1993,10 @@ impl Parser<'_> {
                 self.bump();
                 if !is_fn {
                     if self.at(&T::DotDot)
-                        || matches!(self.kind(), T::Name(_) | T::UpName(_) | T::Str(_))
-                            && *self.nth(1) == T::Colon
+                        || matches!(
+                            self.kind(),
+                            T::Name(_) | T::UpName(_) | T::Str(_) | T::Interpolated(_)
+                        ) && *self.nth(1) == T::Colon
                     {
                         self.record_type(T::RParen)?
                     } else {

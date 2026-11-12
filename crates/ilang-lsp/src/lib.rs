@@ -10,6 +10,7 @@ mod analysis;
 mod change;
 pub mod format;
 pub mod position;
+mod semantic;
 mod server;
 pub mod uri;
 

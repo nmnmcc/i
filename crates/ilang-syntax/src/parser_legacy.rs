@@ -1654,6 +1654,7 @@ impl Parser<'_> {
                 if self.eat(&T::LtGt) {
                     PatternKind::Prefix {
                         prefix,
+                        suffix: String::new(),
                         rest: self.binder()?,
                     }
                 } else {

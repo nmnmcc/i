@@ -17,6 +17,7 @@ pub enum TokenKind {
     Int(BigUint),
     Float(f64),
     Str(String),
+    Interpolated(Vec<StringPart>),
     // Symbols (§1.5)
     Eq,
     Colon,
@@ -66,6 +67,13 @@ pub enum TokenKind {
     Eof,
 }
 
+/// Decoded text and independently lexed expressions inside one string token.
+#[derive(Clone, Debug, PartialEq)]
+pub enum StringPart {
+    Text(String),
+    Expr(Vec<Token>),
+}
+
 /// A token. `nl` is set when a line end or a comment comes before it, and
 /// `brk` when that line end is a break (§1.7).
 #[derive(Clone, Debug, PartialEq)]
@@ -82,7 +90,7 @@ impl TokenKind {
         use TokenKind::*;
         matches!(
             self,
-            Name(_) | UpName(_) | Discard(_) | Int(_) | Float(_) | Str(_)
+            Name(_) | UpName(_) | Discard(_) | Int(_) | Float(_) | Str(_) | Interpolated(_)
         ) || matches!(self, RParen | RBracket | RBrace | GtGt)
     }
 
@@ -91,7 +99,7 @@ impl TokenKind {
         use TokenKind::*;
         matches!(
             self,
-            Name(_) | UpName(_) | Discard(_) | Int(_) | Float(_) | Str(_)
+            Name(_) | UpName(_) | Discard(_) | Int(_) | Float(_) | Str(_) | Interpolated(_)
         ) || matches!(
             self,
             LParen | LBracket | LBrace | LtLt | Minus | MinusDot | DotDot | Bang | At
@@ -107,7 +115,7 @@ impl TokenKind {
             Discard(_) => "a discard",
             Int(_) => "an int",
             Float(_) => "a float",
-            Str(_) => "a string",
+            Str(_) | Interpolated(_) => "a string",
             Eq => "=",
             Colon => ":",
             Comma => ",",

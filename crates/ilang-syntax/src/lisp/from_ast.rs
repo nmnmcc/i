@@ -472,8 +472,21 @@ fn pattern(p: &Pattern) -> String {
             }
         }
         PatternKind::String(s) => string_literal(s),
-        PatternKind::Prefix { prefix, rest } => {
-            form("<>", [string_literal(prefix), rest.name.clone()])
+        PatternKind::Prefix {
+            prefix,
+            suffix,
+            rest,
+        } => {
+            let start = if !prefix.is_empty() || suffix.is_empty() {
+                form("<>", [string_literal(prefix), rest.name.clone()])
+            } else {
+                rest.name.clone()
+            };
+            if suffix.is_empty() {
+                start
+            } else {
+                form("<>", [start, string_literal(suffix)])
+            }
         }
         PatternKind::Constructor {
             module,

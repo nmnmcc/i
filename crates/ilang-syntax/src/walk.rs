@@ -232,8 +232,13 @@ impl Walk for PatternKind {
                 name.walk(v);
                 pattern.walk(v);
             }
-            Self::Prefix { prefix, rest } => {
+            Self::Prefix {
+                prefix,
+                suffix,
+                rest,
+            } => {
                 prefix.walk(v);
+                suffix.walk(v);
                 rest.walk(v);
             }
             Self::Constructor {

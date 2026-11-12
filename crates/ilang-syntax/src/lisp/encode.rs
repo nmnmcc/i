@@ -378,7 +378,9 @@ impl Encoder<'_> {
     }
     fn record_label(&self, n: &Ident) -> Syntax {
         let token = &self.tokens[self.positions[n.span.start as usize]];
-        if matches!(token.kind, TokenKind::Str(_)) && crate::print::record_label(&n.name, false).starts_with('"') {
+        if matches!(token.kind, TokenKind::Str(_))
+            && crate::print::record_label(&n.name, false).starts_with('"')
+        {
             self.node(Node::Text(n.name.clone()), n.span)
         } else {
             self.name(n)
@@ -958,16 +960,33 @@ impl Encoder<'_> {
                 }
             }
             PatternKind::String(s) => self.node(Node::Text(s.clone()), p.span),
-            PatternKind::Prefix { prefix, rest } => {
+            PatternKind::Prefix {
+                prefix,
+                suffix,
+                rest,
+            } => {
                 let span = self.token_span(p.span, |k| matches!(k, TokenKind::Str(_)));
-                self.form(
-                    "<>",
-                    [
-                        self.node(Node::Text(prefix.clone()), span),
-                        self.binder(rest),
-                    ],
-                    p.span,
-                )
+                let start = if !prefix.is_empty() || suffix.is_empty() {
+                    self.form(
+                        "<>",
+                        [
+                            self.node(Node::Text(prefix.clone()), span),
+                            self.binder(rest),
+                        ],
+                        p.span,
+                    )
+                } else {
+                    self.binder(rest)
+                };
+                if suffix.is_empty() {
+                    start
+                } else {
+                    self.form(
+                        "<>",
+                        [start, self.node(Node::Text(suffix.clone()), span)],
+                        p.span,
+                    )
+                }
             }
             PatternKind::Constructor {
                 module,

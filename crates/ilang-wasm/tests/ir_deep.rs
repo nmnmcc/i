@@ -155,7 +155,7 @@ fn condition_leaf_forms_remain_distinct() {
         Cond::IsInt(a.clone(), BigInt::from(4)),
         Cond::IsFloat(a.clone(), 2.5),
         Cond::IsString(a.clone(), "x".into()),
-        Cond::StartsWith(a.clone(), b.clone()),
+        Cond::StartsWith(a.clone(), b.clone(), Atom::String(String::new())),
         Cond::I32(2),
         Cond::NumLt(n.clone(), m.clone()),
         Cond::NumEq(n.clone(), m.clone()),
