@@ -25,6 +25,17 @@ No language or library surface was added, including state mechanisms.
   temporary copy of the original source: parsing before and after formatting
   produces the same canonical tree; comments and idempotence also pass.
   Removed the temporary copy after the check. The formatter is correct.
+- i benchmark: `i test --project bench --opt 0` failed with
+  `error[E0501]: i/request.Root is not a subtype of task.Scheduler` in the
+  explicitly Scheduler-only `spawns` helper. `scope_call` used
+  `request.within`, leaking its internal Root requirement through scope,
+  local_scope, both, race and map_concurrently. Keep the run Root in the
+  private immutable Scheduler value and use it only to allocate the scope's
+  Owner. Retain the caller's services around the body, bind that Owner, and
+  close it through `resource.ensure` on all returning/unwinding paths. The
+  benchmark source and its requirements stay unchanged. Added Scheduler-only
+  scope/local_scope helpers to the existing §9.9 task case and updated the
+  library type snapshot to the specified schemes.
 - i generation: `scripts/qa/generate.py` still emitted `@main`, producing
   `error[E0301]: the attribute @main is kept for macros` instead of exercising
   accepted models. Generate ordinary `main` bindings in `src/main.i`, and
@@ -57,6 +68,13 @@ No language or library surface was added, including state mechanisms.
 - Verified the lint exception against `records/graph.rs::Arena::intern`,
   `records/bridge.rs::Pool`, and `records/shown.rs` equality/hash: allocation
   uses interior mutability, while stored nodes and graph keys stay immutable.
+- Spec §9.9's scope schemes control over the old library snapshot's extra
+  Root requirement. Scope resource ownership belongs to its scheduler run;
+  caller service bindings remain available to the body. Read reference
+  `effect/packages/effect/src/internal/effect.ts` (`scoped`, `scopedWith`,
+  `scopeUse`): allocate the internal scope, provide it around the body, and
+  always close it on exit. Used i's existing Owner and resource.ensure for
+  the same lifetime pattern, with no new state API.
 
 ## Verification
 

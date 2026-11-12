@@ -146,6 +146,7 @@ Scheduler {
 	DetachedScheduler
 	Scheduler(
 		run:     Key(Nil)
+		root:    request.Root
 		path:    Keyed
 		seed:    () -> rng.Generator
 		witness: Witness
@@ -1222,6 +1223,7 @@ make_scheduler = (
 	task_path: List(Int)
 	id: Int
 	run: Key(Nil)
+	root: request.Root
 	upstream: Runner
 ) -> Scheduler {
 	upstream |> {
@@ -1289,6 +1291,7 @@ make_scheduler = (
 			}
 			Scheduler(
 				run
+				root
 				key.wrap(path_key, task_path)
 				generator
 				Local(b)
@@ -2812,10 +2815,11 @@ turn = (s: State, t: TaskState) -> Turn {
 			path = t.path
 			id = t.serial
 			run = s.run
+			root = s.root
 			runner = s.runner
 			body = start.body
 			control.boundary((b) {
-				own = make_scheduler(b, path, id, run, runner)
+				own = make_scheduler(b, path, id, run, root, runner)
 				Finished(id, body(own))
 			})
 		}
@@ -3537,10 +3541,22 @@ scope_call(A, E, N) = (
 	mode: Mode
 	own: Scheduler
 ) -> ScopeResult(A) ^ E ! N {
-	kept = control.keep_env((_: Nil) {
-		request.within(() { scope_call_body(body, witness, mode, own) })
-	})
-	retain(kept(Nil))
+	own |> {
+		DetachedScheduler -> panic("task: no scheduler")
+		Scheduler(..) -> {
+			owner = {
+				! request.Root = own.root
+				retain(request.open_owner())
+			}
+			kept = control.keep_env((_: Nil) {
+				resource.ensure(() {
+					! request.Owner = owner
+					retain(scope_call_body(body, witness, mode, own))
+				}, () { request.close_owner(owner) })
+			})
+			retain(kept(Nil))
+		}
+	}
 }
 
 execute(A, E, N) = (

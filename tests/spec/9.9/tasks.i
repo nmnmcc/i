@@ -6,8 +6,13 @@
 	i/task
 )
 
+scoped = () -> Int ! task.Scheduler { task.scope((_) { 1 }) }
+
+local_scoped = () -> Int ! task.Scheduler { task.local_scope((_) { 2 }) }
 
 main = () {
+	assert(scoped() == 1)
+	assert(local_scoped() == 2)
 	assert(task.path() == [])
 	value = task.scope((s) {
 		c: task.Channel(Int) = task.channel()
