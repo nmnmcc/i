@@ -214,7 +214,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     assert_eq!(read(&dir.join("i.toml")), test_project::manifest("demo"));
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
-    assert!(read(&dir.join("src/main.i")).contains("main = (io ! Io)"));
+    assert!(read(&dir.join("src/main.i")).contains("main = () <- (io: Io)"));
     assert!(read(&dir.join("test/main_test.i")).contains("test(\"greets\""));
 
     let project = dir.display().to_string();
@@ -656,7 +656,7 @@ fn publish_compares_the_interface() {
 
     // An addition needs a minor version.
     let added = API_1
-        .replace("(one,", "(one, two,")
+        .replace("\tone\n", "\tone\n\ttwo\n")
         .replace("one = 1\n", "one = 1\n\ntwo = 2\n");
     write(&dir, &[("src/api.i", &added)]);
     commit(&dir, "two");
@@ -674,7 +674,7 @@ fn publish_compares_the_interface() {
             "add = (a: Int, b: Int) { a + b }",
             "add = (a: Int, b: Int, c: Int) { a + b + c }",
         )
-        .replace("Square(side: Float) }", "Square(side: Float) Dot }");
+        .replace("Shape = Circle | Square\n", "Dot = ()\nShape = Circle | Square | Dot\n");
     write(&dir, &[("src/api.i", &changed)]);
     commit(&dir, "change");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
@@ -696,7 +696,7 @@ fn publish_compares_the_interface() {
     // Removing a name, or hiding constructors, is incompatible too.
     let hidden = changed
         .replace("Shape(..)", "Shape")
-        .replace("one, two,", "one,");
+        .replace("\ttwo\n", "");
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
@@ -884,8 +884,8 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
         "1.0.1",
     );
     assert!(!ok, "{out}");
-    assert!(out.contains("changed constructors api.W: W(a.T)"), "{out}");
-    assert!(out.contains("to constructors api.W: W(b.T)"), "{out}");
+    assert!(out.contains("changed type api.W: W = (a.T)"), "{out}");
+    assert!(out.contains("to type api.W: W = (b.T)"), "{out}");
     assert!(out.contains("a new major version"), "{out}");
 
     // An alias of another type of the same name.
