@@ -162,8 +162,26 @@ impl Checker<'_> {
             self.bind_catch_all(q, b, in_case);
         } else {
             let t = self.pat(q, in_case);
+            // Syntax three §2.12 (D4): a fitted constructor pattern may
+            // fail, so it needs `B <: Q | r - Q`, not `B <: Q`: `Ok(v) = r`
+            // with `r: Result(A, E) = Ok(A) | Error(E)`.
+            let t = if top_ctor(q).is_some() {
+                self.with_rest(t)
+            } else {
+                t
+            };
             self.sub(b, &t, q.span);
         }
+    }
+
+    /// `T | r - T`, with a new type variable `r`.
+    fn with_rest(&mut self, t: Ty) -> Ty {
+        let mut members = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&t), &mut members);
+        let r = self.s.fresh();
+        let rest = self.s.diff(r, members.clone());
+        members.push(rest);
+        Ty::Union(members)
     }
 
     /// The type of a parameter (rule 4): a new variable for a catch-all,
@@ -497,8 +515,13 @@ impl Checker<'_> {
         for i in 0..places.len() {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
             let pats = std::mem::take(&mut places[i].pats);
+            // A fitted constructor pattern may fail (syntax three §2.12).
+            let fitted_ctor = fitted
+                && pats
+                    .iter()
+                    .any(|t| matches!(t, Ty::Con(Head::Named(TypeRef::Custom(_)), _, _)));
             let p = self.union(pats, span);
-            let want = if slack[i] {
+            let want = if slack[i] || fitted_ctor {
                 let mut members = Vec::new();
                 super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
                 let r = self.s.fresh();

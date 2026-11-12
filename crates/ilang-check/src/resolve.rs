@@ -2258,15 +2258,26 @@ impl<'a> Resolver<'a> {
                     } = expanded.kind
                         && args.len() == 1
                     {
-                        let answer = self.expand(&args[0]);
-                        let (value, error) = if let TypeKind::Named {
-                            ty: TypeRef::Custom(id),
-                            args,
-                        } = &answer.kind
-                            && self.p.ty(*id).name == "Result"
-                            && Some(self.p.ty(*id).module) == self.p.prelude
-                            && args.len() == 2
-                        {
+                        // `Result(A, E)` is an alias of `Ok(A) | Error(E)`:
+                        // look for it before expanding it.
+                        let mut answer = args[0].clone();
+                        let result_args = loop {
+                            if let TypeKind::Named {
+                                ty: TypeRef::Custom(id),
+                                args,
+                            } = &answer.kind
+                                && self.p.ty(*id).name == "Result"
+                                && Some(self.p.ty(*id).module) == self.p.prelude
+                                && args.len() == 2
+                            {
+                                break Some(args.clone());
+                            }
+                            match self.expand_alias(&answer) {
+                                Some(next) => answer = next,
+                                None => break None,
+                            }
+                        };
+                        let (value, error) = if let Some(args) = result_args {
                             wrapped = true;
                             (args[0].clone(), Some(Box::new(args[1].clone())))
                         } else {

@@ -5,17 +5,26 @@
 //// `Boundary`, and `Continuation` are built into the compiler.
 
 (
-	Bool(..)
+	Bool
+	True(..)
+	False(..)
 	Nil(..)
-	Result(..)
+	Result
+	Ok(..)
+	Error(..)
 	AssertionFailure(..)
 	Assert(..)
 	panic
 	assert
 )
 
-Bool {
+Bool = True | False
+
+True {
 	True
+}
+
+False {
 	False
 }
 
@@ -23,8 +32,13 @@ Nil {
 	Nil
 }
 
-Result(A, E) {
+Result(A, E) = Ok(A) | Error(E)
+
+Ok(A) {
 	Ok(A)
+}
+
+Error(E) {
 	Error(E)
 }
 
