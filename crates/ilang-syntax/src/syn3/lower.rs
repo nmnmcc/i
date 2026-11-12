@@ -509,9 +509,12 @@ impl Cx {
     fn binding(&mut self, b: &n::Binding) -> o::Binding {
         let mut generics: Vec<&n::Ident> = Vec::new();
         if let n::ExprKind::Chain(fs) = &b.value.kind {
+            // Branches may share a name; a name written twice in one list
+            // is kept twice, so that the resolver reports it (E0226).
             for f in fs {
+                let before = generics.len();
                 for g in &f.generics {
-                    if !generics.iter().any(|x| x.name == g.name) {
+                    if !generics[..before].iter().any(|x| x.name == g.name) {
                         generics.push(g);
                     }
                 }
