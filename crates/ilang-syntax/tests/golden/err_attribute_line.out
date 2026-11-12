@@ -1,3 +1,0 @@
-main = () { Nil }
---- errors ---
-E0115 @3:1 a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them

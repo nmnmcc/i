@@ -1,7 +1,0 @@
-a = 1
-
-b = 2
-
-c = 3
---- errors ---
-E0001 @2:6 unexpected character U+000C

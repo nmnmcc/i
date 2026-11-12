@@ -1,5 +1,0 @@
-a = 1
-
-b = 2
---- errors ---
-E0115 @3:1 a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file

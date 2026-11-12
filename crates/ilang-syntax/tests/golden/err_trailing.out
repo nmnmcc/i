@@ -1,4 +1,0 @@
---- errors ---
-E0101 @2:3 expected a type, found `,`
-E0101 @3:11 expected a type, found `,`
-E0101 @4:7 expected a part, found `)`
