@@ -15,9 +15,22 @@ use crate::token::{StringPart, Token, TokenKind as T};
 use crate::walk::{Visitor, Walk};
 use std::collections::{HashMap, HashSet};
 
-/// For each constructor name, the distinct lists of field labels with which
-/// it is defined in the files that were read.
-pub type CtorTable = HashMap<String, Vec<Vec<Option<String>>>>;
+/// The labels of the fields of a constructor, or of the parameters of a
+/// function, in order.
+pub type Labels = Vec<Option<String>>;
+
+/// What the files that were read define: the facts of other modules that the
+/// converter needs and the text of one file does not show.
+#[derive(Clone, Debug, Default)]
+pub struct Signatures {
+    /// For each constructor name, the distinct lists of field labels with
+    /// which it is defined.
+    pub ctors: HashMap<String, Vec<Labels>>,
+    /// The same, for each module (the last part of its path) and constructor.
+    pub module_ctors: HashMap<(String, String), Vec<Labels>>,
+    /// For each module and top-level function, the labels of its parameters.
+    pub module_fns: HashMap<(String, String), Vec<Labels>>,
+}
 
 /// Something the converter could not do from the text alone.
 #[derive(Clone, Debug, PartialEq)]
@@ -28,26 +41,104 @@ pub struct Note {
     pub message: String,
 }
 
-/// Adds the constructors that `module` defines to `table`.
-pub fn collect_ctors(module: &o::Module, table: &mut CtorTable) {
+fn add(list: &mut Vec<Labels>, labels: Labels) {
+    if !list.contains(&labels) {
+        list.push(labels);
+    }
+}
+
+/// The label of a parameter (spec §6.11): the last name in the `=` chain at
+/// the top of its pattern.
+fn param_label(p: &o::Pattern) -> Option<String> {
+    match &p.kind {
+        o::PatternKind::Var(n) => Some(n.clone()),
+        o::PatternKind::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
+        o::PatternKind::Named { name, pattern } => {
+            param_label(pattern).or_else(|| Some(name.name.clone()))
+        }
+        _ => None,
+    }
+}
+
+/// The constructors and the top-level functions of a module.
+fn definitions(module: &o::Module) -> (Vec<(String, Labels)>, Vec<(String, Labels)>) {
+    let (mut ctors, mut fns) = (Vec::new(), Vec::new());
     for item in &module.items {
-        if let o::ItemKind::TypeDef(o::TypeDef {
-            body: o::TypeBody::Custom(ctors),
-            ..
-        }) = &item.kind
-        {
-            for c in ctors {
-                let labels: Vec<Option<String>> = c
-                    .fields
-                    .iter()
-                    .map(|f| f.label.as_ref().map(|l| l.name.clone()))
-                    .collect();
-                let entry = table.entry(c.name.name.clone()).or_default();
-                if !entry.contains(&labels) {
-                    entry.push(labels);
+        match &item.kind {
+            o::ItemKind::TypeDef(o::TypeDef {
+                body: o::TypeBody::Custom(cs),
+                ..
+            }) => {
+                for c in cs {
+                    let labels = c
+                        .fields
+                        .iter()
+                        .map(|f| f.label.as_ref().map(|l| l.name.clone()))
+                        .collect();
+                    ctors.push((c.name.name.clone(), labels));
                 }
             }
+            o::ItemKind::Binding(b) => {
+                let name = match &b.pattern.kind {
+                    o::PatternKind::Var(n) => n,
+                    o::PatternKind::Typed { binder, .. } => &binder.name,
+                    _ => continue,
+                };
+                let mut value = &b.value;
+                while let o::ExprKind::Block(block) = &value.kind
+                    && let [o::Stmt::Expr(inner)] = block.stmts.as_slice()
+                {
+                    value = inner;
+                }
+                if let o::ExprKind::Fn(f) = &value.kind {
+                    let labels = f
+                        .params
+                        .iter()
+                        .filter_map(|p| match p {
+                            o::Param::Pattern(p) => Some(param_label(p)),
+                            o::Param::Env { .. } => None,
+                        })
+                        .collect();
+                    fns.push((name.clone(), labels));
+                }
+            }
+            o::ItemKind::Declaration { name, ty, .. } => {
+                if let o::TypeKind::Fn { params, .. } = &ty.kind {
+                    let labels = params
+                        .iter()
+                        .map(|p| p.label.as_ref().map(|l| l.name.clone()))
+                        .collect();
+                    fns.push((name.name.clone(), labels));
+                }
+            }
+            _ => {}
         }
+    }
+    (ctors, fns)
+}
+
+/// Adds what `module` defines to `table`. `stem` is the last part of the
+/// module's path: the name of its file without the extension.
+pub fn collect(module: &o::Module, stem: &str, table: &mut Signatures) {
+    let (ctors, fns) = definitions(module);
+    for (name, labels) in ctors {
+        add(table.ctors.entry(name.clone()).or_default(), labels.clone());
+        add(
+            table
+                .module_ctors
+                .entry((stem.to_string(), name))
+                .or_default(),
+            labels,
+        );
+    }
+    for (name, labels) in fns {
+        add(
+            table
+                .module_fns
+                .entry((stem.to_string(), name))
+                .or_default(),
+            labels,
+        );
     }
 }
 
@@ -56,18 +147,45 @@ pub fn collect_ctors(module: &o::Module, table: &mut CtorTable) {
 pub fn convert(
     module: &o::Module,
     lexed: Option<&Lexed>,
-    ctors: &CtorTable,
+    signatures: &Signatures,
 ) -> (n::Module, Vec<Note>) {
-    let mut local = CtorTable::new();
-    collect_ctors(module, &mut local);
+    let (ctors, fns) = definitions(module);
+    let mut local: HashMap<String, Vec<Labels>> = HashMap::new();
+    for (name, labels) in ctors {
+        add(local.entry(name).or_default(), labels);
+    }
+    let mut local_fns: HashMap<String, Vec<Labels>> = HashMap::new();
+    for (name, labels) in fns {
+        add(local_fns.entry(name).or_default(), labels);
+    }
+    // The module that each imported name and each module name stands for.
+    let mut modules = HashMap::new();
+    let mut imported = HashMap::new();
+    for i in &module.imports {
+        let Some(stem) = i.path.last().map(|p| p.name.clone()) else {
+            continue;
+        };
+        if let Some(alias) = &i.alias {
+            modules.insert(alias.name.clone(), stem.clone());
+        } else if i.names.is_empty() {
+            modules.insert(stem.clone(), stem.clone());
+        }
+        for n in &i.names {
+            imported.insert(n.name.clone(), stem.clone());
+        }
+    }
     let mut interps = HashMap::new();
     if let Some(lexed) = lexed {
         collect_interps(&lexed.tokens, &mut interps);
     }
     let mut cx = Cx {
         local,
-        global: ctors,
+        local_fns,
+        modules,
+        imported,
+        global: signatures,
         interps,
+        fresh: 0,
         notes: Vec::new(),
         vars: Vec::new(),
         absorbed: Vec::new(),
@@ -126,8 +244,16 @@ enum Lookup {
 }
 
 struct Cx<'a> {
-    local: CtorTable,
-    global: &'a CtorTable,
+    /// The constructors and the top-level functions of this module.
+    local: HashMap<String, Vec<Labels>>,
+    local_fns: HashMap<String, Vec<Labels>>,
+    /// The module (the last part of its path) of each module name and of
+    /// each imported name of this file.
+    modules: HashMap<String, String>,
+    imported: HashMap<String, String>,
+    global: &'a Signatures,
+    /// The number of fresh locals `_syn3_N` made so far.
+    fresh: usize,
     interps: HashMap<(u32, u32), Interp>,
     notes: Vec<Note>,
     /// The type variables in scope, for telling a row variable from a
@@ -207,13 +333,35 @@ impl Cx<'_> {
         n::Ident::new(s, l.span)
     }
 
-    fn lookup(&self, name: &str, fits: impl Fn(&[Option<String>]) -> bool) -> Lookup {
-        let candidates = match self.local.get(name) {
-            Some(c) => c,
-            None => match self.global.get(name) {
-                Some(c) => c,
-                None => return Lookup::Positional,
-            },
+    /// The definitions of the constructor `[module.]name` that this file
+    /// can mean: its own, those of the module it imports the name from, or
+    /// every one that was read.
+    fn ctor_candidates(&self, module: Option<&o::Ident>, name: &str) -> Option<&Vec<Labels>> {
+        let stem = match module {
+            Some(m) => self.modules.get(&m.name),
+            None => {
+                if let Some(own) = self.local.get(name) {
+                    return Some(own);
+                }
+                self.imported.get(name)
+            }
+        };
+        stem.and_then(|stem| {
+            self.global
+                .module_ctors
+                .get(&(stem.clone(), name.to_string()))
+        })
+        .or_else(|| self.global.ctors.get(name))
+    }
+
+    fn lookup(
+        &self,
+        module: Option<&o::Ident>,
+        name: &str,
+        fits: impl Fn(&[Option<String>]) -> bool,
+    ) -> Lookup {
+        let Some(candidates) = self.ctor_candidates(module, name) else {
+            return Lookup::Positional;
         };
         if candidates.iter().all(|c| c.iter().all(Option::is_none)) {
             return Lookup::Positional;
@@ -224,6 +372,149 @@ impl Cx<'_> {
             (_, [one]) => Lookup::Fields((*one).clone()),
             _ => Lookup::Ambiguous,
         }
+    }
+
+    /// The labels of the parameters of the function that `callee` names,
+    /// when exactly one definition that was read takes `count` arguments
+    /// and has every label of `labels`.
+    fn fn_labels(&self, callee: &o::Expr, count: usize, labels: &[&str]) -> Option<Labels> {
+        let candidates = match &callee.kind {
+            o::ExprKind::Name { module: None, name } => match self.local_fns.get(&name.name) {
+                Some(own) => Some(own),
+                None => self.imported.get(&name.name).and_then(|stem| {
+                    self.global
+                        .module_fns
+                        .get(&(stem.clone(), name.name.clone()))
+                }),
+            },
+            o::ExprKind::Field { target, name } => match &target.kind {
+                o::ExprKind::Name {
+                    module: None,
+                    name: m,
+                } => self.modules.get(&m.name).and_then(|stem| {
+                    self.global
+                        .module_fns
+                        .get(&(stem.clone(), name.name.clone()))
+                }),
+                _ => None,
+            },
+            _ => None,
+        }?;
+        let fitting: Vec<&Labels> = candidates
+            .iter()
+            .filter(|c| {
+                c.len() == count
+                    && labels
+                        .iter()
+                        .all(|l| c.iter().any(|f| f.as_deref() == Some(*l)))
+            })
+            .collect();
+        match fitting.as_slice() {
+            [one] => Some((*one).clone()),
+            _ => None,
+        }
+    }
+
+    /// §7.3: a call of a function with arguments by label becomes
+    /// positional, in parameter order. `piped` is set when the call is the
+    /// right side of `|>`, which gives it its first argument. Returns `None`
+    /// when the function is not known from the text.
+    fn positional_call(
+        &mut self,
+        callee: &o::Expr,
+        args: &[o::Arg],
+        piped: bool,
+        span: Span,
+    ) -> Option<n::ExprKind> {
+        let offset = usize::from(piped);
+        let given: Vec<&str> = args
+            .iter()
+            .filter_map(|a| a.label.as_ref().map(|l| l.name.as_str()))
+            .collect();
+        let params = self.fn_labels(callee, args.len() + offset, &given)?;
+        // The index of the argument that goes to each parameter.
+        let mut slots: Vec<Option<usize>> = vec![None; params.len() - offset];
+        let mut next = 0;
+        for (i, a) in args.iter().enumerate() {
+            let slot = match &a.label {
+                None => {
+                    let slot = next;
+                    next += 1;
+                    slot
+                }
+                Some(l) => params
+                    .iter()
+                    .position(|p| p.as_deref() == Some(l.name.as_str()))?
+                    .checked_sub(offset)?,
+            };
+            if slots.get(slot)?.is_some() {
+                return None;
+            }
+            slots[slot] = Some(i);
+        }
+        let order: Vec<usize> = slots.into_iter().collect::<Option<_>>()?;
+        let moved = order.windows(2).any(|w| w[0] > w[1]);
+        let indirect: Vec<usize> = (0..args.len())
+            .filter(|&i| !is_direct(&args[i].value))
+            .collect();
+        let callee = Box::new(self.expr(callee));
+        if !moved || indirect.len() < 2 {
+            let items = order
+                .iter()
+                .map(|&i| n::DItem::Pos(self.expr(&args[i].value)))
+                .collect();
+            return Some(n::ExprKind::Call {
+                callee,
+                args: items,
+            });
+        }
+        if piped {
+            // The piped value is worked out before the arguments; locals
+            // before the pipe would change that.
+            return None;
+        }
+        // The order changes and two or more arguments are not direct
+        // values: each of those is bound, in written order, to a fresh
+        // local in a group block, so the order of evaluation stays.
+        let mut stmts = Vec::new();
+        let mut names: HashMap<usize, String> = HashMap::new();
+        for &i in &indirect {
+            let name = format!("_syn3_{}", self.fresh);
+            self.fresh += 1;
+            let at = args[i].value.span;
+            stmts.push(n::Stmt::Bind(n::Binding {
+                pattern: n::Pattern::new(n::PatternKind::Var(name.clone()), at),
+                value: self.expr(&args[i].value),
+                span: n::Sp(Span::default()),
+            }));
+            names.insert(i, name);
+        }
+        let items = order
+            .iter()
+            .map(|&i| {
+                n::DItem::Pos(match names.get(&i) {
+                    Some(name) => n::Expr::new(
+                        n::ExprKind::Name {
+                            module: None,
+                            name: n::Ident::new(name.clone(), args[i].value.span),
+                        },
+                        args[i].value.span,
+                    ),
+                    None => self.expr(&args[i].value),
+                })
+            })
+            .collect();
+        stmts.push(n::Stmt::Expr(n::Expr::new(
+            n::ExprKind::Call {
+                callee,
+                args: items,
+            },
+            span,
+        )));
+        Some(n::ExprKind::Block(n::Block {
+            stmts,
+            span: n::Sp(Span::default()),
+        }))
     }
 
     // ---- Module and items ----
@@ -784,14 +1075,51 @@ impl Cx<'_> {
         )
     }
 
+    fn call(&mut self, callee: &o::Expr, args: &[o::Arg], piped: bool, span: Span) -> n::ExprKind {
+        let ctor = match &callee.kind {
+            o::ExprKind::Name { module, name }
+                if name.name.as_bytes().first().is_some_and(u8::is_ascii_uppercase) =>
+            {
+                Some((module.as_ref(), name))
+            }
+            _ => None,
+        };
+        let items = match ctor {
+            Some((module, name)) => self.ctor_args(module, name, args, span),
+            None => {
+                if let Some(a) = args.iter().find(|a| a.label.is_some()) {
+                    if let Some(kind) = self.positional_call(callee, args, piped, span) {
+                        return kind;
+                    }
+                    self.note(
+                        a.value.span,
+                        "labelled-call",
+                        "a call with an argument by label of a function whose parameters the text does not show: the labels are kept as labelled items; the stage 4 migrator (`labels`) makes the call positional",
+                    );
+                }
+                args.iter().map(|a| self.arg(a)).collect()
+            }
+        };
+        n::ExprKind::Call {
+            callee: Box::new(self.expr(callee)),
+            args: items,
+        }
+    }
+
     /// The data of a call of a constructor.
-    fn ctor_args(&mut self, name: &o::Ident, args: &[o::Arg], span: Span) -> Vec<n::DItem> {
+    fn ctor_args(
+        &mut self,
+        module: Option<&o::Ident>,
+        name: &o::Ident,
+        args: &[o::Arg],
+        span: Span,
+    ) -> Vec<n::DItem> {
         let count = args.len();
         let labels: Vec<&str> = args
             .iter()
             .filter_map(|a| a.label.as_ref().map(|l| l.name.as_str()))
             .collect();
-        let lookup = self.lookup(&name.name, |c| {
+        let lookup = self.lookup(module, &name.name, |c| {
             c.len() >= count
                 && labels
                     .iter()
@@ -912,33 +1240,7 @@ impl Cx<'_> {
                 }
                 n::ExprKind::Chain(clauses.iter().map(|c| self.clause(c)).collect())
             }
-            o::ExprKind::Call { callee, args } => {
-                let ctor = match &callee.kind {
-                    o::ExprKind::Name { name, .. }
-                        if name.name.as_bytes().first().is_some_and(u8::is_ascii_uppercase) =>
-                    {
-                        Some(name)
-                    }
-                    _ => None,
-                };
-                let items = match ctor {
-                    Some(name) => self.ctor_args(name, args, e.span),
-                    None => {
-                        if let Some(a) = args.iter().find(|a| a.label.is_some()) {
-                            self.note(
-                                a.value.span,
-                                "labelled-call",
-                                "a call of a function with an argument by label: syntax three passes it as a labelled item; the stage 4 migrator (`labels`) makes it positional",
-                            );
-                        }
-                        args.iter().map(|a| self.arg(a)).collect()
-                    }
-                };
-                n::ExprKind::Call {
-                    callee: Box::new(self.expr(callee)),
-                    args: items,
-                }
-            }
+            o::ExprKind::Call { callee, args } => self.call(callee, args, false, e.span),
             o::ExprKind::Field { target, name } => n::ExprKind::Field {
                 target: Box::new(self.expr(target)),
                 name: id(name),
@@ -970,10 +1272,21 @@ impl Cx<'_> {
                 op: o::BinOp::Pipe,
                 lhs,
                 rhs,
-            } => n::ExprKind::Pipe {
-                lhs: Box::new(self.expr(lhs)),
-                rhs: Box::new(self.expr(rhs)),
-            },
+            } => {
+                let lhs = Box::new(self.expr(lhs));
+                // `a |> f(b)` is `f(a, b)`: the labels of `f` count from
+                // its second parameter.
+                let rhs = match &rhs.kind {
+                    o::ExprKind::Call { callee, args } => {
+                        n::Expr::new(self.call(callee, args, true, rhs.span), rhs.span)
+                    }
+                    _ => self.expr(rhs),
+                };
+                n::ExprKind::Pipe {
+                    lhs,
+                    rhs: Box::new(rhs),
+                }
+            }
             o::ExprKind::Binary { op, lhs, rhs } => n::ExprKind::Binary {
                 op: *op,
                 lhs: Box::new(self.expr(lhs)),
@@ -1069,7 +1382,7 @@ impl Cx<'_> {
                 args,
                 spread,
             } => {
-                let items = self.ctor_pattern(name, args, *spread, p.span);
+                let items = self.ctor_pattern(module.as_ref(), name, args, *spread, p.span);
                 n::PatternKind::Ctor {
                     module: opt_id(module),
                     name: id(name),
@@ -1103,6 +1416,7 @@ impl Cx<'_> {
     /// by the last name in the chain of `=` of each part.
     fn ctor_pattern(
         &mut self,
+        module: Option<&o::Ident>,
         name: &o::Ident,
         args: &[o::Pattern],
         spread: bool,
@@ -1120,7 +1434,7 @@ impl Cx<'_> {
             }
         }
         let count = args.len();
-        let lookup = self.lookup(&name.name, |c| {
+        let lookup = self.lookup(module, &name.name, |c| {
             let free = c.iter().filter(|f| f.is_none()).count();
             (if spread { c.len() >= count } else { c.len() == count })
                 && args.iter().skip(free).all(|a| {

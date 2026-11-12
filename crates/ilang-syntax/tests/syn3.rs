@@ -798,7 +798,7 @@ fn converted(old: &str) -> String {
     let (module, diags) = ilang_syntax::parse_module(old);
     assert!(diags.is_empty(), "{old}\n{diags:#?}");
     let lexed = ilang_syntax::lexer::lex(old);
-    let (new, _) = convert::convert(&module, Some(&lexed), &convert::CtorTable::new());
+    let (new, _) = convert::convert(&module, Some(&lexed), &convert::Signatures::default());
     let text = syn3::print_with_comments(&new, old, &lexed.comments);
     let (read, diags) = syn3::parse_module(&text);
     assert!(diags.is_empty(), "{text}\n{diags:#?}");
@@ -906,11 +906,46 @@ fn convert_services() {
 }
 
 #[test]
+fn convert_labelled_calls() {
+    // The parameters of a function of the file are known: positional, in
+    // parameter order.
+    assert_eq!(
+        converted("connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", port: 80)\nd = connect(port: 80, host: \"a.com\")\n"),
+        "connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", 80)\nd = connect(\"a.com\", 80)\n"
+    );
+    // The order changes and two arguments are not direct values: locals keep
+    // the order of evaluation.
+    assert_eq!(
+        converted("f = (a: Int, b: Int) { a - b }\nx = f(b: g(), a: h())\n"),
+        "f = (a: Int, b: Int) { a - b }\nx = {\n\t_syn3_0 = g()\n\t_syn3_1 = h()\n\tf(_syn3_1, _syn3_0)\n}\n"
+    );
+    // The piped value is the first argument.
+    assert_eq!(
+        converted("f = (a: Int, b: Int, c: Int) { a }\nx = 1 |> f(c: 3, b: 2)\n"),
+        "f = (a: Int, b: Int, c: Int) { a }\nx = 1 |> f(2, 3)\n"
+    );
+    // A function that the text does not show keeps its labels.
+    assert_eq!(converted("x = m.f(1, to: 2)\n"), "x = m.f(1, to = 2)\n");
+    // The functions and constructors of an imported module.
+    let (lib, _) = ilang_syntax::parse_module("User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n");
+    let mut signatures = convert::Signatures::default();
+    convert::collect(&lib, "users", &mut signatures);
+    let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to: 9, from: 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";
+    let (module, _) = ilang_syntax::parse_module(old);
+    let (new, notes) = convert::convert(&module, Some(&ilang_syntax::lexer::lex(old)), &signatures);
+    assert!(notes.is_empty(), "{notes:#?}");
+    assert_eq!(
+        syn3::print_module(&new),
+        "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(1, 9)\n\ny = User(name = \"ada\", age = 36)\n\nz = u.User(name = \"ada\", age = 36)\n"
+    );
+}
+
+#[test]
 fn convert_lisp_surface() {
     let old = "(= append (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))\n";
     let (module, diags) = ilang_syntax::lisp::parse_source(old);
     assert!(diags.is_empty(), "{diags:#?}");
-    let (new, _) = convert::convert(&module, None, &convert::CtorTable::new());
+    let (new, _) = convert::convert(&module, None, &convert::Signatures::default());
     let text = lisp::to_lisp(&new);
     assert_eq!(
         text,

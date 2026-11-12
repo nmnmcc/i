@@ -67,7 +67,7 @@ struct Converted {
 fn convert_file(
     path: &Path,
     source: &str,
-    ctors: &convert::CtorTable,
+    ctors: &convert::Signatures,
 ) -> Result<Converted, Vec<Diagnostic>> {
     let (old, diags) = parse_old(path, source);
     if !diags.is_empty() {
@@ -139,15 +139,16 @@ fn check(path: &Path, c: &Converted) -> Option<String> {
         })
 }
 
-fn ctor_table(files: &[PathBuf]) -> convert::CtorTable {
-    let mut table = convert::CtorTable::new();
+fn ctor_table(files: &[PathBuf]) -> convert::Signatures {
+    let mut table = convert::Signatures::default();
     for path in files {
         let Ok(source) = std::fs::read_to_string(path) else {
             continue;
         };
         let (old, diags) = parse_old(path, &source);
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         if diags.is_empty() {
-            convert::collect_ctors(&old, &mut table);
+            convert::collect(&old, stem, &mut table);
         }
     }
     table
