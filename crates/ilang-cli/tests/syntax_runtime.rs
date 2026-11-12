@@ -74,9 +74,9 @@ test("exercise", () -> Nil ^ syntax.SyntaxError ! Assert {
   assert(syntax.definition(value) == value)
   assert(syntax.show(value) == "(f x)")
   syntax.node(value) |> {
-    syntax.Round([first, second]) -> {
+    syntax.Node(syntax.Round([first, second])) -> {
       syntax.node(value) |> {
-        syntax.Round([again, _]) -> assert(first == again)
+        syntax.Node(syntax.Round([again, _])) -> assert(first == again)
         _ -> panic("unexpected syntax node")
       }
       assert(syntax.show(first) == "f")
@@ -84,21 +84,21 @@ test("exercise", () -> Nil ^ syntax.SyntaxError ! Assert {
     }
     _ -> panic("unexpected syntax node")
   }
-  made = syntax.make(syntax.Name("made"), value)
+  made = syntax.make(syntax.Node(syntax.Name("made")), value)
   assert(syntax.show(made) == "made")
   assert(syntax.same_code(made, made))
   assert(syntax.show_as(made, syntax.Expression) == "made")
-  pair = syntax.make(syntax.Round([made, value]), value)
+  pair = syntax.make(syntax.Node(syntax.Round([made, value])), value)
   assert(syntax.show(pair) == "(made (f x))")
-  fail.catch(() { syntax.make(syntax.Name("Bad Name"), value) }) |> {
+  fail.catch(() { syntax.make(syntax.Node(syntax.Name("Bad Name")), value) }) |> {
     Error(syntax.SyntaxError(message, at)) -> {
       assert(message != "")
       assert(syntax.same_code(at, value))
     }
     Ok(_) -> panic("invalid syntax atom was accepted")
   }
-  comma = syntax.make(syntax.Symbol(","), value)
-  bad = syntax.make(syntax.Round([comma]), value)
+  comma = syntax.make(syntax.Node(syntax.Symbol(",")), value)
+  bad = syntax.make(syntax.Node(syntax.Round([comma])), value)
   fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |> {
     Error(syntax.SyntaxError(message, at)) -> {
       assert(message != "")
@@ -318,7 +318,7 @@ test("exercise", () {
   assert(count(syntax._append(make_many(first, 3000, []), [replacement]), 0) == 3001)
   assert(syntax.show(result) == "(f y)")
   syntax.node(result) |> {
-    syntax.Round([_, child]) -> assert(child == replacement)
+    syntax.Node(syntax.Round([_, child])) -> assert(child == replacement)
     _ -> panic("unexpected template")
   }
   Nil

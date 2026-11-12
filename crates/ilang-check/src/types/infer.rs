@@ -160,7 +160,11 @@ fn external_key_slots(ty: &Type) -> Vec<(TyVarId, usize)> {
 
 /// The custom types of §4.2 and §9.6 that the rules use.
 pub(super) struct Builtins {
-    pub bool_: TypeRef,
+    /// `True` and `False`, the members of `Bool = True | False`.
+    pub true_: TypeRef,
+    pub false_: TypeRef,
+    /// `Bool` as the checker writes it.
+    pub bool_: Ty,
     pub nil: TypeRef,
     pub assert: TypeRef,
 }
@@ -250,12 +254,18 @@ impl<'a> Checker<'a> {
                 .map(|i| TypeRef::Custom(TypeId(i as u32)))
                 .unwrap_or(TypeRef::Builtin(BuiltinType::Never))
         };
+        let mut solver = Solver::new(variances(p), Vec::new());
+        let (true_, false_) = (find("True"), find("False"));
         let b = Builtins {
-            bool_: find("Bool"),
+            true_,
+            false_,
+            bool_: solver.union(vec![
+                Ty::named(true_, Vec::new()),
+                Ty::named(false_, Vec::new()),
+            ]),
             nil: find("Nil"),
             assert: find("Assert"),
         };
-        let mut solver = Solver::new(variances(p), Vec::new());
         solver.row_params = row_parameters(p);
         Checker {
             p,
@@ -881,7 +891,7 @@ impl<'a> Checker<'a> {
         }
         let error_members = known::members(&f.err);
         let errors_ok = error_members.iter().all(|m| {
-            matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
+            matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.true_ || *r == self.b.false_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
         // B.2: the signature that the code generator encodes.
         let params: Option<Vec<HostType>> = f.params.iter().map(|p| self.host_part(&p.1)).collect();
@@ -923,6 +933,7 @@ impl<'a> Checker<'a> {
     /// take (§10.3, B.2).
     fn host_part(&self, t: &Ty) -> Option<HostType> {
         Some(match t {
+            Ty::Union(_) if *t == self.b.bool_ => HostType::Bool,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => match b {
                 BuiltinType::Int => HostType::Int,
                 BuiltinType::Float => HostType::Float,
@@ -933,7 +944,7 @@ impl<'a> Checker<'a> {
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
                 if *r == self.b.nil {
                     HostType::Nil
-                } else if *r == self.b.bool_ {
+                } else if *r == self.b.true_ || *r == self.b.false_ {
                     HostType::Bool
                 } else if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()) {
                     HostType::Opaque(*id)
@@ -950,10 +961,12 @@ impl<'a> Checker<'a> {
     /// (§10.1).
     fn host_type(&self, t: &Ty) -> bool {
         match t {
+            Ty::Union(_) => *t == self.b.bool_,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => host_builtin(*b),
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
                 *r == self.b.nil
-                    || *r == self.b.bool_
+                    || *r == self.b.true_
+                    || *r == self.b.false_
                     || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
             }
             _ => false,
@@ -1684,7 +1697,7 @@ impl<'a> Checker<'a> {
     }
 
     pub fn bool_ty(&self) -> Ty {
-        Ty::named(self.b.bool_, Vec::new())
+        self.b.bool_.clone()
     }
 
     // ---- Expressions ----

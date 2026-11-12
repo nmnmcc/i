@@ -55,6 +55,7 @@ pub mod code {
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const MACRO_RESERVED: &str = "E0234";
     pub const MACRO_BINDER: &str = "E0235";
+    pub const MANY_CONSTRUCTORS: &str = "E0238";
     // E0229, E0233 and E0237 were temporary value-type reservations.
     pub const VALUE_TYPE_CIRCLE: &str = "E0530";
     pub const VALUE_TYPE_PLACE: &str = "E0531";

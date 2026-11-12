@@ -6,6 +6,18 @@
 (
 	Syntax
 	Node(..)
+	Name(..)
+	Discard(..)
+	Up(..)
+	Symbol(..)
+	Text(..)
+	Round(..)
+	Square(..)
+	Curly(..)
+	Bits(..)
+	Quote(..)
+	Unquote(..)
+	Splice(..)
 	Position(..)
 	SyntaxError(..)
 	Definitions(..)
@@ -35,20 +47,58 @@ ItemMetadata {}
 
 ItemResult {}
 
+/// A node of syntax. `Int` and `Float` are the built-in types; the other
+/// members share a type constructor with another member, so each is its own
+/// type (syntax three §2.8).
 Node {
+	Node(Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)
+}
+
+Name {
 	Name(String)
+}
+
+Discard {
 	Discard(String)
+}
+
+Up {
 	Up(String)
+}
+
+Symbol {
 	Symbol(String)
-	Int(Int)
-	Float(Float)
+}
+
+Text {
 	Text(String)
+}
+
+Round {
 	Round(List(Syntax))
+}
+
+Square {
 	Square(List(Syntax))
+}
+
+Curly {
 	Curly(List(Syntax))
+}
+
+Bits {
 	Bits(List(Syntax))
+}
+
+Quote {
 	Quote(Syntax)
+}
+
+Unquote {
 	Unquote(Syntax)
+}
+
+Splice {
 	Splice(Syntax)
 }
 
@@ -358,20 +408,20 @@ children = (
 /// Gives the node without changing the scopes of its children.
 node = (syntax: Syntax) -> Node {
 	raw_kind(syntax) |> {
-		0  -> Name(raw_text(syntax))
-		1  -> Discard(raw_text(syntax))
-		2  -> Up(raw_text(syntax))
-		3  -> Symbol(raw_text(syntax))
-		4  -> Int(raw_int(syntax))
-		5  -> Float(raw_float(syntax))
-		6  -> Text(raw_text(syntax))
-		7  -> Round(children(syntax, 0, raw_length(syntax), []))
-		8  -> Square(children(syntax, 0, raw_length(syntax), []))
-		9  -> Curly(children(syntax, 0, raw_length(syntax), []))
-		10 -> Bits(children(syntax, 0, raw_length(syntax), []))
-		11 -> Quote(raw_child(syntax, 0))
-		12 -> Unquote(raw_child(syntax, 0))
-		13 -> Splice(raw_child(syntax, 0))
+		0  -> Node(Name(raw_text(syntax)))
+		1  -> Node(Discard(raw_text(syntax)))
+		2  -> Node(Up(raw_text(syntax)))
+		3  -> Node(Symbol(raw_text(syntax)))
+		4  -> Node(raw_int(syntax))
+		5  -> Node(raw_float(syntax))
+		6  -> Node(Text(raw_text(syntax)))
+		7  -> Node(Round(children(syntax, 0, raw_length(syntax), [])))
+		8  -> Node(Square(children(syntax, 0, raw_length(syntax), [])))
+		9  -> Node(Curly(children(syntax, 0, raw_length(syntax), [])))
+		10 -> Node(Bits(children(syntax, 0, raw_length(syntax), [])))
+		11 -> Node(Quote(raw_child(syntax, 0)))
+		12 -> Node(Unquote(raw_child(syntax, 0)))
+		13 -> Node(Splice(raw_child(syntax, 0)))
 		_  -> panic("syntax: invalid node kind")
 	}
 }
@@ -391,36 +441,36 @@ _rebuild = (template: Syntax, children: List(Syntax)) -> Syntax {
 /// Makes syntax at the span and scope of `like`.
 make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
 	result = node |> {
-		Name(value)    -> raw_make_text(0, value, like)
-		Discard(value) -> raw_make_text(1, value, like)
-		Up(value)      -> raw_make_text(2, value, like)
-		Symbol(value)  -> raw_make_text(3, value, like)
-		Int(value)     -> raw_make_int(value, like)
-		Float(value)   -> raw_make_float(value, like)
-		Text(value)    -> raw_make_text(6, value, like)
-		Round(items) -> raw_make_list(
+		Node(Name(value))    -> raw_make_text(0, value, like)
+		Node(Discard(value)) -> raw_make_text(1, value, like)
+		Node(Up(value))      -> raw_make_text(2, value, like)
+		Node(Symbol(value))  -> raw_make_text(3, value, like)
+		Node(value: Int)     -> raw_make_int(value, like)
+		Node(value: Float)   -> raw_make_float(value, like)
+		Node(Text(value))    -> raw_make_text(6, value, like)
+		Node(Round(items)) -> raw_make_list(
 			7
 			build_list(items, raw_list_new())
 			like
 		)
-		Square(items) -> raw_make_list(
+		Node(Square(items)) -> raw_make_list(
 			8
 			build_list(items, raw_list_new())
 			like
 		)
-		Curly(items) -> raw_make_list(
+		Node(Curly(items)) -> raw_make_list(
 			9
 			build_list(items, raw_list_new())
 			like
 		)
-		Bits(items) -> raw_make_list(
+		Node(Bits(items)) -> raw_make_list(
 			10
 			build_list(items, raw_list_new())
 			like
 		)
-		Quote(item)   -> raw_make_one(11, item, like)
-		Unquote(item) -> raw_make_one(12, item, like)
-		Splice(item)  -> raw_make_one(13, item, like)
+		Node(Quote(item))   -> raw_make_one(11, item, like)
+		Node(Unquote(item)) -> raw_make_one(12, item, like)
+		Node(Splice(item))  -> raw_make_one(13, item, like)
 	}
 	raw_syntax_ok(result) |> {
 		True  -> raw_syntax_value(result)

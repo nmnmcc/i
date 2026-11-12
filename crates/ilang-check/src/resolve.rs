@@ -712,6 +712,18 @@ impl<'a> Resolver<'a> {
                 span: t.span,
             }),
             ast::TypeBody::Custom(ctors) => {
+                if let [_, second, ..] = &ctors[..] {
+                    let names: Vec<&str> = ctors.iter().map(|c| c.name.name.as_str()).collect();
+                    self.error(
+                        code::MANY_CONSTRUCTORS,
+                        second.name.span,
+                        format!(
+                            "a custom type has one constructor or none; write one type for each constructor and name their union: `{} = {}` (§4.3)",
+                            def.name.name,
+                            names.join(" | ")
+                        ),
+                    );
+                }
                 let mut out = Vec::new();
                 for c in ctors {
                     if !self.value_free(m, &c.name.name, c.name.span) {
@@ -2374,12 +2386,25 @@ impl<'a> Resolver<'a> {
             }
         }
         members.sort();
+        members.dedup();
         Some(HostFn {
             params,
             result,
             errors: members,
             request_result: false,
         })
+    }
+
+    /// The name of a prelude type that `t` names with no arguments.
+    fn prelude_ctor_type(&self, t: &Ty) -> Option<&str> {
+        match t {
+            Ty::Con(Head::Named(TypeRef::Custom(id)), _, args)
+                if args.is_empty() && Some(self.p.ty(*id).module) == self.p.prelude =>
+            {
+                Some(self.p.ty(*id).name.as_str())
+            }
+            _ => None,
+        }
     }
 
     fn is_never(&self, t: &Type) -> bool {
@@ -2408,6 +2433,15 @@ impl<'a> Resolver<'a> {
             return None;
         }
         match t {
+            // `Bool = True | False`.
+            Ty::Union(ms)
+                if ms.len() == 2
+                    && ["True", "False"]
+                        .iter()
+                        .all(|n| ms.iter().any(|m| self.prelude_ctor_type(m) == Some(*n))) =>
+            {
+                Some(HostType::Bool)
+            }
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args) if args.is_empty() => match b {
                 BuiltinType::Int => Some(HostType::Int),
                 BuiltinType::Float => Some(HostType::Float),
@@ -2421,7 +2455,12 @@ impl<'a> Resolver<'a> {
                 match &def.body {
                     TypeBody::Custom(ctors) if ctors.is_empty() => Some(HostType::Opaque(*id)),
                     TypeBody::Custom(_) if prelude && def.name == "Nil" => Some(HostType::Nil),
-                    TypeBody::Custom(_) if prelude && def.name == "Bool" => Some(HostType::Bool),
+                    // One of the two members of `Bool`, as a value or an error.
+                    TypeBody::Custom(_)
+                        if prelude && outgoing && matches!(def.name.as_str(), "True" | "False") =>
+                    {
+                        Some(HostType::Bool)
+                    }
                     _ => None,
                 }
             }

@@ -649,7 +649,7 @@ These types may be used in every module:
 | `Never` | No values |
 | `Record` | All structural records; no type arguments |
 
-These built-in types are normal custom types (§4.3) with these definitions:
+These built-in types are normal custom types and names of their unions (§4.3), with these definitions:
 
 ```i
 Bool { True False }
@@ -687,7 +687,7 @@ TypePattern = UpName | "_"
             | "(" [ TypePattern { "," TypePattern } [ "," ] ] ")" .
 ```
 
-- `T { C1 C2 … }` defines a nominal custom type. Each constructor has zero or more fields, which may have labels. Two custom type definitions are different types even if their fields are the same.
+- `T { C }` defines a nominal custom type with one constructor. The constructor has zero or more fields, which may have labels. Two custom type definitions are different types even if their fields are the same. A definition with two or more constructors is a compile error: a type with several kinds of values is the union of one-constructor types, named by an alias, as `Option(A) = Some(A) | None` with `Some(A) { Some(A) }` and `None { None }`. One constructor type may be a member of several unions.
 - `T {}` has no constructors; i code cannot make its values. They come from the host (§10), including `@js` declarations with the full closed nominal annotation of §10.1.1.
 - `T = Type` is a transparent alias. Aliases may not use themselves, directly or through other aliases or alias patterns.
 - An item `T(P1, …, Pn) = v` is an **alias pattern** exactly when its written right side is a value type (§3), after removing groups. Otherwise its head is a list of type parameters. This classification is made before expanding the right side; it never depends on imports or on what a macro returns there.
@@ -2502,7 +2502,8 @@ These names may be used in every module. Other names may cover them.
 | Name | What it is | See |
 |---|---|---|
 | `Int` `Float` `String` `List` `BitArray` `UtfCodepoint` `Never` `Record` | Types | §4.2, §4.9 |
-| `Bool` `Nil` `Result`, and `True` `False` `Nil` `Ok` `Error` | Custom types and their constructors | §4.2 |
+| `True` `False` `Nil` `Ok` `Error` | Custom types and their constructors | §4.2 |
+| `Bool` `Result` | Names of unions of those custom types | §4.2 |
 | `Assert` `AssertionFailure` | Custom types and their constructors | §9.6 |
 | `Boundary` `Continuation` | Built-in types made by `i/control` | §9.4 |
 | `Key` `Keyed` | Built-in types made by `i/key` | §9.8 |
