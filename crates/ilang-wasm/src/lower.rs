@@ -382,6 +382,12 @@ fn expression_values(e: &Expr) -> usize {
 struct Walk {
     used: BTreeSet<VarId>,
     bound: HashSet<VarId>,
+    /// How many times each name is used.
+    uses: HashMap<VarId, u32>,
+    /// The calls of a top-level name whose first written argument (or the
+    /// left side of `|>`) is a local name: the callee, the name, and the
+    /// span of the call, which keys its argument order.
+    first_args: Vec<(DefId, VarId, Span)>,
 }
 
 impl Walk {
@@ -389,6 +395,7 @@ impl Walk {
         match &e.kind {
             ExprKind::Name(ValueRef::Local(v)) => {
                 self.used.insert(*v);
+                *self.uses.entry(*v).or_default() += 1;
             }
             ExprKind::Int(_)
             | ExprKind::Float(_)
@@ -427,6 +434,32 @@ impl Walk {
                 }
             }
             ExprKind::Call { callee, args } => {
+                if let (ExprKind::Name(ValueRef::Def(d)), Some(first)) =
+                    (&callee.kind, args.first())
+                    && let ExprKind::Name(ValueRef::Local(v)) = first.value.kind
+                {
+                    self.first_args.push((*d, v, e.span));
+                }
+                self.expr(callee);
+                args.iter().for_each(|a| self.expr(&a.value));
+            }
+            ExprKind::Binary {
+                op: BinOp::Pipe,
+                lhs,
+                rhs,
+            } => {
+                // `a |> f(…)` is `f(a, …)` (§6.9): `a` is the first
+                // written argument.
+                let (callee, args) = match &rhs.kind {
+                    ExprKind::Call { callee, args } => (callee.as_ref(), &args[..]),
+                    _ => (rhs.as_ref(), &[][..]),
+                };
+                if let (ExprKind::Name(ValueRef::Def(d)), ExprKind::Name(ValueRef::Local(v))) =
+                    (&callee.kind, &lhs.kind)
+                {
+                    self.first_args.push((*d, *v, e.span));
+                }
+                self.expr(lhs);
                 self.expr(callee);
                 args.iter().for_each(|a| self.expr(&a.value));
             }
@@ -2327,21 +2360,45 @@ impl<'a> Lowerer<'a> {
         name: String,
         id: FuncId,
     ) -> Func {
+        self.function_code(module, f, captures, name, id, false)
+    }
+
+    /// As `function`; when `lifted`, the captures are parameters after the
+    /// function's own, and it has no closure (a light boundary's body).
+    fn function_code(
+        &mut self,
+        module: ModuleId,
+        f: &Function,
+        captures: &[VarId],
+        name: String,
+        id: FuncId,
+        lifted: bool,
+    ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
-        let arity = f
+        let own = f
             .params
             .iter()
             .filter(|p| matches!(p, Param::Pattern { .. }))
             .count() as u32;
+        let arity = if lifted {
+            own + captures.len() as u32
+        } else {
+            own
+        };
         for _ in 0..arity {
             fx.local(LocalType::Value);
         }
         for (i, &v) in captures.iter().enumerate() {
             let l = fx.var(v);
+            let value = if lifted {
+                Value::Atom(Atom::Local(own + i as u32))
+            } else {
+                Value::Capture(i as u32)
+            };
             out.push(Stmt::Let {
                 dst: l,
-                value: Value::Capture(i as u32),
+                value,
                 site: None,
             });
         }
@@ -2859,6 +2916,127 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// `control.boundary(f)` where `f` is a function literal whose parameter
+    /// is used only as the first argument of `control.escape`, directly or
+    /// in function literals inside it: a light boundary (syntax-3 §2.10.7,
+    /// O30). The decision is read from the program's shape only. Its handle
+    /// is never suspended on, stored, or given elsewhere, so the boundary
+    /// needs no continuation of its own; `f` is lifted to code that takes
+    /// its captures as parameters, so no closure is made for it. `None` when
+    /// the call is not one.
+    #[allow(clippy::too_many_arguments)]
+    fn light_boundary(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[&Expr],
+        tail: bool,
+    ) -> Option<Option<Atom>> {
+        if self.library_op(callee) != Some(Op::Boundary) {
+            return None;
+        }
+        let arg: &Expr = match (first, args) {
+            (Some(a), []) => a,
+            (None, [a]) => a,
+            _ => return None,
+        };
+        let ExprKind::Fn(f) = &ungroup(arg).kind else {
+            return None;
+        };
+        let mut patterns = f.params.iter().filter_map(|p| match p {
+            Param::Pattern { pattern, .. } => Some(pattern),
+            Param::Env { .. } => None,
+        });
+        let (Some(param), None) = (patterns.next(), patterns.next()) else {
+            return None;
+        };
+        // The names the parameter binds, and every use of them.
+        let mut names = Walk::default();
+        names.pattern(param);
+        let mut body = Walk::default();
+        body.block(&f.body);
+        for &v in &names.bound {
+            let all = body.uses.get(&v).copied().unwrap_or(0);
+            let escapes = body
+                .first_args
+                .iter()
+                .filter(|&&(d, x, call)| {
+                    x == v
+                        && self.def_op(d) == Some(Op::Escape)
+                        && self
+                            .typed
+                            .args
+                            .get(&(fx.module, call))
+                            .is_none_or(|order| order.first() == Some(&0))
+                })
+                .count() as u32;
+            if all != escapes {
+                return None;
+            }
+        }
+        let captures = captures_of(f);
+        if fx
+            .pending
+            .as_ref()
+            .is_some_and(|p| captures.iter().any(|v| p.contains(v)))
+        {
+            return None;
+        }
+        let id = self.new_func();
+        let name = format!("{}:light{}", self.program.module(fx.module).path, id.0);
+        let func = self.function_code(fx.module, f, &captures, name, id, true);
+        self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+        let b = let_value(
+            fx,
+            out,
+            Value::Op(
+                Op::Runtime {
+                    name: "light_new",
+                    arity: 0,
+                },
+                vec![],
+            ),
+            None,
+        );
+        let mut atoms = vec![b];
+        atoms.extend(captures.iter().map(|v| Atom::Local(fx.var(*v))));
+        let site = self.site(fx, span.start);
+        let v = let_value(
+            fx,
+            out,
+            Value::Light {
+                func: id,
+                args: atoms,
+                env: fx.env,
+            },
+            site,
+        );
+        Some(finish(out, tail, v))
+    }
+
+    /// The operation of a callee that names an external function of the
+    /// library, as `target` finds it.
+    fn library_op(&self, callee: &Expr) -> Option<Op> {
+        match &callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) => self.def_op(*d),
+            _ => None,
+        }
+    }
+
+    fn def_op(&self, d: DefId) -> Option<Op> {
+        match self.program.def(d).kind {
+            DefKind::External { ref module, .. }
+                if self.is_library(d.module) && module.starts_with("ilang:") =>
+            {
+                self.external_op(d).ok().map(|(op, _)| op)
+            }
+            _ => None,
+        }
+    }
+
     fn closure(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, f: &Function) -> Atom {
         let captures = captures_of(f);
         let id = self.new_func();
@@ -3081,6 +3259,9 @@ impl<'a> Lowerer<'a> {
         args: &[&Expr],
         tail: bool,
     ) -> Option<Atom> {
+        if let Some(a) = self.light_boundary(fx, out, span, callee, first, args, tail) {
+            return a;
+        }
         let mut written = Vec::new();
         if let Some(a) = first {
             written.push(self.expr(fx, out, a));

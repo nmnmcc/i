@@ -78,7 +78,9 @@ pub fn split(p: &mut Program) {
                 unreachable!()
             };
             let env = match value {
-                Value::Call { env, .. } | Value::OpEnv(_, _, env) => *env,
+                Value::Call { env, .. } | Value::OpEnv(_, _, env) | Value::Light { env, .. } => {
+                    *env
+                }
                 _ => Env::Param,
             };
             let after = &live.points[&point];
@@ -280,6 +282,8 @@ fn suspends(v: &Value, may: &[bool]) -> bool {
             callee: Callee::Direct(f) | Callee::Known { func: f, .. },
             ..
         } => may[f.0 as usize],
+        // A capture goes through a light boundary only from its body.
+        Value::Light { func, .. } => may[func.0 as usize],
         Value::Op(op, _) | Value::OpEnv(op, _, _) => op.suspends(),
         _ => false,
     }
@@ -666,7 +670,7 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         Value::Op(_, args) | Value::Finite(_, args) | Value::Tuple(args) => {
             args.iter().for_each(|a| atom_uses(a, f))
         }
-        Value::OpEnv(_, args, env) => {
+        Value::OpEnv(_, args, env) | Value::Light { args, env, .. } => {
             args.iter().for_each(|a| atom_uses(a, f));
             env_uses(*env, f);
         }

@@ -53,7 +53,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
         | Value::Op(_, args)
         | Value::Finite(_, args)
         | Value::Tuple(args) => args.iter_mut().for_each(map),
-        Value::OpEnv(_, args, e) => {
+        Value::OpEnv(_, args, e) | Value::Light { args, env: e, .. } => {
             args.iter_mut().for_each(&mut *map);
             env(e, map);
         }

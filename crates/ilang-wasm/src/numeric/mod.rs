@@ -894,7 +894,10 @@ fn inline(
             match s {
                 Stmt::Let {
                     value:
-                        Value::Call { env, .. } | Value::OpEnv(_, _, env) | Value::Service(env, _),
+                        Value::Call { env, .. }
+                        | Value::OpEnv(_, _, env)
+                        | Value::Light { env, .. }
+                        | Value::Service(env, _),
                     ..
                 }
                 | Stmt::TailCall { env, .. }

@@ -97,6 +97,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         strings: HashMap::new(),
         data: String::new(),
         out: String::new(),
+        lights: 0,
     };
     e.arities.insert(0);
     e.arities.insert(1);
@@ -310,6 +311,8 @@ struct Emitter<'p> {
     strings: HashMap<Vec<u8>, usize>,
     data: String,
     out: String,
+    /// The number of light boundaries emitted, for their labels.
+    lights: u32,
 }
 
 impl<'p> Emitter<'p> {
@@ -910,6 +913,31 @@ impl<'p> Emitter<'p> {
             Value::OpEnv(op, args, env) => {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, &env_text(*env))
+            }
+            Value::Light { func, args, env } => {
+                // The body runs in a handler that takes an escape to this
+                // boundary (`$light_unwind`), and makes a capture that goes
+                // through it a record of the boundary (`$light_captured`).
+                // An error or a cancel that is not for it goes on.
+                let n = self.lights;
+                self.lights += 1;
+                let b = self.atom(&args[0]);
+                let callee = Callee::Direct(*func);
+                let mut call = self.call(&callee, args, false, &env_text(*env));
+                if self.float_call(&callee) {
+                    call = numeric::box_float(&call);
+                }
+                format!(
+                    "(block $lt{n} (result eqref)\n\
+                     (block $lc{n} (result (ref $cap) exnref)\n\
+                     (block $lu{n} (result eqref exnref)\n\
+                     (br $lt{n} (call $light_done {b}\n\
+                     (try_table (result eqref) (catch_ref $error $lu{n}) (catch_ref $cancel $lu{n})\n\
+                     (catch_ref $capture $lc{n})\n\
+                     {call}))))\n\
+                     (br $lt{n} (call $light_unwind {b})))\n\
+                     (call $light_captured {b}) (unreachable))"
+                )
             }
             Value::Service(env, id) => {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
@@ -1606,7 +1634,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), lights:0 };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

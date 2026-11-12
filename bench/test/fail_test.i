@@ -69,7 +69,7 @@ builtin_passed = (i: Int, acc: Int) -> Int {
 	}
 }
 
-total = rounds * (rounds + 1) / 2 + rounds
+total = rounds * { rounds + 1 } / 2 + rounds
 
 test("fail_caught", () { check(caught(rounds, 0) == total, "fail_caught") })
 

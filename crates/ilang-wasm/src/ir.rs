@@ -308,6 +308,18 @@ pub enum Value {
     Finite(Op, Vec<Atom>),
     /// An operation that calls i code with this environment.
     OpEnv(Op, Vec<Atom>, Env),
+    /// A light boundary (syntax-3 §2.10.7, O30): `control.boundary(f)` where
+    /// `f` is a function literal whose parameter is used only as the first
+    /// argument of `control.escape`. `func` is the literal's code, lifted:
+    /// its parameters are the boundary, then the literal's captures, so no
+    /// closure is made. `args[0]` is the boundary, made by `light_new`. The
+    /// call runs in a handler that takes only an escape to that boundary;
+    /// a capture that goes through it pauses it as a `$boundary` does.
+    Light {
+        func: FuncId,
+        args: Vec<Atom>,
+        env: Env,
+    },
     /// The service with this id in the environment (§9.2).
     Service(Env, u32),
     Closure {

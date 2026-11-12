@@ -529,6 +529,43 @@ pub(super) const EFFECTS: &str = r#"
     (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
     (local.get $v) (local.get $mode)))
 
+;; A light boundary (`Value::Light`): a boundary whose handle is only given
+;; to `control.escape`. Field 2 keeps the depth of the shadow stack where it
+;; starts, which an escape to it puts back.
+(func $light_new (result eqref)
+  (struct.new $boundary (i32.const 11) (i32.const 0) (i64.extend_i32_u (call $shadow_depth)) (f64.const 0)
+    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)
+    (ref.null eq) (i32.const 0)))
+
+;; The body of the light boundary `b` gave `r`.
+(func $light_done (param $b eqref) (param $r eqref) (result eqref)
+  (struct.set $boundary 8 (ref.cast (ref $boundary) (local.get $b)) (i32.const 0))
+  (local.get $r))
+
+;; The error or the cancel `e` (exception `x`) left the body of the light
+;; boundary `b`: an escape to `b` ends it with its value; anything else goes
+;; on, as in `$boundary_core`.
+(func $light_unwind (param $e eqref) (param $x exnref) (param $b eqref) (result eqref)
+  (local $boundary (ref $boundary)) (local $esc (ref $escaped))
+  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
+  (struct.set $boundary 8 (local.get $boundary) (i32.const 0))
+  (if (ref.test (ref $escaped) (local.get $e))
+    (then
+      (local.set $esc (ref.cast (ref $escaped) (local.get $e)))
+      (if (ref.eq (struct.get $escaped 0 (local.get $esc)) (local.get $boundary))
+        (then
+          (call $shadow_restore (i32.wrap_i64 (struct.get $boundary 2 (local.get $boundary))))
+          (return (struct.get $escaped 1 (local.get $esc)))))))
+  (throw_ref (local.get $x)))
+
+;; A capture for another boundary went through the light boundary `b`: it
+;; is paused with it, and is re-entered as a `$boundary` (`$boundary_reenter`).
+(func $light_captured (param $c (ref $cap)) (param $x exnref) (param $b eqref)
+  (local $boundary (ref $boundary))
+  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
+  (struct.set $boundary 8 (local.get $boundary) (i32.const 0))
+  (call $capture_pack (local.get $c) (local.get $x) (ref.func $boundary_reenter) (local.get $boundary)))
+
 ;; `control.suspend(b, f)`: stops when `b` is not active.
 (func $control_suspend (param $b eqref) (param $f eqref) (result eqref)
   (local $boundary (ref $boundary))
