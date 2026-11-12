@@ -27,8 +27,7 @@ fn entry_without_services_has_empty_provider_environment() {
 
 #[test]
 fn entry_retains_ordinary_service_for_provider_planning() {
-    let (needs, program) =
-        entry_needs("Service { Service }\n\nmain = (s ! Service) { Nil }\n");
+    let (needs, program) = entry_needs("Service { Service }\n\nmain = (s ! Service) { Nil }\n");
     let service = program
         .types
         .iter()

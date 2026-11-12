@@ -390,7 +390,15 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 7] = ["i/clock", "i/fs", "i/process", "i/net", "i/tls", "i/fetch", "i/stdio"];
+const RESERVED: [&str; 7] = [
+    "i/clock",
+    "i/fs",
+    "i/process",
+    "i/net",
+    "i/tls",
+    "i/fetch",
+    "i/stdio",
+];
 
 /// User code imports every reserved module with no problems.
 ///

@@ -13,7 +13,11 @@ fn run(args: &[&str]) -> std::process::Output {
 #[test]
 fn valid_arguments() {
     let out = run(&["--name", "world", "--count", "2"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(out.stdout, b"hello world\nhello world\ncli ok\n");
     assert!(String::from_utf8_lossy(&out.stderr).contains("info \"greeting\""));
 }

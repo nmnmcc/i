@@ -160,11 +160,23 @@ fn cli_selects_entries_and_passes_arguments() {
         String::from_utf8_lossy(&default.stderr)
     );
     assert_eq!(default.stdout, b"default ok\n");
-    assert!(default.stderr.is_empty(), "{}", String::from_utf8_lossy(&default.stderr));
+    assert!(
+        default.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&default.stderr)
+    );
     let plain = run(&["run", "--opt", "0", "other"]);
-    assert!(plain.status.success(), "{}", String::from_utf8_lossy(&plain.stderr));
+    assert!(
+        plain.status.success(),
+        "{}",
+        String::from_utf8_lossy(&plain.stderr)
+    );
     assert_eq!(plain.stdout, b"plain ok\n");
-    assert!(plain.stderr.is_empty(), "{}", String::from_utf8_lossy(&plain.stderr));
+    assert!(
+        plain.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&plain.stderr)
+    );
     let named = run(&["run", "--opt", "0", "tool", "--", "alpha", "--beta"]);
     assert!(
         named.status.success(),

@@ -159,10 +159,7 @@ fn metadata() {
 fn externals_are_imports() {
     let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (x: Float) -> Float\n";
     for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
-        let bytes = wasm(&format!(
-            "{external}f = () {{ sqrt(2.0) }}\n\n{main}\n"
-        ))
-        .unwrap();
+        let bytes = wasm(&format!("{external}f = () {{ sqrt(2.0) }}\n\n{main}\n")).unwrap();
         let mut imports = Vec::new();
         let mut abi = None;
         for payload in wasmparser::Parser::new(0).parse_all(&bytes) {

@@ -336,53 +336,53 @@ pub(super) fn render_anchored(
                     if is_record(xs) {
                         record!(xs, Type, true);
                     } else {
-                    match xs {
-                        [h, a, b] if symbol(h, ".") => {
-                            text!(label(a)?);
-                            text!(".");
-                            text!(import_name(b)?);
+                        match xs {
+                            [h, a, b] if symbol(h, ".") => {
+                                text!(label(a)?);
+                                text!(".");
+                                text!(import_name(b)?);
+                            }
+                            [h, a] if symbol(h, "-") && matches!(a.kind, K::Int(_)) => {
+                                text!("-");
+                                text!(show(a));
+                            }
+                            [h, rest @ ..] if symbol(h, ",") && !rest.is_empty() => {
+                                text!("(");
+                                seq!(rest, Type, ", ");
+                                text!(")");
+                            }
+                            [h, rest @ ..]
+                                if (symbol(h, "|") || symbol(h, "&") || symbol(h, "-"))
+                                    && rest.len() >= 2 =>
+                            {
+                                text!("{ ");
+                                seq!(rest, Type, &format!(" {} ", show(h)));
+                                text!(" }");
+                            }
+                            [h, ps, r] if symbol(h, "->") => {
+                                let ps =
+                                    round(ps).ok_or_else(|| bad(ps, "function type parameters"))?;
+                                text!("{ (");
+                                seq!(ps, Field, ", ");
+                                text!(") -> ");
+                                node!(Return, r);
+                                text!(" }");
+                            }
+                            [head]
+                                if matches!(head.kind, K::Name(_))
+                                    || matches!(round(head),Some([h,_,n]) if symbol(h,".")&&matches!(n.kind,K::Name(_))) =>
+                            {
+                                node!(Name, head);
+                                text!("()");
+                            }
+                            [head, args @ ..] if !args.is_empty() => {
+                                node!(Name, head);
+                                text!("(");
+                                seq!(args, Type, ", ");
+                                text!(")");
+                            }
+                            _ => return Err(bad(d, "a type")),
                         }
-                        [h, a] if symbol(h, "-") && matches!(a.kind, K::Int(_)) => {
-                            text!("-");
-                            text!(show(a));
-                        }
-                        [h, rest @ ..] if symbol(h, ",") && !rest.is_empty() => {
-                            text!("(");
-                            seq!(rest, Type, ", ");
-                            text!(")");
-                        }
-                        [h, rest @ ..]
-                            if (symbol(h, "|") || symbol(h, "&") || symbol(h, "-"))
-                                && rest.len() >= 2 =>
-                        {
-                            text!("{ ");
-                            seq!(rest, Type, &format!(" {} ", show(h)));
-                            text!(" }");
-                        }
-                        [h, ps, r] if symbol(h, "->") => {
-                            let ps =
-                                round(ps).ok_or_else(|| bad(ps, "function type parameters"))?;
-                            text!("{ (");
-                            seq!(ps, Field, ", ");
-                            text!(") -> ");
-                            node!(Return, r);
-                            text!(" }");
-                        }
-                        [head]
-                            if matches!(head.kind, K::Name(_))
-                                || matches!(round(head),Some([h,_,n]) if symbol(h,".")&&matches!(n.kind,K::Name(_))) =>
-                        {
-                            node!(Name, head);
-                            text!("()");
-                        }
-                        [head, args @ ..] if !args.is_empty() => {
-                            node!(Name, head);
-                            text!("(");
-                            seq!(args, Type, ", ");
-                            text!(")");
-                        }
-                        _ => return Err(bad(d, "a type")),
-                    }
                     }
                 } else if let K::Curly(xs) = &d.kind
                     && xs.len() == 1
