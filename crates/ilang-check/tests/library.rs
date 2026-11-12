@@ -351,20 +351,23 @@ fn prelude_types() {
         .types
         .iter()
         .filter(|t| t.module == prelude)
-        .map(|t| {
+        .filter_map(|t| {
+            // `Bool` and `Result` are names of unions (syntax three).
             let TypeBody::Custom(cs) = &t.body else {
-                panic!()
+                return None;
             };
-            (t.name.clone(), cs.iter().map(|c| c.name.clone()).collect())
+            Some((t.name.clone(), cs.iter().map(|c| c.name.clone()).collect()))
         })
         .collect();
     found.sort();
     let want = [
         ("Assert", vec!["Assert"]),
         ("AssertionFailure", vec!["AssertionFailure"]),
-        ("Bool", vec!["True", "False"]),
+        ("Error", vec!["Error"]),
+        ("False", vec!["False"]),
         ("Nil", vec!["Nil"]),
-        ("Result", vec!["Ok", "Error"]),
+        ("Ok", vec!["Ok"]),
+        ("True", vec!["True"]),
     ];
     let want: Vec<(String, Vec<String>)> = want
         .iter()
