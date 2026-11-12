@@ -1,0 +1,3 @@
+(, if)
+(@ macro
+  (= if (-> (test then else) _ `(| ~test {(-> True ~then) (-> False ~else)}))))
