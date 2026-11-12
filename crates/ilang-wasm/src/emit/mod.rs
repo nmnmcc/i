@@ -367,6 +367,8 @@ impl<'p> Emitter<'p> {
         for i in 0..arity {
             if self.worker.as_ref().is_some_and(|w| w.floats[i as usize]) {
                 let _ = write!(self.out, " (param $numeric_f{i} f64)");
+            } else if self.worker.as_ref().is_some_and(|w| w.ints[i as usize]) {
+                let _ = write!(self.out, " (param $numeric_i{i} i64)");
             } else {
                 let _ = write!(self.out, " (param $l{i} eqref)");
             }
@@ -378,8 +380,14 @@ impl<'p> Emitter<'p> {
                 " (result eqref)\n"
             });
         if let Some(worker) = &self.worker {
-            for (i, float) in worker.floats.iter().enumerate() {
-                if *float {
+            for (i, scalar) in worker
+                .floats
+                .iter()
+                .zip(&worker.ints)
+                .map(|(f, i)| *f || *i)
+                .enumerate()
+            {
+                if scalar {
                     let _ = writeln!(self.out, " (local $l{i} eqref)");
                 }
             }
@@ -399,7 +407,11 @@ impl<'p> Emitter<'p> {
         self.worker = id.and_then(|id| self.p.workers.get(&id)).cloned();
         self.header(name, f.arity, &f.locals);
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
-            numeric::Plan::for_func(f, id.and_then(|id| self.p.numeric_locals.get(&id)))
+            numeric::Plan::for_func(
+                f,
+                id.and_then(|id| self.p.numeric_locals.get(&id)),
+                self.worker.as_ref(),
+            )
         } else {
             numeric::Plan::default()
         };
@@ -409,6 +421,14 @@ impl<'p> Emitter<'p> {
                 if *float {
                     declarations =
                         declarations.replace(&format!(" (local $numeric_f{i} f64)\n"), "");
+                }
+            }
+        }
+        if let Some(worker) = &self.worker {
+            for (i, int) in worker.ints.iter().enumerate() {
+                if *int {
+                    declarations =
+                        declarations.replace(&format!(" (local $numeric_i{i} i64)\n"), "");
                 }
             }
         }
@@ -631,45 +651,67 @@ impl<'p> Emitter<'p> {
     fn call(&mut self, callee: &Callee, args: &[Atom], tail: bool, env: &str) -> String {
         let n = args.len() as u32;
         self.arities.insert(n);
-        let worker = match callee {
-            Callee::Direct(f) | Callee::Known { func: f, .. } => self.p.workers.get(f),
+        let target = match callee {
+            Callee::Direct(f) | Callee::Known { func: f, .. } => Some(*f),
             _ => None,
-        }
-        .cloned();
-        let args: String = args
+        };
+        let worker = target.and_then(|f| self.p.workers.get(&f)).cloned();
+        let prefix = if tail { "return_" } else { "" };
+        let closure = match callee {
+            Callee::Known { closure, .. } => {
+                format!("(ref.cast (ref null $obj) {})", self.atom(closure))
+            }
+            _ => "(ref.null $obj)".into(),
+        };
+        let mut guards = Vec::new();
+        let raw_args = args
             .iter()
             .enumerate()
             .map(|(i, a)| {
-                format!(
-                    " {}",
-                    if worker.as_ref().is_some_and(|w| w.floats[i]) {
-                        self.float_atom(a)
-                    } else {
-                        self.atom(a)
-                    }
-                )
+                let raw = if worker.as_ref().is_some_and(|w| w.floats[i]) {
+                    self.float_atom(a)
+                } else if worker.as_ref().is_some_and(|w| w.ints[i]) {
+                    let (guard, raw) = self.small_int(a);
+                    guards.push(guard);
+                    raw
+                } else {
+                    self.atom(a)
+                };
+                format!(" {raw}")
             })
-            .collect();
-        let prefix = if tail { "return_" } else { "" };
-        match callee {
-            Callee::Direct(f) => {
-                format!("({prefix}call $f{} (ref.null $obj) {env}{args})", f.0)
-            }
-            Callee::Known { func, closure } => {
-                let closure = self.atom(closure);
-                format!(
-                    "({prefix}call $f{} (ref.cast (ref null $obj) {closure}) {env}{args})",
-                    func.0
-                )
+            .collect::<String>();
+        let call = match callee {
+            Callee::Direct(f) | Callee::Known { func: f, .. } => {
+                format!("({prefix}call $f{} {closure} {env}{raw_args})", f.0)
             }
             Callee::Value(a) => {
                 let a = self.atom(a);
                 format!(
-                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{args} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
+                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
                 )
             }
+        };
+        if guards.is_empty() {
+            return call;
         }
+        let worker = worker.expect("integer guards have a worker");
+        assert!(
+            !worker.float_result,
+            "guarded Int fallback has Value result"
+        );
+        let guard = guards
+            .into_iter()
+            .reduce(|a, b| format!("(i32.and {a} {b})"))
+            .unwrap();
+        let canonical = args
+            .iter()
+            .map(|a| format!(" {}", self.atom(a)))
+            .collect::<String>();
+        let result = if tail { "" } else { " (result eqref)" };
+        format!(
+            "(if{result} {guard} (then {call}) (else ({prefix}call $f{} {closure} {env}{canonical})))",
+            worker.origin.0
+        )
     }
 
     fn string(&mut self, s: &str) -> String {
@@ -1096,6 +1138,19 @@ impl<'p> Emitter<'p> {
             Cond::Tuple(a, n) => format!("(call $is_tuple {} (i32.const {n}))", self.atom(a)),
             Cond::Empty(a) => format!("(call $list_is_empty {})", self.atom(a)),
             Cond::Equal(a, b) => format!("(call $equal {} {})", self.atom(a), self.atom(b)),
+            Cond::IsInt(a, n)
+                if self.numeric_plan.locals.get(match a {
+                    Atom::Local(l) => l,
+                    _ => &u32::MAX,
+                }) == Some(&numeric::Repr::Int)
+                    && i64::try_from(n).is_ok_and(|n| (-1073741824..=1073741823).contains(&n)) =>
+            {
+                let (guard, raw) = self.small_int(a);
+                format!(
+                    "(i32.and {guard} (i64.eq {raw} (i64.const {})))",
+                    i64::try_from(n).unwrap()
+                )
+            }
             Cond::IsInt(a, n) => match i64::try_from(n) {
                 // Small Ints are always `i31ref` (`runtime/mod.rs`).
                 Ok(v) if (-(1 << 30)..(1 << 30)).contains(&v) => {

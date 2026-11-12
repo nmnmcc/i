@@ -4,12 +4,14 @@ use crate::ir::*;
 use ilang_check::types::NumericFact;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 mod aggregate;
+mod integer;
 pub(crate) mod rewrite;
 
 #[derive(Clone, Debug)]
 pub struct Worker {
     pub origin: FuncId,
     pub floats: Vec<bool>,
+    pub ints: Vec<bool>,
     pub float_result: bool,
 }
 
@@ -292,8 +294,51 @@ fn callbacks(p: &mut Program) -> (usize, BTreeMap<FuncId, FuncId>, BTreeMap<Func
     (growth, roots, counts)
 }
 
+fn has_numeric(f: &Func) -> bool {
+    let mut body = f.body.clone();
+    let mut found = false;
+    rewrite::walk(&mut body, &mut |s| {
+        if matches!(
+            s,
+            Stmt::Let {
+                value: Value::Op(
+                    Op::IntAdd
+                        | Op::IntSub
+                        | Op::IntMul
+                        | Op::IntDiv
+                        | Op::IntRem
+                        | Op::IntNeg
+                        | Op::IntLt
+                        | Op::IntLe
+                        | Op::IntGt
+                        | Op::IntGe
+                        | Op::FloatAdd
+                        | Op::FloatSub
+                        | Op::FloatMul
+                        | Op::FloatDiv
+                        | Op::FloatNeg
+                        | Op::FloatLt
+                        | Op::FloatLe
+                        | Op::FloatGt
+                        | Op::FloatGe,
+                    _
+                ),
+                ..
+            }
+        ) {
+            found = true;
+        }
+    });
+    found
+}
+
 pub fn run(p: &mut Program) {
-    if p.numeric_locals.values().all(HashMap::is_empty) {
+    if p.numeric_locals.values().all(HashMap::is_empty)
+        && !p
+            .funcs
+            .iter()
+            .any(|f| matches!(f, FuncKind::Code(f) if has_numeric(f)))
+    {
         return;
     }
     assert!(
@@ -405,7 +450,13 @@ pub fn run(p: &mut Program) {
                 p.numeric_locals.get(&id).and_then(|m| m.get(&l)) == Some(&NumericFact::FiniteF64)
             })
             .collect::<Vec<_>>();
-        if !floats.iter().any(|b| *b) && !results[i] {
+        let mut ints = integer::parameters(f);
+        for (int, float) in ints.iter_mut().zip(&floats) {
+            if *float {
+                *int = false;
+            }
+        }
+        if !floats.iter().chain(&ints).any(|b| *b) && !results[i] {
             continue;
         }
         let cost = rewrite::size(&f.body);
@@ -429,8 +480,9 @@ pub fn run(p: &mut Program) {
             worker,
             Worker {
                 origin: id,
+                float_result: results[i] && !ints.iter().any(|b| *b),
                 floats,
-                float_result: results[i],
+                ints,
             },
         );
         p.numeric_log.push(format!(
@@ -511,9 +563,10 @@ pub fn run(p: &mut Program) {
     }
     for (i, function) in p.funcs.iter_mut().enumerate() {
         if let FuncKind::Code(f) = function
-            && p.numeric_locals
-                .get(&FuncId(i as u32))
-                .is_some_and(|facts| !facts.is_empty())
+            && (has_numeric(f)
+                || p.numeric_locals
+                    .get(&FuncId(i as u32))
+                    .is_some_and(|facts| !facts.is_empty()))
         {
             aggregate::run(f);
         }
@@ -572,6 +625,9 @@ pub fn run(p: &mut Program) {
     // scalar-result worker has no Value/unknown tail successor, so the one
     // boxing adapter cannot accumulate recursively along source tail edges.
     for (&origin, &worker) in &workers {
+        if p.workers[&worker].ints.iter().any(|b| *b) {
+            continue;
+        }
         let FuncKind::Code(original) = &originals[origin.0 as usize] else {
             unreachable!()
         };
@@ -676,9 +732,7 @@ fn inline(
             continue;
         }
         // Keep expansion within numeric regions; no-op programs retain bytes.
-        if !all_facts.get(&id).is_some_and(|m| !m.is_empty())
-            && !crate::emit::numeric::has_float(&f.body)
-        {
+        if !all_facts.get(&id).is_some_and(|m| !m.is_empty()) && !has_numeric(f) {
             continue;
         }
         let closure = match callee {

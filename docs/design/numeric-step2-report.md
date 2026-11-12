@@ -74,3 +74,26 @@ N3 paired batch medians (ns), compared with N2:
 The tuple allocation target is met: 13 raw allocations, one after subtracting
 the wrapper, with no tuple/backing-array allocation. The sine survivor still
 crosses larger record-returning helpers; out-of-line multivalue is deferred by R5.
+
+N4 adds signed-i31 worker entry guards. Parameter aliases feed widened i64
+arithmetic; only i31 values enter the scalar signature. A failed edge passes
+current canonical operands directly to the ordinary entry, including exact
+promotion results, without restarting any source computation. Arbitrary Int
+never uses int_to_i64. Conservative integer intervals remove redundant small
+operand/result tests, while numeric equality and exhaustive Bool branches use
+machine conditions. The differential effect loop crosses the i31 boundary and
+checks every step occurs once; scalar Int capture is tested across suspension.
+
+N4 paired batch medians (ns), compared with N3:
+
+| Kernel | N3 baseline | N4 | N4 allocations including wrapper |
+|---|---|---|---:|
+| fast | [4226, 4156, 4354, 4147, 4147] | [4286, 4557, 4477, 4537, 4186] | 50 |
+| horner | [60, 51, 60, 60, 59] | [61, 60, 40, 51, 40] | 13 |
+| dot | [2644, 2593, 2945, 1852, 1843] | [1823, 1783, 3445, 3455, 1792] | 13 |
+| integer | [1154, 1112, 1121, 1242, 1182] | [1392, 1372, 1343, 1282, 1362] | 14 |
+| tuples | [69, 49, 60, 59, 70] | [39, 51, 40, 40, 51] | 13 |
+| closures | [1644, 1662, 1644, 2946, 2775] | [1604, 1653, 1653, 1684, 2675] | 16 |
+
+N4 differential corpus and changed-crate Clippy pass. These batch spreads
+require a quiet confirmation before a performance pass/fail claim.

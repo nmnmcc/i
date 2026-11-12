@@ -217,6 +217,32 @@ fn corpus() -> Vec<Case> {
         events: vec!["before".into()],
     });
     cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    // N4: carry the current accumulator through promotion and demotion. The
+    // effect trace checks that leaving a guarded worker never replays a step.
+    for n in 0..24 {
+        let x = BigInt::from(1073741823_i64 - n);
+        cases.push(int_case("loop_int(7, x)", x.clone(), &x + 28));
+        cases.push(int_case("loop_down(7, x)", -&x, -&x - 28));
+    }
+    let start = BigInt::from(1073741821_i64);
+    let mut acc = start.clone();
+    let mut events = Vec::new();
+    for n in (1..=7).rev() {
+        events.push(acc.to_string());
+        acc += n;
+    }
+    cases.push(Case {
+        body: "core.inspect(loop_effect(7, x))".into(),
+        input: Value::Int(start),
+        expected: acc.to_string(),
+        stop: false,
+        events,
+    });
+    cases.push(int_case(
+        "control.boundary((b) { suspend_int(b, x) })",
+        1073741822.into(),
+        1073741825.into(),
+    ));
     // N3: cross-call pairs, structural and nominal numeric records, including
     // joins and repeated projections. Shapes carry actual labels/constructors.
     for n in 0..24 {
@@ -277,6 +303,9 @@ relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ ->
 numeric_pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
 step_float = (x: Float) -> Float { x *. 0.5 +. 0.25 }
 apply = (f: (Float) -> Float, x: Float) -> Float { f(x) }
+suspend_int = (b, x: Int) -> Int { a = x + 1 control.suspend(b, (k) { control.resume(k, Nil) }) a + 2 }
+loop_down = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> loop_down(n - 1, acc - n) } }
+loop_effect = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> { record(core.inspect(acc)) loop_effect(n - 1, acc + n) } } }
 loop_int = (n: Int, sum: Int) -> Int { n |> { 0 -> sum _ -> loop_int(n - 1, sum + n) } }
 fact = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> fact(n - 1, acc * n) } }
 loop_float = (n: Int, sum: Float) -> Float { n |> { 0 -> sum _ -> loop_float(n - 1, sum +. 0.25) } }

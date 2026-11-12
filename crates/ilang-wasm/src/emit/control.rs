@@ -941,7 +941,7 @@ impl<'p> Emitter<'p> {
         code: &[Stmt],
     ) {
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
-            numeric::Plan::for_func(f, self.p.numeric_locals.get(&id))
+            numeric::Plan::for_func(f, self.p.numeric_locals.get(&id), self.p.workers.get(&id))
         } else {
             numeric::Plan::default()
         };
