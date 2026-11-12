@@ -68,7 +68,9 @@ ItemResult {}
 /// members share a type constructor with another member, so each is its own
 /// type (syntax three §2.8).
 Node {
-	Node(Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)
+	Node(
+		Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice
+	)
 }
 
 Name {
