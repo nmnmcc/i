@@ -22,7 +22,8 @@
 (
 	Client(..)
 	Transport(..)
-	ResponseStream
+	ResponseStream(..)
+	ClientFunctions(..)
 	native_client
 	fetch_client
 	send_stream
@@ -1238,23 +1239,27 @@ drain_body = (reader) {
 }
 
 // Target providers capture transport services; callers retain one principal type.
-ResponseStream = (
-	head: Response
-	read: (
-		max: Int
-	) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-)
+ResponseStream {
+	ResponseStream(
+		head: Response
+		read: (
+			max: Int
+		) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	)
+}
 
-ClientFunctions = (
-	stream: (
-		req: Request
-	) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	send: (
-		req: Request
-	) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-)
+ClientFunctions {
+	ClientFunctions(
+		stream: (
+			req: Request
+		) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		send: (
+			req: Request
+		) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	)
+}
 
 Transport {
 	Transport(
@@ -1282,7 +1287,7 @@ native_client = (n ! net.Net, t ! tls.Tls) {
 			! tls.Tls = t
 			res = provider.send(req)
 			cursor = task.ref(res.body)
-			(head: res, read: (max) {
+			ResponseStream(head: res, read: (max) {
 				{ max <= 0 } |> {
 					True  -> fail.raise(Protocol("invalid read size"))
 					False -> Nil
@@ -1318,7 +1323,7 @@ client = (
 	c ! Client
 ) -> ClientFunctions ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
 	t = c.make()
-	(stream: t.stream, send: t.send, close: t.close)
+	ClientFunctions(stream: t.stream, send: t.send, close: t.close)
 }
 
 send = (
@@ -1370,13 +1375,13 @@ fetch_open = (req: Request) {
 	id
 }
 
-fetch_stream = (req: Request, f ! fetch.Fetch) -> ResponseStream ^ HttpError ! fetch.Fetch {
+fetch_stream = (req: Request, f ! fetch.Fetch) {
 	id = fetch_open(req)
 	// The host context also owns the response if this task is cancelled.
 	status = fetch_reply(() { fetch.status(id) })
 	encoded = fetch_reply(() { fetch.headers(id) })
 	hs = Headers(fetch_headers(string.split(encoded, "\u{0}")))
-	(
+	ResponseStream(
 		head: Response(Status(status), reason(status), hs, <<>>, Headers([]))
 		read: (max) {
 			! fetch.Fetch = f
@@ -1405,7 +1410,7 @@ fetch_client = (f ! fetch.Fetch) {
 					h.status
 					h.reason
 					h.headers
-					collect_body(reader, [])
+					collect_body((read: reader.read), [])
 					h.trailers
 				)
 			}, reader.close)
