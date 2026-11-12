@@ -165,7 +165,10 @@ fn position_params(uri: &str, line: u32, character: u32) -> Value {
 
 /// The line and UTF-16 character of the `nth` occurrence of `needle`.
 fn find(text: &str, needle: &str, nth: usize) -> (u32, u32) {
-    let (i, _) = text.match_indices(needle).nth(nth).unwrap();
+    let (i, _) = text
+        .match_indices(needle)
+        .nth(nth)
+        .unwrap_or_else(|| panic!("no {needle:?} #{nth} in\n{text}"));
     let before = &text[..i];
     let line = before.matches('\n').count() as u32;
     let col = before[before.rfind('\n').map_or(0, |n| n + 1)..]
@@ -566,7 +569,7 @@ fn completion_after_an_expression() {
 fn typed_macro_argument_completion_without_expansion() {
     let dir = tempfile::tempdir().unwrap();
     let text = "(\n\tm = app/macros\n)\nPoint = (x = Int, y = Int)\nmain = () {\n\tp = Point(x = 1, y = 2)\n\tm.broken(p.x)\n}\n";
-    let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: (broken A) (-> ((: value A)) A)))\n(@ macro (= broken (-> (value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
+    let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: broken (-> [A] (, A) A)))\n(@ macro (= broken (-> (, value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
     package(
         dir.path(),
         &[("src/main.i", text), ("src/macros.is", macros)],
@@ -849,7 +852,7 @@ fn disjoint_comparison_is_a_warning_at_the_comparison() {
 fn macro_expansion_preserves_hover_on_user_argument() {
     let dir = tempfile::tempdir().unwrap();
     let main_text = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
     package(
         dir.path(),
         &[("src/main.i", main_text), ("src/macros.is", macro_text)],
@@ -908,7 +911,7 @@ fn semantic_tokens_and_hover_inside_raw_interpolation() {
 fn typed_macro_hover_and_definition_through_call() {
     let dir = tempfile::tempdir().unwrap();
     let source = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-    let macros = "(, (= syntax (/ i syntax)))\n(, pass)\n/// A typed forwarding macro.\n(@ macro (: (pass A) (-> ((: value A)) A)))\n(@ macro (= pass (-> (value) _ value)))\n";
+    let macros = "(, (= syntax (/ i syntax)))\n(, pass)\n/// A typed forwarding macro.\n(@ macro (: pass (-> [A] (, A) A)))\n(@ macro (= pass (-> (, value) _ value)))\n";
     package(
         dir.path(),
         &[("src/main.i", source), ("src/macros.is", macros)],
@@ -962,9 +965,9 @@ struct Ws {
 }
 
 fn to_lisp(text: &str) -> String {
-    let (module, diags) = ilang_syntax::parse_module(text);
+    let (module, diags) = ilang_syntax::syn3::parse_module(text);
     assert!(diags.is_empty(), "{diags:?}");
-    ilang_syntax::lisp::print_module(&module)
+    ilang_syntax::syn3::lisp::to_lisp(&module)
 }
 
 fn workspace(lisp: bool) -> Ws {
@@ -1489,7 +1492,7 @@ fn lsp_rename_refuses_the_library() {
 fn lsp_rename_refuses_macro_expansion() {
     let dir = tempfile::tempdir().unwrap();
     let main_text = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
     package(
         dir.path(),
         &[("src/main.i", main_text), ("src/macros.is", macro_text)],
@@ -1708,7 +1711,7 @@ fn lsp_definition_into_a_dependency() {
 }
 
 const MACRO_MAIN: &str = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-const MACROS: &str = "(, (= syntax (/ i syntax)))\n(, pass)\n/// Gives back its argument.\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+const MACROS: &str = "(, (= syntax (/ i syntax)))\n(, pass)\n/// Gives back its argument.\n(@ macro (= pass (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
 
 #[test]
 fn lsp_definition_of_a_macro_call() {
@@ -1997,10 +2000,10 @@ fn lsp_signature_of_a_function() {
     c.open(&main, text);
     c.diagnostics(&main);
     let s = signature(&mut c, pos(&main, text, "add(1", 0, 4));
-    assert_eq!(s.signatures[0].label, "add(x: Int, y: Int) -> Int");
+    assert_eq!(s.signatures[0].label, "add(x = Int, y = Int) -> Int");
     assert_eq!(s.active_parameter, Some(0));
     let params = s.signatures[0].parameters.clone().unwrap();
-    assert_eq!(params[1].label, lsp::ParameterLabel::LabelOffsets([12, 18]));
+    assert_eq!(params[1].label, lsp::ParameterLabel::LabelOffsets([13, 20]));
     let s = signature(&mut c, pos(&main, text, "2)", 0, 0));
     assert_eq!(s.active_parameter, Some(1));
     assert!(
@@ -2053,7 +2056,7 @@ fn lsp_hover_type_and_documentation() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area(s)", 0, 1));
     assert!(
-        h.contains("area: (s: Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area: (s = Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
@@ -2078,7 +2081,7 @@ fn lsp_hover_value_of_a_constant() {
 #[test]
 fn lsp_hover_errors_and_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) -> Int { 0 }\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) <- (Clock, Fail(String)) -> Int { 0 }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2135,7 +2138,7 @@ fn lsp_hover_lisp_surface() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area s", 0, 1));
     assert!(
-        h.contains("area: (s: Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area: (s = Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "(= a ", 0, 3));
@@ -2300,7 +2303,7 @@ fn lsp_code_action_adds_the_missing_clauses() {
     let actions = code_actions(&mut c, &main, d.range);
     let after = applied(action(&actions, "Add the missing clauses"), text, &main);
     assert!(
-        after.contains("\t\tCircle(1) -> 1\n\t\tCircle(..) -> panic(\"todo\")\n\t\tRect(..) -> panic(\"todo\")\n\t}"),
+        after.contains("| (Circle(1)) { 1 } | (Circle(..)) { panic(\"todo\") } | (Rect(..)) { panic(\"todo\") }"),
         "{after}"
     );
     // The new text checks.
@@ -2597,7 +2600,7 @@ fn lsp_diagnostics_related_information_and_data() {
     // A problem in the code that a macro made: the template is related.
     let dir = tempfile::tempdir().unwrap();
     let main_text = "(m = app/macros)\nmain = () { m.bad() }\n";
-    let macros = "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> () (. syntax Syntax) `(+ 1 \"a\"))))\n";
+    let macros = "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> (,) (. syntax Syntax) `(+ 1 \"a\"))))\n";
     package(
         dir.path(),
         &[("src/main.i", main_text), ("src/macros.is", macros)],
@@ -3078,7 +3081,7 @@ fn lsp_completion_constructors_lisp_surface() {
 #[test]
 fn formats_lisp_documents_with_the_source_formatter() {
     let dir = tempfile::tempdir().unwrap();
-    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
+    let source = "// keep\n(= main (-> (,) _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
     package(dir.path(), &[("src/main.is", source)]);
     let main = file_uri(&dir.path().join("src/main.is"));
     let mut client = Client::start();
