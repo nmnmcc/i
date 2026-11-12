@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "5801908c256337cacd552116c1b73692aa12c06e",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.int : () -> Int ! Cell(Int)\napp/main.text : () -> String ! Cell(String)\napp/main.apply : (f: () -> A ? E ! N) -> A ? E ! N\napp/main.both : (a: () -> A ? E ! N, b: () -> B ? E2 ! N2) -> () -> B ? E | E2 ! N | N2\napp/main.bad : () -> String ! Cell(Int) | Cell(String)\n",
+      "stdout": "app/main.int : () -> Int ! Cell(Int)\napp/main.text : () -> String ! Cell(String)\napp/main.apply : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.both : (a: () -> A ^ E ! N, b: () -> B ^ E2 ! N2) -> () -> B ^ E | E2 ! N | N2\napp/main.bad : () -> String ! Cell(Int) | Cell(String)\n",
       "stderr": "src/main.i:6:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:6:31: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 6:12 needs it)\n2 errors\n"
     },
     "run0": {

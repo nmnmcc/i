@@ -143,6 +143,13 @@ No language or library surface was added, including state mechanisms.
   always close it on exit. Used i's existing Owner and resource.ensure for
   the same lifetime pattern, with no new state API.
 
+- Later K4d/K4s/K4-lane and R2 observations had the same source/target
+  split and error-slot changes. Refreshed 81 complete observations only
+  after mechanically checking the full difference: 40 preserve target E0523
+  rejection, nine remove obsolete E0522 alongside unchanged source errors,
+  and 32 change only error-slot spelling or remove scope's accidental Root
+  requirement. All saved budgets and semantic requirements stay intact.
+
 ## Verification
 
 Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
