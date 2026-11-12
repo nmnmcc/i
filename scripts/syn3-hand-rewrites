@@ -40,4 +40,20 @@ rewrite("tests/spec/9/environment.i", [(
     "count = (n, acc, name) {",
     "count = (n, acc, name: Name) {",
 )])
+# 6/evaluation_order.i tests that call arguments are worked out left to right;
+# its labelled call becomes a local binding (§7.3), which tests the order of
+# statements instead. Syntax three has no labelled call of a function, so the
+# fixture keeps its purpose with the arguments in written order.
+p = root / "tests/spec/6/evaluation_order.i"
+if p.exists():
+    p.write_text(re.sub(r"(?m)^// at: spec/main:\d+:\d+$", "// at: spec/main:11:7", p.read_text(), count=1))
+rewrite("tests/spec/6/evaluation_order.i", [
+    ("// written, also with labels.", "// written."),
+    ("""\t{
+\t\t_syn3_0 = panic("first")
+\t\tpair(panic("second"), _syn3_0)
+\t}
+""", """\tpair(panic("first"), panic("second"))
+"""),
+])
 PY
