@@ -92,7 +92,10 @@ fn type_parameters_and_row_variables() {
     );
     assert!(text.contains("map(A, B, N, N%E) ="), "{text}");
     assert!(text.contains("f: (A) -> B ^ N%E ! N"), "{text}");
-    assert!(text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"), "{text}");
+    assert!(
+        text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"),
+        "{text}"
+    );
 }
 
 #[test]

@@ -1,5 +1,5 @@
-//! The library package `i` (§2.1), which every program has: the library
-//! modules (§9, §13) and the prelude of built-in names (§12).
+//! The library package `i`, which every program has: the library modules
+//! and the prelude of built-in names.
 
 use crate::{ModuleKind, ModuleSource, Package, PackageGraph};
 

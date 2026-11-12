@@ -19,7 +19,11 @@ fn ok(source: &str) -> Module {
     let (again, diags) = syn3::parse_module(&formatted);
     assert!(diags.is_empty(), "formatted:\n{formatted}\n{diags:#?}");
     assert_eq!(again, module, "formatted:\n{formatted}");
-    assert_eq!(syn3::format(&formatted).unwrap(), formatted, "the formatter is stable");
+    assert_eq!(
+        syn3::format(&formatted).unwrap(),
+        formatted,
+        "the formatter is stable"
+    );
     let text = lisp::to_lisp(&module);
     let (read, diags) = lisp::from_lisp(&text);
     assert!(diags.is_empty(), "lisp:\n{text}\n{diags:#?}");
@@ -137,14 +141,19 @@ fn type_errors() {
     ok("x = a != b\n");
     bad("f: (..N) -> Int", "a data type has no spread");
     // §2.3: a positional item may not follow a labelled item.
-    bad("f: (port = Int, String) -> Conn", "by position may not come after");
+    bad(
+        "f: (port = Int, String) -> Conn",
+        "by position may not come after",
+    );
 }
 
 // ---- §3.2 Items and type definitions ----
 
 #[test]
 fn type_definitions() {
-    let m = ok("Some(A) = (A)\nNone = ()\nUser = (name = String, age = Int)\nOption(A) = Some(A) | None\nMeters = Int\nPoint = { (Int, Int) }\nWrap = (Int) | Nil\nHandler = (Request) -> Response\nElement = Opaque\nHandle(A) = Opaque\nCodec(Size, _) = size\n");
+    let m = ok(
+        "Some(A) = (A)\nNone = ()\nUser = (name = String, age = Int)\nOption(A) = Some(A) | None\nMeters = Int\nPoint = { (Int, Int) }\nWrap = (Int) | Nil\nHandler = (Request) -> Response\nElement = Opaque\nHandle(A) = Opaque\nCodec(Size, _) = size\n",
+    );
     let kinds: Vec<&TypeRhs> = m
         .items
         .iter()
@@ -171,17 +180,24 @@ fn type_definitions() {
         syn3::print_module(&m),
         "Some(A) = (A)\n\nNone = ()\n\nUser = (name = String, age = Int)\n\nOption(A) = Some(A) | None\n\nMeters = Int\n\nPoint = { (Int, Int) }\n\nWrap = (Int) | Nil\n\nHandler = (Request) -> Response\n\nElement = Opaque\n\nHandle(A) = Opaque\n\nCodec(Size, _) = size\n"
     );
-    bad("Tree(A) { Leaf  Node(A) }", "the constructor list `Name { … }` is removed");
+    bad(
+        "Tree(A) { Leaf  Node(A) }",
+        "the constructor list `Name { … }` is removed",
+    );
 }
 
 #[test]
 fn node_of_i_syntax() {
-    ok("Node = (Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)\nName = (String)\nRound = (List(Syntax))\nQuote = (Syntax)\n");
+    ok(
+        "Node = (Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)\nName = (String)\nRound = (List(Syntax))\nQuote = (Syntax)\n",
+    );
 }
 
 #[test]
 fn header_items_declarations_attributes() {
-    let m = ok("//// A module.\n(\n\ti/fail\n\treq = i/request\n\t(Option, Some, None) = std/option\n)\n\n(\n\tUser(..)\n\tOption\n\tfind\n)\n\n/// Reads.\n@external(\"i:fs/v1\", \"read\")\nread: (String) <- (Fail(String)) -> String\n\n@host(\"app:storage/v1\", \"async\")\nStorage = (read = (String) <- (Fail(String)) -> String)\n\n@macro\nid = (x) { x }\n\ntest.suite(\"name\", () { 1 })\n");
+    let m = ok(
+        "//// A module.\n(\n\ti/fail\n\treq = i/request\n\t(Option, Some, None) = std/option\n)\n\n(\n\tUser(..)\n\tOption\n\tfind\n)\n\n/// Reads.\n@external(\"i:fs/v1\", \"read\")\nread: (String) <- (Fail(String)) -> String\n\n@host(\"app:storage/v1\", \"async\")\nStorage = (read = (String) <- (Fail(String)) -> String)\n\n@macro\nid = (x) { x }\n\ntest.suite(\"name\", () { 1 })\n",
+    );
     assert_eq!(m.doc, [" A module."]);
     assert_eq!(m.imports.len(), 3);
     assert_eq!(m.exports.len(), 3);
@@ -225,7 +241,10 @@ fn data_values() {
         syn3::parse_expr("(a == b)").unwrap().kind,
         ExprKind::Data(items) if matches!(items[0], DItem::Pos(_))
     ));
-    bad("x = (port = 443, \"a.com\")", "by position may not come after");
+    bad(
+        "x = (port = 443, \"a.com\")",
+        "by position may not come after",
+    );
     bad("x = f(name: 1)", "written `label = value`");
 }
 
@@ -256,12 +275,18 @@ fn operators_and_groups() {
 #[test]
 fn p1_function_or_data() {
     // `)` followed by `->`, or by `{` on the same line: a function.
-    assert_eq!(chain(&value("f = (a: Int, b: Int) -> Int { a + b }")).len(), 1);
+    assert_eq!(
+        chain(&value("f = (a: Int, b: Int) -> Int { a + b }")).len(),
+        1
+    );
     assert_eq!(chain(&value("f = (n) { n + 1 }")).len(), 1);
     assert_eq!(chain(&value("f = () { clock.read() }")).len(), 1);
     // G6, G27.
     assert!(matches!(value("f = (x) { y }").kind, ExprKind::Chain(_)));
-    assert!(matches!(value("f = (x = 1) { 2 }").kind, ExprKind::Chain(_)));
+    assert!(matches!(
+        value("f = (x = 1) { 2 }").kind,
+        ExprKind::Chain(_)
+    ));
     assert!(matches!(value("f = (x = 1)").kind, ExprKind::Data(_)));
     // G32: the outer `(` is data, the inner item a function.
     match value("p = ((a) { a }, 1)").kind {
@@ -272,7 +297,9 @@ fn p1_function_or_data() {
     }
     // A `{` on the next line is not a body.
     let m = ok("f = () {\n\tx = (a)\n\t{ a }\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 2);
     bad("f = (a) -> Int\n", "expected the function body");
 }
@@ -281,19 +308,24 @@ fn p1_function_or_data() {
 fn p2_call() {
     // G7: `f(x) { … }` is a call and then a block statement.
     let m = ok("g = () {\n\tf(x)\n\t{ 1 }\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     let body = &chain(&b.value)[0].body;
     assert!(matches!(&body.stmts[0], Stmt::Expr(e) if matches!(e.kind, ExprKind::Call { .. })));
     assert!(matches!(&body.stmts[1], Stmt::Expr(e) if matches!(e.kind, ExprKind::Block(_))));
     // A `(` on a new line begins a new statement.
     let m = ok("g = () {\n\tf\n\t(a, b)\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 2);
 }
 
 #[test]
 fn p4_branch_join() {
-    let gcd = value("gcd =\n\t(a: Int, 0) -> Int { a }\n\t| (a: Int, b: Int) -> Int { gcd(b, a % b) }\n");
+    let gcd =
+        value("gcd =\n\t(a: Int, 0) -> Int { a }\n\t| (a: Int, b: Int) -> Int { gcd(b, a % b) }\n");
     assert_eq!(chain(&gcd).len(), 2);
     // G1: the body's `{` ends the `->` part; `|` after `}` is a join.
     assert_eq!(chain(&value("f = (p) -> A { e } | (q) { f }")).len(), 2);
@@ -321,7 +353,9 @@ fn p4_branch_join() {
     bad("h = f | g", "`|` joins only function literals");
     bad("h = (a) { 1 } | g", "`|` joins only function literals");
     // Overloading by shape (§2.6).
-    let show = value("show =\n\t(n: Int) -> String { int.to_string(n) }\n\t| (s: String) -> Int { string.length(s) }\n\t| (a: Int, b: Int) -> Bool { a == b }\n\t| (host: String, port = p: Int) -> Conn { open(host, p) }\n");
+    let show = value(
+        "show =\n\t(n: Int) -> String { int.to_string(n) }\n\t| (s: String) -> Int { string.length(s) }\n\t| (a: Int, b: Int) -> Bool { a == b }\n\t| (host: String, port = p: Int) -> Conn { open(host, p) }\n",
+    );
     assert_eq!(chain(&show).len(), 4);
 }
 
@@ -338,8 +372,12 @@ fn p5_arrow_part() {
 
 #[test]
 fn p6_statements() {
-    let m = ok("f = () {\n\ta = b = c = d\n\tt = (a, b) = pair\n\t(x, y) = whole = e\n\tx: (n = Int) = (n = 1)\n\ta = (n = 1) = b\n\tUser(name = \"ada\")\n\t(w = 3, h = 4, area = w * h)\n\tOk(v) = parse(text)\n\tv\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let m = ok(
+        "f = () {\n\ta = b = c = d\n\tt = (a, b) = pair\n\t(x, y) = whole = e\n\tx: (n = Int) = (n = 1)\n\ta = (n = 1) = b\n\tUser(name = \"ada\")\n\t(w = 3, h = 4, area = w * h)\n\tOk(v) = parse(text)\n\tv\n}\n",
+    );
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     let stmts = &chain(&b.value)[0].body.stmts;
     let parts = |s: &Stmt| match s {
         Stmt::Bind(b) => match &b.pattern.kind {
@@ -349,7 +387,10 @@ fn p6_statements() {
         Stmt::Expr(_) => 0,
     };
     // G38, G12, G30, G18, G11.
-    assert_eq!(stmts.iter().map(parts).collect::<Vec<_>>(), [3, 2, 2, 1, 2, 0, 0, 1, 0]);
+    assert_eq!(
+        stmts.iter().map(parts).collect::<Vec<_>>(),
+        [3, 2, 2, 1, 2, 0, 0, 1, 0]
+    );
     assert!(matches!(&stmts[5], Stmt::Expr(e) if matches!(e.kind, ExprKind::Call { .. })));
     assert!(matches!(&stmts[6], Stmt::Expr(e) if matches!(e.kind, ExprKind::Data(_))));
     bad("f = () { x = 1 }", "a block ends with an expression");
@@ -383,7 +424,10 @@ fn p11_pipe() {
         assert_eq!(expr(e), e);
     }
     // G5.
-    bad("y = x |> g == 2", "the right side of `|>` must be a name, a call");
+    bad(
+        "y = x |> g == 2",
+        "the right side of `|>` must be a name, a call",
+    );
     // G4: the whole chain is the right operand.
     match syn3::parse_expr("x |> (p) { e } | (q) { f }").unwrap().kind {
         ExprKind::Pipe { rhs, .. } => assert_eq!(chain(&rhs).len(), 2),
@@ -396,7 +440,9 @@ fn p13_lines() {
     // A line that begins with `|` continues; a line that begins with `(`
     // begins a new statement; inside `( )` a break is a `,`.
     let m = ok("f = () {\n\tr = x |>\n\t\t(1) { a }\n\t\t| (_) { b }\n\t(r, 1)\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 2);
     assert_eq!(
         syn3::parse_expr("f(\n\ta\n\tb = 1\n)").unwrap(),
@@ -574,7 +620,10 @@ keep = <S, A, N>(f: (S) <- N -> A) <- (..env: N) -> (S) -> A { (x) { f(x) <- env
     }
     // `..env: N` binds the whole environment.
     let keep = function(9);
-    assert!(matches!(keep.services.as_deref(), Some([SItem { rest: true, .. }])));
+    assert!(matches!(
+        keep.services.as_deref(),
+        Some([SItem { rest: true, .. }])
+    ));
     // A bare row variable is written only in a type; a service has a name.
     bad("f = (x) <- N -> Int { x }", "bare row variable");
     bad("f = (x) <- (Db) { x }", "written `name: Type`");
@@ -613,25 +662,42 @@ fn provide() {
         other => panic!("{other:?}"),
     }
     match syn3::parse_expr("f() <- (a) <- (b)").unwrap().kind {
-        ExprKind::Provide { target, .. } => assert!(matches!(target.kind, ExprKind::Provide { .. })),
+        ExprKind::Provide { target, .. } => {
+            assert!(matches!(target.kind, ExprKind::Provide { .. }))
+        }
         other => panic!("{other:?}"),
     }
     // The right operand is one postfix expression.
     match syn3::parse_expr("f() <- s.x(1)").unwrap().kind {
-        ExprKind::Provide { services, .. } => assert!(matches!(services.kind, ExprKind::Call { .. })),
+        ExprKind::Provide { services, .. } => {
+            assert!(matches!(services.kind, ExprKind::Call { .. }))
+        }
         other => panic!("{other:?}"),
     }
     // P1: `( … ) <- ( … )` is a function head only when the service group
     // is followed on the same line by `->` or `{`.
-    assert!(matches!(syn3::parse_expr("(a) <- (s)").unwrap().kind, ExprKind::Provide { .. }));
-    assert!(matches!(syn3::parse_expr("(a) <- (s: S) { a }").unwrap().kind, ExprKind::Chain(_)));
-    assert!(matches!(syn3::parse_expr("(a) <- (s: S) -> Int { a }").unwrap().kind, ExprKind::Chain(_)));
+    assert!(matches!(
+        syn3::parse_expr("(a) <- (s)").unwrap().kind,
+        ExprKind::Provide { .. }
+    ));
+    assert!(matches!(
+        syn3::parse_expr("(a) <- (s: S) { a }").unwrap().kind,
+        ExprKind::Chain(_)
+    ));
+    assert!(matches!(
+        syn3::parse_expr("(a) <- (s: S) -> Int { a }").unwrap().kind,
+        ExprKind::Chain(_)
+    ));
     // A line that begins or ends with `<-` continues.
     let m = ok("f = () {\n\tapp()\n\t\t<- live()\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 1);
     let m = ok("f = () {\n\tapp() <-\n\t\tlive()\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 1);
     bad("x = f() <- (db = d)", "provided services have no labels");
     // A block provided with services, with statements.
@@ -642,7 +708,9 @@ fn provide() {
 fn generics() {
     // `<` after a line end begins a statement when `UpName … > (` follows.
     let m = ok("f = () {\n\tlog()\n\t<A>(x: A) { x }\n}\n");
-    let ItemKind::Bind(b) = &m.items[0].kind else { unreachable!() };
+    let ItemKind::Bind(b) = &m.items[0].kind else {
+        unreachable!()
+    };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 2);
     // Each branch of a chain writes its own `<…>`.
     let f = value("f = <A>(x: A) { 1 } | <B>(x: B, y: B) { 2 }");
@@ -652,8 +720,14 @@ fn generics() {
     assert_eq!(expr("a < b"), "a < b");
     assert_eq!(expr("a < B"), "a < B");
     // The type parameters of a binding head are removed.
-    bad("id(A) = (x: A) { x }", "type parameters are written on the function");
-    bad("f = () {\n\tid(A): (A) -> A = g\n\tid\n}\n", "type parameters are written on the function");
+    bad(
+        "id(A) = (x: A) { x }",
+        "type parameters are written on the function",
+    );
+    bad(
+        "f = () {\n\tid(A): (A) -> A = g\n\tid\n}\n",
+        "type parameters are written on the function",
+    );
     ok("id = <A,>(x: A) { x }\n");
 }
 
@@ -661,7 +735,13 @@ fn generics() {
 fn lexer() {
     use ilang_syntax::lexer::{lex, lex3};
     use ilang_syntax::token::TokenKind as T;
-    let kinds = |s: &str| lex3(s).tokens.into_iter().map(|t| t.kind).collect::<Vec<_>>();
+    let kinds = |s: &str| {
+        lex3(s)
+            .tokens
+            .into_iter()
+            .map(|t| t.kind)
+            .collect::<Vec<_>>()
+    };
     assert!(kinds("a <- b").contains(&T::LArrow));
     assert!(kinds("x<-1").contains(&T::LArrow));
     assert!(!kinds("x < -1").contains(&T::LArrow));
@@ -723,29 +803,59 @@ fn lisp_rows() {
         ("y = (p) -> R { e }", "(= y (-> (, p) R e))"),
         ("y = () { e }", "(= y (-> (,) _ e))"),
         ("y = (p1, p2 ? g) { e }", "(= y (-> (? (, p1 p2) g) _ e))"),
-        ("y = (a) { 1 } | (b) { 2 }", "(= y (| (-> (, a) _ 1) (-> (, b) _ 2)))"),
+        (
+            "y = (a) { 1 } | (b) { 2 }",
+            "(= y (| (-> (, a) _ 1) (-> (, b) _ 2)))",
+        ),
         ("y = e |> f", "(= y (|> e f))"),
-        ("y = e |> (a) { 1 } | (b) { 2 }", "(= y (|> e (| (-> (, a) _ 1) (-> (, b) _ 2))))"),
+        (
+            "y = e |> (a) { 1 } | (b) { 2 }",
+            "(= y (|> e (| (-> (, a) _ 1) (-> (, b) _ 2))))",
+        ),
         ("(p1, x = p2) = v", "(= (, p1 (= x p2)) v)"),
         ("(p, ..) = v", "(= (, p ..) v)"),
         ("(p, ..r) = v", "(= (, p .. r) v)"),
-        ("y = (C(p1, x = p2)) { 1 }", "(= y (-> (, (C p1 (= x p2))) _ 1))"),
+        (
+            "y = (C(p1, x = p2)) { 1 }",
+            "(= y (-> (, (C p1 (= x p2))) _ 1))",
+        ),
         ("y = (C(p, ..), D) { 1 }", "(= y (-> (, (C p ..) D) _ 1))"),
-        ("(size = whole = (w, h)) = box", "(= (, (= size whole (, w h))) box)"),
-        ("y = ((a, b) = args) { 1 }", "(= y (-> (, (= (, a b) args)) _ 1))"),
+        (
+            "(size = whole = (w, h)) = box",
+            "(= (, (= size whole (, w h))) box)",
+        ),
+        (
+            "y = ((a, b) = args) { 1 }",
+            "(= y (-> (, (= (, a b) args)) _ 1))",
+        ),
         ("t = (a, b) = e", "(= (= t (, a b)) e)"),
-        ("y = (Sat | Sun, x) { 1 }", "(= y (-> (, (| Sat Sun) x) _ 1))"),
+        (
+            "y = (Sat | Sun, x) { 1 }",
+            "(= y (-> (, (| Sat Sun) x) _ 1))",
+        ),
         // The services forms.
-        ("x: (T) <- (Db, Log) -> R", "(: x (-> (, T) (<- R (, Db Log))))"),
+        (
+            "x: (T) <- (Db, Log) -> R",
+            "(: x (-> (, T) (<- R (, Db Log))))",
+        ),
         ("x: (T) <- N -> R", "(: x (-> (, T) (<- R N)))"),
-        ("x: (T) <- (..N, Db) -> R", "(: x (-> (, T) (<- R (, .. N Db))))"),
+        (
+            "x: (T) <- (..N, Db) -> R",
+            "(: x (-> (, T) (<- R (, .. N Db))))",
+        ),
         ("x: <A>(A) -> A", "(: x (-> [A] (, A) A))"),
         (
             "y = (id: String) <- (db: Db) -> User { e }",
             "(= y (-> (, (: id String)) (<- User (, (: db Db))) e))",
         ),
-        ("y = (id) <- (db: Db) { e }", "(= y (-> (, id) (<- _ (, (: db Db))) e))"),
-        ("y = <A, N>(x: A) <- (..env: N) { e }", "(= y (-> [A N] (, (: x A)) (<- _ (, .. (: env N))) e))"),
+        (
+            "y = (id) <- (db: Db) { e }",
+            "(= y (-> (, id) (<- _ (, (: db Db))) e))",
+        ),
+        (
+            "y = <A, N>(x: A) <- (..env: N) { e }",
+            "(= y (-> [A N] (, (: x A)) (<- _ (, .. (: env N))) e))",
+        ),
         ("y = f(x) <- (s)", "(= y (<- (f x) (, s)))"),
         ("y = app() <- live()", "(= y (<- (app) (live)))"),
     ] {
@@ -788,7 +898,10 @@ fn lisp_errors() {
         ("(= y (-> (, .. r) _ 1))", "no rest"),
     ] {
         let (_, diags) = lisp::from_lisp(text);
-        assert!(diags.iter().any(|d| d.message.contains(needle)), "{text}\n{diags:#?}");
+        assert!(
+            diags.iter().any(|d| d.message.contains(needle)),
+            "{text}\n{diags:#?}"
+        );
     }
 }
 
@@ -816,10 +929,19 @@ fn convert_types() {
         converted("Tree(A) {\n\tLeaf\n\tNode(left: Tree(A), value: A, right: Tree(A))\n}\n"),
         "Leaf = ()\nNode(A) = (left = Tree(A), value = A, right = Tree(A))\nTree(A) = Leaf | Node(A)\n"
     );
-    assert_eq!(converted("User { User(name: String, age: Int) }\n"), "User = (name = String, age = Int)\n");
+    assert_eq!(
+        converted("User { User(name: String, age: Int) }\n"),
+        "User = (name = String, age = Int)\n"
+    );
     assert_eq!(converted("Element {}\n"), "Element = Opaque\n");
-    assert_eq!(converted("Point = (x: Int, y: Int)\n"), "Point = { (x = Int, y = Int) }\n");
-    assert_eq!(converted("Pair(A, B) = (A, B)\n"), "Pair(A, B) = { (A, B) }\n");
+    assert_eq!(
+        converted("Point = (x: Int, y: Int)\n"),
+        "Point = { (x = Int, y = Int) }\n"
+    );
+    assert_eq!(
+        converted("Pair(A, B) = (A, B)\n"),
+        "Pair(A, B) = { (A, B) }\n"
+    );
     assert_eq!(converted("Meters = Int\n"), "Meters = Int\n");
     // `T` alone is exported with its members.
     assert_eq!(
@@ -831,56 +953,99 @@ fn convert_types() {
 #[test]
 fn convert_clauses_and_matches() {
     assert_eq!(
-        converted("describe = (opt: Option(String)) -> String {\n\topt |> {\n\t\tSome(v) ? string.is_empty(v) -> \"empty\"\n\t\tSome(v) -> v\n\t\tNone -> \"none\"\n\t}\n}\n"),
+        converted(
+            "describe = (opt: Option(String)) -> String {\n\topt |> {\n\t\tSome(v) ? string.is_empty(v) -> \"empty\"\n\t\tSome(v) -> v\n\t\tNone -> \"none\"\n\t}\n}\n"
+        ),
         "describe = (opt: Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
     );
     // A tuple pattern becomes the one item `((a, b))`.
     assert_eq!(
-        converted("pick = (p: (Int, Int)) -> Int {\n\tp |> {\n\t\t(0, y) -> y\n\t\t(x, _) -> x\n\t}\n}\n"),
+        converted(
+            "pick = (p: (Int, Int)) -> Int {\n\tp |> {\n\t\t(0, y) -> y\n\t\t(x, _) -> x\n\t}\n}\n"
+        ),
         "pick = (p: (Int, Int)) -> Int { p |> ((0, y)) { y } | ((x, _)) { x } }\n"
     );
     assert_eq!(
         converted("x = list.map(opts, { Some(u) -> u.name  None -> \"\" })\n"),
         "x = list.map(opts, (Some(u)) { u.name } | (None) { \"\" })\n"
     );
-    assert_eq!(converted("k = d |> { Sat | Sun -> 1  _ -> 2 }\n"), "k = d |> (Sat | Sun) { 1 } | (_) { 2 }\n");
-    assert_eq!(converted("absurd = (x: Never) { x |> {} }\n"), "absurd = (x: Never) { core.never(x) }\n");
-    // The pipe is the weakest operator now, so groups are put in.
-    assert_eq!(converted("ok = a <> b |> f\n"), "ok = a <> { b |> f }\n");
-    assert_eq!(converted("ok = { x |> f } == y\n"), "ok = { x |> f } == y\n");
+    assert_eq!(
+        converted("k = d |> { Sat | Sun -> 1  _ -> 2 }\n"),
+        "k = d |> (Sat | Sun) { 1 } | (_) { 2 }\n"
+    );
+    assert_eq!(
+        converted("absurd = (x: Never) { x |> {} }\n"),
+        "absurd = (x: Never) { core.never(x) }\n"
+    );
+    // The pipe is the weakest operator in both syntaxes, so the grouping is kept as written.
+    assert_eq!(converted("ok = a <> b |> f\n"), "ok = a <> b |> f\n");
+    assert_eq!(
+        converted("ok = a <> { b |> f }\n"),
+        "ok = a <> { b |> f }\n"
+    );
+    assert_eq!(
+        converted("ok = { x |> f } == y\n"),
+        "ok = { x |> f } == y\n"
+    );
 }
 
 #[test]
 fn convert_patterns_and_data() {
-    assert_eq!(converted("swap = (t = (a, b)) { (b, a) }\n"), "swap = ((a, b) = t) { (b, a) }\n");
-    assert_eq!(converted("f = (x = label) { x }\n"), "f = (_ = x = label) { x }\n");
-    assert_eq!(converted("f = (x = label: T) { x }\n"), "f = (label: T = x) { x }\n");
+    assert_eq!(
+        converted("swap = (t = (a, b)) { (b, a) }\n"),
+        "swap = ((a, b) = t) { (b, a) }\n"
+    );
+    assert_eq!(
+        converted("f = (x = label) { x }\n"),
+        "f = (_ = x = label) { x }\n"
+    );
+    assert_eq!(
+        converted("f = (x = label: T) { x }\n"),
+        "f = (label: T = x) { x }\n"
+    );
     assert_eq!(
         converted("f = () {\n\tt = (a, b) = pair\n\tOk(v) = parse(text)\n\tv\n}\n"),
         "f = () {\n\tt = (a, b) = pair\n\tOk(v) = parse(text)\n\tv\n}\n"
     );
-    assert_eq!(converted("ada = (name: \"ada\", age: 36)\n"), "ada = (name = \"ada\", age = 36)\n");
-    assert_eq!(converted("older = (..ada, age: 37)\n"), "older = (..ada, age = 37)\n");
+    assert_eq!(
+        converted("ada = (name: \"ada\", age: 36)\n"),
+        "ada = (name = \"ada\", age = 36)\n"
+    );
+    assert_eq!(
+        converted("older = (..ada, age: 37)\n"),
+        "older = (..ada, age = 37)\n"
+    );
     // Constructors of the file: fields by label, no punning.
     assert_eq!(
-        converted("User { User(name: String, age: Int) }\nu = User(\"ada\", 36)\nv = User(..u, age: 37)\nadult = (u: User) { u |> { User(name, age) -> age > 17 } }\nyoung = (u: User) { u |> { User(n = name, ..) -> n } }\n"),
+        converted(
+            "User { User(name: String, age: Int) }\nu = User(\"ada\", 36)\nv = User(..u, age: 37)\nadult = (u: User) { u |> { User(name, age) -> age > 17 } }\nyoung = (u: User) { u |> { User(n = name, ..) -> n } }\n"
+        ),
         "User = (name = String, age = Int)\nu = User(name = \"ada\", age = 36)\nv = User(..u, age = 37)\nadult = (u: User) { u |> (User(name = name, age = age)) { age > 17 } }\nyoung = (u: User) { u |> (User(name = n, ..)) { n } }\n"
     );
-    assert_eq!(converted("s = \"a \\(x + 1) b\"\n"), "s = \"a \\(x + 1) b\"\n");
+    assert_eq!(
+        converted("s = \"a \\(x + 1) b\"\n"),
+        "s = \"a \\(x + 1) b\"\n"
+    );
 }
 
 #[test]
 fn convert_services() {
     assert_eq!(
-        converted("find_user = (id: String, db ! Db) -> User ^ NotFound ! Db {\n\tdb.find(id)\n}\n"),
+        converted(
+            "find_user = (id: String, db ! Db) -> User ^ NotFound ! Db {\n\tdb.find(id)\n}\n"
+        ),
         "find_user = (id: String) <- (db: Db) -> User { db.find(id) }\n"
     );
     assert_eq!(
-        converted("fake = () -> User ^ NotFound {\n\t! Db = Db(find: (id) { fail.raise(NotFound(id)) })\n\tfind_user(\"1\")\n}\n"),
+        converted(
+            "fake = () -> User ^ NotFound {\n\t! Db = Db(find: (id) { fail.raise(NotFound(id)) })\n\tfind_user(\"1\")\n}\n"
+        ),
         "fake = () -> User {\n\tfind_user(\"1\") <- (Db(find = (id) { fail.raise(NotFound(id)) }))\n}\n"
     );
     assert_eq!(
-        converted("count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N { 0 }\n"),
+        converted(
+            "count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N { 0 }\n"
+        ),
         "count = <A, N>(list: List(A), where: (A) <- N -> Bool) -> Int { 0 }\n"
     );
     assert_eq!(
@@ -891,9 +1056,15 @@ fn convert_services() {
         converted("f = () {\n\t! A = a\n\tx = 1\n\tg(x)\n}\n"),
         "f = () {\n\t{\n\t\tx = 1\n\t\tg(x)\n\t} <- (a)\n}\n"
     );
-    assert_eq!(converted("h(N) = (f: () -> Int ! N) -> Int ! N { f() }\n"), "h = <N>(f: () <- N -> Int) -> Int { f() }\n");
+    assert_eq!(
+        converted("h(N) = (f: () -> Int ! N) -> Int ! N { f() }\n"),
+        "h = <N>(f: () <- N -> Int) -> Int { f() }\n"
+    );
     // Direct values merge into one provide; other values nest.
-    assert_eq!(converted("f = () {\n\t! A = a\n\t! B = b\n\tg()\n}\n"), "f = () { g() <- (a, b) }\n");
+    assert_eq!(
+        converted("f = () {\n\t! A = a\n\t! B = b\n\tg()\n}\n"),
+        "f = () { g() <- (a, b) }\n"
+    );
     assert_eq!(
         converted("f = () {\n\t! A = make()\n\t! B = b\n\tg()\n}\n"),
         "f = () { g() <- (b) <- (make()) }\n"
@@ -902,7 +1073,10 @@ fn convert_services() {
         converted("T = (key: String) -> Int ^ E ! Db | Log\n"),
         "T = (String) <- (Fail(E), Db, Log) -> Int\n"
     );
-    assert_eq!(converted("m(A, B, E) = (f: (A) -> B ^ E) -> B ^ E { f(a) }\n"), "m = <A, B, E>(f: (A) <- (Fail(E)) -> B) -> B { f(a) }\n");
+    assert_eq!(
+        converted("m(A, B, E) = (f: (A) -> B ^ E) -> B ^ E { f(a) }\n"),
+        "m = <A, B, E>(f: (A) <- (Fail(E)) -> B) -> B { f(a) }\n"
+    );
 }
 
 #[test]
@@ -910,7 +1084,9 @@ fn convert_labelled_calls() {
     // The parameters of a function of the file are known: positional, in
     // parameter order.
     assert_eq!(
-        converted("connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", port: 80)\nd = connect(port: 80, host: \"a.com\")\n"),
+        converted(
+            "connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", port: 80)\nd = connect(port: 80, host: \"a.com\")\n"
+        ),
         "connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", 80)\nd = connect(\"a.com\", 80)\n"
     );
     // The order changes and two arguments are not direct values: locals keep
@@ -927,7 +1103,9 @@ fn convert_labelled_calls() {
     // A function that the text does not show keeps its labels.
     assert_eq!(converted("x = m.f(1, to: 2)\n"), "x = m.f(1, to = 2)\n");
     // The functions and constructors of an imported module.
-    let (lib, _) = ilang_syntax::parse_module("User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n");
+    let (lib, _) = ilang_syntax::parse_module(
+        "User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n",
+    );
     let mut signatures = convert::Signatures::default();
     convert::collect(&lib, "users", &mut signatures);
     let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to: 9, from: 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";

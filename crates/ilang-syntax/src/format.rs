@@ -62,7 +62,7 @@ fn format_module(source: &str, module: &Module) -> String {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Align {
+pub(crate) enum Align {
     /// The part after `label:` of a field or an argument.
     Label,
     /// The `->` of a `case` clause.
@@ -72,7 +72,7 @@ enum Align {
 }
 
 #[derive(Clone, Debug)]
-enum Doc {
+pub(crate) enum Doc {
     Text(String),
     /// Text only when the group is on one line, such as the `,` between
     /// parts.
@@ -103,7 +103,7 @@ enum Doc {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Kind {
+pub(crate) enum Kind {
     Plain,
     /// A block of one expression: when it is measured, all of it is measured,
     /// also the blocks that hug inside it.
@@ -114,15 +114,15 @@ enum Kind {
     Hug,
 }
 
-fn text(s: impl Into<String>) -> Doc {
+pub(crate) fn text(s: impl Into<String>) -> Doc {
     Doc::Text(s.into())
 }
 
-fn cat(parts: Vec<Doc>) -> Doc {
+pub(crate) fn cat(parts: Vec<Doc>) -> Doc {
     Doc::Cat(parts)
 }
 
-fn nest(d: Doc) -> Doc {
+pub(crate) fn nest(d: Doc) -> Doc {
     Doc::Nest(Box::new(d))
 }
 
@@ -136,7 +136,7 @@ fn forces(d: &Doc) -> bool {
     }
 }
 
-fn group(d: Doc) -> Doc {
+pub(crate) fn group(d: Doc) -> Doc {
     let forced = forces(&d);
     Doc::Group(Box::new(d), forced, Kind::Plain)
 }
@@ -269,7 +269,13 @@ fn fits(next: &Doc, rest: &[(usize, Mode, &Doc)], mut rem: isize, full: bool) ->
     }
 }
 
-fn render(doc: &Doc, max: usize) -> String {
+pub(crate) fn render(doc: &Doc, max: usize) -> String {
+    render_with_indent_limit(doc, max, usize::MAX)
+}
+
+/// Keep room for delimiters when a surface permits arbitrarily nested forms
+/// with a break at every datum boundary. The normal surface has no limit.
+pub(crate) fn render_with_indent_limit(doc: &Doc, max: usize, max_indent: usize) -> String {
     let mut out = Out { lines: Vec::new() };
     out.newline(0);
     let mut col = 0usize;
@@ -318,7 +324,11 @@ fn render(doc: &Doc, max: usize) -> String {
             }
             // In a group on one line, only the lines of forced groups inside it
             // end; they are indented from the line where the group began.
-            Doc::Nest(d) => cmds.push((indent + usize::from(mode == Mode::Break), mode, d)),
+            Doc::Nest(d) => cmds.push((
+                (indent + usize::from(mode == Mode::Break)).min(max_indent),
+                mode,
+                d,
+            )),
             Doc::Full(d) => cmds.push((indent, mode, d)),
             Doc::Cat(v) => cmds.extend(v.iter().rev().map(|d| (indent, mode, d))),
             Doc::Group(d, forced, kind) => {
@@ -1136,8 +1146,8 @@ impl<'a> Formatter<'a> {
             if token.span == e.span && matches!(token.kind, T::Interpolated(_)) {
                 return text(f.slice(e.span));
             }
-            // A match is an operation at level 6 (§6.9).
-            if level(e) < min || is_match(e) && min > 6 {
+            // A match is an operation at level 1 (§6.9).
+            if level(e) < min || is_match(e) && min > 1 {
                 let before = f.hard;
                 let body = f.expr_raw(e);
                 if f.hard == before {
@@ -1235,7 +1245,7 @@ impl<'a> Formatter<'a> {
             ExprKind::Block(b) => self.block(b, false),
             ExprKind::Fn(func) => self.function(func, span.start),
             ExprKind::Case { subject, clauses } => {
-                let subject_doc = self.expr(subject, 6);
+                let subject_doc = self.expr(subject, 1);
                 let op = self.tok_after(subject.span.end);
                 let open = self.tok_after(op.span.end).span.start;
                 let body = self.clause_block(open, span.end - 1, clauses);

@@ -16,6 +16,7 @@ pub mod definitions;
 mod encode;
 mod encode_charge;
 pub mod expansion;
+mod format;
 mod from_ast;
 pub mod quote_lower;
 mod render;
@@ -283,11 +284,11 @@ pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
         }
         return Ok(crate::syn3::lisp::to_lisp(&module));
     }
-    let (module, diagnostics) = parse_source(source);
+    let (_, diagnostics) = parse_source(source);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
-    Ok(from_ast::format_with_comments(source, &module))
+    format::format(source)
 }
 
 struct Parser<'a> {
@@ -517,6 +518,7 @@ impl Printable for syntax::Syntax {
             Quote(x) => View::Prefix("`", x),
             Unquote(x) => View::Prefix("~", x),
             Splice(x) => View::Prefix("~..", x),
+            TypeView(_) => View::Atom("#<type-view>"),
         }
     }
 }

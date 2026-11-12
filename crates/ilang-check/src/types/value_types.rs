@@ -21,7 +21,7 @@ pub(super) struct Fixed {
     pub module: ModuleId,
     pub span: Span,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct Reads {
     pub prepared: bool,
     pub templates: HashMap<TypeId, super::alias::Template>,
@@ -351,8 +351,7 @@ fn contains_var(t: &Ty) -> bool {
         Ty::Var(_) | Ty::Top => true,
         Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
         Ty::Fn(f) => {
-            contains_var(&f.param)
-                || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
+            contains_var(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
         }
         Ty::Diff(t, ts) => contains_var(t) || ts.iter().any(contains_var),
         Ty::Both(a, b) => contains_var(a) || contains_var(b),
@@ -1522,7 +1521,8 @@ impl Checker<'_> {
                     ret,
                     err,
                     env,
-                } => Ty::Fn(Box::new(FnTy::new(params
+                } => Ty::Fn(Box::new(FnTy::new(
+                    params
                         .iter()
                         .map(|p| {
                             (
@@ -1530,7 +1530,11 @@ impl Checker<'_> {
                                 written(c, &p.ty, map, seen),
                             )
                         })
-                        .collect(), written(c, ret, map, seen), err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)), env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen))))),
+                        .collect(),
+                    written(c, ret, map, seen),
+                    err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
+                    env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
+                ))),
                 TypeKind::Hole | TypeKind::Error => Ty::Top,
             }
         }

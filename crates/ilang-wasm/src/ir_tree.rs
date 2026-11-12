@@ -244,6 +244,7 @@ impl Clone for Stmt {
                             todo.push(Work::Visit(s));
                         }
                     }
+                    Stmt::Logical(action) => done.push(Stmt::Logical(*action)),
                     Stmt::Let { dst, value, site } => done.push(Stmt::Let {
                         dst: *dst,
                         value: value.clone(),
@@ -472,6 +473,11 @@ impl PartialEq for Stmt {
                     },
                 ) => {
                     if a != e || b != f || c != g || d != h {
+                        return false;
+                    }
+                }
+                (Stmt::Logical(a), Stmt::Logical(b)) => {
+                    if a != b {
                         return false;
                     }
                 }

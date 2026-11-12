@@ -1,4 +1,4 @@
-//! Loading the package graph (§2.1, §2.6).
+//! Loading the package graph.
 
 use ilang_package::{ModuleKind, code, load};
 use std::fs;
@@ -204,6 +204,8 @@ fn standard_library_modules() {
             "std/bool",
             "std/calendar",
             "std/cli",
+            "std/crypto",
+            "std/csv",
             "std/dict",
             "std/float",
             "std/http",
@@ -216,6 +218,7 @@ fn standard_library_modules() {
             "std/pair",
             "std/path",
             "std/property",
+            "std/regex",
             "std/result",
             "std/schema",
             "std/sequence",

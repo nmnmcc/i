@@ -27,7 +27,7 @@ main = () {
   assert(int_match(-1) == 20)
   assert(float_match(-.1.0) == 20)
   assert(pair_match((3, 4)) == 3)
-  assert(3
-    |> { x -> x + 1 } == 4)
+  assert({ 3
+    |> { x -> x + 1 } } == 4)
   Nil
 }
