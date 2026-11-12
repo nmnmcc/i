@@ -831,6 +831,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "target-lexicon",
  "tokio",
  "tokio-rustls",
  "wasmparser 0.262.0",
@@ -875,6 +876,13 @@ dependencies = [
  "sha2",
  "tempfile",
  "toml",
+]
+
+[[package]]
+name = "ilang-runner"
+version = "0.1.0"
+dependencies = [
+ "ilang-host",
 ]
 
 [[package]]

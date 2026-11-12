@@ -17,7 +17,7 @@ read_name = (name ! Name) { name.value }
 
 
 main = () {
-	! Name = Name("saved")
+	! Name = Name(value: "saved")
 	callback = task.keep((x: Int) {
 		task.yield()
 		task.yield()
@@ -26,7 +26,7 @@ main = () {
 	})
 	task.scope((s) {
 		t = task.go(s, () {
-			! Name = Name("caller")
+			! Name = Name(value: "caller")
 			answer = callback(7)
 			assert(read_name() == "caller")
 			answer
@@ -37,7 +37,7 @@ main = () {
 	pure = task.keep((_: Nil) { 1 })
 	assert(core.portable(pure))
 	control.boundary((b) {
-		! Name = Name("saved")
+		! Name = Name(value: "saved")
 		! Marker = Marker(b)
 		task.scope((s) {
 			t = task.go(s, () {

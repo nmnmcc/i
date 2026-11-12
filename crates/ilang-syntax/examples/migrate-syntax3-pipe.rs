@@ -210,9 +210,7 @@ fn insertions(src: &str) -> Option<Vec<(usize, &'static str)>> {
     // At one position, closers come first; openers go outermost first and closers
     // innermost first, so nested groups stay nested.
     let mut marks = f.marks;
-    marks.sort_by_key(|&(pos, open, len)| {
-        (pos, open, if open { usize::MAX - len } else { len })
-    });
+    marks.sort_by_key(|&(pos, open, len)| (pos, open, if open { usize::MAX - len } else { len }));
     marks.dedup();
     Some(
         marks
@@ -453,7 +451,9 @@ fn migrate_file(path: &str, text: &str, report: &mut Report) -> String {
             }
             match insertions(source) {
                 Some(v) => inserts.extend(v.into_iter().map(|(p, t)| (start + p, t))),
-                None => report.unparsed.push(format!("{path}:{}: fence", line(start))),
+                None => report
+                    .unparsed
+                    .push(format!("{path}:{}: fence", line(start))),
             }
         }
     } else {

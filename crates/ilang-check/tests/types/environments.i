@@ -5,7 +5,7 @@
 )
 
 Yield(A) {
-	Yield(emit: (value: A) -> Nil)
+	Yield(emit: (A) -> Nil)
 }
 
 Source(A) {
@@ -14,7 +14,7 @@ Source(A) {
 
 collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 	control.boundary((b) {
-		! Yield(A) = Yield((x) {
+		! Yield(A) = Yield(emit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		body()
@@ -76,11 +76,11 @@ written = (y ! Yield(Int), z ! Source(Int)) -> Nil ! Yield(Int) | Source(Int) {
 emit_any = (y ! Yield(Int | String)) { y.emit(1) }
 
 given_narrow = () {
-	! Yield(Int) = Yield((x) { Nil })
+	! Yield(Int) = Yield(emit: (x) { Nil })
 	emit_any()
 }
 
 given_same = () {
-	! Yield(Int | String) = Yield((x) { Nil })
+	! Yield(Int | String) = Yield(emit: (x) { Nil })
 	emit_any()
 }

@@ -20,13 +20,13 @@ Back(A) {
 }
 
 // Covariant: two forms are put together by union.
-boxes = [Box(1), Box("a")]
+boxes = [Box(value: 1), Box(value: "a")]
 
 // Contravariant: by intersection.
 sinks = (s1: Sink(Int), s2: Sink(String)) { [s1, s2] }
 
 // Through other definitions.
-wraps = [Wrap(Box(1)), Wrap(Box("a"))]
+wraps = [Wrap(inner: Box(value: 1)), Wrap(inner: Box(value: "a"))]
 
 backs = (b1: Back(Int), b2: Back(String)) { [b1, b2] }
 

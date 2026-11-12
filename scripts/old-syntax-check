@@ -103,12 +103,23 @@ def identity(path, source):
     return path + ":" + hashlib.sha256(source.encode("utf-8", "surrogatepass")).hexdigest()[:16]
 
 
+NEXT_SYNTAX = (
+    "tests/syn3/",
+    "crates/ilang-syntax/src/syn3/",
+    "crates/ilang-syntax/tests/syn3",
+    "crates/ilang-syntax/examples/migrate-syntax3",
+)
+
+
 def snippets():
     registered = json.loads(DATA.read_text())
     paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
     for path in sorted(set(paths)):
         file = ROOT / path
         if not file.is_file():
+            continue
+        # Sources of the next syntax are read by its own parser and tests, not by this check.
+        if path.startswith(NEXT_SYNTAX):
             continue
         text = file.read_bytes().decode()
         if path.endswith(".i"):

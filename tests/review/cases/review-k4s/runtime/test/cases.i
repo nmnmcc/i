@@ -37,7 +37,7 @@ right(N) = (b: Bool, s ! S(Int, Never, N)) {
 }
 
 test("integer", () {
-	! Dep = Dep(7)
+	! Dep = Dep(value: 7)
 	! S(Int, Never, Dep) = S((x: Int) { x + get() }, (_: Dep) { Nil })
 	forward(1) |> {
 		8     -> Nil
@@ -64,7 +64,7 @@ test("error", () {
 })
 
 test("mutual", () {
-	! Dep = Dep(7)
+	! Dep = Dep(value: 7)
 	! S(Int, Never, Dep) = S((x: Int) { x + get() }, (_: Dep) { Nil })
 	left(True) |> {
 		8     -> Nil
@@ -74,7 +74,7 @@ test("mutual", () {
 
 make = (x: Int) {
 	() {
-		! Dep = Dep(x)
+		! Dep = Dep(value: x)
 		! S(Int, Never, Dep) = S((n: Int) { n + get() }, (_: Dep) { Nil })
 		run(() { use(1) })
 	}

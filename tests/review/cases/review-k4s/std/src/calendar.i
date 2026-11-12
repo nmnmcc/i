@@ -275,8 +275,8 @@ at = (instant: time.Instant, offset: Offset) -> Civil {
 	day = floor_divide(local, 86400000000000)
 	rest = local - day * 86400000000000
 	Civil(
-		from_day_number(day)
-		TimeOfDay(
+		date: from_day_number(day)
+		time: TimeOfDay(
 			rest / 3600000000000
 			rest / 60000000000 % 60
 			rest / 1000000000 % 60
@@ -430,7 +430,7 @@ parse = (text: String) -> Result((Civil, Offset), CalendarError) {
 			Ok(value) -> value
 			Error(_)  -> fail.raise(BadText)
 		}
-		(Civil(day, tod), off)
+		(Civil(date: day, time: tod), off)
 	})
 }
 

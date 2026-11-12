@@ -10,8 +10,8 @@ uset(N) = (s ! T(N)) {
 }
 
 main = () {
-  ! S(Dep) = S(() { get() })
-  ! T(S(Dep)) = T(() { use() }, (_) { Nil })
+  ! S(Dep) = S(f: () { get() })
+  ! T(S(Dep)) = T(f: () { use() }, m: (_) { Nil })
   uset()
   Nil
 }

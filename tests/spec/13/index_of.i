@@ -17,7 +17,7 @@ test("found", () {
 	check(core.index_of("hello", "l", 3), Ok(3))
 	check(core.index_of("hello", "lo", 0), Ok(3))
 	check(core.index_of("hello", "hello", 0), Ok(0))
-	check(core.index_of(in: "abcabcabd", find: "abcabd", from: 0), Ok(3))
+	check(core.index_of("abcabcabd", "abcabd", 0), Ok(3))
 	check(core.index_of("aaaaaaab", "aaab", 1), Ok(4))
 })
 

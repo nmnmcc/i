@@ -3,6 +3,6 @@
 pair = ("b", () { pair |> { ("a", _) | ("c", _) -> 1 } })
 
 main = () {
-    ! Assert = Assert((_) { panic("group choices") })
+    ! Assert = Assert(fail: (_) { panic("group choices") })
     pair.1()
 }

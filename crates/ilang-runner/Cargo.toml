@@ -1,0 +1,15 @@
+[package]
+name = "ilang-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The runner of native i packages: Wasmtime's runtime without a compiler, the standard host services and a program payload"
+
+[[bin]]
+name = "i-runner"
+path = "src/main.rs"
+
+[dependencies]
+# Without the default `compiler` feature: no Cranelift (docs/design/native.md N2).
+ilang-host = { path = "../ilang-host", default-features = false }

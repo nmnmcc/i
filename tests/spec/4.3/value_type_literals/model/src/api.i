@@ -1,7 +1,7 @@
 (Config(..), ConfigType, config, Method, Port, Number, Methods)
 
 Config(M, P) { Config(method: M, port: P) }
-config = Config("GET", 8080)
+config = Config(method: "GET", port: 8080)
 ConfigType = config
 
 method = "GET"

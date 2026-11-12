@@ -13,6 +13,6 @@ Raw {
 	Raw(read: () -> Int)
 }
 
-value = Secret(42)
+value = Secret(number: 42)
 
-raw = Raw(() { 42 })
+raw = Raw(read: () { 42 })

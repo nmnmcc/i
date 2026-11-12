@@ -184,7 +184,7 @@ traced = (xs: List(Int)) -> stream.Stream(Int, Never, Trace) {
 
 test("stream_demand", () {
 	trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		s = traced([1, 2, 3, 1])
@@ -214,7 +214,7 @@ test("stream_demand", () {
 	assert(trace == [1, 1, 11, 2, 12, 3, 13])
 	// Left-first zip discards precisely one unmatched left element.
 	zip_trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		assert(
@@ -229,15 +229,15 @@ test("stream_demand", () {
 test("stream_replay_and_services", () {
 	s = positive()
 	assert({
-		! Bias = Bias(10)
+		! Bias = Bias(value: 10)
 		head(s)
 	} == Some(10))
 	assert({
-		! Bias = Bias(20)
+		! Bias = Bias(value: 20)
 		head(s)
 	} == Some(20))
 	assert({
-		! Bias = Bias(30)
+		! Bias = Bias(value: 30)
 		stream.to_list(needs_bias())
 	} == [])
 	a = source([1, 2])
@@ -251,7 +251,7 @@ test("stream_replay_and_services", () {
 	run = (
 		body: () -> stream.Step(Int, Never, Bias) ! Bias
 	) -> stream.Step(Int, Never, Bias) {
-		! Bias = Bias(10)
+		! Bias = Bias(value: 10)
 		body()
 	}
 	adapted = stream.map_environment(s, run)
@@ -275,8 +275,8 @@ common = () -> stream.Stream(Int, Never, Bias | Scale) {
 
 test("stream_common_environment", () {
 	s = stream.map(common(), (x: Int, scale ! Scale) { x * scale.value })
-	! Bias = Bias(10)
-	! Scale = Scale(3)
+	! Bias = Bias(value: 10)
+	! Scale = Scale(value: 3)
 	assert(stream.to_list(s) == [30])
 	Nil
 })
@@ -384,14 +384,14 @@ test("stream_long_searches", () {
 
 test("stream_runner_demand", () {
 	trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		run = (
 			body: () -> stream.Step(Int, Never, Bias) ! Bias
 		) -> stream.Step(Int, Never, Bias) ! Trace {
 			visit(99)
-			! Bias = Bias(10)
+			! Bias = Bias(value: 10)
 			body()
 		}
 		adapted = stream.map_environment(positive(), run)
@@ -484,7 +484,7 @@ test("stream_callback_failures", () {
 
 test("stream_callback_order", () {
 	trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		s = stream.map(traced([1, 2, 3]), (x) -> Int ^ String ! Trace {
@@ -503,7 +503,7 @@ test("stream_callback_order", () {
 
 test("stream_resource_scope", () {
 	trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		resource.ensure(() {
@@ -538,20 +538,20 @@ Count {
 }
 
 test("stream_nominal_callbacks", () {
-	s: stream.Stream(Item, Never, Never) = stream.from_list([Item(2), Item(3)])
+	s: stream.Stream(Item, Never, Never) = stream.from_list([Item(value: 2), Item(value: 3)])
 	assert(stream.to_list(stream.map(s, (x) { x.value })) == [2, 3])
 	assert(
-		stream.fold(s, Count(0), (acc, x) {
-			Count(acc.total + x.value)
+		stream.fold(s, Count(total: 0), (acc, x) {
+			Count(total: acc.total + x.value)
 		}).total ==
 			5
 	)
-	assert(stream.to_list(stream.unfold(Count(0), (state) {
+	assert(stream.to_list(stream.unfold(Count(total: 0), (state) {
 		{ state.total < 3 } |> {
-			True  -> Some((Item(state.total), Count(state.total + 1)))
+			True  -> Some((Item(value: state.total), Count(total: state.total + 1)))
 			False -> None
 		}
-	})) == [Item(0), Item(1), Item(2)])
+	})) == [Item(value: 0), Item(value: 1), Item(value: 2)])
 	Nil
 })
 
@@ -591,7 +591,7 @@ test("stream_nominal_callbacks", () {
 
 test("stream_factory_demand", () {
 	trace = control.boundary((b) {
-		! Trace = Trace((x) {
+		! Trace = Trace(visit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		d = stream.defer(() -> stream.Stream(Int, Never, Trace) ! Trace {

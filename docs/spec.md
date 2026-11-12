@@ -853,7 +853,7 @@ The targets are `js`, `nodejs`, `native`, `wasi` and `host`. `--target ilang` is
 |---|---|---|
 | `i run` | native / Native | Validate the selected entry plan; execute in process |
 | `i test` | native / Native | Validate test entry plans; execute in process with the normal fresh test instances |
-| `i build` | selected target; default native | Validate that target's entry plans; emit its artifacts |
+| `i build` | selected target; default native | Validate that target's entry plans; emit its artifacts: for native, one executable `build/<name>` (below); for the other targets, the module `build/<name>.wasm` |
 | `i check` | none | Parse, resolve and infer all source, including test bodies; no target plan selection |
 | `i check --target t` | t, with ilang normalized to host | Check source and the plans for that target's main, configured exports and eligible tests; emit and execute nothing |
 
@@ -864,7 +864,7 @@ The targets are `js`, `nodejs`, `native`, `wasi` and `host`. `--target ilang` is
 |---|---|---|
 | `i run` | native | Check the needs of the selected entry against the platform; run in process |
 | `i test` | native | Check the needs of the tests against the platform; run each test in a fresh instance |
-| `i build` | the selected target; default native | Check the needs of its entries against that platform; write its artifacts |
+| `i build` | the selected target; default native | Check the needs of its entries against that platform; write its artifacts (below) |
 | `i check` | none | Parse, resolve and infer all source, including test bodies; check no need against a platform |
 | `i check --target t` | t, with ilang read as host | Check source and the needs of that target's main, configured exports and eligible tests; write and run nothing |
 
@@ -897,12 +897,14 @@ The target-independent source checker keeps the entry shape and interface checks
 
 `i build [NAME] [--target t]` writes the artifacts of the selected target for the selected entry:
 
-- `native`, the default: one executable file. It is a runner that contains no compiler, together with the program compiled ahead of time for the runner's machine. The executable is statically linked: it needs no dynamic loader and no shared library at run time, and it resolves host names without the system's name-service libraries. Native builds require `main` or a named entry and reject only required imports that the runner cannot supply.
-- `wasi`: a WASI preview 1 command module (§B.7).
-- `js` and `nodejs`: `name.wasm`, `name.mjs` and `name.d.ts` (§B.6.1).
-- `host`, also written `ilang`: the module of Appendix B, for an embedding host.
+- `native`, the default: one executable, `build/<name>` (below). Native builds require `main` or a named entry.
+- `wasi`: the WASI preview 1 command module `build/<name>.wasm` (§B.7).
+- `js` and `nodejs`: `build/<name>.wasm` with its loader `name.mjs` and `name.d.ts` (§B.6.1).
+- `host`, also written `ilang`: the module `build/<name>.wasm` of Appendix B, for an embedding host.
 
-Only `--target host` (or `ilang`), `wasi`, `js` and `nodejs` write a `.wasm` module; a plain `i build` does not.
+A plain `i build` writes no `.wasm` module.
+
+**Native packages.** `i build` with the native target writes one executable file, `build/<name>`, where `<name>` is the package name or the entry `NAME` of `i build NAME` (`--out` chooses another path). It is the native runner — Wasmtime's runtime without a compiler, the standard host services and the reactor of `i run` — followed by a payload: a manifest, the program's `ilang.*` metadata and its code compiled ahead of time, sealed by a SHA-256 digest. The manifest records the contract the code was compiled for (Wasmtime version, target triple, CPU feature baseline, collector and engine settings), the digest of the module and its trusted binding plan; the runner loads nothing else, and refuses a missing, truncated or damaged payload and a payload whose contract is not its own. The executable runs the program entry with its arguments, environment and standard streams, and exits as `i run` does. On Linux the executable is statically linked and needs no shared library; on macOS it depends only on system libraries. Its code is compiled for the runner's target triple (on Linux the musl triple of the building machine's architecture); cross-target builds and signing are not specified. Building fails, with the namespace and label, for each required import the runner cannot supply, including a declaration it does not grant (§9.7); a service replaced by ordinary i code needs no import.
 
 ### 2.7 Versions
 
@@ -1650,11 +1652,11 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 
 `f(a1, …, an)` calls the function `f`. Every function is called in this way, whatever expression gives it.
 
-- An argument may be given by position or by label. Arguments by position come before arguments by label, and they go to the parameters in order, from the first. Arguments by label may be in any order.
-- A call with an argument by label needs a known function type for `f` (§4.8). Each such argument is put in the place of the parameter with that label in this type. If there is no such parameter, it is a compile error.
+- An argument of a function is given by position: the arguments go to the parameters in order, from the first. An argument by label, `f(name: e)`, is a compile error unless `f` is a constructor (§6.7).
+- An argument of a constructor may be given by position or by label. Arguments by position come before arguments by label, and they go to the fields in order, from the first. Arguments by label may be in any order. Each such argument is put in the place of the field with that label. If there is no such field, it is a compile error.
 - Every parameter must get exactly one argument. Environment parameters (§9.2) are not parameters of the type, so they get no argument.
 
-A labelled argument is not a record argument; use `f((label: value))` to pass a record. Calls and constructor fields may still mix positions and labels.
+A labelled argument is not a record argument; use `f((label: value))` to pass a record. Constructor calls may still mix positions and labels.
 
 ### 6.7 Constructors and fields
 
@@ -1786,6 +1788,7 @@ Rest       = ".." [ name | discard ] .
 - A `Name` in a pattern must be a constructor. Its parts are matched to its fields in the same way as parameters get their labels (§6.11):
   - The fields without labels are matched by position: the first parts go to them, in order.
   - The fields with labels are matched by label. Every other part must have a label, the last name in the chain of `=` at its top, that is the label of a field. These parts may be in any order. So with `User { User(name: String, age: Int) }`, `User(name, age)`, `User(age, name)`, and `User(n = name, ..)` are correct, but `User(n, a)` is not.
+  - A part `name = name`, or `name = name: T`, writes the label `name` and binds `name` once. So `User(name = name, age = age)` is correct, and is the same as `User(name, age)`.
   - A field may be matched only one time. `..` at the end leaves out the fields that are not matched, and `C(..)` does not look at the fields. With no `..`, every field must be matched.
   - A call of `C` may still give the fields with labels by position (§6.6), but a pattern takes them only by label. A call puts values in, where the order is clear; a pattern takes them out and names them, and the names are the labels. TypeScript does the same: `new User("bob", 3)` and `const { name, age } = user`.
 - The type after `:` goes as far to the right as it can, as every type does (§3). So `x: Int | String` tests for a union, and `f: (Int) -> Int = e` needs no brackets. In a clause, `p: (Int, Int) -> e` is read as a function type, so a tuple type there is put in `{ }`, or a tuple pattern is used. A `?` after a function type begins the guard; error slots use `^`. A missing clause arrow after a function type is an arrow/type-boundary error; group a tuple or record type in `{ T }` when needed. A `|` after a type is part of the type, so a type test is written after the other choices: `True | _: Int`. The type is read with no going back: once `( … )` is followed by `->`, it is a function type, and once a `|` follows a type, the next part is a type. When what follows cannot be read as a type, the pattern is wrong; it is not read again as a shorter pattern. So `v |> { p: (Int, Int) -> 0  _ -> 1 }` is a compile error, in the first clause and in any other. In `v |> { x: Int | y -> a  _ -> b }`, `Int | y` is a type; `y` is a value type (§3). But `v |> { x: Int | 0 -> a  _ -> b }` is correct, because `0` is a literal type (§4.2) and `Int | 0` is `Int`; so is `_: Int | "a"`.
@@ -2229,10 +2232,10 @@ The `E` part of a function type is the set of errors the function may give. An e
 
 | Function | Type | What it does |
 |---|---|---|
-| `fail.raise` | `(error: E) -> Never ^ E` | Ends the computation with `error` |
-| `fail.catch` | `(body: () -> A ^ E ! N) -> Result(A, E) ! N` | Changes every error into `Error(…)` |
-| `fail.from_result` | `(result: Result(A, E)) -> A ^ E` | Gives the error `x` for `Error(x)` |
-| `fail.map_error` | `(body: () -> A ^ E ! N, with: (E) -> E2 ! N) -> A ^ E2 ! N` | Changes the errors |
+| `fail.raise` | `(E) -> Never ^ E` | Ends the computation with `error` |
+| `fail.catch` | `(() -> A ^ E ! N) -> Result(A, E) ! N` | Changes every error into `Error(…)` |
+| `fail.from_result` | `(Result(A, E)) -> A ^ E` | Gives the error `x` for `Error(x)` |
+| `fail.map_error` | `(() -> A ^ E ! N, (E) -> E2 ! N) -> A ^ E2 ! N` | Changes the errors |
 
 ```i future-SYN2
 load = (id) { parse_user(http_get(id)) }
@@ -2258,11 +2261,11 @@ The module `i/control` has one operation to pause a computation and go on with i
 
 | Function | Type |
 |---|---|
-| `control.boundary` | `(body: (b: Boundary(R, E, N)) -> R ^ E ! N) -> R ^ E ! N` |
-| `control.suspend` | `(b: Boundary(R, E, N), f: (k: Continuation(A, R, E, N)) -> R ^ E ! N) -> A` |
-| `control.resume` | `(k: Continuation(A, R, E, N), value: A) -> R ^ E ! N` |
-| `control.cancel` | `(k: Continuation(A, R, E, N)) -> Nil ! N` |
-| `control.keep_env` | `(f: (x: S) -> A ^ E ! N) -> { (x: S) -> A ^ E } ! N` |
+| `control.boundary` | `((Boundary(R, E, N)) -> R ^ E ! N) -> R ^ E ! N` |
+| `control.suspend` | `(Boundary(R, E, N), (Continuation(A, R, E, N)) -> R ^ E ! N) -> A` |
+| `control.resume` | `(Continuation(A, R, E, N), A) -> R ^ E ! N` |
+| `control.cancel` | `(Continuation(A, R, E, N)) -> Nil ! N` |
+| `control.keep_env` | `((S) -> A ^ E ! N) -> { (S) -> A ^ E } ! N` |
 
 `Boundary` and `Continuation` are built-in types. They are not custom types: their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
 
@@ -2303,8 +2306,8 @@ The module `i/resource` puts final functions in place:
 
 | Function | Type | What it does |
 |---|---|---|
-| `resource.ensure` | `(body: () -> A ^ E ! N, with: () -> Nil ! N) -> A ^ E ! N` | Runs `with` after `body`, whether `body` ends normally, ends with an error, or is unwound |
-| `resource.acquire` | `(open: () -> R ^ E ! N, release: (R) -> Nil ! N, use: (R) -> A ^ E ! N) -> A ^ E ! N` | After `open` is done, runs `release` when `use` ends or is unwound |
+| `resource.ensure` | `(() -> A ^ E ! N, () -> Nil ! N) -> A ^ E ! N` | Runs `with` after `body`, whether `body` ends normally, ends with an error, or is unwound |
+| `resource.acquire` | `(() -> R ^ E ! N, (R) -> Nil ! N, (R) -> A ^ E ! N) -> A ^ E ! N` | After `open` is done, runs `release` when `use` ends or is unwound |
 
 A final function may not give errors. When the program stops (§11.7), final functions are not run.
 
@@ -2715,8 +2718,8 @@ Datagrams follow TCP's resource identity, owner, creation guard, teardown and le
 | Function | Type | What it does |
 |---|---|---|
 | `new` | `() -> Key(A)` | A new key, the same only as itself |
-| `wrap` | `(k: Key(A), value: A) -> Keyed` | The value, marked with the key |
-| `unwrap` | `(k: Key(A), x: Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
+| `wrap` | `(Key(A), A) -> Keyed` | The value, marked with the key |
+| `unwrap` | `(Key(A), Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
 
 <!-- /syn3-old -->
 <!-- syn3-new -->
@@ -2802,36 +2805,36 @@ Assert and user host services remain in N where the body needs them.
 
 | Binding | Type |
 |---|---|
-| `top` | `(seed: random.Generator) -> Runner ! Runner` |
-| `run(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ^ E ! N) -> A ^ E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ^ E ! N) -> A ^ E ! N \| Scheduler` |
+| `top` | `(random.Generator) -> Runner ! Runner` |
+| `run(A,E,N)` | `(() -> A ^ E ! N) -> A ^ E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(random.Generator, List(List(Int)), () -> A ^ E ! N) -> A ^ E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `scope(A,E,N)` | `((Scope(E)) -> A ^ E ! N) -> A ^ E ! N \| Scheduler` |
 | `local_scope(A,E,N)` | Same scheme as scope |
-| `go(A,E,N)` | `(s: Scope(E), body: () -> A ^ E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `join(A,E)` | `(t: Task(A,E)) -> A ^ E ! Scheduler` |
+| `go(A,E,N)` | `(Scope(E), () -> A ^ E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `join(A,E)` | `(Task(A,E)) -> A ^ E ! Scheduler` |
 | `yield` | `() -> Nil ! Scheduler` |
 | `path` | `() -> List(Int) ! Scheduler` |
 | `random` | `() -> random.Generator ! Scheduler` |
-| `keep(S,A,E,N)` | `(f: (S) -> A ^ E ! N) -> { (S) -> A ^ E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `keep(S,A,E,N)` | `((S) -> A ^ E ! N) -> { (S) -> A ^ E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `channel(A)` | `() -> Channel(A) ! Scheduler` |
 | `local_channel(A)` | `() -> Channel(A) ! Scheduler` |
-| `send(A)` | `(c: Channel(A), value: A) -> Nil ! Scheduler` |
-| `receive(A)` | `(c: Channel(A)) -> A ! Scheduler` |
-| `send_event(A)` | `(c: Channel(A), value: A) -> Event(Nil,Never,Never)` |
-| `receive_event(A)` | `(c: Channel(A)) -> Event(A,Never,Never)` |
-| `join_event(A,E)` | `(t: Task(A,E)) -> Event(A,E,Never)` |
-| `always(A)` | `(value: A) -> Event(A,Never,Never)` |
+| `send(A)` | `(Channel(A), A) -> Nil ! Scheduler` |
+| `receive(A)` | `(Channel(A)) -> A ! Scheduler` |
+| `send_event(A)` | `(Channel(A), A) -> Event(Nil,Never,Never)` |
+| `receive_event(A)` | `(Channel(A)) -> Event(A,Never,Never)` |
+| `join_event(A,E)` | `(Task(A,E)) -> Event(A,E,Never)` |
+| `always(A)` | `(A) -> Event(A,Never,Never)` |
 | `never` | `() -> Event(Never,Never,Never)` |
-| `choose(A,E,N)` | `(events: List(Event(A,E,N))) -> Event(A,E,N)` |
-| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ^ F ! M) -> Event(B,E \| F,N \| M)` |
-| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
-| `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
-| `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
-| `ref(A)` | `(value: A) -> Ref(A) ! Scheduler` |
-| `update(A,B)` | `(ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler` |
-| `both(A,B,E,N)` | `(left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `choose(A,E,N)` | `(List(Event(A,E,N))) -> Event(A,E,N)` |
+| `map(A,B,E,F,N,M)` | `(Event(A,E,N), (A) -> B ^ F ! M) -> Event(B,E \| F,N \| M)` |
+| `sync(A,E,N)` | `(Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
+| `share(A,E)` | `(Scope(E), A) -> Shared(A) ! Scheduler` |
+| `get(A)` | `(Shared(A)) -> A ! Scheduler` |
+| `ref(A)` | `(A) -> Ref(A) ! Scheduler` |
+| `update(A,B)` | `(Ref(A), (A) -> (A, B)) -> B ! Scheduler` |
+| `both(A,B,E,N)` | `(() -> A ^ E ! N, () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `race(A,E,N)` | `(() -> A ^ E ! N, () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `map_concurrently(A,B,E,N)` | `(List(A), (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 
 <!-- /syn3-old -->
 <!-- syn3-new -->
@@ -3262,12 +3265,12 @@ RandomError { InvalidBound(Int) InvalidPath(List(Int)) }
 |---|---|
 <!-- syn3-old -->
 
-| `from_seed` | `(seed: Int) -> Generator` |
-| `word` | `(g: Generator) -> (Int, Generator)` |
-| `int` | `(g: Generator, below: Int) -> (Int, Generator) ^ RandomError` |
-| `float` | `(g: Generator) -> (Float, Generator)` |
-| `split` | `(g: Generator) -> (Generator, Generator)` |
-| `at_path` | `(g: Generator, path: List(Int)) -> Generator ^ RandomError` |
+| `from_seed` | `(Int) -> Generator` |
+| `word` | `(Generator) -> (Int, Generator)` |
+| `int` | `(Generator, Int) -> (Int, Generator) ^ RandomError` |
+| `float` | `(Generator) -> (Float, Generator)` |
+| `split` | `(Generator) -> (Generator, Generator)` |
+| `at_path` | `(Generator, List(Int)) -> Generator ^ RandomError` |
 
 <!-- /syn3-old -->
 <!-- syn3-new -->
@@ -3372,27 +3375,27 @@ RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 <!-- syn3-old -->
 
 | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-| `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `close_root` | `(Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-| `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-| `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
-| `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
-| `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
-| `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
-| `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
-| `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
-| `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
-| `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-| `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
-| `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
-| `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
-| `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
-| `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
-| `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-| `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-| `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
-| `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
-| `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+| `close_owner` | `(Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+| `count` | `(Owner) -> Int` | Number of outstanding requests in this group |
+| `count_root` | `(Root) -> Int` | Number of outstanding requests in all groups of this root |
+| `settled_owner` | `(Owner) -> Bool` | True exactly when count(owner) is zero |
+| `settled_root` | `(Root) -> Bool` | True exactly when count_root(root) is zero |
+| `cancel_all` | `(Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(Owner) -> Nil ! Await` | Await until this group's count is zero |
+| `wait_none_root` | `(Root) -> Nil ! Await` | Await until this root's count is zero |
+| `within(A,E,N)` | `(() -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `ready(A)` | `(A) -> Request(A)` | A fresh completed request; available in pure fakes |
+| `ticket(A)` | `(Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+| `state(A)` | `(Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+| `take(A)` | `(Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+| `settled` | `(Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+| `cancel` | `(Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+| `await(A)` | `(Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+| `await_owned(A)` | `(Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+| `wait_any` | `(List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
 <!-- /syn3-old -->
@@ -4223,8 +4226,8 @@ These names may be used in every module. Other names may cover them.
 | `Boundary` `Continuation` | Built-in types made by `i/control` | §9.4 |
 | `Key` `Keyed` | Built-in types made by `i/key` | §9.8 |
 | `Request` `Ticket` | Built-in types operated on by `i/request` | §9.11 |
-| `panic` | `(message: String) -> Never` | §11.7 |
-| `assert` | `(c: Bool) -> Nil ! Assert` | §9.6 |
+| `panic` | `(String) -> Never` | §11.7 |
+| `assert` | `(Bool) -> Nil ! Assert` | §9.6 |
 
 <!-- /syn3-old -->
 <!-- syn3-new -->
@@ -4282,7 +4285,7 @@ These are normal functions: they are called, given, and compared like any other 
 
 | Function | Type | What it gives |
 |---|---|---|
-| `portable` | `(value: A) -> Bool` | `True` when the value is portable (§11.9) |
+| `portable` | `(A) -> Bool` | `True` when the value is portable (§11.9) |
 | `not` | `(Bool) -> Bool` | `True` for `False`, and `False` for `True` |
 | `to_float` | `(Int) -> Float` | The nearest Float, with ties to even. If it is not finite, the program stops. |
 | `truncate` | `(Float) -> Int` | The Float without its fraction, rounded toward zero |
@@ -4297,14 +4300,14 @@ These are normal functions: they are called, given, and compared like any other 
 | `shift_right` | `(Int, Int) -> Int` | `x` ÷ 2^n, rounded down. A negative n is `shift_left` by −n. |
 | `concat` | `(List(String)) -> String` | The strings one after the other |
 | `byte_size` | `(String) -> Int` | The number of UTF-8 bytes |
-| `byte_slice` | `(String, start: Int, length: Int) -> Result(String, Nil)` | The bytes from `start` (counting from 0), `length` of them. `Error(Nil)` when they are not all in the string, or when the start or the end is inside a character. |
+| `byte_slice` | `(String, Int, Int) -> Result(String, Nil)` | The bytes from `start` (counting from 0), `length` of them. `Error(Nil)` when they are not all in the string, or when the start or the end is inside a character. |
 | `codepoints` | `(String) -> List(UtfCodepoint)` | The characters in order |
 | `from_codepoints` | `(List(UtfCodepoint)) -> String` | The string of these characters |
 | `codepoint_to_int` | `(UtfCodepoint) -> Int` | The number of the character |
 | `int_to_codepoint` | `(Int) -> Result(UtfCodepoint, Nil)` | The character with this number, or `Error(Nil)` when it is not a Unicode scalar value |
 | `to_upper` | `(String) -> String` | The string with each character changed to its simple uppercase mapping in Unicode 18.0.0 (UnicodeData.txt). This is one character for one character, and no language changes it. A character with no simple uppercase mapping, such as `ß`, stays the same. |
 | `to_lower` | `(String) -> String` | The string with each character changed to its simple lowercase mapping in Unicode 18.0.0, in the same way |
-| `index_of` | `(in: String, find: String, from: Int) -> Result(Int, Nil)` | The byte offset (counting from 0) of the first `find` in `in` that starts at `from` or after it. An empty `find` is at `from`. `Error(Nil)` when there is no such `find`, when `from` is less than 0 or greater than the byte size of `in`, or when `from` is inside a character. |
+| `index_of` | `(String, String, Int) -> Result(Int, Nil)` | The byte offset (counting from 0) of the first `find` in `in` that starts at `from` or after it. An empty `find` is at `from`. `Error(Nil)` when there is no such `find`, when `from` is less than 0 or greater than the byte size of `in`, or when `from` is inside a character. |
 | `bit_size` | `(BitArray) -> Int` | The number of bits |
 | `bit_array_to_string` | `(BitArray) -> Result(String, Nil)` | The string, when the bits are whole bytes of correct UTF-8; `Error(Nil)` when not |
 | `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
@@ -4860,13 +4863,13 @@ These are ordinary library functions, using the label parameters of §4.9.4. The
 
 | Function | Type | What it gives |
 |---|---|---|
-| `get(K, V)` | `(r: (K: V), key: K) -> V` | The field `key` of `r` |
-| `put(R, K, V)` | `(r: R & Record, key: K, value: V) -> (..R, K: V)` | A record with the field added or replaced |
-| `remove(R, K)` | `(r: R & Record, key: K) -> (..R, -K)` | A record without the field, if it has one |
-| `has` | `(r: Record, key: String) -> Bool` | Whether the record has the field, including fields hidden by its static type |
-| `keys` | `(r: Record) -> List(String)` | The labels, sorted by UTF-8 bytes |
-| `size` | `(r: Record) -> Int` | The number of fields |
-| `texts` | `(r: Record) -> List((String, String))` | Each label with its value's text form (§11.8), sorted by label bytes |
+| `get(K, V)` | `((K: V), K) -> V` | The field `key` of `r` |
+| `put(R, K, V)` | `(R & Record, K, V) -> (..R, K: V)` | A record with the field added or replaced |
+| `remove(R, K)` | `(R & Record, K) -> (..R, -K)` | A record without the field, if it has one |
+| `has` | `(Record, String) -> Bool` | Whether the record has the field, including fields hidden by its static type |
+| `keys` | `(Record) -> List(String)` | The labels, sorted by UTF-8 bytes |
+| `size` | `(Record) -> Int` | The number of fields |
+| `texts` | `(Record) -> List((String, String))` | Each label with its value's text form (§11.8), sorted by label bytes |
 
 There is no `empty` function: `()` is the empty record. `has` and `keys` do not change any type. There is no operation returning all fields as values of one type: fields may have different types. Code that knows their types reads them by label; code that shows them uses `texts`.
 
@@ -5137,12 +5140,12 @@ wraps it. Root APIs expose operations, not the table.
 
 | Field | Type |
 |---|---|
-| alloc | `(size: Int) -> Int ^ String` |
-| free | `(token: Int) -> Nil ^ String` |
-| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ^ String` |
-| load | `(token: Int, offset: Int, size: Int) -> BitArray ^ String` |
-| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ^ String` |
-| proc_exit | `(code: Int) -> Nil ^ String` |
+| alloc | `(Int) -> Int ^ String` |
+| free | `(Int) -> Nil ^ String` |
+| store | `(Int, Int, BitArray) -> Nil ^ String` |
+| load | `(Int, Int, Int) -> BitArray ^ String` |
+| fd_write | `(Int, Int, Int, Int) -> Int ^ String` |
+| proc_exit | `(Int) -> Nil ^ String` |
 
 <!-- /syn3-old -->
 <!-- syn3-new -->

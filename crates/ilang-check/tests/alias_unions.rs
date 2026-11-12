@@ -57,7 +57,10 @@ fn nominal_union_recursive_match_scales() {
         let took = start.elapsed();
         eprintln!("{n} members: {took:?}");
         let base = *smallest.get_or_insert(took.max(Duration::from_millis(50)));
-        assert!(took < base * 2000, "{n} members took {took:?}, 8 members took {base:?}");
+        assert!(
+            took < base * 2000,
+            "{n} members took {took:?}, 8 members took {base:?}"
+        );
         assert!(
             lines.contains(&"app/main.f0 : (e: E(Int)) -> Int".to_string()),
             "{n} members: {lines:?}"

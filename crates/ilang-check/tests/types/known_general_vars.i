@@ -14,7 +14,7 @@ map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
 
 id = (x) { x }
 
-users = [User("bob", 3)]
+users = [User(name: "bob", age: 3)]
 
 through_id = users |> map(id) |> map((v) { v.age })
 

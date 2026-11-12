@@ -7,8 +7,8 @@ Whole = {String - "error"} | "error"
 @host("test:kv/v1")
 Kv {
 	Kv(
-		get: (key: String & {String | Int}) -> Whole ^ String | "error"
-		check: (n: {Int | String} & Int) -> {Int - 0} | 0 ^ Nil | {Int - 0} | 0 | String | "error"
+		get: (String & {String | Int}) -> Whole ^ String | "error"
+		check: ({Int | String} & Int) -> {Int - 0} | 0 ^ Nil | {Int - 0} | 0 | String | "error"
 	)
 }
 

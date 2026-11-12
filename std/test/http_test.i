@@ -703,14 +703,14 @@ test("http_obs_text_round_trip", () {
 
 test("http_generated_body_round_trip", () {
 	Ok(gen) = property.string(30)
-	property.test(gen, property.Config(17, 100, 30, 0, 100), (s) {
+	property.test(gen, property.Config(seed: 17, cases: 100, max_size: 30, max_discards: 0, max_shrinks: 100), (s) {
 		body = <<s:utf8>>
 		req = http.Request(
-			http.Method("POST")
-			"/"
-			http.Headers([])
-			body
-			http.Headers([])
+			method: http.Method("POST")
+			target: "/"
+			headers: http.Headers([])
+			body: body
+			trailers: http.Headers([])
 		)
 		http.Complete(parsed, <<>>) = http.feed_request(
 			<<>>

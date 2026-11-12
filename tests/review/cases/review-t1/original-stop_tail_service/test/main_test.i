@@ -9,7 +9,7 @@
 check = (c: Bool, a ! Assert) {
 	c |> {
 		True  -> Nil
-		False -> a.fail(AssertionFailure("mine"))
+		False -> a.fail(AssertionFailure(message: "mine"))
 	}
 }
 
