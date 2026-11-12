@@ -50,7 +50,33 @@ declarations of the trusted library package exactly as `i run` does.
 
 ## Measurements
 
-MEASUREMENTS
+Measured 2026-11-13 on x86_64-unknown-linux-gnu (16 cores, load average about 30 from
+other builds, so times are upper bounds), release profile (thin LTO, one codegen unit,
+debug info stripped, symbols kept), `--opt 2`.
+
+| Executable | Wasm module (bytes) | Payload (bytes) | Executable size (bytes) |
+|---|---|---|---|
+| runner alone (`i-runner`) | — | — | 7,136,368 |
+| examples/hello | 17,167 | 249,992 | 7,386,360 |
+| examples/cli-log | 99,440 | 1,173,783 | 8,310,151 |
+| examples/echo | 227,587 | 2,630,766 | 9,767,134 |
+| examples/http-get | (host target has no HTTP provider) | 4,761,893 | 11,898,261 |
+
+The payload is mostly precompiled machine code: roughly 10–20 times the optimized Wasm
+size. `i` itself is 62,348,656 bytes, of which the embedded runner is 7.1 MB.
+
+Start-up (20 runs each, empty environment, wall time from spawn to exit):
+
+| Command | Median | Minimum |
+|---|---|---|
+| bare runner (rejects: no payload) | 4.1 ms | 1.5 ms |
+| examples/hello executable | 5.6 ms | 2.8 ms |
+| examples/cli-log executable (parses arguments, logs) | 14.5 ms | 6.9 ms |
+| `i run --project examples/hello` (compiles first) | about 1,000 ms | — |
+
+The executables are dynamically linked against the C library of the building machine
+(here a Nix store glibc path), as `i` is; a static or older-glibc runner is part of the
+open distribution question.
 
 ## Decisions
 
