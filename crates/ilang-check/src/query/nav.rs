@@ -307,8 +307,23 @@ impl Query<'_> {
             visit_module(p, m, &mut |n| {
                 if let Node::Block(b) = n {
                     for s in &b.stmts {
-                        if let Stmt::Env { ty, span, .. } = s
-                            && matches!(&ty.kind, TypeKind::Named { ty: TypeRef::Custom(x), .. } if *x == t)
+                        let Stmt::Env { ty, value, span } = s else {
+                            continue;
+                        };
+                        // A provide `e <- (C(…))` of syntax three lowers to
+                        // an environment statement with no written type: its
+                        // type is the one of the constructor it calls.
+                        let provided = matches!(&ty.kind, TypeKind::Hole)
+                            && match &value.kind {
+                                ExprKind::Name(ValueRef::Ctor(c)) => c.ty == t,
+                                ExprKind::Call { callee, .. } => matches!(
+                                    &callee.kind,
+                                    ExprKind::Name(ValueRef::Ctor(c)) if c.ty == t
+                                ),
+                                _ => false,
+                            };
+                        if provided
+                            || matches!(&ty.kind, TypeKind::Named { ty: TypeRef::Custom(x), .. } if *x == t)
                         {
                             found.push(*span);
                         }

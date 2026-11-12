@@ -530,13 +530,13 @@ impl Query<'_> {
                     return None;
                 }
                 Some(Completion {
-                    label: format!("{label}:"),
+                    label: format!("{label} ="),
                     kind: CompletionKind::Field,
                     detail: ty,
                     insert: Some(if lisp {
-                        format!("(: {label} ")
+                        format!("(= {label} ")
                     } else {
-                        format!("{label}: ")
+                        format!("{label} = ")
                     }),
                     preferred: true,
                     ..Default::default()

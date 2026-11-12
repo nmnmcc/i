@@ -372,7 +372,7 @@ impl<'a> Query<'a> {
                 }],
                 ..ast::Module::default()
             };
-            code.push_str(&ilang_syntax::lisp::print_module(&module));
+            code.push_str(&ilang_syntax::syn3::print_current(&module, true));
         }
         Some(Hover {
             span,
