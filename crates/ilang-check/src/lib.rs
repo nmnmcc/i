@@ -69,7 +69,6 @@ pub mod code {
     pub const ATTRIBUTE_ARGS: &str = "E0302";
     pub const ATTRIBUTE_PLACE: &str = "E0303";
     pub const ENTRY_FORM: &str = "E0304";
-    pub const TEST_OUTSIDE_TEST: &str = "E0305";
     pub const RESERVED_ILANG: &str = "E0306";
     pub const MAIN_TWICE: &str = "E0307";
     pub const DECLARATION_WITHOUT_EXTERNAL: &str = "E0308";

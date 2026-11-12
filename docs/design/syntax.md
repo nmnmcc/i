@@ -139,7 +139,7 @@ The first paragraph, "A file has at most one `import` and at most one `export`. 
 
 The paragraph "In one module, every top-level name is defined one time only. …" keeps its text. The paragraph "These are the attributes. …" becomes:
 
-> These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels, and an attribute that takes no arguments is written with no `( )`, as in `@test`. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, or `@test()`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
+> These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels,. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
 
 The list of the attributes keeps its text, with this addition from js.md §9:
 
@@ -474,7 +474,7 @@ So in `loop = { 0 -> Done  n -> loop(n - 1) }`, the call `loop(n - 1)` uses no m
   - `crates/ilang-syntax/tests/golden/err_clause_tuple_type.i`, `p |> { p: (Int, Int) -> e }`, now gives the error that `( name: e )` is kept for records, with the note on tuple types (§7.1). Its `.out` file changes in A2; old-syntax errors stay unchanged in A1.
   - `crates/ilang-syntax/tests/golden/err_pattern.i`, `x |> { -y -> 1 }`, and `crates/ilang-syntax/tests/golden/err_segment_type.i`, `b |> { <<x: Int>> -> 1 }`, keep their errors in the pattern, because a first statement that is not a correct expression and has a `->` after it is a clause whose pattern is wrong (§6.1). Their `.out` files are checked again.
   - `crates/ilang-syntax/tests/golden/err_block_end.i`, line 3, `h = {}`, expects "a block ends with an expression", but `{}` is now a correct clause block (§6.12). The line is removed, and a test of `{}` is added to the checker tests.
-  - `crates/ilang-syntax/tests/golden/err_trailing.i`, line 4, `@test()`, expects "expected a part, found `)`", but `()` is now a correct `Call` with no arguments. A built-in attribute that takes no arguments is written with no `( )` (§2.2), so the error stays, with a new message, and the `.out` file changes.
+  - The former `@test()` fixture is now an ordinary unknown-attribute rejection (E0301). Attribute-call syntax itself remains general for macros.
   - `crates/ilang-syntax/tests/golden/err_toplevel.i`, line 1, `f(x)`, expects "expected an item", but it is now a `MacroItem`, which is kept for macros (§2.2). The line is replaced by a form that is still not an item, such as `1`, and the `.out` file is checked again. Lines 3 and 4, `@external("m", "f")` and then `g = 1`, expect "expected `:`", but an item is now a declaration by its form, not by `@external` (§2.2), so they are a binding with an attribute in the wrong place, which the parser accepts. They are removed, and a test of `@external` on a binding is added to the checker tests.
   - `crates/ilang-syntax/tests/golden/err_import_late.i`, `import (i/fail)` after an item, becomes `(i/fail)` after an item, which is a group in `( )` at the top level that is not an item (§2.2). It is still an error, and the message still says that the imports come first, but the `.out` file changes.
   - `crates/ilang-syntax/tests/golden/err_trailing.i`, line 1, `T(,) { C }`, expects "expected a name", but the parser now reads the head as types (§4.3), so the error expects a type, and the `.out` file changes.
@@ -544,8 +544,8 @@ A3 owns the editor grammar, removal of the old syntax, and old-tag handling.
 The §2.2 attribute/group error skips the whole group and reports E0115 once.
 An old `err_module_path` stays an old parser error until A2; its new checker
 counterpart gives E0215 and the module-path hint only for an available module.
-The old `err_trailing` head error expects a type, and `@test()` is checked as
-an attribute call. Layout-sensitive sources use the shared splice plan, and
+The old `err_trailing` head error expects a type. General attributes are parsed
+as attribute calls; the removed test attribute is rejected by ordinary resolution. Layout-sensitive sources use the shared splice plan, and
 syntax-error files are refused when their diagnostic codes would change.
 
 WAT comparison follows A1 §3.17: exact ERROR text on shared exports, site-data

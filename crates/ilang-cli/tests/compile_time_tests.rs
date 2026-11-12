@@ -148,7 +148,11 @@ fn tests_use_each_builds_unmarked_quote_templates() {
             "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> () _ { (assert (== ((. syntax show) quoted) \"(a b)\")) Nil }))\n",
         );
         let built = build(root, true, opt).unwrap();
-        let templates = built.templates.iter().filter(|s| matches!(s.show().as_str(), "(f x)" | "(a b)")).collect::<Vec<_>>();
+        let templates = built
+            .templates
+            .iter()
+            .filter(|s| matches!(s.show().as_str(), "(f x)" | "(a b)"))
+            .collect::<Vec<_>>();
         assert_eq!(templates.len(), 2, "both fixture quotes must survive");
         assert!(templates.iter().all(|s| s.scope().marks.is_empty()));
         let modules: std::collections::HashSet<_> =

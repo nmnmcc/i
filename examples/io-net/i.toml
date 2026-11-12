@@ -1,7 +1,9 @@
 name = "io_net"
 
 [dependencies]
-std = { path = "../../std" }
 
 [test]
 collection = "std/test.tests"
+
+[dev-dependencies]
+std = { path = "../../std" }

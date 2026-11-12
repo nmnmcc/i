@@ -8,7 +8,7 @@ pub fn manifest(name: &str) -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
+        "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
         std.to_str().unwrap()
     )
 }
@@ -18,7 +18,7 @@ pub fn configure(project: &Path) {
     let mut manifest: toml_edit::DocumentMut =
         std::fs::read_to_string(&path).unwrap().parse().unwrap();
     manifest["test"]["collection"] = toml_edit::value("std/test.tests");
-    manifest["dependencies"]["std"]["path"] = toml_edit::value(
+    manifest["dev-dependencies"]["std"]["path"] = toml_edit::value(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../std")
             .to_str()

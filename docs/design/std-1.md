@@ -909,7 +909,7 @@ implementation starts only after the separate compiler track passes §3.4's
 positive factory and negative service-compatibility gates. Each writer owns
 one new `std/src/<name>.i` and one new `std/test/<name>_test.i`, from line 1 through
 EOF. Module source regions, in order: imports; exact exports; public types;
-factories/parsers; operations/builders; private helpers. Tests use `@test`,
+factories/parsers; operations/builders; private helpers. Tests use imported `test` macros,
 assertions and pure local fake services like the existing tests. No module may
 import a test module (spec §2.1). No writer edits string.i, list.i, dict.i, the
 prelude, the compiler, or another writer's files. URI does not depend on path;

@@ -42,13 +42,17 @@ if (process.argv[2] === 'ilang') {{
     combinations = 0
     for name in ['laws', 'vectors', 'interface']:
         source = Path(__file__).with_name(name + '.i').read_text()
-        tests = re.findall(r'@test\s+(\w+)\s*=', source)
+        # Preserve the literal macro bodies as ordinary named functions for
+        # command targets, which execute one main rather than the test runner.
+        tests = re.findall(r'test\("([^"\n]+)",\s*\(\)\s*\{', source)
         assert tests
         project = WORK / name
         (project / 'src').mkdir(parents=True, exist_ok=True)
         (project / 'i.toml').write_text('name = "replay"\n')
-        source = source.replace('@test\n', '')
-        source += '\n@main\nmain = () {\n' + ''.join('\t' + t + '()\n' for t in tests) + '\tNil\n}\n'
+        source = re.sub(r'\s*testlib\s*=\s*\(test\)\s*=\s*std/test\s*,?', '', source)
+        source = re.sub(r'test\("([^"\n]+)",\s*(\(\)\s*\{)', r'\1 = \2', source)
+        source = re.sub(r'(?m)^\}\)\s*$', '}', source)
+        source += '\nmain = () {\n' + ''.join('\t' + t + '()\n' for t in tests) + '\tNil\n}\n'
         (project / 'src/main.i').write_text(source)
         for level in [0, 2]:
             run(cli, 'run', '--project', project, '--opt', level)

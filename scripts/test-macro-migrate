@@ -151,11 +151,14 @@ def main():
             relative = os.path.relpath(ROOT / 'std', package)
             dev_std = re.search(r'(?m)^std\s*=.*$', text) if 'std' in manifest_data.get('dev-dependencies', {}) else None
             dependency = (dev_std.group() + '\n') if dev_std else f'std = {{ path = {json.dumps(relative)} }}\n'
-            section = re.search(r'(?m)^\[dependencies\][^\n]*\n', text)
+            table = 'dependencies' if source_module else 'dev-dependencies'
+            if dev_std:
+                text = text[:dev_std.start()] + text[dev_std.end():]
+            section = re.search(r'(?m)^\[' + table + r'\][^\n]*\n', text)
             if section:
                 text = text[:section.end()] + dependency + text[section.end():]
             else:
-                text += '\n[dependencies]\n' + dependency
+                text += '\n[' + table + ']\n' + dependency
         existing = manifest_data.get('test', {})
         if 'collection' in existing:
             if existing['collection'] != 'std/test.tests':

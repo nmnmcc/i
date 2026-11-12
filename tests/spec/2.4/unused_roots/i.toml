@@ -6,7 +6,9 @@ name = "app"
 exports = ["app/host.run"]
 
 [dependencies]
-std = { path = "../../../../std" }
 
 [test]
 collection = "std/test.tests"
+
+[dev-dependencies]
+std = { path = "../../../../std" }

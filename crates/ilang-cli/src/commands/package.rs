@@ -133,7 +133,7 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
         (
             "i.toml".to_string(),
             format!(
-                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
+                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
                 std.to_str().expect("standard library path is UTF-8")
             ),
         ),
@@ -623,10 +623,17 @@ struct Report {
 /// modules declare, and the host services of the library modules that they
 /// import.
 fn report(graph: &PackageGraph) -> Result<Report> {
-    let (program, diags) = ilang_check::resolve_program(graph);
-    let Some(program) = program else {
+    let mut expanded_graph = graph.clone();
+    let mut expanded = ilang_macro::project::expand(&mut expanded_graph)
+        .map_err(|diags| problems(&expanded_graph, &diags))?;
+    expanded.lower_quotes();
+    let (program, mut diags) = ilang_check::resolve_parsed(&expanded_graph, &expanded.parsed);
+    diags.extend(expanded.diagnostics);
+    let graph = &expanded_graph;
+    if diags.iter().any(Diagnostic::is_error) {
         return Err(problems(graph, &diags));
-    };
+    }
+    let program = program.expect("resolved permission report");
     let root = graph
         .root
         .ok_or_else(|| anyhow!("the package could not be read"))?;
@@ -731,7 +738,7 @@ fn library_hosts<'a>(
 }
 
 fn deps(project: &Path, target: ilang_wasm::Target) -> Result<ExitCode> {
-    let (graph, diags) = load(project, true);
+    let (mut graph, diags) = load(project, true);
     if diags.iter().any(Diagnostic::is_error) || graph.root.is_none() {
         return Err(problems(&graph, &diags));
     }
@@ -746,7 +753,12 @@ fn deps(project: &Path, target: ilang_wasm::Target) -> Result<ExitCode> {
             println!("  {what} ({})", at.join(", "));
         }
     }
-    let checked = ilang_check::check(&graph);
+    let expanded = ilang_macro::project::check(&mut graph);
+    let checked = ilang_check::Checked {
+        program: expanded.program,
+        types: expanded.types,
+        diags: expanded.diags,
+    };
     if checked.diags.iter().any(Diagnostic::is_error) {
         return Err(problems(&graph, &checked.diags));
     }

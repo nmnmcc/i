@@ -635,6 +635,8 @@ This uses the new syntax, so it is committed after A1+A2 land.
 //// suspend should take the same time at every depth (docs/performance.md).
 
 (
+	testlib = (test) = std/test
+
   i/control
   i/core
 )
@@ -695,17 +697,17 @@ run = (depth) {
   check(got == 5_000_050_000, "the sum of 1 to rounds is wrong")
 }
 
-@test
-resume_depth_10 = () { run(10) }
 
-@test
-resume_depth_100 = () { run(100) }
+test("resume_depth_10", () { run(10) })
 
-@test
-resume_depth_1000 = () { run(1000) }
+
+test("resume_depth_100", () { run(100) })
+
+
+test("resume_depth_1000", () { run(1000) })
 ```
 
-Before it is committed, it must check under A1+A2: the imports group, the `|>` clause blocks, `@test` on bindings, a top-level clause block (`deeper`), and `b`, `k` and `step` with no type. `tests/spec/9/control.i` (line 205) has a similar `Step`, `Step { Done  More(Int, Continuation(Nil, Step, Never, Never)) }`. Only its `More` matches: its `Done` has no field, and the bench's `Done` has an `Int`. So the bench's type is checked on its own, not taken from that file. `Continuation(Nil, Step, Never, Never)` is written the same in the new syntax: syntax.md renames only type variables, and `Nil`, `Step` and `Never` are types (syntax.md §3: an `UpName` is a type variable only when a type variable with that name is declared where the type is written). If `deeper` were inlined, the frames would still stay, because it does work after `down` returns.
+Before it is committed, it must check under A1+A2: the imports group, the `|>` clause blocks, ordinary `test` macro calls, a top-level clause block (`deeper`), and `b`, `k` and `step` with no type. `tests/spec/9/control.i` (line 205) has a similar `Step`, `Step { Done  More(Int, Continuation(Nil, Step, Never, Never)) }`. Only its `More` matches: its `Done` has no field, and the bench's `Done` has an `Int`. So the bench's type is checked on its own, not taken from that file. `Continuation(Nil, Step, Never, Never)` is written the same in the new syntax: syntax.md renames only type variables, and `Nil`, `Step` and `Never` are types (syntax.md §3: an `UpName` is a type variable only when a type variable with that name is declared where the type is written). If `deeper` were inlined, the frames would still stay, because it does work after `down` returns.
 
 ### 13.2 `crates/ilang-wasm/tests/control_lazy.rs`
 
@@ -854,6 +856,8 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 - `tests/spec/9/control_lazy_env_unwind.i`: the mode 1 and mode 2 path of walk W (lemma Env). The first part:
 
   ```i
+  (testlib = (test) = std/test)
+
   f = (b, outer) {
     ! Name = Name("in")
     resource.ensure(
@@ -871,12 +875,12 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
     )
   }
 
-  @test
-  cancel_keeps_inner_environment = () {
+
+  test("cancel_keeps_inner_environment", () {
     ! Name = Name("outside")
     r = control.boundary((outer) { control.boundary((b) { f(b, outer) }) })
     check(r, "in, cancelled")
-  }
+  })
   ```
 
   The call of `resource.ensure` in `f` is under `! Name = Name("in")`, so f's record has kind 1 and lies outside the pending ensure record. The final function must see "in", not "out" (the place of `cancel`) and not "outside". A second part resumes instead, from a place where `Name` is "out", and the resumed code raises an error with `fail.raise` inside a `fail.catch` around `f`, so the final function runs in mode 1; it must also see "in". A third part puts two more kind-1 frames with other values of `Name` between the ensure and `f`, so that `cur` is reset more than once before the ensure is reached, and the final function must see the value of the innermost of them.
@@ -905,6 +909,8 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 - `tests/spec/9/control_lazy_long_pending.i`: `$shadow_insert` with far more slots than `$shadow` holds (D14). The pending list grows with each re-suspend while `$sp` stays low:
 
   ```i
+  (testlib = (test) = std/test)
+
   Gen { More(Continuation(Nil, Gen, Never, Never))  End }
 
   // One new frame per round: the call is not in tail position.
@@ -924,10 +930,10 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
     }
   }
 
-  @test
-  cancel_long_pending = () {
+
+  test("cancel_long_pending", () {
     check(show(drive(control.boundary((b) { g(b, 0) }), 10_000)), "Nil")
-  }
+  })
   ```
 
   After 10,000 rounds the list holds about 10,000 code records, and `$shadow` still has its first 256 entries. The cancel skips them all and inserts them at the end of the list. A second part does the same with an error: each step recurses 200 more frames (not in tail position) before it suspends, 50 steps are resumed from a flat loop, and on the last resume the innermost frame does `fail.raise(1)`. A `fail.catch` around that `resume` in the test function must give `Error(1)`. If `$shadow_insert` grew the array only once, both parts would trap. (`x = g(b, i + 1)` then `x` must stay a frame at O2; step 2 checks this in the WAT, and if the optimizer turns it into a tail call, the case uses `keep(g(b, i + 1))` with a clause block as in test 13 of 13.2.)
@@ -955,6 +961,8 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 - `tests/spec/11/stop_lazy_after_catch.i`: the restore of `d` just before a call in mode 1 (D13, P3). Every other stop case stops in mode 0, and the other cases that call a record in mode 1 or 2 either start with `$sp == d` or check only values. Here the error reaches the trampoline with `$sp = d + 1`:
 
   ```i
+  (testlib = (test) = std/test)
+
   Paused { Paused(Continuation(Nil, Paused, Never, Never)) }
 
   inner = (b) {
@@ -973,12 +981,12 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
     panic("after")
   }
 
-  @test
-  stop_after_catch = () {
+
+  test("stop_after_catch", () {
     control.boundary((b) { outer(b) }) |> {
       Paused(k) -> control.resume(k, Nil)
     }
-  }
+  })
   ```
 
   The resume re-enters only `inner`, whose slot is pushed at `d`. Its error reaches the trampoline with `$sp = d + 1`; the trampoline skips mid's record, restores `d` and calls the catch record in mode 1, then calls outer's record, which pushes its slot at `d` and panics. The `at:` list is outer's site, the body of the boundary, the resume, then the test. Without the restore, outer's slot lands at `d + 1` and the list has a stale line of `inner`. The mode-2 form of this check needs a cancel that leaves a trampoline, which the spec does not state, so it is run test 15 of 13.2.

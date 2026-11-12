@@ -779,14 +779,10 @@ impl<'a> Resolver<'a> {
                 "host" => r#"`@host("namespace")` or `@host("namespace", "async")`"#,
                 _ => r#"`@deprecated("note")`"#,
             };
-            if let Some((args, _)) = &a.call {
-                let message = if counts == [0] && args.is_empty() {
-                    format!("`@{name}` takes no arguments and is written with no `( )`")
-                } else {
-                    format!(
-                        "the arguments of `@{name}` are string literals given by position: {form}"
-                    )
-                };
+            if a.call.is_some() {
+                let message = format!(
+                    "the arguments of `@{name}` are string literals given by position: {form}"
+                );
                 self.error(code::ATTRIBUTE_ARGS, a.span, message);
                 continue;
             }

@@ -11,11 +11,10 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 fixture = ROOT / 'std/test/std3_failure_probe_test.i'
-source = '''(i/core, std/property)
-@test
-adapter = () {
+source = '''(testlib = (test) = std/test, i/core, std/property)
+test("adapter", () {
  property.test(property.constant(1), property.Config(42,1,0,0,0), (x) { assert(x == 0) }, core.inspect)
-}
+})
 '''
 assert not fixture.exists()
 try:

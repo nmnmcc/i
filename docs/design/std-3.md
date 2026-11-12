@@ -170,19 +170,21 @@ written recursive result types, never polymorphic recursion. An ordinary client:
 
 ```i
 (
+	testlib = (test) = std/test
+
   i/core
   std/list
   std/property
 )
 
-@test
-reverse_twice = () {
+
+test("reverse_twice", () {
   Ok(item) = property.int(-100, 100)
   Ok(items) = property.list(item, min: 0, max: 50)
   property.test(items, property.defaults(), (xs) {
     assert(list.reverse(list.reverse(xs)) == xs)
   }, core.inspect)
-}
+})
 ```
 
 ### 3.3 Exact generation and shrinking rules
@@ -330,7 +332,7 @@ to built-in sampling/shrink order require an explicit protocol version change.
 property invocation in assertion.catch. Ok(Nil) gives Pass; Error(failure)
 gives Fail(failure.message). Afterwards Passed returns Nil; other reports call
 *the caller's* Assert.fail(AssertionFailure(format(report,show))). The final
-fail is outside the per-case catch. Runner sees one ordinary failed @test.
+fail is outside the per-case catch. Runner sees one ordinary failed test.
 AssertionFailure carries a message, not the original stack: the final stop site
 is the adapter, with the original message in reason. Do not promise the original
 property source location without a separate general assertion design.
@@ -921,19 +923,21 @@ functions or polymorphic recursion.
 **Floats can stop before a checked wrapper returns.** Baseline programs:
 
 ```i
-(i/core, std/float)
+(
+	testlib = (test) = std/test
+	i/core, std/float)
 
-@test
-nonfinite_bits = () {
+
+test("nonfinite_bits", () {
   core.float_from_bits(0x7ff0000000000000)
   Nil
-}
+})
 
-@test
-overflow_before_result = () {
+
+test("overflow_before_result", () {
   float.max_finite *. float.max_finite
   Nil
-}
+})
 ```
 
 Both ran and stopped with `float: result is not finite`; two failed tests,
@@ -976,7 +980,7 @@ No further serious issue found. Checked these concrete adversarial cases:
   constant zero with >0 discards without retry. Cyclic/nonterminating child
   computation with zero budget stays unforced.
 - Per-case Assert becomes Fail, then final delivery is caught by a caller's
-  assertion.catch. A separate failing @test printed the multiline seed/case
+  assertion.catch. A separate failing test printed the multiline seed/case
   message and exited 1 with exactly one failed test. It used existing runner
   behavior and revealed no special registration requirement.
 - Rational sin/cos/tan/atan model against independent MPFR directed endpoints:

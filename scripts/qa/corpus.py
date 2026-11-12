@@ -270,7 +270,24 @@ def observe_in(binary, case, bound, runtime):
             name += '_again'
         entry = project / 'test' / (name + '.i')
         entry.parent.mkdir(parents=True, exist_ok=True)
-        entry.write_text('@test\nqa_startup = () { Nil }\n')
+        entry.write_text('(testlib = (test) = std/test)\ntest("qa_startup", () { Nil })\n')
+        manifest_path = project / 'i.toml'
+        manifest = manifest_path.read_text()
+        data = tomllib.loads(manifest)
+        if data.get('name') != 'std' and 'std' not in data.get('dependencies', {}) and 'std' not in data.get('dev-dependencies', {}):
+            dependency = 'std = { path = ' + json.dumps(str(ROOT / 'std')) + ' }\n'
+            section = re.search(r'(?m)^\[dev-dependencies\]\s*\n', manifest)
+            if section:
+                manifest = manifest[:section.end()] + dependency + manifest[section.end():]
+            else:
+                manifest += '\n[dev-dependencies]\n' + dependency
+        if 'collection' not in data.get('test', {}):
+            section = re.search(r'(?m)^\[test\]\s*\n', manifest)
+            if section:
+                manifest = manifest[:section.end()] + 'collection = "std/test.tests"\n' + manifest[section.end():]
+            else:
+                manifest += '\n[test]\ncollection = "std/test.tests"\n'
+        manifest_path.write_text(manifest)
         for opt in [0, 2]:
             test, _ = invoke(binary, project, ['test', '--opt', str(opt)], bound)
             result['test' + str(opt)] = test

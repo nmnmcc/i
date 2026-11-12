@@ -273,7 +273,7 @@ fn new_with_a_path_and_bad_names() {
     w.ok(&["new", "tool", "--path", "nested/place"]);
     assert_eq!(
         read(&w.path().join("nested/place/i.toml")),
-        "name = \"tool\"\n"
+        test_project::manifest("tool")
     );
     // The directory is not empty now.
     let err = w.fails(&["new", "tool", "--path", "nested/place"]);

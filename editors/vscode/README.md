@@ -12,7 +12,7 @@ Editor support for **the i programming language**, as defined in
     floats (`1.0`, `2.`, `6.25e-3`); `t.0.1` is two tuple parts;
   - header groups and their module paths and aliases, clause blocks, guards,
     and declared type parameters;
-  - the attributes `@main`, `@test`, `@external`, `@host`, and
+  - the attributes `@external`, `@host`, and
     `@deprecated`;
   - types and constructors (`UpName`s), built-in types, `True`, `False`, and
     `Nil`;

@@ -126,15 +126,6 @@
   "crates/ilang-check/tests/types.rs:41a8b6c35fcc6353": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-cli/src/commands/package.rs:192f1113b28f5014": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/src/commands/package.rs:ad9fbe9cb9e893b7": {
-    "not_source": "Host or test-runner diagnostic text"
-  },
-  "crates/ilang-cli/src/commands/package.rs:d3d32da5709fee27": {
-    "not_source": "Host or test-runner diagnostic text"
-  },
   "crates/ilang-cli/src/main.rs:c6d9f1c6871f9ba9": {
     "not_source": "Host or test-runner diagnostic text"
   },
@@ -172,15 +163,6 @@
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/package_commands.rs:d245d0e92715694f": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:2364dc3e3b8f6ec3": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:a478aaac268b7a92": {
-    "not_source": "Template output substring assertion"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:14a65931b1fc50b0": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/package_commands.rs:fb41c1629043bb04": {
@@ -503,23 +485,6 @@
   },
   "crates/ilang-check/tests/types.rs:a426596383004acc": {
     "suffix": "\n  a0\n}\n",
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/src/commands/package.rs:06f50aba6c3af279": {
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-cli/src/commands/package.rs:826bab0a71cc61a4": {
@@ -1824,27 +1789,6 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/common/single_file.rs:1569de767872d82e": {
-    "substitutions": [
-      [
-        "{name}",
-        "test_name"
-      ],
-      [
-        "{alias}",
-        "source"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Materialize the generated test wrapper before parsing it."
-  },
   "crates/ilang-cli/tests/entries.rs:c6011128210874b0": {
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
@@ -1942,13 +1886,6 @@
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected a name, found `2`"
-    ]
-  },
-  "editors/vscode/test/sample.i:e58bed8a30762048": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
@@ -2391,9 +2328,6 @@
   "crates/ilang-check/tests/macro_names.rs:b9a5c2ac5caa2929": {
     "not_source": "Attribute name used in a diagnostic assertion"
   },
-  "crates/ilang-cli/src/main.rs:9072ee0af7b301bf": {
-    "not_source": "Test runner output format"
-  },
   "crates/ilang-cli/tests/compile_time_tests.rs:214210542efaddfa": {
     "not_source": "TOML manifest"
   },
@@ -2830,5 +2764,38 @@
   "crates/ilang-cli/tests/providers.rs:cb4a79fc55a008e5": {
     "not_source": true,
     "reason": "TOML named-entry/test manifest or dependency path format template."
+  },
+  "crates/ilang-cli/src/commands/package.rs:f3b00c7d58e41220": {
+    "substitutions": [
+      [
+        "{name}",
+        "app"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
+    "not_source": "Publish test-runner diagnostic text."
+  },
+  "editors/vscode/test/sample.i:1b4b9e4de98c425f": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "crates/ilang-cli/src/commands/package.rs:df747cb87930f0f2": {
+    "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
+  },
+  "crates/ilang-cli/tests/common/test_project.rs:df747cb87930f0f2": {
+    "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
   }
 }

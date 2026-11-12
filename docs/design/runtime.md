@@ -1788,7 +1788,7 @@ Exclude the discussion of compiler frame/table layout.
 
 > The program entry is `main` in `src/main.i`, or a target selected from the
 > compiled package's `[entries]`. It has no ordinary parameters and its value
-> is ignored. Dependency entries do not affect the program. Tests are @test
+> is ignored. Dependency entries do not affect the program. Tests are collection-selected
 > functions in test/ of the compiled package; each has no ordinary parameters
 > and returns Nil. A test passes by returning Nil and fails on a stop. Each
 > runs in its own freshly started instance. Host exports are the functions

@@ -15637,7 +15637,8 @@
         "test/stream_test.i",
         "test/string_test.i",
         "test/time_test.i",
-        "test/uri_test.i"
+        "test/uri_test.i",
+        "src/test.is"
       ]
     },
     {

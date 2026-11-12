@@ -236,8 +236,8 @@ The general parameter in the example corrects the earlier `(Int) -> Int` text he
 
 - `MacroItem`: E0234, "a call at the top level is kept for macros".
 - A declaration with no `@external`: E0308, message now "a declaration with no `@external` is kept for macros".
-- An attribute with a module, or whose name is not built in: E0301, message now "the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`".
-- A built-in attribute with `call` present: E0302, with `@x` the name written. When the attribute takes no arguments in the arity table of `attributes()` (`@test`) and the `( )` is empty: "`@x` takes no arguments and is written with no `( )`". In every other case: "the arguments of `@x` are string literals given by position: <form>", where <form> is the form that `attributes()` already gives for that attribute (for `@external`, `` `@external("module", "function")` ``).
+- An attribute with a module, or whose name is not built in: E0301, message now "the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`".
+- A built-in attribute with `call` present gives E0302: its arguments must be positional string literals. The removed test attribute has no built-in arity or placement rules; an unresolved use gives ordinary E0301.
 - `@external` on a binding: E0303, which exists today.
 - Type definition heads, in `type_defs` (after imports are known), in this order (finding 3):
   1. `head` is not empty (a part is not a plain name, or the parts mix lowercase names and `UpName`s): a custom type gives E0232 TYPE_PARAM_FORM, "a type parameter is an `UpName` with no module name and no arguments"; an alias gives E0233 ALIAS_PATTERN_RESERVED, "the left side of an alias that is not a list of type parameters is kept for alias patterns". The body is not resolved.

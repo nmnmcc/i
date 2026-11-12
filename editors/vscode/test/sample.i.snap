@@ -353,10 +353,12 @@
 "}"  punctuation.brackets.curly.i
 ")"  punctuation.brackets.round.i
 "}"  punctuation.brackets.curly.i
-"@"  storage.type.annotation.i punctuation.definition.annotation.i
-"test"  storage.type.annotation.i
-"adds"  entity.name.function.definition.i
-"="  keyword.operator.assignment.i
+"test"  entity.name.function.call.i
+"("  punctuation.brackets.round.i
+"\""  string.quoted.double.i punctuation.definition.string.begin.i
+"adds"  string.quoted.double.i
+"\""  string.quoted.double.i punctuation.definition.string.end.i
+","  punctuation.separator.comma.i
 "("  punctuation.brackets.round.i
 ")"  punctuation.brackets.round.i
 "{"  punctuation.brackets.curly.i
@@ -372,6 +374,7 @@
 "3"  constant.numeric.integer.decimal.i
 ")"  punctuation.brackets.round.i
 "}"  punctuation.brackets.curly.i
+")"  punctuation.brackets.round.i
 "identity"  entity.name.function.definition.i
 "("  punctuation.brackets.round.i
 "A"  entity.name.type.parameter.i

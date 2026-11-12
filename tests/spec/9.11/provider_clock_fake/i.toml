@@ -5,7 +5,9 @@ name = "app"
 native = "app/main.fake"
 
 [dependencies]
-std = { path = "../../../../std" }
 
 [test]
 collection = "std/test.tests"
+
+[dev-dependencies]
+std = { path = "../../../../std" }

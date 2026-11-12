@@ -1613,7 +1613,7 @@ F2 originally said “allowing parentheses or a one-expression group around the 
 **docs/design/meta.md**
 
 - Baseline paragraph/row 368: An attribute whose name is one of the built-in attributes (`external`, `host`, `main`, `test`, `deprecated`, `macro`) is that attribute; a macro with such a name is used with its module name.
-- Baseline paragraph/row 378: The attributes `@external`, `@host`, `@test` may be in a result only when the attribute came from the code of the caller (it has no marks, §5).
+- Baseline paragraph/row 378: The attributes `@external`, `@host` may be in a result only when the attribute came from the code of the caller (it has no marks, §5).
 - Baseline paragraph/row 494: This is the only case where two items have one name, and the only use of a declaration other than `@external`.
 
 **docs/design/syntax.md**
