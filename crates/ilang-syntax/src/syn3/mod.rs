@@ -54,7 +54,7 @@ pub fn print_current(module: &crate::ast::Module, lisp: bool) -> String {
 /// Rewrites a source text of the current normal surface (compiler-made
 /// modules) as syntax three.
 pub fn convert_source(source: &str) -> String {
-    let (old, diags) = crate::parser::parse_module_uncached(source);
+    let (old, diags) = crate::parser::parse_module_legacy(source);
     assert!(diags.is_empty(), "compiler-made source must parse: {diags:?}");
     let lexed = crate::lex(source);
     let (module, _) = convert::convert(&old, Some(&lexed), &convert::Signatures::default());

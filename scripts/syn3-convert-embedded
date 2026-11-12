@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""Converts the i snippets embedded in Rust and JavaScript strings and in
+Markdown fences to syntax three, in place (docs/design/syntax-3.md §7.2 stage
+8, §7.3 "Rust-embedded snippets and doc fences"). Called by
+scripts/syn3-convert-all after the `.i` and `.is` files.
+
+    scripts/syn3-convert-embedded MIGRATOR [--ctors DIR]...
+
+The snippets are the ones `scripts/old-syntax-check` extracts. A snippet is
+converted when only the syntax before syntax three reads it (or both read it
+to different trees and it has no `<-`), and left as it is when it is in syntax
+three already, so the script can run again. Left out, and listed: snippets the
+inventory marks as not i, as invalid on purpose (`diagnostics`), and source
+templates (`prefix`, `suffix`, `substitutions`), and Rust strings that use
+`{{` (format strings). A snippet that neither syntax reads, or whose converted
+text cannot be written back into its string, is a failure (exit 1).
+
+The keys of `scripts/old-syntax-check.json` are the paths and hashes of the
+snippets; the keys of the snippets and `.i` files that changed are moved to
+their new hashes: those of snippets here, those of whole files by
+`--rekey BEFORE`, where BEFORE is the map written by `--snapshot BEFORE` before
+the files are converted.
+"""
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_check():
+    loader = SourceFileLoader("old_syntax_check", str(ROOT / "scripts/old-syntax-check"))
+    spec = importlib.util.spec_from_loader("old_syntax_check", loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+check = load_check()
+
+
+def file_identity(path):
+    text = (ROOT / path).read_bytes().decode()
+    return check.identity(path, re.sub(r"(?m)^// old-syntax-check:.*\n?", "", text))
+
+
+def snapshot(out):
+    """The keys of the inventory that name whole `.i` files, by path."""
+    os.chdir(ROOT)
+    config = json.loads(check.DATA.read_text())
+    places = {}
+    for key in config:
+        path = key.rsplit(":", 1)[0]
+        if path.endswith(".i") and (ROOT / path).is_file() and file_identity(path) == key:
+            places[key] = path
+    Path(out).write_text(json.dumps(places))
+
+
+def move_keys(moves):
+    config = json.loads(check.DATA.read_text())
+    out = {moves.get(key, key): entry for key, entry in config.items()}
+    check.DATA.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+    return sum(1 for k in config if moves.get(k, k) != k)
+
+
+def rekey(before):
+    os.chdir(ROOT)
+    places = json.loads(Path(before).read_text())
+    moved = move_keys({key: file_identity(path) for key, path in places.items()})
+    print(f"syn3-convert-embedded: {moved} keys of whole files in scripts/old-syntax-check.json moved to the converted text")
+
+
+def rust_encode(literal, value):
+    """The Rust literal for `value`, in the style of `literal`."""
+    raw = re.match(r'r(#*)"', literal)
+    if raw:
+        hashes = raw[1]
+        while '"' + hashes in value:
+            hashes += "#"
+        return "r" + hashes + '"' + value + '"' + hashes
+    body = literal[1:-1]
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    cont = re.search(r"\\\n([ \t]*)", body)
+    if cont:
+        indent = cont[1]
+        lines = escaped.split("\n")
+        out = []
+        for i, line in enumerate(lines):
+            # A continuation skips the white space at the start of the next line.
+            lead = re.match(r"[ \t]*", line)[0]
+            line = lead.replace("\t", "\\t").replace(" ", "\\x20") + line[len(lead):]
+            out.append(line)
+        sep = "\\n\\\n" + indent
+        return '"' + sep.join(out) + '"'
+    if "\n" in body:
+        return '"' + escaped + '"'
+    return '"' + escaped.replace("\n", "\\n").replace("\t", "\\t") + '"'
+
+
+def js_encode(literal, value):
+    quote = literal[0]
+    escaped = value.replace("\\", "\\\\")
+    if quote == "`":
+        return "`" + escaped.replace("`", "\\`").replace("${", "\\${") + "`"
+    return quote + escaped.replace(quote, "\\" + quote).replace("\n", "\\n").replace("\t", "\\t") + quote
+
+
+def migrate(binary, ctors, sources):
+    data = b"".join(str(len(s.encode())).encode() + b"\n" + s.encode() for s in sources)
+    out = subprocess.run([binary, "snippets", *ctors], input=data, check=True, stdout=subprocess.PIPE).stdout
+    answers = []
+    for line in out.decode().splitlines():
+        kind, _, rest = line.partition(" ")
+        answers.append((kind, bytes.fromhex(rest).decode() if rest else ""))
+    assert len(answers) == len(sources)
+    return answers
+
+
+def convert(binary, ctors):
+    os.chdir(ROOT)
+    config = json.loads(check.DATA.read_text())
+    items = []
+    left = []
+    for item in check.snippets():
+        if item["kind"] == "file":
+            continue
+        entry = config.get(check.identity(item["path"], item["source"]), {})
+        if entry.get("not_source"):
+            continue
+        why = ("invalid on purpose" if entry.get("diagnostics") else
+               "source template" if any(k in entry for k in ("prefix", "suffix", "substitutions")) else
+               "format string" if item["path"].endswith(".rs") and ("{{" in item["source"] or "}}" in item["source"]) else
+               None)
+        if why:
+            left.append(f'{item["path"]}:{item["line"]}: left: {why}')
+            continue
+        items.append(item)
+    answers = migrate(binary, ctors, [i["source"] for i in items])
+    edits = {}
+    moves = {}
+    failed = []
+    counts = dict(converted=0, already=0)
+    for item, (kind, text) in zip(items, answers):
+        where = f'{item["path"]}:{item["line"]}'
+        if kind == "new":
+            counts["already"] += 1
+            continue
+        if kind != "old":
+            failed.append(f"{where}: FAILED: {kind}: {text}")
+            continue
+        host = item["host"]
+        if item["kind"] == "markdown":
+            fence = host[item["start"]:item["end"]]
+            head = fence[:fence.index("\n") + 1]
+            start = item["start"] + len(head)
+            end = start + len(item["source"])
+            new = text
+        else:
+            start, end = item["start"], item["end"]
+            literal = host[start:end]
+            encode = rust_encode if item["path"].endswith(".rs") else js_encode
+            # Keep a trailing line break only when the snippet had one.
+            if not item["source"].endswith("\n"):
+                text = text.rstrip("\n")
+            new = encode(literal, text)
+        counts["converted"] += 1
+        moves[check.identity(item["path"], item["source"])] = check.identity(item["path"], text)
+        edits.setdefault(item["path"], []).append((start, end, new))
+    for path, spans in edits.items():
+        text = (ROOT / path).read_text()
+        for start, end, new in sorted(spans, reverse=True):
+            text = text[:start] + new + text[end:]
+        (ROOT / path).write_text(text)
+    move_keys(moves)
+    for line in left:
+        print(line, file=sys.stderr)
+    for line in failed:
+        print(line, file=sys.stderr)
+    print(f'syn3-convert-embedded: {len(items) + len(left)} snippets in {len(edits)} files changed: '
+          f'{counts["converted"]} converted, {counts["already"]} in syntax three already, '
+          f'{len(left)} left (listed), {len(failed)} failed')
+    if failed:
+        sys.exit(1)
+
+
+def main():
+    args = sys.argv[1:]
+    if args[0] == "--snapshot":
+        snapshot(args[1])
+    elif args[0] == "--rekey":
+        rekey(args[1])
+    else:
+        convert(args[0], args[1:])
+
+
+if __name__ == "__main__":
+    main()

@@ -269,6 +269,12 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
     if crate::syn3::enabled() {
         return crate::syn3::parse_lisp_lowered(source);
     }
+    parse_source_legacy(source)
+}
+
+/// Parses a Lisp-surface file with the rows before syntax three, whatever the
+/// switch says (the migrator).
+pub fn parse_source_legacy(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
     match parse(source).and_then(|d| parse_module(&d).map_err(|e| vec![e])) {
         Ok(module) => (module, Vec::new()),
         Err(diags) => (crate::ast::Module::default(), diags),

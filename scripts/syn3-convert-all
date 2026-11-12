@@ -1,33 +1,72 @@
 #!/usr/bin/env bash
-# Converts lib, std, examples and tests to syntax three in place
-# (docs/design/syntax-3.md §7.2 stage 8), with `migrate-syntax3 convert --write`.
+# Converts the whole repository to syntax three in place (docs/design/syntax-3.md
+# §7.2 stage 8, §7.3): every tracked `.i` and `.is` file (lib, std, examples,
+# tests, bench, editors, crates/*/tests), then the i snippets in Rust and
+# JavaScript strings and Markdown fences (scripts/syn3-convert-embedded), then
+# the hand rewrites (scripts/syn3-hand-rewrites).
 #
-#   scripts/syn3-convert-all [ROOT]
+#   scripts/syn3-convert-all [--since REV]
 #
-# ROOT (default: the repository) is the directory that holds `lib`, `std`,
-# `examples` and `tests`; pass a scratch copy to try the conversion without
-# touching the tree. The migrator is built from this repository.
+# The conversion can run again on a newer tree: a file already in syntax three
+# is left as it is (see `migrate-syntax3 convert`). With `--since REV` (the
+# commit of an earlier conversion) only the files changed since REV and the new
+# files are read, which also settles the few texts that both syntaxes read to
+# different trees (`T = (A)` is an alias before and a labelled type after).
 #
-# After the conversion the tree is read with the transition switch:
-#   I_SYNTAX=3 I_SYNTAX3_LIB=ROOT/lib i check --project ROOT/std
+# Fails (exit 1, and says which) when a file cannot be converted and is not in
+# scripts/syn3-unconvertible.txt, the files that neither syntax reads (parse
+# error fixtures of the syntax before syntax three). The migrator's notes go to
+# target/syn3/notes.txt. The migrator is built from this repository, or taken
+# from $SYN3_MIGRATE.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
-root=$(cd "${1:-$repo}" && pwd)
+cd "$repo"
+since=
+if [ "${1:-}" = --since ]; then
+	since=$2
+	shift 2
+fi
 bin=${SYN3_MIGRATE:-}
 if [ -z "$bin" ]; then
-	(cd "$repo" && cargo build --release -p ilang-syntax --example migrate-syntax3)
+	cargo build --release --locked -p ilang-syntax --example migrate-syntax3
 	bin=$repo/target/release/examples/migrate-syntax3
 fi
-dirs=()
-for d in lib std examples tests; do
-	[ -d "$root/$d" ] && dirs+=("$root/$d")
-done
+out=$repo/target/syn3
+mkdir -p "$out"
 ctors=()
-for d in "${dirs[@]}"; do ctors+=(--ctors "$d"); done
-# Every `.i` and `.is` source; generated and vendored trees are left alone.
-mapfile -d '' files < <(find "${dirs[@]}" \( -name target -o -name node_modules -o -name .git \) -prune \
-	-o -type f \( -name '*.i' -o -name '*.is' \) -print0 | sort -z)
-"$bin" convert --write "${ctors[@]}" "${files[@]}" 2> "$root/syn3-convert-notes.txt" || true
-echo "converted ${#files[@]} files under $root; notes: $root/syn3-convert-notes.txt ($(wc -l < "$root/syn3-convert-notes.txt") lines)"
+for d in lib std examples tests bench editors crates; do ctors+=(--ctors "$d"); done
+mapfile -t files < <(git ls-files --cached --others --exclude-standard -- '*.i' '*.is' |
+	grep -v '^crates/ilang-binaryen/' | sort -u)
+if [ -n "$since" ]; then
+	declare -A changed=()
+	while IFS= read -r f; do changed[$f]=1; done < <(git diff --name-only "$since" -- '*.i' '*.is'; git ls-files --others --exclude-standard -- '*.i' '*.is')
+	keep=()
+	for f in "${files[@]}"; do [ -n "${changed[$f]:-}" ] && keep+=("$f"); done
+	files=("${keep[@]}")
+fi
+"$repo/scripts/syn3-convert-embedded" --snapshot "$out/keys.json"
+status=0
+if [ ${#files[@]} -gt 0 ]; then
+	"$bin" convert --write "${ctors[@]}" "${files[@]}" 2> "$out/notes.txt" || status=$?
+fi
+touch "$out/notes.txt"
+tail -n 1 "$out/notes.txt"
+"$repo/scripts/syn3-convert-embedded" --rekey "$out/keys.json"
+# The failures that are expected: files that neither syntax reads.
+grep -o '^[^:]*: FAILED' "$out/notes.txt" | sed 's/: FAILED$//' | sort -u > "$out/failed.txt" || true
+grep -v '^#' "$repo/scripts/syn3-unconvertible.txt" | sed 's/ .*//' | sort -u > "$out/expected.txt"
+unexpected=$(comm -23 "$out/failed.txt" "$out/expected.txt")
+if [ -n "$unexpected" ]; then
+	echo "syn3-convert-all: FAILED: files that cannot be converted (see target/syn3/notes.txt):" >&2
+	echo "$unexpected" >&2
+	grep -F -f <(echo "$unexpected") "$out/notes.txt" | grep FAILED >&2 || true
+	exit 1
+fi
+[ "$status" = 0 ] || [ -s "$out/failed.txt" ] || exit "$status"
+echo "syn3-convert-all: $(wc -l < "$out/failed.txt") files left as they are (scripts/syn3-unconvertible.txt)"
+"$repo/scripts/syn3-convert-embedded" "$bin" "${ctors[@]}" 2> "$out/embedded.txt" || {
+	grep FAILED "$out/embedded.txt" >&2
+	exit 1
+}
 # The hand rewrites (§7.3) that the migrator cannot do from the text.
-"$repo/scripts/syn3-hand-rewrites" "$root"
+"$repo/scripts/syn3-hand-rewrites" "$repo"

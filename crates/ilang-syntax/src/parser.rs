@@ -37,6 +37,13 @@ pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     if crate::syn3::enabled() {
         return crate::syn3::parse_lowered(source);
     }
+    parse_module_legacy(source)
+}
+
+/// Parses with the syntax before syntax three, whatever the switch says. Only
+/// the migrator (`examples/migrate-syntax3.rs`) and compiler-made text that is
+/// converted on the fly (`syn3::convert_source`) read it.
+pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
     let (module, diags, _) = run(source, true);
     (module, diags)
 }
