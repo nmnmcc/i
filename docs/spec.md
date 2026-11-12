@@ -3656,6 +3656,8 @@ runs. Initializers may have host side effects. Use function expressions to defer
 call. A retained declaration is available only on js and nodejs. On any other target, it is a compile error under §10.1.2.
 No initializer or synchronous bridge call may re-enter i. Callback re-entry is not defined.
 
+<!-- syn3-old -->
+
 #### 10.1.2 Foreign linking
 
 This rule defines acceptance and foreign initializer execution. Run it after ordinary type
@@ -3754,6 +3756,29 @@ constructor also gives no pruning. An uncalled closure referenced in retained
 code still retains its foreign reads. This loss is deliberate and predictable.
 A direct entry match remains expressible under the certified-entry rule.
 An ordinary environment-bound Target may hold a substituted value. It is not certified by its type or name, and helpers are not specialized.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+#### 10.1.2 Foreign linking
+
+This rule defines acceptance and foreign initializer execution. Run it after ordinary type checking, before optimization, with the same result at every optimization level. There is no per-input specialization, constructor propagation, constant folding, Boolean evaluation, type-directed branch elimination or implementation-chosen widening. There is exactly one branch-pruning rule below.
+
+The finite graph has one node for each ordinary binding's initializer, each source function body (each branch of a chain is one), and each foreign declaration. References are resolved lexical definition identities. Start with all ordinary top-level initializers and emitted entries, exports and tests. Scanning an initializer keeps §2.5: making a function does not scan its body. A reference to an existing binding, including a name bound to another name or a function passed as data, follows its definition and activates all function bodies syntactically contained in that definition. Scanning an activated body visits all expressions and guards, both sides of Boolean operators, and every branch except this section's sole pruning case. A function reached in an activated body is itself activated, even if it is never called. A non-direct initializer scans its nested function bodies too, since it may execute them. Reads of foreign declarations retain them.
+
+Iterate these fixed reference edges to the least fixed point. Every source body has one node shared by all callers; a second call adds no specialized copy. Recursion terminates by marking nodes once. References to bindings of data activate all functions in their definitions, not only a selected key. Higher-order parameters add no inferred callee set: all supplied functions are already activated where they are referenced, stored, returned or passed. This closed program cannot receive an i function from the host (§10.3). So an unknown function parameter cannot hide an unvisited source function. No function-value analysis or optimizer discovery changes this graph.
+
+**The only pruning case.** The platform provides `Target` (§9.7) at every entry, holding the member of `Target`'s data for the target being built. A subject is **certified** only when it is the name bound by `target: Target` in the service pattern of an emitted entry, or a lexical name made solely by `alias = certified_name` (a group does not change this). The entry binding must have **no source value reference anywhere in the compiled program**, including as a higher-order value or recursive call; its imports, exports and entry configuration are declarations, not references. So no i call can provide another `Target` to that body. A parameter, a function result, a key read, a constructor expression, a service pattern of any other function, and a `Target` provided by i code are unknown. There is no propagation through arguments or results.
+
+A function's direct lexical capture of a certified name or alias remains certified. A newly bound or covering name is a different definition and gains certification only through the alias rule. A provide of another `Target` does not change a name already bound; later functions that take `Target` from their caller see the provided value and are unknown. `keep` (§9.4) activates its argument by ordinary reference reachability and grants no certification to the services it keeps. These rules use lexical identity, not run-time analysis.
+
+For the source form `certified_name |> chain` (allowing a one-expression `{ }` group around the subject), omit a branch's guard and body only if its pattern is `Target(C(…))` or `Target(C)` for a resolved constructor `C` that is not the build's member, allowing patterns for the data of `C` and conjunctions with names. For alternatives, this must hold for **every** alternative; any other alternative prevents pruning. Compare resolved constructor identities, not names or target labels. `js` and `nodejs` have different members. A catch-all, a type test or any other pattern is retained. A guarded branch with the build's member is always possibly executed, even if its guard is literally `False`; later branches are retained too. No first-match or coverage reasoning removes any other branch. Calling a named chain, or passing the subject to a function, gives no pruning. Type-check all branches first. Suppressing an impossible branch's references does not remove the pattern-failure `Assert` behavior of a one-branch match, or any other source meaning. This rule changes no inferred need. The compiler keeps this source match until the analysis is done; matches introduced by an optimizer cannot gain certification.
+
+Every retained foreign declaration is initialized exactly once in §10.1.1 order, even if an optimizer removes its reads. An unretained declaration is never initialized. On an unavailable target a retained declaration is a compile error at its declaration and a requiring reference, never null or a late trap. Ordinary top-level `forced = foreign` always retains it. Two retained `@js("({})")` declarations produce distinct objects; reads of one keep its identity within its opaque type (§4.1, §11.4).
+
+Passing `Target` to a helper, taking it in a helper's service pattern, or making the matching constructor also gives no pruning. An uncalled function referenced in retained code still retains its foreign reads. This loss is deliberate and predictable. A direct entry match remains expressible under the certified-entry rule.
+
+<!-- /syn3-new -->
 
 The generated artifact and loader metadata are specified in §B.6.1. Host exports always use the fixed ABI conversions, never a dynamically replaced Js converter.
 
@@ -4221,6 +4246,8 @@ These are normal functions: they are called, given, and compared like any other 
 
 <!-- /syn3-new -->
 
+<!-- syn3-old -->
+
 ## 14. Macros and the Lisp surface
 
 ### 14.1 Two surfaces
@@ -4460,6 +4487,261 @@ A **compile-time binding** has `@macro`, or has a quote or a function of `i/synt
 
 An error in expanded code is reported at the span of the code; code from a template is reported at the macro call, with the template as a note. Warnings are given only for code whose span is in the module being compiled.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+## 14. Macros and the Lisp surface
+
+### 14.1 Two surfaces
+
+i has one **core tree** and two ways to write it. The **normal surface** is the syntax of §1 to §8, in files whose names end in `.i`. The **Lisp surface** writes the same core tree with brackets, in files whose names end in `.is`. A file uses one surface, chosen by the end of its name. A module path leaves out the extension; a module with both a `.i` and a `.is` file is a compile error. Imports, exports, dependencies and visibility mean the same in both surfaces, and a module written in one surface is used from the other with no difference.
+
+Two trees are **the same code** when they are equal after every group is removed. A `.is` file can be written as a `.i` file only when the normal surface can write its core tree; a quote and a macro definition have no normal spelling.
+
+A **macro** is an i function that runs in the compiler. It takes code as data and gives code as data. Macros are defined only in `.is` files and are used from both surfaces. A macro has no host services: it cannot read files, use the network or read the time, and it gives the same result for the same input on every machine.
+
+### 14.2 Tokens and datums
+
+The Lisp surface uses the tokens of §1 and two more symbols, `` ` `` and `~`. Documentation comments work as in the normal surface. The rule of lines (§1.7) is not used: every line end is a space. `,` does not separate parts; it is only the head of data, of a data type, of a data pattern, and of the imports and exports. Tokens are cut by the longest match (§1.5), so a space is needed where two tokens would be read as one, as between an integer and a `..` after it. After `.` in `(. e k)`, `k` is a `decimal`.
+
+```
+Datum   = Atom | Round | Square | Curly | Bits | Quote | Unquote | Splice .
+Atom    = name | discard | UpName | int_lit | float_lit | string_lit | Symbol .
+Round   = "(" { Datum } ")" .
+Square  = "[" { Datum } "]" .
+Curly   = "{" { Datum } "}" .
+Bits    = "<<" { Datum } ">>" .
+Quote   = "`" Datum .
+Unquote = "~" Datum .
+Splice  = "~" ".." Datum .
+Symbol  = (* a symbol of §1.5 that is not a bracket *) .
+```
+
+- A `.is` file is a list of datums. The **head** of a `Round` is its first part.
+- `~` followed by `..` is always a `Splice`.
+- An `Unquote` or a `Splice` may only be inside a `Quote`. A `Quote` may be inside a `Quote` only inside an `Unquote` or a `Splice` of the outer quote.
+- A datum is read by its **position**: import item, export item, item, attribute, type, data type item, function result, expression, data item, statement, pattern, data pattern item, bit array segment, or format. Each position admits the rows of §14.3 given for it. A datum that fits no row of its position is a compile error.
+
+### 14.3 How each form is written
+
+In these tables `e` is an expression, `p` a pattern, `T` a type, `R` a result type, `N` a named type, `x` and `a` names, `C` and `U` `UpName`s, `F` a function, and `…` zero or more of the thing before it.
+
+**Files and items**
+
+| Form | Normal surface | Lisp surface |
+|---|---|---|
+| Imports | `(a/b/c, x = a/b, (C, y) = a/b)` | `(, (/ a b c) (= x (/ a b)) (= (, C y) (/ a b)))` |
+| Exports | `(x, U, U(..))` | `(, x U (U ..))` |
+| Attribute | `@deprecated("old") Item`, `@m(e…) Item` | `(@ (deprecated "old") Item)`, `(@ (m e…) Item)` |
+| Labelled type | `U = (T1, x = T2)`, `U(A) = (A)`, `U = ()` | `(= U (, T1 (= x T2)))`, `(= (U A) (, A))`, `(= U (,))` |
+| Opaque type | `U = Opaque`, `U(A) = Opaque` | `(= U Opaque)`, `(= (U A) Opaque)` |
+| Name | `U = T`, `U(A) = T`, `U = { (T1, T2) }` | `(= U T)`, `(= (U A) T)`, `(= U { (, T1 T2) })` |
+| Binding | `p = e`, `x: T = e` | `(= p e)`, `(= (: x T) e)` |
+| Declaration | `x: T` | `(: x T)` |
+| Macro call as an item | `m(e…)`, `a.m(e…)` | `(m e…)`, `((. a m) e…)` |
+| Items from an expansion | none | `{ Item… }` |
+
+The `{ }` around the right side of a name whose right side is a data type is part of the item: it is kept in `Syntax`, so a macro can tell a name from a labelled type.
+
+**Types**
+
+| Form | Normal surface | Lisp surface |
+|---|---|---|
+| Union, intersection, difference | `A \| B`, `A & B`, `A - B` | `(\| A B)`, `(& A B)`, `(- A B)` |
+| Data type | `(T1, x = T2)`, `(T)`, `()` | `(, T1 (= x T2))`, `(, T)`, `(,)` |
+| Function type | `(T1, x = T2) -> R`, `() -> R` | `(-> (, T1 (= x T2)) R)`, `(-> (,) R)` |
+| Function type with a need | `(T) <- (Db, Log) -> R`, `(T) <- N -> R`, `(T) <- (..N, Db) -> R` | `(-> (, T) (<- R (, Db Log)))`, `(-> (, T) (<- R N))`, `(-> (, T) (<- R (, .. N Db)))` |
+| Polymorphic function type | `<A>(A) -> A`, `<A, N>(A) <- N -> A` | `(-> [A] (, A) A)`, `(-> [A N] (, A) (<- A N))` |
+| Function type with several shapes | `{ (T) \| (T, T) } -> R` | `(-> (\| (, T) (, T T)) R)` |
+| Named type, value type | `U`, `a.U`, `U(T)`, `x`, `a.x` | `U`, `(. a U)`, `(U T)`, `x`, `(. a x)` |
+| Literal type, hole, group | `"a"`, `1`, `-1`, `_`, `{ T }` | `"a"`, `1`, `(- 1)`, `_`, `{ T }` |
+| Macro call | `m(T, 3)` | `(m T 3)` |
+
+**Expressions and statements**
+
+| Form | Normal surface | Lisp surface |
+|---|---|---|
+| Name, member | `x`, `C`, `a.x` | `x`, `C`, `(. a x)` |
+| Call | `f(e1, x = e2)`, `f()`, `f(..e)` | `(f e1 (= x e2))`, `(f)`, `(f .. e)` |
+| Operators | `e1 + e2`, `-e`, `e \|> f` | `(+ e1 e2)`, `(- e)`, `(\|> e f)` |
+| Key | `e.x`, `e.0` | `(. e x)`, `(. e 0)` |
+| Data | `(e1, x = e2)`, `(e)`, `()`, `(..e, x = v)` | `(, e1 (= x e2))`, `(, e)`, `(,)`, `(, .. e (= x v))` |
+| List, bit array | `[e1, ..e2]`, `<<e1, e2: f>>` | `[e1 .. e2]`, `<<e1 (: e2 f)>>` |
+| Block | `{ s1  s2  e }` | `{ s1 s2 e }` |
+| Function | `(p1, x = p2) { e }`, `(p) -> R { e }`, `() { e }` | `(-> (, p1 (= x p2)) _ e)`, `(-> (, p) R e)`, `(-> (,) _ e)` |
+| Function with a service pattern | `(id: String) <- (db: Db) -> User { e }`, `(f) <- (..env: N) { e }` | `(-> (, (: id String)) (<- User (, (: db Db))) e)`, `(-> (, f) (<- _ (, .. (: env N))) e)` |
+| Function with type parameters | `<A, N>(x: A) -> A { e }` | `(-> [A N] (, (: x A)) A e)` |
+| Function with a guard | `(p1, p2 ? g) { e }` | `(-> (? (, p1 p2) g) _ e)` |
+| Chain, match | `F1 \| F2`, `e \|> F1 \| F2` | `(\| F1 F2)`, `(\|> e (\| F1 F2))` |
+| Provide | `e <- (s1, ..env)`, `app() <- live()` | `(<- e (, s1 .. env))`, `(<- (app) (live))` |
+| Quote | none | `` `d `` |
+
+**Patterns**
+
+| Form | Normal surface | Lisp surface |
+|---|---|---|
+| Type test or annotation | `x: T` | `(: x T)` |
+| Literal | `1`, `-1`, `"a"` | `1`, `(- 1)`, `"a"` |
+| String prefix, suffix | `"a" <> x`, `x <> "a"` | `(<> "a" x)`, `(<> x "a")` |
+| Constructor | `C`, `C(p1, x = p2)`, `C(p, ..)` | `C`, `(C p1 (= x p2))`, `(C p ..)` |
+| Data pattern | `(p1, x = p2)`, `(p, ..r)`, `()` | `(, p1 (= x p2))`, `(, p .. r)`, `(,)` |
+| List | `[p, ..x]` | `[p .. x]` |
+| Conjunction | `p1 = p2 = p3` | `(= p1 p2 p3)` |
+| Alternatives in a parameter item | `p1 \| p2` | `(\| p1 p2)` |
+| Quote pattern | none | `` `d `` |
+
+- In the position of an expression, `(-> …)` is a function: an optional `Square` of type parameters, the parameter data pattern, the result (`_` when no `->` part is written, or `(<- R needs)` with a service pattern), and the body, which is any one expression. In the position of a type, `(-> …)` is a function type. In an expression, `(<- e s)` is a provide.
+- `(| …)` in the position of an expression is a chain of two or more functions.
+- `(,)` is the empty data in the positions of values, types and patterns. The empty `()` has no position.
+- In the position of a data pattern item, `(= n …)` whose first part is a name is a labelled item: `n` is the label and the other parts are its pattern. So `(size = whole = (w, h))` is `(, (= size whole (, w h)))`, and `((a, b) = args)` is `(, (= (, a b) args))`.
+- `|`, `&` and `-` take two or more parts in a type. A string interpolation of the normal surface is written as the `<>` of its parts (§1.6).
+
+### 14.4 Code as data
+
+The module `i/syntax` exports these types:
+
+```i future-SYN3
+Syntax = Opaque
+TypeHandle = Opaque
+Node = (TypeView | Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)
+TypeView = (TypeHandle)
+Name = (String)
+Discard = (String)
+Up = (String)
+Symbol = (String)
+Text = (String)
+Round = (List(Syntax))
+Square = (List(Syntax))
+Curly = (List(Syntax))
+Bits = (List(Syntax))
+Quote = (Syntax)
+Unquote = (Syntax)
+Splice = (Syntax)
+SyntaxError = (message = String, at = Syntax)
+```
+
+`Position` is a name for the union of one labelled type with data `()` for each position of §14.2: `ImportItem`, `ExportItem`, `Item`, `Attribute`, `Type`, `DataTypeItem`, `FunctionResult`, `Expression`, `DataItem`, `Statement`, `Pattern`, `DataPatternItem`, `Segment` and `Format`.
+
+- A `Syntax` value is one datum with its span in a source file and its **scope** (§14.6). `Syntax` has no constructors: only the compiler, a quote and `make` give `Syntax` values. `TypeHandle` is a checked type that a typed macro query gives (§14.8); it is valid only in the position of a type.
+- The `Syntax` of a piece of code is the datum that the Lisp surface writes for it, also for code from a `.i` file. So the node of the argument `n > 0` is `Node(Round(…))` whose parts have the nodes `Node(Symbol(">"))`, `Node(Name("n"))` and `Node(0)`. `Int` and `Float` atoms are the built-in types in the union of `Node`.
+- A macro never sees a group: the compiler removes every group from the code it gives to a macro.
+- An atom is one token of its kind. A negative number is the `Round` `(- 1)`. `make` gives a `SyntaxError` for any other atom.
+- `==` on two `Syntax` values is `True` only for the same value; `same_code` compares code.
+
+| Function | Type | What it gives |
+|---|---|---|
+| `node` | `(Syntax) -> Node` | The node of the value |
+| `make` | `(Node, Syntax) <- (Fail(SyntaxError)) -> Syntax` | A new value with this node and the span and scope of `like` |
+| `same_code` | `(Syntax, Syntax) -> Bool` | `True` when the two are the same datum; spans and scopes are not compared |
+| `show` | `(Syntax) -> String` | The datum in the Lisp surface, on one line |
+| `show_as` | `(Syntax, Position) <- (Fail(SyntaxError)) -> String` | The code in the normal surface, read for this position |
+| `definition` | `(Syntax) <- (Definitions, Fail(SyntaxError)) -> Syntax` | §14.7 |
+
+**Quote.** A quote is written only in a `.is` file; the datum in it is a **template**. As an expression, `` `d `` gives the `Syntax` of `d`, with the scope of the module where it is written. Inside it, `~e` puts in the value of `e : Syntax`, and `~..e` puts in every member of `e : List(Syntax)`; `~..e` may only be a part of a bracket. As a pattern, `` `d `` matches a `Syntax` value: an atom matches a node of the same kind with the same text or value, a bracket matches the same bracket with the same number of parts, `~p` matches one part with `p`, and `~..p`, only as the last part of a bracket, matches the rest as a `List(Syntax)`. Spans and scopes are not compared. A quote pattern may fail.
+
+### 14.5 Syntax macros
+
+A **syntax macro** is a top-level binding in a `.is` file with the attribute `@macro` and no declaration of the same name. Its pattern is one name, its value a function expression whose parameter items are names, and the value must have a subtype of `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), Items) -> Syntax`, with one `Syntax` for each parameter. `@macro` in a `.i` file, and an item with `@macro` in the result of an expansion, are compile errors. A macro is exported and imported as a value is. Its name may only be used in the imports, in the exports, and as the macro of a macro call. A macro may not be used in the module that defines it; a call in a template is data, not a use.
+
+```lisp
+(, unless)
+(@ macro
+  (= unless
+    (-> (, cond body) _
+      `(|> ~cond (| (-> (, True) _ Nil) (-> (, False) _ ~body))))))
+```
+
+A **macro call** is written in these ways in both surfaces, where `m` is a name, or `a.m` with a module name `a`, that is a macro there:
+
+| Position | Written | Arguments | The result must be |
+|---|---|---|---|
+| Expression | `m(args)`, `e \|> m`, `e \|> m(args)` | Expressions, by position or label | An expression |
+| Item | `m(args)`, `a.m(args)` | Expressions | An item, or a `Curly` of zero or more items |
+| Before an item | `@m Item`, `@m(args) Item` | Expressions, then the item as the last argument | See below |
+| Type | `m(args)` | Types, integer literals and strings, with no labels | A type |
+
+- The parser does not know which names are macros, so arguments are read by the grammar of the position. Arguments are not worked out: the macro gets their `Syntax`. A labelled argument goes to the parameter item with that label. The number of arguments must be the number of parameters.
+- No macro call gives a statement or a pattern.
+- Before a type definition, the macro adds its result after the definition, which stays as written. Before a binding or a declaration, the result takes the place of the item. The item goes to the last parameter, with the attributes written after the macro. A built-in attribute may not be written before a macro. With several macros before an item, the first is expanded first.
+- A result may not contain imports, a quote, an unquote or a splice, or a `Curly` of items anywhere but at the top. `@external`, `@js` and `@host` may be in a result only when the whole attribute datum, with its arguments and its item, came unchanged from the caller's source through the arguments of each run, and at most once.
+
+**Expanding.** One call of a macro is one **run**. Expansion goes from the outside in, and the result is expanded again. A module is expanded in two steps: first the item macros, the macros before items and the type macros inside type definitions, until none is left; then the expression macros and the other type macros. After the first step every top-level name and type definition of the module is known, and the exports are checked. A module is expanded and checked after every module it imports, so a macro's module is done before the modules that use it.
+
+**Limits.** Each run has a fresh budget of 100,000,000 work units, 2^28 allocation words of eight bytes and 10,000 frame units, and expansions may be nested at most 256 deep. These are counted in units of the language, not of the machine; a package cannot change them. Going over a limit is a compile error at the call that names the macro and the limit. A `SyntaxError` from a macro is a compile error at the span of its `at`; a stop in a macro, also by a failure reported to `Assert`, is a compile error at the call.
+
+**Collected bindings.** During an item run the service `Items` of `i/syntax` is provided:
+
+```i future-SYN3
+Items = (
+  add = (Syntax, Syntax, List((String, String)), Syntax) <- (Fail(SyntaxError)) -> Nil,
+  expose = (Syntax) <- (Fail(SyntaxError)) -> Nil,
+)
+Diagnostics = (note = (String) -> Nil)
+```
+
+`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter group is `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
+
+### 14.6 Names in expanded code
+
+Every `Syntax` value has a scope: a module and a set of **marks**. Code read from a file of module `M`, and a template written in `M`, have the scope `M` with no marks. `make(node, like)` gives the scope of `like`. For each run the compiler makes a new mark; it adds the mark to the arguments and to every answer of `Definitions` or `Types`, runs the macro, and then flips the mark on every part of the result. So code from the arguments is as it was, and code the macro made has the mark.
+
+A name is looked up in this way:
+
+1. It is bound by the nearest binding around it with the same text and the same scope.
+2. Else, when it has no marks, it is a top-level, imported or built-in name of the module of its scope by the usual rules. A made name of another module reaches only exported names.
+3. Else, when it has marks, it is a top-level name that an expansion defined with the same text and scope in the module of the call; or else a top-level, imported or module name of the module of its scope, and then a built-in name. A made name reaches only exported names.
+
+Labels are compared by text only. Every rule that compares names (§2.2, §2.3, §4.3, §4.7, §6.11, §7.1) compares text and scope. A name defined by an expansion with marks may be used only by code of the same run; it cannot be exported, and it may not have the text of a top-level, imported or module name of the module of its scope. A name with no marks whose scope is another module may not be defined. An atom that came from an answer of `Definitions` or `Types` may not be a binder. Services and errors are found by type, not by name, so code from a template and code from the caller share services and error handlers as they would through an ordinary function.
+
+### 14.7 Asking for definitions
+
+```i future-SYN3
+Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
+```
+
+`definition(of)` gives the written type definition named by `of`, an `UpName` or `(. a U)`, with its attributes and parameters, as the `Syntax` of the item. A name bound by a type variable, a type of another module that is not exported or whose constructors are not exported, and a built-in type are `SyntaxError`s; `Bool`, `Nil`, `Result`, `Assert` and `AssertionFailure` give the definitions this document gives them. A value-dependent alias gives its written item. A name that is not found is a compile error at `of`. The definition of a binding cannot be asked for.
+
+In the first step of expansion, a definition of the module being expanded is given only when it is **ready**: written in the module with no macro call left in it. A run that asks for a definition that is not ready is put off and done again later as a new run. When every run left has been put off, they are done one at a time in source order, each answered from the module as it is then; at the end of the step each such answer is asked again of the complete module, and a different answer is a compile error naming the name and the two runs. Runs that wait for one another in a circle are compile errors. So the result does not depend on the order in which runs are done.
+
+### 14.8 Typed macros
+
+A **typed macro** is a declaration and a binding with one name in a `.is` file, both with `@macro`. The declaration is the **signature**: a full function type, with no `_`. The binding is the **implementation**: one `Syntax` parameter for each parameter of the signature, checked against `(Syntax, …) <- (Assert, Definitions, Fail(SyntaxError), Types) -> Syntax`. A typed macro is used only in the position of an expression. Its signature is written `(@ macro (: name T))`, as `(@ macro (: to_text (-> [A] (, A) String)))`.
+
+For type checking, a call of a typed macro is a call of a function with the signature's type: the types of the code around it never depend on what the macro gives, and whether a binding is a direct value and how it is generalized are decided before expansion. The calls of a group of bindings (§4.7) are expanded after the group is inferred, against one unchanged snapshot of its types. The result is checked against the instantiated signature without adding bounds to any type variable of the snapshot, and a result that cannot be proved to fit is a compile error at the call. A generic binding is expanded once, not once per instance.
+
+```i future-SYN3
+Yes = ()
+No = ()
+NotKnown = ()
+Truth = Yes | No | NotKnown
+
+Types = (
+  type_of = (Syntax) <- (Fail(SyntaxError)) -> Syntax,
+  signature = () -> Syntax,
+  subtype = (Syntax, Syntax) <- (Fail(SyntaxError)) -> Truth,
+  members = (Syntax) <- (Fail(SyntaxError)) -> List(Syntax),
+)
+```
+
+| Function | What it gives |
+|---|---|
+| `type_of(s)` | The type of `s`, an argument of this run or an expression or bound name inside one |
+| `signature()` | The type of the call as a function type |
+| `subtype(a, b)` | `Yes` when `a <: b` is proved, `No` when it is false and neither has a type variable, `NotKnown` otherwise |
+| `members(t)` | The members of `t` (§4.4); a member of `Int` or `String` with a finite value set gives one literal type per value |
+
+A type variable of the snapshot is given as an `Up` node with a scope of its own that only names that variable. A variable that occurs only in the result of the signature has no evidence, so a typed macro cannot choose by the type that its call is expected to have. A typed macro cannot delay an argument that has a need, and it cannot make items.
+
+### 14.9 Running macros
+
+The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` gives fixed numbers there. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
+
+A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full needs (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
+
+An error in expanded code is reported at the span of the code; code from a template is reported at the macro call, with the template as a note. Warnings are given only for code whose span is in the module being compiled.
+
+<!-- /syn3-new -->
+
 <!-- syn3-old -->
 
 ## 15. The module `i/record`
@@ -4586,7 +4868,16 @@ So for an export, the host makes the parameter buffers with `ilang_alloc`, frees
 - A call of `ilang_resume:…` with an id that is not outstanding, or that another function started, traps.
 - When the status is 1 and no request is outstanding, the program can never go on. This is a fault of the module, and the host does not use the instance again.
 - When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; a module made by this compiler has no outstanding request at that point.
+<!-- syn3-old -->
+
 - When the work of an async function fails in the host (not an error of its `^ E`, which is an answer), the host drops every outstanding request and does not use the instance again.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- When the work of an async function fails in the host (not an error raised through its `Fail`, which is an answer), the host drops every outstanding request and does not use the instance again.
+
+<!-- /syn3-new -->
 - While an async entry point is waiting or runnable, the host may only call `ilang_resume:…`, `ilang_continue`, `ilang_alloc`, and `ilang_free`. So an instance runs one async entry point at a time. The module does not check every export for this; a host that calls another export breaks the instance.
 - When the program stops, the export traps after the `panic` import (§B.4). After a trap, the host may not use that instance of the module again. Every outstanding request is dropped, and an answer that comes later is ignored. The host makes a new instance and calls `ilang_start` on it.
 
@@ -4616,7 +4907,16 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 - `version` is 3. A host refuses a module with another version, so a module of an older version must be built again. Version 3 differs from version 2 in these ways: an async function has a request id; status 1 means one or more outstanding requests, not exactly one, and the host may answer them in any order; status 2 and the export `ilang_continue` are new, and `ilang_continue` is a reserved export name; the runtime import `cancel` is new; outstanding requests are dropped when the entry point ends, on a trap, and when the work fails in the host; and an async function may only be called during an async entry point, a resume or `ilang_continue` (§B.4). A runtime import, status or export that a host must handle is added only with a new version.
 - Type names are `nil`, `bool`, `int`, `float`, `string`, `bit_array`, and `externref`. `errors` is in the canonical order (§B.2).
 - `entry` names the selected function by its module path and function name, not its `[entries]` key. It is `null` when there is no selected entry. Only that entry is emitted as the program entry; unselected declarations do not add ABI exports. The JavaScript SDK uses this metadata entry. The ABI version and shape stay unchanged. `tests` is empty unless tests were compiled.
+<!-- syn3-old -->
+
 - `services` lists every required host-registration function left by the chosen provider graph, and `externals` every required external function. A service supplied internally by an ordinary provider is not a required host import. Entry async flags and status/result exports follow §10.2, before linking and optimization.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- `services` lists every required host-registration function of the host services that the platform provides to the entries, and `externals` every required external function. A host service that i code provides is not a required host import. Entry async flags and status/result exports follow §10.2, before linking and optimization.
+
+<!-- /syn3-new -->
 - The host must give every import in `services`, `externals`, and `ilang:host/v1` before it makes an instance of the module. If not, making the instance fails.
 - A module of the WASI target (§B.7) also has `"target": "wasi"`. JS targets have `"target": "js"` or `"target": "nodejs"` (§B.6.1). Host modules have no `target`. A host of this appendix does not run a module with a `target`.
 
