@@ -242,7 +242,7 @@ impl ScopedSource {
                         4 + bytes.div_ceil(8),
                     )?;
                 }
-                Node::Float(_) => charge(32, 8)?,
+                Node::Float(_) | Node::TypeView(_) => charge(32, 8)?,
             }
         }
         Ok(())

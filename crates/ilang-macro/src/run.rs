@@ -55,7 +55,7 @@ impl std::fmt::Display for CompileError {
 }
 impl std::error::Error for CompileError {}
 
-/// Compile compiler-generated Syntax wrappers from an already expanded import
+/// Compiles compiler-generated Syntax wrappers from an already expanded import
 /// closure. This uses the ordinary checker and emitter, but checks the selected
 /// wrappers under compiler capabilities rather than ordinary entry authority.
 pub fn compile(
@@ -85,7 +85,7 @@ pub fn compile(
     graph.entry = None;
     // Compiler wrappers install the sandbox capabilities lexically. Runtime
     // target plans belong to the user program, not this separate compiler
-    // program and its deliberately restricted import closure (§8).
+    // program and its deliberately restricted import closure.
     for package in &mut graph.packages {
         package.provider_plan = Default::default();
     }
@@ -136,7 +136,7 @@ pub fn compile(
     Ok(result)
 }
 
-/// Invoke a compiler-generated export whose ABI takes and returns Syntax.
+/// Invokes a compiler-generated export whose ABI takes and returns Syntax.
 ///
 /// The compiler must check the export's signature and its reachable external
 /// declarations before constructing `built`; the host also validates the ABI
@@ -146,7 +146,7 @@ pub fn invoke(built: &MacroProgram, export: &str, arguments: &[Syntax]) -> Resul
     invoke_with_templates(built, export, arguments, std::sync::Arc::from([]))
 }
 
-/// Invoke with this compiled program's source-located quote templates. The
+/// Invokes with this compiled program's source-located quote templates. The
 /// table belongs to this fresh instance and is never shared with another run.
 pub fn invoke_with_templates(
     built: &MacroProgram,
@@ -199,7 +199,7 @@ pub enum RunOutcome {
     Stopped(ilang_host::Stop),
 }
 
-/// Execute a compiler entry with per-run definition state and templates.
+/// Executes a compiler entry with per-run definition state and templates.
 pub fn invoke_with_context(
     built: &MacroProgram,
     export: &str,
@@ -210,7 +210,7 @@ pub fn invoke_with_context(
     invoke_with_items(built, export, arguments, templates, context, None)
 }
 
-/// Execute with an item journal for an item-position run. The driver commits
+/// Executes with an item journal for an item-position run. The driver commits
 /// its requests and buffered notes only after the result has been validated.
 pub fn invoke_with_items(
     built: &MacroProgram,
@@ -231,7 +231,7 @@ pub fn invoke_with_items(
     )
 }
 
-/// Execute with a budget shared with the compiler-side definition resolver.
+/// Executes with a budget shared with the compiler-side definition resolver.
 pub fn invoke_with_items_budget(
     built: &MacroProgram,
     export: &str,

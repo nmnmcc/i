@@ -148,7 +148,7 @@ enum Command {
     Package(commands::package::PackageCommand),
     /// Run the language server, on standard input and output.
     Lsp,
-    /// Format source files; by default every `.i` file in `src/` and `test/`.
+    /// Format source files; by default every `.i` and `.is` file in `src/` and `test/`.
     Fmt {
         #[arg(long, default_value = ".")]
         project: PathBuf,

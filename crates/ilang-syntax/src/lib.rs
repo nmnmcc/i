@@ -10,7 +10,6 @@ pub mod lexer;
 pub mod lisp;
 pub mod parser;
 #[doc(hidden)]
-pub mod parser_legacy;
 pub mod print;
 #[doc(hidden)]
 pub mod shape;
@@ -171,4 +170,5 @@ impl Diagnostic {
     }
 }
 
-mod walk;
+#[doc(hidden)]
+pub mod walk;

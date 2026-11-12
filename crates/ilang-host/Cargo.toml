@@ -28,7 +28,7 @@ rustls-pemfile = "2.2.0"
 [features]
 default = ["compiler"]
 # Compile Wasm with Cranelift: `Program::from_bytes` and native packaging.
-compiler = ["wasmtime/cranelift", "wasmtime/parallel-compilation"]
+compiler = ["wasmtime/cranelift", "wasmtime/parallel-compilation", "wasmtime/incremental-cache"]
 
 [dev-dependencies]
 tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "test-util", "net"] }

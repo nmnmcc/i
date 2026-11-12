@@ -13,7 +13,7 @@ function build(name) {
   execFileSync(cli, ['build', '--target', 'host', '--project', project], { cwd: root, stdio: 'pipe' });
   return resolve(project, 'build', name.replaceAll('-', '_') + '.wasm');
 }
-for (const name of ['io-clock', 'io-fs', 'io-net', 'io-process', 'io-tls']) {
+for (const name of ['io-clock', 'io-fs', 'io-net', 'io-udp', 'io-process', 'io-tls']) {
   test(name, { timeout: 120000 }, () => {
     const wasm = build(name);
     const output = execFileSync(process.execPath, [runner, wasm, ...(name === 'io-process' ? ['--', 'alpha', 'beta'] : [])], { cwd: root, encoding: 'utf8', timeout: 100000 });

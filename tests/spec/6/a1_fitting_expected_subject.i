@@ -9,7 +9,7 @@ single: (Int) -> Int ! Assert = { 0 -> 7 }
 
 main = () {
   assert(get(Some(User("Ada"))) == "Ada")
-  assert((u) { u.name } |> { f: (User) -> String -> f(User("Bob")) } == "Bob")
+  assert({ (u) { u.name } |> { f: (User) -> String -> f(User("Bob")) } } == "Bob")
   assert(single(0) == 7)
   Nil
 }

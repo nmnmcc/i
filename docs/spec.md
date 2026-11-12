@@ -65,7 +65,7 @@ char    = (* any Unicode scalar value but '"' and "\" *) .
 
 i has no keywords. Every word is a `name`, an `UpName`, or a discard (§1.3), and any `name` may be used as a name. The forms that other languages make with keywords are made with brackets and symbols: imports and exports are groups at the start of a file (§2.2), matching is a call of a clause block (§6.12), and a guard is written with `?`.
 
-Some forms are kept for macros, which are not yet part of i: an attribute that is not built in, such as `@m` or `@m(args)` before an item (§2.2); a top-level item that is a call, `m(args)` or `a.m(args)` (§2.2); a declaration with neither `@external` nor `@js` (§2.2); and, in a type, a lowercase name or `a.m` followed by `(` (§3). The parser reads each of them in full, and each is a compile error whose message says that the form is kept for macros.
+Macros (§15) use attributes, top-level calls, expression calls and lowercase calls in types. A syntax macro expands before inference. A typed macro has a declared function signature and expands at the inference group boundary (§15.7). These forms do not introduce keywords or change parsing.
 
 ### 1.5 Symbols
 
@@ -132,6 +132,23 @@ From this rule:
 
 One rule does not depend on lines: in the `->` part of a function, after the `)` of its parameters, a `{` right after `->`, `^`, `!`, `|`, `&`, or `-` is part of the type (§3). The first other `{` that is not inside brackets begins the body.
 
+`i fmt` formats `.i` and `.is` source files in their own surface, including
+both extensions by default in `src/`, `test/` and given directories;
+`--check` reports files that would change. Both surfaces use 80 columns. The
+normal surface indents with one tab per level. The Lisp surface is laid out
+by Lisp convention (cljfmt indentation): a datum that fits stays on one
+line; closing brackets never begin a line and are gathered at the end of the
+form's last line; indentation is with spaces. A broken block-like form (`=`,
+`->`, `|`, `.`, `@`, `:`, `!`) keeps its head and distinguished first parts
+on the head line and indents its body two spaces; another call either keeps
+its first argument on the head line and aligns the others under it, or puts
+its arguments under the head, one space in; `{`, `[` and `<<` align their
+parts under the first. Reader prefixes stay attached, strings are not split,
+comments keep their place (a line comment before closing brackets moves them
+to the next line), and at most one existing blank line separates top-level
+items. A single indivisible atom, string or comment may exceed the width.
+`i fmt --to is` uses that same layout.
+
 ## 2. Modules
 
 ### 2.1 Packages and modules
@@ -185,13 +202,13 @@ A file has at most one imports group and at most one exports group. They come fi
 
 An item that is a `name`, with or without type parameters (§2.5), then `:` and a type, with no `=` after the type, is a declaration, whatever its attributes. Any other item that starts with an `UpName` is a type definition (§4.3). An item that is a call, `m(args)` or `a.m(args)`, with no `=` or `:` after its `)`, is a `MacroItem`. Every other item is a binding (§2.5).
 
-A `MacroItem` is kept for macros. It is a compile error, and the message says that a call at the top level is kept for macros.
+A `MacroItem` invokes an imported syntax macro (§15). A typed macro is not valid in item position.
 
-A declaration requires `@external` or `@js` (§10.1), or expansion by a macro. A declaration with neither attribute is kept for macros, where it goes with a binding of the same name. Until that expansion is defined, it is a compile error, and the message says that the declaration is kept for macros.
+A declaration requires `@external` or `@js` (§10.1), expansion by a syntax macro, or the `@macro` signature and implementation pair of §15.7. A declaration with none of these is a compile error.
 
 In one module, every top-level name is defined one time only. Two bindings may not bind the same name, two type definitions may not define the same type, and two constructors may not have the same name. A constructor and a top-level binding may not have the same name either, because they are in one space of names (§2.3).
 
-These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels,. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, is a compile error. Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, is a macro before an item. It is kept for macros, and it is a compile error whose message says so. An attribute in another place, or one attribute given two times on one item, is a compile error.
+These are the attributes. An attribute whose name is one of them, with no module name before it, is that attribute. Its arguments must be string literals, given by position, with no labels,. Any other argument, such as `@external("env" <> "", "f")`, `@external(module: "env", "f")`, is a compile error. `@macro` marks a macro definition in a `.is` module (§15). Any other attribute, such as `@m`, `@m(args)`, or `@a.m(args)`, invokes an imported syntax macro before an item (§15). An attribute in another place, or one attribute given two times on one item, is a compile error.
 
 - `@js("expression")`: on a declaration of a closed opaque type (§10.1.1). A declaration cannot have both `@js` and `@external`.
 - `@external("module", "function")`: on a declaration (§10.1). The module may not start with `ilang:`, which is kept for the runtime (§B.4).
@@ -264,7 +281,7 @@ A binding whose pattern is one name, with or without a type, may declare type va
 
 An item that starts with `name ( UpName { , UpName } )` and then `=` or `:` is always a binding or a declaration with type parameters. It is never a binding with a constructor pattern, though `f(A)` could also be read as one (§7.1). So `wrap(A) = (x: A) { Some(x) }` declares `A`. The same is true for a statement of a block (§6.1).
 
-An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, is not a binding. It is kept for macros (§2.2).
+An item that is a call, `m(args)` or `a.m(args)`, and has no `=` or `:` after its `)`, invokes an imported syntax macro (§15).
 
 An item `name [ TypeParams ] : Type` with no `=` after the type is a declaration, whatever its attributes. A declaration requires `@external` or `@js`, or expansion by a macro (§2.2). A `@js` declaration has the closed opaque type and foreign link semantics of §10.1. It is initialized once during start only if retained by the target link pass; ordinary bindings retain this section's initialization rules.
 
@@ -610,7 +627,7 @@ Label      = name | string_lit | UpName .
 - A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `^` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
 - A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
 - A value type, directly or through aliases, may not occur in a custom constructor field, an external or host declaration, or a service/environment type. Those types must be complete before inference.
-- A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is kept for macros, and is a compile error. It is in the grammar, so a type with it is read in full, and the error says that it is kept for macros.
+- A lowercase `name`, or `a.m` with a lowercase `m`, followed by `(` is a `TypeCall`. It invokes a syntax macro (§15). A typed macro cannot be used in a type.
 - `A | B` is a union, `A & B` is an intersection, and `A - B` is a difference (§4.4). `-` is stronger than `&`, and `&` is stronger than `|`.
 - `( … )` with `->` after it is a function type. Without `->`, a first `..` or label followed by `:` selects a record type; other nonempty contents select a positional tuple type. Empty `()` is a compile error suggesting `Record`. A record parameter type needs nesting: `((a: Int)) -> T`; `(a: Int) -> T` has one Int parameter labelled `a`.
 - A parameter of a function type may have a label: `(in: String, each: String) -> String` (§4.6).
@@ -638,7 +655,7 @@ A **member** of a type (§4.4) is a type constructor, its type arguments, and a 
 
 ### 4.2 Built-in types
 
-These types may be used in every module:
+These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. The prelude custom types may be named through `i/prelude`.
 
 | Type | Values |
 |---|---|
@@ -995,13 +1012,13 @@ Operators are part of the syntax. They are not functions, and they may not be us
 
 | Level | Operators | Operand type | Result type |
 |---|---|---|---|
-| 1 | `\|\|` | Bool | Bool |
-| 2 | `&&` | Bool | Bool |
-| 3 | `==` `!=` | Any two types; see below | Bool |
-| 4 | `<` `<=` `>` `>=` | Int | Bool |
-| 4 | `<.` `<=.` `>.` `>=.` | Float | Bool |
-| 5 | `<>` | String | String |
-| 6 | `\|>` | See below | |
+| 1 | `\|>` | See below | |
+| 2 | `\|\|` | Bool | Bool |
+| 3 | `&&` | Bool | Bool |
+| 4 | `==` `!=` | Any two types; see below | Bool |
+| 5 | `<` `<=` `>` `>=` | Int | Bool |
+| 5 | `<.` `<=.` `>.` `>=.` | Float | Bool |
+| 6 | `<>` | String | String |
 | 7 | `+` `-` | Int | Int |
 | 7 | `+.` `-.` | Float | Float |
 | 8 | `*` `/` `%` | Int | Int |
@@ -1013,9 +1030,9 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 - Int and Float have different operators. One is never changed into the other without a function such as `core.to_float` (§13).
 - `a |> f` is `f(a)`, and `a |> f(b, …)` is `f(a, b, …)`. The right side of `|>` must be a name, a call, a function, or a clause block.
-- `|>` is weaker than `+` and stronger than the operators of levels 1 to 5: `||`, `&&`, `==`, `!=`, comparisons, and `<>`. So the left side of `|>` that is made with those operators is put in a group: `{ a == b } |> { True -> …  False -> … }`.
+- `|>` is the weakest operator, below `||`, and goes from left to right. Its whole left expression is its left operand: `a == b |> f` is `{ a == b } |> f`, and `a |> f |> g` is `{ a |> f } |> g`. Its right side is made with stronger operators only, so `x |> g == 2` is a compile error; the group is written: `{ x |> g } == 2`.
 - `e |> { … }`, where the right side is a clause block, is a match (§6.12).
-- A match is an operation at level 6, so an operator of level 7 or 8, `.f`, `.k`, or a call after the clause block is part of the right side: in `n |> { 0 -> 1  _ -> 2 } * 10`, the right side is `{ 0 -> 1  _ -> 2 } * 10`, and in `opt |> { … }.name`, it is `{ … }.name`. In the same way, the left side of `1 + n |> { … }` is `1 + n`, as in `{ 1 + n } |> { … }`, and the left side of `-n |> { … }` is `-n`. So a match that is an operand of such an operator or of `-` or `-.`, or that has `.f`, `.k`, or a call after it, is put in a group: `{ n |> { 0 -> 1  _ -> 2 } } * 10`, `1 + { n |> { … } }`, `-{ n |> { … } }`, `{ opt |> { … } }.name`.
+- A match is an operation at level 1, so an operator, `.f`, `.k`, or a call after the clause block is part of the right side: in `n |> { 0 -> 1  _ -> 2 } * 10`, the right side is `{ 0 -> 1  _ -> 2 } * 10`, and in `opt |> { … }.name`, it is `{ … }.name`. In the same way, the left side of `1 + n |> { … }` is `1 + n`, as in `{ 1 + n } |> { … }`, and the left side of `-n |> { … }` is `-n`. So a match that is an operand of such an operator or of `-` or `-.`, or that has `.f`, `.k`, or a call after it, is put in a group: `{ n |> { 0 -> 1  _ -> 2 } } * 10`, `1 + { n |> { … } }`, `-{ n |> { … } }`, `{ opt |> { … } }.name`.
 - When both sides of `==` or `!=` have known types (§4.8), and these are disjoint (§4.5 rule 3), the compiler gives warning W0503, showing both types: the two sides can never be equal. The comparison is well defined and has type `Bool`: `==` is always `False` and `!=` is always `True`. A member of a known type that is `_` or a type variable is never disjoint from anything. Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s: String) { s == 1 }` give the warning, but `(s: String) { s == "a" }`, `(m: "a" | "b") { m == "b" }`, `x == Nil` with `x: Int | Nil`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` do not. Only the top members of the two types are compared (§4.5 rule 3), so `(1, 2) == (3, 4)` and `Some(1) == Some(2)` give no warning, though they are always `False`. Literal types are not widened. The warning adds no narrowing fact. A clause guard `? x == 2` with `x: 1` is always false; coverage treats it as any guard (§7.4). What `==` does is in §11.4.
 
 ### 6.10 Blocks and bindings
@@ -1474,7 +1491,9 @@ The process module separates its capabilities as follows, keeping its existing o
 
 The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
-`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`; UDP is not in v1.
+`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`. UDP datagrams are part of `i/net`: `bind(address, port)` returns a private nominal `Datagram` over Int, `send_to(socket, address, port, bytes)` sends one datagram, and `receive_from(socket, max_bytes)` returns `(data: BitArray, address: String, port: Int)` with the numeric sender address and port. `local_address(socket)` and `local_port(socket)` return the bound numeric address and port; `close_datagram(socket)` closes it. Bind accepts IPv4, IPv6 and host names; port 0 asks the OS to choose a port. Send accepts a numeric address or host name and port 1..65535; addresses are resolved and tried in system order as for TCP. Receive requires a positive bound, capped at 65536 bytes; it consumes exactly one datagram and discards any excess bytes. An empty datagram is data, not EOF. Sends require whole bytes and are atomic; expected host failures give `NetError` values through the ordinary error axis. UDP provides no delivery or ordering guarantee.
+
+Datagrams follow TCP's resource identity, owner, creation guard, teardown and lease rules (native N9). One send and one receive may overlap; a second operation in the same direction gives `busy`. Close is idempotent and error-free and wakes a blocked receive with `closed` unless its answer already committed. Scope cancellation cancels an owned blocked receive and releases its lease, leaving the socket usable until close or entry teardown. The Rust host uses tokio and Node uses `node:dgram`; browser and WASI have no Net provider and compilation fails naming `i/net.Net`. No automatic unsupported provider is installed.
 
 ### 9.8 Keys
 
@@ -2182,8 +2201,13 @@ These ordinary functions use the services described in §9.7; their definitions 
 
 | Function | What it does |
 |---|---|
+| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). |
+| `send_to` | Send one datagram to an address and port. |
+| `receive_from` | Receive one datagram and its sender address and port. |
+| `local_address` | Read a datagram socket's numeric local address. |
+| `close_datagram` | Close a datagram socket. |
 | `listen` | Listen for TCP connections. |
-| `local_port` | Read the listener’s local port. |
+| `local_port` | Read a listener or datagram socket’s local port. |
 | `accept` | Accept a TCP connection. |
 | `connect` | Connect to a host and port. |
 | `resolve` | Resolve a host name to addresses. |
@@ -2516,6 +2540,8 @@ These are normal functions and types. The modules `i/fail` (§9.3), `i/control` 
 
 ## 13. The module `i/core`
 
+The module exports the built-in types `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`, `Record`, `Boundary`, `Continuation`, `Key`, `Keyed`, `Request`, and `Ticket`. These are the same types as the unqualified built-in names.
+
 These are normal functions: they are called, given, and compared like any other function. Only their bodies are not written in i. Most of them do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). Some, such as `index_of` and `bit_array_concat`, could be written in i, but the runtime does them much faster. They have no errors and need no environment.
 
 | Function | Type | What it gives |
@@ -2564,6 +2590,219 @@ These are ordinary library functions, using the label parameters of §4.9.4. The
 | `texts` | `(r: Record) -> List((String, String))` | Each label with its value's text form (§11.8), sorted by label bytes |
 
 There is no `empty` function: `()` is the empty record. `has` and `keys` do not change any type. There is no operation returning all fields as values of one type: fields may have different types. Code that knows their types reads them by label; code that shows them uses `texts`.
+
+## 15. Metaprogramming
+
+A module has one surface: the normal surface in `.i`, or the Lisp surface in
+`.is`. Both represent the same core syntax. Lisp datums use symbol heads for
+core forms; they do not introduce keywords. Quote, unquote and splice produce
+scoped `i/syntax.Syntax` values. Macros are ordinary immutable i functions
+executed by the compiler. A macro is imported and cannot be called in its own
+module. Lexical bindings shadow imported macro names.
+
+A syntax macro has one `@macro` binding in a `.is` module. Its implementation
+takes Syntax arguments and returns Syntax, with `SyntaxError`, `Definitions`
+and `Assert`; item-position runs also receive `Items`. Expression and type
+results expand outside-in before ordinary name resolution and inference.
+Item runs finish before body runs. Expansion preserves argument scopes,
+binding identities and source origins; fresh run marks keep template binders
+apart. Item contributions and export requests commit only after successful
+validation. The definition-query and collection contracts are specified in
+`docs/design/meta.md` §§3–6.
+
+A macro program has no host services, executable JS, or foreign external
+functions outside package `i`. Each invocation starts a fresh sandbox with
+fixed logical work, memory and depth limits (meta §§4.4, 8). It receives only
+compiler syntax services and its explicit implementation arguments. Macro code
+and compiler queries are erased from a runtime program. Normal library runtime
+helpers referenced by expansions remain ordinary dependencies.
+
+### 15.7 Typed macros
+
+#### 15.7.1 Defining
+
+A **typed macro** is a declaration and a binding with the same name in a `.is` file, both with `@macro`:
+
+```lisp
+// my/text.is
+(,
+  (= (, type_of subtype Yes No NotKnown SyntaxError) (/ i syntax))
+  (= (, raise) (/ i fail)))
+(, to_text)
+
+(= int_text (-> ((: n Int)) String …))
+
+(@ macro (: (to_text A) (-> ((: value A)) String)))
+
+(@ macro
+  (= to_text (-> (value) _ {
+    (= t (type_of value))
+    (| (subtype t `Int) {
+      (-> Yes `(int_text ~value))
+      (-> _ (| (subtype t `String) {
+        (-> Yes value)
+        (-> NotKnown (raise (SyntaxError "to_text: the type is not known here" value)))
+        (-> No (raise (SyntaxError "to_text: this type has no text form" value))) })) }) })))
+```
+
+- The declaration is the **signature**. It is a full function type, with its type variables declared after the name. It may have errors and an environment. It may not have `_`. The rules for written types (spec §4.4) and for types in exported items (spec §2.4) are used for it.
+- The binding is the **implementation**. It follows the rules of §4.1, with these changes: it has one parameter for each parameter of the signature, in the same order, and it is checked against `(Syntax, …) -> Syntax ^ SyntaxError ! Types | Definitions | Assert`.
+- This is the only case where two items have one name. The declaration has neither `@external` nor `@js`; both surfaces read it as a declaration by its form (syntax.md §2.2 and §2.5 read `name [TypeParams] : Type` with no `=` as a declaration whatever its attributes, and keep the one with neither `@external` nor `@js` for macros).
+- The documentation comment of the macro is on the declaration.
+
+#### 15.7.2 Checking a call
+
+A typed macro is used only in the position of an expression, written as in §4.3. For type checking, the call is a call of a function with the type of the signature:
+
+- The arguments are checked as the arguments of that function. Labels, expected types (spec §4.8), and `|` work as for a function.
+- The call has the result type, the errors, and the environment of the signature, with its type variables filled in by inference as for any call. The errors and the environment of the arguments are part of the call, as for any call, also when the macro does not use an argument.
+- So the types of the code around the call depend only on the signature, never on the result of the macro. Whether a binding is a direct value, and how it is generalized (spec §4.7, §6.10), are decided before any typed macro is expanded.
+
+#### 15.7.3 Expanding
+
+**T1. Barrier.** Infer the binding SCC once, with typed calls represented by
+their declared signatures. Complete its T2 reads and retain its ordinary
+constraints and obligations. If it has an error, expand none of its typed
+calls. Save this graph as an immutable snapshot. Expand outer calls before
+inner calls; independent calls all see this same snapshot. This uses the
+existing spec §4.7 group boundary, not source order among independent groups.
+
+**T2. Observation.** A caller variable is *closed* if it is local to this SCC,
+not generalized, and unreachable in either direction through bounds and
+obligations from any published scheme, declared variable, generalized variable
+or non-generalized top-level value. Every other variable is *fixed*. For query
+presentation only, count a closed variable's polarities across all parts of
+the instantiated signature: each argument type, result, error row and service
+row starts in an output place. If every occurrence is positive, substitute
+the union of its lower bounds (Never if none); if every occurrence is negative
+and upper bounds exist, substitute their intersection. Otherwise keep one
+opaque variable identity. Do not fabricate a universal top for an empty
+intersection. Invariant service/record/nominal arguments retain identity.
+Apply one substitution consistently to `signature` and `type_of`; never
+replace the same variable differently at separate occurrences. Unrelated
+expression queries use the same rule with their root in an output place.
+This is not the shortened display type and not a solver mutation.
+
+**T3. Validation.** Freeze *all* variables of
+the snapshot, including closed ones, and its T2 fixation state. Only fresh variables allocated for the result may acquire bounds. Validate
+against the original instantiated signature and the closed components exposed
+by T2. A result-only variable therefore cannot guess a value from a contextual
+upper bound. This is the conservative implementation of the ledger's GM5.
+
+Use a disposable solver transaction for the result. Preserve complete argument
+nodes as checked holes with their original inferred types, expected types,
+resolved binding identities and obligations. Rebuilt or partial argument code
+is checked anew, but its original names retain their resolved meaning. Neither
+capture of an argument's already resolved free name nor escape of a binder's
+use outside that binder is allowed. No caller scheme or obligation changes
+when the transaction commits. Commit only checked output code and facts for
+new nodes. Later callers still see the signature, even if output is narrower
+or arguments disappear. Error and environment rows also remain those of the
+signature plus the original argument evaluation, as in §15.7.2.
+
+**T4. Rigid proof rule.** Reuse ordinary closed subtyping, including exact T3
+U3/U4 proofs. An obligation involving a frozen variable is proved from the
+snapshot; it is never solved by adding a bound to that variable. For `a <: T`,
+first accept reflexivity or a recorded transitive frozen-variable edge. Then
+try the intersection of non-variable upper bounds reachable from a through
+frozen upper edges. For `T <: a`, use the dual union of reachable non-variable
+lower bounds (Never when none). Keep shared variable identities inside these
+bounds. No upper bounds means “not proved”, not a top value. Direct edges to a
+fresh variable add bounds only to that fresh variable; ordinary decomposition
+then proves any remaining obligations. In particular `a <: r - U` also needs
+the ordinary difference/disjointness proof: it is not proved just by `a <: r`.
+
+The proof worklist memoizes completed goals, never an in-progress goal as
+success. A repeated unguarded rigid goal is “not proved”; it is not evidence
+for a recursive type. Reject the expansion when a required proof is not
+established. Branch trials use isolated transactions; no failed trial leaks
+bounds. T3 proof-budget exhaustion remains E0546, not No. This deliberately
+conservative decision procedure may refuse a valid macro implementation; it
+does not change principal inference of ordinary source or guess among caller
+solutions.
+
+**T5. Dependencies.** New runtime value references must be in the SCC or its
+strict ancestor dependency groups, or completed imported modules. A new
+reference to an unrelated same-module group is rejected regardless of the
+order the checker happened to visit it. Pure type definitions available at
+module start are allowed. For value-dependent aliases all same-module sources
+must be strict ancestors and imported sources must be completed. New direct
+value-type reads are E0531, even local ones. Add no T2 demands or fixation
+equations (value-types.md M3). Expand expression/type syntax macros in a typed
+result under these restrictions, and prohibit item/export/collection effects.
+
+**T6. Code and diagnostics.** Expand each generic binding once, not for each
+instantiation. A complete forwarded argument keeps its type; a result's fresh
+code has fresh node identities. Dropped arguments are still diagnosed from
+the first check. Do not repeat those warnings. Report invalid output at the
+call with its template origin as a note. Recompute runtime dependency order
+from the validated output; never re-infer the caller from its expansion.
+
+#### 15.7.4 Asking for types
+
+```i
+Truth { Yes  No  NotKnown }
+
+Types {
+  Types(
+    type_of: (Syntax) -> Syntax ^ SyntaxError,
+    signature: () -> Syntax,
+    subtype: (Syntax, Syntax) -> Truth ^ SyntaxError,
+    members: (Syntax) -> List(Syntax) ^ SyntaxError,
+  )
+}
+```
+
+`Types` is a service type exported by `i/syntax`, with one function of `i/syntax` for each field, as `definition` is for `Definitions`. The compiler gives the service when it runs a typed macro.
+
+A type is given to a macro as scoped Syntax, using the written-type rows when possible and an opaque TypeView otherwise (§2.3 plus the extension below). In a type that the compiler gives:
+
+- The scopes are set so that every name means the same type in every position where the macro may put it. A name of a built-in type or a built-in constructor has the scope of its own kind of §5, so a top-level or imported name of the module of the call with the same text, as its own `Result`, does not cover it. A fixed variable has the scope of its own kind (below). A type of a module, with no marks there, has the scope of that module with no marks, so rule 2 of §5 finds it there. A type that an expansion defined with marks has the scope it was defined with, its module and its marks, so rule 3 of §5 finds it. These `Syntax` values have the mark of the run only while the run lasts (§5).
+- The type given is the snapshot type, with the observation-only substitution of §15.7.3 T2. A closed variable that is in the needed type is replaced as it is there, with its places counted in the parts of §15.7.3, so that `type_of` and `signature()` give one answer for one variable; any other closed variable is replaced by its places in the type that is given, with the top of that type an output place. No other variable is removed or replaced: the display form of spec §4.7, which shows a variable that is not generalized as the union of the types that come to it, is not used. Only fixed variables, and closed variables that are not replaced, are left, and both are given as below. A fixed variable is always given as a variable.
+- A fixed variable is given as an `Up` node, as `A`, with a scope of its own kind that names that variable (§5). That scope keeps it apart from every type name and every type variable that a template or the caller declares, also one with the same text. One variable has the same node in every answer of one run. It may be written in the result with no declaration: the rule of syntax.md §4.7 that a type variable must be declared is not used for it. The ordinary spec §4.4 place checks still apply; a frozen handle cannot evade them. It may not be in a type test of a clause (spec §15.7.1).
+- T3 types keep exact shared graph structure, variable identities and retained
+  obligations (records@0d0ce19 §§20–21). They are never widened or expanded into
+  DNF merely for a query. Add an opaque `TypeView(TypeHandle)` Node case holding a checked
+  type handle when the full graph cannot be written as surface type syntax.
+  It is valid only in type position, cannot be made with `make`, and is scoped
+  to the module check/replayed snapshot. `subtype` accepts it; `show_as` may
+  give SyntaxError and `show` prints a diagnostic token, not reparseable code.
+  This is an explicit exception to the text round-trip promise for compiler
+  answers, not for source Syntax. A record graph is one `members` item;
+  finite scalar sets still split into literal items. Cache serialization must
+  use the graph bundle, not printed type text.
+
+| Function | What it gives |
+|---|---|
+| `type_of(s)` | The type that the checker gave to `s` at its position in the call. `s` must be a `Syntax` that the compiler gave to this run: an argument, an expression inside an argument, or a name that a pattern inside an argument binds. For any other `Syntax`, also one made by `make` or by a quote, and for a datum that is not an expression or such a name, it is a `SyntaxError`. |
+| `signature()` | The needed type of the call (§15.7.3), as a function type. Closed variables are filled in, and fixed variables are given as in the list above. |
+| `subtype(a, b)` | `Yes` when `a` is a subtype of `b` (spec §4.5) by §15.7.3 T4, with no snapshot variable given a bound. The types are taken in the form that `type_of` gives. `No` when it is not, and neither type has a type variable in it. `NotKnown` in every other case. A `Syntax` that is not a correct type, or has `_` in it, is a `SyntaxError`. |
+| `members(t)` | The members of the type (spec §4.4), in the order of their `show` text. `Never` has no members. `A & Int` and `A - U`, with a fixed variable `A`, are one member each. `Bool` is one member. With literal types, a member of `Int` or `String` with a finite set of values gives one item for each value, a literal type, and a member with all values but a finite set is one item, as `String - "a"`; here only, an item is not a member of spec §4.4. So `members` of `"GET" \| "POST"` is `"GET"` and `"POST"`, and of `2 \| 10 \| Nil` it is `10`, `2`, `Nil`. The same `SyntaxError` as for `subtype`. |
+
+- `type_of` gives the type at the position of the argument in the call. When the macro puts the argument in another position of its result, for example inside a clause, the argument keeps that type and its type variables (§15.7.3), and only the constraints of the new position are checked. With literal types, the type may be a literal type, as `1` for `to_text(1)`, a `Syntax` whose node is `Int(1)`, and `subtype` and `members` take it.
+- A type is a set of values, and one type may be written in more than one way: `Int | String` and `String | Int` are the same type. So a macro asks `subtype` and `members`, and does not match the `Syntax` of a type by its form.
+- `definition` (§6) gives the constructors and fields of a named type, and returns the written alias item for a value-dependent alias (T2 M2).
+
+#### 15.7.5 Restrictions
+
+- The result type of a call cannot depend on the result of the macro. A macro that reads a table of a database cannot give its rows a type that is not in the signature.
+- A result-only signature variable has no lower evidence: `signature()` gives
+  `Never` if it closes, or the opaque frozen variable otherwise. It does not
+  reveal the caller's desired output. A guessed `""` for `default(A): () -> A`
+  is rejected. Pass the type explicitly to a syntax macro when needed.
+- A typed macro cannot put an argument that has errors or needs an environment inside a function to be called later, because the signature has no way to say that the errors of the argument go to that function.
+- A typed macro cannot choose by the type inside a binding with type variables.
+- A typed macro cannot make items. Syntax macros do that.
+
+### 15.8 Diagnostics and tools
+
+Errors in a typed expansion are reported at the call, with the template origin
+as a note. The signature check diagnoses every argument, including dropped
+arguments; validation does not repeat those warnings. Generic bindings expand
+once. `i expand` prints checked output, and `--trace` includes the typed runs.
+The language server gives argument types and completion from the signature,
+shows a macro's signature and expansion, and follows resolved definitions.
+`i fmt` formats source without expanding macros.
 
 ## Appendix A. Choices
 
