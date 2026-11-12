@@ -729,7 +729,7 @@
       "source": "docs/spec.md §4.5 rule 4 and §9.2; review-k4s/review-summary.json records expected E0522, with E0505 on its historical baseline",
       "origin": "review-k4s/soundness/src/main.i",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "diagnostic_reason": "E0505 is not a repair: these programs contain no structural recursive type. Preserve service obligations and report the incompatible/unprovided service.",
       "phase": "entry",
@@ -743,7 +743,9 @@
       "finding": "T3 preserves a compact exact 20-step record graph and normalizes the Never substitution",
       "source": "docs/spec.md §4.9.3: keep unions and forgetting shared and exact; normalization commutes with closed substitution",
       "origin": "review-rec/growth.i; original source fingerprint retained as a historical snapshot",
-      "types_contain": ["type-graph-v1"]
+      "types_contain": [
+        "type-graph-v1"
+      ]
     },
     {
       "pattern": "^review-rec/_loose/probes$",
@@ -752,8 +754,14 @@
       "finding": "T3 proves scalar and tuple record alternatives but rejects an unestablished open union obligation",
       "source": "docs/spec.md §4.9.3 and docs/design/records.md §20.3: union inclusion does not choose alternative-specific bounds",
       "origin": "review-rec/probes.i; original source fingerprint retained as a historical snapshot",
-      "diagnostic_codes": ["E0501"],
-      "types_contain": ["app/main.wrap_union :", "app/main.pair_annotated :", "app/main.choose :"]
+      "diagnostic_codes": [
+        "E0501"
+      ],
+      "types_contain": [
+        "app/main.wrap_union :",
+        "app/main.pair_annotated :",
+        "app/main.choose :"
+      ]
     },
     {
       "pattern": "^review-rec/_loose/schema-union$",
@@ -762,7 +770,9 @@
       "finding": "T2 completion preserves the exact record union through a user-defined schema",
       "source": "docs/spec.md §4.9.3 and docs/design/records.md §20.3: common fields work across every record alternative",
       "origin": "review-rec/schema-union.i; original source fingerprint retained as a historical snapshot",
-      "types_contain": ["app/main.read : (r: (a: 1) | (a: \"x\")) -> 1 | \"x\""]
+      "types_contain": [
+        "app/main.read : (r: (a: 1) | (a: \"x\")) -> 1 | \"x\""
+      ]
     },
     {
       "pattern": "^review-k4d/(?:proj|_loose/p)/q24$",
@@ -833,7 +843,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -847,7 +857,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -861,7 +871,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -875,7 +885,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -889,7 +899,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -903,7 +913,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -917,7 +927,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -931,7 +941,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -945,7 +955,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -959,7 +969,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -973,7 +983,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -987,7 +997,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1001,7 +1011,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1015,7 +1025,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1029,7 +1039,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1043,7 +1053,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1057,7 +1067,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1071,7 +1081,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1085,7 +1095,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1099,7 +1109,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1113,7 +1123,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1127,7 +1137,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1141,7 +1151,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1155,7 +1165,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1169,7 +1179,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1183,7 +1193,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1197,7 +1207,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1211,7 +1221,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1225,7 +1235,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1239,7 +1249,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1253,7 +1263,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1267,7 +1277,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1281,7 +1291,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1295,7 +1305,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "K4 review corpus: incompatible service provision or an unprovided generic service must be rejected before entry execution",
       "source": "docs/spec.md §4.5 rule 4: Service arguments are compared as equal, not by direction; §9.2: a service is a value that goes in and comes out; review-k4d criteria C1/C5",
@@ -1757,7 +1767,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4d/proj/b4$",
       "known_failure": false,
@@ -1770,7 +1780,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4d/proj/b7$",
       "known_failure": false,
@@ -1783,7 +1793,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4d/proj/r2$",
       "known_failure": false,
@@ -1796,7 +1806,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4d/proj/r3$",
       "known_failure": false,
@@ -2393,7 +2403,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4d/proj/a3$",
       "known_failure": false,
@@ -2415,7 +2425,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4s/soundness_unannotated$",
       "known_failure": false,
@@ -2437,7 +2447,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-0\\-False$",
       "known_failure": false,
@@ -2450,7 +2460,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-0\\-True$",
       "known_failure": false,
@@ -2463,7 +2473,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-1\\-False$",
       "known_failure": false,
@@ -2476,7 +2486,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-2\\-False$",
       "known_failure": false,
@@ -2489,7 +2499,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-2\\-True$",
       "known_failure": false,
@@ -2502,7 +2512,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-3\\-False$",
       "known_failure": false,
@@ -2515,7 +2525,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-3\\-True$",
       "known_failure": false,
@@ -2528,7 +2538,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-4\\-False$",
       "known_failure": false,
@@ -2541,7 +2551,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-4\\-True$",
       "known_failure": false,
@@ -2554,7 +2564,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-5\\-False$",
       "known_failure": false,
@@ -2567,7 +2577,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-5\\-True$",
       "known_failure": false,
@@ -2580,7 +2590,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-6\\-False$",
       "known_failure": false,
@@ -2593,7 +2603,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-6\\-True$",
       "known_failure": false,
@@ -2606,7 +2616,7 @@
     {
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "pattern": "^review\\-k4\\-lane/previous\\-chain\\-64$",
       "known_failure": false,
@@ -2699,7 +2709,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2712,7 +2722,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2725,7 +2735,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2738,7 +2748,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2751,7 +2761,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2764,7 +2774,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2777,7 +2787,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2790,7 +2800,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2803,7 +2813,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2816,7 +2826,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2829,7 +2839,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2842,7 +2852,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2855,7 +2865,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2868,7 +2878,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2881,7 +2891,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2894,7 +2904,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2907,7 +2917,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2920,7 +2930,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2933,7 +2943,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2946,7 +2956,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2959,7 +2969,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2972,7 +2982,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2985,7 +2995,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -2998,7 +3008,7 @@
       "known_failure": false,
       "outcome": "reject",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: entry requires an unprovided service",
@@ -3552,7 +3562,7 @@
       "outcome": "reject",
       "phase": "entry",
       "diagnostic_codes": [
-        "E0522"
+        "E0523"
       ],
       "finding": "A child retains an unsupplied ordinary service; execution must be rejected.",
       "source": "docs/spec.md §9.2: the environment that a function needs is the union of the environments that its calls need; coordinator R2 default-plan specialization."
