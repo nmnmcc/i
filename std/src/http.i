@@ -1370,7 +1370,7 @@ fetch_open = (req: Request) {
 	id
 }
 
-fetch_stream = (req: Request, f ! fetch.Fetch) {
+fetch_stream = (req: Request, f ! fetch.Fetch) -> ResponseStream ^ HttpError ! fetch.Fetch {
 	id = fetch_open(req)
 	// The host context also owns the response if this task is cancelled.
 	status = fetch_reply(() { fetch.status(id) })
