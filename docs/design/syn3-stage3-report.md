@@ -93,8 +93,6 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
   subtype of `Circle | Square`) besides E0516.
 - `Circle(..v, …)` with `v: Shape` gives E0501, not E0517's message.
 - `field_shared` no longer joins the constructors of a former family.
-- A union shown inside a larger union is not folded to its alias:
-  `String | True | False`, `(True | False) -> True | False`.
 - Coverage witnesses show a one-constructor type as its constructor
   (`("a", False)`).
 
@@ -112,3 +110,7 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
   from alias folding: the record of std/http's request body reader showed
   its error union in checking order. That reader is now the custom type
   `BodyReader(E, N, M)`; the record solver bug above is the same family.
+
+## Not solved
+
+- The record-field solver bug above (stage 6 deletes records).
