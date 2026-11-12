@@ -944,7 +944,7 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
 #[test]
 fn publish_sees_a_new_major_version_of_a_dependency() {
     let w = World::new();
-    let v = |ty: &str| format!(" (V(..))\n\nV {{ V({ty}) }}\n");
+    let v = |ty: &str| format!(" (V(..))\n\nV = {{ ({ty}) }}\n");
     let (v1, v2) = (v("Int"), v("String"));
     w.repo(
         "dep",
@@ -1067,7 +1067,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
     let w = World::new();
     // Two packages, both named `util`, each with a module `u` and a type
     // `T`; `pa` and `pb` each use one of them as `util`.
-    let util = |ty: &str| format!(" (T(..))\n\nT {{ T({ty}) }}\n");
+    let util = |ty: &str| format!(" (T(..))\n\nT = {{ ({ty}) }}\n");
     let (u1, u2) = (util("Int"), util("String"));
     w.repo(
         "u1",
