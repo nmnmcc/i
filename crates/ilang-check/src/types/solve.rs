@@ -1780,6 +1780,23 @@ impl Solver {
     fn route(&mut self, l: &Ty, ms: &[Ty], env: Mode) {
         let mut flat = Vec::new();
         flatten_union(ms, &mut flat);
+        // A union kept as a record-graph node (a row inside a record type)
+        // has its members routed too.
+        if env == Mode::Env {
+            let mut todo = std::mem::take(&mut flat);
+            while let Some(m) = todo.pop() {
+                match &m {
+                    Ty::Graph(g) if !g.record_only() => match g.view() {
+                        Some(Ty::Union(xs)) => todo.extend(xs),
+                        Some(v) => flat.push(v),
+                        None => flat.push(m.clone()),
+                    },
+                    Ty::Union(xs) => todo.extend(xs.iter().cloned()),
+                    _ => flat.push(m),
+                }
+            }
+            flat.reverse();
+        }
         let h = l.value_head();
         if h == Some(Head::Record) {
             let records: Vec<_> = flat
