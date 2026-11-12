@@ -319,9 +319,15 @@ impl Query<'_> {
         for reference in refs {
             let loc = reference.location;
             let lisp = self.is_lisp(loc.module);
-            let text =
-                &self.written_text(loc.module)[loc.span.start as usize..loc.span.end as usize];
-            let edit = match (&r.target, reference.label_binder) {
+            let written = self.written_text(loc.module);
+            let text = &written[loc.span.start as usize..loc.span.end as usize];
+            // Syntax three writes the label of a pattern part itself,
+            // `C(label = local)`: the label is renamed in place.
+            let labelled = !lisp && {
+                let after = written[loc.span.end as usize..].trim_start();
+                after.starts_with('=') && !after.starts_with("==")
+            };
+            let edit = match (&r.target, reference.label_binder && !labelled) {
                 // `User(name, ..)` binds `name` and matches the field
                 // `name`: keep the local, give the new label.
                 (Target::Field(_), true) => {
@@ -332,7 +338,14 @@ impl Query<'_> {
                     }
                 }
                 // Keep the label, give the new local name.
-                (Target::Local(_), _) if self.is_label_binder(loc.module, loc.span) => {
+                (Target::Local(_), _)
+                    if self.is_label_binder(loc.module, loc.span)
+                        && !(!lisp && {
+                            let before = written[..loc.span.start as usize].trim_end();
+                            before.ends_with('=')
+                                && !["==", "<=", ">=", "!="].iter().any(|o| before.ends_with(o))
+                        }) =>
+                {
                     if lisp {
                         format!("(= {new_name} {text})")
                     } else {
