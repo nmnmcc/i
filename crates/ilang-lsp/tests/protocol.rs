@@ -3006,3 +3006,33 @@ fn lsp_completion_constructors_lisp_surface() {
     assert_eq!(items[0].label, "Circle");
     c.shutdown();
 }
+
+#[test]
+fn formats_lisp_documents_with_the_source_formatter() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (+ first second)}))\n";
+    package(dir.path(), &[("src/main.is", source)]);
+    let main = file_uri(&dir.path().join("src/main.is"));
+    let mut client = Client::start();
+    client.open(&main, source);
+    let edits = client.request::<lsp::request::Formatting>(json!({
+        "textDocument": { "uri": main },
+        "options": { "tabSize": 4, "insertSpaces": false }
+    }));
+    let expected = ilang_syntax::lisp::format(source).unwrap();
+    assert!(expected.lines().count() >= 6);
+    assert_eq!(edits[0]["newText"], expected);
+    client.change(&main, 2, &expected);
+    let edits = client.request::<lsp::request::Formatting>(json!({
+        "textDocument": { "uri": main },
+        "options": { "tabSize": 4, "insertSpaces": false }
+    }));
+    assert!(edits.is_null());
+    client.change(&main, 3, "(= broken");
+    let edits = client.request::<lsp::request::Formatting>(json!({
+        "textDocument": { "uri": main },
+        "options": { "tabSize": 4, "insertSpaces": false }
+    }));
+    assert!(edits.is_null());
+    client.shutdown();
+}
