@@ -1167,12 +1167,12 @@ impl Parser<'_> {
         let mut expressions = Vec::new();
         for part in parts {
             match part {
-                StringPart::Text(s) if !s.is_empty() => expressions.push(Expr {
+                StringPart::Text(s, text_span) if !s.is_empty() => expressions.push(Expr {
                     kind: ExprKind::String(s),
-                    span,
+                    span: text_span,
                 }),
-                StringPart::Text(_) => {}
-                StringPart::Expr(tokens) => {
+                StringPart::Text(_, _) => {}
+                StringPart::Expr { tokens, .. } => {
                     let close = crate::lexer::pair_brackets(&tokens, &mut self.diags);
                     let mut child = Parser {
                         toks: &tokens,
@@ -1199,20 +1199,21 @@ impl Parser<'_> {
                 0,
                 Expr {
                     kind: ExprKind::String(String::new()),
-                    span,
+                    span: Span::new(span.start, span.start),
                 },
             );
         }
         let mut iter = expressions.into_iter();
         let mut result = iter.next().expect("interpolation has an expression");
         for rhs in iter {
+            let part_span = result.span.to(rhs.span);
             result = Expr {
                 kind: ExprKind::Binary {
                     op: BinOp::Concat,
                     lhs: Box::new(result),
                     rhs: Box::new(rhs),
                 },
-                span,
+                span: part_span,
             };
         }
         result.span = span;

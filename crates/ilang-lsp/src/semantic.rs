@@ -27,19 +27,16 @@ fn ranges(tokens: &[Token], out: &mut Vec<(Span, u32)>) {
             T::Interpolated(parts) => {
                 let mut at = token.span.start;
                 for part in parts {
-                    if let StringPart::Expr(tokens) = part {
-                        let start = tokens
-                            .first()
-                            .expect("expression tokens end in EOF")
-                            .span
-                            .start;
-                        out.push((Span::new(at, start), 0));
+                    if let StringPart::Expr {
+                        tokens,
+                        span,
+                        comments,
+                    } = part
+                    {
+                        out.push((Span::new(at, span.start), 0));
                         ranges(tokens, out);
-                        at = tokens
-                            .last()
-                            .expect("expression tokens end in EOF")
-                            .span
-                            .start;
+                        out.extend(comments.iter().map(|c| (c.span, 5)));
+                        at = span.end;
                     }
                 }
                 out.push((Span::new(at, token.span.end), 0));
@@ -131,5 +128,39 @@ mod tests {
             }
         }
         assert!(seen_name);
+    }
+    #[test]
+    fn comments_and_names_in_nested_interpolations_have_disjoint_ranges() {
+        let text = r###"value = "a\( // leading
+ #"inner \#(name)"#)b"
+"###;
+        let result = tokens(text, false);
+        let ix = LineIndex::new(text);
+        let (mut line, mut column) = (0, 0);
+        let mut seen_comment = false;
+        let mut seen_name = false;
+        let mut end = 0;
+        for token in result.data {
+            column = if token.delta_line == 0 {
+                column + token.delta_start
+            } else {
+                token.delta_start
+            };
+            line += token.delta_line;
+            let a = ix.offset(lsp_types::Position::new(line, column));
+            let z = ix.offset(lsp_types::Position::new(line, column + token.length));
+            assert!(a >= end);
+            let source = &text[a as usize..z as usize];
+            if source == "// leading" {
+                assert_eq!(token.token_type, 5);
+                seen_comment = true;
+            }
+            if source == "name" {
+                assert_eq!(token.token_type, 3);
+                seen_name = true;
+            }
+            end = z;
+        }
+        assert!(seen_comment && seen_name);
     }
 }

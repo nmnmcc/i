@@ -23,6 +23,7 @@ Implemented cooked/raw/multi-line interpolation before the core tree, literal-on
 - `cargo check -p ilang-syntax -p ilang-check -p ilang-wasm -p ilang-lsp --all-targets`: passed (through the shared heavy wrapper and development shell).
 - `cargo test -p ilang-syntax --test string_forms --test lisp_encode_deep`: passed, 14 tests, including nested interpolation, canonical/formatter/Lisp round trips, source encoding and exact macro syntax charges.
 - Focused `ilang-cli --test spec` run with the new single-file cases: 28/28 passed at O0 and O2. A further package case exercises macros around and inside interpolation; the workspace spec run includes it.
+- `UPDATE=1 cargo test -p ilang-syntax --test format`: passed, golden layout and repository-wide round-trip/idempotence properties; the skip list records the new intentionally invalid spec cases.
 - `cargo test -p ilang-lsp --lib --test protocol`: passed, 8 unit tests and 17 protocol tests, including raw interpolation hover and nonoverlapping UTF-16 semantic tokens for nested expressions/comments.
 - `tree-sitter test --grammar-path editors/tree-sitter-i`: passed, 11 corpus cases. Set `XDG_CACHE_HOME=$PWD/target/str-tree-cache` to isolate the parser cache from other concurrently running lanes.
 - `npm --prefix editors/vscode test`: passed, 9 tests.

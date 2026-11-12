@@ -70,8 +70,12 @@ pub enum TokenKind {
 /// Decoded text and independently lexed expressions inside one string token.
 #[derive(Clone, Debug, PartialEq)]
 pub enum StringPart {
-    Text(String),
-    Expr(Vec<Token>),
+    Text(String, Span),
+    Expr {
+        tokens: Vec<Token>,
+        span: Span,
+        comments: Vec<crate::lexer::Comment>,
+    },
 }
 
 /// A token. `nl` is set when a line end or a comment comes before it, and

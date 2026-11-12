@@ -1,5 +1,5 @@
 //! The language server of i (`i lsp`): diagnostics, hover, go to
-//! definition, document symbols, completion, and formatting, over the
+//! definition, document symbols, completion, semantic tokens, and formatting, over the
 //! Language Server Protocol on standard input and output.
 //!
 //! The answers come from `ilang_check::query`. Positions are converted

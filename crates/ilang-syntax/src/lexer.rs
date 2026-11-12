@@ -489,7 +489,11 @@ impl Lexer<'_> {
     fn string(&mut self) -> T {
         enum Piece {
             Text(usize, usize),
-            Expr(Vec<Token>),
+            Expr {
+                tokens: Vec<Token>,
+                span: Span,
+                comments: Vec<Comment>,
+            },
         }
         let start = self.pos;
         while self.at(0) == b'#' {
@@ -504,7 +508,22 @@ impl Lexer<'_> {
             );
             return T::Str(String::new());
         }
-        let multiline = self.src[self.pos..].starts_with(b"\"\"\"");
+        let triple = self.src[self.pos..].starts_with(b"\"\"\"");
+        // Swift distinguishes raw quote-only strings such as #"""# from
+        // multi-line openers by a matching raw close on the same line.
+        let same_line_close = hashes > 0 && triple && {
+            let line_end = self.source[self.pos..]
+                .find(['\r', '\n'])
+                .map_or(self.src.len(), |n| self.pos + n);
+            (self.pos + 2..line_end).any(|at| {
+                self.src[at] == b'"'
+                    && self
+                        .src
+                        .get(at + 1..at + 1 + hashes)
+                        .is_some_and(|s| s.iter().all(|b| *b == b'#'))
+            })
+        };
+        let multiline = triple && !same_line_close;
         let quotes = if multiline { 3 } else { 1 };
         self.pos += quotes;
         if multiline {
@@ -550,6 +569,7 @@ impl Lexer<'_> {
                 if self.at(0) == b'(' {
                     pieces.push(Piece::Text(text_start, slash));
                     self.pos += 1;
+                    let expression_start = self.pos;
                     let mut child = Lexer {
                         src: self.src,
                         source: self.source,
@@ -571,7 +591,20 @@ impl Lexer<'_> {
                     self.pos = child.pos;
                     self.diags.extend(child.diags);
                     mark_breaks(&mut child.tokens);
-                    pieces.push(Piece::Expr(child.tokens));
+                    let span = Span::new(
+                        expression_start as u32,
+                        child
+                            .tokens
+                            .last()
+                            .expect("expression ends in EOF")
+                            .span
+                            .start,
+                    );
+                    pieces.push(Piece::Expr {
+                        tokens: child.tokens,
+                        span,
+                        comments: child.comments,
+                    });
                     text_start = self.pos;
                 } else if self.pos < self.src.len() {
                     // Keep escapes in the text range; decode after indentation
@@ -603,10 +636,10 @@ impl Lexer<'_> {
                         .map_or(line, |n| at + n);
                     let content = &self.source[at..stop];
                     let blank = content.bytes().all(|b| matches!(b, b' ' | b'\t'));
-                    if blank {
-                        remove.push((at, stop));
-                    } else if content.starts_with(indent) {
+                    if content.starts_with(indent) {
                         remove.push((at, at + indent.len()));
+                    } else if blank {
+                        remove.push((at, stop));
                     } else {
                         self.error(Code::BadEscape, Span::new(at as u32, stop as u32), "a multi-line string line has less or different indentation than its closing delimiter");
                     }
@@ -632,9 +665,17 @@ impl Lexer<'_> {
         let mut interpolated = false;
         for piece in pieces {
             match piece {
-                Piece::Expr(tokens) => {
+                Piece::Expr {
+                    tokens,
+                    span,
+                    comments,
+                } => {
                     interpolated = true;
-                    parts.push(StringPart::Expr(tokens));
+                    parts.push(StringPart::Expr {
+                        tokens,
+                        span,
+                        comments,
+                    });
                 }
                 Piece::Text(a, z) => {
                     self.pos = a;
@@ -664,7 +705,7 @@ impl Lexer<'_> {
                             value.push(c);
                         }
                     }
-                    parts.push(StringPart::Text(value));
+                    parts.push(StringPart::Text(value, Span::new(a as u32, z as u32)));
                 }
             }
         }
@@ -679,7 +720,7 @@ impl Lexer<'_> {
             }
             T::Interpolated(parts)
         } else {
-            let [StringPart::Text(value)] = parts.as_slice() else {
+            let [StringPart::Text(value, _)] = parts.as_slice() else {
                 unreachable!("a literal has one text part")
             };
             T::Str(value.clone())

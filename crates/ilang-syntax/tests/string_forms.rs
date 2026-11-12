@@ -28,9 +28,12 @@ fn raw_and_multiline_values() {
     for (source, expected) in [
         (r##"#"raw \(name) \n"#"##, r"raw \(name) \n"),
         (r###"##"\#n\##n"##"###, "\\#n\n"),
+        (r##"#"""#"##, "\""),
+        (r###"##""""##"###, "\"\""),
         ("\"\"\"\n  one\n    two\n  \"\"\"", "one\n  two"),
         ("\"\"\"\r\n\tα\\\r\n\tβ\r\n\t\"\"\"", "αβ"),
         ("\"\"\"\n  a\n \n  b\n  \"\"\"", "a\n\nb"),
+        ("\"\"\"\n  a\n    \n  b\n  \"\"\"", "a\n  \nb"),
         ("#\"\"\"\n  \\n\n  \"\"\"#", "\\n"),
         ("\"\"\"\n\"\"\"", ""),
         ("\"\"\"\n  \\n\n  \"\"\"", "\n"),
@@ -78,25 +81,33 @@ x })b" // outside"#,
         let (back, ds) = lisp::parse_source(&printed);
         assert!(ds.is_empty(), "{printed}: {ds:?}");
         assert!(shape::equivalent(&a, &back), "{printed}");
+        let scope = lisp::syntax::Scope {
+            module: 0,
+            marks: Default::default(),
+        };
+        assert_eq!(
+            lisp::item_syntax(&a.items[0], &scope, source).show(),
+            printed.trim_end()
+        );
     }
 }
 
 #[test]
 fn interpolation_and_multiline_boundaries_are_diagnosed() {
     for source in [
-        r#"value = ("\(x)": 1)"#,
-        r#"Value = ("\(x)": Int)"#,
-        r#"Value = "\(x)""#,
-        r#"value = (s) { s |> { "\(x)" -> 1 } }"#,
-        r#"@deprecated("\(x)")
+        /* old-syntax-check: E0101 */ r#"value = ("\(x)": 1)"#,
+        /* old-syntax-check: E0101 */ r#"Value = ("\(x)": Int)"#,
+        /* old-syntax-check: E0101 */ r#"Value = "\(x)""#,
+        /* old-syntax-check: E0101 */ r#"value = (s) { s |> { "\(x)" -> 1 } }"#,
+        /* old-syntax-check: E0101 */ r#"@deprecated("\(x)")
 value = 1"#,
-        r#"("\(x)")
+        /* old-syntax-check: E0101 */ r#"("\(x)")
 value = 1"#,
-        r#"value = (s) { s |> { a <> "x" <> b -> 1 } }"#,
-        "value = \"\"\"bad\n\"\"\"",
-        "value = \"\"\"\na\n  \"\"\"",
-        "value = \"\"\"\n  a\"\"\"",
-        r##"value = #"bad"##,
+        /* old-syntax-check: E0108 */ r#"value = (s) { s |> { a <> "x" <> b -> 1 } }"#,
+        /* old-syntax-check: E0003 */ "value = \"\"\"bad\n\"\"\"",
+        /* old-syntax-check: E0003 */ "value = \"\"\"\na\n  \"\"\"",
+        /* old-syntax-check: E0003 */ "value = \"\"\"\n  a\"\"\"",
+        /* old-syntax-check: E0002 */ r##"value = #"bad"##,
     ] {
         let (_, ds) = parse_module(source);
         assert!(!ds.is_empty(), "accepted: {source}");
