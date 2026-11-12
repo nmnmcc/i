@@ -65,6 +65,7 @@ pub struct BodyEngine<'a> {
     pub(crate) item_replacements: Vec<(Span, Span, ilang_host::macro_budget::MacroBudget)>,
     pub(crate) run_mark: Arc<std::sync::atomic::AtomicU64>,
     session: &'a mut Session,
+    source_encoder: std::sync::OnceLock<ilang_syntax::lisp::SourceEncoder>,
 }
 impl<'a> BodyEngine<'a> {
     pub fn new(
@@ -92,6 +93,7 @@ impl<'a> BodyEngine<'a> {
             item_replacements: Vec::new(),
             run_mark: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             session,
+            source_encoder: std::sync::OnceLock::new(),
         }
     }
     /// Virtual origins produced by the most recent failed item phase.
@@ -156,19 +158,35 @@ impl<'a> BodyEngine<'a> {
             &self.locals(locals, depth),
         )
     }
+    pub(crate) fn source_encoder(&self) -> &ilang_syntax::lisp::SourceEncoder {
+        self.source_encoder.get_or_init(|| {
+            ilang_syntax::lisp::SourceEncoder::new(
+                &self.scope(),
+                &self.graph.sources.get(self.source).text,
+            )
+        })
+    }
     pub(crate) fn expr_syntax(&self, e: &Expr) -> Syntax {
         if let Some(origin) = self.scoped.origin(e.span) {
             return origin.syntax.clone();
         }
         let file = self.graph.sources.get(self.source);
-        source_expression_syntax(e, &self.scope(), &file.text, file.display.ends_with(".is"))
+        if file.display.ends_with(".is") {
+            source_expression_syntax(e, &self.scope(), &file.text, true)
+        } else {
+            self.source_encoder().expression(e)
+        }
     }
     pub(crate) fn ty_syntax(&self, ty: &TypeExpr) -> Syntax {
         if let Some(origin) = self.scoped.origin(ty.span) {
             return origin.syntax.clone();
         }
         let file = self.graph.sources.get(self.source);
-        source_type_syntax(ty, &self.scope(), &file.text, file.display.ends_with(".is"))
+        if file.display.ends_with(".is") {
+            source_type_syntax(ty, &self.scope(), &file.text, true)
+        } else {
+            self.source_encoder().ty(ty)
+        }
     }
     pub(crate) fn execute(
         &mut self,

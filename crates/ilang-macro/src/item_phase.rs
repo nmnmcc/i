@@ -61,12 +61,11 @@ impl BodyEngine<'_> {
         }
         let file = self.graph.sources.get(self.source);
         (
-            source_item_syntax(
-                item,
-                &self.scope(),
-                &file.text,
-                file.display.ends_with(".is"),
-            ),
+            if file.display.ends_with(".is") {
+                source_item_syntax(item, &self.scope(), &file.text, true)
+            } else {
+                self.source_encoder().item(item)
+            },
             item.span,
         )
     }

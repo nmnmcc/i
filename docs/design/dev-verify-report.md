@@ -122,6 +122,14 @@ No language or library surface was added, including state mechanisms.
   the new two-caller definition-context regression. Its first draft queried
   a value with the type-only definition API (E0234); corrected the test to
   query distinct caller type aliases, then reran the full suites successfully.
+  Further samples found project-wide resolver copies and repeated lexical
+  indexing of the same source for every argument. Freeze the existing import
+  closure (which includes macro-template sources) and reuse the existing
+  SourceEncoder once per engine. The preserved std source now checks within
+  its original cap; the large literal key case also passes O0/O2 under ten
+  seconds. Verified the std snapshot differs only by 1446 hygienic test names
+  and six ordinary test helper bindings; its two existing censored runtime
+  observations and budgets are unchanged.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
@@ -182,6 +190,15 @@ Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
 - `cargo check -p ilang-check --all-targets`: passed.
 - `cargo check -p ilang-wasm --all-targets`: passed.
 - `cargo check -p ilang-cli --all-targets`: passed.
+- Final macro changes: `cargo check --release -p ilang-cli --all-targets`,
+  `cargo build --release --locked -p ilang-cli`, and `cargo fmt --all --
+  --check`: passed. `cargo test --release -p ilang-cli --test macro_run
+  --test macro_budget --locked`: passed, 57 expansion and nine budget tests.
+- Bounded reproductions: mutual50/100/150/200/300, nested50 and declaration
+  order118 now match their successful snapshots. The large literal key case
+  passes O0/O2. The std checker succeeds under ten seconds; refreshed only
+  its previously described migrated type output, with existing runtime
+  timeout observations retained.
 - After the normalization fix, `cargo check -p ilang-check --all-targets`
   and `cargo test -p ilang-check --lib --test generic_services --test
   row_schemes --test types --locked`: passed, with type goldens unchanged.
@@ -206,7 +223,8 @@ Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
   repository parsing, generated parser equality and Zed cargo check.
 
 The exact supplied clean-worktree acceptance script runs after this report
-is committed. Its combined output is captured in `/tmp/js-acceptance.log`;
+is committed. Its final combined output is captured in
+`/tmp/js-acceptance-final-green.log`;
 individual part outputs are `/tmp/dv-{rust,i,js,editors}.<shell-pid>`. It runs
 each part separately through the heavy wrapper, requires each exit status to
 be zero, compares the verification script against `lane/integ`, and checks
@@ -216,3 +234,13 @@ An extra full-corpus diagnostic run with the debug CLI was stopped after
 50 cases, then restarted with the release CLI used by the i gate. The
 per-case runtime budgets are unchanged; final verification runs the complete
 1973-case corpus with the release CLI.
+
+One intermediate overlapping Cargo run failed at doctests with
+`error[E0460]: found possibly newer version of crate ilang_check which
+ilang_macro depends on`. Another Cargo build had replaced artifacts while
+workspace tests were running. Final acceptance waits for that workspace
+command to finish and runs without overlapping Cargo builds. No Cargo
+command was interrupted. Earlier bounded std and literal failures were
+`review-k4s/std: unclassified checker timeout` and
+`review-t1/stress-keys-2000: full output changed`; the fixes above retain
+their original limits and successful checker/runtime requirements.

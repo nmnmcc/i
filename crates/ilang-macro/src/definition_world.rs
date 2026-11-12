@@ -65,12 +65,12 @@ pub struct DefinitionWorld {
 }
 impl DefinitionWorld {
     pub fn new(graph: &PackageGraph, parsed: &[Parsed]) -> Self {
-        Self::new_shared(graph, parsed, Arc::new(AtomicU64::new(0)))
+        Self::new_shared(graph, parsed.to_vec(), Arc::new(AtomicU64::new(0)))
     }
     /// All modules in one project share the same answer identity allocator.
     pub fn new_shared(
         graph: &PackageGraph,
-        parsed: &[Parsed],
+        parsed: Vec<Parsed>,
         next_answer: Arc<AtomicU64>,
     ) -> Self {
         let lisp_documents = parsed
@@ -113,7 +113,7 @@ impl DefinitionWorld {
             .collect();
         Self {
             graph: graph.clone(),
-            parsed: parsed.to_vec(),
+            parsed,
             next_answer,
             lisp_documents,
             source_encoders,

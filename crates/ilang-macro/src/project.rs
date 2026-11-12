@@ -81,9 +81,19 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
                 return Err(diagnostics);
             }
         };
+        // Definition queries can name the caller and its transitive imports,
+        // including the modules that supplied macro templates. Freeze that
+        // existing import closure rather than copying unrelated project ASTs.
+        let definition_modules = match crate::prepare::import_closure(graph, &parsed, source) {
+            Ok(modules) => modules,
+            Err(errors) => {
+                diagnostics.extend(errors);
+                return Err(diagnostics);
+            }
+        };
         let definitions = Arc::new(DefinitionWorld::new_shared(
             graph,
-            &parsed,
+            definition_modules,
             next_answer.clone(),
         ));
         let mut ast = parsed[index].ast.clone();
