@@ -51,11 +51,9 @@ pub fn run(source: &Source) -> Outcome {
         return Outcome::default();
     }
     let src = source.text.as_str();
-    let (module, diags) = ilang_syntax::parse_module(src);
-    if !diags.is_empty() && matches!(source.kind, crate::common::Kind::Embedded { .. }) {
-        // A Rust literal that is not a clean i module is not touched.
-        return Outcome::default();
-    }
+    // A source with syntax errors elsewhere still has its type definitions
+    // rewritten: fixtures for other errors keep only the error they test.
+    let (module, _) = ilang_syntax::parse_module(src);
     let defs: Vec<(&Item, &TypeDef)> = module
         .items
         .iter()

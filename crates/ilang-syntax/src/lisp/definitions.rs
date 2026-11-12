@@ -47,9 +47,13 @@ fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
 /// another. Every node is located at the query that caused this answer.
 pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> Option<Syntax> {
     let source = match name {
-        "Bool" => "(Bool { True False })",
+        "Bool" => "(= Bool (| True False))",
+        "True" => "(True { True })",
+        "False" => "(False { False })",
         "Nil" => "(Nil { Nil })",
-        "Result" => "((Result A E) { (Ok A) (Error E) })",
+        "Result" => "(= (Result A E) (| (Ok A) (Error E)))",
+        "Ok" => "((Ok A) { (Ok A) })",
+        "Error" => "((Error E) { (Error E) })",
         "AssertionFailure" => "(AssertionFailure { (AssertionFailure (: message String)) })",
         "Assert" => "(Assert { (Assert (: fail (-> ((: failure AssertionFailure)) Never))) })",
         _ => return None,
