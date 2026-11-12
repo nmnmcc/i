@@ -9,7 +9,7 @@ use ilang_syntax::syn3;
 fn same(new: &str, old: &str) {
     let (module, diags) = syn3::parse_lowered(new);
     assert!(diags.is_empty(), "{new}\n{diags:#?}");
-    let (expected, diags) = ilang_syntax::parse_module(old);
+    let (expected, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{old}\n{diags:#?}");
     assert_eq!(print_module(&module), print_module(&expected), "{new}");
 }

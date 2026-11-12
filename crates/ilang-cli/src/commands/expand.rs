@@ -60,25 +60,7 @@ pub fn run(
     // leave a partial source document on stdout.
     let mut output = String::new();
     for module in modules {
-        if ilang_syntax::syn3::enabled() {
-            let text = ilang_syntax::syn3::print_current(&module.ast, to == "is");
-            output.push_str(&format!("// {}\n{text}\n", module.path));
-            continue;
-        }
-        let lisp = ilang_syntax::lisp::print_module(&module.ast);
-        let text = if to == "is" {
-            ilang_syntax::lisp::format(&lisp).expect("expanded AST prints valid Lisp")
-        } else {
-            let document =
-                ilang_syntax::lisp::parse(&lisp).expect("expanded AST prints valid Lisp");
-            ilang_syntax::lisp::normal_source(&document).map_err(|error| {
-                anyhow::anyhow!(
-                    "{}: {}; use --to is for quotations or other Lisp-only forms",
-                    module.path,
-                    error.message
-                )
-            })?
-        };
+        let text = ilang_syntax::syn3::print_current(&module.ast, to == "is");
         output.push_str(&format!("// {}\n{text}\n", module.path));
     }
     if trace {

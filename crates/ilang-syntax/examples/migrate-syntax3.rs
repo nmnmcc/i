@@ -60,7 +60,7 @@ fn parse_old(path: &Path, source: &str) -> (ilang_syntax::ast::Module, Vec<Diagn
     if is_lisp(path) {
         ilang_syntax::lisp::parse_source_legacy(source)
     } else {
-        ilang_syntax::parser::parse_module_legacy(source)
+        ilang_syntax::legacy::parser::parse_module_legacy(source)
     }
 }
 
@@ -322,10 +322,12 @@ fn convert_command(args: &[String]) -> i32 {
             Reading::New => {
                 already += 1;
                 // Formatted, so that the layout is the formatter's everywhere.
-                let text = match syn3::format(&source) {
-                    Ok(text) if !is_lisp(path) => text,
-                    _ => source.clone(),
+                let formatted = if is_lisp(path) {
+                    ilang_syntax::lisp::format(&source)
+                } else {
+                    syn3::format(&source)
                 };
+                let text = formatted.unwrap_or_else(|_| source.clone());
                 if !write {
                     print!("{text}");
                 } else if text != source {

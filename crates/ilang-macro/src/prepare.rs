@@ -228,33 +228,33 @@ pub fn add_wrapper(
         .collect::<Vec<_>>()
         .join(", ");
     let arguments = args.join(", ");
-    let (item_service, item_row) = if position == MacroPosition::Item {
-        ("  ! syntax.Items = syntax._items()\n", " | syntax.Items")
+    let items = if position == MacroPosition::Item {
+        " <- (syntax._items())"
     } else {
-        ("", "")
+        ""
     };
     let source = format!(
-        r#"(syntax = i/syntax, fail = i/fail, target = {})
-(_entry)
+        r#"(
+	syntax = i/syntax
+	fail = i/fail
+	target = {}
+)
+(
+	_entry
+)
 _entry = ({parameters}) -> syntax.Syntax {{
-  ! Assert = Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }})
-  ! syntax.Definitions = syntax._definitions()
-{item_service}  ! syntax.Diagnostics = syntax._diagnostics()
-  body = () -> syntax.Syntax ^ syntax.SyntaxError ! Assert | syntax.Definitions{item_row} | syntax.Diagnostics {{ target.{}({arguments}) }}
-  fail.catch(body) |> {{
-    Ok(value) -> value
-    Error(syntax.SyntaxError(message, at)) -> syntax._report_error(message, at)
-  }}
+	{{
+		body = () -> syntax.Syntax {{ target.{}({arguments}) }}
+		fail.catch(body) |>
+			(Ok(value)) {{ value }}
+			| (Error(syntax.SyntaxError(message, at))) {{ syntax._report_error(message, at) }}
+	}} <- (syntax._diagnostics()){items} <- (syntax._definitions()) <- (
+		Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }}),
+	)
 }}
 "#,
         binding.module, binding.name
     );
-    // Transition to syntax three: the wrapper is written in today's syntax.
-    let source = if ilang_syntax::syn3::enabled() {
-        ilang_syntax::syn3::convert_source(&source)
-    } else {
-        source
-    };
     let (ast, diagnostics) = ilang_syntax::parse_module(&source);
     assert!(
         diagnostics.is_empty(),

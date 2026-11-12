@@ -6,9 +6,10 @@ pub mod ast;
 mod ast_clone;
 mod ast_eq;
 pub mod format;
+#[cfg(feature = "legacy")]
+pub mod legacy;
 pub mod lexer;
 pub mod lisp;
-pub mod parser;
 #[doc(hidden)]
 pub mod print;
 #[doc(hidden)]
@@ -20,7 +21,13 @@ pub mod token;
 use span::Span;
 
 pub use lexer::{Lexed, lex};
-pub use parser::{ParseStats, parse_module, parse_stats};
+
+/// Parses a module of syntax three into the tree the compiler reads. The
+/// module is complete as far as the source allows; the diagnostics say what
+/// was wrong, sorted by position.
+pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
+    syn3::parse_lowered(source)
+}
 
 /// Token marks used to explain errors in packages published before A3.
 /// This never changes how a name is parsed or resolved.

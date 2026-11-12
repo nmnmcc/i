@@ -24,19 +24,17 @@ use crate::lexer::{Comment, lex};
 use crate::print::{is_match, level, type_prec};
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
-use crate::{Diagnostic, parse_module};
+use super::parser::parse_module_legacy as parse_module;
+use crate::Diagnostic;
 
 /// The width that the layout tries to keep to.
-pub const WIDTH: usize = 80;
+pub use crate::format::WIDTH;
 
 /// The columns that a tab counts for when lines are measured.
-pub const TAB_WIDTH: usize = 4;
+pub use crate::format::TAB_WIDTH;
 
 /// Formats a source file. Syntax errors leave the source untouched.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
-    if crate::syn3::enabled() {
-        return crate::syn3::format(source);
-    }
     let (module, diags) = parse_module(source);
     if !diags.is_empty() {
         return Err(diags);

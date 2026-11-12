@@ -15,15 +15,6 @@ pub mod convert;
 pub mod lisp;
 pub mod lower;
 
-/// The switch of the transition (stage 8 to stage 12): every source file is
-/// read as syntax three and lowered to the current tree, unless the
-/// environment variable `I_SYNTAX=2` asks for the syntax before it. Deleted in
-/// stage 12.
-pub fn enabled() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("I_SYNTAX").map_or(true, |v| v != "2"))
-}
-
 /// Reads a normal-surface file of syntax three into the current tree.
 pub fn parse_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic>) {
     let (module, mut diags) = parse_module(source);
@@ -51,14 +42,4 @@ pub fn print_current(module: &crate::ast::Module, lisp: bool) -> String {
     } else {
         print_module(&module)
     }
-}
-
-/// Rewrites a source text of the current normal surface (compiler-made
-/// modules) as syntax three.
-pub fn convert_source(source: &str) -> String {
-    let (old, diags) = crate::parser::parse_module_legacy(source);
-    assert!(diags.is_empty(), "compiler-made source must parse: {diags:?}");
-    let lexed = crate::lex(source);
-    let (module, _) = convert::convert(&old, Some(&lexed), &convert::Signatures::default());
-    print_module(&module)
 }

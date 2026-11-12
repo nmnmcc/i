@@ -795,7 +795,7 @@ fn lisp_errors() {
 // ---- §7.3 The converter ----
 
 fn converted(old: &str) -> String {
-    let (module, diags) = ilang_syntax::parse_module(old);
+    let (module, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{old}\n{diags:#?}");
     let lexed = ilang_syntax::lexer::lex(old);
     let (new, _) = convert::convert(&module, Some(&lexed), &convert::Signatures::default());
@@ -927,11 +927,11 @@ fn convert_labelled_calls() {
     // A function that the text does not show keeps its labels.
     assert_eq!(converted("x = m.f(1, to: 2)\n"), "x = m.f(1, to = 2)\n");
     // The functions and constructors of an imported module.
-    let (lib, _) = ilang_syntax::parse_module("User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n");
+    let (lib, _) = ilang_syntax::legacy::parser::parse_module_legacy("User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n");
     let mut signatures = convert::Signatures::default();
     convert::collect(&lib, "users", &mut signatures);
     let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to: 9, from: 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";
-    let (module, _) = ilang_syntax::parse_module(old);
+    let (module, _) = ilang_syntax::legacy::parser::parse_module_legacy(old);
     let (new, notes) = convert::convert(&module, Some(&ilang_syntax::lexer::lex(old)), &signatures);
     assert!(notes.is_empty(), "{notes:#?}");
     assert_eq!(
@@ -943,7 +943,7 @@ fn convert_labelled_calls() {
 #[test]
 fn convert_lisp_surface() {
     let old = "(= append (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))\n";
-    let (module, diags) = ilang_syntax::lisp::parse_source(old);
+    let (module, diags) = ilang_syntax::lisp::parse_source_legacy(old);
     assert!(diags.is_empty(), "{diags:#?}");
     let (new, _) = convert::convert(&module, None, &convert::Signatures::default());
     let text = lisp::to_lisp(&new);
