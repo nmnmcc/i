@@ -85,9 +85,12 @@ compiler) and the standard host services of `i run` (standard streams, files,
 network, TLS, clocks, randomness, processes), followed by the program,
 compiled ahead of time. The executable passes its arguments, environment and
 standard streams to the program, and exits as `i run` does: 0 when the entry
-returns, 1 with the message when it stops. It is built for the target triple
-of the machine that builds it, for a baseline of CPU features (x86-64-v2 on
-x86-64); building for other targets and signing are not supported yet. The
+returns, 1 with the message when it stops. On Linux it is statically linked
+(musl): it needs no library of the machine, not even the C library, and runs
+on any Linux of the same architecture; on macOS it depends only on system
+libraries. It is built for the operating system and architecture of the
+machine that builds it, for a baseline of CPU features (x86-64-v2 on x86-64);
+building for other targets and signing are not supported yet. The
 program needs a program entry, and may only import host services the runner
 gives; a package that needs others is built with `--target host` and run by
 an embedding host. See `docs/design/native.md` and

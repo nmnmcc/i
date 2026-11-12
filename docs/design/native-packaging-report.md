@@ -40,7 +40,7 @@ triple (so no CPU features of the building machine are inferred) and the baselin
 flags. The contract string, recorded in the manifest and compared by the runner, is
 
 ```text
-ilang-host 0.1.0; abi 3; wasmtime 50.0.0; target <host triple>; cpu x86-64-v2;
+ilang-host 0.1.0; abi 3; wasmtime 50.0.0; target x86_64-unknown-linux-musl; cpu x86-64-v2;
 collector copying; gc heap 268435456; wasm stack …; thread stack …; epochs off; fuel off
 ```
 
@@ -50,33 +50,77 @@ declarations of the trusted library package exactly as `i run` does.
 
 ## Measurements
 
-Measured 2026-11-13 on x86_64-unknown-linux-gnu (16 cores, load average about 30 from
-other builds, so times are upper bounds), release profile (thin LTO, one codegen unit,
-debug info stripped, symbols kept), `--opt 2`.
+Measured 2026-11-13 on x86_64 Linux (16 cores shared with other builds; load average
+about 30 for the first set, about 55 for the static set, so times are upper bounds),
+release profile (thin LTO, one codegen unit, debug info stripped, symbols kept),
+`--opt 2`.
 
-| Executable | Wasm module (bytes) | Payload (bytes) | Executable size (bytes) |
-|---|---|---|---|
-| runner alone (`i-runner`) | — | — | 7,136,368 |
-| examples/hello | 17,167 | 249,992 | 7,386,360 |
-| examples/cli-log | 99,440 | 1,173,783 | 8,310,151 |
-| examples/echo | 227,587 | 2,630,766 | 9,767,134 |
-| examples/http-get | (host target has no HTTP provider) | 4,761,893 | 11,898,261 |
+### Static runner (current: `x86_64-unknown-linux-musl`, static-pie)
 
-The payload is mostly precompiled machine code: roughly 10–20 times the optimized Wasm
-size. `i` itself is 62,348,656 bytes, of which the embedded runner is 7.1 MB.
+`file`: "ELF 64-bit LSB pie executable, x86-64, static-pie linked"; `ldd`: "statically
+linked"; no `PT_INTERP`, no `DT_NEEDED` (checked by `packages_are_statically_linked`).
 
-Start-up (20 runs each, empty environment, wall time from spawn to exit):
+| Executable | Wasm module (bytes) | Executable size (bytes) |
+|---|---|---|
+| runner alone (`i-runner`) | — | 6,911,408 |
+| examples/hello | 17,167 | 7,161,401 |
+| examples/cli-log | 99,440 | 8,085,192 |
+| examples/echo | 227,587 | 9,542,175 |
+| examples/http-get | (host target has no HTTP provider) | 11,673,302 |
+
+The payload (executable minus runner) is the same as before: 250 KB for hello, 4.76 MB
+for http-get; it is mostly machine code, roughly 10–20 times the optimized Wasm.
+
+Start-up (20 runs each, empty environment, wall time from spawn to exit, load ~55):
 
 | Command | Median | Minimum |
 |---|---|---|
-| bare runner (rejects: no payload) | 4.1 ms | 1.5 ms |
-| examples/hello executable | 5.6 ms | 2.8 ms |
-| examples/cli-log executable (parses arguments, logs) | 14.5 ms | 6.9 ms |
-| `i run --project examples/hello` (compiles first) | about 1,000 ms | — |
+| bare runner (rejects: no payload) | 1.0 ms | 0.5 ms |
+| examples/hello executable | 10.4 ms | 4.7 ms |
+| examples/cli-log executable | 30.2 ms | 16.4 ms |
 
-The executables are dynamically linked against the C library of the building machine
-(here a Nix store glibc path), as `i` is; a static or older-glibc runner is part of the
-open distribution question.
+### First, dynamically linked runner (glibc, superseded)
+
+Runner 7,136,368 bytes; hello 7,386,360; cli-log 8,310,151; echo 9,767,134; http-get
+11,898,261. Start-up at load ~30: hello median 5.6 ms (min 2.8), cli-log 14.5 ms (min
+6.9), bare runner 4.1 ms (min 1.5). `i run --project examples/hello` (compiles first)
+takes about 1,000 ms. `i` itself is about 62 MB, of which the embedded runner is 6.9 MB.
+
+The static minimums are of the same order as the dynamic ones; the medians were taken
+at almost twice the load. musl's allocator is known to be slower than glibc's for
+allocation-heavy hosts; a measured comparison on a quiet machine (and, if needed, a
+bundled allocator such as mimalloc, as many musl Rust tools ship) is follow-up work.
+
+## Static linking
+
+Owner decision: the executables `i build` writes are statically linked. As Deno and
+Bun ship a prebuilt runner per target, and Go and Zig link statically, `build.rs` builds
+`i-runner` for `<arch>-unknown-linux-musl` on Linux (`rust-toolchain.toml` adds the
+x86-64 musl target; CI's `devenv shell` gets it from there). Rust's musl targets link
+musl statically by default (`crt-static`), and produce a static PIE.
+
+- Wasmtime supports musl (its signal-based trap handling uses `sigaction`/`ucontext`,
+  which musl provides); every packaged example runs, including traps and stops.
+- TLS is rustls with ring; ring's C and assembly are compiled for the musl target by the
+  ordinary C compiler, with no system library. Root certificates are read from the
+  system's certificate files at run time (rustls-native-certs), not linked.
+- Name resolution: `i/net` resolves through the standard library's `getaddrinfo`,
+  which in musl reads `/etc/hosts` and `/etc/resolv.conf` itself and does not load
+  glibc's NSS modules; the http-get example resolves `example.com` this way. (glibc
+  `+crt-static` was rejected: its `getaddrinfo` needs NSS shared objects at run time.)
+- The AOT code is compiled for the runner's triple (`ILANG_RUNNER_TARGET`,
+  `ilang_cli::RUNNER_TARGET`), not for `i`'s own `x86_64-unknown-linux-gnu`; the
+  contract names that triple, and the runner refuses any other.
+- aarch64 Linux: add `aarch64-unknown-linux-musl` to `rust-toolchain.toml` on that
+  machine (build.rs already selects `<arch>-unknown-linux-musl`); ring and Wasmtime
+  support it. Nothing else changes.
+- macOS cannot be fully static (Apple supports only dynamic linking to libSystem).
+  There `build.rs` builds the runner for `i`'s own target, and the rule is "depends
+  only on system libraries" (libSystem and the Security framework that
+  rustls-native-certs uses); a test like `packages_are_statically_linked` would check
+  `otool -L` lists only `/usr/lib/` and `/System/Library/` paths.
+- Cross-target packages (one `i` making executables for other systems) still need
+  per-target runners, as Deno downloads `denort` per target; still open.
 
 ## Decisions
 

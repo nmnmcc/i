@@ -393,7 +393,7 @@ fn packages_are_statically_linked() {
     // A static PIE has a dynamic section for its own relocations, but
     // needs no shared library.
     for (_, offset, size) in headers.iter().filter(|(kind, _, _)| *kind == PT_DYNAMIC) {
-        for entry in bytes[*offset..offset + size].chunks_exact(16) {
+        for entry in bytes[*offset..offset + size].as_chunks::<16>().0 {
             let tag = u64::from_le_bytes(entry[..8].try_into().unwrap());
             assert_ne!(tag, DT_NEEDED, "the package needs a shared library");
         }

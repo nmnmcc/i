@@ -55,8 +55,9 @@ enum Command {
     /// The default target, native, makes one executable file,
     /// `build/<name>` (the package name, or the entry NAME), which runs
     /// without `i`: a runner with Wasmtime's runtime and the standard host
-    /// services, and the program compiled ahead of time. It is built for the
-    /// target triple of this machine only, with a baseline of CPU features
+    /// services, and the program compiled ahead of time. On Linux it is
+    /// statically linked (musl). It is built for the operating system and
+    /// architecture of this machine only, with a baseline of CPU features
     /// (x86-64-v2 on x86-64); building for other targets and signing are not
     /// supported yet. `--target host` (or `ilang`), `js`, `nodejs` and `wasi`
     /// write the Wasm module `build/<name>.wasm` instead.
