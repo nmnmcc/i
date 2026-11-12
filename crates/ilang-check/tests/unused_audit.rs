@@ -115,6 +115,18 @@ fn unused_audit() {
     std::fs::write(out.join("checks.tsv"), statuses.join("\n") + "\n").unwrap();
 }
 
+/// User plus system CPU time of a running child, from `/proc/<pid>/stat` (Linux; 100 ticks a
+/// second). `None` where that is not available.
+fn child_cpu_time(pid: u32) -> Option<Duration> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    // The command name is in parentheses and may hold spaces: count fields after the last ')'.
+    let rest = stat.rsplit_once(')')?.1;
+    let fields: Vec<&str> = rest.split_whitespace().collect();
+    // After the name: state is field 3, utime 14 and stime 15 (1-based), so indices 11 and 12.
+    let ticks: u64 = fields.get(11)?.parse::<u64>().ok()? + fields.get(12)?.parse::<u64>().ok()?;
+    Some(Duration::from_millis(ticks * 10))
+}
+
 fn bounded(
     root: &Path,
     project: &Path,
@@ -134,12 +146,22 @@ fn bounded(
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
+    // What this bound is about: a case that loops or blows up is cut off and reported as a
+    // timeout. It is a bound on the child's CPU time, not on wall time, so a busy machine does
+    // not turn slow-but-fine cases into timeouts. Wall time only backs it up for a child that
+    // sleeps forever, or where CPU time cannot be read.
     let start = Instant::now();
     let status = loop {
         if let Some(status) = child.try_wait().unwrap() {
             break Some(status);
         }
-        if start.elapsed() >= Duration::from_secs(10) {
+        let over = match child_cpu_time(child.id()) {
+            Some(cpu) => {
+                cpu >= Duration::from_secs(10) || start.elapsed() >= Duration::from_secs(600)
+            }
+            None => start.elapsed() >= Duration::from_secs(60),
+        };
+        if over {
             child.kill().unwrap();
             child.wait().unwrap();
             break None;
@@ -168,7 +190,7 @@ fn bounded(
         statuses.push(format!(
             "{label}\t{}",
             if status.is_none() {
-                "timeout (10 seconds)"
+                "timeout (10 CPU seconds)"
             } else {
                 "crash"
             }
