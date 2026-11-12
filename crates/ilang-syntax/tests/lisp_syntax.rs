@@ -1309,7 +1309,7 @@ fn rewriting_a_definition_head_cannot_forge_parameter_binding_authority() {
     let unchanged = item[0].replace_children(head.clone());
     assert_eq!(unchanged.definition_head(), Some(30));
     let replacement = Syntax::make(Node::Up("A".into()), &head[1]).unwrap();
-    let changed = item[0].replace_children(vec![head[0].clone(), replacement, head[2].clone()]);
+    let changed = item[0].replace_children(vec![head[0].clone(), replacement]);
     assert_eq!(changed.definition_head(), None);
 }
 

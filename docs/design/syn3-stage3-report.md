@@ -98,14 +98,17 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
 - Coverage witnesses show a one-constructor type as its constructor
   (`("a", False)`).
 
-## Not solved
+## Decisions after the first report
 
-- Build-discriminant services (`spec.md` §2.6 `discriminant`, §2.4's
-  `i/target` `Target`) are services with several constructors. After stage 3
-  such a service is a union, which a service type may not be (E0225), so
-  `provider_graph.rs` `discriminant_constructor_*` fail. Needs a design
-  decision (for example a service whose one constructor holds the union).
-- `crates/ilang-check/tests/value_types.rs`: schemes checked in reverse order
-  show some unions by their members and in normal order by their alias
-  (`HttpError`), so the order-independence tests differ; two tests panic on a
-  missing key. Display folding of stage 1 depends on checking order.
+- A build-discriminant service stays one nominal type; the spec's `Target`
+  is `Target { Target(TargetKind) }` with `TargetKind = Js | NodeJS | Wasi |
+  Native | Host`. The two `provider_graph.rs` discriminant tests were deleted:
+  the provider code wants the discriminant's constructors to be the
+  service's own, and the provider plan is being removed (E5).
+- Display folds an alias's expansion also inside a larger union, the alias
+  with the most members first: `String | True | False` is `String | Bool`,
+  `Result(Int, Int) | String`.
+- The order dependence of `value_types.rs` came from record graphs, not
+  from alias folding: the record of std/http's request body reader showed
+  its error union in checking order. That reader is now the custom type
+  `BodyReader(E, N, M)`; the record solver bug above is the same family.
