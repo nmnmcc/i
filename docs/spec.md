@@ -2938,6 +2938,8 @@ scope's cancellation can unwind the caller, the command delivers cancellation
 instead of returning the handle. This priority also applies at a valid join.
 A cancelling scope never starts new user work just to manufacture a join value.
 
+<!-- syn3-old -->
+
 R3. On a normal scope exit, join every live child before returning its body
 value. Before either successful or failing return, free the scope's channels,
 shares, completed-task table entries, and registration records. The owning
@@ -2947,6 +2949,21 @@ first scope in the maker's chain, or the run. A channel wait still present when
 that owner ends stops with `task: channel is gone`, including a waiter in an
 outer scope; it is not silently dropped. share get after exit stops with
 `task: shared value is gone`. Scope ends are scheduling/commit steps.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+R3. On a normal scope exit, join every live child before returning its body
+value. Before either successful or failing return, free the scope's channels,
+shares, completed-task table entries, and registration records. The owning
+Group/Task handle can survive but does not retain its result/state after exit.
+Reads needing dead state stop by the defined checks. Channel ownership is the
+first scope in the maker's chain, or the run. A channel wait still present when
+that owner ends stops with `task: channel is gone`, including a waiter in an
+outer scope; it is not silently dropped. share get after exit stops with
+`task: shared value is gone`. Scope ends are scheduling/commit steps.
+
+<!-- /syn3-new -->
 
 R4. A paused or runnable started task receives Cancel at the next switch after
 cancellation reaches it. A running task sees it at its next scheduler suspend.

@@ -3002,5 +3002,203 @@
       "E0010: `(` is not closed",
       "E0002: this string is not closed"
     ]
+  },
+  "docs/spec.md:a12d9a52fd631114": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "docs/spec.md:f644ea0d31f307b2": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:2f5b05034fc1229f": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
+    ]
+  },
+  "docs/spec.md:e7d9c651ae0ffea8": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
+      "E0101: expected `,` or `)`, found `?`"
+    ]
+  },
+  "docs/spec.md:912892ff09b080d5": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:6e7bc6c384edd950": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:f30f07d66d50ef70": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:8cd36264ae24baa3": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected a name, found `..`",
+      "E0101: expected `:`, found `)`"
+    ]
+  },
+  "docs/spec.md:5aae9c9a5ac4e3f9": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:fa26cd87534cb894": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`",
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:d457fbb1e446a369": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `|`"
+    ]
+  },
+  "docs/spec.md:9dd6b392676320e8": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:5a03b853ff51115c": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:d6fdfeb8cc43c346": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:3f075e37e918dad7": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `|`"
+    ]
+  },
+  "docs/spec.md:31ad23aa280e3999": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:8826291ef2e8a1ab": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:bedb60a148643970": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "docs/spec.md:f1593542964fc4e8": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "docs/spec.md:e90707beeb178a90": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:a3d2992aab5bde34": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:8793f6c04245c85f": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:5db078f812d3d664": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:9305a9d9ed7d77fe": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
   }
 }
