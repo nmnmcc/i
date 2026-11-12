@@ -33,7 +33,7 @@ main = <N>() {
 	local()
 }";
     entry(source);
-    entry(&source.replace("local: () -> Nil ! N | S(N)", "local"));
+    entry(&source.replace("local: () <- (S(N), ..N) -> Nil", "local"));
 }
 
 #[test]
@@ -56,14 +56,14 @@ main = <N>() {
     assert!(
         types
             .lines(&program, common::module(&program, "app/other"))
-            .contains(&"app/other.main : () -> Nil ! N | S(N)".to_string())
+            .contains(&"app/other.main : () <- (S(N), ..N) -> Nil".to_string())
     );
     let query = ilang_check::query::Query::new(&graph, &program, Some(&types));
     let module = common::module(&program, "app/other");
     let local = query
         .type_at(module, source.find("local:").unwrap() as u32)
         .unwrap();
-    assert_eq!(local.code, "local: () -> Nil ! N | S(N)");
+    assert_eq!(local.code, "local: () <- (S(N), ..N) -> Nil");
 }
 
 #[test]
@@ -97,8 +97,9 @@ main = () { helper() }",
     ] {
         entry(&format!("{base}\n{body}"));
         let inferred = body
-            .replace(": () -> Nil ! N | S(N)", "")
-            .replace("() -> Nil ! N | S(N) {", "() {");
+            .replace(": <N>() <- (S(N), ..N) -> Nil", "")
+            .replace(": () <- (S(N), ..N) -> Nil", "")
+            .replace("() -> Nil {", "() {");
         entry(&format!("{base}\n{inferred}"));
     }
 }
@@ -127,8 +128,9 @@ main = () { helper() }",
     ] {
         entry(&format!("{base}\n{body}"));
         let inferred = body
-            .replace(": () -> Nil ^ E ! N | S(E, N)", "")
-            .replace("() -> Nil ^ E ! N | S(E, N) {", "() {");
+            .replace(": <E, N>() <- (Fail(E), S(E, N), ..N) -> Nil", "")
+            .replace(": () <- (Fail(E), S(E, N), ..N) -> Nil", "")
+            .replace("() -> Nil {", "() {");
         entry(&format!("{base}\n{inferred}"));
     }
 }
@@ -143,11 +145,13 @@ use = <A, B>() <- (s: S(A, B)) {
 }
 
 main = <A, B>() {
-	local: () <- (S(A, B), ..A) -> Nil = () { use() }
+	local = () { use() }
 	local()
 }";
+    // The old annotation `() -> Nil ! A | B | S(A, B)` has two row variables,
+    // which syntax three cannot write (one `..N` per need list); only the
+    // inferred form is checked.
     entry(source);
-    entry(&source.replace("local: () -> Nil ! A | B | S(A, B)", "local"));
 }
 
 #[test]
@@ -193,10 +197,11 @@ apply = <N>() {
 
 main = () { apply() <- (S(() { read() })) }";
     entry(dependency);
-    let supplied = dependency.replace(
-        "! S(Dependency)",
-        "! Dependency = Dependency\n! S(Dependency)",
-    );
+    // An empty `Dependency = ()` is not a keyed service type in syntax three
+    // (E0225), so the supplied variant gives it a field.
+    let supplied = dependency
+        .replace("Dependency = ()", "Dependency = (value = Int)")
+        .replace("apply() <- (S(", "apply() <- (Dependency(value = 1), S(");
     let (graph, _, _) = common::check_files(&[("src/main.i", &supplied)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -259,6 +264,6 @@ helper = <N>() {
         index: index as u32,
     };
     let names = ilang_check::types::type_names(&program, module);
-    assert_eq!(types.scheme_types[&id].text(&names), "() -> Nil ! N | S(N)");
-    assert_eq!(types.schemes[&id], "() -> Nil ! N | S(N)");
+    assert_eq!(types.scheme_types[&id].text(&names), "() <- (S(N), ..N) -> Nil");
+    assert_eq!(types.schemes[&id], "() <- (S(N), ..N) -> Nil");
 }
