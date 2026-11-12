@@ -789,9 +789,29 @@ elision, role erasure or hidden context provider is permitted.
 
 #### 2.6.2 Synchronous exports and commands
 
+<!-- syn3-old -->
+
 `wasm.synchronous` is a list of host exports and must be a subset of `wasm.exports`. A listed export whose complete chosen provider graph classifies async (§10.2) is a compile error showing a qualifying dependency path. Otherwise the caller uses the async entry protocol when the metadata says async, even if the first call returns status 0. No source type promises synchronous host calling, and no implicit blocking adapter changes that contract. WASI retains §B.7's blocking ABI.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+`wasm.synchronous` is a list of host exports and must be a subset of `wasm.exports`. A listed export that is async (§10.2) is a compile error showing the service of its need that makes it async. Otherwise the caller uses the async entry protocol when the metadata says async, even if the first call returns status 0. No source type promises synchronous host calling, and no implicit blocking adapter changes that contract. WASI retains §B.7's blocking ABI.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 The target columns are `js`, `nodejs`, `native`, `wasi` and `host`. `--target ilang` is an alias of `--target host`, with no removal scheduled. Legacy host artifacts keep Appendix B's format. The native provider column does not require an AOT executable: execution location and provider selection are separate.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The targets are `js`, `nodejs`, `native`, `wasi` and `host`. `--target ilang` is an alias of `--target host`. Host artifacts keep Appendix B's format. `i run` and `i test` check against the native platform and run in the compiler's process.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
 
 | Command | Provider column / Target value | Validation and execution |
 |---|---|---|
@@ -801,6 +821,21 @@ The target columns are `js`, `nodejs`, `native`, `wasi` and `host`. `--target il
 | `i check` | none | Parse, resolve and infer all source, including test bodies; no target plan selection |
 | `i check --target t` | t, with ilang normalized to host | Check source and the plans for that target's main, configured exports and eligible tests; emit and execute nothing |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Command | Target | Checking and execution |
+|---|---|---|
+| `i run` | native | Check the needs of the selected entry against the platform; run in process |
+| `i test` | native | Check the needs of the tests against the platform; run each test in a fresh instance |
+| `i build` | the selected target; default native | Check the needs of its entries against that platform; write its artifacts |
+| `i check` | none | Parse, resolve and infer all source, including test bodies; check no need against a platform |
+| `i check --target t` | t, with ilang read as host | Check source and the needs of that target's main, configured exports and eligible tests; write and run nothing |
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 WASI has no compiled test entries under §B.7: its check still checks test source,
 but constructs no test wrapper/plan. Targeted checking validates supplies,
 adapter types/conflicts, cycles, synchronous contracts and §10.1.2's foreign
@@ -809,6 +844,20 @@ promise that any target can build or run the program. Neither check form
 promises actual host grants, engine features, successful initializers, or
 runtime results. Malformed manifest syntax is still a package-load error.
 The target-independent source checker retains entry arity and ABI checks, but does not reject an entry merely for requiring an ordinary service. These command rules concern provider selection. A package with only host exports uses host (or its ilang alias).
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+WASI has no compiled test entries under §B.7: its check still checks test source,
+but builds no test entry. Targeted checking checks the needs of entries against
+the platform, synchronous contracts and §10.1.2's foreign
+availability. Untargeted checking promises none of these: success does not
+promise that any target can build or run the program. Neither check form
+promises actual host grants, engine features, successful initializers, or
+runtime results. Malformed manifest syntax is still a package-load error.
+The target-independent source checker keeps the entry shape and interface checks, but does not reject an entry merely for needing a service. A package with only host exports uses host (or its ilang alias).
+
+<!-- /syn3-new -->
 
 `i build [NAME] [--target t]` writes the artifacts of the selected target for the selected entry:
 
@@ -4961,6 +5010,8 @@ Js service; a custom outgoing converter cannot change an export's ABI.
 
 When the program runs out of memory or stack (§11.7), there is no stop message: the host gives its own error. The host also decides how deep the stack may be, so ordinary recursion that is not in tail position may stop earlier than in another host.
 
+<!-- syn3-old -->
+
 Preview-1 defaults also supply Stdio, Clock, Entropy, Arguments, Environment
 and Fs. Required Net, Tls, Process or WorkingDirectory without an explicit
 provider is a compile error naming the service, target and entry. Custom
@@ -4969,6 +5020,20 @@ on checked i values: they copy strings/whole-byte bit arrays, validate integer
 ranges, construct pointer-bearing layouts privately, check host result extents,
 and release scratch allocations on returning paths. No guest-supplied bytes
 are interpreted as pointers. Request operations return completed requests.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The WASI platform also provides Stdio, Clock, Entropy, Arguments, Environment
+and Fs. A need of Net, Tls, Process or WorkingDirectory that the program does
+not provide is a compile error naming the service, target and entry. Custom
+imports retain the blocking ABI above. Standard capability adapters operate
+on checked i values: they copy strings/whole-byte bit arrays, validate integer
+ranges, construct pointer-bearing layouts privately, check host result extents,
+and release scratch allocations on returning paths. No guest-supplied bytes
+are interpreted as pointers. Request operations return completed requests.
+
+<!-- /syn3-new -->
 
 | Capability | Raw preview-1 imports and checked layouts |
 |---|---|
@@ -4998,6 +5063,8 @@ End of entry/startup failure/stop frees remaining checked buffers. A token
 from another instance is not a portable memory reference; no library IO value
 wraps it. Root APIs expose operations, not the table.
 
+<!-- syn3-old -->
+
 | Field | Type |
 |---|---|
 | alloc | `(size: Int) -> Int ^ String` |
@@ -5006,6 +5073,20 @@ wraps it. Root APIs expose operations, not the table.
 | load | `(token: Int, offset: Int, size: Int) -> BitArray ^ String` |
 | fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ^ String` |
 | proc_exit | `(code: Int) -> Nil ^ String` |
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Field | Type |
+|---|---|
+| alloc | `(Int) <- (Fail(String)) -> Int` |
+| free | `(Int) <- (Fail(String)) -> Nil` |
+| store | `(Int, Int, BitArray) <- (Fail(String)) -> Nil` |
+| load | `(Int, Int, Int) <- (Fail(String)) -> BitArray` |
+| fd_write | `(Int, Int, Int, Int) <- (Fail(String)) -> Int` |
+| proc_exit | `(Int) <- (Fail(String)) -> Nil` |
+
+<!-- /syn3-new -->
 
 `Wasi` is an ordinary service type with this checked signature. Its implementation is a checked adapter, not generic Int ABI lowering. Library helpers
 may wrap buffer tokens privately and add structured cleanup, as ordinary code.
