@@ -170,8 +170,8 @@ fn kept_form_messages_are_independent_checks() {
     // expected output defines them.
     for (src, code, message) in [
         ("f = <A>(x: A(Int)) { x }", "E0230", "takes no arguments"),
-        ("f = 1", "E0226", "declared more than once"),
-        ("f = 1", "E0231", "name of a type"),
+        ("f = <A, A>(x: A) { x }", "E0226", "declared more than once"),
+        ("f = <Int>(x: Int) { x }", "E0231", "name of a type"),
         ("f = <A>(x: a) { x }", "E0201", "not defined"),
         (
             "f = (x: Missing) { x }",

@@ -445,6 +445,11 @@ fn snippets_command(args: &[String]) -> i32 {
             Reading::New => "new".to_string(),
             Reading::Neither(d) => format!("neither {}", hex(&d[0].message)),
             Reading::Old | Reading::Ambiguous => match convert_file(path, &source, &ctors) {
+                // A dropped part of a snippet is not silent: it is listed.
+                Ok(c) if c.notes.iter().any(|n| n.kind == "type-params") => format!(
+                    "failed {}",
+                    hex("type parameters of a binding that is not a function are dropped; rewrite the snippet by hand")
+                ),
                 Ok(c) => match check(path, &c) {
                     None => format!("old {}", hex(&c.text)),
                     Some(why) => format!("failed {}", hex(&why)),
