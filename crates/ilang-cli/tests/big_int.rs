@@ -32,7 +32,14 @@ fn programs() -> Vec<(u8, Program)> {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        "name = \"big\"\n[wasm]\nexports = [\"big/main.apply\", \"big/main.bits\", \"big/main.float_of\", \"big/main.whole\", \"big/main.segment\", \"big/main.read_u\", \"big/main.read_i\", \"big/main.le72\", \"big/main.le72_i\", \"big/main.le512\", \"big/main.le512_u\"]\n",
+        format!(
+            "name = \"big\"\n[wasm]\nexports = {:?}\n",
+            [
+                "apply", "bits", "float_of", "whole", "segment", "read_u", "read_i", "le72",
+                "le72_i", "le512", "le512_u"
+            ]
+            .map(|name| format!("big/main.{name}"))
+        ),
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), SOURCE).unwrap();
@@ -180,9 +187,9 @@ fn large_int_arithmetic_matches_num_bigint() {
                 .unwrap()
             {
                 Outcome::Ok(Value::String(text)) => text,
-                other => panic!("O{opt} {a} {b}: {other:?}"),
+                other => panic!("level {opt} {a} {b}: {other:?}"),
             };
-            assert_eq!(got, expected(a, b), "O{opt}: a = {a}, b = {b}");
+            assert_eq!(got, expected(a, b), "level {opt}: a = {a}, b = {b}");
         }
     }
 }
@@ -225,7 +232,7 @@ fn bitwise_operations_shifts_and_floats_match_num_bigint() {
                         Value::Int(BigInt::from(n)),
                     ],
                 );
-                assert_eq!(got, expected, "O{opt}: bits of {a}, {b}, {n}");
+                assert_eq!(got, expected, "level {opt}: bits of {a}, {b}, {n}");
             }
             // The nearest Float, read from the exact decimal text.
             if a.bits() < 1024 {
@@ -235,9 +242,13 @@ fn bitwise_operations_shifts_and_floats_match_num_bigint() {
                     .unwrap()
                 {
                     Outcome::Ok(Value::Float(got)) => {
-                        assert_eq!(got.to_bits(), expected.to_bits(), "O{opt}: to_float {a}")
+                        assert_eq!(
+                            got.to_bits(),
+                            expected.to_bits(),
+                            "level {opt}: to_float {a}"
+                        )
                     }
-                    other => panic!("O{opt}: to_float {a}: {other:?}"),
+                    other => panic!("level {opt}: to_float {a}: {other:?}"),
                 }
             }
         }
@@ -264,7 +275,7 @@ fn bitwise_operations_shifts_and_floats_match_num_bigint() {
             assert_eq!(
                 text(&mut instance, "big/main.whole", &[Value::Float(x)]),
                 expected,
-                "O{opt}: truncate {x}"
+                "level {opt}: truncate {x}"
             );
         }
     }
@@ -333,7 +344,7 @@ fn wide_integer_segments_match_their_encoding() {
             .unwrap();
         let mut run = |export: &str, args: Vec<Value>| match instance.call(export, &args).unwrap() {
             Outcome::Ok(value) => value,
-            other => panic!("O{opt} {export} {args:?}: {other:?}"),
+            other => panic!("level {opt} {export} {args:?}: {other:?}"),
         };
         for (value, width) in &cases {
             let n = Value::Int(BigInt::from(*width));
@@ -346,7 +357,7 @@ fn wide_integer_segments_match_their_encoding() {
                     assert_eq!(
                         (b.bytes, b.bit_length as usize),
                         (bytes.clone(), *width),
-                        "O{opt}: u({width}) of {value}"
+                        "level {opt}: u({width}) of {value}"
                     )
                 }
                 other => panic!("{other:?}"),
@@ -355,7 +366,7 @@ fn wide_integer_segments_match_their_encoding() {
             assert_eq!(
                 int_of(run("big/main.read_u", vec![bits.clone(), n.clone()])),
                 unsigned(value, *width),
-                "O{opt}: read u({width}) of {value}"
+                "level {opt}: read u({width}) of {value}"
             );
             let half = BigInt::from(1) << (width - 1);
             let u = unsigned(value, *width);
@@ -367,7 +378,7 @@ fn wide_integer_segments_match_their_encoding() {
             assert_eq!(
                 int_of(run("big/main.read_i", vec![bits, n])),
                 signed,
-                "O{opt}: read i({width}) of {value}"
+                "level {opt}: read i({width}) of {value}"
             );
         }
         for value in values() {
@@ -378,7 +389,7 @@ fn wide_integer_segments_match_their_encoding() {
                 let bytes = encoding(&value, width, true);
                 match run(write, vec![Value::Int(value.clone())]) {
                     Value::BitArray(b) => {
-                        assert_eq!(b.bytes, bytes, "O{opt}: le{width} of {value}")
+                        assert_eq!(b.bytes, bytes, "level {opt}: le{width} of {value}")
                     }
                     other => panic!("{other:?}"),
                 }
@@ -392,7 +403,7 @@ fn wide_integer_segments_match_their_encoding() {
                 assert_eq!(
                     int_of(run(read, vec![bits])),
                     expected,
-                    "O{opt}: read le{width} of {value}"
+                    "level {opt}: read le{width} of {value}"
                 );
             }
         }

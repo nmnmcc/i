@@ -239,7 +239,7 @@ fn check_all(values: &[(f64, String)]) {
             assert_eq!(
                 text(&mut instance, "text/main.show", *value),
                 *expected,
-                "O{opt}: {value:e} ({:#x})",
+                "level {opt}: {value:e} ({:#x})",
                 value.to_bits()
             );
         }
@@ -320,7 +320,7 @@ fn floats_inside_inspected_values_use_the_same_text() {
             assert_eq!(
                 text(&mut instance, "text/main.nested", value),
                 format!("[Ok({one}), Error(({one}, \"x\"))]"),
-                "O{opt}"
+                "level {opt}"
             );
         }
     }

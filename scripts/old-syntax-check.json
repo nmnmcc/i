@@ -3023,5 +3023,13 @@
   },
   "crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1": {
     "not_source": "JSON object key in a serde_json macro"
+  },
+  "crates/ilang-cli/tests/big_int.rs:16b691ee8beb299b": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-cli/tests/float_text.rs:cca1ac99a7986d4f": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
   }
 }
