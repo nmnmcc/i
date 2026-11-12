@@ -804,8 +804,8 @@ impl<'c> Server<'c> {
             Ok(Err(response)) => response,
             Err(Later::Wait(root)) => {
                 // A request of the same kind for the same document that
-                // still waits is superseded by this one (§ LSP
-                // `ContentModified`).
+                // still waits is superseded by this one, as the LSP error
+                // `ContentModified` allows.
                 let doc = req.params["textDocument"]["uri"].clone();
                 let mut kept = Vec::new();
                 for (old, r) in std::mem::take(&mut self.waiting) {

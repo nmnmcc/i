@@ -789,7 +789,7 @@ fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
 
 #[test]
 fn disjoint_comparison_is_a_warning_at_the_comparison() {
-    // W520/§6.9 keeps the comparison span and shows both types.
+    // W520 keeps the comparison span and shows both types.
     let source = "x = 1 == 2\n";
     let dir = tempfile::tempdir().unwrap();
     package(dir.path(), &[("src/main.i", source)]);
