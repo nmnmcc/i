@@ -690,37 +690,37 @@ fn eager(name: &str) -> (String, &'static str, &'static str, i32) {
         "cancel_out_trace" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:13:7\napp/main:55:3\n",
+            "control: boundary is not active\napp/main:17:7\napp/main:59:3\n",
             1,
         ),
         "cancel_out_trace_catch" => (
             [CANCEL_OUT, G_CATCH, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:14:5\napp/main:13:7\napp/main:59:3\n",
+            "control: boundary is not active\napp/main:18:5\napp/main:17:7\napp/main:63:3\n",
             1,
         ),
         "cancel_out_two_trampolines" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_PLAIN, MAIN_THIRD].concat(),
             "",
-            "control: boundary is not active\napp/main:13:7\napp/main:60:16\napp/main:64:3\napp/main:69:22\napp/main:82:3\n",
+            "control: boundary is not active\napp/main:17:7\napp/main:66:16\napp/main:70:3\napp/main:75:22\napp/main:88:3\n",
             1,
         ),
         "cancel_out_restores_before_mode2" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_ENSURE, MAIN_THIRD].concat(),
             "",
-            "panic: final\napp/main:69:61\napp/main:69:22\napp/main:82:3\n",
+            "panic: final\napp/main:75:61\napp/main:75:22\napp/main:88:3\n",
             1,
         ),
         "env_tail_call_resume" => (
             ENV_TAIL_RESUME.to_string(),
             "",
-            "panic: resumer\napp/main:10:3\napp/main:24:5\napp/main:31:3\n",
+            "panic: resumer\napp/main:12:3\napp/main:26:5\napp/main:33:3\n",
             1,
         ),
         "env_tail_call_cancel" => (
             ENV_TAIL_CANCEL.to_string(),
             "",
-            "panic: resumer\napp/main:11:10\napp/main:26:5\napp/main:33:3\n",
+            "panic: resumer\napp/main:13:10\napp/main:28:5\napp/main:35:3\n",
             1,
         ),
         "cancel_suspends_to_inner_boundary" => (
