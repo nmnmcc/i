@@ -1440,8 +1440,12 @@ The ordinary module `i/target` exports this nominal service and its constructors
 
 ```i
 (js = i/js, wasi = i/wasi)
-(Target, Js(..), NodeJS(..), Wasi(..), Native(..), Host(..))
-Target = Js | NodeJS | Wasi | Native | Host
+(Target(..), TargetKind, Js(..), NodeJS(..), Wasi(..), Native(..), Host(..))
+Target {
+  Target(TargetKind)
+}
+
+TargetKind = Js | NodeJS | Wasi | Native | Host
 
 Js {
   Js(js: js.Js)
