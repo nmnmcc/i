@@ -943,6 +943,26 @@ impl<'a> Lowerer<'a> {
                 || (self.options.tests && self.options.target != ir::Target::Wasi))
     }
 
+    /// A definition of the library package, by module path and name.
+    fn library_def(&self, path: &str, name: &str) -> DefId {
+        let (mi, m) = self
+            .program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path && m.package == self.graph.library)
+            .unwrap_or_else(|| panic!("library module {path}"));
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .unwrap_or_else(|| panic!("library definition {path}.{name}"));
+        DefId {
+            module: ModuleId(mi as u32),
+            index: index as u32,
+        }
+    }
+
     fn is_library(&self, m: ModuleId) -> bool {
         self.program.module(m).package == self.graph.library
     }
@@ -1086,6 +1106,12 @@ impl<'a> Lowerer<'a> {
             return;
         }
         self.entries();
+        for &(wat, module, name) in ir::RUNTIME_CALLS {
+            let def = self.library_def(module, name);
+            let f = self.def_func(def);
+            self.constants.insert(f);
+            self.out.runtime_calls.push((wat, f));
+        }
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
             let tb = self.program.binding(b);

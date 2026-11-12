@@ -14,6 +14,9 @@ pub(crate) const STUB_HOST: &str = r#"
   (throw $test_stop (local.get $address) (local.get $length)))
 (func $host_reference_id (param $r externref) (result i64)
   (if (result i64) (ref.is_null (local.get $r)) (then (i64.const 0)) (else (i64.const 1))))
+;; The text of a Float is i code (`lib/i/float_text.i`), which these
+;; modules do not have.
+(func $float_to_string (param eqref) (result eqref) unreachable)
 "#;
 
 /// A list of checks, each an `i32` expression that must not be 0.

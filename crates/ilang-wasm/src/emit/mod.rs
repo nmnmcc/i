@@ -280,6 +280,24 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         );
     }
     m.push_str(&e.out);
+    // The runtime calls these library functions written in i. An
+    // intermediate program made without lowering has no library, and then
+    // they stop.
+    for (wat, _, _) in crate::ir::RUNTIME_CALLS {
+        match p.runtime_calls.iter().find(|(name, _)| name == wat) {
+            Some((_, f)) => {
+                let _ = writeln!(
+                    m,
+                    "(func {wat} (param $value eqref) (result eqref) \
+                     (call $f{} (global.get $c{}) (ref.null $env) (local.get $value)))",
+                    f.0, f.0
+                );
+            }
+            None => {
+                let _ = writeln!(m, "(func {wat} (param eqref) (result eqref) unreachable)");
+            }
+        }
+    }
     let mut declared: Vec<String> = (0..p.funcs.len()).map(|i| format!("$f{i}")).collect();
     declared.extend((0..p.points.len()).map(|i| format!("$r{i}")));
     declared.extend(DECLARED.iter().map(|d| d.to_string()));

@@ -12,6 +12,7 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/request", include_str!("../../../lib/i/request.i")),
     ("i/key", include_str!("../../../lib/i/key.i")),
     ("i/core", include_str!("../../../lib/i/core.i")),
+    ("i/float_text", include_str!("../../../lib/i/float_text.i")),
     ("i/record", include_str!("../../../lib/i/record.i")),
     ("i/io", include_str!("../../../lib/i/io.i")),
     ("i/task", include_str!("../../../lib/i/task.i")),
