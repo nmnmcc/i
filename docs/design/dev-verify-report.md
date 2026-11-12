@@ -46,6 +46,14 @@ No language or library surface was added, including state mechanisms.
   actual output with each saved observation: rejection, code and source
   position are unchanged. Regenerated only these two diagnostic observations
   against the current CLI; their independent requirements remain unchanged.
+  Five further A1 observations were stale after syntax migration: both
+  `09_attr_tuple_same_line` copies now contain only an ordinary tuple binding
+  (the migration removed their attribute), both `26_guard_fn_ungrouped`
+  copies use `?` as a guard after a function type (spec §§3, 7.1), and the
+  historical `25_old_guard_fn/original` input still rejects with the current
+  parser's E0101 rather than the old record-brace diagnostic. Inspected the
+  sources and complete release-CLI observations, including both startup runs
+  for the four now-valid inputs, before refreshing these five snapshots.
 - i WASI smoke: its generated stopping program also used removed `@main`
   and failed with E0301 after the hello module built. Generate the ordinary
   main binding; retain both engines, both optimization levels, output/stop

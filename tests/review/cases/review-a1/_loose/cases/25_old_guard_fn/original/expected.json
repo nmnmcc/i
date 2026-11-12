@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "5ef0366730c1657d9a4b9159bf704e2326e57590",
+  "binary_sha256": "f2447ed6524ac42e527ffba7bc86f6ce4166071bc4a0c4ee9ec692f4c1e3ec59",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:32: error[E0114]: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`\nsrc/main.i:2:50: error[E0101]: expected `->`, found `if`; a tuple type in a clause pattern is put in `{ }`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`\n2 errors\n"
+      "stderr": "src/main.i:2:35: error[E0101]: expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`\n1 error\n"
     }
   }
 }
