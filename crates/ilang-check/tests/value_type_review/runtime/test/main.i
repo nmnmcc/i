@@ -1,6 +1,6 @@
 (
 	testlib = (test) = std/test
-	runtime = review/main
+	runtime = review/runtime
 )
 
 test("alias_tests", () { runtime.alias_tests() })

@@ -48,7 +48,8 @@ Hand rewrites:
   Nil-result check without depending on macro expansion inside the checker.
   Unused-binding tests use ordinary underscore roots to retain helper references.
   `value_type_review/runtime` separates its ordinary source functions from the
-  four macro test wrappers. The core review harness checks source without test
+  four macro test wrappers (`src/runtime.i` and `test/main.i`, with distinct module
+  paths). The core review harness checks source without test
   expansion; the package still runs all four tests through the normal CLI.
 - Generic attribute parser/printer fixtures (`golden/attributes` and
   `lisp_syntax`) use `@custom`; their subject is attribute syntax, not testing.
@@ -134,3 +135,6 @@ initially reported obsolete hashes and the pre-existing formatter's `?` output;
 all affected sources/classifications were corrected, with no broad exemptions.
 
 No requested behavior remains deferred.
+
+The split runtime fixture initially used colliding `src/main.i` and `test/main.i`
+module paths (`error[E0624]`); its source helper is now `src/runtime.i`.
