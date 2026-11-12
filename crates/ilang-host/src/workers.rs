@@ -98,9 +98,11 @@ struct PoolState {
     /// Tasks run per worker: index 0 is the home worker.
     ran: Vec<u64>,
     published: u64,
+    /// Records whose maker waited for them already.
+    polled: std::collections::HashSet<u64>,
     /// `scope.share` values, encoded once, until their scope ends.
     shares: HashMap<ShareKey, Arc<Vec<u8>>>,
-    /// Speculations interrupted because their maker forgot them (a cancel).
+    /// Running speculations interrupted because their maker forgot them (a cancel).
     stopped: u64,
 }
 
@@ -227,7 +229,17 @@ impl Pool {
     /// not spin.
     pub(crate) fn poll(&self, id: u64) -> i32 {
         let mut state = self.lock();
-        for round in 0..2 {
+        // The first wait for a record gives a short claimant time to finish,
+        // so tasks end near the order one worker gives; later waits only keep
+        // an idle maker from spinning.
+        let first = state.polled.insert(id);
+        let deadline = std::time::Instant::now()
+            + if first {
+                Duration::from_millis(20)
+            } else {
+                Duration::from_micros(500)
+            };
+        loop {
             match kind(state.entries.get(&id)) {
                 Kind::Done => {
                     // A value read by the speculation may have ended with
@@ -236,6 +248,7 @@ impl Pool {
                         unreachable!()
                     };
                     if reads.iter().all(|key| state.shares.contains_key(key)) {
+                        state.polled.remove(&id);
                         return 1;
                     }
                     state.entries.insert(id, Entry::Returned);
@@ -246,6 +259,7 @@ impl Pool {
                         state.finished -= 1;
                         state.ran[0] += 1;
                     }
+                    state.polled.remove(&id);
                     return 2;
                 }
                 Kind::Ready => {
@@ -255,21 +269,21 @@ impl Pool {
                         state.queue.remove(at);
                     }
                     state.ran[0] += 1;
+                    state.polled.remove(&id);
                     return 2;
                 }
                 Kind::Taken => {}
             }
-            if round == 0 && state.finished == 0 {
-                state = self
-                    .results
-                    .wait_timeout(state, Duration::from_micros(500))
-                    .unwrap_or_else(|e| e.into_inner())
-                    .0;
-            } else {
-                break;
+            let now = std::time::Instant::now();
+            if now >= deadline || (!first && state.finished > 0) {
+                return 0;
             }
+            state = self
+                .results
+                .wait_timeout(state, deadline - now)
+                .unwrap_or_else(|e| e.into_inner())
+                .0;
         }
-        0
     }
 
     pub(crate) fn take(&self, id: u64) -> Option<Vec<u8>> {
@@ -306,6 +320,7 @@ impl Pool {
 
     pub(crate) fn forget(&self, id: u64) {
         let mut state = self.lock();
+        state.polled.remove(&id);
         match state.entries.remove(&id) {
             Some(Entry::Ready(_)) => {
                 if let Some(at) = state.queue.iter().position(|x| *x == id) {
@@ -316,6 +331,7 @@ impl Pool {
                 let slot = &state.slots[worker - 1];
                 if slot.running == Some(id) {
                     slot.abandon.store(true, Ordering::SeqCst);
+                    state.stopped += 1;
                 }
             }
             Some(Entry::Done(..) | Entry::Returned) => state.finished -= 1,
@@ -419,9 +435,6 @@ impl Pool {
                     drop(state);
                     self.results.notify_all();
                 } else {
-                    if trapped && !state.shutdown {
-                        state.stopped += 1;
-                    }
                     drop(state);
                 }
                 if trapped {

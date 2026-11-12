@@ -287,7 +287,7 @@ upto = (n: Int, acc: List(Int)) -> List(Int) {{
 total = (xs: List(Int), acc: Int) -> Int {{
 	xs |> {{
 		[]          -> acc
-		[x, ..rest] -> total(rest, { acc + x } % 65537)
+		[x, ..rest] -> total(rest, {{ acc + x }} % 65537)
 	}}
 }}
 
