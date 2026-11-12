@@ -12,6 +12,7 @@ mod control;
 mod host;
 mod numeric;
 mod wasi;
+mod workers;
 
 pub(super) const FIXED_MAX: usize = 10_000;
 
@@ -114,6 +115,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     e.start();
     e.exports();
     e.resume_exports();
+    // The `ilang:worker` operations of `i/task` bring the multicore codec and
+    // its transport imports (emit/workers.rs).
+    let uses_workers = e.out.contains("(call $worker_");
     let mut m = String::from("(module\n");
     // A host reference can come into the program only through an import or
     // an export whose types have one (B.2).
@@ -151,6 +155,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         }
     } else {
         m.push_str(runtime::HOST);
+        if uses_workers {
+            m.push_str(workers::IMPORTS);
+        }
     }
     if p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
         m.push_str("(import \"ilang:host/v1\" \"cancel\" (func $host_cancel (param i32)))\n");
@@ -225,6 +232,13 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m.push_str(control::EFFECTS);
     m.push_str(&host::effects());
     m.push_str(ENTRY);
+    if uses_workers {
+        if wasi {
+            m.push_str(workers::WASI_STUBS);
+        }
+        m.push_str(workers::WAT);
+        m.push_str(&workers::closures(&e.arities, p.funcs.len()));
+    }
     m.push_str(&e.data);
     for (id, label) in p.labels.iter().enumerate() {
         if label.len() > FIXED_MAX {
@@ -287,8 +301,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
 fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
     let flags = u32::from(patched);
     format!(
-        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const 0) \
+        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const {}) \
          (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
+        f.0 + 3,
         f.0
     )
 }
@@ -1091,7 +1106,7 @@ impl<'p> Emitter<'p> {
             "(global.set $root_env (array.new $env (ref.null eq) (i32.const {})))\n\
              (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {ASSERT_SERVICE})\n\
              (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1\n\
-             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0) (ref.null $bytes)\n\
+             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 2) (ref.null $bytes)\n\
              (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
             self.p.services.max(1)
         );

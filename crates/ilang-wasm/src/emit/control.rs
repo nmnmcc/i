@@ -676,7 +676,7 @@ pub(super) const EFFECTS: &str = r#"
       (array.get $env (local.get $env) (local.get $i)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
-  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 1)
     (ref.null $bytes)
     (array.new_fixed $values 2 (local.get $f) (call $tuple (local.get $slots)))
     (ref.null $limbs) (ref.null $call) (ref.func $keep_call)))

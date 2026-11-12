@@ -120,7 +120,24 @@ Turn {
 }
 
 Start {
-	Start(body: (Scheduler) -> Completion)
+	Start(
+		body:   (Launch) -> Completion
+		spec:   (Scheduler) -> Completion
+		ticket: Int
+	)
+}
+
+/// How the scheduler starts a task: with its own scheduler and the ticket of
+/// its published record (0 when the record was not published).
+Launch {
+	Launch(own: Scheduler, ticket: Int)
+}
+
+/// A published task record (multicore D8, native N7): the start function of
+/// the body without the task frame, and the scheduler it runs with on a
+/// worker. Every step of that scheduler gives the record back to its maker.
+Job {
+	Job(start: (Scheduler) -> Completion, own: Scheduler)
 }
 
 Policy {
@@ -1095,6 +1112,33 @@ guarded = (
 	})
 }
 
+complete(A, E, N) = (
+	body: () -> A ^ E ! N
+	result: Key(Result(A, E))
+	errors: Key(E)
+	check: Bool
+) -> Completion ! N {
+	fail.catch(body) |> {
+		Ok(value) -> {
+			{ check } |> {
+				True  -> portable(value)
+				False -> Nil
+			}
+			Succeeded(key.wrap(result, Ok(value)))
+		}
+		Error(error) -> {
+			{ check } |> {
+				True  -> portable(error)
+				False -> Nil
+			}
+			Failed(
+				key.wrap(result, Error(error))
+				key.wrap(errors, error)
+			)
+		}
+	}
+}
+
 make_start(A, E, N) = (
 	body: () -> A ^ E ! N
 	result: Key(Result(A, E))
@@ -1104,7 +1148,8 @@ make_start(A, E, N) = (
 	! Scheduler = DetachedScheduler
 	! Runner = DetachedRunner
 	! request.Await = request.Await((_) { panic("task: no scheduler") })
-	kept = control.keep_env((own: Scheduler) {
+	kept = control.keep_env((launch: Launch) {
+		own = launch.own
 		own |> {
 			DetachedScheduler -> panic("task: no scheduler")
 			Scheduler(..) -> {
@@ -1112,31 +1157,151 @@ make_start(A, E, N) = (
 				! Runner = own.runner
 				! request.Await = own.waiter
 				local = control.keep_env((_: Nil) {
-					fail.catch(body) |> {
-						Ok(value) -> {
-							{ check } |> {
-								True  -> portable(value)
-								False -> Nil
-							}
-							Succeeded(key.wrap(result, Ok(value)))
-						}
-						Error(error) -> {
-							{ check } |> {
-								True  -> portable(error)
-								False -> Nil
-							}
-							Failed(
-								key.wrap(result, Error(error))
-								key.wrap(errors, error)
-							)
-						}
-					}
+					complete(body, result, errors, check)
 				})
-				retain(guarded(own, Absent, () { local(Nil) }))
+				ticket = launch.ticket
+				retain(guarded(own, Absent, () {
+					claimed(own, ticket) |> {
+						Present(done) -> done
+						Absent        -> local(Nil)
+					}
+				}))
 			}
 		}
 	})
-	Start(kept)
+	// The same body without the task frame, run by another worker as a
+	// speculation: any scheduler step gives the record back (multicore P1).
+	spec = control.keep_env((own: Scheduler) {
+		own |> {
+			DetachedScheduler -> panic("task: no scheduler")
+			Scheduler(..) -> {
+				! Scheduler = own
+				! Runner = own.runner
+				! request.Await = own.waiter
+				retain(complete(body, result, errors, check))
+			}
+		}
+	})
+	Start(kept, spec, 0)
+}
+
+@external("ilang:worker", "enabled")
+worker_enabled: () -> Bool
+
+@external("ilang:worker", "publish")
+worker_publish: (job: Job) -> Int
+
+@external("ilang:worker", "claim")
+worker_claim: (ticket: Int) -> Bool
+
+@external("ilang:worker", "poll")
+worker_poll: (ticket: Int) -> Int
+
+@external("ilang:worker", "take")
+worker_take: (ticket: Int) -> Completion
+
+@external("ilang:worker", "forget")
+worker_forget: (ticket: Int) -> Nil
+
+@external("ilang:worker", "abort")
+worker_abort: () -> Never
+
+@external("ilang:worker", "share_put")
+worker_share_put: (run: Key(Nil), address: Address, value: Keyed) -> Nil
+
+@external("ilang:worker", "share_get")
+worker_share_get: (run: Key(Nil), address: Address) -> List(Keyed)
+
+@external("ilang:worker", "share_drop")
+worker_share_drop: (run: Key(Nil), address: Address) -> Nil
+
+/// The completion of a published task that another worker claimed, or Absent
+/// when this task runs its own original: the maker claimed it first, or the
+/// worker gave the record back. Waiting yields, so the scheduler goes on and
+/// a cancel reaches the task (the claimant is then stopped).
+claimed = (own: Scheduler, ticket: Int) -> Maybe(Completion) {
+	{ ticket == 0 } |> {
+		True  -> Absent
+		False -> worker_claim(ticket) |> {
+			True  -> Absent
+			False -> retain(resource.ensure(
+				() { await_worker(own, ticket) }
+				() { worker_forget(ticket) }
+			))
+		}
+	}
+}
+
+await_worker = (own: Scheduler, ticket: Int) -> Maybe(Completion) {
+	worker_poll(ticket) |> {
+		0 -> {
+			ask(own, Yield)
+			await_worker(own, ticket)
+		}
+		1 -> Present(worker_take(ticket))
+		_ -> Absent
+	}
+}
+
+/// The only step a speculation takes itself: reading a value shared in its
+/// own run, from the host transport (`scope.share`). Its maker checks, when
+/// it takes the completion, that every value read is still there.
+speculation_step = (run: Key(Nil), command: Command) -> StepAnswer {
+	command |> {
+		GetShare(handle, _, id) ? handle == run -> worker_share_get(
+			run
+			read(address_key, id)
+		) |> {
+			[value] -> Proceed(value)
+			_       -> worker_abort()
+		}
+		_ -> worker_abort()
+	}
+}
+
+drop_shares = (s: State, ids: List(Address)) {
+	ids |> {
+		[] -> Nil
+		[id, ..rest] -> {
+			worker_share_drop(s.run, id)
+			drop_shares(s, rest)
+		}
+	}
+}
+
+speculation_wait = (_: Ticket) -> Nil { worker_abort() }
+
+/// Publish the record of a new task when more than one worker runs. The
+/// scheduler of the record has the task's run, root, path and generator, so
+/// `task.path()` and `task.random()` give what they give at home.
+publish = (s: State, task_path: List(Int), start: Start) -> Start {
+	{ s.scripted || core.not(worker_enabled()) } |> {
+		True  -> start
+		False -> {
+			runner = s.runner
+			run = s.run
+			seed = runner |> {
+				DetachedRunner -> panic("task: no scheduler")
+				Runner(..)     -> runner.seed
+			}
+			own = Scheduler(
+				s.run
+				s.root
+				key.wrap(path_key, task_path)
+				() {
+					fail.catch(() { rng.at_path(seed, task_path) }) |> {
+						Ok(g)    -> g
+						Error(_) -> panic("task: invalid task path")
+					}
+				}
+				Portable
+				(command: Command) { speculation_step(run, command) }
+				DetachedRunner
+				request.Await(speculation_wait)
+			)
+			Start(..start, ticket: worker_publish(Job(start.spec, own)))
+		}
+	}
 }
 
 path = (own ! Scheduler) {
@@ -2219,6 +2384,10 @@ retire_scope = (s: State, scope: ScopeState) -> State {
 		True  -> panic("task: channel is gone")
 		False -> Nil
 	}
+	{ worker_enabled() } |> {
+		True  -> drop_shares(s, scope.owned_shares)
+		False -> Nil
+	}
 	next = State(
 		..s
 		scopes:   drop_children(s.scopes, [address_index(scope.address)])
@@ -2383,7 +2552,7 @@ do_command = (
 			child_path = append(t.path, [index])
 			immune = exemptions(s, t)
 			(status, outcome, clean) = scope.cancellation |> {
-				Absent         -> (Dormant(start), Pending, False)
+				Absent         -> (Dormant(publish(s, child_path, start)), Pending, False)
 				Present(cause) -> (Ended, Cancelled(cause), True)
 			}
 			child = TaskState(
@@ -2608,6 +2777,10 @@ do_command = (
 		NewShare(info, value) -> {
 			portable(value)
 			id = new_address(t)
+			{ worker_enabled() } |> {
+				True  -> worker_share_put(s.run, id, value)
+				False -> Nil
+			}
 			row = ShareState(id, Present(read(address_key, info.id)), value)
 			next = set_task(s, TaskState(..t, handles: t.handles + 1))
 			scope = find_scope(next.scopes, read(address_key, info.id))
@@ -2818,9 +2991,10 @@ turn = (s: State, t: TaskState) -> Turn {
 			root = s.root
 			runner = s.runner
 			body = start.body
+			ticket = start.ticket
 			control.boundary((b) {
 				own = make_scheduler(b, path, id, run, root, runner)
-				Finished(id, body(own))
+				Finished(id, body(Launch(own, ticket)))
 			})
 		}
 		Runnable(k, value) -> control.resume(k, value)

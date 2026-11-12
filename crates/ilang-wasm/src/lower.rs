@@ -2493,6 +2493,22 @@ impl<'a> Lowerer<'a> {
                 };
                 Ok((Op::Runtime { name, arity }, arity))
             }
+            "ilang:worker" => {
+                let name = match function.as_str() {
+                    "enabled" => "worker_enabled",
+                    "publish" => "worker_publish",
+                    "claim" => "worker_claim",
+                    "poll" => "worker_poll",
+                    "take" => "worker_take",
+                    "forget" => "worker_forget",
+                    "abort" => "worker_abort",
+                    "share_put" => "worker_share_put",
+                    "share_get" => "worker_share_get",
+                    "share_drop" => "worker_share_drop",
+                    _ => return Err(format!("`worker.{function}` is not known")),
+                };
+                Ok((Op::Runtime { name, arity }, arity))
+            }
             "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
             "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),

@@ -155,6 +155,9 @@ const CORE: &str = r#"
       (if (i32.eq (local.get $ka) (i32.const 10)) (then
         (local.set $c (call $compare_i64 (call $host_id (local.get $a)) (call $host_id (local.get $b))))
         (br $compared)))
+      ;; Copies of one key on two workers keep its id (multicore D6).
+      (if (i32.eq (local.get $ka) (i32.const 15)) (then
+        (br_if $compared (call $key_same (local.get $a) (local.get $b)))))
       ;; Identity values that are not ref.eq are different. The order between
       ;; them only has to be consistent within one comparison.
       (if (call $value_identity_kind (local.get $ka)) (then (return (i32.const 1))))
@@ -394,15 +397,30 @@ const CORE: &str = r#"
   (call $int_from_i64 (i64.extend_i32_u (call $value_hash_u32 (local.get $v)))))
 
 ;; Keys are identity values. Tag 14 remains reserved for structural records.
+;; Field 2 is the key's id (multicore D6): start-up takes 1, 2, ... the same
+;; on every worker; a worker then takes ids above its own prefix. A copy of a
+;; key on another worker keeps the id, so it is the same key. Only `==` and
+;; `key.read` read ids.
+(global $id_prefix (mut i64) (i64.const 0))
+(global $id_next (mut i64) (i64.const 0))
 (func $key_new (result eqref)
-  (struct.new $obj (i32.const 15) (i32.const 0) (i64.const 0) (f64.const 0)
+  (global.set $id_next (i64.add (global.get $id_next) (i64.const 1)))
+  (struct.new $obj (i32.const 15) (i32.const 0) (i64.or (global.get $id_prefix) (global.get $id_next)) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+(func $key_same (param $a eqref) (param $b eqref) (result i32)
+  (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
+  (if (i32.eqz (i32.and (ref.test (ref $obj) (local.get $a)) (ref.test (ref $obj) (local.get $b))))
+    (then (return (i32.const 0))))
+  (i32.and
+    (i64.ne (struct.get $obj 2 (ref.cast (ref $obj) (local.get $a))) (i64.const 0))
+    (i64.eq (struct.get $obj 2 (ref.cast (ref $obj) (local.get $a)))
+            (struct.get $obj 2 (ref.cast (ref $obj) (local.get $b))))))
 (func $key_wrap (param $key eqref) (param $value eqref) (result eqref)
   (struct.new $obj (i32.const 16) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (array.new_fixed $values 2 (local.get $key) (local.get $value))
     (ref.null $limbs) (ref.null $call)))
 (func $key_read (param $key eqref) (param $value eqref) (result eqref)
-  (if (ref.eq (local.get $key) (call $field (local.get $value) (i32.const 0)))
+  (if (call $key_same (local.get $key) (call $field (local.get $value) (i32.const 0)))
     (then (return_call $result_ok (call $field (local.get $value) (i32.const 1)))))
   (call $result_error (ref.null eq)))
 
