@@ -15,25 +15,25 @@ User {
 
 user_schema = () {
 	names = schema.field(
-		schema.object(User("", 0))
+		schema.object(User(name: "", age: 0))
 		"name"
 		schema.string
 		(u) { u.name }
-		(u, name) { User(name, u.age) }
+		(u, name) { User(name: name, age: u.age) }
 	)
 	schema.field(names, "age", schema.int, (u) { u.age }, (u, age) {
-		User(u.name, age)
+		User(name: u.name, age: age)
 	})
 }
 
 reply = (status, text) {
 	r = http.response(http.Status(status))
 	http.Response(
-		r.status
-		r.reason
-		http.Headers([("Content-Type", "application/json")])
-		<<text:utf8>>
-		http.Headers([])
+		status:   r.status
+		reason:   r.reason
+		headers:  http.Headers([("Content-Type", "application/json")])
+		body:     <<text:utf8>>
+		trailers: http.Headers([])
 	)
 }
 
@@ -42,11 +42,11 @@ handle = (req: http.Request) {
 		(http.Method("GET"), "/health") -> {
 			r = http.response(http.Status(200))
 			http.Response(
-				r.status
-				r.reason
-				r.headers
-				<<"ok":utf8>>
-				r.trailers
+				status:   r.status
+				reason:   r.reason
+				headers:  r.headers
+				body:     <<"ok":utf8>>
+				trailers: r.trailers
 			)
 		}
 		(http.Method("POST"), "/users") -> bit_array.to_string(req.body) |> {

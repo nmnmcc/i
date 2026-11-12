@@ -1,4 +1,4 @@
-//! Run the program entry and the tests of a compiled module.
+//! Runs the program entry and the tests of a compiled module.
 //!
 //! cargo run --release -p ilang-host --example run -- MODULE.wasm
 //!

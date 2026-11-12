@@ -218,10 +218,15 @@ impl Checker<'_> {
                 ret,
                 err,
                 env,
-            } => Ty::Fn(Box::new(FnTy::new(params
+            } => Ty::Fn(Box::new(FnTy::new(
+                params
                     .iter()
                     .map(|p| (p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)))
-                    .collect(), go(ret), err.as_deref().map_or(Ty::Never, go), env.as_deref().map_or(Ty::Never, go)))),
+                    .collect(),
+                go(ret),
+                err.as_deref().map_or(Ty::Never, go),
+                env.as_deref().map_or(Ty::Never, go),
+            ))),
             TypeKind::Union(ts) => self.kunion(ts.iter().map(go).collect()),
             TypeKind::Inter(ts) => display::known_inter(&self.s, ts.iter().map(go).collect()),
             TypeKind::Diff(ts) => {
@@ -332,16 +337,8 @@ impl Checker<'_> {
                 err: self.known_bound(&f.err),
                 env: self.s.fresh(),
             })),
-            Ty::Union(xs) => Ty::Union(
-                xs.iter()
-                    .map(|x| self.known_bound(x))
-                    .collect(),
-            ),
-            Ty::Inter(xs) => Ty::Inter(
-                xs.iter()
-                    .map(|x| self.known_bound(x))
-                    .collect(),
-            ),
+            Ty::Union(xs) => Ty::Union(xs.iter().map(|x| self.known_bound(x)).collect()),
+            Ty::Inter(xs) => Ty::Inter(xs.iter().map(|x| self.known_bound(x)).collect()),
             Ty::Diff(a, h)
                 if h.iter()
                     .any(|t| t.scalar().is_some() && !t.values().is_all()) =>
@@ -614,7 +611,10 @@ impl Checker<'_> {
                 }
             }
             PatternKind::Tuple(ps) => {
-                let parts = match member(b, Some(Head::Shape(super::ShapeId::positional(ps.len() as u32)))) {
+                let parts = match member(
+                    b,
+                    Some(Head::Shape(super::ShapeId::positional(ps.len() as u32))),
+                ) {
                     Some(Ty::Con(_, _, xs)) => xs,
                     _ => vec![Ty::Top; ps.len()],
                 };
@@ -849,7 +849,13 @@ pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
                 })
                 .collect(),
         ),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: Ty::Top, labels: f.labels.clone(), ret: whole_lits(s, &f.ret), err: whole_lits(s, &f.err), env: Ty::Top })),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            param: Ty::Top,
+            labels: f.labels.clone(),
+            ret: whole_lits(s, &f.ret),
+            err: whole_lits(s, &f.err),
+            env: Ty::Top,
+        })),
         Ty::Union(ms) => display::known_union(s, ms.iter().map(|t| whole_lits(s, t)).collect()),
         Ty::Inter(ms) => display::known_inter(s, ms.iter().map(|t| whole_lits(s, t)).collect()),
         Ty::Diff(a, h)
@@ -883,9 +889,7 @@ pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
                 }
             }
             Ty::Fn(f) => {
-                for p in [&f.param] {
-                    walk(s, p, !given, false, out);
-                }
+                walk(s, &f.param, !given, false, out);
                 walk(s, &f.ret, given, false, out);
                 walk(s, &f.err, given, false, out);
                 walk(s, &f.env, true, false, out);
@@ -909,9 +913,7 @@ pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
         }
     }
     let mut out = Vec::new();
-    for p in [&f.param] {
-        walk(s, p, true, true, &mut out);
-    }
+    walk(s, &f.param, true, true, &mut out);
     walk(s, &f.ret, false, false, &mut out);
     walk(s, &f.env, true, false, &mut out);
     out
@@ -951,7 +953,8 @@ mod literal_known_tests {
     fn hidden_inputs_and_recursive_widening() {
         // decision 7: callback outputs and environments, not callback inputs.
         let s = super::super::solve::Solver::new(Default::default(), Vec::new());
-        let f = FnTy::new(vec![(
+        let f = FnTy::new(
+            vec![(
                 None,
                 Ty::Fn(Box::new(FnTy::new(
                     vec![(None, Ty::Var(V(0)))],
@@ -959,7 +962,11 @@ mod literal_known_tests {
                     Ty::Never,
                     Ty::Never,
                 ))),
-            )], Ty::Var(V(2)), Ty::Never, Ty::Var(V(3)));
+            )],
+            Ty::Var(V(2)),
+            Ty::Never,
+            Ty::Var(V(3)),
+        );
         assert_eq!(hidden_inputs(&s, &f), [V(1), V(3)]);
         let lit = Ty::lit(
             BuiltinType::Int,

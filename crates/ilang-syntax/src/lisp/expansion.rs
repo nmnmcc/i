@@ -43,6 +43,8 @@ pub struct MacroDefinition {
     pub item: usize,
     pub name: String,
     pub parameters: Vec<String>,
+    /// Index of the declared runtime signature, for a typed macro.
+    pub signature: Option<usize>,
 }
 
 /// Find and validate source macro definitions. The type checker subsequently
@@ -77,6 +79,12 @@ pub fn definitions(
         }
         if attributes.len() != 1 || !attr.args.is_empty() || attr.call.is_some() {
             errors.push(error("@macro is given once without arguments", attr.span));
+            continue;
+        }
+        if let ItemKind::Declaration { name, .. } = &item.kind {
+            if !module.items.iter().any(|other| matches!(&other.kind, ItemKind::Binding(b) if matches!(&b.pattern.kind, PatternKind::Var(n) if n == &name.name)) && other.attributes.iter().any(|a| a.module.is_none() && a.name.name == "macro")) {
+                errors.push(error("a typed macro signature needs an @macro implementation", item.span));
+            }
             continue;
         }
         let ItemKind::Binding(binding) = &item.kind else {
@@ -125,15 +133,71 @@ pub fn definitions(
                 },
             }
         }
-        if module.items.iter().any(|other| matches!(&other.kind, ItemKind::Declaration { name: declared, .. } if declared.name == *name)) {
-            errors.push(error("a macro cannot have a separate declaration", binding.pattern.span));
-            valid = false;
+        let signature = module.items.iter().position(|other| matches!(&other.kind, ItemKind::Declaration { name: declared, .. } if declared.name == *name));
+        if let Some(index) = signature {
+            let declaration = &module.items[index];
+            if declaration
+                .attributes
+                .iter()
+                .any(|a| a.module.is_none() && matches!(a.name.name.as_str(), "external" | "js"))
+            {
+                errors.push(error(
+                    "a typed macro signature cannot have @external or @js",
+                    declaration.span,
+                ));
+                valid = false;
+            }
+            if !declaration
+                .attributes
+                .iter()
+                .any(|a| a.module.is_none() && a.name.name == "macro")
+            {
+                errors.push(error(
+                    "a typed macro signature needs @macro",
+                    declaration.span,
+                ));
+                valid = false;
+            }
+            if let ItemKind::Declaration { ty, .. } = &declaration.kind {
+                struct Holes(bool);
+                impl crate::walk::Visitor for Holes {
+                    fn ty(&mut self, t: &mut crate::ast::TypeExpr) {
+                        self.0 |= matches!(t.kind, crate::ast::TypeKind::Hole);
+                    }
+                }
+                use crate::walk::Walk;
+                let mut holes = Holes(false);
+                ty.clone().walk(&mut holes);
+                if holes.0 {
+                    errors.push(error(
+                        "a typed macro signature must be fully written without _",
+                        declaration.span,
+                    ));
+                    valid = false;
+                }
+                match &ty.kind {
+                    crate::ast::TypeKind::Fn { params, .. } if params.len() == parameters.len() => {
+                    }
+                    crate::ast::TypeKind::Fn { .. } => {
+                        errors.push(error("a typed macro implementation must have one parameter for each signature parameter", item.span));
+                        valid = false;
+                    }
+                    _ => {
+                        errors.push(error(
+                            "a typed macro signature must be a full function type",
+                            declaration.span,
+                        ));
+                        valid = false;
+                    }
+                }
+            }
         }
         if valid {
             found.push(MacroDefinition {
                 item: index,
                 name: name.clone(),
                 parameters,
+                signature,
             });
         }
     }

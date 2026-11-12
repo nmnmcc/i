@@ -3,15 +3,15 @@ get = (d ! Dep) { d.v }
 S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
 T(N) { T(f: () -> Int ! N, m: (N) -> Nil) }
 us(N) = (s ! S(N)) {
-  S(f, ..) = s
+  S(f = f, ..) = s
   f()
 }
 ut(N) = (t ! T(N)) {
-  T(f, ..) = t
+  T(f = f, ..) = t
   f()
 }
 usa(N) = (s ! S(N)) -> Int ! N | S(N) {
-  S(f, ..) = s
+  S(f = f, ..) = s
   f()
 }
 run(A, N) = (body: () -> A ! N) { body() }
@@ -20,11 +20,11 @@ h1 = () { usa() }
 
 main = () {
   w = () {
-    ! Dep = Dep(1)
-    ! S(Dep | T(Dep)) = S(() { ut() + get() }, (_: Dep | T(Dep)) { Nil })
+    ! Dep = Dep(v: 1)
+    ! S(Dep | T(Dep)) = S(f: () { ut() + get() }, m: (_: Dep | T(Dep)) { Nil })
     run(() { run(() { usa() }) }) + h0() + run(() { ut() + get() })
   }
-  ! T(S(Never)) = T(() { get() }, (_: S(Never)) { Nil })
+  ! T(S(Never)) = T(f: () { get() }, m: (_: S(Never)) { Nil })
   l = () { run(() { us() + usa() }) }
   h0() + l() + ut() + h1() + w()
   Nil

@@ -16,6 +16,6 @@ tell = (x: Int) { x |> {
 } }
 
 main = (io ! Io) {
-  ! Svc(Int) = Svc(() { 1 }, (_: Int) { Nil })
-  io.print(tell(wrap((b) { b() + ask() }, Svc(() { "s" }, (_: String) { Nil }))))
+  ! Svc(Int) = Svc(f: () { 1 }, m: (_: Int) { Nil })
+  io.print(tell(wrap((b) { b() + ask() }, Svc(f: () { "s" }, m: (_: String) { Nil }))))
 }

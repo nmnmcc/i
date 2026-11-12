@@ -8,6 +8,6 @@ fw(M) = () -> Int ! M | S(M) { use() }
 
 
 main = () {
-	! S(Never) = S(() { 1 })
+	! S(Never) = S(f: () { 1 })
 	assert(fw() == 1)
 }

@@ -125,11 +125,11 @@ parse = (text: String) -> Result(Uri, UriError) {
 			_ -> (None, rest, start, [])
 		}
 		p = Parts(
-			scheme
-			authority
-			text_bytes(path_bytes)
-			optional_text(query_bytes, query_present)
-			optional_text(fragment_bytes, fragment_present)
+			scheme:    scheme
+			authority: authority
+			path:      text_bytes(path_bytes)
+			query:     optional_text(query_bytes, query_present)
+			fragment:  optional_text(fragment_bytes, fragment_present)
 		)
 		offsets = list.append(
 			locations
@@ -142,7 +142,7 @@ parse = (text: String) -> Result(Uri, UriError) {
 		)
 		validated(p, True) |> {
 			Ok(u) -> u
-			Error(UriError(part, offset, problem)) -> {
+			Error(UriError(part = part, offset = offset, problem = problem)) -> {
 				origin = list.fold(offsets, 0, (acc, pair) {
 					(kind, at) = pair
 					{ kind == part } |> {
@@ -150,7 +150,13 @@ parse = (text: String) -> Result(Uri, UriError) {
 						False -> acc
 					}
 				})
-				fail.raise(UriError(part, origin + offset, problem))
+				fail.raise(
+					UriError(
+						part:    part
+						offset:  origin + offset
+						problem: problem
+					)
+				)
 			}
 		}
 	})
@@ -199,7 +205,9 @@ resolve = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
 	b = parts(base)
 	r = parts(reference)
 	b.scheme |> {
-		None -> Error(UriError(WholePart, 0, RelativeBase))
+		None -> Error(
+			UriError(part: WholePart, offset: 0, problem: RelativeBase)
+		)
 		Some(_) -> {
 			candidate = r.scheme |> {
 				Some(_) -> Parts(..r, path: remove_dots(r.path))
@@ -218,7 +226,13 @@ resolve = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
 							"/" <> _ -> (remove_dots(r.path), r.query)
 							_        -> (remove_dots(merge_path(b, r.path)), r.query)
 						}
-						Parts(b.scheme, b.authority, path, query, r.fragment)
+						Parts(
+							scheme:    b.scheme
+							authority: b.authority
+							path:      path
+							query:     query
+							fragment:  r.fragment
+						)
 					}
 				}
 			}
@@ -267,11 +281,11 @@ parse_query = (query: String) -> Result(List((String, String)), CodecError) {
 							decode_text(text_bytes(input), True)
 						}) |> {
 							Ok(x) -> x
-							Error(BadEscape(offset)) -> fail.raise(
-								BadEscape(origin + offset)
+							Error(BadEscape(offset = offset)) -> fail.raise(
+								BadEscape(offset: origin + offset)
 							)
-							Error(NonAscii(offset)) -> fail.raise(
-								NonAscii(origin + offset)
+							Error(NonAscii(offset = offset)) -> fail.raise(
+								NonAscii(offset: origin + offset)
 							)
 							Error(e) -> fail.raise(e)
 						}
@@ -390,7 +404,7 @@ path_constraints = (p: Parts) -> Nil ^ UriError {
 }
 
 problem = (part: UriPart, offset: Int, why: UriProblem) -> Never ^ UriError {
-	fail.raise(UriError(part, offset, why))
+	fail.raise(UriError(part: part, offset: offset, problem: why))
 }
 
 require = (
@@ -502,7 +516,9 @@ read_authority = (
 	// Structure selects the components; userinfo grammar precedes host grammar.
 	fail.map_error(
 		() { grammar_option(userinfo, UserInfoPart, BadAuthority, user_char) }
-		(e: UriError) { UriError(e.part, start + e.offset, e.problem) }
+		(e: UriError) {
+			UriError(part: e.part, offset: start + e.offset, problem: e.problem)
+		}
 	)
 	(host, port, host_start, port_start) = hostport |> {
 		[91, ..inside] -> {
@@ -520,7 +536,13 @@ read_authority = (
 			(h, p, colon) = cut(hostport, 58)
 			fail.map_error(
 				() { grammar(h, HostPart, BadHost, reg_char, 0) }
-				(e: UriError) { UriError(e.part, hstart + e.offset, e.problem) }
+				(e: UriError) {
+					UriError(
+						part:    e.part
+						offset:  hstart + e.offset
+						problem: e.problem
+					)
+				}
 			)
 			(extra, _, again) = cut(p, 58)
 			require(
@@ -538,7 +560,7 @@ read_authority = (
 		}
 	}
 	(
-		Authority(userinfo, host, port)
+		Authority(userinfo: userinfo, host: host, port: port)
 		[(UserInfoPart, start), (HostPart, host_start), (PortPart, port_start)]
 	)
 }
@@ -818,12 +840,12 @@ decode_raw = (xs: List(Int), form: Bool) -> BitArray ^ CodecError {
 							at + 3
 							[<<hex(a) * 16 + hex(b)>>, ..acc]
 						)
-						False -> fail.raise(BadEscape(at))
+						False -> fail.raise(BadEscape(offset: at))
 					}
-					_ -> fail.raise(BadEscape(at))
+					_ -> fail.raise(BadEscape(offset: at))
 				}
 				False -> { x >= 128 } |> {
-					True -> fail.raise(NonAscii(at))
+					True -> fail.raise(NonAscii(offset: at))
 					False -> {
 						value = { form && x == 43 } |> {
 							True  -> 32

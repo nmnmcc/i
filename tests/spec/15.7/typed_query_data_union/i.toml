@@ -1,0 +1,6 @@
+# spec: 15.7.4; typed macro typed query of a union of closed data.
+# expect: pass
+# Replaces typed_query_opaque_expression_error: under closed data
+# (syntax-3 stage 6) a union of data is ordinary type syntax, not an
+# opaque TypeView, so the query result is written back in a type position.
+name = "spec"

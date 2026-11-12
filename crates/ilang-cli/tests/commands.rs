@@ -35,7 +35,7 @@ fn build_writes_the_module() {
         ("i.toml", "name = \"app\"\n"),
         ("src/main.i", "\nmain = () { 1 + 2 }\n"),
     ]);
-    let out = i(&["build"], dir.path());
+    let out = i(&["build", "--target", "host"], dir.path());
     assert!(
         out.status.success(),
         "{}",
@@ -50,7 +50,7 @@ fn build_writes_the_module() {
     assert!(!out.status.success(), "--out needs a file");
     let file = dir.path().join("other/x.wasm");
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
-        .args(["build", "--opt", "0", "--out"])
+        .args(["build", "--target", "host", "--opt", "0", "--out"])
         .arg(&file)
         .arg("--project")
         .arg(dir.path())
@@ -138,7 +138,7 @@ fn test_runs_each_test() {
     assert!(!text.contains("bad"), "{text}");
 
     // Tests are not built by `i build`.
-    let out = i(&["build"], dir.path());
+    let out = i(&["build", "--target", "host"], dir.path());
     assert!(out.status.success());
     let wasm = std::fs::read(dir.path().join("build/app.wasm")).unwrap();
     assert!(Program::from_bytes(&wasm).unwrap().abi().tests.is_empty());
@@ -617,7 +617,7 @@ fn an_error_stops_a_test() {
         match ilang_cli::run_test(&program, "i.tool.0") {
             ilang_host::TestResult::Stopped(stop) => assert_eq!(
                 stop.message.as_deref(),
-                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from std/test:5:73")
+                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from std/test:11:17")
             ),
             other => panic!("{other:?}"),
         }

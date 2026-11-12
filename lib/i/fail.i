@@ -9,11 +9,11 @@
 
 /// Ends the computation with `error`.
 @external("ilang:fail", "raise")
-raise(E): (error: E) -> Never ^ E
+raise(E): (E) -> Never ^ E
 
 /// Changes every error into `Error(…)`.
 @external("ilang:fail", "catch")
-catch(A, E, N): (body: () -> A ^ E ! N) -> Result(A, E) ! N
+catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N
 
 /// Gives the error `x` for `Error(x)`.
 from_result(A, E) = (result: Result(A, E)) -> A ^ E {

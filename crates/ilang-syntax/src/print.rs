@@ -530,13 +530,13 @@ impl Printer {
     // ---- Expressions ----
 
     /// Prints `e` where an expression of at least level `min` is needed. A
-    /// match is an operation at level 6 (§6.9), so it needs a group where
+    /// match is an operation at level 1 (§6.9), so it needs a group where
     /// more than that is needed.
     fn expr(&mut self, e: &Expr, min: u8) {
         let lvl = level(e);
         if lvl < min
             || self.explicit && min > 0 && lvl < 10
-            || matches!(e.kind, ExprKind::Case { .. }) && min > 6
+            || matches!(e.kind, ExprKind::Case { .. }) && min > 1
         {
             self.w("{ ");
             self.expr_raw(e);
@@ -610,7 +610,7 @@ impl Printer {
             ExprKind::Block(b) => self.block(b),
             ExprKind::Fn(f) => self.function(f),
             ExprKind::Case { subject, clauses } => {
-                self.expr(subject, 6);
+                self.expr(subject, 1);
                 self.w(" |> ");
                 self.clauses(clauses);
             }

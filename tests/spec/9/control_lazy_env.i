@@ -33,20 +33,20 @@ leaf = (b) {
 
 // Two environment statements: the later one is seen.
 twice = (b) {
-	! Name = Name("a")
-	! Name = Name("twice")
+	! Name = Name(text: "a")
+	! Name = Name(text: "twice")
 	x = leaf(b)
 	x <> "/" <> name()
 }
 
 one = (b) {
-	! Name = Name("one")
+	! Name = Name(text: "one")
 	x = twice(b)
 	x <> "/" <> name()
 }
 
 two = (b) {
-	! Name = Name("two")
+	! Name = Name(text: "two")
 	x = one(b)
 	x <> "/" <> name()
 }
@@ -60,13 +60,13 @@ plain = (b) {
 // top of the environment of the place of `resume`.
 
 test("environment_of_frames_that_wait", () {
-	! Name = Name("start")
+	! Name = Name(text: "start")
 	p = control.boundary((b) { Done(plain(b)) })
 	k = p |> {
 		Paused(k) -> k
 		Done(_)   -> panic("not paused")
 	}
-	! Name = Name("resumer")
+	! Name = Name(text: "resumer")
 	{ control.resume(k, Nil) } |> {
 		Done(s)   -> check(s, "twice/twice/one/two/resumer")
 		Paused(_) -> panic("paused again")
@@ -76,7 +76,7 @@ test("environment_of_frames_that_wait", () {
 // Each resume of a computation gives it the environment of its own place.
 
 test("two_places", () {
-	! Name = Name("start")
+	! Name = Name(text: "start")
 	p = control.boundary((b) {
 		x = leaf(b)
 		y = leaf(b)
@@ -86,12 +86,12 @@ test("two_places", () {
 		Paused(k) -> k
 		Done(_)   -> panic("not paused")
 	}
-	! Name = Name("first")
+	! Name = Name(text: "first")
 	k2 = { control.resume(k, Nil) } |> {
 		Paused(k2) -> k2
 		Done(_)    -> panic("not paused again")
 	}
-	! Name = Name("second")
+	! Name = Name(text: "second")
 	{ control.resume(k2, Nil) } |> {
 		Done(s)   -> check(s, "first,second")
 		Paused(_) -> panic("paused again")

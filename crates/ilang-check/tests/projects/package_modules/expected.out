@@ -1,5 +1,5 @@
-src/1st.i:1:1: error[E0623]: every part of a module path must be a name (§2.1), but `1st` is not
-src/Bad.i:1:1: error[E0623]: every part of a module path must be a name (§2.1), but `Bad` is not
-src/bad-name.i:1:1: error[E0623]: every part of a module path must be a name (§2.1), but `bad-name` is not
-src/good/__x.i:1:1: error[E0623]: every part of a module path must be a name (§2.1), but `__x` is not
+src/1st.i:1:1: error[E0623]: every part of a module path must be a name, but `1st` is not
+src/Bad.i:1:1: error[E0623]: every part of a module path must be a name, but `Bad` is not
+src/bad-name.i:1:1: error[E0623]: every part of a module path must be a name, but `bad-name` is not
+src/good/__x.i:1:1: error[E0623]: every part of a module path must be a name, but `__x` is not
 test/same.i:1:1: error[E0624]: the module path `app/same` is also the path of `src/same.i`

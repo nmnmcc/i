@@ -6,6 +6,7 @@
 (
 	Syntax
 	Node(..)
+	TypeHandle
 	Position(..)
 	SyntaxError(..)
 	Definitions(..)
@@ -17,6 +18,12 @@
 	show_as
 	Items(..)
 	Diagnostics(..)
+	Types(..)
+	Truth(..)
+	type_of
+	signature
+	subtype
+	members
 )
 
 Syntax {}
@@ -35,7 +42,10 @@ ItemMetadata {}
 
 ItemResult {}
 
+TypeHandle {}
+
 Node {
+	TypeView(TypeHandle)
 	Name(String)
 	Discard(String)
 	Up(String)
@@ -77,7 +87,7 @@ SyntaxError {
 }
 
 Definitions {
-	Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError)
+	Definitions(definition: (Syntax) -> Syntax ^ SyntaxError)
 }
 
 /// Asks the installed definition service for a type's written definition.
@@ -96,18 +106,18 @@ raw_note: (String) -> Nil
 /// Constructs the compiler's transactional diagnostic service.
 _diagnostics = () -> Diagnostics {
 	notify = (message: String) -> Nil { raw_note(message) }
-	Diagnostics(notify)
+	Diagnostics(note: notify)
 }
 
 Items {
 	Items(
 		add: (
-			collection: Syntax
-			target:     Syntax
-			data:       List((String, String))
-			at:         Syntax
+			Syntax
+			Syntax
+			List((String, String))
+			Syntax
 		) -> Nil ^ SyntaxError
-		expose: (name: Syntax) -> Nil ^ SyntaxError
+		expose: (Syntax) -> Nil ^ SyntaxError
 	)
 }
 
@@ -149,7 +159,10 @@ item_result = (result: ItemResult) -> Nil ^ SyntaxError {
 	raw_items_ok(result) |> {
 		True -> Nil
 		False -> fail.raise(
-			SyntaxError(raw_items_message(result), raw_items_at(result))
+			SyntaxError(
+				message: raw_items_message(result)
+				at:      raw_items_at(result)
+			)
 		)
 	}
 }
@@ -157,7 +170,7 @@ item_result = (result: ItemResult) -> Nil ^ SyntaxError {
 /// Constructs the compiler's transactional item service for one macro run.
 _items = () -> Items {
 	Items(
-		(collection, target, data, at) -> Nil ^ SyntaxError {
+		add: (collection, target, data, at) -> Nil ^ SyntaxError {
 			item_result(
 				raw_items_add(
 					collection
@@ -167,7 +180,9 @@ _items = () -> Items {
 				)
 			)
 		}
-		(name) -> Nil ^ SyntaxError { item_result(raw_items_expose(name)) }
+		expose: (name) -> Nil ^ SyntaxError {
+			item_result(raw_items_expose(name))
+		}
 	)
 }
 
@@ -191,14 +206,14 @@ raw_definition_at: (DefinitionResult) -> Syntax
 
 /// Constructs the compiler's definition service for one macro run.
 _definitions = () -> Definitions {
-	Definitions((of) -> Syntax ^ SyntaxError {
+	Definitions(definition: (of) -> Syntax ^ SyntaxError {
 		result = raw_definition(of)
 		raw_definition_ok(result) |> {
 			True -> raw_definition_value(result)
 			False -> fail.raise(
 				SyntaxError(
-					raw_definition_message(result)
-					raw_definition_at(result)
+					message: raw_definition_message(result)
+					at:      raw_definition_at(result)
 				)
 			)
 		}
@@ -372,6 +387,7 @@ node = (syntax: Syntax) -> Node {
 		11 -> Quote(raw_child(syntax, 0))
 		12 -> Unquote(raw_child(syntax, 0))
 		13 -> Splice(raw_child(syntax, 0))
+		14 -> TypeView(raw_type_handle(syntax))
 		_  -> panic("syntax: invalid node kind")
 	}
 }
@@ -389,7 +405,16 @@ _rebuild = (template: Syntax, children: List(Syntax)) -> Syntax {
 }
 
 /// Makes syntax at the span and scope of `like`.
+@external("i:compiler/syntax/v1", "type_handle")
+raw_type_handle: (Syntax) -> TypeHandle
+
 make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
+	node |> {
+		TypeView(_) -> fail.raise(
+			SyntaxError(message: "make cannot construct a TypeView", at: like)
+		)
+		_ -> Nil
+	}
 	result = node |> {
 		Name(value)    -> raw_make_text(0, value, like)
 		Discard(value) -> raw_make_text(1, value, like)
@@ -421,10 +446,13 @@ make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
 		Quote(item)   -> raw_make_one(11, item, like)
 		Unquote(item) -> raw_make_one(12, item, like)
 		Splice(item)  -> raw_make_one(13, item, like)
+		TypeView(_)   -> panic("TypeView make invariant")
 	}
 	raw_syntax_ok(result) |> {
-		True  -> raw_syntax_value(result)
-		False -> fail.raise(SyntaxError(raw_syntax_error(result), like))
+		True -> raw_syntax_value(result)
+		False -> fail.raise(
+			SyntaxError(message: raw_syntax_error(result), at: like)
+		)
 	}
 }
 
@@ -462,7 +490,126 @@ show_as = (syntax: Syntax, position: Position) -> String ^ SyntaxError {
 	raw_text_ok(result) |> {
 		True -> raw_text_value(result)
 		False -> fail.raise(
-			SyntaxError(raw_text_error(result), raw_text_error_at(result))
+			SyntaxError(
+				message: raw_text_error(result)
+				at:      raw_text_error_at(result)
+			)
 		)
 	}
+}
+
+/// Frozen type observations supplied only to typed macro implementations.
+Truth {
+	Yes
+	No
+	NotKnown
+}
+
+Types {
+	Types(
+		type_of:   (Syntax) -> Syntax ^ SyntaxError
+		signature: () -> Syntax
+		subtype:   (Syntax, Syntax) -> Truth ^ SyntaxError
+		members:   (Syntax) -> List(Syntax) ^ SyntaxError
+	)
+}
+
+TypeResult {}
+
+@external("i:compiler/syntax/v1", "type_of")
+raw_type_of: (Syntax) -> TypeResult
+
+@external("i:compiler/syntax/v1", "signature")
+raw_signature: () -> TypeResult
+
+@external("i:compiler/syntax/v1", "subtype")
+raw_subtype: (Syntax, Syntax) -> TypeResult
+
+@external("i:compiler/syntax/v1", "members")
+raw_members: (Syntax) -> TypeResult
+
+@external("i:compiler/syntax/v1", "type_ok")
+raw_type_ok: (TypeResult) -> Bool
+
+@external("i:compiler/syntax/v1", "type_value")
+raw_type_value: (TypeResult) -> Syntax
+
+@external("i:compiler/syntax/v1", "type_truth")
+raw_type_truth: (TypeResult) -> Int
+
+@external("i:compiler/syntax/v1", "type_len")
+raw_type_len: (TypeResult) -> Int
+
+@external("i:compiler/syntax/v1", "type_child")
+raw_type_child: (TypeResult, Int) -> Syntax
+
+@external("i:compiler/syntax/v1", "type_message")
+raw_type_message: (TypeResult) -> String
+
+@external("i:compiler/syntax/v1", "type_at")
+raw_type_at: (TypeResult) -> Syntax
+
+type_result = (r: TypeResult) -> Syntax ^ SyntaxError {
+	raw_type_ok(r) |> {
+		True -> raw_type_value(r)
+		False -> fail.raise(
+			SyntaxError(message: raw_type_message(r), at: raw_type_at(r))
+		)
+	}
+}
+
+type_members = (r: TypeResult, index: Int, count: Int) -> List(Syntax) {
+	{ index >= count } |> {
+		True  -> []
+		False -> [raw_type_child(r, index), ..type_members(r, index + 1, count)]
+	}
+}
+
+_types = () -> Types {
+	Types(
+		type_of:   (s) -> Syntax ^ SyntaxError { type_result(raw_type_of(s)) }
+		signature: () -> Syntax { raw_type_value(raw_signature()) }
+		subtype: (a, b) -> Truth ^ SyntaxError {
+			r = raw_subtype(a, b)
+			raw_type_ok(r) |> {
+				False -> fail.raise(
+					SyntaxError(
+						message: raw_type_message(r)
+						at:      raw_type_at(r)
+					)
+				)
+				True -> raw_type_truth(r) |> {
+					0 -> Yes
+					1 -> No
+					_ -> NotKnown
+				}
+			}
+		}
+		members: (s) -> List(Syntax) ^ SyntaxError {
+			r = raw_members(s)
+			raw_type_ok(r) |> {
+				False -> fail.raise(
+					SyntaxError(
+						message: raw_type_message(r)
+						at:      raw_type_at(r)
+					)
+				)
+				True -> type_members(r, 0, raw_type_len(r))
+			}
+		}
+	)
+}
+
+type_of = (s: Syntax, types ! Types) -> Syntax ^ SyntaxError ! Types {
+	types.type_of(s)
+}
+
+signature = (types ! Types) -> Syntax ! Types { types.signature() }
+
+subtype = (a: Syntax, b: Syntax, types ! Types) -> Truth ^ SyntaxError ! Types {
+	types.subtype(a, b)
+}
+
+members = (s: Syntax, types ! Types) -> List(Syntax) ^ SyntaxError ! Types {
+	types.members(s)
 }

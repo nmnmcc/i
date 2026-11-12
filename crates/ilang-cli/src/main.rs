@@ -50,7 +50,17 @@ enum Command {
         #[arg(long, value_enum)]
         target: Option<TargetArg>,
     },
-    /// Build a package into a Wasm module.
+    /// Build a package into a native executable, or a Wasm module.
+    ///
+    /// The default target, native, makes one executable file,
+    /// `build/<name>` (the package name, or the entry NAME), which runs
+    /// without `i`: a runner with Wasmtime's runtime and the standard host
+    /// services, and the program compiled ahead of time. On Linux it is
+    /// statically linked (musl). It is built for the operating system and
+    /// architecture of this machine only, with a baseline of CPU features
+    /// (x86-64-v2 on x86-64); building for other targets and signing are not
+    /// supported yet. `--target host` (or `ilang`), `js`, `nodejs` and `wasi`
+    /// write the Wasm module `build/<name>.wasm` instead.
     Build {
         #[arg(long, default_value = ".")]
         project: PathBuf,
@@ -62,7 +72,8 @@ enum Command {
         opt: u8,
         /// Select a function declared in [entries].
         entry: Option<String>,
-        /// The output file; by default `build/<name>.wasm` in the package.
+        /// The output file; by default `build/<name>` (native) or
+        /// `build/<name>.wasm` in the package.
         #[arg(long)]
         out: Option<PathBuf>,
         /// Provider column; ilang is an alias of host.
@@ -137,7 +148,7 @@ enum Command {
     Package(commands::package::PackageCommand),
     /// Run the language server, on standard input and output.
     Lsp,
-    /// Format source files; by default every `.i` file in `src/` and `test/`.
+    /// Format source files; by default every `.i` and `.is` file in `src/` and `test/`.
     Fmt {
         #[arg(long, default_value = ".")]
         project: PathBuf,
@@ -327,14 +338,47 @@ fn cmd_build(
     let Some(b) = built_entry(project, options, entry)? else {
         return Ok(ExitCode::FAILURE);
     };
-    let out = out.unwrap_or_else(|| project.join("build").join(format!("{}.wasm", b.name)));
-    if let Some(dir) = out.parent()
-        && !dir.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(dir)?;
+    let native = target == Target::Native;
+    let name = if native {
+        entry.unwrap_or(&b.name)
+    } else {
+        &b.name
+    };
+    let out = out.unwrap_or_else(|| {
+        project.join("build").join(if native {
+            name.to_owned()
+        } else {
+            format!("{name}.wasm")
+        })
+    });
+    let dir = out
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir)?;
+    if native {
+        let package = match b.native_package(name) {
+            Ok(package) => package,
+            Err(error) => {
+                eprintln!("error: {error:#}");
+                return Ok(ExitCode::FAILURE);
+            }
+        };
+        // Write a new file and rename it, so that a running copy of the
+        // old executable is not changed under it.
+        let mut file = tempfile::NamedTempFile::new_in(dir)?;
+        std::io::Write::write_all(&mut file, &package)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file.as_file()
+                .set_permissions(std::fs::Permissions::from_mode(0o755))?;
+        }
+        file.persist(&out)?;
+    } else {
+        std::fs::write(&out, &b.wasm)?;
     }
-    std::fs::write(&out, &b.wasm)?;
-    if target != ilang_wasm::Target::Wasi {
+    if !native && target != ilang_wasm::Target::Wasi {
         std::fs::write(
             out.with_extension("bindings.json"),
             b.binding_plan.to_json()?,

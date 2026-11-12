@@ -6,10 +6,10 @@
 //! Control flow is structured, as in Wasm: blocks that a `Break` leaves, `If`,
 //! and statements that end a function (`Return`, `TailCall`, `Unreachable`).
 //!
-//! Semantic values and every call boundary use `eqref` (see `runtime/mod.rs`).
-//! At O2/O3, `emit::numeric` selects per-definition f64 and guarded i31 local
-//! encodings, with explicit materialization at reference uses. Functions with
-//! saved frames keep canonical values throughout. A few internal locals hold
+//! Semantic values and generic call boundaries use `eqref` (see `runtime/mod.rs`).
+//! At O2/O3, numeric workers use separate f64 signatures; source closures keep
+//! the generic entry. `emit::numeric` selects per-definition scalar encodings
+//! and materializes canonical values at escapes and on actual capture. A few internal locals hold
 //! i64 or i32 positions and widths in bit array patterns.
 //!
 //! # Calling convention
@@ -137,6 +137,8 @@ pub enum Env {
 /// than once.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Atom {
+    /// Original closure forwarded by a reference-entry worker adapter.
+    CurrentClosure,
     Local(Local),
     /// A top-level value that is worked out in `ilang_start`.
     Global(GlobalId),
@@ -288,6 +290,8 @@ pub fn shape_id(positions: u32, set: u32) -> ShapeId {
 pub enum Callee {
     /// A known function, called with `call`.
     Direct(FuncId),
+    /// Known code with the original closure and the current call-site environment.
+    Known { func: FuncId, closure: Atom },
     /// A function value called with argument data of `n` positions, `n` the
     /// number of arguments: `call_ref` when it is a `$clo{n}`, else the
     /// dispatch of a multi-shape value on the shape (syntax-3.md §6.4).
@@ -301,7 +305,7 @@ impl Callee {
     /// The function value of an indirect call.
     pub fn value(&self) -> Option<&Atom> {
         match self {
-            Callee::Direct(_) => None,
+            Callee::Direct(_) | Callee::Known { .. } => None,
             Callee::Value(a) | Callee::Shaped(a, _) => Some(a),
         }
     }
@@ -328,6 +332,8 @@ pub enum Value {
         env: Env,
     },
     Op(Op, Vec<Atom>),
+    /// This exact Float operation has an outward finite-result proof.
+    Finite(Op, Vec<Atom>),
     /// An operation that calls i code with this environment.
     OpEnv(Op, Vec<Atom>, Env),
     /// The service with this id in the environment (§9.2).
@@ -445,6 +451,14 @@ pub enum NumValue {
     WidthOf(Atom, u32),
 }
 
+/// Eager logical frame actions for non-suspending inline expansions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Logical {
+    Enter(Option<Site>),
+    Leave,
+    Tail(Option<Site>),
+}
+
 /// A test, as an `i32`.
 #[derive(Debug)]
 pub enum Cond {
@@ -489,6 +503,7 @@ pub enum Cond {
 
 #[derive(Debug)]
 pub enum Stmt {
+    Logical(Logical),
     /// `dst = value`. With a site, the site is put on the shadow stack first.
     Let {
         dst: Local,
@@ -830,6 +845,10 @@ pub struct Program {
         FuncId,
         std::collections::HashMap<Local, ilang_check::types::NumericFact>,
     >,
+    /// Internal worker signatures, never stored in a source closure.
+    pub workers: std::collections::BTreeMap<FuncId, crate::numeric::Worker>,
+    /// Stable eligibility/budget decisions for internal dumps.
+    pub numeric_log: Vec<String>,
     /// The label sets of data, in UTF-8 order; index 0 is the empty set of
     /// tuples and is not listed here, so set `i` is `shapes[i - 1]`.
     pub shapes: Vec<Vec<String>>,

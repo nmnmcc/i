@@ -68,7 +68,7 @@ test("reverse_skin_tone_emoji_test", () {
 })
 
 test("reverse_skin_tone_roundtrip_test", () {
-	assert("👶🏿" |> string.reverse |> string.reverse == "👶🏿")
+	assert({ "👶🏿" |> string.reverse |> string.reverse } == "👶🏿")
 	Nil
 })
 
@@ -162,7 +162,7 @@ test("contains_absent_test", () {
 })
 
 test("contains_labelled_test", () {
-	assert(string.contains(does: "bellwether", contain: "bell"))
+	assert(string.contains("bellwether", "bell"))
 	Nil
 })
 
@@ -179,22 +179,22 @@ test("concat_emoji_test", () {
 })
 
 test("repeat_one_test", () {
-	assert(string.repeat("hi", times: 1) == "hi")
+	assert(string.repeat("hi", 1) == "hi")
 	Nil
 })
 
 test("repeat_two_test", () {
-	assert(string.repeat("hi", times: 2) == "hihi")
+	assert(string.repeat("hi", 2) == "hihi")
 	Nil
 })
 
 test("repeat_three_test", () {
-	assert(string.repeat("hi", times: 3) == "hihihi")
+	assert(string.repeat("hi", 3) == "hihihi")
 	Nil
 })
 
 test("repeat_large_test", () {
-	assert(string.repeat("a", times: 10_001) |> string.length == 10_001)
+	assert({ string.repeat("a", 10_001) |> string.length } == 10_001)
 	Nil
 })
 
@@ -209,38 +209,38 @@ test("repeat_negative_test", () {
 })
 
 test("join_0_test", () {
-	assert(string.join([], with: ", ") == "")
+	assert(string.join([], ", ") == "")
 	Nil
 })
 
 test("join_0_dash_test", () {
-	assert(string.join([], with: "-") == "")
+	assert(string.join([], "-") == "")
 	Nil
 })
 
 test("join_1_test", () {
-	assert(string.join(["Hello"], with: ", ") == "Hello")
+	assert(string.join(["Hello"], ", ") == "Hello")
 	Nil
 })
 
 test("join_1_dash_test", () {
-	assert(string.join(["Hello"], with: "-") == "Hello")
+	assert(string.join(["Hello"], "-") == "Hello")
 	Nil
 })
 
 test("join_2_test", () {
-	assert(string.join(["Hello", "world!"], with: ", ") == "Hello, world!")
+	assert(string.join(["Hello", "world!"], ", ") == "Hello, world!")
 	Nil
 })
 
 test("join_2_dash_test", () {
-	assert(string.join(["Hello", "world!"], with: "-") == "Hello-world!")
+	assert(string.join(["Hello", "world!"], "-") == "Hello-world!")
 	Nil
 })
 
 test("join_3_test", () {
 	assert(
-		string.join(["Hello", "there", "world!"], with: ", ") ==
+		string.join(["Hello", "there", "world!"], ", ") ==
 			"Hello, there, world!"
 	)
 	Nil
@@ -248,8 +248,7 @@ test("join_3_test", () {
 
 test("join_3_dash_test", () {
 	assert(
-		string.join(["Hello", "there", "world!"], with: "-") ==
-			"Hello-there-world!"
+		string.join(["Hello", "there", "world!"], "-") == "Hello-there-world!"
 	)
 	Nil
 })
@@ -500,42 +499,42 @@ test("ends_with_longer_test", () {
 })
 
 test("slice_basic_test", () {
-	assert(string.slice("gleam", at_index: 1, length: 2) == "le")
+	assert(string.slice("gleam", 1, 2) == "le")
 	Nil
 })
 
 test("slice_beyond_length_test", () {
-	assert(string.slice("gleam", at_index: 1, length: 10) == "leam")
+	assert(string.slice("gleam", 1, 10) == "leam")
 	Nil
 })
 
 test("slice_beyond_string_test", () {
-	assert(string.slice("gleam", at_index: 10, length: 3) == "")
+	assert(string.slice("gleam", 10, 3) == "")
 	Nil
 })
 
 test("slice_negative_index_test", () {
-	assert(string.slice("gleam", at_index: -2, length: 2) == "am")
+	assert(string.slice("gleam", -2, 2) == "am")
 	Nil
 })
 
 test("slice_negative_beyond_test", () {
-	assert(string.slice("gleam", at_index: -12, length: 2) == "")
+	assert(string.slice("gleam", -12, 2) == "")
 	Nil
 })
 
 test("slice_negative_length_test", () {
-	assert(string.slice("gleam", at_index: 2, length: -3) == "")
+	assert(string.slice("gleam", 2, -3) == "")
 	Nil
 })
 
 test("slice_zero_length_test", () {
-	assert(string.slice("gleam", at_index: 2, length: 0) == "")
+	assert(string.slice("gleam", 2, 0) == "")
 	Nil
 })
 
 test("slice_emoji_test", () {
-	assert(string.slice("👶🏿", at_index: 0, length: 3) == "👶🏿")
+	assert(string.slice("👶🏿", 0, 3) == "👶🏿")
 	Nil
 })
 
@@ -550,7 +549,7 @@ test("crop_middle_test", () {
 })
 
 test("crop_labelled_test", () {
-	assert(string.crop(from: "gleam", before: "ea") == "eam")
+	assert(string.crop("gleam", "ea") == "eam")
 	Nil
 })
 
@@ -565,22 +564,22 @@ test("crop_not_found_test", () {
 })
 
 test("drop_start_basic_test", () {
-	assert(string.drop_start("gleam", up_to: 2) == "eam")
+	assert(string.drop_start("gleam", 2) == "eam")
 	Nil
 })
 
 test("drop_start_beyond_length_test", () {
-	assert(string.drop_start("gleam", up_to: 6) == "")
+	assert(string.drop_start("gleam", 6) == "")
 	Nil
 })
 
 test("drop_start_negative_test", () {
-	assert(string.drop_start("gleam", up_to: -2) == "gleam")
+	assert(string.drop_start("gleam", -2) == "gleam")
 	Nil
 })
 
 test("drop_start_zero_test", () {
-	assert(string.drop_start("gleam", up_to: 0) == "gleam")
+	assert(string.drop_start("gleam", 0) == "gleam")
 	Nil
 })
 
@@ -591,82 +590,82 @@ test("drop_start_3499_test", () {
 })
 
 test("drop_end_basic_test", () {
-	assert(string.drop_end("gleam", up_to: 2) == "gle")
+	assert(string.drop_end("gleam", 2) == "gle")
 	Nil
 })
 
 test("drop_end_all_test", () {
-	assert(string.drop_end("gleam", up_to: 5) == "")
+	assert(string.drop_end("gleam", 5) == "")
 	Nil
 })
 
 test("drop_end_negative_test", () {
-	assert(string.drop_end("gleam", up_to: -2) == "gleam")
+	assert(string.drop_end("gleam", -2) == "gleam")
 	Nil
 })
 
 test("drop_end_zero_test", () {
-	assert(string.drop_end("gleam", up_to: 0) == "gleam")
+	assert(string.drop_end("gleam", 0) == "gleam")
 	Nil
 })
 
 test("pad_left_basic_test", () {
-	assert(string.pad_left("121", to: 5, with: ".") == "..121")
+	assert(string.pad_left("121", 5, ".") == "..121")
 	Nil
 })
 
 test("pad_left_exact_test", () {
-	assert(string.pad_left("121", to: 3, with: ".") == "121")
+	assert(string.pad_left("121", 3, ".") == "121")
 	Nil
 })
 
 test("pad_left_shorter_test", () {
-	assert(string.pad_left("121", to: 2, with: ".") == "121")
+	assert(string.pad_left("121", 2, ".") == "121")
 	Nil
 })
 
 test("pad_left_partial_multi_test", () {
-	assert(string.pad_left("121", to: 4, with: "XY") == "X121")
+	assert(string.pad_left("121", 4, "XY") == "X121")
 	Nil
 })
 
 test("pad_left_exact_multi_test", () {
-	assert(string.pad_left("121", to: 5, with: "XY") == "XY121")
+	assert(string.pad_left("121", 5, "XY") == "XY121")
 	Nil
 })
 
 test("pad_left_extra_multi_test", () {
-	assert(string.pad_left("121", to: 6, with: "XY") == "XYX121")
+	assert(string.pad_left("121", 6, "XY") == "XYX121")
 	Nil
 })
 
 test("pad_right_basic_test", () {
-	assert(string.pad_right("121", to: 5, with: ".") == "121..")
+	assert(string.pad_right("121", 5, ".") == "121..")
 	Nil
 })
 
 test("pad_right_exact_test", () {
-	assert(string.pad_right("121", to: 3, with: ".") == "121")
+	assert(string.pad_right("121", 3, ".") == "121")
 	Nil
 })
 
 test("pad_right_shorter_test", () {
-	assert(string.pad_right("121", to: 2, with: ".") == "121")
+	assert(string.pad_right("121", 2, ".") == "121")
 	Nil
 })
 
 test("pad_right_partial_multi_test", () {
-	assert(string.pad_right("121", to: 4, with: "XY") == "121X")
+	assert(string.pad_right("121", 4, "XY") == "121X")
 	Nil
 })
 
 test("pad_right_exact_multi_test", () {
-	assert(string.pad_right("121", to: 5, with: "XY") == "121XY")
+	assert(string.pad_right("121", 5, "XY") == "121XY")
 	Nil
 })
 
 test("pad_right_extra_multi_test", () {
-	assert(string.pad_right("121", to: 6, with: "XY") == "121XYX")
+	assert(string.pad_right("121", 6, "XY") == "121XYX")
 	Nil
 })
 
@@ -759,17 +758,21 @@ test("to_utf_codepoints_rainbow_flag_test", () {
 })
 
 test("from_utf_codepoints_empty_test", () {
-	assert("" |> string.to_codepoints |> string.from_codepoints == "")
+	assert({ "" |> string.to_codepoints |> string.from_codepoints } == "")
 	Nil
 })
 
 test("from_utf_codepoints_basic_test", () {
-	assert("gleam" |> string.to_codepoints |> string.from_codepoints == "gleam")
+	assert(
+		{ "gleam" |> string.to_codepoints |> string.from_codepoints } == "gleam"
+	)
 	Nil
 })
 
 test("from_utf_codepoints_emoji_test", () {
-	assert("🏳️‍🌈" |> string.to_codepoints |> string.from_codepoints == "🏳️‍🌈")
+	assert(
+		{ "🏳️‍🌈" |> string.to_codepoints |> string.from_codepoints } == "🏳️‍🌈"
+	)
 	Nil
 })
 
@@ -1737,7 +1740,7 @@ test("remove_prefix_test", () {
 	assert(string.remove_prefix("🦑lucy", "🦑") == "lucy")
 	assert(string.remove_prefix("🦑🦑", "🦑") == "🦑")
 	assert(string.remove_prefix("abc", "abcde") == "abc")
-	assert(string.remove_prefix(from: "abc", matching: "ab") == "c")
+	assert(string.remove_prefix("abc", "ab") == "c")
 	Nil
 })
 
@@ -1749,7 +1752,7 @@ test("remove_suffix_test", () {
 	assert(string.remove_suffix("gleam", "gleam") == "")
 	assert(string.remove_suffix("lucy🦑", "🦑") == "lucy")
 	assert(string.remove_suffix("🦑🦑", "🦑") == "🦑")
-	assert(string.remove_suffix(from: "abc", matching: "bc") == "a")
+	assert(string.remove_suffix("abc", "bc") == "a")
 	Nil
 })
 
@@ -1757,13 +1760,13 @@ test("remove_suffix_test", () {
 // library.
 
 test("split_more_test", () {
-	assert(string.split("a,b,,c", on: ",") == ["a", "b", "", "c"])
-	assert(string.split("", on: ",") == [""])
-	assert(string.split(",", on: ",") == ["", ""])
-	assert(string.split("abc", on: "") == ["a", "b", "c"])
-	assert(string.split("a--b---c", on: "--") == ["a", "b", "-c"])
-	assert(string.split("héllo wörld", on: "ö") == ["héllo w", "rld"])
-	assert(string.split("😀x😀", on: "😀") == ["", "x", ""])
+	assert(string.split("a,b,,c", ",") == ["a", "b", "", "c"])
+	assert(string.split("", ",") == [""])
+	assert(string.split(",", ",") == ["", ""])
+	assert(string.split("abc", "") == ["a", "b", "c"])
+	assert(string.split("a--b---c", "--") == ["a", "b", "-c"])
+	assert(string.split("héllo wörld", "ö") == ["héllo w", "rld"])
+	assert(string.split("😀x😀", "😀") == ["", "x", ""])
 })
 
 test("split_long_test", () {
@@ -1775,19 +1778,17 @@ test("split_long_test", () {
 })
 
 test("split_unicode_needle_test", () {
-	assert(string.split("aéébé", on: "é") == ["a", "", "b", ""])
-	assert(string.split("abababc", on: "abc") == ["abab", ""])
-	assert(string.split("aaaa", on: "aa") == ["", "", ""])
-	assert(string.split("日本語", on: "本") == ["日", "語"])
+	assert(string.split("aéébé", "é") == ["a", "", "b", ""])
+	assert(string.split("abababc", "abc") == ["abab", ""])
+	assert(string.split("aaaa", "aa") == ["", "", ""])
+	assert(string.split("日本語", "本") == ["日", "語"])
 })
 
 test("split_once_more_test", () {
-	assert(
-		string.split_once("key=value=x", on: "=") == Some(("key", "value=x"))
-	)
-	assert(string.split_once("novalue", on: "=") == None)
-	assert(string.split_once("abc", on: "") == None)
-	assert(string.split_once("=", on: "=") == Some(("", "")))
+	assert(string.split_once("key=value=x", "=") == Some(("key", "value=x")))
+	assert(string.split_once("novalue", "=") == None)
+	assert(string.split_once("abc", "") == None)
+	assert(string.split_once("=", "=") == Some(("", "")))
 })
 
 test("lines_test", () {
@@ -1798,17 +1799,14 @@ test("lines_test", () {
 })
 
 test("replace_more_test", () {
-	assert(
-		string.replace(in: "www.example.com", each: ".", with: "-") ==
-			"www-example-com"
-	)
+	assert(string.replace("www.example.com", ".", "-") == "www-example-com")
 	assert(string.replace("aaa", "a", "bb") == "bbbbbb")
 	assert(string.replace("abc", "", "x") == "abc")
 	assert(string.replace("héllo", "é", "e") == "hello")
 })
 
 test("contains_more_test", () {
-	assert(string.contains(does: "theory", contain: "ory"))
+	assert(string.contains("theory", "ory"))
 	assert(string.contains("abc", ""))
 	assert(string.contains("", ""))
 	assert(core.not(string.contains("", "a")))
@@ -1821,9 +1819,9 @@ test("contains_and_crop_test", () {
 	assert(string.contains("aaaaaaab", "aaab"))
 	assert(core.not(string.contains("aaaaaaa", "aaab")))
 	assert(string.contains("𐐨𐐩", "𐐩"))
-	assert(string.crop("héllo wörld", before: "wö") == "wörld")
-	assert(string.crop("aaab", before: "ab") == "ab")
-	assert(string.crop("abc", before: "") == "abc")
+	assert(string.crop("héllo wörld", "wö") == "wörld")
+	assert(string.crop("aaab", "ab") == "ab")
+	assert(string.crop("abc", "") == "abc")
 })
 
 test("search_long_test", () {
@@ -1849,13 +1847,13 @@ test("starts_ends_test", () {
 })
 
 test("slice_more_test", () {
-	assert(string.slice("gleam", at_index: 1, length: 2) == "le")
-	assert(string.slice("gleam", at_index: -3, length: 2) == "ea")
-	assert(string.slice("gleam", at_index: 1, length: 10) == "leam")
-	assert(string.slice("gleam", at_index: 10, length: 2) == "")
-	assert(string.slice("gleam", at_index: -10, length: 2) == "")
-	assert(string.slice("gleam", at_index: 1, length: -1) == "")
-	assert(string.slice("héllo", at_index: 1, length: 3) == "éll")
+	assert(string.slice("gleam", 1, 2) == "le")
+	assert(string.slice("gleam", -3, 2) == "ea")
+	assert(string.slice("gleam", 1, 10) == "leam")
+	assert(string.slice("gleam", 10, 2) == "")
+	assert(string.slice("gleam", -10, 2) == "")
+	assert(string.slice("gleam", 1, -1) == "")
+	assert(string.slice("héllo", 1, 3) == "éll")
 })
 
 test("case_unicode_test", () {
@@ -1904,13 +1902,13 @@ test("trim_unicode_test", () {
 })
 
 test("pad_test", () {
-	assert(string.pad_left("121", to: 5, with: ".") == "..121")
-	assert(string.pad_left("121", to: 6, with: "XY") == "XYX121")
-	assert(string.pad_left("121", to: 2, with: ".") == "121")
-	assert(string.pad_right("121", to: 5, with: ".") == "121..")
-	assert(string.pad_right("121", to: 6, with: "XY") == "121XYX")
-	assert(string.pad_right("é", to: 3, with: "é") == "ééé")
-	assert(string.pad_left("a", to: 3, with: "") == "a")
+	assert(string.pad_left("121", 5, ".") == "..121")
+	assert(string.pad_left("121", 6, "XY") == "XYX121")
+	assert(string.pad_left("121", 2, ".") == "121")
+	assert(string.pad_right("121", 5, ".") == "121..")
+	assert(string.pad_right("121", 6, "XY") == "121XYX")
+	assert(string.pad_right("é", 3, "é") == "ééé")
+	assert(string.pad_left("a", 3, "") == "a")
 })
 
 test("reverse_more_test", () {
@@ -1963,6 +1961,6 @@ test("length_long_test", () {
 })
 
 test("join_long_test", () {
-	joined = string.join(list.repeat("a", 100_000), with: ",")
+	joined = string.join(list.repeat("a", 100_000), ",")
 	assert(string.byte_size(joined) == 199_999)
 })

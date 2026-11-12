@@ -4,7 +4,7 @@ f(A) = (x: A) -> A { x |> {
   other -> other
 } }
 g(A) = (x: A) -> A { x |> {
-  Box(v: 1) -> x
+  Box(v = v: 1) -> x
   other -> other
 } }
 h(A) = (x: A | Nil) -> A { x |> {
@@ -17,6 +17,6 @@ k(A) = (x: A | List(Int)) -> A { x |> {
   other -> other
 } }
 a = () { f(["a"]) }
-b = () { g(Box("s")) }
+b = () { g(Box(v: "s")) }
 c = () { k(["a"]) }
-d = () { k(Box(1)) }
+d = () { k(Box(v: 1)) }

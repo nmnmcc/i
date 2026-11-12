@@ -126,6 +126,10 @@ impl Checker<'_> {
     /// Gives a name of a pattern its type. In a `case`, the choices of a
     /// clause bind one name together, so it gets the union of their types.
     fn bind(&mut self, b: &Binder, t: Ty, in_case: bool) {
+        if !self.p.typed_macros.is_empty() {
+            self.query_binder_handles
+                .insert((self.module, b.span), t.clone());
+        }
         if in_case {
             if let Some(s) = self.locals.get(&b.var).cloned() {
                 self.sub(&t, &s.ty, b.span);
@@ -153,8 +157,39 @@ impl Checker<'_> {
 
     /// Fits `q` to `b` (§4.8): a catch-all gives its names `b`; any other
     /// pattern needs `b <: Q`, with its parts fitted to the parts of `Q`.
+    ///
+    /// A constructor pattern `C(…)` (also as `x = C(…)`) with pattern type
+    /// `Q` may fail: when some known value of `b` is made by another
+    /// constructor, it needs `b <: Q | r - Q` with a new variable `r`, not
+    /// `b <: Q`, so that such a value is a failure to match that reports to
+    /// `Assert` (§4.8, syntax three D4). When no value of `b` is made by `C`,
+    /// the pattern never matches: a warning. While the values of `b` are not
+    /// known, or are all made by `C`, `b <: Q` keeps the principal type.
     pub fn fit(&mut self, q: &Pattern, b: &Ty) {
-        self.fit_in(q, b, false);
+        let Some(ctor) = top_ctor(q) else {
+            self.fit_in(q, b, false);
+            return;
+        };
+        let head = Head::Named(TypeRef::Custom(ctor.ty));
+        let (others, disjoint) = self.made_by_others(b, head);
+        if !others {
+            self.fit_in(q, b, false);
+            return;
+        }
+        let t = self.pat(q, false);
+        let r = self.s.fresh();
+        let rest = self.s.diff(r, vec![t.clone()]);
+        self.sub(b, &Ty::Union(vec![t, rest]), q.span);
+        if disjoint {
+            let name = &self.p.ty(ctor.ty).name;
+            self.warning(
+                code::PATTERN_DISJOINT,
+                q.span,
+                format!(
+                    "this pattern never matches: no value of this type is made by `{name}` (§4.8)"
+                ),
+            );
+        }
     }
 
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
@@ -357,6 +392,24 @@ impl Checker<'_> {
                     }
                 }
             };
+            if j >= unlabeled.len()
+                && let Some(i) = field
+                && crate::syn3_facts::on()
+                && let PatternKind::Var(Binder { name, .. })
+                | PatternKind::Typed {
+                    binder: Some(Binder { name, .. }),
+                    ..
+                } = &a.kind
+            {
+                crate::syn3_facts::record(crate::syn3_facts::Fact::PatternPart {
+                    file: crate::syn3_facts::File::of(
+                        self.sources,
+                        self.p.module(self.module).source,
+                    ),
+                    span: a.span,
+                    label: fields[i].0.clone().unwrap_or_else(|| name.clone()),
+                });
+            }
             indices.push(field.map_or(u32::MAX, |i| i as u32));
             if let Some(i) = field {
                 if out.iter().any(|o| o.1 == i) {
@@ -688,7 +741,12 @@ impl Checker<'_> {
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
-                    Head::Fn => Ty::Fn(Box::new(FnTy::new(args.into_iter().map(|a| (None, a)).collect(), self.s.fresh(), self.s.fresh(), self.s.fresh()))),
+                    Head::Fn => Ty::Fn(Box::new(FnTy::new(
+                        args.into_iter().map(|a| (None, a)).collect(),
+                        self.s.fresh(),
+                        self.s.fresh(),
+                        self.s.fresh(),
+                    ))),
                     h => Ty::Con(h, super::lits::ValueSet::ALL, args),
                 });
             }
@@ -1088,7 +1146,10 @@ impl Checker<'_> {
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
-                (Ty::tuple(parts), Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats))
+                (
+                    Ty::tuple(parts),
+                    Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats),
+                )
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));

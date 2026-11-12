@@ -352,10 +352,7 @@ fn dpitems(items: &[DPItem]) -> Vec<String> {
         .iter()
         .flat_map(|i| match i {
             DPItem::Pos(p) => vec![pattern(p)],
-            DPItem::Key(k, p) => vec![form(
-                "=",
-                std::iter::once(name(k)).chain(pattern_parts(p)),
-            )],
+            DPItem::Key(k, p) => vec![form("=", std::iter::once(name(k)).chain(pattern_parts(p)))],
             DPItem::Rest(None) => vec!["..".into()],
             DPItem::Rest(Some(b)) => vec!["..".into(), b.name.clone()],
         })
@@ -398,7 +395,11 @@ fn pattern(p: &Pattern) -> String {
                 form("<>", [start, string_literal(suffix)])
             }
         }
-        PatternKind::Ctor { module, name: n, args } => {
+        PatternKind::Ctor {
+            module,
+            name: n,
+            args,
+        } => {
             let n = qualified(module, n);
             match args {
                 None => n,
@@ -445,9 +446,15 @@ pub fn from_lisp(source: &str) -> (Module, Vec<Diagnostic>) {
         let result = (|| -> R<()> {
             if let Some(parts) = round(d, ",") {
                 if !header {
-                    return err(d, "the imports and the exports are the first datums of a file");
+                    return err(
+                        d,
+                        "the imports and the exports are the first datums of a file",
+                    );
                 }
-                if parts.iter().any(|p| round(p, "/").is_some() || import_path(p).is_some()) {
+                if parts
+                    .iter()
+                    .any(|p| round(p, "/").is_some() || import_path(p).is_some())
+                {
                     module.imports = parts.iter().map(import).collect::<R<_>>()?;
                 } else {
                     module.exports = parts.iter().map(export).collect::<R<_>>()?;
@@ -503,7 +510,7 @@ fn round<'a>(d: &'a Datum, head: &str) -> Option<&'a [Datum]> {
     }
 }
 
-fn symbol<'a>(d: &'a Datum) -> Option<&'a str> {
+fn symbol(d: &Datum) -> Option<&str> {
     match &d.kind {
         K::Symbol(s) => Some(s),
         _ => None,
@@ -704,7 +711,10 @@ fn titems_of(parts: &[Datum], services: bool) -> R<Vec<TItem>> {
                 return err(d, "`..` needs a type after it");
             };
             if !services {
-                return err(d, "a data type has no spread; `.. N` is written only after `<-`");
+                return err(
+                    d,
+                    "a data type has no spread; `.. N` is written only after `<-`",
+                );
             }
             out.push(TItem::Spread(type_of(next)?));
             i += 2;
@@ -750,13 +760,21 @@ fn type_of(d: &Datum) -> R<Type> {
             match &head.kind {
                 K::Symbol(s) => match (s.as_str(), rest) {
                     (",", _) => TypeKind::Data(titems_of(rest, false)?),
-                    ("|", [_, _, ..]) => TypeKind::Union(rest.iter().map(type_of).collect::<R<_>>()?),
-                    ("&", [_, _, ..]) => TypeKind::Inter(rest.iter().map(type_of).collect::<R<_>>()?),
+                    ("|", [_, _, ..]) => {
+                        TypeKind::Union(rest.iter().map(type_of).collect::<R<_>>()?)
+                    }
+                    ("&", [_, _, ..]) => {
+                        TypeKind::Inter(rest.iter().map(type_of).collect::<R<_>>()?)
+                    }
                     ("-", [k]) => match &k.kind {
-                        K::Int(n) => TypeKind::Lit(LitValue::Int(-num_bigint::BigInt::from(n.clone()))),
+                        K::Int(n) => {
+                            TypeKind::Lit(LitValue::Int(-num_bigint::BigInt::from(n.clone())))
+                        }
                         _ => return err(k, "`(- k)` in a type is a negative integer literal"),
                     },
-                    ("-", [_, _, ..]) => TypeKind::Diff(rest.iter().map(type_of).collect::<R<_>>()?),
+                    ("-", [_, _, ..]) => {
+                        TypeKind::Diff(rest.iter().map(type_of).collect::<R<_>>()?)
+                    }
                     (".", [m, n]) => match &n.kind {
                         K::UpName(_) => named(Some(lower(m)?), upper(n)?, Vec::new()),
                         _ => TypeKind::ValueOf {
@@ -770,15 +788,17 @@ fn type_of(d: &Datum) -> R<Type> {
                             None => (Vec::new(), rest),
                         };
                         let [param, ret] = rest else {
-                            return err(d, "a function type `(-> P R)` has a parameter part and a result");
+                            return err(
+                                d,
+                                "a function type `(-> P R)` has a parameter part and a result",
+                            );
                         };
                         let (ret, services) = match round(ret, "<-") {
                             Some([r, s]) => {
                                 let s = match round(s, ",") {
-                                    Some(items) => Type::new(
-                                        TypeKind::Data(titems_of(items, true)?),
-                                        s.span,
-                                    ),
+                                    Some(items) => {
+                                        Type::new(TypeKind::Data(titems_of(items, true)?), s.span)
+                                    }
                                     None => type_of(s)?,
                                 };
                                 (type_of(r)?, Some(s))
@@ -795,9 +815,11 @@ fn type_of(d: &Datum) -> R<Type> {
                     }
                     _ => return err(d, "this is not a type"),
                 },
-                K::UpName(_) if !rest.is_empty() => {
-                    named(None, upper(head)?, rest.iter().map(type_of).collect::<R<_>>()?)
-                }
+                K::UpName(_) if !rest.is_empty() => named(
+                    None,
+                    upper(head)?,
+                    rest.iter().map(type_of).collect::<R<_>>()?,
+                ),
                 K::Name(_) => TypeKind::Call {
                     module: None,
                     name: lower(head)?,
@@ -894,7 +916,10 @@ fn stmt_of(d: &Datum) -> R<Stmt> {
 
 fn block_of(d: &Datum, parts: &[Datum]) -> R<Block> {
     if parts.is_empty() {
-        return err(d, "a block has one or more parts; the empty match is `core.never`");
+        return err(
+            d,
+            "a block has one or more parts; the empty match is `core.never`",
+        );
     }
     let stmts = parts.iter().map(stmt_of).collect::<R<Vec<_>>>()?;
     if !matches!(stmts.last(), Some(Stmt::Expr(_))) {
@@ -955,7 +980,10 @@ fn function_of(d: &Datum) -> R<Function> {
         None => (params, None),
     };
     let Some(items) = round(params, ",") else {
-        return err(params, "the parameters of a function are a data pattern `(, …)`");
+        return err(
+            params,
+            "the parameters of a function are a data pattern `(, …)`",
+        );
     };
     if items.iter().any(|i| symbol(i) == Some("..")) {
         return err(params, "a parameter group has no rest `..` at its top");
@@ -998,9 +1026,7 @@ fn function_of(d: &Datum) -> R<Function> {
     // A body is one expression. A Curly with one expression is a group in
     // the body; any other Curly is the body's block.
     let body = match &body.kind {
-        K::Curly(parts)
-            if parts.len() != 1 || round(&parts[0], "=").is_some() =>
-        {
+        K::Curly(parts) if parts.len() != 1 || round(&parts[0], "=").is_some() => {
             block_of(body, parts)?
         }
         _ => Block {
@@ -1038,7 +1064,12 @@ fn expr_of(d: &Datum) -> R<Expr> {
             module: None,
             name: any_name(d)?,
         },
-        K::Discard(_) => return err(d, "a discard binds nothing, so it may not be used as a value"),
+        K::Discard(_) => {
+            return err(
+                d,
+                "a discard binds nothing, so it may not be used as a value",
+            );
+        }
         K::Quote(_) => ExprKind::Quote(Quoted(Box::new(d.clone()))),
         K::Square(parts) => {
             let mut items = Vec::new();
@@ -1066,7 +1097,10 @@ fn expr_of(d: &Datum) -> R<Expr> {
         K::Curly(parts) => ExprKind::Block(block_of(d, parts)?),
         K::Round(parts) => {
             let Some(head) = parts.first() else {
-                return err(d, "the empty Round `()` has no position; the empty data is `(,)`");
+                return err(
+                    d,
+                    "the empty Round `()` has no position; the empty data is `(,)`",
+                );
             };
             let rest = &parts[1..];
             match symbol(head) {
@@ -1120,7 +1154,12 @@ fn expr_of(d: &Datum) -> R<Expr> {
                         lhs: Box::new(expr_of(l)?),
                         rhs: Box::new(expr_of(r)?),
                     },
-                    _ => return err(d, format!("`{op}` is not an expression form with these parts")),
+                    _ => {
+                        return err(
+                            d,
+                            format!("`{op}` is not an expression form with these parts"),
+                        );
+                    }
                 },
                 None => ExprKind::Call {
                     callee: Box::new(expr_of(head)?),
@@ -1222,7 +1261,10 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
         ),
         K::Round(parts) => {
             let Some(head) = parts.first() else {
-                return err(d, "the empty Round `()` has no position; the empty data pattern is `(,)`");
+                return err(
+                    d,
+                    "the empty Round `()` has no position; the empty data pattern is `(,)`",
+                );
             };
             let rest = &parts[1..];
             match (symbol(head), rest) {
@@ -1279,10 +1321,16 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
                     args: None,
                 },
                 (Some("|"), _) => {
-                    return err(d, "alternatives `(| …)` are written only in the items of a parameter group");
+                    return err(
+                        d,
+                        "alternatives `(| …)` are written only in the items of a parameter group",
+                    );
                 }
                 (Some("?"), _) => {
-                    return err(d, "a guard `(? (, …) g)` is written only around the parameters of a function");
+                    return err(
+                        d,
+                        "a guard `(? (, …) g)` is written only around the parameters of a function",
+                    );
                 }
                 (None, _) => {
                     let (module, name) = match &head.kind {
@@ -1343,7 +1391,10 @@ pub fn convert_quote(d: &Datum) -> Datum {
             Some([p, g]) => (p, Some(g)),
             _ => (head, None),
         };
-        let data = node(K::Round(vec![sym(",", pat.span), convert_quote(pat)]), pat.span);
+        let data = node(
+            K::Round(vec![sym(",", pat.span), convert_quote(pat)]),
+            pat.span,
+        );
         let params = match guard {
             Some(g) => node(
                 K::Round(vec![sym("?", head.span), data, convert_quote(g)]),
@@ -1416,7 +1467,11 @@ pub fn convert_quote(d: &Datum) -> Datum {
                     let mut group = vec![sym(",", ret.span)];
                     group.extend(services);
                     result = node(
-                        K::Round(vec![sym("<-", ret.span), result, node(K::Round(group), ret.span)]),
+                        K::Round(vec![
+                            sym("<-", ret.span),
+                            result,
+                            node(K::Round(group), ret.span),
+                        ]),
                         ret.span,
                     );
                 }
@@ -1427,8 +1482,7 @@ pub fn convert_quote(d: &Datum) -> Datum {
                     convert_quote(body),
                 ])
             }
-            (Some("->"), [arrow, params, ret])
-                if matches!(&params.kind, K::Round(ps) if ps.first().and_then(symbol).is_none()) =>
+            (Some("->"), [arrow, params, ret]) if matches!(&params.kind, K::Round(ps) if ps.first().and_then(symbol).is_none()) =>
             {
                 // A function type: a data type with no labels, and the needs.
                 let K::Round(ps) = &params.kind else {
@@ -1447,7 +1501,10 @@ pub fn convert_quote(d: &Datum) -> Datum {
                     && !matches!(&e.kind, K::UpName(s) if s == "Never")
                 {
                     needs.push(node(
-                        K::Round(vec![node(K::UpName("Fail".into()), e.span), convert_quote(e)]),
+                        K::Round(vec![
+                            node(K::UpName("Fail".into()), e.span),
+                            convert_quote(e),
+                        ]),
                         e.span,
                     ));
                 }
@@ -1462,14 +1519,21 @@ pub fn convert_quote(d: &Datum) -> Datum {
                     let mut group = vec![sym(",", ret.span)];
                     group.extend(needs);
                     result = node(
-                        K::Round(vec![sym("<-", ret.span), result, node(K::Round(group), ret.span)]),
+                        K::Round(vec![
+                            sym("<-", ret.span),
+                            result,
+                            node(K::Round(group), ret.span),
+                        ]),
                         ret.span,
                     );
                 }
-                K::Round(vec![arrow.clone(), node(K::Round(items), params.span), result])
+                K::Round(vec![
+                    arrow.clone(),
+                    node(K::Round(items), params.span),
+                    result,
+                ])
             }
-            (Some("|" | "."), [_, subject, block])
-                if matches!(&block.kind, K::Curly(cs) if !cs.is_empty() && cs.iter().all(is_clause)) =>
+            (Some("|" | "."), [_, subject, block]) if matches!(&block.kind, K::Curly(cs) if !cs.is_empty() && cs.iter().all(is_clause)) =>
             {
                 let K::Curly(cs) = &block.kind else {
                     unreachable!()
@@ -1539,7 +1603,11 @@ pub fn unconvert_quote(d: &Datum) -> Datum {
         let (p, guard, body) = branch(c).unwrap();
         let head = match guard {
             Some(g) => node(
-                K::Round(vec![sym("?", p.span), unconvert_quote(p), unconvert_quote(g)]),
+                K::Round(vec![
+                    sym("?", p.span),
+                    unconvert_quote(p),
+                    unconvert_quote(g),
+                ]),
                 p.span,
             ),
             None => unconvert_quote(p),
@@ -1588,7 +1656,8 @@ pub fn unconvert_quote(d: &Datum) -> Datum {
                 for item in items {
                     match &item.kind {
                         K::Round(xs)
-                            if xs.len() == 2 && matches!(&xs[0].kind, K::UpName(s) if s == "Fail") =>
+                            if xs.len() == 2
+                                && matches!(&xs[0].kind, K::UpName(s) if s == "Fail") =>
                         {
                             error = Some(unconvert_quote(&xs[1]));
                         }

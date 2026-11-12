@@ -3,7 +3,12 @@
     "i": {
       "language_servers": ["ilang"],
       "formatter": { "language_server": { "name": "ilang" } },
-      "format_on_save": "on"
+      "format_on_save": "on",
+      "inlay_hints": {
+        "enabled": true,
+        "show_type_hints": true,
+        "show_parameter_hints": true
+      }
     }
   },
   "lsp": {

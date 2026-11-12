@@ -31,7 +31,7 @@ literal = (n) {
 }
 
 single = (u: User) {
-	User(name, ..) = u
+	User(name = name, ..) = u
 	name
 }
 
@@ -96,7 +96,7 @@ type_var(A) = (x: A) -> A { x }
 
 param_tuple = ((a, b)) { a }
 
-param_user = (User(name, ..)) { name }
+param_user = (User(name = name, ..)) { name }
 
 param_ctor = (Ok(v)) { v }
 

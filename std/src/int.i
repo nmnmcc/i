@@ -209,7 +209,7 @@ max = (a: Int, b: Int) -> Int {
 /// `min` is greater than `max`, the two bounds are swapped.
 ///
 /// ```i
-/// int.clamp(40, min: 50, max: 60)  // 50
+/// int.clamp(40, 50, 60)  // 50
 /// ```
 clamp = (x: Int, min: Int, max: Int) -> Int {
 	(low, high) = { min <= max } |> {
@@ -250,7 +250,7 @@ is_odd = (x: Int) -> Bool { x % 2 != 0 }
 /// `Error(Nil)`, because the result would not be a whole number.
 ///
 /// ```i
-/// int.power(2, of: 10)  // Ok(1024)
+/// int.power(2, 10)  // Ok(1024)
 /// ```
 power = (base: Int, of: Int) -> Result(Int, Nil) {
 	{ of < 0 } |> {
@@ -364,7 +364,7 @@ divide = (a: Int, by: Int) -> Result(Int, Nil) {
 /// `by` is `0`.
 ///
 /// ```i
-/// int.remainder(-13, by: 3)  // Ok(-1)
+/// int.remainder(-13, 3)  // Ok(-1)
 /// ```
 remainder = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |> {
@@ -377,7 +377,7 @@ remainder = (a: Int, by: Int) -> Result(Int, Nil) {
 /// `by`, or `Error(Nil)` when `by` is `0`.
 ///
 /// ```i
-/// int.modulo(-13, by: 3)  // Ok(2)
+/// int.modulo(-13, 3)  // Ok(2)
 /// ```
 modulo = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |> {
@@ -395,7 +395,7 @@ modulo = (a: Int, by: Int) -> Result(Int, Nil) {
 /// `a / by`, rounded down, or `Error(Nil)` when `by` is `0`.
 ///
 /// ```i
-/// int.floor_divide(-7, by: 2)  // Ok(-4)
+/// int.floor_divide(-7, 2)  // Ok(-4)
 /// ```
 floor_divide = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |> {
@@ -441,7 +441,7 @@ bitwise_shift_right = (x: Int, y: Int) -> Int { core.shift_right(x, y) }
 /// `to`. It counts up or down, as needed.
 ///
 /// ```i
-/// int.range(from: 0, to: 3, with: [], run: (acc, i) { [i, ..acc] })  // [2, 1, 0]
+/// int.range(0, 3, [], (acc, i) { [i, ..acc] })  // [2, 1, 0]
 /// ```
 range(Acc, E, N) = (
 	from: Int

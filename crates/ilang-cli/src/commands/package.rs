@@ -2082,10 +2082,7 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
             Box::new(canonical_alias_order(t, key)),
             ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
         ),
-        ShownType::Lit(_)
-        | ShownType::Var(_)
-        | ShownType::Hole
-        | ShownType::Never => t.clone(),
+        ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
         ShownType::Record(keys, ts) => ShownType::Record(
             keys.clone(),
             ts.iter().map(|t| canonical_alias_order(t, key)).collect(),

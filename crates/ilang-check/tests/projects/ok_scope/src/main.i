@@ -9,7 +9,7 @@ c = (1, d)
 
 d = () { c }
 
-wrapped = Wrap((n) { wrapped })
+wrapped = Wrap(f: (n) { wrapped })
 
 Wrap {
 	Wrap(f: (Int) -> Wrap)
