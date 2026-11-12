@@ -23,12 +23,17 @@ Implemented cooked/raw/multi-line interpolation before the core tree, literal-on
 - `cargo check -p ilang-syntax -p ilang-check -p ilang-wasm -p ilang-lsp --all-targets`: passed (through the shared heavy wrapper and development shell).
 - `cargo test -p ilang-syntax --test string_forms --test lisp_encode_deep`: passed, 14 tests, including nested interpolation, canonical/formatter/Lisp round trips, source encoding and exact macro syntax charges.
 - Focused `ilang-cli --test spec` run with the new single-file cases: 28/28 passed at O0 and O2. A further package case exercises macros around and inside interpolation; the workspace spec run includes it.
+- `cargo test -p ilang-syntax --test string_forms --test format`: passed after fixing duplicated comments between prefix/binder/suffix parts; 6 tests, including comment preservation and repository formatter properties.
+- `i run --project tests/spec/6/interpolation_macro --opt 0`: passed; macro calls both around and inside interpolation retain scope and values.
+- `i run --project examples/hello` and `i run --project examples/io-fs`: passed (`Hello from i!`, `fs ok`).
 - `UPDATE=1 cargo test -p ilang-syntax --test format`: passed, golden layout and repository-wide round-trip/idempotence properties; the skip list records the new intentionally invalid spec cases.
 - `cargo test -p ilang-lsp --lib --test protocol`: passed, 8 unit tests and 17 protocol tests, including raw interpolation hover and nonoverlapping UTF-16 semantic tokens for nested expressions/comments.
 - `tree-sitter test --grammar-path editors/tree-sitter-i`: passed, 11 corpus cases. Set `XDG_CACHE_HOME=$PWD/target/str-tree-cache` to isolate the parser cache from other concurrently running lanes.
 - `npm --prefix editors/vscode test`: passed, 9 tests.
 - `scripts/old-syntax-check`: passed, 4,602 extracted sources at the focused run. Intentional negative cases have adjacent markers and exact diagnostics in its registry.
 - The task's complete acceptance script is the final gate: release build, O0/O2 output, formatter preservation, rejected Int interpolation, workspace tests, std O0 and old-syntax checks. Its command logs are `/tmp/str-accept-build.log`, `/tmp/str-accept-workspace.log` and `/tmp/str-accept-syntax.log`.
+
+A manual formatter check found duplicate `// prefix` and `// suffix` comments in a string pattern. Structured printing of the literal/binder parts fixes it, and the formatter test checks that each comment occurs once.
 
 Earlier failures corrected during implementation: the first syntax check reported `missing field suffix`; the IR check reported `cannot find function atom` and mismatched match-arm types; the initial string test used the datum-only Lisp parse API; TextMate's standalone regex test rejected dynamic end-pattern backreferences (`invalid backref number/name`), so it now resolves those as TextMate does. Tree-sitter initially needed the development shell's C compiler and regenerated corpus nodes. A broad test run built before the raw quote-only literal addition then read that new fixture and failed `unexpected parse failure: .../raw_string_literal.i`; the final gate recompiles everything.
 

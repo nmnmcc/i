@@ -62,6 +62,11 @@ fn formatter_preserves_interpolation_with_nested_expressions() {
         r#"value = "a\({ // inner comment
 x })b" // outside"#,
         r#"value = (s) { s |> { "a" <> r <> "b" -> r  r <> "x" -> r  _ -> "" } }"#,
+        r#"value = (s) { s |> { "a" <> // prefix
+r <> // suffix
+"b" -> r  _ -> "" } }"#,
+        r#"value = (s) { s |> { r <> // suffix
+"b" -> r  _ -> "" } }"#,
     ] {
         let (a, ds) = parse_module(source);
         assert!(ds.is_empty(), "{source}: {ds:?}");
@@ -70,6 +75,11 @@ x })b" // outside"#,
         assert!(ds.is_empty(), "{out}: {ds:?}");
         assert!(shape::equivalent(&a, &b), "{source}\n{out}");
         assert_eq!(out, format(&out).unwrap());
+        assert_eq!(
+            lex(source).comments.len(),
+            lex(&out).comments.len(),
+            "{out}"
+        );
         if source.contains("\\(") || source.contains("\\#(") {
             assert!(out.contains("\\(") || out.contains("\\#("), "{out}");
         }

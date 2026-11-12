@@ -1521,7 +1521,23 @@ impl<'a> Formatter<'a> {
                 self.literal_before(span.end)
             )),
             PatternKind::String(_) => text(self.slice(span)),
-            PatternKind::Prefix { .. } => text(self.slice(span)),
+            PatternKind::Prefix { rest, .. } => {
+                let first = &self.toks[self.tok_index(span.start)];
+                let prefix = matches!(first.kind, T::Str(_)).then_some(first.span);
+                let last = &self.toks[self.tok_index(span.end) - 1];
+                let suffix = matches!(last.kind, T::Str(_)).then_some(last.span);
+                let mut parts = Vec::new();
+                if let Some(prefix) = prefix {
+                    parts.push(text(self.slice(prefix)));
+                    parts.push(text(" <> "));
+                }
+                parts.push(self.continued(rest.span.start, |_| text(&rest.name)));
+                if let Some(suffix) = suffix {
+                    parts.push(text(" <> "));
+                    parts.push(self.continued(suffix.start, |f| text(f.slice(suffix))));
+                }
+                group(cat(parts))
+            }
             PatternKind::Constructor {
                 module,
                 name,
