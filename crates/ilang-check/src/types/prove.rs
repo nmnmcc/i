@@ -171,6 +171,13 @@ impl Prover<'_> {
                 flatten(l, false, &mut ms);
                 self.any(&ms, r, mode)
             }
+            // `a - H1 <: b - H2` when `a <: b` and every member of `H2` is
+            // taken out by `H1`.
+            (Ty::Diff(a, h1), Ty::Diff(b, h2))
+                if h2.iter().all(|m| h1.iter().any(|n| n.head() == m.head())) =>
+            {
+                self.sub(a, b, mode)
+            }
             (Ty::Diff(a, _), _) => self.sub(a, r, mode),
             (_, Ty::Diff(a, hs)) => {
                 let h = l.head();
