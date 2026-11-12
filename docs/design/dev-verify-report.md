@@ -88,6 +88,12 @@ No language or library surface was added, including state mechanisms.
   removed source-only E0522; each still requires rejection before execution,
   and incompatible-provision E0515 requirements remain unchanged. No extra
   diagnostic code or successful runtime outcome was allowed.
+  Recursive K4c recovery observations also retained a fabricated `b : () ->
+  Nil` line after E0505. Both the pre-normalization debug CLI and the current
+  release CLI omit it; the same error, location and rejection remain. Updated
+  only snapshots whose complete difference is that omitted recovery type
+  (plus the separately reviewed error-slot spelling), consistent with
+  `infer.rs` omitting recursive schemes after a diagnosed failure.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
