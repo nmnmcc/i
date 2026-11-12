@@ -139,16 +139,26 @@ members; time bound and the shown type `(e: E(Int)) -> Int`) and
 Row 2 of `docs/design/syntax-3.md` §7.2 (on the `redesign` branch; §2.12).
 
 - `pattern.rs` `fit`: a fitted pattern whose top is a constructor pattern
-  `C(…)` (also `x = C(…)`) with pattern type `Q` now needs
-  `b <: Q | r - Q` with a new variable `r` (made with `Solver::diff`, which
-  bounds `r` by `Q | r'`), instead of `b <: Q`. A value of `b` made by another
-  constructor goes to `r - Q`, so the binding may fail and reports to
-  `Assert` through the existing `binding_may_fail`/`binding_failure`, and the
-  code generator stops with `assertion failed: pattern … did not match …`.
-- When the values of `b` are known (no unknown member, at least one head)
-  and none is made by `C`, warning W0505 (`code::PATTERN_DISJOINT`): "this
-  pattern never matches: no value of this type is made by `C`". A value whose
-  values are not known yet (a recursive group) gives no warning.
+  `C(…)` (also `x = C(…)`) with pattern type `Q`, fitted to a value `b`
+  whose known values (coverage's `Pos` values: no unknown member) include a
+  head other than `C`, now needs `b <: Q | r - Q` with a new variable `r`
+  (made with `Solver::diff`, which bounds `r` by `Q | r'`), instead of
+  `b <: Q`. A value of `b` made by another constructor goes to `r - Q`, so
+  the binding may fail and reports to `Assert` through the existing
+  `binding_may_fail`/`binding_failure`, and the code generator stops with
+  `assertion failed: pattern … did not match …`.
+- Interpretation: while the values of `b` are not known (a parameter, a
+  recursive group) or are all made by `C`, `fit` keeps `b <: Q`. Applying
+  `Q | r - Q` there too (tried first) changed the shown types of existing
+  goldens: `first : (r: Result(A, B) | C - Result(Never, _)) -> A ! Assert`
+  in `tests/types/effects.i` and `may_fail.i`, and `User(…) = u` in
+  `labels.i` gave `u: A` with `! Assert` for a one-constructor pattern that
+  cannot fail. Keeping `<: Q` when no other constructor is known keeps those
+  principal types and still accepts every refutable member binding of a
+  known union.
+- When the values of `b` are known and none is made by `C`, warning W0505
+  (`code::PATTERN_DISJOINT`): "this pattern never matches: no value of this
+  type is made by `C`".
 - `fit` is the binding-statement and top-level-binding path. Interpretation:
   parameter patterns (`(Some(x)) { … }`) keep their parameter type `Q`;
   changing them would change every shown function type with a constructor
