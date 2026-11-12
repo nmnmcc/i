@@ -148,3 +148,10 @@ review fixture.
 The workspace scan also caught the pre-existing macro-definition `@main`
 rejection diagnostic changing (`invalid_macro_definitions_are_reported`). Its
 unrelated rejection check is retained; only the test-attribute branch is removed.
+
+The full workspace scan found three failures in `ilang-wasm --test control_lazy`
+(`deep_resume`, `deep_resume_in_recursion`, `resume_cost_is_flat`): the benchmark
+source adapter still split at a constructed legacy attribute marker. It now
+uses parser spans to retain the ordinary benchmark definitions and omit macro
+registration/imports for its command entry. The benchmark workload and all 17
+tests are preserved; this is a migration fix, not stack hardening.

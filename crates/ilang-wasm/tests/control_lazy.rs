@@ -829,7 +829,32 @@ fn error_through_pending_final() {
 // runtime path instead of the benchmark's resume and re-suspend.
 fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
     let source = include_str!("../../../bench/test/control_test.i");
-    let source = source.split(concat!("\n@", "test")).next().unwrap();
+    let (module, diagnostics) = ilang_syntax::parse_module(source);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let end = module
+        .items
+        .iter()
+        .find(|item| matches!(item.kind, ilang_syntax::ast::ItemKind::MacroItem { .. }))
+        .expect("benchmark has test registration calls")
+        .span
+        .start as usize;
+    let import = module
+        .imports
+        .iter()
+        .find(|import| {
+            import
+                .path
+                .iter()
+                .map(|part| part.name.as_str())
+                .eq(["std", "test"])
+        })
+        .expect("benchmark imports its test macros")
+        .span;
+    let source = format!(
+        "{}{}",
+        &source[..import.start as usize],
+        &source[import.end as usize..end]
+    );
     let source = source
         .replace("rounds = 100_000", &format!("rounds = {rounds}"))
         .replace(
