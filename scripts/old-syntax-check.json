@@ -3200,5 +3200,23 @@
       "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
       "E0101: expected `,` or `)`, found `=`"
     ]
+  },
+  "crates/ilang-check/tests/alias_unions.rs:1176f1053a24405c": {
+    "not_source": "Rust format template or JSON key; the generated i source is checked by the test itself"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:3bb2195cc9c09f06": {
+    "not_source": "Rust format template or JSON key; the generated i source is checked by the test itself"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:4ff96d8c9f03da76": {
+    "not_source": "Rust format template or JSON key; the generated i source is checked by the test itself"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:beaaa485d82b9360": {
+    "not_source": "Rust format template or JSON key; the generated i source is checked by the test itself"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:c4a37f2a714decb3": {
+    "not_source": "Rust format template or JSON key; the generated i source is checked by the test itself"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1": {
+    "not_source": "JSON field name in a test fixture writer, not i source"
   }
 }
