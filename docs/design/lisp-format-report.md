@@ -110,7 +110,14 @@ and LSP formatting/idempotence/syntax-error behavior.
 - Acceptance rerun: release build, formatter checks and `dev-verify rust` passed.
   `dev-verify i` passed its format, standard library, benchmark and WASI checks,
   but its review corpus reported three timeouts and changed outputs in wide/stress
-  cases under concurrent load. The verification is being retried.
+  cases. A second full acceptance attempt failed in the same review corpus:
+  `review-k4d/perf/mutual200`, `mutual300`, and `review-k4s/std` timed out;
+  `stress_wide_open_1024` and `review-t1/stress-keys-2000` also differed.
+- Small reproduction: `heavy ./scripts/review-corpus run --binary "$PWD/target/release/i"
+  --filter review-k4s/std --jobs 1` failed with `review-k4s/std: unclassified
+  checker timeout` and `full output changed`. This checker/corpus failure remains.
+- `target/release/i test --project examples/macro-tests`: passed, 8 passed,
+  0 failed, 1 skipped.
 
 ## std/src/test.is before and after
 
@@ -172,4 +179,5 @@ First 30 lines:
 
 ## Unfinished
 
-Acceptance verification is being rerun; no implementation behavior is deferred.
+Full acceptance does not pass: `dev-verify i` fails in the review corpus as
+described above. No formatter implementation behavior is deferred.
