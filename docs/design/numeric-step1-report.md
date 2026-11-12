@@ -78,8 +78,8 @@ facts only for fresh expression definitions, not narrowed uses of older locals.
 - Closure captures, globals, list elements, tuple/record fields, service values,
   host values, portability walks and saved continuation data: existing layouts
   and observers require canonical values.
-- Runtime operations without a local scalar form (including floor, ceiling,
-  square root, bit conversion and inspection): the existing checked runtime
+- Generic equality/inequality, and runtime operations without a local scalar form
+  (including floor, ceiling, square root, bit conversion and inspection): the existing checked runtime
   operation consumes canonical arguments and returns canonical values.
 - Mixed/unknown types and multiple definitions at joins: conservative Value
   encoding; no guessed type or SSA assumption.
@@ -92,7 +92,10 @@ facts only for fresh expression definitions, not narrowed uses of older locals.
 ## N0 experiment, before scalar selection
 
 `tests/perf/numeric` freezes the six kernels from numeric-lowering §2.2 plus
-identity. `math.i` is a diagnostic copy of `de4d58d:std/src/float.i` with the
+identity. Interpretation: the Int loop uses the ordinary literal-zero clause
+rather than an intermediate Bool equality; every variant uses this same source
+and the same 128-iteration sum. These are paired current-compiler measurements,
+not a claim of byte-identical inputs to the historical design-note artifacts. `math.i` is a diagnostic copy of `de4d58d:std/src/float.i` with the
 same fast-sine wrapper. It is benchmark code, not a change to the float library
 or its release/rounding contract. The six expected answers at x=0.5 are checked.
 
@@ -135,6 +138,71 @@ kernels/closures; quiet paired reruns follow before making timing claims.
 
 Artifacts: ignored `target/numeric-step1/n0-full/{samples.csv,medians.csv,
 *-count.wasm,*.wasm,*.wat}`; the committed harness regenerates all of them.
+
+## Final N1 measurements
+
+After materialization reuse, the second five-batch quiet comparison below is the
+confirmation run. First corrected run and confirmation both retain all six
+expected answers and the same allocation counts. No N2 latency gate is claimed;
+workers, callback specialization and aggregate elimination are out of scope.
+
+| Kernel | Baseline O2 median ns | N0 O2 median ns | N1 O2 median ns | Allocations baseline / N0 / N1 |
+|---|---:|---:|---:|---|
+| certified fast sine | 14331 | 4607 | 4287 | 322 / 56 / 56 |
+| Horner | 2453 | 69 | 59 | 34 / 13 / 13 |
+| integer | 1814 | 1861 | 1071 | 13 / 13 / 13 |
+| dot | 4666 | 4337 | 4226 | 76 / 44 / 44 |
+| tuples | 280 | 150 | 162 | 33 / 27 / 27 |
+| closures | 4538 | 4206 | 4235 | 79 / 47 / 47 |
+
+Module bytes: baseline 65,522; N0 75,679; final N1 75,505 (+15.24% against
+baseline, below the note's 25% size ceiling). The clear additional N1 gain is the
+Int path: 1,814 to 1,071 ns in the confirmation run (1.69x); no Int limbs are
+allocated on its small path. Float allocation removal is primarily N0's work.
+N1 makes scalar locals and materialization explicit while retaining N0's counts;
+small Float timing differences between N0 and N1 are not robust speed claims.
+
+All five final run medians (ns), including outliers, follow. Run A is the first
+corrected measurement; B is the confirmation, repeated because spread exceeded
+20%. Both use the committed `numeric_measure` driver and the shared quiet lock.
+The quiet wrapper currently reserves slots 1–3 while the shared heavy wrapper
+has six slots; it does not prevent unrelated CPU work. Scheduling outliers and
+10 ns timer quantization remain visible, especially in short kernels. These are
+observations, not worst-case timings or a claim that later-stage targets pass.
+
+| Run | Kernel | Baseline | N0 | N1 |
+|---|---|---|---|---|
+| A | certified fast sine | 14842,14722,15215,14653,14401 | 4759,4627,4707,4656,4597 | 4395,4366,4478,4427,4528 |
+| A | Horner | 2493,2542,2694,2495,2433 | 120,49,60,80,109 | 100,40,29,50,70 |
+| A | integer | 1873,1843,1893,2905,1923 | 1905,1834,1903,2835,2774 | 1110,1111,1352,1332,1121 |
+| A | dot | 4747,4768,5007,4729,4758 | 4367,4286,4407,4347,4348 | 4316,4327,4447,4417,4337 |
+| A | tuples | 281,290,281,281,261 | 150,162,151,160,181 | 140,150,141,140,161 |
+| A | closures | 4678,4537,4507,4527,4536 | 4286,4195,4177,4226,4186 | 4176,4107,4207,4204,4195 |
+| B | certified fast sine | 18999,14201,14331,14361,14191 | 4618,4607,4607,4597,4657 | 4257,4275,4306,4287,4347 |
+| B | Horner | 2444,2464,2404,2453,2473 | 69,60,41,90,151 | 59,40,20,69,110 |
+| B | integer | 1814,1791,1843,1834,1812 | 1824,1833,1911,1884,1861 | 1061,1061,1071,1092,1071 |
+| B | dot | 4677,4628,4687,4666,4646 | 4377,4307,4337,4356,4296 | 4245,4226,4217,6170,4215 |
+| B | tuples | 250,291,280,260,302 | 140,250,150,168,150 | 162,199,160,141,162 |
+| B | closures | 4547,4507,4526,4538,4548 | 4206,4207,4176,4187,4206 | 4287,4237,4235,4206,4186 |
+
+Final confirmation SHA-256:
+
+- baseline: `e64a24dada36b86cd6b469d44309d751845cf37fd8eed709339ec04b8b935c9d`
+- N0: `012d85f8ac18ec42dfddcdecf16267bd26854c835a12dbc7fd2891f6c15277eb`
+- N1: `f34bee4c464bd253b945806a1acd243f7c944936b6549ef0d1480f8675f1afdc`
+
+Baseline and N0 binaries are also byte-identical between the initial N0 experiment
+and the final confirmation, separating N0's effect from N1. Raw samples, WAT and
+instrumented modules are under ignored `target/numeric-step1/materialized-paired`
+and `confirmation-paired`; all run medians are committed above.
+
+Reproduce from this lane:
+
+```sh
+R=/home/agent/Programming/i
+$R/.rd/cache/heavy direnv exec $R cargo build --locked -p ilang-cli --example numeric_measure
+$R/.rd/cache/quiet direnv exec $R target/debug/examples/numeric_measure target/numeric-step1/reproduce
+```
 
 ## Verification
 

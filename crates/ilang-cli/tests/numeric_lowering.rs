@@ -1,4 +1,5 @@
-//! O0 is the reference lowering oracle. Compare full language stop messages
+//! O0, O2 and O3 must agree. O0 is the reference lowering oracle.
+//! Compare full language stop messages
 //! (including every logical source position), values, bits and final effects.
 use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
 use ilang_wasm::{Numeric, Options};
