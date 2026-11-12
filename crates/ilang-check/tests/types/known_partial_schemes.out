@@ -1,12 +1,12 @@
-map : (xs: List(A), f: (A) -> B) -> List(B)
+map : (xs = List(A), f = (A) -> B) -> List(B)
 users : List(User)
 name : List(String)
 part : List(String)
 thunk : List(Int)
 tuple_pattern : List(String)
-unknown : (p: (name: A)) -> A
-17:1: warning[W0504]: top-level binding `name` is not used
-22:1: warning[W0504]: top-level binding `part` is not used
-27:1: warning[W0504]: top-level binding `thunk` is not used
-32:1: warning[W0504]: top-level binding `tuple_pattern` is not used
-38:1: warning[W0504]: top-level binding `unknown` is not used
+unknown : (p = (name = A)) -> A
+12:1: warning[W0504]: top-level binding `name` is not used
+17:1: warning[W0504]: top-level binding `part` is not used
+22:1: warning[W0504]: top-level binding `thunk` is not used
+27:1: warning[W0504]: top-level binding `tuple_pattern` is not used
+33:1: warning[W0504]: top-level binding `unknown` is not used

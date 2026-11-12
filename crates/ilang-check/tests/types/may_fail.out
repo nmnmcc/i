@@ -1,46 +1,46 @@
-pair : (t: (A, B)) -> A
-pair_written : (t: (Int, String)) -> String
-first : (r: Result(A, B)) -> A ! Assert
+pair : (t = (A, B)) -> A
+pair_written : (t = (Int, String)) -> String
+first : (r = Result(A, B)) <- (Assert) -> A
 annotated : () -> Int
-literal : (n: A & Int) -> A ! Assert
-single : (u: User) -> String
-only_ok : (r: Result(Int, Never)) -> Int
-nested : (p: (Result(Int, Never), Bool)) -> Int
+literal : (n = A & Int) <- (Assert) -> A
+single : (u = User) -> String
+only_ok : (r = Result(Int, Never)) -> Int
+nested : (p = (Result(Int, Never), Bool)) -> Int
 from_value : () -> 1
-list : (xs: List(A)) -> A ! Assert
-list_rest : (xs: List(A)) -> List(A)
-prefix : (s: String) -> String
-prefix_some : (s: String) -> String ! Assert
-named : (r: Result(A, B)) -> Result(A, B) ! Assert
-typed_part : (p: (Int, A)) -> A
-bits : (b: BitArray) -> Int ! Assert
-float : (f: A & Float) -> A ! Assert
-type_var : (x: A) -> A
+list : (xs = List(A)) <- (Assert) -> A
+list_rest : (xs = List(A)) -> List(A)
+prefix : (s = String) -> String
+prefix_some : (s = String) <- (Assert) -> String
+named : (r = Result(A, B)) <- (Assert) -> Result(A, B)
+typed_part : (p = (Int, A)) -> A
+bits : (b = BitArray) <- (Assert) -> Int
+float : (f = A & Float) <- (Assert) -> A
+type_var : (x = A) -> A
 param_tuple : ((A, B)) -> A
 param_user : (User) -> String
-param_ctor : (Result(A, B)) -> A ! Assert
-param_literal : (Int) -> 1 ! Assert
-param_list : (List(A)) -> 1 ! Assert
-8:1: warning[W0504]: top-level binding `pair` is not used
-13:1: warning[W0504]: top-level binding `pair_written` is not used
-18:1: warning[W0504]: top-level binding `first` is not used
-23:1: warning[W0504]: top-level binding `annotated` is not used
-28:1: warning[W0504]: top-level binding `literal` is not used
-33:1: warning[W0504]: top-level binding `single` is not used
-39:1: warning[W0504]: top-level binding `only_ok` is not used
-44:1: warning[W0504]: top-level binding `nested` is not used
-49:1: warning[W0504]: top-level binding `from_value` is not used
-54:1: warning[W0504]: top-level binding `list` is not used
-59:1: warning[W0504]: top-level binding `list_rest` is not used
-64:1: warning[W0504]: top-level binding `prefix` is not used
-69:1: warning[W0504]: top-level binding `prefix_some` is not used
-74:1: warning[W0504]: top-level binding `named` is not used
-79:1: warning[W0504]: top-level binding `typed_part` is not used
-84:1: warning[W0504]: top-level binding `bits` is not used
-89:1: warning[W0504]: top-level binding `float` is not used
-95:1: warning[W0504]: top-level binding `type_var` is not used
-97:1: warning[W0504]: top-level binding `param_tuple` is not used
-99:1: warning[W0504]: top-level binding `param_user` is not used
-101:1: warning[W0504]: top-level binding `param_ctor` is not used
-103:1: warning[W0504]: top-level binding `param_literal` is not used
-105:1: warning[W0504]: top-level binding `param_list` is not used
+param_ctor : (Result(A, B)) <- (Assert) -> A
+param_literal : (Int) <- (Assert) -> 1
+param_list : (List(A)) <- (Assert) -> 1
+6:1: warning[W0504]: top-level binding `pair` is not used
+11:1: warning[W0504]: top-level binding `pair_written` is not used
+16:1: warning[W0504]: top-level binding `first` is not used
+21:1: warning[W0504]: top-level binding `annotated` is not used
+26:1: warning[W0504]: top-level binding `literal` is not used
+31:1: warning[W0504]: top-level binding `single` is not used
+37:1: warning[W0504]: top-level binding `only_ok` is not used
+42:1: warning[W0504]: top-level binding `nested` is not used
+47:1: warning[W0504]: top-level binding `from_value` is not used
+52:1: warning[W0504]: top-level binding `list` is not used
+57:1: warning[W0504]: top-level binding `list_rest` is not used
+62:1: warning[W0504]: top-level binding `prefix` is not used
+67:1: warning[W0504]: top-level binding `prefix_some` is not used
+72:1: warning[W0504]: top-level binding `named` is not used
+77:1: warning[W0504]: top-level binding `typed_part` is not used
+82:1: warning[W0504]: top-level binding `bits` is not used
+87:1: warning[W0504]: top-level binding `float` is not used
+93:1: warning[W0504]: top-level binding `type_var` is not used
+95:1: warning[W0504]: top-level binding `param_tuple` is not used
+97:1: warning[W0504]: top-level binding `param_user` is not used
+99:1: warning[W0504]: top-level binding `param_ctor` is not used
+101:1: warning[W0504]: top-level binding `param_literal` is not used
+103:1: warning[W0504]: top-level binding `param_list` is not used

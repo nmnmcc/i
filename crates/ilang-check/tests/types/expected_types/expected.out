@@ -1,19 +1,19 @@
-app/list.map : (xs: List(A), f: (A) -> B) -> List(B)
-app/list.fold : (xs: List(A), init: B, f: (B, A) -> B) -> B
+app/list.map : (xs = List(A), f = (A) -> B) -> List(B)
+app/list.fold : (xs = List(A), init = B, f = (B, A) -> B) -> B
 app/main.users : List(User)
 app/main.names : List(String)
 app/main.first_name : () -> Bool
 app/main.piped : List(Int)
 app/main.by_label : List(String)
 app/main.total : Int
-app/main.unknown : (people: List((name: A))) -> List(A)
+app/main.unknown : (people = List((name = A))) -> List(A)
 app/main.annotated : (User) -> String
 app/main.getter : () -> (User) -> String
 app/main.in_block : (User) -> Int
-app/main.in_case : (b: Bool) -> (User) -> String
+app/main.in_case : (b = Bool) -> (User) -> String
 app/main.in_tuple : ((User) -> String, Int)
 app/main.in_list : List((User) -> Int)
 app/main.arity : (User) -> String
-app/main.alone : (u: (name: A)) -> A
-src/main.i:20:14: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-src/main.i:60:1: error[E0502]: the function types `(u: _, v: _) -> _` and `(User) -> String` have different numbers of parameters
+app/main.alone : (u = (name = A)) -> A
+src/main.i:17:49: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+src/main.i:52:1: error[E0502]: the function types `(u = _, v = _) -> _` and `(User) -> String` have different numbers of parameters

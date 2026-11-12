@@ -1,6 +1,6 @@
-text_name : (b: A) -> 0 | 1
-not_last : (b: A) -> 0 | 1 | 2
-fine : (b: A) -> 0 | 1 | 2
-5:5: error[E0519]: the format `utf8` in a pattern needs a string literal, which gives the bits to match (§8.4)
-12:7: error[E0519]: `bits` with no length takes all the bits that are left, so it may only be the last segment (§8.4)
-13:7: error[E0519]: `bytes` with no length takes all the bits that are left, so it may only be the last segment (§8.4)
+text_name : (b = A) -> 0 | 1
+not_last : (b = A) -> 0 | 1 | 2
+fine : (b = A) -> 0 | 1 | 2
+3:27: error[E0519]: the format `utf8` in a pattern needs a string literal, which gives the bits to match (§8.4)
+6:12: error[E0519]: `bits` with no length takes all the bits that are left, so it may only be the last segment (§8.4)
+6:36: error[E0519]: `bytes` with no length takes all the bits that are left, so it may only be the last segment (§8.4)

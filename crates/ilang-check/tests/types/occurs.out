@@ -1,6 +1,6 @@
 local : () -> 1
-fine : (x: A & List(A)) -> List(A)
-id : (x: A) -> A
+fine : (x = A & List(A)) -> List(A)
+id : (x = A) -> A
 mono : () -> 1
 unbound : () -> 1
 2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
