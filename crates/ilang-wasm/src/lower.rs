@@ -634,6 +634,24 @@ pub fn lower_tests_with_bindings(
     options: Options,
     tests: &[(DefId, String)],
 ) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
+    lower_tests_numeric(
+        graph,
+        program,
+        typed,
+        options,
+        tests,
+        crate::Numeric::Reference,
+    )
+}
+
+pub(crate) fn lower_tests_numeric(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    tests: &[(DefId, String)],
+    numeric: crate::Numeric,
+) -> Result<(ir::Program, Vec<serde_json::Value>), Vec<Diagnostic>> {
     if !typed.coalescing_errors().is_empty() {
         return Err(typed.coalescing_errors().to_vec());
     }
@@ -668,6 +686,10 @@ pub fn lower_tests_with_bindings(
     l.extra_tests = tests.to_vec();
     l.run();
     if l.diags.is_empty() {
+        l.out.numeric = numeric;
+        if numeric == crate::Numeric::Scalars {
+            crate::numeric::run(&mut l.out);
+        }
         crate::control::split(&mut l.out);
         Ok((l.out, l.bindings))
     } else {
@@ -684,6 +706,26 @@ pub fn lower_selected_with_bindings(
     options: Options,
     target: DefId,
     export: &str,
+) -> Result<(ir::Program, Vec<serde_json::Value>, bool), Vec<Diagnostic>> {
+    lower_selected_numeric(
+        graph,
+        program,
+        typed,
+        options,
+        target,
+        export,
+        crate::Numeric::Reference,
+    )
+}
+
+pub(crate) fn lower_selected_numeric(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: Options,
+    target: DefId,
+    export: &str,
+    numeric: crate::Numeric,
 ) -> Result<(ir::Program, Vec<serde_json::Value>, bool), Vec<Diagnostic>> {
     if !typed.coalescing_errors().is_empty() {
         let mut diags = typed.coalescing_errors().to_vec();
@@ -707,6 +749,10 @@ pub fn lower_selected_with_bindings(
     l.run();
     let is_async = l.selected_async;
     if l.diags.is_empty() {
+        l.out.numeric = numeric;
+        if numeric == crate::Numeric::Scalars {
+            crate::numeric::run(&mut l.out);
+        }
         crate::control::split(&mut l.out);
         Ok((l.out, l.bindings, is_async))
     } else {

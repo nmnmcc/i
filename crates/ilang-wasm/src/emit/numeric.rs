@@ -47,7 +47,7 @@ pub(super) fn float_op(op: Op, args: &[String]) -> Option<String> {
     })
 }
 
-pub(super) fn has_float(stmts: &[Stmt]) -> bool {
+pub(crate) fn has_float(stmts: &[Stmt]) -> bool {
     let mut work = vec![stmts];
     while let Some(stmts) = work.pop() {
         for stmt in stmts {
@@ -105,12 +105,7 @@ impl Plan {
         while let Some(stmts) = work.pop() {
             for stmt in stmts {
                 match stmt {
-                    // Conservative N1: every saved-frame function stays boxed,
-                    // including scalars dead at some of its suspension points.
-                    Stmt::Suspendable { .. } | Stmt::Continue(_) | Stmt::Join(_) => {
-                        return Self::default();
-                    }
-                    Stmt::Let { dst, value, .. } => {
+                    Stmt::Let { dst, value, .. } | Stmt::Suspendable { dst, value, .. } => {
                         definitions.entry(*dst).or_default().push(value)
                     }
                     Stmt::If {
@@ -125,9 +120,7 @@ impl Plan {
             }
         }
         let mut plan = Self::default();
-        if has_float(&f.body)
-            && let Some(facts) = facts
-        {
+        if let Some(facts) = facts {
             for (&local, fact) in facts {
                 if local < f.arity && *fact == ilang_check::types::NumericFact::FiniteF64 {
                     plan.locals.insert(local, Repr::Float);
@@ -223,6 +216,28 @@ impl Plan {
 }
 
 impl Emitter<'_> {
+    pub(super) fn restore_scalar(&self, local: Local) -> String {
+        match self.numeric_plan.locals.get(&local) {
+            Some(Repr::Float) => format!(
+                "(local.set $numeric_f{local} {})\n",
+                unbox_float(&format!("(local.get $l{local})"))
+            ),
+            Some(Repr::Int) => Self::int_normalize(local),
+            Some(Repr::Bool) => format!(
+                "(local.set $numeric_c{local} (call $is_bool (local.get $l{local}) (i32.const 1)))\n"
+            ),
+            None => String::new(),
+        }
+    }
+    pub(super) fn float_call(&self, callee: &Callee) -> bool {
+        match callee {
+            Callee::Direct(f) | Callee::Known { func: f, .. } => {
+                self.p.workers.get(f).is_some_and(|w| w.float_result)
+            }
+            _ => false,
+        }
+    }
+
     pub(super) fn float_atom(&mut self, atom: &Atom) -> String {
         match atom {
             Atom::Float(value) => format!(
@@ -262,7 +277,7 @@ impl Emitter<'_> {
         )
     }
 
-    fn int_normalize(local: Local) -> String {
+    pub(super) fn int_normalize(local: Local) -> String {
         format!(
             "(if (ref.test (ref i31) (local.get $l{local})) (then (local.set $numeric_i{local} (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $l{local}))))) (local.set $l{local} (ref.null eq))))"
         )
@@ -274,6 +289,9 @@ impl Emitter<'_> {
             Repr::Float => {
                 let mut reference = "(ref.null eq)".to_string();
                 let raw = match value {
+                    Value::Call { callee, args, env } if self.float_call(callee) => {
+                        self.call(callee, args, false, &env_text(*env))
+                    }
                     Value::Atom(atom) => {
                         if let Atom::Local(source) = atom
                             && self.numeric_plan.locals.get(source) == Some(&Repr::Float)

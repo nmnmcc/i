@@ -216,6 +216,22 @@ fn corpus() -> Vec<Case> {
         stop: true,
         events: vec!["before".into()],
     });
+    cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    // N2: cross-call scalar chains and closures with different captures share
+    // code without sharing identity or the capture values.
+    for n in 0..32 {
+        let x = n as f64 * 0.125 - 2.0;
+        cases.push(float_case(
+            "step_float(step_float(x))",
+            x,
+            (x * 0.5 + 0.25) * 0.5 + 0.25,
+        ));
+        cases.push(float_case(
+            "{ f = (v: Float) -> Float { v *. 0.5 +. x } apply(f, 0.25) }",
+            x,
+            0.125 + x,
+        ));
+    }
     cases
 }
 
@@ -238,6 +254,8 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
 (i/core, i/control, i/resource)
 @external("numeric:events", "record")
 record: (String) -> Nil
+relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ -> relay(f, n - 1, x) } }
+step_float = (x: Float) -> Float { x *. 0.5 +. 0.25 }
 apply = (f: (Float) -> Float, x: Float) -> Float { f(x) }
 loop_int = (n: Int, sum: Int) -> Int { n |> { 0 -> sum _ -> loop_int(n - 1, sum + n) } }
 fact = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> fact(n - 1, acc * n) } }
@@ -486,12 +504,45 @@ fn transitive_suspend_preserves_pending_logical_frames() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"trace\"\n").unwrap();
     std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x: Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x: Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x: Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n Nil\n}\n").unwrap();
+    let (graph, diags) = ilang_package::load(dir.path());
+    assert!(diags.is_empty());
+    let checked = ilang_check::check(&graph);
+    let wat = ilang_wasm::compile_wat_numeric(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        Options::default().numeric(Numeric::Scalars),
+    )
+    .unwrap();
+    for name in ["f", "h"] {
+        assert!(
+            wat.lines().any(|line| line.contains("numeric: code")
+                && line.contains(&format!(".{name})"))
+                && line.contains("inline=false suspend=true")),
+            "transitive exclusion for {name}: {}",
+            wat.lines()
+                .filter(|l| l.contains("numeric: code"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
     for opt in ["0", "2", "3"] {
         let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
-            .args(["run", "--project", dir.path().to_str().unwrap(), "--opt", opt])
-            .output().unwrap();
+            .args([
+                "run",
+                "--project",
+                dir.path().to_str().unwrap(),
+                "--opt",
+                opt,
+            ])
+            .output()
+            .unwrap();
         assert_eq!(output.status.code(), Some(1), "O{opt}");
         assert!(output.stdout.is_empty(), "O{opt}: {:?}", output.stdout);
-        assert_eq!(String::from_utf8(output.stderr).unwrap(), "float: result is not finite\ntrace/main:4:2\ntrace/main:7:6\ntrace/main:11:6\ntrace/main:16:2\n", "O{opt}");
+        assert_eq!(
+            String::from_utf8(output.stderr).unwrap(),
+            "float: result is not finite\ntrace/main:4:2\ntrace/main:7:6\ntrace/main:11:6\ntrace/main:16:2\n",
+            "O{opt}"
+        );
     }
 }

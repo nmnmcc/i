@@ -49,7 +49,14 @@ fn main() -> anyhow::Result<()> {
             checked.types.as_ref().unwrap(),
             Options::default().numeric(numeric),
         )?;
-        let bytes = ilang_cli::optimize(&bytes, ilang_cli::Level::O2)?;
+        let bytes = if name == "baseline" {
+            match std::env::var_os("NUMERIC_BASELINE") {
+                Some(path) => std::fs::read(path)?,
+                None => ilang_cli::optimize(&bytes, ilang_cli::Level::O2)?,
+            }
+        } else {
+            ilang_cli::optimize(&bytes, ilang_cli::Level::O2)?
+        };
         let path = output.join(format!("{name}.wasm"));
         std::fs::write(&path, &bytes)?;
         let printed = Command::new("wasm-tools")
