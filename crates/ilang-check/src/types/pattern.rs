@@ -402,7 +402,10 @@ impl Checker<'_> {
                 } = &a.kind
             {
                 crate::syn3_facts::record(crate::syn3_facts::Fact::PatternPart {
-                    file: crate::syn3_facts::File::of(self.sources, self.p.module(self.module).source),
+                    file: crate::syn3_facts::File::of(
+                        self.sources,
+                        self.p.module(self.module).source,
+                    ),
                     span: a.span,
                     label: fields[i].0.clone().unwrap_or_else(|| name.clone()),
                 });

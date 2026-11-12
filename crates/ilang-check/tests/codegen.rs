@@ -101,7 +101,10 @@ fn codegen_data() {
     assert_eq!(fields[0].0.index, 0);
     assert_eq!(by_text(&typed.access, m, "t.1"), &Access::Part(1));
     // The argument that goes to each parameter.
-    assert_eq!(by_text(&typed.args, m, "Cat(name: \"a\", lives: 9)"), &vec![1, 0]);
+    assert_eq!(
+        by_text(&typed.args, m, "Cat(name: \"a\", lives: 9)"),
+        &vec![1, 0]
+    );
     assert_eq!(by_text(&typed.args, m, "5 |> minus(1)"), &vec![0, 1]);
     assert_eq!(by_text(&typed.args, m, "minus(1, 2)"), &vec![0, 1]);
     // Whole-head tests have All values (types-joint §2.2).

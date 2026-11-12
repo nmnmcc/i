@@ -2666,9 +2666,9 @@ impl<'a> Checker<'a> {
         let params: Vec<Option<String>> = k.params.iter().map(|p| p.0.clone()).collect();
         let skip = usize::from(first.is_some());
         let wanted = if ctor {
-            args.iter()
-                .enumerate()
-                .any(|(i, a)| a.label.is_none() && params.get(to[skip + i]).is_some_and(Option::is_some))
+            args.iter().enumerate().any(|(i, a)| {
+                a.label.is_none() && params.get(to[skip + i]).is_some_and(Option::is_some)
+            })
         } else {
             args.iter().any(|a| a.label.is_some())
         };

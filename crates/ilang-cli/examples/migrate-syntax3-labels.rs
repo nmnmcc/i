@@ -98,9 +98,7 @@ fn migrate(repo: &Path, project: &Path, check: bool, lib: bool) -> usize {
 
 fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
     let single = project.is_file() && project.extension().is_some_and(|e| e == "i");
-    if single
-        && std::fs::read_to_string(project).is_ok_and(|t| t.contains(KEEP))
-    {
+    if single && std::fs::read_to_string(project).is_ok_and(|t| t.contains(KEEP)) {
         return Vec::new();
     }
     let temp;
@@ -137,7 +135,11 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                     continue;
                 }
                 let a = repo.join("lib/i").join(file);
-                let path = if a.exists() { a } else { repo.join("lib").join(file) };
+                let path = if a.exists() {
+                    a
+                } else {
+                    repo.join("lib").join(file)
+                };
                 let text = std::fs::read_to_string(&path).expect("library module");
                 graph.sources.set_text(m.source, text);
                 path
@@ -146,7 +148,11 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                     Some(f) => f.clone(),
                     None => {
                         let p = Path::new(&shown);
-                        let p = if p.is_absolute() { p.to_path_buf() } else { dir.join(p) };
+                        let p = if p.is_absolute() {
+                            p.to_path_buf()
+                        } else {
+                            dir.join(p)
+                        };
                         if !p.exists() {
                             eprintln!("{}: cannot find {shown}", project.display());
                             continue;
@@ -175,7 +181,9 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
     let mut seen = std::collections::HashSet::new();
     for fact in facts {
         let file = match &fact {
-            Fact::Call { file, .. } | Fact::PatternPart { file, .. } | Fact::FnTypeLabel { file, .. } => file,
+            Fact::Call { file, .. }
+            | Fact::PatternPart { file, .. }
+            | Fact::FnTypeLabel { file, .. } => file,
         };
         let Some(m) = program
             .modules
@@ -199,8 +207,10 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                     let origin = scoped.origin(s)?;
                     let scope = origin.syntax.scope();
                     let o = origin.syntax.span();
-                    (scope.module == m.source.0 && scope.marks.is_empty() && o.end as usize <= text.len())
-                        .then_some(o)
+                    (scope.module == m.source.0
+                        && scope.marks.is_empty()
+                        && o.end as usize <= text.len())
+                    .then_some(o)
                 }
                 _ => Some(s),
             }
@@ -232,14 +242,20 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                         }
                         let found = written_args(&text, callee.end as usize, span.end as usize)?;
                         if found.len() != args.len()
-                            || found.iter().zip(&args).any(|(f, a)| f.label.is_some() != a.label.is_some())
+                            || found
+                                .iter()
+                                .zip(&args)
+                                .any(|(f, a)| f.label.is_some() != a.label.is_some())
                         {
                             return None;
                         }
                         let args = found
                             .into_iter()
                             .zip(&args)
-                            .map(|(f, a)| ArgFact { direct: a.direct, ..f })
+                            .map(|(f, a)| ArgFact {
+                                direct: a.direct,
+                                ..f
+                            })
                             .collect();
                         return Some((span, callee, first, args));
                     }
@@ -275,14 +291,26 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                     })
                 });
                 let Some((span, callee, first, args)) = mapped else {
-                    eprintln!("{}: a call in expanded code is not migrated", path.display());
+                    eprintln!(
+                        "{}: a call in expanded code is not migrated",
+                        path.display()
+                    );
                     continue;
                 };
                 let counter = fresh.entry(path.clone()).or_insert(0);
                 let edits = if ctor {
                     ctor_edits(&text, &args, &params, &to, first.is_some())
                 } else {
-                    call_edits(&text, span, callee, callee_direct, first, &args, &to, counter)
+                    call_edits(
+                        &text,
+                        span,
+                        callee,
+                        callee_direct,
+                        first,
+                        &args,
+                        &to,
+                        counter,
+                    )
                 };
                 match edits {
                     Ok(edits) => Some(Group {
@@ -291,7 +319,11 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                         call: true,
                     }),
                     Err(why) => {
-                        eprintln!("{}:{}: {why}", path.display(), line(&text, span.start as usize));
+                        eprintln!(
+                            "{}:{}: {why}",
+                            path.display(),
+                            line(&text, span.start as usize)
+                        );
                         None
                     }
                 }
@@ -300,9 +332,13 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                 let Some(span) = map(span) else { continue };
                 let part = &text[span.start as usize..span.end as usize];
                 if !part.starts_with(label.as_str())
-                    || part[label.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_')
+                    || part[label.len()..]
+                        .starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_')
                 {
-                    eprintln!("{}: a pattern in expanded code is not migrated", path.display());
+                    eprintln!(
+                        "{}: a pattern in expanded code is not migrated",
+                        path.display()
+                    );
                     continue;
                 }
                 let rest = part.strip_prefix(label.as_str()).map(str::trim_start);
@@ -318,7 +354,9 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                 })
             }
             Fact::FnTypeLabel { label, ty, .. } => {
-                let (Some(label), Some(ty)) = (map(label), map(ty)) else { continue };
+                let (Some(label), Some(ty)) = (map(label), map(ty)) else {
+                    continue;
+                };
                 let between = &text[label.end as usize..ty.start as usize];
                 let name = &text[label.start as usize..label.end as usize];
                 (between.trim() == ":"
@@ -417,17 +455,25 @@ fn written_args(text: &str, from: usize, end: usize) -> Option<Vec<ArgFact>> {
                     && after.starts_with(':')
                     && !after.starts_with("::")
                     && !after.starts_with(":="))
-                .then_some(Span { start: s as u32, end: (s + name) as u32 });
+                .then_some(Span {
+                    start: s as u32,
+                    end: (s + name) as u32,
+                });
                 let value_start = match label {
                     Some(_) => {
                         let colon = s + seg.find(':').expect("label colon");
-                        colon + 1 + (text[colon + 1..e].len() - text[colon + 1..e].trim_start().len())
+                        colon
+                            + 1
+                            + (text[colon + 1..e].len() - text[colon + 1..e].trim_start().len())
                     }
                     None => s,
                 };
                 ArgFact {
                     label,
-                    value: Span { start: value_start as u32, end: e as u32 },
+                    value: Span {
+                        start: value_start as u32,
+                        end: e as u32,
+                    },
                     direct: false,
                 }
             })
@@ -513,7 +559,9 @@ fn call_edits(
     // others are bound first.
     let running: Vec<usize> = (0..args.len()).filter(|i| !args[*i].direct).collect();
     let mut keep = running.len();
-    while keep > 0 && (keep == running.len() || to[skip + running[keep - 1]] < to[skip + running[keep]]) {
+    while keep > 0
+        && (keep == running.len() || to[skip + running[keep - 1]] < to[skip + running[keep]])
+    {
         keep -= 1;
     }
     let bound: Vec<usize> = running[..keep].to_vec();
@@ -536,9 +584,9 @@ fn call_edits(
     let mut name = || loop {
         let n = format!("_syn3_{counter}");
         *counter += 1;
-        let used = text
-            .match_indices(&n)
-            .any(|(at, _)| !text[at + n.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'));
+        let used = text.match_indices(&n).any(|(at, _)| {
+            !text[at + n.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_')
+        });
         if !used {
             return n;
         }

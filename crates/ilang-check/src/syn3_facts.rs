@@ -63,11 +63,7 @@ pub enum Fact {
     },
     /// A label of a parameter of a function type: from the start of the
     /// label to the start of the type.
-    FnTypeLabel {
-        file: File,
-        label: Span,
-        ty: Span,
-    },
+    FnTypeLabel { file: File, label: Span, ty: Span },
 }
 
 static ON: AtomicBool = AtomicBool::new(false);
