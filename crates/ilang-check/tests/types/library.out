@@ -109,6 +109,45 @@ i/float_text.digit_list : (digits: List(Int), acc: List(String)) -> List(String)
 i/float_text.int_text : (e: Int) -> List(String)
 i/float_text.int_digits : (e: Int, acc: List(String)) -> List(String)
 i/float_text.digit_text : (d: Int) -> String
+i/big.sign : (Int) -> Int
+i/big.digits : (Int) -> List(Int)
+i/big.from_digits : (sign: Int, digits: List(Int)) -> Int
+i/big.base : 16384
+i/big.half : 8192
+i/big.compare : (a: Int, b: Int) -> Int
+i/big.add : (a: Int, b: Int) -> Int
+i/big.subtract : (a: Int, b: Int) -> Int
+i/big.signed_add : (a: Int, sa: Int, b: Int, sb: Int) -> Int
+i/big.multiply : (a: Int, b: Int) -> Int
+i/big.divide : (a: Int, b: Int) -> Int
+i/big.remainder : (a: Int, b: Int) -> Int
+i/big.to_text : (value: Int, radix: Int) -> String
+i/big.length : (x: List(Int), n: Int) -> Int
+i/big.reverse : (x: List(Int), acc: List(Int)) -> List(Int)
+i/big.trim : (x: List(Int)) -> List(Int)
+i/big.drop_zeros : (x: List(Int)) -> List(Int)
+i/big.at : (x: List(Int), index: Int) -> Int
+i/big.magnitude_compare : (x: List(Int), y: List(Int)) -> Int
+i/big.compare_from_top : (x: List(Int), y: List(Int)) -> Int
+i/big.magnitude_add : (x: List(Int), y: List(Int), carry: Int, acc: List(Int)) -> List(Int)
+i/big.add_digit : (sum: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int)
+i/big.magnitude_subtract : (x: List(Int), y: List(Int), borrow: Int, acc: List(Int)) -> List(Int)
+i/big.subtract_digit : (difference: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int)
+i/big.multiply_digit : (x: List(Int), d: Int, carry: Int, acc: List(Int)) -> List(Int)
+i/big.magnitude_multiply : (x: List(Int), y: List(Int), shift: List(Int), acc: List(Int)) -> List(Int)
+i/big.prepend : (front: List(Int), back: List(Int)) -> List(Int)
+i/big.magnitude_divide : (x: List(Int), y: List(Int)) -> (List(Int), List(Int))
+i/big.normal_shift : (top: Int, s: Int) -> Int
+i/big.shift_left : (x: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int)
+i/big.shift_right : (top: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int)
+i/big.power_of_two : (s: Int, acc: Int) -> Int
+i/big.short_divide : (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), Int)
+i/big.long_divide : (top: List(Int), y: List(Int), m: Int, divisor_top: Int, r: List(Int), q: List(Int)) -> (List(Int), List(Int))
+i/big.correct : (r: List(Int), y: List(Int), digit: Int) -> (Int, List(Int))
+i/big.chunk_of : (radix: Int, chunk: Int, width: Int) -> (Int, Int)
+i/big.text_chunks : (x: List(Int), chunk: Int, radix: Int, width: Int, acc: List(String)) -> List(String)
+i/big.chunk_text : (v: Int, radix: Int, width: Int, padded: Bool, acc: List(String)) -> List(String)
+i/big.digit_text : (d: Int) -> String
 i/record.get : (r: (K: A), key: K) -> A
 i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
 i/record.remove : (r: Record & A, key: K) -> (..A, -K)
