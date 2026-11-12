@@ -1,6 +1,5 @@
 //// The module documentation.
 //// It has two lines.
-
 (
 	i/core
 	decode = json/decode
