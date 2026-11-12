@@ -166,7 +166,9 @@ small Float timing differences between N0 and N1 are not robust speed claims.
 
 All five final run medians (ns), including outliers, follow. Run A is the first
 corrected measurement; B is the confirmation, repeated because spread exceeded
-20%. Both use the committed `numeric_measure` driver and the shared quiet lock.
+20%. C regenerated the same bytes after the function-ID refinement and serves as
+the final artifact check. All use the committed `numeric_measure` driver and the
+shared quiet lock.
 The quiet wrapper currently reserves slots 1–3 while the shared heavy wrapper
 has six slots; it does not prevent unrelated CPU work. Scheduling outliers and
 10 ns timer quantization remain visible, especially in short kernels. These are
@@ -186,6 +188,12 @@ observations, not worst-case timings or a claim that later-stage targets pass.
 | B | dot | 4677,4628,4687,4666,4646 | 4377,4307,4337,4356,4296 | 4245,4226,4217,6170,4215 |
 | B | tuples | 250,291,280,260,302 | 140,250,150,168,150 | 162,199,160,141,162 |
 | B | closures | 4547,4507,4526,4538,4548 | 4206,4207,4176,4187,4206 | 4287,4237,4235,4206,4186 |
+| C | certified fast sine | 14662,13722,13801,14492,13390 | 4446,4497,4377,4355,4337 | 4158,4138,4046,4046,4026 |
+| C | Horner | 2204,2204,2396,2223,2183 | 109,40,41,80,91 | 70,29,1,49,81 |
+| C | integer | 1873,1865,1903,1923,1923 | 1793,1773,1833,1833,1772 | 1022,1051,1051,1042,1013 |
+| C | dot | 4427,4417,4437,4417,4436 | 4087,4065,4116,4106,4097 | 4016,4045,4126,4037,4047 |
+| C | tuples | 340,271,260,250,310 | 150,152,159,152,160 | 141,130,141,130,220 |
+| C | closures | 5668,4406,4376,4368,4327 | 4056,4056,4086,4026,4016 | 4056,4036,4107,4046,4026 |
 
 Final confirmation SHA-256:
 
@@ -196,7 +204,8 @@ Final confirmation SHA-256:
 Baseline and N0 binaries are also byte-identical between the initial N0 experiment
 and the final confirmation, separating N0's effect from N1. Raw samples, WAT and
 instrumented modules are under ignored `target/numeric-step1/materialized-paired`
-and `confirmation-paired`; all run medians are committed above.
+and `confirmation-paired`; final artifact-check samples are under `identity-check`.
+All reported final run medians are committed above.
 
 Reproduce from this lane:
 
@@ -220,5 +229,68 @@ closures, records, loops, factorial, finals, cancellation, two suspensions and
 three transitively suspending helper frames. Nonfinite bit patterns and unused
 operations still stop. O0 emitted bytes and nonnumeric O2/O3 WAT/bytes are checked.
 
-Completed commands and final acceptance results are recorded below after the
-last validation run.
+Final verification (all Cargo commands used the shared heavy wrapper and
+`direnv exec /home/agent/Programming/i`):
+
+- `cargo check -p ilang-check -p ilang-wasm -p ilang-cli --all-targets`: passed;
+  final backend follow-up `cargo check -p ilang-wasm -p ilang-cli --all-targets`
+  also passed.
+- `cargo test --locked -p ilang-check -p ilang-wasm`: passed. Four pre-existing
+  ignored checker tests remain; no numeric tests are ignored.
+- `cargo test --locked -p ilang-cli --test numeric_lowering`: 3 passed, 0 failed;
+  includes 111 programs at reference/O0, visible/O2, scalar/O2 and scalar/O3,
+  nonnumeric byte equality and code-identity invariance.
+- `cargo build --release --locked -p ilang-cli`: passed on implementation
+  revision `3be6ec93`.
+- `cargo test --workspace --locked`: passed on that revision. Earlier complete
+  workspace/acceptance runs also passed before the final identity refinement.
+- The exact task acceptance check: **passed**, including a clean starting tree,
+  the numeric project build and the differential/report discovery checks.
+- Std: **1845 passed, 0 failed** at each of O0, O2 and O3.
+- The exact task factorial/zero-divisor/BigInt fixture produced, at all three
+  levels:
+
+```text
+265252859812191058636308480000000
+9223372036854775807
+```
+
+- `cmp` of the saved original O0 benchmark Wasm and WAT against the final
+  release compiler's O0 output: passed, byte-for-byte.
+- Baseline/N0 artifacts from the first experiment versus final confirmation:
+  passed, byte-for-byte. The final implementation regenerated identical baseline,
+  N0 and N1 bytes after the function-ID refinement. The actual acceptance CLI
+  build `tests/perf/numeric/build/numeric.wasm` also has the measured N1 hash.
+- All measurement runs completed and checked expected answers separately from
+  timing. `rustfmt --check` on changed Rust files and `git diff --check`: passed.
+
+Initial harness/scaffolding failures, corrected before the final passes:
+
+| Command | Failing line | Correction |
+|---|---|---|
+| `cargo check -p ilang-wasm -p ilang-cli --all-targets` | `error[E0283]: type annotations needed` | Kept the original concrete Options entry points; numeric variants are explicit. |
+| same check | `error[E0063]: missing field numeric_enabled in initializer of emit::Emitter` | Completed the existing emitter test initializer. |
+| `cargo check -p ilang-cli --example numeric_measure` | `error[E0308]: mismatched types` (expected wasmtime::Error, found anyhow::Error) | Used the pinned Wasmtime error type in the measurement import hook. |
+| `cargo check -p ilang-cli --test numeric_lowering` | `error[E0277]: Vec<std::string::String> doesn't implement std::fmt::Display` | Rendered diagnostics with Debug in the harness assertion. |
+| `cargo test -p ilang-cli --test numeric_lowering` | `error[E0105]: a block ends with an expression` | Put the following tuple on a new line rather than adding a comma. |
+| same test | `error[E0313]: the host export numeric/cases.case_0 is not a function in the exports of a module numeric/cases` | Added the source module export group. |
+| same test | `error[E0201]: b is not defined` | Used ordinary record field access; spec §7.1 has no record patterns. |
+| same test | `error[E0115]: a group in ( ) that is not followed by = is the imports or the exports, which come first in a file` | Moved the export group into the file header. |
+
+The failing diagnostic lines were:
+
+```text
+error[E0283]: type annotations needed
+error[E0063]: missing field `numeric_enabled` in initializer of `emit::Emitter<'_>`
+error[E0308]: mismatched types
+error[E0277]: `Vec<std::string::String>` doesn't implement `std::fmt::Display`
+error[E0105]: a block ends with an expression
+error[E0313]: the host export `numeric/cases.case_0` is not a function in the exports of a module `numeric/cases`
+error[E0201]: `b` is not defined
+error[E0115]: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file
+```
+
+No unresolved failure or unfinished N0/conservative-N1 behavior remains. N2+
+workers, scalar parameters/results across calls, transitive inlining, typed heaps,
+unrestricted i64 Int, aggregate replacement and range-based check removal were
+intentionally not implemented in this step. Branch: `lane/jp`.
