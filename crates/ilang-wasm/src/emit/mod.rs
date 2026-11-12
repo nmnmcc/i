@@ -329,9 +329,11 @@ impl<'p> Emitter<'p> {
                 let fields: String = (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
                 let _ = writeln!(
                     self.out,
-                    "(call $shadow_enter_call)\n\
+                    "{}\
                      (local.set $l{arity} (call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields})))\n\
-                     (call $shadow_leave) (local.get $l{arity}))"
+                     {} (local.get $l{arity}))",
+                    self.enter_call(),
+                    self.leave()
                 );
             }
             FuncKind::Runtime { op, arity } => {
@@ -344,8 +346,10 @@ impl<'p> Emitter<'p> {
                 let body = self.op(*op, &args, "(local.get $env)");
                 let _ = writeln!(
                     self.out,
-                    "(call $shadow_enter_call)\n(local.set $l{arity} {body})\n\
-                     (call $shadow_leave) (local.get $l{arity}))"
+                    "{}(local.set $l{arity} {body})\n\
+                     {} (local.get $l{arity}))",
+                    self.enter_call(),
+                    self.leave()
                 );
             }
         }
@@ -451,7 +455,7 @@ impl<'p> Emitter<'p> {
                     f.budget_frame
                 );
             }
-            self.out.push_str("(call $shadow_enter_call)\n");
+            self.out.push_str(self.enter_call());
         }
         let mut parameters = self.numeric_plan.parameters(f.arity);
         if let Some(worker) = &self.worker {
@@ -522,23 +526,16 @@ impl<'p> Emitter<'p> {
             Stmt::Logical(action) => match action {
                 Logical::Enter(site) => {
                     if let Some(site) = site {
-                        let _ =
-                            writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                        out.push_str(&self.shadow_site(*site, frame));
                     }
-                    out.push_str("(call $shadow_enter_call)\n");
+                    out.push_str(self.enter_call());
                 }
-                Logical::Leave => out.push_str("(call $shadow_leave)\n"),
-                Logical::Tail(site) => {
-                    let _ = writeln!(
-                        out,
-                        "(call $shadow_leave_tail (i32.const {}))",
-                        site.map_or(-1, site_code)
-                    );
-                }
+                Logical::Leave => out.push_str(self.leave()),
+                Logical::Tail(site) => out.push_str(&self.leave_tail(*site)),
             },
             Stmt::Let { dst, value, site } => {
                 if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                    out.push_str(&self.shadow_site(*site, frame));
                 }
                 if let Some(assignment) = self.scalar_assignment(*dst, value) {
                     out.push_str(&assignment);
@@ -555,7 +552,7 @@ impl<'p> Emitter<'p> {
             }
             Stmt::LetNum { dst, value, site } => {
                 if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                    out.push_str(&self.shadow_site(*site, frame));
                 }
                 let v = self.num_value(value);
                 let _ = writeln!(out, "(local.set $l{dst} {v})");
@@ -591,7 +588,7 @@ impl<'p> Emitter<'p> {
                     self.atom(a)
                 };
                 if frame {
-                    out.push_str("(call $shadow_leave)\n");
+                    out.push_str(self.leave());
                 }
                 let _ = writeln!(out, "(return {a})");
             }
@@ -602,8 +599,7 @@ impl<'p> Emitter<'p> {
                 site,
             } => {
                 if frame {
-                    let s = site.map_or(-1, site_code);
-                    let _ = writeln!(out, "(call $shadow_leave_tail (i32.const {s}))");
+                    out.push_str(&self.leave_tail(*site));
                 }
                 let call = self.call(callee, args, true, &env_text(*env));
                 let _ = writeln!(out, "{call}");
@@ -712,6 +708,51 @@ impl<'p> Emitter<'p> {
             "(if{result} {guard} (then {call}) (else ({prefix}call $f{} {closure} {env}{canonical})))",
             worker.origin.0
         )
+    }
+
+    /// Numeric (O2/O3) code writes the shadow-stack actions out instead of
+    /// calling the runtime: two out-of-line calls per call or tail iteration
+    /// cost more than the work they do (numeric-step3-report.md). Only
+    /// functions with numeric code do this, so a program without any keeps its
+    /// WAT (numeric-lowering §7 gate 2); reference code, the O0 oracle, and
+    /// metered code keep the runtime calls.
+    fn fast_frames(&self) -> bool {
+        self.p.numeric != crate::Numeric::Reference
+            && !self.metered
+            && (self.numeric_enabled
+                || self.worker.is_some()
+                || !self.numeric_plan.locals.is_empty())
+    }
+
+    fn enter_call(&self) -> &'static str {
+        if self.fast_frames() {
+            SHADOW_ENTER_CALL
+        } else {
+            "(call $shadow_enter_call)\n"
+        }
+    }
+
+    fn leave(&self) -> &'static str {
+        if self.fast_frames() {
+            SHADOW_LEAVE
+        } else {
+            "(call $shadow_leave)\n"
+        }
+    }
+
+    fn shadow_site(&self, site: Site, frame: bool) -> String {
+        shadow_site(site, frame && self.fast_frames())
+    }
+
+    fn leave_tail(&self, site: Option<Site>) -> String {
+        if self.fast_frames() {
+            leave_tail(site)
+        } else {
+            format!(
+                "(call $shadow_leave_tail (i32.const {}))\n",
+                site.map_or(-1, site_code)
+            )
+        }
     }
 
     fn string(&mut self, s: &str) -> String {
@@ -1513,6 +1554,43 @@ fn local_type(t: LocalType) -> &'static str {
         LocalType::I64 => "i64",
         LocalType::I32 => "i32",
         LocalType::Env => "(ref null $env)",
+    }
+}
+
+/// `$shadow_enter_call` written out (runtime/stops.rs): push `$tail` and
+/// clear it. The array grows in the cold call.
+const SHADOW_ENTER_CALL: &str = "(if (i32.ge_u (global.get $sp) (array.len (global.get $shadow))) (then (call $shadow_grow)))\n\
+(array.set $frames (global.get $shadow) (global.get $sp) (global.get $tail))\n\
+(global.set $sp (i32.add (global.get $sp) (i32.const 1)))\n\
+(global.set $tail (i32.const -1))\n";
+
+/// `$shadow_leave` written out.
+const SHADOW_LEAVE: &str = "(global.set $sp (i32.sub (global.get $sp) (i32.const 1)))\n";
+
+/// `$shadow_site`: in a function with a frame the slot `sp - 1` is its own,
+/// so the store is written out; elsewhere `sp` may be 0.
+fn shadow_site(site: Site, frame: bool) -> String {
+    if frame {
+        format!("{SHADOW_SLOT_SET}(i32.const {}))\n", site_code(site))
+    } else {
+        format!("(call $shadow_site (i32.const {}))\n", site_code(site))
+    }
+}
+
+/// The start of a store into the slot of the running frame, `sp - 1`; the
+/// caller gives the value and the closing parenthesis.
+const SHADOW_SLOT_SET: &str =
+    "(array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1)) ";
+
+/// `$shadow_leave_tail` written out when the site is known: the frame is
+/// gone and its tail site waits in `$tail` for the callee.
+fn leave_tail(site: Option<Site>) -> String {
+    match site {
+        Some(site) => format!(
+            "(global.set $sp (i32.sub (global.get $sp) (i32.const 1)))\n(global.set $tail (i32.const {}))\n",
+            site_code(site)
+        ),
+        None => "(call $shadow_leave_tail (i32.const -1))\n".into(),
     }
 }
 
