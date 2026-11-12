@@ -6,11 +6,11 @@ add : (x: Int) -> Int
 bad_arg : () -> Int
 bad_op : () -> Int
 bad_guard : (x: A) -> A | 2
-arity : () -> Never
-arity_var : (f: (1) -> A ^ E ! N) -> (A, Never) ^ E ! N
+arity : () -> Int
+arity_var : (f: { (1) | (1, 2) } -> A & B ^ E ! N) -> (A, B) ^ E ! N
 ambiguous : (x: A | B) -> A | B
 use_ambiguous : () -> Never
-field : (u: (name: A)) -> A
+field : (u: A) -> Never
 part : (t: A) -> Never
 radius : (s: Shape) -> Never
 now : () -> Int ! Clock
@@ -25,10 +25,10 @@ bad_bits : BitArray
 18:20: error[E0501]: `"a"` is not a subtype of `Int` (the type at 18:16 needs it)
 20:19: error[E0501]: `"a"` is not a subtype of `Int`
 24:7: error[E0501]: `1` is not a subtype of `Bool`
-30:14: error[E0502]: this call gives 2 arguments, but the function has 1 parameter (§6.6)
-32:26: error[E0502]: the function types `(1) -> _ ^ _ ! _` and `(1, 2) -> _ ^ _ ! _` have different numbers of parameters
+30:14: error[E0501]: `(1, 2)` is not a subtype of `(Int)` (the type at 30:14 needs it)
 35:23: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
 37:32: error[E0504]: a value of `1` could go to more than one type variable of `_ | _` (§4.4) (the type at 37:22 needs it)
+40:17: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
 42:16: error[E0506]: `.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`
 50:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
 59:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`
