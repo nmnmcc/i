@@ -192,7 +192,9 @@ fn lisp_convention_gathers_closers_and_aligns_arguments() {
         out,
         "(= main\n  (-> () _\n    {(print_all_of_these first_argument\n                         second_argument\n                         third_argument\n                         fourth)}))\n"
     );
-    let out = check("(= x ((. items add) first_argument_is_long second_argument_is_long third_argument_is_long))\n");
+    let out = check(
+        "(= x ((. items add) first_argument_is_long second_argument_is_long third_argument_is_long))\n",
+    );
     assert_eq!(
         out,
         "(= x\n  ((. items add)\n   first_argument_is_long\n   second_argument_is_long\n   third_argument_is_long))\n"

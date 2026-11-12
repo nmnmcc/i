@@ -88,7 +88,10 @@ fn width(s: &str) -> usize {
 
 enum Item {
     Datum(usize),
-    Comment { text: String, trailing: bool },
+    Comment {
+        text: String,
+        trailing: bool,
+    },
     /// One kept blank line between top-level items.
     Blank,
 }
@@ -145,7 +148,11 @@ impl Builder<'_> {
             self.next += 1;
         }
         let whitespace = &self.source[end as usize..to as usize];
-        if top && end != 0 && to as usize != self.source.len() && whitespace.matches('\n').count() >= 2 {
+        if top
+            && end != 0
+            && to as usize != self.source.len()
+            && whitespace.matches('\n').count() >= 2
+        {
             items.push(Item::Blank);
         }
     }
@@ -278,7 +285,9 @@ impl Printer<'_> {
         let nodes = self.nodes;
         let (node, flat) = &nodes[id];
         let layout = match (node, flat) {
-            (_, Some(flat)) if col + width(flat) + suffix <= WIDTH || matches!(node, Node::Atom(_)) => {
+            (_, Some(flat))
+                if col + width(flat) + suffix <= WIDTH || matches!(node, Node::Atom(_)) =>
+            {
                 measure(flat.clone(), col, suffix)
             }
             (Node::Prefix(parts, child), _) => {
@@ -412,7 +421,10 @@ impl Printer<'_> {
                     cur = layout.last_col;
                     datum += 1;
                 }
-                Item::Comment { text: comment, trailing } => {
+                Item::Comment {
+                    text: comment,
+                    trailing,
+                } => {
                     if *trailing && (first || cur + 1 + width(comment) <= WIDTH) {
                         if !first {
                             text.push(' ');

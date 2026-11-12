@@ -44,6 +44,51 @@ Rules as implemented (`crates/ilang-syntax/src/lisp/format.rs`):
 10. Atoms, strings and comments are never split; only such a single token
     (with its brackets) may exceed the width.
 
+Other decisions: `{` blocks, clause lists and records are laid out as
+collections (first part after the bracket, others aligned under it), the
+cljfmt treatment of maps/vectors, so the two-space body indent comes from
+the enclosing `->`/`=`/`|`. Blank lines inside forms are dropped as before.
+An unfitting trailing comment moves to the next line in the same gap.
+
+`std/src/test.is` after this revision: 100 lines, no tab, no line that
+starts with a closing bracket; the only line over 80 columns is a single
+`panic` string with its closers. The macro expansion location in
+`crates/ilang-cli/tests/commands.rs` moved to `std/test:11:17`.
+First 30 lines:
+
+```is
+(, (= syntax (/ i syntax)) (= int (/ std int)))
+(, tests test skip only fails suite each)
+(= tests Nil)
+(= text
+  (-> (x) _
+    {(| ((. syntax node) x)
+       {(-> ((. syntax Text) s) s)
+        (-> _ (panic "test name must be a string literal"))})}))
+(= _entry
+  (-> (name body mode (! items (. syntax Items))) _
+    {(= target `generated_test)
+     ((. items add) `tests target [(, "name" (text name)) (, "mode" mode)] name)
+     `(= ~target (-> () _ {(~body)}))}))
+(@ macro
+  (= test
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "test")})))
+(@ macro
+  (= skip
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "skip")})))
+(@ macro
+  (= only
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "only")})))
+(@ macro
+  (= fails
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "fails")})))
+(= append
+  (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))
+(= suite_items
+  (-> (prefix statements env) _
+    {(| statements
+```
+
 ## Original report
 
 No language or library surface for state was added.

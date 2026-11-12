@@ -112,7 +112,7 @@ fn lisp_files_are_formatted_in_default_roots_and_given_paths() {
     let pretty = ilang_syntax::lisp::format(source).unwrap();
     assert_eq!(
         pretty,
-        "// keep\n(= main\n  (-> () _\n    {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n"
+        "// keep\n(= main\n  (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n"
     );
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
@@ -140,7 +140,8 @@ fn lisp_files_are_formatted_in_default_roots_and_given_paths() {
 
 #[test]
 fn conversion_to_lisp_uses_pretty_layout() {
-    let source = "// keep\nmain = () {\n first = 1\n second = 2\n third = 3\n first + second + third\n}\n";
+    let source =
+        "// keep\nmain = () {\n first = 1\n second = 2\n third = 3\n first + second + third\n}\n";
     let dir = package(&[("src/main.i", source)]);
     let out = fmt(&["--to", "is"], dir.path());
     assert!(
@@ -153,7 +154,9 @@ fn conversion_to_lisp_uses_pretty_layout() {
     assert!(
         converted.lines().count() >= 3
             && converted.contains("// keep")
-            && converted.lines().all(|l| !l.trim_start().starts_with([')', '}']) && !l.contains('\t')),
+            && converted
+                .lines()
+                .all(|l| !l.trim_start().starts_with([')', '}']) && !l.contains('\t')),
         "{converted}"
     );
     assert_eq!(ilang_syntax::lisp::format(&converted).unwrap(), converted);
