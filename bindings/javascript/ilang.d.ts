@@ -1,6 +1,6 @@
 export type AbiType = "nil" | "bool" | "int" | "float" | "string" | "bit_array" | "externref";
 export type ErrorType = Exclude<AbiType, "externref">;
-/** A function at the boundary: `(P1, …, Pn) -> A ? E` (Appendix B.2). */
+/** A function at the boundary: `(P1, …, Pn) -> A ? E`. */
 export interface Signature {
   params: AbiType[];
   result: AbiType;
@@ -9,7 +9,7 @@ export interface Signature {
   async?: boolean;
 }
 export interface EntryPoint { name: string; async?: boolean }
-/** The ilang.abi metadata (Appendix B.6). */
+/** The ilang.abi metadata. */
 export interface Abi {
   version: 3;
   entry?: EntryPoint | null;
@@ -56,7 +56,7 @@ export interface Options {
    * Check the answers of host functions in the loader, and stop the program
    * there, with no positions, when one is not correct. By default an answer
    * of the right type is given to the module as it is, and the module checks
-   * it and stops with the positions of the call (B.2).
+   * it and stops with the positions of the call.
    */
   checkReplies?: boolean;
 }

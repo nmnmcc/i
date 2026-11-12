@@ -595,10 +595,11 @@ test("a module without ilang_continue or an ilang_resume export breaks", async (
   const value = await guest([], { later: () => new Promise(() => {}) });
   void value.callAsync("app/async.later", [1]);
   assert.throws(() => value.exports.ilang_continue(), WebAssembly.RuntimeError);
-  // No answer may resume this instance after the raw trap (B.5).
+  // No answer may resume this instance after the raw trap.
 });
 
-// B.5 requires exports when a request starts or status 2 is returned,
+// A module must have the export that answers a request when a request starts,
+// or the export `ilang_continue` when status 2 is returned,
 // even when an answer is ready, the entry ends, or the request is cancelled.
 test("required exports are checked before delivery or drop", async () => {
   for (const [fixture, badResume] of [[noContinueFixture, "no_resume"], [wrongTypesFixture, "bad_resume"]]) {
