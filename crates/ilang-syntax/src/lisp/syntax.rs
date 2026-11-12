@@ -97,8 +97,16 @@ pub enum Provenance {
 }
 
 /// The contents of a syntax value; children keep their own scopes and spans.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TypeHandle {
+    pub snapshot: u64,
+    pub index: u32,
+}
+
 #[derive(Clone, Debug)]
 pub enum Node {
+    /// Compiler-only graph reference, scoped to one frozen inference snapshot.
+    TypeView(TypeHandle),
     Name(String),
     Discard(String),
     Up(String),
@@ -463,6 +471,7 @@ impl Syntax {
                             Node::Name(s) => DatumKind::Name(s.clone()),
                             Node::Discard(s) => DatumKind::Discard(s.clone()),
                             Node::Up(s) => DatumKind::UpName(s.clone()),
+                            Node::TypeView(_) => DatumKind::UpName("TypeView".into()),
                             Node::Symbol(s) => DatumKind::Symbol(s.clone()),
                             Node::Int(n) => DatumKind::Int(n.clone()),
                             Node::Float(n) => DatumKind::Float(*n),
@@ -509,10 +518,30 @@ impl Syntax {
         assert_eq!(values.len(), 1, "syntax conversion has one result");
         values.pop().expect("syntax conversion result")
     }
+    /// Create an opaque compiler answer; source `make` rejects this node.
+    pub fn type_view(handle: TypeHandle, like: &Syntax) -> Self {
+        like.with_node(Node::TypeView(handle)).as_answer()
+    }
     pub fn show(&self) -> String {
+        if let Node::TypeView(_) = self.node() {
+            return "#<type-view>".into();
+        }
         super::show_tree(self)
     }
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
+        let mut work = vec![self];
+        while let Some(s) = work.pop() {
+            match s.node() {
+                Node::TypeView(_) => {
+                    return Err(s.error("an opaque TypeView has no surface type text"));
+                }
+                Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
+                    work.extend(xs)
+                }
+                Node::Quote(x) | Node::Unquote(x) | Node::Splice(x) => work.push(x),
+                _ => {}
+            }
+        }
         super::to_source::show_as(&self.to_datum(), position).map_err(|e| SyntaxError {
             message: e.message,
             span: e.span,
@@ -534,6 +563,7 @@ impl Syntax {
                 && accepts(&lexed.tokens[0].kind)
         };
         let valid = match &node {
+            Node::TypeView(_) => false,
             Node::Name(s) => check(s, |k| matches!(k, TokenKind::Name(_))),
             Node::Discard(s) => check(s, |k| matches!(k, TokenKind::Discard(_))),
             Node::Up(s) => check(s, |k| matches!(k, TokenKind::UpName(_))),
@@ -593,6 +623,9 @@ impl Syntax {
     }
 
     /// Compare datums, ignoring provenance, scopes, and value identity.
+    pub fn same_input(&self, other: &Self) -> bool {
+        same_origin_tree(self, other) && self.same_code(other)
+    }
     pub fn same_code(&self, other: &Self) -> bool {
         use Node::*;
         let mut pending = vec![(self, other)];
@@ -604,6 +637,7 @@ impl Syntax {
                 | (Symbol(a), Symbol(b))
                 | (Text(a), Text(b))
                     if a == b => {}
+                (TypeView(a), TypeView(b)) if a == b => {}
                 (Int(a), Int(b)) if a == b => {}
                 (Float(a), Float(b)) if a == b => {}
                 (Round(a), Round(b))

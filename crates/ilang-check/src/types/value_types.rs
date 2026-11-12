@@ -21,7 +21,7 @@ pub(super) struct Fixed {
     pub module: ModuleId,
     pub span: Span,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct Reads {
     pub prepared: bool,
     pub templates: HashMap<TypeId, super::alias::Template>,

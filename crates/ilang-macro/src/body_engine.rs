@@ -204,6 +204,9 @@ impl<'a> BodyEngine<'a> {
         ),
         Error,
     > {
+        if mac.definition.signature.is_some() && position != MacroPosition::Expression {
+            return Err(Error::InvalidItem(invocation_span,"a typed macro is allowed only as an expression call; it cannot make items or types".into()));
+        }
         if mac.source == self.source {
             return Err(Error::SameModule(invocation_span));
         }
@@ -311,7 +314,7 @@ impl Hook for BodyEngine<'_> {
     fn is_macro(&mut self, expression: &Expr, locals: &[Local], depth: u32) -> Result<bool, Error> {
         Ok(call::expression(expression).is_some_and(|call| {
             self.resolve(call.module, call.name, locals, depth)
-                .is_some()
+                .is_some_and(|mac| mac.definition.signature.is_none())
         }))
     }
     fn expand(&mut self, expression: &Expr, locals: &[Local], depth: u32) -> Result<Expr, Error> {

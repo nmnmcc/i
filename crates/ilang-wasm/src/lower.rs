@@ -1017,6 +1017,7 @@ impl<'a> Lowerer<'a> {
                     index: di as u32,
                 };
                 if matches!(d.kind, DefKind::External { .. })
+                    && !self.program.typed_macros.contains(&id)
                     && reachable.as_ref().is_none_or(|set| set.contains(&id))
                 {
                     self.external_func(id);

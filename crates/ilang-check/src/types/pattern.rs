@@ -126,6 +126,8 @@ impl Checker<'_> {
     /// Gives a name of a pattern its type. In a `case`, the choices of a
     /// clause bind one name together, so it gets the union of their types.
     fn bind(&mut self, b: &Binder, t: Ty, in_case: bool) {
+        self.numeric_param_handles
+            .insert((self.module, b.span), t.clone());
         if in_case {
             if let Some(s) = self.locals.get(&b.var).cloned() {
                 self.sub(&t, &s.ty, b.span);

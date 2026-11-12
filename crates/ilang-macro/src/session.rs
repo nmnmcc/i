@@ -52,6 +52,7 @@ pub type DefinitionResolver =
 pub struct Session {
     next_mark: u64,
     depth: u16,
+    pub(crate) types: Option<Arc<ilang_host::syntax::TypeCallback>>,
     /// Imported macro definitions are stable after dependency-ordered expansion.
     /// Share compiled code across caller modules; each invocation still starts
     /// a fresh guest instance and receives its own budget and resolver.
@@ -114,6 +115,11 @@ impl Session {
                 other => other,
             }
         }));
+        if let Some(types) = self.types.clone() {
+            context.set_types(Arc::new(move |op, args| {
+                types(op, args).map(|xs| xs.into_iter().map(|s| s.flip_mark(mark)).collect())
+            }));
+        }
         let items = (position == MacroPosition::Item)
             .then(|| Arc::new(ItemContext::new(marked.clone().into(), call.clone())));
         self.depth += 1;

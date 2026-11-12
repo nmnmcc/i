@@ -362,6 +362,7 @@ fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
 fn macro_arguments_match_labels_and_attribute_items() {
     use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
     let m = MacroDefinition {
+        signature: None,
         item: 0,
         name: "m".into(),
         parameters: vec!["first".into(), "second".into(), "item".into()],

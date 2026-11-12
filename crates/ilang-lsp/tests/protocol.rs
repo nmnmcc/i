@@ -864,3 +864,37 @@ fn semantic_tokens_and_hover_inside_raw_interpolation() {
         "{hover:?}"
     );
 }
+
+#[test]
+fn typed_macro_hover_and_definition_through_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
+    let macros = "(, (= syntax (/ i syntax)))\n(, pass)\n/// A typed forwarding macro.\n(@ macro (: (pass A) (-> ((: value A)) A)))\n(@ macro (= pass (-> (value) _ value)))\n";
+    package(
+        dir.path(),
+        &[("src/main.i", source), ("src/macros.is", macros)],
+    );
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mac = file_uri(&dir.path().join("src/macros.is"));
+    let mut client = Client::start();
+    client.open(&main, source);
+    let ds = client.diagnostics(&main);
+    assert!(
+        !ds.iter()
+            .any(|d| d.severity == Some(lsp::DiagnosticSeverity::ERROR)),
+        "{ds:?}"
+    );
+    let (line, column) = find(source, "pass(x)", 0);
+    let hover =
+        client.request::<lsp::request::HoverRequest>(position_params(&main, line, column + 5));
+    assert!(
+        hover["contents"]["value"]
+            .as_str()
+            .is_some_and(|s| s.contains("x: 42")),
+        "{hover:?}"
+    );
+    let definition =
+        client.request::<lsp::request::GotoDefinition>(position_params(&main, line, column + 1));
+    assert_eq!(definition["uri"], mac);
+    assert_eq!(definition["range"]["start"]["line"], 3);
+}
