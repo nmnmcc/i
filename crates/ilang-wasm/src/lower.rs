@@ -3073,12 +3073,16 @@ impl<'a> Lowerer<'a> {
         }
         let mut positional = Vec::new();
         let mut labelled: Vec<(String, Atom)> = Vec::new();
+        let mut written = Vec::new();
         if let Some(a) = first {
-            positional.push(self.expr(fx, out, a));
+            let v = self.expr(fx, out, a);
+            written.push(v.clone());
+            positional.push(v);
         }
         let target = self.target(fx, out, callee);
         for a in args {
             let v = self.expr(fx, out, &a.value);
+            written.push(v.clone());
             match &a.label {
                 Some(l) => labelled.push((l.name.clone(), v)),
                 None => positional.push(v),
@@ -3087,14 +3091,24 @@ impl<'a> Lowerer<'a> {
         labelled.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
         let labels: Vec<String> = labelled.iter().map(|(l, _)| l.clone()).collect();
         let shape = ilang_check::types::ShapeId::new(positional.len() as u32, labels);
-        let mut all = positional;
-        all.extend(labelled.into_iter().map(|(_, v)| v));
-        let target = match target {
+        let (target, all) = match target {
             Target::Callee(Callee::Value(f)) => {
                 let id = crate::ir::shape_id(shape.positions(), self.shape_set(shape));
-                Target::Callee(Callee::Shaped(f, id))
+                let mut all = positional;
+                all.extend(labelled.into_iter().map(|(_, v)| v));
+                (Target::Callee(Callee::Shaped(f, id)), all)
             }
-            other => other,
+            // A known function takes its arguments in the order the
+            // checker gives (`typed.args`), as `call` does.
+            other => {
+                let all = match self.typed.args.get(&(fx.module, span)) {
+                    Some(order) if order.len() == written.len() => {
+                        order.iter().map(|&i| written[i as usize].clone()).collect()
+                    }
+                    _ => written,
+                };
+                (other, all)
+            }
         };
         self.finish_call(fx, out, span, target, all, tail)
     }
