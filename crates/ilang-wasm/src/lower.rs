@@ -2670,7 +2670,12 @@ impl<'a> Lowerer<'a> {
             ExprKind::Name(r) => {
                 // A chain name that an expected type narrowed to one shape
                 // group stands for that group's function.
-                let r = self.typed.selected_names.get(&(fx.module, e.span)).copied().unwrap_or(*r);
+                let r = self
+                    .typed
+                    .selected_names
+                    .get(&(fx.module, e.span))
+                    .copied()
+                    .unwrap_or(*r);
                 self.name(fx, e, r)
             }
             ExprKind::Tuple(items) => {
@@ -2685,7 +2690,10 @@ impl<'a> Lowerer<'a> {
                 // `$multi`, it is the tuple of its group closures; the
                 // checker lets nothing call it.
                 None => {
-                    let parts = groups.iter().map(|g| self.expr(fx, out, &g.value)).collect();
+                    let parts = groups
+                        .iter()
+                        .map(|g| self.expr(fx, out, &g.value))
+                        .collect();
                     let_value(fx, out, Value::Tuple(parts), None)
                 }
             },

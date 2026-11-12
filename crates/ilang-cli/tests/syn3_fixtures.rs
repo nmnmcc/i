@@ -114,7 +114,9 @@ fn syntax_three_fixtures() {
         if let Some(expected) = read("expected.txt") {
             let (ok, stdout, all) = i(library.path(), &["run"], dir);
             if !ok || stdout.trim_end() != expected.trim_end() {
-                problems.push(format!("{name}: `i run` gave:\n{all}\nexpected:\n{expected}"));
+                problems.push(format!(
+                    "{name}: `i run` gave:\n{all}\nexpected:\n{expected}"
+                ));
             }
         }
     }

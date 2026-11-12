@@ -18,7 +18,12 @@ pub(crate) const DATA: &str = "%data";
 pub(crate) fn is_multi(f: &FnTy) -> bool {
     match &f.param {
         Ty::Con(Head::Shape(s), _, _) => s.has_labels(),
-        Ty::Union(ms) => ms.iter().filter(|m| matches!(m, Ty::Con(Head::Shape(_), _, _))).count() > 1,
+        Ty::Union(ms) => {
+            ms.iter()
+                .filter(|m| matches!(m, Ty::Con(Head::Shape(_), _, _)))
+                .count()
+                > 1
+        }
         _ => false,
     }
 }
@@ -37,7 +42,11 @@ pub(crate) fn with_data(param: Ty, ret: Ty, err: Ty, env: Ty) -> FnTy {
 /// The parameter data type of one shape group: the group's function takes
 /// the parts of `shape` in canonical order.
 pub(crate) fn group_data(shape: ShapeId, parts: &[Ty]) -> Ty {
-    assert_eq!(shape.len(), parts.len(), "a group function takes the parts of its shape");
+    assert_eq!(
+        shape.len(),
+        parts.len(),
+        "a group function takes the parts of its shape"
+    );
     Ty::data(shape, parts.to_vec())
 }
 
@@ -113,7 +122,9 @@ pub(crate) fn group_case(value: &Expr) -> Option<(Span, bool, usize)> {
     };
     let is = |e: &Expr, v: VarId| matches!(&e.kind, ExprKind::Name(ValueRef::Local(x)) if *x == v);
     match &subject.kind {
-        ExprKind::Name(_) if params.len() == 1 && is(subject, params[0]) => Some((body.span, true, 1)),
+        ExprKind::Name(_) if params.len() == 1 && is(subject, params[0]) => {
+            Some((body.span, true, 1))
+        }
         ExprKind::Tuple(items)
             if items.len() == params.len() && items.iter().zip(&params).all(|(e, v)| is(e, *v)) =>
         {
@@ -264,9 +275,10 @@ impl Checker<'_> {
                 };
                 let b = &self.p.module(d.module).bindings[binding as usize].binding;
                 match (&b.pattern.kind, &b.value.kind) {
-                    (PatternKind::Var(_), ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_)))) => {
-                        Some(*to)
-                    }
+                    (
+                        PatternKind::Var(_),
+                        ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_))),
+                    ) => Some(*to),
                     _ => None,
                 }
             }
@@ -364,10 +376,13 @@ impl Checker<'_> {
             q[k] = Pat::Or(here);
             if self.useful(earlier, &q, &cols).is_none() {
                 match c {
-                    Pat::Ctor(ctor @ Ctor::Lit(Lit::Int(v) | Lit::Str(v)), _) => taken_values.push((
-                        ctor.head(),
-                        super::lits::ValueSet::only([std::sync::Arc::from(v.as_str())]).unwrap(),
-                    )),
+                    Pat::Ctor(ctor @ Ctor::Lit(Lit::Int(v) | Lit::Str(v)), _) => {
+                        taken_values.push((
+                            ctor.head(),
+                            super::lits::ValueSet::only([std::sync::Arc::from(v.as_str())])
+                                .unwrap(),
+                        ))
+                    }
                     Pat::Head(h, _) => taken_heads.push(*h),
                     _ => unreachable!("a candidate is a head or a literal"),
                 }
@@ -471,7 +486,8 @@ impl Checker<'_> {
             );
             return None;
         }
-        self.selected_fn(&table, &selected, span).map(|f| Ty::Fn(Box::new(f)))
+        self.selected_fn(&table, &selected, span)
+            .map(|f| Ty::Fn(Box::new(f)))
     }
 
     /// §2.6.4: a name with a table, used where one function type is

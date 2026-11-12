@@ -597,7 +597,8 @@ impl<'a> Checker<'a> {
             self.pending_typed.clear();
         }
         self.group_level = None;
-        let holder_types: HashMap<DefId, Ty> = types.iter().map(|(d, _, t, _)| (*d, t.clone())).collect();
+        let holder_types: HashMap<DefId, Ty> =
+            types.iter().map(|(d, _, t, _)| (*d, t.clone())).collect();
         for (d, _, t, span) in types {
             self.set_module(d.module);
             let scheme = if direct {
@@ -2315,7 +2316,12 @@ impl<'a> Checker<'a> {
             self.s.fresh_input(),
             self.s.fresh_input(),
         );
-        let want = groups::with_data(groups::group_data(shape, &parts), r.clone(), e.clone(), n.clone());
+        let want = groups::with_data(
+            groups::group_data(shape, &parts),
+            r.clone(),
+            e.clone(),
+            n.clone(),
+        );
         self.sub(f, &Ty::Fn(Box::new(want)), span);
         self.add_err(e);
         self.add_env(n);
@@ -2334,7 +2340,9 @@ impl<'a> Checker<'a> {
         {
             let shape = super::ShapeId::positional(n as u32);
             if let Some(i) = gs.iter().position(|g| g.shape == shape) {
-                self.out.selected_groups.insert((self.module, span), i as u32);
+                self.out
+                    .selected_groups
+                    .insert((self.module, span), i as u32);
                 return self.infer_k(&gs[i].value, expected);
             }
         }
@@ -2343,7 +2351,9 @@ impl<'a> Checker<'a> {
         for g in gs {
             let (t, _) = self.infer_k(&g.value, &Ty::Top);
             let parts: Vec<Ty> = match &t {
-                Ty::Fn(f) if f.arity() == Some(g.shape.len()) => f.parts().expect("data parameter").to_vec(),
+                Ty::Fn(f) if f.arity() == Some(g.shape.len()) => {
+                    f.parts().expect("data parameter").to_vec()
+                }
                 _ => (0..g.shape.len()).map(|_| self.s.fresh_input()).collect(),
             };
             // The results and the needs of every group are those of the
@@ -2357,8 +2367,15 @@ impl<'a> Checker<'a> {
             data.push(groups::group_data(g.shape, &parts));
             self.sub(&t, &Ty::Fn(Box::new(part)), g.value.span);
         }
-        let param = if data.len() == 1 { data.pop().unwrap() } else { Ty::Union(data) };
-        (Ty::Fn(Box::new(groups::with_data(param, ret, err, env))), Ty::Top)
+        let param = if data.len() == 1 {
+            data.pop().unwrap()
+        } else {
+            Ty::Union(data)
+        };
+        (
+            Ty::Fn(Box::new(groups::with_data(param, ret, err, env))),
+            Ty::Top,
+        )
     }
 
     /// Records a call for the syntax-three label migration (`syn3_facts`).
@@ -3231,8 +3248,10 @@ impl<'a> Checker<'a> {
         }
         self.check_occurs(mark, b.pattern.span);
         self.fit_known(&b.pattern, &k, false);
-        if let (PatternKind::Var(binder), ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_)))) =
-            (&b.pattern.kind, &b.value.kind)
+        if let (
+            PatternKind::Var(binder),
+            ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_))),
+        ) = (&b.pattern.kind, &b.value.kind)
         {
             self.local_aliases.insert(binder.var, *to);
         }
@@ -3242,7 +3261,13 @@ impl<'a> Checker<'a> {
             if let PatternKind::Var(binder) = &b.pattern.kind
                 && let Some(s) = self.locals.get(&binder.var).cloned()
             {
-                self.keep_branches(ValueRef::Local(binder.var), &b.value, &s.ty, Some(level), b.pattern.span);
+                self.keep_branches(
+                    ValueRef::Local(binder.var),
+                    &b.value,
+                    &s.ty,
+                    Some(level),
+                    b.pattern.span,
+                );
             }
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {

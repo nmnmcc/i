@@ -1882,7 +1882,9 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                         parts
                             .iter()
                             .enumerate()
-                            .map(|(i, p)| (keys[i].clone().or_else(|| f.label(i)), tree_with(p, name)))
+                            .map(|(i, p)| {
+                                (keys[i].clone().or_else(|| f.label(i)), tree_with(p, name))
+                            })
                             .collect(),
                         false,
                     )

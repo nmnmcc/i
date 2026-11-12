@@ -226,7 +226,11 @@ fn multi_groups(e: &ast::Expr) -> Option<&[ast::Arg]> {
 /// of positions, then each label after a comma.
 fn shape_of_text(text: &str) -> ShapeId {
     let mut parts = text.split(',');
-    let positions: u32 = parts.next().unwrap().parse().expect("a shape starts with its positions");
+    let positions: u32 = parts
+        .next()
+        .unwrap()
+        .parse()
+        .expect("a shape starts with its positions");
     ShapeId::new(positions, parts.map(str::to_string))
 }
 
@@ -3380,7 +3384,9 @@ impl<'a> Resolver<'a> {
             E::Call { args, .. } if multi_groups(e).is_some() => ExprKind::Multi(
                 args.iter()
                     .map(|a| MultiGroup {
-                        shape: shape_of_text(&a.label.as_ref().expect("a group has its shape").name),
+                        shape: shape_of_text(
+                            &a.label.as_ref().expect("a group has its shape").name,
+                        ),
                         value: self.expr(&a.value),
                     })
                     .collect(),
@@ -3498,19 +3504,28 @@ impl<'a> Resolver<'a> {
         use ast::ExprKind as E;
         let in_module = |r: &Self, target: ModuleId, name: &ast::Ident| {
             let index = *r.defs_by_name[target.0 as usize].get(&name.name)?;
-            Some(DefId { module: target, index })
+            Some(DefId {
+                module: target,
+                index,
+            })
         };
         match &ungroup(e).kind {
             E::Name { module: None, name } => match self.find(&name.name, name.span)? {
                 Found::Entry(Entry::Def(d)) => Some(d),
                 _ => None,
             },
-            E::Name { module: Some(m), name } => match self.find(&m.name, m.span)? {
+            E::Name {
+                module: Some(m),
+                name,
+            } => match self.find(&m.name, m.span)? {
                 Found::Entry(Entry::Module(t)) => in_module(self, t, name),
                 _ => None,
             },
             E::Field { target, name } => match &target.kind {
-                E::Name { module: None, name: m } => match self.find(&m.name, m.span)? {
+                E::Name {
+                    module: None,
+                    name: m,
+                } => match self.find(&m.name, m.span)? {
                     Found::Entry(Entry::Module(t)) => in_module(self, t, name),
                     _ => None,
                 },
@@ -3609,9 +3624,9 @@ impl<'a> Resolver<'a> {
         };
         match &callee.kind {
             E::Name { module: None, name } => quiet(self, name),
-            E::Name { .. } | E::Field { .. } => {
-                self.alias_target(callee).is_some_and(|d| self.def_tables.contains_key(&d))
-            }
+            E::Name { .. } | E::Field { .. } => self
+                .alias_target(callee)
+                .is_some_and(|d| self.def_tables.contains_key(&d)),
             _ => false,
         }
     }
@@ -3739,7 +3754,9 @@ impl<'a> Resolver<'a> {
             ExprKind::Multi(groups) => groups
                 .iter()
                 .map(|g| match &g.value.kind {
-                    ExprKind::Name(v @ (ValueRef::Local(_) | ValueRef::Def(_))) => Some((g.shape, *v)),
+                    ExprKind::Name(v @ (ValueRef::Local(_) | ValueRef::Def(_))) => {
+                        Some((g.shape, *v))
+                    }
                     _ => None,
                 })
                 .collect::<Option<Vec<_>>>()
