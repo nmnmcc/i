@@ -175,7 +175,7 @@ const LEVELS: [Level; 2] = [Level::O0, Level::O2];
 #[test]
 fn hello_needs_only_wasi() {
     let dir = package(&format!(
-        "{IO}\nmain = (io ! Io) {{ io.print(\"Hello from i!\") }}\n"
+        "{IO}\nmain = () <- (io: Io) {{ io.print(\"Hello from i!\") }}\n"
     ));
     for opt in LEVELS {
         let wasm = wasi(dir.path(), opt);
@@ -239,24 +239,22 @@ fn long_output_survives_short_writes() {
     let dir = package(&format!(
         "{IO}
 double = (s: String, n: Int) {{
-  n |> {{
-    0 -> s
-    _ -> double(s <> s, n - 1)
+  n
+  |> (0) {{ s }}
+  | (_) {{ double(s <> s, n - 1) }}
+}}
+
+lines = (n: Int) <- (io: Io) {{
+  n
+  |> (0) {{ Nil }}
+  | (_) {{
+    io.print(\"ünïcödé ✓\")
+    lines(n - 1)
   }}
 }}
 
-lines = (io ! Io, n: Int) {{
-  n |> {{
-    0 -> Nil
-    _ -> {{
-      io.print(\"ünïcödé ✓\")
-      lines(n - 1)
-    }}
-  }}
-}}
 
-
-main = (io ! Io) {{
+main = () <- (io: Io) {{
   io.print(double(\"héllo ✓ \", 14))
   lines(1000)
 }}
@@ -302,8 +300,8 @@ fn greeter(linker: &mut Linker<State>) {
 
 fn greet_program(attribute: &str) -> tempfile::TempDir {
     package(&format!(
-        "{IO}{attribute}\nGreet {{ Greet(greet: (name: String) -> String) }}\n\
-         \nmain = (io ! Io, g ! Greet) {{ io.print(g.greet(\"i\")) }}\n"
+        "{IO}{attribute}\nGreet = (greet = (String) -> String)\n\
+         \nmain = () <- (io: Io, g: Greet) {{ io.print(g.greet(\"i\")) }}\n"
     ))
 }
 
@@ -420,14 +418,14 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     let wasi_module = "wasi_snapshot_preview1";
     for name in ["fd_write", "proc_exit"] {
         let external = format!(
-            "@external(\"{wasi_module}\", \"{name}\")\nf: (code: String) -> Nil\n\
+            "@external(\"{wasi_module}\", \"{name}\")\nf: (String) -> Nil\n\
              \nmain = () {{ f(\"x\") }}\n"
         );
         let e = build_error(&external);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
         let service = format!(
-            "@host(\"{wasi_module}\")\nW {{ W({name}: (code: Bool) -> Nil) }}\n\
-             \nmain = (w ! W) {{ w.{name}(True) }}\n"
+            "@host(\"{wasi_module}\")\nW = ({name} = (Bool) -> Nil)\n\
+             \nmain = () <- (w: W) {{ w.{name}(True) }}\n"
         );
         let e = build_error(&service);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
@@ -441,7 +439,7 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     assert!(imports(&wasm).contains(&(wasi_module.into(), "sched_yield".into())));
     // On the target of the binary interface they are normal imports.
     let dir = package(&format!(
-        "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (code: Int) -> Nil\n\
+        "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (Int) -> Nil\n\
          \nmain = () {{ exit(0) }}\n"
     ));
     assert!(build(dir.path(), options(Level::O0, Target::Native)).is_ok());
