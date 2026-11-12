@@ -171,6 +171,13 @@ impl Prover<'_> {
                 flatten(l, false, &mut ms);
                 self.any(&ms, r, mode)
             }
+            // `a - H1 <: b - H2` when `a <: b` and every member of `H2` is
+            // taken out by `H1`.
+            (Ty::Diff(a, h1), Ty::Diff(b, h2))
+                if h2.iter().all(|m| h1.iter().any(|n| n.head() == m.head())) =>
+            {
+                self.sub(a, b, mode)
+            }
             (Ty::Diff(a, _), _) => self.sub(a, r, mode),
             (_, Ty::Diff(a, hs)) => {
                 let h = l.head();
@@ -233,15 +240,8 @@ impl Prover<'_> {
                 Ok(true)
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if f.params.len() != g.params.len() {
-                    return Ok(false);
-                }
-                for (p, q) in f.params.iter().zip(&g.params) {
-                    if !self.sub(&q.1, &p.1, Mode::Value)? {
-                        return Ok(false);
-                    }
-                }
-                Ok(self.sub(&f.ret, &g.ret, Mode::Value)?
+                Ok(self.sub(&g.param, &f.param, Mode::Value)?
+                    && self.sub(&f.ret, &g.ret, Mode::Value)?
                     && self.sub(&f.err, &g.err, Mode::Row)?
                     && self.sub(&f.env, &g.env, Mode::Env)?)
             }

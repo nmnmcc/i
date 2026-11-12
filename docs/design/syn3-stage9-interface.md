@@ -43,13 +43,13 @@ names are exported with it.
 **Anywhere else** (an argument, a list item, a binding with a written type):
 `Multi[(shape, function literal), …]` with the group functions in place.
 
-Tree nodes:
+Tree nodes. The current syntax tree (deleted in stage 12) gets no new node:
+`Multi[…]` is written there as a call of the reserved name `%multi` with one
+argument per group, whose label is the shape as text (`2`, `1,port`) and
+whose value is the group's function (`syn3/lower.rs` `multi_expr`). The
+resolver turns it into the HIR node:
 
 ```rust
-// crates/ilang-syntax/src/ast.rs
-ExprKind::Multi(Vec<MultiGroup>)
-pub struct MultiGroup { pub positions: u32, pub labels: Vec<Ident> /* sorted */, pub value: Expr }
-
 // crates/ilang-check/src/hir.rs
 ExprKind::Multi(Vec<MultiGroup>)
 pub struct MultiGroup { pub shape: ShapeId, pub value: Expr }
@@ -83,7 +83,7 @@ binding: the checker, the numeric lowering and the back end need nothing new,
 and there is no dispatch (§6.4 "Direct calls"). When the written order of the
 arguments is not the canonical order, the call is wrapped in a block that
 binds the arguments in written order first, so the order of evaluation is the
-written one. No group with that shape is the compile error `E0530`.
+written one. No group with that shape is the compile error `E0550`.
 
 Selection by known types (stage 11) only changes the *type* of such a call
 (the result is the union over the selected branches of that group). It never
@@ -101,8 +101,15 @@ alone** (selection by an expected type, §2.6.4). The checker records it in
 
 ```rust
 // crates/ilang-check/src/types/mod.rs, on the result of checking
-Types::selected_groups: HashMap<Span /* of the Multi expression */, u32 /* index into groups */>
+Typed::selected_groups: HashMap<(ModuleId, Span /* of the Multi expression */), u32 /* index into groups */>
+// The same for a use of the NAME of a top-level chain (`apply(area, 2.0)`): the
+// name expression at that span stands for the hidden group binding.
+Typed::selected_names: HashMap<(ModuleId, Span /* of the Name expression */), ValueRef>
 ```
+
+`crates/ilang-wasm/src/lower.rs` already reads both. A local chain name is
+not narrowed this way (its closure captures are found before types are
+read); it is a multi-shape value wherever it is not called directly.
 
 The back end lowers a `Multi` whose span is in `selected_groups` as its
 `groups[i].value` and nothing else. Every other `Multi` is built as `$multi`
@@ -128,17 +135,27 @@ today's calls have no labels, so the shape is `positional(args.len())`, which
 is the `n` the back end already has at each of the 11 sites. The arguments
 are passed in canonical order.
 
-In the type checker, a multi-shape type is used where a one-shape function
-type is wanted (`{ (Int) | (Int, Int) } -> R <: (Int) -> R`) at one place:
-`Solver::constrain` for two function types, when the left one is multi-shape
-(`groups::is_multi`) and the right one is not. Stage 9 reports the temporary
-error `E0531` there ("a multi-shape function value can only be called
-directly by its name until the run time has multi-shape values"). **Stage 10
-lifts it by deleting that one `self.fail(…)` line** (marked `syn3-stage10` in
-`crates/ilang-check/src/types/solve.rs`); the constraint beside it (argument
-data against the member of the call's shape, results, needs) is already
-there. After that every closure call site can receive a `$multi` and needs
-the slow path of §6.4.
+In the type checker (`FnTy` has one data parameter since stage 7), a
+multi-shape function type is a `FnTy` whose `param` is a union of data of
+several shapes, or data of one shape with labels (`groups::is_multi`). It is
+used where a one-shape function type is wanted
+(`{ (Int) | (Int, Int) } -> R <: (Int) -> R`) by the ordinary rule
+`constrain(g.param, f.param)`. Stage 9 reports the temporary error `E0551`
+("a multi-shape function value can only be called directly by its name until
+the run time has multi-shape values") at two places, both marked
+`syn3-stage10`:
+
+- `Solver::multi_to_one_shape` in `crates/ilang-check/src/types/groups.rs`
+  (called by `constrain_in` for two function types): the one `self.fail(…)`;
+- the call rule in `crates/ilang-check/src/types/infer.rs` (`fn call`, the
+  arm for a callee whose type is itself a multi-shape function type): the one
+  `self.error(code::MULTI_VALUE_CALL, …)`.
+
+**Stage 10 lifts the error by deleting those two statements**; the
+constraints beside them are already the final ones. After that every closure
+call site can receive a `$multi` and needs the slow path of §6.4. The fixture
+`tests/syn3/multi_value_call` expects the error today; with stage 10 it
+becomes a running fixture (`f(2.0)` prints `12.0`).
 
 ## 6. What stage 10 does not need from the checker
 

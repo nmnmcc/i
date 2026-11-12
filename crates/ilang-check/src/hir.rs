@@ -54,9 +54,12 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// The top-level names that are the callee of a direct call of a chain
+    /// with several shape groups: the call itself names the group.
+    pub chain_uses: Vec<DefId>,
     /// The hidden group bindings of each top-level name bound to a chain
     /// with several shape groups (syntax three §2.5), in group order.
-    pub chain_groups: std::collections::HashMap<DefId, Vec<DefId>>,
+    pub chain_groups: std::collections::HashMap<DefId, Vec<(crate::types::ShapeId, DefId)>>,
     /// Reads in invalid dependency components, before query recovery.
     pub failed_reads: std::collections::HashSet<OfId>,
     /// Expression SCC members invalidated by a type-dependency cycle.

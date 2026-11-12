@@ -600,6 +600,7 @@ fn substitute(t: &ShownType, vars: &HashMap<String, ShownType>) -> ShownType {
                 .iter()
                 .map(|(label, ty)| (label.clone(), substitute(ty, vars)))
                 .collect(),
+            group: f.group,
             ret: substitute(&f.ret, vars),
             err: f.err.as_ref().map(|ty| substitute(ty, vars)),
             env: f.env.as_ref().map(|ty| substitute(ty, vars)),

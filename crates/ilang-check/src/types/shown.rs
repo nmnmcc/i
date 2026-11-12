@@ -40,6 +40,9 @@ pub enum ShownType {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ShownFn {
     pub params: Vec<(Option<String>, ShownType)>,
+    /// The parameter is not data of one shape: `params` has the whole
+    /// parameter type, shown as a group `{ T } -> R` (syntax-3 §6.1).
+    pub group: bool,
     pub ret: ShownType,
     pub err: Option<ShownType>,
     pub env: Option<ShownType>,
@@ -191,28 +194,18 @@ impl ShownType {
             }
             ShownType::Fn(f) => {
                 open(out, 0);
-                if let [(Some(l), p)] = f.params.as_slice()
-                    && l == super::groups::DATA
-                {
-                    // A multi-shape function type: its parameter data
-                    // types in a group (syntax three §2.4).
-                    out.push_str("{ ");
-                    p.write(0, out, n);
-                    out.push_str(" } -> ");
-                } else {
-                    out.push('(');
-                    for (i, (l, p)) in f.params.iter().enumerate() {
-                        if i > 0 {
-                            out.push_str(", ");
-                        }
-                        if let Some(l) = l {
-                            out.push_str(l);
-                            out.push_str(": ");
-                        }
-                        p.write(0, out, n);
+                out.push_str(if f.group { "{ " } else { "(" });
+                for (i, (l, p)) in f.params.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
                     }
-                    out.push_str(") -> ");
+                    if let Some(l) = l {
+                        out.push_str(l);
+                        out.push_str(": ");
+                    }
+                    p.write(0, out, n);
                 }
+                out.push_str(if f.group { " } -> " } else { ") -> " });
                 // A function type followed by `^` or `!` is put in `{ }`.
                 let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
                     let braces = followed && matches!(x, ShownType::Fn(_));

@@ -130,6 +130,13 @@ pub(crate) struct Checker<'a> {
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
+    /// The rule-11 cases typed in the binding being checked, by span: what
+    /// a selection table is made from (syntax three §2.6.1).
+    pub(super) case_tables: HashMap<(ModuleId, Span), groups::CaseTable>,
+    /// The selection tables of the names bound to a group function.
+    pub(super) branch_tables: HashMap<ValueRef, std::rc::Rc<groups::BranchTable>>,
+    /// The local names bound by `g = name` (direct aliases, §2.6.7).
+    pub(super) local_aliases: HashMap<VarId, ValueRef>,
 }
 
 impl<'a> Checker<'a> {
@@ -181,6 +188,9 @@ impl<'a> Checker<'a> {
             group_level: None,
             pending_failures: Vec::new(),
             shared_fields: HashMap::new(),
+            case_tables: HashMap::new(),
+            branch_tables: HashMap::new(),
+            local_aliases: HashMap::new(),
         }
     }
 
@@ -532,6 +542,7 @@ impl<'a> Checker<'a> {
         }
         self.finish_reads(group, &candidates);
         self.group_level = None;
+        let holder_types: HashMap<DefId, Ty> = types.iter().map(|(d, _, t, _)| (*d, t.clone())).collect();
         for (d, _, t, span) in types {
             self.set_module(d.module);
             let scheme = if direct {
@@ -545,6 +556,18 @@ impl<'a> Checker<'a> {
             self.defs.insert(d, scheme);
         }
         self.group_defs.clear();
+        for b in group {
+            let top = p.binding(*b);
+            if let ([d], PatternKind::Var(_)) = (top.defs.as_slice(), &top.binding.pattern.kind)
+                && let Some(t) = holder_types.get(d)
+            {
+                self.set_module(b.module);
+                let generalized = direct.then_some(0);
+                let (value, span) = (&top.binding.value, top.binding.span);
+                self.keep_branches(ValueRef::Def(*d), value, t, generalized, span);
+            }
+        }
+        self.case_tables.clear();
         for (b, k) in group.iter().zip(knowns) {
             self.out.generalized.insert(*b, direct);
             let top = p.binding(*b);
@@ -656,9 +679,10 @@ impl<'a> Checker<'a> {
             return;
         }
         let parts = f
-            .params
+            .parts()
+            .unwrap_or_default()
             .iter()
-            .map(|p| ("a parameter", &p.1, true))
+            .map(|p| ("a parameter", p, true))
             .chain([("the value", &f.ret, false)]);
         for (what, t, input) in parts {
             if !self.host_type(t) || input && !t.values().is_all() {
@@ -689,7 +713,9 @@ impl<'a> Checker<'a> {
             matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
         // B.2: the signature that the code generator encodes.
-        let params: Option<Vec<HostType>> = f.params.iter().map(|p| self.host_part(&p.1)).collect();
+        let params: Option<Vec<HostType>> = f
+            .parts()
+            .and_then(|ps| ps.iter().map(|p| self.host_part(p)).collect());
         let result = self.host_part(&f.ret);
         let mut errors: Option<Vec<HostType>> = error_members
             .iter()
@@ -1047,10 +1073,6 @@ impl<'a> Checker<'a> {
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
             ),
-            FailKind::Arity => (
-                code::FN_ARITY,
-                format!("the function types `{l}` and `{r}` have different numbers of parameters"),
-            ),
             FailKind::Invariant => (
                 code::TYPE_INVARIANT,
                 format!(
@@ -1232,12 +1254,7 @@ impl<'a> Checker<'a> {
                 let env = env
                     .as_ref()
                     .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
-                Ty::Fn(Box::new(FnTy {
-                    params,
-                    ret,
-                    err,
-                    env,
-                }))
+                Ty::Fn(Box::new(FnTy::new(params, ret, err, env)))
             }
             TypeKind::Union(ts) => {
                 let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
@@ -1384,12 +1401,7 @@ impl<'a> Checker<'a> {
         if fields.is_empty() {
             return t;
         }
-        Ty::Fn(Box::new(FnTy {
-            params: fields,
-            ret: t,
-            err: Ty::Never,
-            env: Ty::Never,
-        }))
+        Ty::Fn(Box::new(FnTy::new(fields, t, Ty::Never, Ty::Never)))
     }
 
     fn prim(&self, b: BuiltinType) -> Ty {
@@ -1410,6 +1422,11 @@ impl<'a> Checker<'a> {
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
         let result = self.infer_k_inner(e, expected);
+        // A name with a selection table, where a function type is expected.
+        let result = match self.select_by_expected(e, expected) {
+            Some(selected) => selected,
+            None => result,
+        };
         self.numeric_handles
             .insert((self.module, e.span), result.0.clone());
         result
@@ -1742,8 +1759,9 @@ impl<'a> Checker<'a> {
                     None
                 }
                 Some(k) => {
-                    let labels: Vec<Option<String>> =
-                        k.params.iter().map(|p| p.0.clone()).collect();
+                    let labels: Vec<Option<String>> = (0..k.arity().unwrap_or(0))
+                        .map(|i| k.label(i))
+                        .collect();
                     let given: Vec<(Option<&Ident>, Span)> = first
                         .iter()
                         .map(|x| (None, x.span))
@@ -1762,7 +1780,11 @@ impl<'a> Checker<'a> {
         let params: Option<Vec<Ty>> = match (&kfn, &to) {
             (Some(k), Some(to)) => Some(
                 to.iter()
-                    .map(|i| k.params.get(*i).map_or(Ty::Top, |p| p.1.clone()))
+                    .map(|i| {
+                        k.parts()
+                            .and_then(|ps| ps.get(*i))
+                            .map_or(Ty::Top, Ty::clone)
+                    })
                     .collect(),
             ),
             _ => None,
@@ -1779,7 +1801,7 @@ impl<'a> Checker<'a> {
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
         for later in [false, true] {
             for (i, a) in values.iter().enumerate() {
-                if (params.is_some() && known::open_fn(a)) != later {
+                if (params.is_some() && (known::open_fn(a) || self.selects(a))) != later {
                     continue;
                 }
                 let expected = match &params {
@@ -1810,34 +1832,39 @@ impl<'a> Checker<'a> {
             .map(|g| (typed[*g as usize].0.clone(), spans[*g as usize]))
             .collect();
         let known = match &kfn {
-            Some(k) if k.params.len() == n => {
+            Some(k) if k.arity() == Some(n) => {
                 let ks: Vec<Ty> = order.iter().map(|g| typed[*g as usize].1.clone()).collect();
                 self.call_known(k, &ks)
             }
             _ => Ty::Top,
         };
+        // Syntax three §2.6.2: a direct call of a name with a selection
+        // table has the type of the branches that the known types of the
+        // arguments select.
+        let f = if args.iter().all(|a| a.label.is_none()) {
+            let ks: Vec<Ty> = typed.iter().map(|x| x.1.clone()).collect();
+            self.select_at_call(callee, &ks, span).unwrap_or(f)
+        } else {
+            f
+        };
         let t = match &f {
-            Ty::Fn(ft) if !groups::is_multi(ft) && ft.params.len() == placed.len() => {
-                for ((t, s), (_, p)) in placed.iter().zip(&ft.params) {
+            Ty::Fn(ft) if !groups::is_multi(ft) && ft.arity() == Some(placed.len()) => {
+                let parts = ft.parts().expect("data parameter").to_vec();
+                for ((t, s), p) in placed.iter().zip(&parts) {
                     self.sub2(t, p, *s, callee.span);
                 }
                 self.add_err(ft.err.clone());
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }
-            Ty::Fn(ft) if !groups::is_multi(ft) => {
-                let n = ft.params.len();
-                self.error(
-                    code::FN_ARITY,
-                    span,
-                    format!(
-                        "this call gives {} argument{}, but the function has {n} parameter{} (§6.6)",
-                        placed.len(),
-                        if placed.len() == 1 { "" } else { "s" },
-                        if n == 1 { "" } else { "s" },
-                    ),
-                );
-                self.s.fresh()
+            Ty::Fn(ft) => {
+                // syntax-3 §6.1: the argument data of another shape is a
+                // mismatch of the parameter.
+                let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
+                self.sub2(&data, &ft.param, span, callee.span);
+                self.add_err(ft.err.clone());
+                self.add_env(ft.env.clone());
+                ft.ret.clone()
             }
             _ => {
                 // The function may be a parameter: what it gives back may
@@ -1847,12 +1874,7 @@ impl<'a> Checker<'a> {
                     self.s.fresh_input(),
                     self.s.fresh_input(),
                 );
-                let want = Ty::Fn(Box::new(FnTy {
-                    params: placed.into_iter().map(|(t, _)| (None, t)).collect(),
-                    ret: r.clone(),
-                    err: e.clone(),
-                    env: n.clone(),
-                }));
+                let want = Ty::Fn(Box::new(FnTy::new(placed.into_iter().map(|(t, _)| (None, t)).collect(), r.clone(), e.clone(), n.clone())));
                 self.sub(&f, &want, span);
                 self.add_err(e);
                 self.add_env(n);
@@ -1870,8 +1892,9 @@ impl<'a> Checker<'a> {
     fn multi(&mut self, gs: &[MultiGroup], expected: &Ty, span: Span) -> (Ty, Ty) {
         if let [Ty::Fn(want)] = known::members(expected).as_slice()
             && !groups::is_multi(want)
+            && let Some(n) = want.arity()
         {
-            let shape = super::ShapeId::positional(want.params.len() as u32);
+            let shape = super::ShapeId::positional(n as u32);
             if let Some(i) = gs.iter().position(|g| g.shape == shape) {
                 self.out.selected_groups.insert((self.module, span), i as u32);
                 return self.infer_k(&gs[i].value, expected);
@@ -1881,19 +1904,19 @@ impl<'a> Checker<'a> {
         let mut data = Vec::new();
         for g in gs {
             let (t, _) = self.infer_k(&g.value, &Ty::Top);
-            let params: Vec<(Option<String>, Ty)> = match &t {
-                Ty::Fn(f) if !groups::is_multi(f) && f.params.len() == g.shape.len() => f.params.clone(),
-                _ => (0..g.shape.len()).map(|_| (None, self.s.fresh_input())).collect(),
+            let parts: Vec<Ty> = match &t {
+                Ty::Fn(f) if f.arity() == Some(g.shape.len()) => f.parts().expect("data parameter").to_vec(),
+                _ => (0..g.shape.len()).map(|_| self.s.fresh_input()).collect(),
             };
             // The results and the needs of every group are those of the
             // value (the need is shared by all branches, §2.5).
-            let part = FnTy {
-                params,
-                ret: ret.clone(),
-                err: err.clone(),
-                env: env.clone(),
-            };
-            data.push(groups::group_data(g.shape, &part));
+            let part = FnTy::new(
+                parts.iter().map(|p| (None, p.clone())).collect(),
+                ret.clone(),
+                err.clone(),
+                env.clone(),
+            );
+            data.push(groups::group_data(g.shape, &parts));
             self.sub(&t, &Ty::Fn(Box::new(part)), g.value.span);
         }
         let param = if data.len() == 1 { data.pop().unwrap() } else { Ty::Union(data) };
@@ -2549,9 +2572,7 @@ impl<'a> Checker<'a> {
             .filter(|p| matches!(p, Param::Pattern { .. }))
             .count();
         let expected: Vec<Ty> = match known::members(expected).as_slice() {
-            [Ty::Fn(g)] if g.params.len() == count => {
-                g.params.iter().map(|p| p.1.clone()).collect()
-            }
+            [Ty::Fn(g)] if g.arity() == Some(count) => g.parts().expect("data parameter").to_vec(),
             _ => Vec::new(),
         };
         let mut params = Vec::new();
@@ -2645,12 +2666,7 @@ impl<'a> Checker<'a> {
                     envs.push(assert);
                 }
                 let env = self.env_union(envs, f.span);
-                Ty::Fn(Box::new(FnTy {
-                    params,
-                    ret: value,
-                    err,
-                    env,
-                }))
+                Ty::Fn(Box::new(FnTy::new(params, value, err, env)))
             }
             (Some((value, rerr, renv)), Some(written)) => {
                 // §6.8: the written `->` part is the type after the
@@ -2673,12 +2689,7 @@ impl<'a> Checker<'a> {
                 if fails {
                     self.sub_env(&assert, &renv, nspan, None);
                 }
-                Ty::Fn(Box::new(FnTy {
-                    params,
-                    ret: value,
-                    err: rerr,
-                    env: renv,
-                }))
+                Ty::Fn(Box::new(FnTy::new(params, value, rerr, renv)))
             }
             _ => {
                 let mut envs = vec![env];
@@ -2687,12 +2698,7 @@ impl<'a> Checker<'a> {
                     envs.push(assert);
                 }
                 let env = self.env_union(envs, f.span);
-                Ty::Fn(Box::new(FnTy {
-                    params,
-                    ret: a,
-                    err,
-                    env,
-                }))
+                Ty::Fn(Box::new(FnTy::new(params, a, err, env)))
             }
         };
         (t, known)
@@ -2739,9 +2745,19 @@ impl<'a> Checker<'a> {
         }
         self.check_occurs(mark, b.pattern.span);
         self.fit_known(&b.pattern, &k, false);
+        if let (PatternKind::Var(binder), ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_)))) =
+            (&b.pattern.kind, &b.value.kind)
+        {
+            self.local_aliases.insert(binder.var, *to);
+        }
         if direct {
             self.s.level -= 1;
             let level = self.s.level;
+            if let PatternKind::Var(binder) = &b.pattern.kind
+                && let Some(s) = self.locals.get(&binder.var).cloned()
+            {
+                self.keep_branches(ValueRef::Local(binder.var), &b.value, &s.ty, Some(level), b.pattern.span);
+            }
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
                     let ty = self.generalize(&s.ty, level, b.pattern.span);
@@ -2802,7 +2818,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+    pub(super) fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
             Err(()) => {
@@ -2878,11 +2894,8 @@ impl<'a> Checker<'a> {
             Ty::Union(ms) => Ty::Union(ms.iter().map(|a| go(self, a)).collect()),
             Ty::Inter(ms) => Ty::Inter(ms.iter().map(|a| go(self, a)).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), go(self, p)))
-                    .collect(),
+                param: go(self, &f.param),
+                labels: f.labels.clone(),
                 ret: go(self, &f.ret),
                 err: go(self, &f.err),
                 env: go(self, &f.env),
@@ -2905,7 +2918,7 @@ fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
         }
         Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| uses_types(x, out)),
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| uses_types(&p.1, out));
+            uses_types(&f.param, out);
             [&f.ret, &f.err, &f.env]
                 .into_iter()
                 .for_each(|x| uses_types(x, out));
@@ -2927,7 +2940,7 @@ fn has_both(t: &Ty) -> bool {
         Ty::Both(..) => true,
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
         Ty::Fn(f) => {
-            f.params.iter().any(|p| has_both(&p.1))
+            has_both(&f.param)
                 || [&f.ret, &f.err, &f.env].into_iter().any(has_both)
         }
         Ty::Diff(a, _) => has_both(a),

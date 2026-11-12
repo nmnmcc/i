@@ -1,0 +1,4 @@
+syn3_area_value/main.area : { (Float) | (Float, Float) } -> Float
+syn3_area_value/main.fs : List({ (Float) | (Float, Float) } -> Float)
+syn3_area_value/main.typed : List({ (Float) | (Float, Float) } -> Float)
+syn3_area_value/main.scale : (Int, by: Int) -> Int

@@ -2605,7 +2605,12 @@ impl<'a> Lowerer<'a> {
             ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
             ExprKind::Float(x) => Atom::Float(*x),
             ExprKind::String(s) => Atom::String(s.clone()),
-            ExprKind::Name(r) => self.name(fx, e, *r),
+            ExprKind::Name(r) => {
+                // A chain name that an expected type narrowed to one shape
+                // group stands for that group's function.
+                let r = self.typed.selected_names.get(&(fx.module, e.span)).copied().unwrap_or(*r);
+                self.name(fx, e, r)
+            }
             ExprKind::Tuple(items) => {
                 let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)

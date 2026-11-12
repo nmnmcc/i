@@ -218,7 +218,11 @@ pub fn shape_text(positions: usize, labels: &[&str]) -> String {
     text
 }
 
-/// The callee of the transition form of a multi chain (see `Cx::multi`).
+/// The label of the one parameter of a multi-shape function type in the
+/// transition tree.
+pub const DATA: &str = "%data";
+
+/// The callee of the transition form of a multi chain (see `multi_expr`).
 pub const MULTI: &str = "%multi";
 
 /// The hidden binding of group `index` of the chain bound to `name`.
@@ -942,7 +946,29 @@ impl Cx {
                 }
             }
         }
-        let ret = fs.iter().find(|f| f.ret.is_some()).and_then(|f| self.ret(f));
+        // The written results: one type when the branches write the same
+        // one; their union when every branch writes one (each branch body
+        // keeps its tail position); none when a branch leaves it out.
+        let mut written: Vec<&n::Type> = Vec::new();
+        for t in fs.iter().filter_map(|f| f.ret.as_ref()) {
+            if !written.contains(&t) {
+                written.push(t);
+            }
+        }
+        let ret = match written.as_slice() {
+            [] => None,
+            [_] => fs.iter().find(|f| f.ret.is_some()).and_then(|f| self.ret(f)),
+            _ if fs.iter().any(|f| f.ret.is_none()) => None,
+            many => {
+                let at = many[0].span.0;
+                let members = many.iter().map(|t| self.ty(t)).collect();
+                Some(o::RetType {
+                    value: ty(o::TypeKind::Union(members), at),
+                    err: Some(ty(o::TypeKind::Hole, at)),
+                    env: Some(ty(o::TypeKind::Hole, at)),
+                })
+            }
+        };
         let subject = if count == 1 {
             name_expr(&names[0].0, names[0].1)
         } else {
@@ -1407,10 +1433,13 @@ impl Cx {
                     }
                 }
             }
-            _ => self.error(
-                f.param.span.0,
-                "a function type whose parameter is not written as data needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
-            ),
+            // A multi-shape function type `{ (A) | (B, C) } -> R`: in the
+            // transition tree, one parameter with the reserved label
+            // `%data` whose type is the parameter data type.
+            _ => params.push(o::FnParamType {
+                label: Some(ident(DATA, f.param.span.0)),
+                ty: self.ty(&f.param),
+            }),
         }
         let mut err: Option<o::TypeExpr> = None;
         let mut env: Vec<o::TypeExpr> = Vec::new();

@@ -243,11 +243,8 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
         (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) => h == g && a == b && all(xs, ys),
         (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
         (Ty::Fn(f), Ty::Fn(g)) => {
-            f.params.len() == g.params.len()
-                && f.params
-                    .iter()
-                    .zip(&g.params)
-                    .all(|(p, q)| p.0 == q.0 && same_unmarked(&p.1, &q.1))
+            f.labels == g.labels
+                && same_unmarked(&f.param, &g.param)
                 && same_unmarked(&f.ret, &g.ret)
                 && same_unmarked(&f.err, &g.err)
                 && same_unmarked(&f.env, &g.env)
@@ -432,7 +429,7 @@ pub(super) fn ty_vars(t: &Ty, out: &mut Vec<V>) {
             xs.iter().for_each(|x| ty_vars(x, out))
         }
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| ty_vars(&p.1, out));
+            ty_vars(&f.param, out);
             [&f.ret, &f.err, &f.env]
                 .into_iter()
                 .for_each(|x| ty_vars(x, out));
@@ -544,11 +541,8 @@ impl Coalescer<'_> {
                 xs.iter().map(|x| self.bound_key(x)).collect(),
             ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), self.bound_key(p)))
-                    .collect(),
+                param: self.bound_key(&f.param),
+                labels: f.labels.clone(),
                 ret: self.bound_key(&f.ret),
                 err: self.bound_key(&f.err),
                 env: self.bound_key(&f.env),
@@ -717,11 +711,8 @@ impl Coalescer<'_> {
                 Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1, false)))
-                    .collect(),
+                param: self.go(&f.param, !pos, depth + 1, false),
+                labels: f.labels.clone(),
                 ret: self.go(&f.ret, pos, depth + 1, false),
                 err: self.go(&f.err, pos, depth + 1, true),
                 env: self.go(&f.env, pos, depth + 1, true),
@@ -757,12 +748,7 @@ pub(crate) fn both(t: &Ty) -> Ty {
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(both).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(both).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(both).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), both(p))).collect(),
-            ret: both(&f.ret),
-            err: both(&f.err),
-            env: both(&f.env),
-        })),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: both(&f.param), labels: f.labels.clone(), ret: both(&f.ret), err: both(&f.err), env: both(&f.env) })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(both(a)), h.iter().map(both).collect()),
         t => t.clone(),
     }
@@ -815,11 +801,8 @@ impl Norm<'_> {
             Ty::Fn(f) => {
                 let f = *f;
                 Ty::Fn(Box::new(FnTy {
-                    params: f
-                        .params
-                        .into_iter()
-                        .map(|(l, p)| (l, self.norm(p)))
-                        .collect(),
+                    param: self.norm(f.param),
+                    labels: f.labels,
                     ret: self.norm(f.ret),
                     err: self.env(f.err),
                     env: self.env(f.env),
@@ -970,7 +953,7 @@ impl Norm<'_> {
                 })
             }
             Ty::Fn(f) => {
-                f.params.iter().all(|p| p.1 == Ty::Never)
+                f.param == Ty::Never
                     && [&f.ret, &f.err, &f.env].iter().all(|x| is_top(x))
             }
             _ => false,
@@ -1140,20 +1123,17 @@ impl Norm<'_> {
                         .collect(),
                 )
             }
-            (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+            (Ty::Fn(f), Ty::Fn(g)) => {
                 let (f, g) = (*f, *g);
+                let labels = f
+                    .labels
+                    .iter()
+                    .zip(&g.labels)
+                    .map(|(l1, l2)| if l1 == l2 { l1.clone() } else { None })
+                    .collect();
                 Ty::Fn(Box::new(FnTy {
-                    params: f
-                        .params
-                        .into_iter()
-                        .zip(g.params)
-                        .map(|((l1, p), (l2, q))| {
-                            (
-                                if l1 == l2 { l1 } else { None },
-                                pick(p, q, Variance::Contra),
-                            )
-                        })
-                        .collect(),
+                    param: pick(f.param, g.param, Variance::Contra),
+                    labels,
                     ret: pick(f.ret, g.ret, Variance::Co),
                     err: pick(f.err, g.err, Variance::Co),
                     env: pick(f.env, g.env, Variance::Co),
@@ -1306,7 +1286,7 @@ impl Norm<'_> {
                     }
                 }
                 Ty::Fn(f) => {
-                    for (_, p) in &f.params {
+                    for p in [&f.param] {
                         self.walk(p, !pos, occ, order, false);
                     }
                     self.walk(&f.ret, pos, occ, order, false);
@@ -1357,7 +1337,7 @@ fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
     match t {
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
-            g.params.iter().for_each(|p| visit(&p.1, f));
+            visit(&g.param, f);
             [&g.ret, &g.err, &g.env]
                 .into_iter()
                 .for_each(|x| visit(x, f));
@@ -1382,12 +1362,7 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
-            ret: r(&f.ret),
-            err: r(&f.err),
-            env: r(&f.env),
-        })),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: r(&f.param), labels: f.labels.clone(), ret: r(&f.ret), err: r(&f.err), env: r(&f.env) })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
         Ty::Both(a, b) => Ty::Both(Box::new(r(a)), Box::new(r(b))),
         t => t.clone(),
@@ -1503,12 +1478,7 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
-            ret: go(&f.ret),
-            err: go(&f.err),
-            env: go(&f.env),
-        })),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: go(&f.param), labels: f.labels.clone(), ret: go(&f.ret), err: go(&f.err), env: go(&f.env) })),
         // A part of `H` with no effect is written `_`.
         Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.clone()),
         Ty::Both(a, b) => {
@@ -1535,7 +1505,7 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
         }
         Ty::Con(_, _, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| roles(&p.1, Role::Value, out));
+            roles(&f.param, Role::Value, out);
             roles(&f.ret, Role::Value, out);
             roles(&f.err, Role::Err, out);
             roles(&f.env, Role::Env, out);
@@ -1595,16 +1565,33 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
         Ty::Con(Head::Shape(shape), _, parts) if shape.has_labels() => ShownType::Record(shape.keys(), all(parts, name)),
         Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
-            let params = f
-                .params
-                .iter()
-                .map(|(l, p)| (l.clone(), tree_with(p, name)))
-                .collect();
+            // syntax-3 §6.1: a parameter that is not data of one shape is
+            // shown as a group: `{ Never } -> A`.
+            let (params, group) = match f.parts() {
+                Some(parts) => {
+                    // A label of the shape is part of the type; the other
+                    // labels are the written parameter names.
+                    let keys = match &f.param {
+                        Ty::Con(Head::Shape(shape), _, _) if shape.has_labels() => shape.keys(),
+                        _ => vec![None; parts.len()],
+                    };
+                    (
+                        parts
+                            .iter()
+                            .enumerate()
+                            .map(|(i, p)| (keys[i].clone().or_else(|| f.label(i)), tree_with(p, name)))
+                            .collect(),
+                        false,
+                    )
+                }
+                None => (vec![(None, tree_with(&f.param, name))], true),
+            };
             let ret = tree_with(&f.ret, name);
             let err = (f.err != Ty::Never).then(|| tree_with(&f.err, name));
             let env = (f.env != Ty::Never).then(|| tree_with(&f.env, name));
             ShownType::Fn(Box::new(ShownFn {
                 params,
+                group,
                 ret,
                 err,
                 env,
@@ -1646,7 +1633,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
             xs.iter().for_each(|x| outer_vars(x, out))
         }
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| outer_vars(&p.1, out));
+            outer_vars(&f.param, out);
             [&f.ret, &f.err, &f.env]
                 .into_iter()
                 .for_each(|x| outer_vars(x, out));
@@ -1674,12 +1661,7 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
                 _ => Ty::Inter(xs),
             }
         }
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
-            ret: go(&f.ret),
-            err: go(&f.err),
-            env: go(&f.env),
-        })),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: go(&f.param), labels: f.labels.clone(), ret: go(&f.ret), err: go(&f.err), env: go(&f.env) })),
         Ty::Diff(a, h) => Ty::Diff(
             Box::new(go(a)),
             h.iter().map(|x| hide(x, outside, true)).collect(),
@@ -1731,12 +1713,7 @@ fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
-        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
-            ret: go(&f.ret),
-            err: go(&f.err),
-            env: go(&f.env),
-        })),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy { param: go(&f.param), labels: f.labels.clone(), ret: go(&f.ret), err: go(&f.err), env: go(&f.env) })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.iter().map(go).collect()),
         Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
         t => t.clone(),

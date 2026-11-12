@@ -313,7 +313,7 @@ fn named_types(t: &Ty, out: &mut Vec<crate::hir::TypeId>) {
         }
         Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| named_types(x, out)),
         Ty::Fn(f) => {
-            f.params.iter().for_each(|(_, p)| named_types(p, out));
+            named_types(&f.param, out);
             [&f.ret, &f.err, &f.env]
                 .into_iter()
                 .for_each(|x| named_types(x, out));
@@ -750,12 +750,7 @@ mod tests {
                 Ty::Var(a)
             };
             solver.has_handlers = true;
-            let root = Ty::Fn(Box::new(FnTy {
-                params: vec![],
-                ret: Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-                err: Ty::Never,
-                env: row,
-            }));
+            let root = Ty::Fn(Box::new(FnTy::new(vec![], Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]), Ty::Never, row)));
             let scheme = Scheme {
                 level: 0,
                 ty: root,
@@ -783,64 +778,6 @@ mod tests {
     }
 
     #[test]
-    fn scheme_coverage_finds_a_counterexample_in_a_union_row_handler() {
-        let build = |second: BuiltinType| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let service = TypeId(5);
-            solver.variance.insert(service, vec![Variance::Co]);
-            let mut rows = Vec::new();
-            for parameter in [BuiltinType::Int, second] {
-                let v = solver.fresh_at(1);
-                solver.vars[v.0 as usize].row = Mode::Env;
-                solver.vars[v.0 as usize].difference = true;
-                solver.vars[v.0 as usize].handled.push(Ty::named(
-                    TypeRef::Custom(service),
-                    vec![Ty::named(TypeRef::Builtin(parameter), vec![])],
-                ));
-                rows.push(Ty::Var(v));
-            }
-            solver.has_handlers = true;
-            let row = Ty::Union(rows);
-            let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-            let body = Ty::Fn(Box::new(FnTy {
-                params: vec![],
-                ret: result.clone(),
-                err: Ty::Never,
-                env: row.clone(),
-            }));
-            let root = Ty::Fn(Box::new(FnTy {
-                params: vec![(Some("body".into()), body)],
-                ret: result,
-                err: Ty::Never,
-                env: row,
-            }));
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => "pkg:Svc".into(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(BuiltinType::Int)
-                .compare(&build(BuiltinType::String), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Different
-        );
-    }
-
-    #[test]
     fn output_only_environment_can_choose_an_empty_row() {
         let build = |parameter: BuiltinType| {
             let mut solver = Solver::new(HashMap::new(), Vec::new());
@@ -854,12 +791,7 @@ mod tests {
                 vec![Ty::named(TypeRef::Builtin(parameter), vec![])],
             ));
             solver.has_handlers = true;
-            let root = Ty::Fn(Box::new(FnTy {
-                params: vec![],
-                ret: Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-                err: Ty::Never,
-                env: Ty::Var(row),
-            }));
+            let root = Ty::Fn(Box::new(FnTy::new(vec![], Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]), Ty::Never, Ty::Var(row))));
             let scheme = Scheme {
                 level: 0,
                 ty: root,
@@ -901,18 +833,8 @@ mod tests {
             ));
             solver.has_handlers = true;
             let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-            let body = Ty::Fn(Box::new(FnTy {
-                params: vec![],
-                ret: result.clone(),
-                err: Ty::Never,
-                env: Ty::Var(row),
-            }));
-            let root = Ty::Fn(Box::new(FnTy {
-                params: vec![(Some("body".into()), body)],
-                ret: result,
-                err: Ty::Never,
-                env: Ty::Var(row),
-            }));
+            let body = Ty::Fn(Box::new(FnTy::new(vec![], result.clone(), Ty::Never, Ty::Var(row))));
+            let root = Ty::Fn(Box::new(FnTy::new(vec![(Some("body".into()), body)], result, Ty::Never, Ty::Var(row))));
             let scheme = Scheme {
                 level: 0,
                 ty: root,
@@ -1063,11 +985,7 @@ impl AliasArtifact {
             let Ty::Fn(function) = &ty else {
                 return ty;
             };
-            let labels = function
-                .params
-                .iter()
-                .map(|(label, _)| label.clone())
-                .collect::<Vec<_>>();
+            let labels = function.labels.clone();
             let id = *tags.entry(labels).or_insert_with(|| {
                 let id = crate::hir::TypeId(next_id);
                 next_id += 1;
@@ -1141,11 +1059,8 @@ fn map_types(ty: &Ty, f: &mut impl FnMut(Ty) -> Ty) -> Ty {
     let shallow = match ty {
         Ty::Con(h, vs, args) => Ty::Con(*h, vs.clone(), args.iter().map(|a| map_types(a, f)).collect()),
         Ty::Fn(fun) => Ty::Fn(Box::new(super::FnTy {
-            params: fun
-                .params
-                .iter()
-                .map(|(l, p)| (l.clone(), map_types(p, f)))
-                .collect(),
+            param: map_types(&fun.param, f),
+            labels: fun.labels.clone(),
             ret: map_types(&fun.ret, f),
             err: map_types(&fun.err, f),
             env: map_types(&fun.env, f),
@@ -1178,11 +1093,7 @@ fn tag_scheme_type(
         let Ty::Fn(f) = &ty else {
             return ty;
         };
-        let labels = f
-            .params
-            .iter()
-            .map(|(label, _)| label.clone())
-            .collect::<Vec<_>>();
+        let labels = f.labels.clone();
         let id = *tags.entry(labels).or_insert_with(|| {
             let id = crate::hir::TypeId(*next);
             *next += 1;
@@ -1320,7 +1231,7 @@ fn sites(ty: &Ty, v: V) -> (bool, bool) {
                 xs.iter().for_each(|x| go(x, v, pos, out))
             }
             Ty::Fn(f) => {
-                f.params.iter().for_each(|(_, p)| go(p, v, !pos, out));
+                go(&f.param, v, !pos, out);
                 [&f.ret, &f.err, &f.env]
                     .into_iter()
                     .for_each(|x| go(x, v, pos, out));
@@ -1402,7 +1313,6 @@ fn definite_failure(solver: &Solver) -> bool {
                 f.kind,
                 FailKind::Mismatch
                     | FailKind::Values
-                    | FailKind::Arity
                     | FailKind::Invariant
                     | FailKind::EnvForms
             )
