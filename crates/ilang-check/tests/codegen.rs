@@ -29,19 +29,10 @@ Watch = Clock
 name = (p: Cat | Dog) { p.name }
 second = (t: (Int, String)) { t.1 }
 minus = (a: Int, b: Int) { a - b }
-by_label = Cat(name: "a", lives: 9)
+by_label = Cat(name = "a", lives = 9)
 piped = 5 |> minus(1)
-tests = (x) {
-   x |> {
-    _: Int | String -> 1
-    _: { (Int, Int) } -> 2
-    _ -> 3
-  }
-}
-env = (c ! Watch) {
-  ! Clock = c
-  c.now()
-}
+tests = (x) { x |> (_: Int | String) { 1 } | (_: (Int, Int)) { 2 } | (_) { 3 } }
+env = () <- (c: Watch) { c.now() <- (c) }
 mono = minus(1, 2)
 age = (Cat(name = name, lives = l)) { l }
 first = (r) {
@@ -106,7 +97,7 @@ fn codegen_data() {
     assert_eq!(by_text(&typed.access, m, "t.1"), &Access::Part(1));
     // The argument that goes to each parameter.
     assert_eq!(
-        by_text(&typed.args, m, "Cat(name: \"a\", lives: 9)"),
+        by_text(&typed.args, m, "Cat(name = \"a\", lives = 9)"),
         &vec![1, 0]
     );
     assert_eq!(by_text(&typed.args, m, "5 |> minus(1)"), &vec![0, 1]);
