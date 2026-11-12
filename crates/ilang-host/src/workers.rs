@@ -436,6 +436,9 @@ impl Pool {
                         );
                         state.started[index] += 1;
                         state.live[index] += 1;
+                        if std::env::var_os("I_WORKERS_TRACE").is_some() {
+                            eprintln!("i: worker {index} started a task");
+                        }
                         Some(Job::Begin(id, record.bytes))
                     } else {
                         None
