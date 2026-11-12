@@ -218,11 +218,9 @@ fn recursive_types_still_fail() {
     // rather than the tautology N <: N | S(N) (§4.5 rule 2).
     for source in [
         "bad = (x) { x(x) }",
-        "S(N) = (() <- N -> Nil, (N) -> Nil)
-bad = <N>() <- (s: S(N)) -> Nil {
-	S(f, _) = s
-	f()
-}",
+        // The old case `bad(N) = (s ! S(N)) -> Nil ! N { … f() }` (the whole
+        // environment is exactly N) needs `..env: N` in the service pattern,
+        // which waits for stage E6 of syntax three; it is left out until then.
         "S(N) = (() <- N -> Nil, (N) -> Nil)
 use = <N>() <- (s: S(N)) {
 	S(f, _) = s
