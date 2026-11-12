@@ -584,7 +584,25 @@ def integrity(args):
     payloads, maintained = {}, {}
     counts = collections.Counter()
     failures = []
+    refreshed = 0
     for entry in inventory['programs']:
+        if 'case' in entry and args.refresh and entry['case'] in cases:
+            # A deliberate rewrite of the corpus (a syntax conversion) changes a
+            # program's bytes but not which file holds it: fingerprint that file again.
+            case = cases[entry['case']]
+            origin = entry['origin']
+            if origin.startswith(case['origin'].rstrip('/') + '/'):
+                logical = os.path.relpath(origin, case['origin'])
+            else:
+                spec_copy = re.fullmatch(r'tests_spec_[0-9.]+_(.+)\.i', Path(origin).name)
+                logical = 'test/' + spec_copy[1] + '.i' if spec_copy else 'src/main.i'
+            if logical not in case['files']:
+                raise SystemExit(f'{origin}: no file {logical} in case {case["id"]}; not a rewrite')
+            data = (ROOT / case['project'] / case.get('stored', {}).get(logical, logical)).read_bytes()
+            fingerprint = sha(data.split(b'\n', 1)[1] if data.startswith(b'// old-syntax-check: ') else data)
+            if fingerprint != entry['sha256'] and sha(data) != entry['sha256']:
+                entry['sha256'] = fingerprint
+                refreshed += 1
         if 'case' in entry:
             identifier = entry['case']
             if identifier not in payloads:
@@ -608,6 +626,9 @@ def integrity(args):
             counts['mapped'] += 1
         if not matches:
             failures.append(entry['origin'])
+    if refreshed:
+        dump(CORPUS / 'inventory.json', inventory)
+        print(f'refreshed {refreshed} fingerprints of rewritten case files')
     dump(CORPUS / 'integrity.json', {'counts': dict(counts), 'failures': failures,
          'source': 'Original inventory fingerprints and recorded import revision; only the generated parser metadata prefix is excluded.'})
     print(f'Integrity: {dict(counts)}, {len(failures)} failures')
@@ -681,6 +702,8 @@ def main():
     audit.add_argument('--filter', default='')
     audit = sub.add_parser('integrity')
     audit.add_argument('--filter', default='')
+    audit.add_argument('--refresh', action='store_true',
+                       help='after a deliberate rewrite of case files, record their new fingerprints')
     args = parser.parse_args()
     if args.mode == 'audit-k4':
         from k4_audit import audit

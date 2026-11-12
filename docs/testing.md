@@ -90,6 +90,9 @@ the review programs; review drivers, logs and compiler snapshots stay in git
 history. Reimporting is a recovery tool, not part of normal CI.
 `UPDATE=1 scripts/review-corpus integrity` verifies every preserved source
 fingerprint and every link to the recorded maintained revision without `/tmp`.
+After a deliberate rewrite of the case files (a syntax conversion), `--refresh`
+records the new fingerprint of each rewritten file; it fails if a program no
+longer has its file.
 
 Measure checker workloads separately from the runtime `scripts/bench`:
 
