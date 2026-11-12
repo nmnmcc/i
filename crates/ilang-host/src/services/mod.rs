@@ -1,7 +1,7 @@
-//! Host services that come with the host (spec §9.7, §10.1).
+//! Host services that come with the host.
 //!
 //! - [`standard`] is what `i run` and `i test` give every program: the
-//!   standard service of spec §9.7, `Io` of the library module `i/io`,
+//!   standard service `Io` of the library module `i/io`,
 //!   which a program imports like this:
 //!
 //!   ```text
@@ -10,15 +10,14 @@
 //!
 //!   `print` writes the text and a line feed. Another embedder gives it like
 //!   any host service, for example with this function.
-//! - [`testing`] is what the spec suite gives: services and external
+//! - [`testing`] is what the conformance tests give: services and external
 //!   functions under `test:` namespaces, which keep a [`Log`].
 //!
-//! A host gives only the functions that the metadata of a program lists
-//! (B.6), so a program that does not declare a service does not need it. To
+//! A host gives only the functions that the metadata of a program lists, so a program that does not declare a service does not need it. To
 //! put a fake in the place of a host service in a test, i code uses an
-//! environment statement (§9.7); a Rust host gives its own [`HostImports`].
+//! environment statement; a Rust host gives its own [`HostImports`].
 //!
-//! Rules for the services written here (B.4):
+//! Rules for the services written here:
 //!
 //! - The start closure of an async service runs during the import, and its
 //!   future is first polled when the host waits. So work out anything that
@@ -100,7 +99,7 @@ pub fn stdout_with_args(args: Vec<String>) -> HostImports {
 /// What the services of [`testing`] were given, in order.
 pub type Log = Arc<Mutex<Vec<String>>>;
 
-/// The services and external functions of the spec suite:
+/// The services and external functions of the conformance tests:
 ///
 /// | Namespace | Function | |
 /// |---|---|---|

@@ -1,4 +1,4 @@
-//! The rules of `i.toml` (§2.6) and of locations and versions.
+//! The rules of `i.toml` and of locations and versions.
 
 use ilang_package::code;
 use ilang_package::manifest::{
@@ -149,7 +149,7 @@ fn wasm_exports() {
     assert_eq!(w(r#"["app/math.Add"]"#), [code::WASM_EXPORT]);
 }
 
-/// §2.6, §10.2: the `[dev-dependencies]` and `[wasm]` of a package that is
+/// The `[dev-dependencies]` and `[wasm]` of a package that is
 /// not compiled are not used, so their shapes give no errors.
 #[test]
 fn dependency_manifest_ignores_dev_dependencies_and_wasm() {
@@ -262,7 +262,7 @@ fn versions() {
 
 #[test]
 fn former_keywords_are_package_and_dependency_names() {
-    // Spec §1.4 and A3: these words are ordinary names everywhere.
+    // These words are not keywords: they are ordinary names everywhere.
     for word in ["import", "export", "case", "if"] {
         assert!(ilang_package::is_name(word));
         assert!(codes(&format!("name = \"{word}\"\n")).is_empty());

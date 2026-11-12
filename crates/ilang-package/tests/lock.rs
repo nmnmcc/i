@@ -1,4 +1,4 @@
-//! The lock file and the hash of a package (§2.8).
+//! The lock file and the hash of a package.
 
 use ilang_package::lock::{FileKind, Lock, LockLine, PackageFile, hash};
 use ilang_package::manifest::parse_version;

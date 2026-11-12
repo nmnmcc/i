@@ -5,5 +5,5 @@ long = (xs) {
 }
 
 compare = () {
-  assert([1, 2, 3] |> set.from_list |> set.to_list |> list.sort(by: int.compare) |> list.reverse == [3, 2, 1])
+  assert({ [1, 2, 3] |> set.from_list |> set.to_list |> list.sort(by: int.compare) |> list.reverse } == [3, 2, 1])
 }

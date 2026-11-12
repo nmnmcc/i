@@ -260,9 +260,12 @@ test("slice_length_too_long_test", () {
 
 test("slice_chained_test", () {
 	assert(
-		bit_array.from_string("ab")
-			|> bit_array.slice(1, 1)
-			|> result.then((b) { bit_array.slice(b, 0, 1) }) == Ok(<<"b":utf8>>)
+		{
+			bit_array.from_string("ab")
+				|> bit_array.slice(1, 1)
+				|> result.then((b) { bit_array.slice(b, 0, 1) })
+		} ==
+			Ok(<<"b":utf8>>)
 	)
 	Nil
 })
@@ -374,12 +377,12 @@ test("base64_encode_empty_test", () {
 
 test("base64_encode_large_test", () {
 	assert(
-		string.repeat("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1024 * 32)
-			|> bit_array.from_string
-			|> bit_array.base64_encode(True) == string.repeat(
-				"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB"
-				1024 * 32
-			)
+		{
+			string.repeat("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1024 * 32)
+				|> bit_array.from_string
+				|> bit_array.base64_encode(True)
+		} ==
+			string.repeat("QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB", 1024 * 32)
 	)
 	Nil
 })

@@ -22,6 +22,7 @@ use super::lits::ValueSet;
 use super::solve::Solver;
 use super::{Head, Ty, V};
 use crate::hir::*;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 /// A literal pattern, a string prefix, or a bit array pattern. Each matches
 /// some values of a head with no finite signature.
@@ -172,7 +173,7 @@ pub(crate) enum Col {
     Ty(Ty, Mode),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Mode {
     Pos,
     Up,
@@ -273,103 +274,353 @@ impl Vals {
     }
 }
 
-/// The values of a type.
-///
-/// In `Pos` mode, the values of a type variable are those of its lower
-/// bounds, and of the variables that have it as an upper bound: the values
-/// that come to it in the constraints. A variable whose
-/// values may also come from outside (an input: a parameter, a written type
-/// variable, the result of a function that is not known) also has every
-/// value that its upper bounds allow (`Up` mode): every value that comes to
-/// it is a subtype of them, and with no bound with a head, it may be any
-/// value (§7.3).
-fn values(s: &Solver, t: &Ty, mode: Mode, seen: &mut Vec<(V, Mode)>) -> Vals {
+/// Values of variables, each with the variables that its search reached.
+type Found<R> = HashMap<(V, Mode), (Vals, R)>;
+
+/// What the searches of `values` found that holds as long as the bounds of
+/// the variables stay as they are. One match makes many searches over the
+/// same variables.
+#[derive(Default)]
+pub(crate) struct Searches {
+    /// The bounds the results were found with: the solver's variables, their
+    /// number, and the numbers of bounds added and of rewrites.
+    stamp: (usize, usize, usize, u64),
+    /// For each variable and mode looked at, the variables that its search
+    /// reaches, or `None` when the search is not closed.
+    regions: HashMap<(V, Mode), Option<HashSet<V>>>,
+    /// The values of the variables whose search is closed, with the
+    /// variables that it reached.
+    memo: Found<Vec<(V, Mode)>>,
+    /// The values of the variables whose search did not depend on its path,
+    /// with the variables it reached: they hold wherever none of those is on
+    /// the path.
+    done: Found<HashSet<(V, Mode)>>,
+}
+
+/// One search of `values`: the variables being looked at.
+struct Walk<'s> {
+    s: &'s Solver,
+    found: &'s mut Searches,
+    seen: Vec<(V, Mode)>,
+    /// The number of times the search depended on its path: it met a
+    /// variable of the path again.
+    cuts: u64,
+    /// The variables reached, in order.
+    trail: Vec<(V, Mode)>,
+}
+
+/// The values of a type; see [`Walk::values`].
+fn values(s: &Solver, t: &Ty, mode: Mode, found: &mut Searches) -> Vals {
+    let stamp = (
+        s.vars.as_ptr() as usize,
+        s.vars.len(),
+        s.touched.len(),
+        s.rewrites,
+    );
+    if found.stamp != stamp {
+        *found = Searches {
+            stamp,
+            ..Searches::default()
+        };
+    }
+    Walk {
+        s,
+        found,
+        seen: Vec::new(),
+        cuts: 0,
+        trail: Vec::new(),
+    }
+    .values(t, mode)
+}
+
+/// The variables whose values the values of `t` come from.
+fn searched_vars(t: &Ty, out: &mut Vec<V>) {
     match t {
-        Ty::Graph(g) => {
-            if g.record_only() {
-                Vals {
-                    heads: vec![(Head::Record, ValueSet::ALL, Vec::new(), mode)],
-                    other: false,
+        Ty::Var(v) => out.push(*v),
+        Ty::Graph(g) if !g.record_only() => {
+            searched_vars(&g.view().expect("non-record graph step"), out)
+        }
+        Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|m| searched_vars(m, out)),
+        Ty::Diff(a, _) => searched_vars(a, out),
+        Ty::Graph(_) | Ty::Con(..) | Ty::Fn(_) | Ty::Never | Ty::Top | Ty::Both(..) => {}
+    }
+}
+
+impl Walk<'_> {
+    /// The values of `t`.
+    ///
+    /// In `Pos` mode, the values of a type variable are those of its lower
+    /// bounds, and of the variables that have it as an upper bound: the values
+    /// that come to it in the constraints. A variable whose
+    /// values may also come from outside (an input: a parameter, a written type
+    /// variable, the result of a function that is not known) also has every
+    /// value that its upper bounds allow (`Up` mode): every value that comes to
+    /// it is a subtype of them, and with no bound with a head, it may be any
+    /// value (§7.3).
+    ///
+    /// A variable met again on the path of the search adds nothing: no values
+    /// in `Pos` mode, and no restriction in `Up` mode.
+    fn values(&mut self, t: &Ty, mode: Mode) -> Vals {
+        match t {
+            Ty::Graph(g) => {
+                if g.record_only() {
+                    Vals {
+                        heads: vec![(Head::Record, ValueSet::ALL, Vec::new(), mode)],
+                        other: false,
+                    }
+                } else {
+                    self.values(&g.view().expect("non-record graph step"), mode)
                 }
-            } else {
-                values(s, &g.view().expect("non-record graph step"), mode, seen)
+            }
+            Ty::Var(v) => {
+                if self.seen.contains(&(*v, mode)) {
+                    self.cuts += 1;
+                    return match mode {
+                        Mode::Pos => Vals::default(),
+                        Mode::Up => Vals::any(),
+                    };
+                }
+                if let Some((vals, reached)) = self.found.done.get(&(*v, mode))
+                    && !self.seen.iter().any(|x| reached.contains(x))
+                {
+                    let vals = vals.clone();
+                    self.trail.extend(reached.iter().copied());
+                    return vals;
+                }
+                if self.closed(*v, mode) {
+                    return self.closed_values(*v, mode);
+                }
+                let (cuts, start) = (self.cuts, self.trail.len());
+                self.trail.push((*v, mode));
+                self.seen.push((*v, mode));
+                let out = self.bounds(*v, mode, &mut |w, t, mode| w.values(t, mode));
+                self.seen.pop();
+                if self.cuts == cuts {
+                    // No variable of the path was met again: the values do
+                    // not depend on the path, only on the variables reached
+                    // not being on it.
+                    let reached = self.trail[start..].iter().copied().collect();
+                    self.found.done.insert((*v, mode), (out.clone(), reached));
+                }
+                out
+            }
+            Ty::Con(h, set, args) => Vals {
+                heads: vec![(*h, set.clone(), args.clone(), mode)],
+                other: false,
+            },
+            // The parameter types stand for the arguments of the head: only
+            // their number is used.
+            Ty::Fn(f) => Vals {
+                heads: vec![(
+                    Head::Fn,
+                    ValueSet::ALL,
+                    f.params.iter().map(|p| p.1.clone()).collect(),
+                    mode,
+                )],
+                other: false,
+            },
+            Ty::Union(ms) => ms
+                .iter()
+                .fold(Vals::default(), |acc, m| acc.union(self.values(m, mode))),
+            Ty::Inter(ms) => ms
+                .iter()
+                .fold(Vals::any(), |acc, m| acc.inter(self.values(m, mode))),
+            Ty::Diff(a, h) => {
+                let mut v = self.values(a, mode);
+                for excluded in h {
+                    v.heads = v
+                        .heads
+                        .into_iter()
+                        .filter_map(|(head, set, args, mode)| {
+                            if excluded.head() != Some(head) {
+                                Some((head, set, args, mode))
+                            } else {
+                                set.minus(excluded.values())
+                                    .map(|set| (head, set, args, mode))
+                            }
+                        })
+                        .collect();
+                }
+                v
+            }
+            Ty::Never => Vals::default(),
+            Ty::Top | Ty::Both(..) => Vals::any(),
+        }
+    }
+
+    /// The values of the variable `v` from its bounds, each bound's values
+    /// found by `part`.
+    fn bounds(
+        &mut self,
+        v: V,
+        mode: Mode,
+        part: &mut dyn FnMut(&mut Self, &Ty, Mode) -> Vals,
+    ) -> Vals {
+        let st = &self.s.vars[v.0 as usize];
+        match mode {
+            Mode::Pos => {
+                let mut acc = Vals::default();
+                for l in st.lower.clone() {
+                    acc = acc.union(part(self, &l, Mode::Pos));
+                }
+                for w in st.from.clone() {
+                    acc = acc.union(part(self, &Ty::Var(w), Mode::Pos));
+                }
+                if st.input {
+                    // `Up` mode never comes back to `Pos` mode, so the
+                    // variables on the path of the search do not matter.
+                    acc = acc.union(self.values(&Ty::Var(v), Mode::Up));
+                }
+                acc
+            }
+            Mode::Up => {
+                let mut acc = Vals::any();
+                for u in st.upper.clone() {
+                    acc = acc.inter(part(self, &u, Mode::Up));
+                }
+                acc
             }
         }
-        Ty::Var(v) => {
-            if seen.contains(&(*v, mode)) {
-                return match mode {
-                    Mode::Pos => Vals::default(),
-                    Mode::Up => Vals::any(),
-                };
+    }
+
+    /// Whether the search from `v` is closed and meets no variable on the
+    /// path of the search. A search is closed when, from variable to
+    /// variable, it only goes through the operation of its mode (union in
+    /// `Pos` mode, intersection in `Up` mode), and every other part of a
+    /// bound (such as a union in `Up` mode) leads to a search that never
+    /// comes back to those variables. Then a variable met again adds
+    /// nothing that it did not add the first time: the values are those of
+    /// every bound reached, put together in the order they are first
+    /// reached, whatever the paths. Without this, a dense graph of variables
+    /// (a recursive match over many constructors) would be searched along
+    /// each of its paths, whose number is exponential.
+    fn closed(&mut self, v: V, mode: Mode) -> bool {
+        if !self.found.regions.contains_key(&(v, mode)) {
+            let region = self.region(v, mode);
+            self.found.regions.insert((v, mode), region);
+        }
+        match &self.found.regions[&(v, mode)] {
+            Some(region) => {
+                let free = !self
+                    .seen
+                    .iter()
+                    .any(|(x, m)| *m == mode && region.contains(x));
+                // Whether the search is closed here depends on the path.
+                self.cuts += u64::from(!free);
+                free
             }
-            seen.push((*v, mode));
-            let st = &s.vars[v.0 as usize];
-            let out = match mode {
-                Mode::Pos => {
-                    let mut acc = Vals::default();
-                    for l in st.lower.clone() {
-                        acc = acc.union(values(s, &l, Mode::Pos, seen));
-                    }
-                    for w in st.from.clone() {
-                        acc = acc.union(values(s, &Ty::Var(w), Mode::Pos, seen));
-                    }
-                    if st.input {
-                        acc = acc.union(values(s, t, Mode::Up, seen));
-                    }
-                    acc
-                }
-                Mode::Up => {
-                    let mut acc = Vals::any();
-                    for u in st.upper.clone() {
-                        acc = acc.inter(values(s, &u, Mode::Up, seen));
-                    }
-                    acc
-                }
+            None => false,
+        }
+    }
+
+    /// Every variable that the search from `v` reaches, when it is closed.
+    fn region(&self, v: V, mode: Mode) -> Option<HashSet<V>> {
+        let mut region = HashSet::default();
+        let mut todo = vec![v];
+        let mut parts = Vec::new();
+        while let Some(x) = todo.pop() {
+            if !region.insert(x) {
+                continue;
+            }
+            let st = &self.s.vars[x.0 as usize];
+            let bounds = match mode {
+                Mode::Pos => &st.lower,
+                Mode::Up => &st.upper,
             };
-            seen.pop();
-            out
-        }
-        Ty::Con(h, set, args) => Vals {
-            heads: vec![(*h, set.clone(), args.clone(), mode)],
-            other: false,
-        },
-        // The parameter types stand for the arguments of the head: only
-        // their number is used.
-        Ty::Fn(f) => Vals {
-            heads: vec![(
-                Head::Fn,
-                ValueSet::ALL,
-                f.params.iter().map(|p| p.1.clone()).collect(),
-                mode,
-            )],
-            other: false,
-        },
-        Ty::Union(ms) => ms.iter().fold(Vals::default(), |acc, m| {
-            acc.union(values(s, m, mode, seen))
-        }),
-        Ty::Inter(ms) => ms
-            .iter()
-            .fold(Vals::any(), |acc, m| acc.inter(values(s, m, mode, seen))),
-        Ty::Diff(a, h) => {
-            let mut v = values(s, a, mode, seen);
-            for excluded in h {
-                v.heads = v
-                    .heads
-                    .into_iter()
-                    .filter_map(|(head, set, args, mode)| {
-                        if excluded.head() != Some(head) {
-                            Some((head, set, args, mode))
-                        } else {
-                            set.minus(excluded.values())
-                                .map(|set| (head, set, args, mode))
-                        }
-                    })
-                    .collect();
+            for b in bounds {
+                self.closed_part(b, mode, &mut todo, &mut parts);
             }
-            v
+            if mode == Mode::Pos {
+                todo.extend(st.from.iter().copied());
+            }
         }
-        Ty::Never => Vals::default(),
-        Ty::Top | Ty::Both(..) => Vals::any(),
+        // The searches of the other parts, which must not come back.
+        let mut reached = HashSet::default();
+        while let Some(x) = parts.pop() {
+            if region.contains(&x) {
+                return None;
+            }
+            if !reached.insert(x) {
+                continue;
+            }
+            let st = &self.s.vars[x.0 as usize];
+            let bounds = match mode {
+                Mode::Pos => &st.lower,
+                Mode::Up => &st.upper,
+            };
+            for b in bounds {
+                searched_vars(b, &mut parts);
+            }
+            if mode == Mode::Pos {
+                parts.extend(st.from.iter().copied());
+            }
+        }
+        region.extend(reached);
+        Some(region)
+    }
+
+    /// Adds the variables of a bound that the search goes to through the
+    /// operation of its mode to `todo`, and the others to `parts`.
+    fn closed_part(&self, t: &Ty, mode: Mode, todo: &mut Vec<V>, parts: &mut Vec<V>) {
+        match t {
+            Ty::Var(v) => todo.push(*v),
+            Ty::Graph(g) if !g.record_only() => {
+                self.closed_part(&g.view().expect("non-record graph step"), mode, todo, parts)
+            }
+            Ty::Union(ms) if mode == Mode::Pos => ms
+                .iter()
+                .for_each(|m| self.closed_part(m, mode, todo, parts)),
+            Ty::Inter(ms) if mode == Mode::Up => ms
+                .iter()
+                .for_each(|m| self.closed_part(m, mode, todo, parts)),
+            t => searched_vars(t, parts),
+        }
+    }
+
+    /// The values of `v` when its search is closed: each variable reached is
+    /// looked at once.
+    fn closed_values(&mut self, v: V, mode: Mode) -> Vals {
+        if let Some((vals, reached)) = self.found.memo.get(&(v, mode)) {
+            let vals = vals.clone();
+            self.trail.extend(reached.iter().copied());
+            return vals;
+        }
+        let start = self.trail.len();
+        let region = self.found.regions[&(v, mode)]
+            .as_ref()
+            .expect("closed search");
+        self.trail.extend(region.iter().map(|x| (*x, mode)));
+        let mut visited = HashSet::default();
+        let out = self.closed_var(v, mode, &mut visited);
+        let reached = self.trail[start..].to_vec();
+        self.found.memo.insert((v, mode), (out.clone(), reached));
+        out
+    }
+
+    fn closed_var(&mut self, v: V, mode: Mode, visited: &mut HashSet<V>) -> Vals {
+        if !visited.insert(v) {
+            return match mode {
+                Mode::Pos => Vals::default(),
+                Mode::Up => Vals::any(),
+            };
+        }
+        self.bounds(v, mode, &mut |w, t, mode| w.closed_ty(t, mode, visited))
+    }
+
+    fn closed_ty(&mut self, t: &Ty, mode: Mode, visited: &mut HashSet<V>) -> Vals {
+        match t {
+            Ty::Var(v) => self.closed_var(*v, mode, visited),
+            Ty::Graph(g) if !g.record_only() => {
+                self.closed_ty(&g.view().expect("non-record graph step"), mode, visited)
+            }
+            Ty::Union(ms) if mode == Mode::Pos => ms.iter().fold(Vals::default(), |acc, m| {
+                acc.union(self.closed_ty(m, mode, visited))
+            }),
+            Ty::Inter(ms) if mode == Mode::Up => ms.iter().fold(Vals::any(), |acc, m| {
+                acc.inter(self.closed_ty(m, mode, visited))
+            }),
+            t => self.values(t, mode),
+        }
     }
 }
 
@@ -778,10 +1029,18 @@ impl Checker<'_> {
         Some(w)
     }
 
+    /// Whether the values of `t` are known and some have a head other than
+    /// `h`, and whether then none has `h`.
+    pub(crate) fn made_by_others(&self, t: &Ty, h: Head) -> (bool, bool) {
+        let vals = self.col_values(&Col::of(t.clone()));
+        let others = !vals.other && vals.heads.iter().any(|x| x.0 != h);
+        (others, others && !vals.has(h))
+    }
+
     fn col_values(&self, col: &Col) -> Vals {
         match col {
             Col::Any => Vals::any(),
-            Col::Ty(t, mode) => values(&self.s, t, *mode, &mut Vec::new()),
+            Col::Ty(t, mode) => values(&self.s, t, *mode, &mut self.coverage.borrow_mut()),
         }
     }
 

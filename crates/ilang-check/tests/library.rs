@@ -224,6 +224,11 @@ fn library_names() {
         (
             "i/net",
             &[
+                "bind",
+                "send_to",
+                "receive_from",
+                "local_address",
+                "close_datagram",
                 "listen",
                 "local_port",
                 "accept",

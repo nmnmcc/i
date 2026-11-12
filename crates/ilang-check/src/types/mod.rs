@@ -30,7 +30,9 @@ mod records;
 mod scheme_wire;
 mod shown;
 mod solve;
+mod typed_macro;
 mod value_types;
+pub use typed_macro::{MacroTruth, TypedMacroQuery};
 
 pub use lits::{LitValue, TestValues};
 pub use records::ShownGraph;
@@ -409,6 +411,7 @@ pub enum NumericFact {
 /// node in the HIR, which is unique among the nodes of one kind.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
+    pub typed_expansions: HashMap<(ModuleId, Span), crate::typed_macro::Output>,
     /// Numeric expression facts, frozen after completion and deferred checks.
     pub numeric: HashMap<(ModuleId, Span), NumericFact>,
     /// Parameter-pattern facts from the same completed inference lifecycle.
@@ -670,7 +673,7 @@ pub fn type_names(program: &Program, module: ModuleId) -> Vec<String> {
 /// Infers the type of every binding of the program, and reports the type
 /// errors.
 pub fn check(program: &Program, sources: &Sources) -> (Typed, Vec<Diagnostic>) {
-    infer::Checker::new(program, sources).run()
+    check_selected(program, sources, &[])
 }
 
 pub fn check_selected(
@@ -678,7 +681,13 @@ pub fn check_selected(
     sources: &Sources,
     selected: &[(DefId, bool)],
 ) -> (Typed, Vec<Diagnostic>) {
-    infer::Checker::new(program, sources).run_selected(selected)
+    if !program.typed_originals.is_empty() {
+        let mut original = program.clone();
+        crate::typed_macro::restore(&mut original);
+        infer::Checker::new(&original, sources).run_selected(selected)
+    } else {
+        infer::Checker::new(program, sources).run_selected(selected)
+    }
 }
 
 /// `check`, keeping the types of the local names in `Typed::locals`.
