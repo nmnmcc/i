@@ -2951,5 +2951,56 @@
   },
   "crates/ilang-cli/tests/numeric_lowering.rs:e47b61baf95042a0": {
     "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
+  },
+  "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
+    "not_source": "Rust format template with a clause placeholder, not a complete i source"
+  },
+  "crates/ilang-check/tests/query.rs:14b48e90364d1623": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/src/server/features.rs:d942f64886578d87": {
+    "not_source": "Code action fix tag, not i source"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d942f64886578d87": {
+    "not_source": "Code action fix tag, not i source"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d2ca964c413f21c8": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:40ccea3ebc617547": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:6108f6cf17bc9fe1": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:c9130ec0e015aa50": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:5d670fc264ba0466": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:274887ecbb44aa02": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:9fa8dccc56811613": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:1418cff66c7679a7": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:02f4d82a1d1b5450": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:2b1965c1b03ffba2": {
+    "reason": "Robustness test: broken input on purpose",
+    "diagnostics": [
+      "E0010: `{` is not closed",
+      "E0010: `(` is not closed",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0010: `{` is not closed",
+      "E0101: expected a closed `{`, found `{`",
+      "E0010: `(` is not closed",
+      "E0002: this string is not closed"
+    ]
   }
 }
