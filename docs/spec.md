@@ -2785,7 +2785,7 @@ Export types Scheduler, Runner, Group(E), Task(A,E), Channel(A), Event(A,E,N),
 Shared(A), Ref(A), and ScheduleError; export only ScheduleError's constructors. The
 other constructors and scheduler protocol are private ordinary labelled types,
 not opaque types. Group, Task, Channel, Shared, and Ref contain invariant keys;
-their parameters are therefore invariant. Event's answer/error/environment
+their parameters are therefore invariant. Event's answer/error/need
 parameters are covariant. In `Event(A, E, N)`, `E` is the type of the errors that syncing raises through `Fail` and `N` is a row variable for the other services it needs; `Never` in that place means no service: its private representation keeps typed decoding
 functions, rather than Key(A) in an output field. A public Event can hold user
 mapping functions and the local handles of its leaves. Such contents affect
