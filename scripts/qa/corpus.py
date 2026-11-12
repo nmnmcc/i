@@ -11,7 +11,6 @@ import runpy
 import shutil
 import signal
 import math
-import resource
 import subprocess
 import tempfile
 import time
@@ -215,13 +214,13 @@ def invoke(binary, project, command, bound):
     started = time.monotonic()
     env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1')
     cpu = max(1, math.ceil(bound))
-    def limit():
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
-    with subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, preexec_fn=limit) as process:
+    # `prlimit` sets the limit in the child; `preexec_fn` is not safe with the runner's threads.
+    argv = ['prlimit', f'--cpu={cpu}:{cpu + 1}', '--', *argv]
+    with subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True) as process:
         try:
             stdout, stderr = process.communicate(timeout=max(30, 6 * bound))
             code = process.returncode
-            if code in (-signal.SIGXCPU, -signal.SIGKILL):
+            if code == -signal.SIGXCPU:
                 code = 'timeout'
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
