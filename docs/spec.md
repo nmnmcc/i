@@ -515,12 +515,48 @@ A top-level binding has the same rules as a binding in a block (§6.10). Only th
 
 **Order.** Working out a direct value (§6.10) runs no code, so it only reads the names outside the function bodies in it. Working out any other value may call every function it can get to, so it may read every name in it, also inside function bodies. From this:
 
+<!-- syn3-old -->
+
 - The **full needs** of a binding are all the top-level names of this module in its value, also inside function bodies, and the full needs of their bindings.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- The **full dependencies** of a binding are all the top-level names of this module in its value, also inside function bodies, and the full dependencies of their bindings.
+
+<!-- /syn3-new -->
+<!-- syn3-old -->
+
 - The **needs** of a binding with a direct value are the top-level names of this module outside the function bodies in its value, and the needs of their bindings. The needs of any other binding are its full needs.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- The **dependencies** of a binding with a direct value are the top-level names of this module outside the function bodies in its value, and the dependencies of their bindings. The dependencies of any other binding are its full dependencies.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
 
 A binding may not be among its own needs. If it is, it is a compile error: `x = [x]` and `x = f()`, where the body of `f` uses `x`, are compile errors, but `f = (n) { f(n - 1) }` is not. The values are worked out one at a time, with a module after the modules it imports. In a module, the next value worked out is always the first binding, in the order of the source, whose needs are all worked out, as in Go. So in `a = (1, z)  y = p("y")  z = p("z")`, the order is `y`, `z`, `a`.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+A binding may not be among its own dependencies. If it is, it is a compile error: `x = [x]` and `x = f()`, where the body of `f` uses `x`, are compile errors, but `f = (n) { f(n - 1) }` is not. The values are worked out one at a time, with a module after the modules it imports. In a module, the next value worked out is always the first binding, in the order of the source, whose dependencies are all worked out, as in Go. So in `a = (1, z)  y = p("y")  z = p("z")`, the order is `y`, `z`, `a`.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 **Type dependencies.** A type may name a value (§3). This does not work out that value or add it to runtime needs or full needs. It only orders type inference: a binding whose annotations use the type of a value of its module, directly or through aliases, is typed after that value's group (§4.7). A type dependency within one group, including on itself, or a cycle between groups is a compile error. The message gives the chain of dependencies.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+**Type dependencies.** A type may name a value (§3). This does not work out that value or add it to dependencies or full dependencies. It only orders type inference: a binding whose annotations use the type of a value of its module, directly or through aliases, is typed after that value's group (§4.7). A type dependency within one group, including on itself, or a cycle between groups is a compile error. The message gives the chain of dependencies.
+
+<!-- /syn3-new -->
 
 ### 2.6 The package file
 
@@ -4785,7 +4821,7 @@ A type variable of the snapshot is given as an `Up` node with a scope of its own
 
 The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` gives fixed numbers there. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
 
-A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full needs (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
+A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full dependencies (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
 
 An error in expanded code is reported at the span of the code; code from a template is reported at the macro call, with the template as a note. Warnings are given only for code whose span is in the module being compiled.
 
@@ -5001,7 +5037,16 @@ Js service; a custom outgoing converter cannot change an export's ABI.
 `i build --target wasi` makes the module a WASI preview 1 command, which a WASI host such as `wasmtime run` or Node's `node:wasi` runs with no other step. It is the module of §B.1 to §B.6 with these changes:
 
 - It imports `fd_write` and `proc_exit` from `wasi_snapshot_preview1`, and not `panic` from `ilang:host/v1`. The stop message (§11.7) and a line feed are written to file descriptor 2, then the process ends with exit code 1. `reference_id` is imported from `ilang:host/v1` only when a type of an import or export is a custom type with no constructors, because only the host can make such a value.
+<!-- syn3-old -->
+
 - The target's ordinary Io provider writes UTF-8 text plus LF to file descriptor 1 through the checked Wasi adapter (§B.7.1). Positive short writes are retried; zero progress or errors give up that write; print gives `Nil`. It attempts the text first, then LF even if writing the text gave up, and frees buffers on every returning path. It is absent from required-import metadata because it is internally provided. Another host service with the namespace `i:io/v1` is an import like any other.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- The platform's `Io` writes UTF-8 text plus LF to file descriptor 1 through the checked Wasi adapter (§B.7.1). Positive short writes are retried; zero progress or errors give up that write; print gives `Nil`. It attempts the text first, then LF even if writing the text gave up, and frees buffers on every returning path. It is absent from required-import metadata because it is internally provided. Another host service with the namespace `i:io/v1` is an import like any other.
+
+<!-- /syn3-new -->
 - Because the runtime imports `fd_write` and `proc_exit`, an import (§B.4) with the import module `wasi_snapshot_preview1` and one of these names is a compile error. Such an import is an external function, or a required host-registration field in the entry provider graph (§9.7). Other functions of `wasi_snapshot_preview1` may be imported.
 - Every other required host-registration function and external function is an import as in §B.4, so a host that has them can give them. A module that the host makes before the program, such as one given with `wasmtime run --preload`, cannot use the program's `memory` or `ilang_alloc`, so it can only give functions whose parameters, values, and errors are `Nil`, `Bool`, or `Float`. An import with an `Int`, `String`, or `BitArray` needs a host that defines it with the exports of the instance, such as an embedder, or a module linked in statically. An import with a host reference needs such a host too, because only the host makes host references, and the module then imports `reference_id`.
 - A function of an async host service is a blocking import, with the results of a function that is not async (§B.2). Nothing is async, and there are no `ilang_resume:…` and `ilang_result:…` exports.

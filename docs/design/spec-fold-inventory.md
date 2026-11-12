@@ -1,7 +1,7 @@
 # Spec fold-in inventory
 
 Inventory of the decisions in `docs/design/*.md` against `docs/spec.md`
-(2026-11-13, branch lane/spec1, spec identical to main 6a1a7c5c).
+(2026-11-13, branch lane/spec1; the spec as merged at the integration head f5680600, then folded on this branch).
 
 Columns:
 
@@ -99,19 +99,18 @@ All rows below are staged in `docs/spec.md` by this lane, except where noted.
 
 | Decision | Status | Spec | New syntax |
 |---|---|---|---|
-| One core tree, two surfaces; `.i` normal, `.is` Lisp; one surface per file; both files for one module is an error | owner ("decisions taken with the user") | no (§1.1 says only `.i`) | no |
-| Macros defined only in `.is`, used from both surfaces; `@macro` in `.i` is an error | owner | no (§1.4 says macros are "not yet part of i") | no |
-| Lisp surface: no keywords; symbol of a form is its head; quote `` ` ``, unquote `~`, `~..` | owner | no | no |
-| Decisions 1–15 (function `(-> (params) R body)`, imports/exports as `(, …)`, `@m(args) Item`, macro arguments in types, no statement or pattern results, macro not usable in its own module, `Syntax` with no constructors, `make` hygiene, `Definitions`/`Types` services, `i/syntax` unreachable from entries, typed macros as declaration + binding, result-only type variables met by `Never`, no delayed erroneous argument) | owner | no | no |
+| One core tree, two surfaces; `.i` normal, `.is` Lisp; one surface per file; both files for one module is an error | owner ("decisions taken with the user") | yes §1.1, §2.1, §14.1 (folded on this branch) | no |
+| Macros defined only in `.is`, used from both surfaces; `@macro` in `.i` is an error | owner | yes §14.5 (folded on this branch; §1.4, §2.2, §3 updated) | no |
+| Lisp surface: no keywords; symbol of a form is its head; quote `` ` ``, unquote `~`, `~..` | owner | yes §14.2–§14.4 | no |
+| Decisions 1–15 (function `(-> (params) R body)`, imports/exports as `(, …)`, `@m(args) Item`, macro arguments in types, no statement or pattern results, macro not usable in its own module, `Syntax` with no constructors, `make` hygiene, `Definitions`/`Types` services, `i/syntax` unreachable from entries, typed macros as declaration + binding, result-only type variables met by `Never`, no delayed erroneous argument) | owner | yes §14 | no |
 | Decision 6 `a \| m` is the macro call `m(a)` | superseded by USER L 11-11 pipe withdrawal (`a \|> m`) | no | — |
-| Lisp rows for syntax three: parameters as data `(-> (, a b) R e)`, `(,)`, pipe head `\|>`, chain `(\| …)` | coord (syntax-3 §6.8, fourth round) | no | yes |
-| Lisp-convention layout of `.is` (closers gathered on the last line, Lisp indentation, spaces) | USER L 11-12 23:41 | **added in place** (§1.1) | no |
-| Macro budgets (macro-budget.md: 100,000,000 work units, 2^28 words, 10,000 frames, nesting 256, per call) | coord | no | no |
-| Hygiene marks, definitions queries, typed-macro boundary (§5–§7), M4 typed macros landed | coord / implementation | no | no |
+| Lisp rows for syntax three: parameters as data `(-> (, a b) R e)`, `(,)`, pipe head `\|>`, chain `(\| …)` | coord (syntax-3 §6.8, fourth round) | staged (§14) | yes |
+| Lisp-convention layout of `.is` (closers gathered on the last line, Lisp indentation, spaces) | USER L 11-12 23:41 | yes §1.7 (`i fmt` paragraph, from lane/syn2) | no |
+| Macro budgets (macro-budget.md: 100,000,000 work units, 2^28 words, 10,000 frames, nesting 256, per call) | coord | yes §14.5 | no |
+| Hygiene marks, definitions queries, typed-macro boundary (§5–§7), M4 typed macros | coord / implementation | yes §14.6–§14.9 | no |
 
-**Gap:** the whole macro and Lisp-surface design is decided and implemented,
-but the spec still calls macros "not yet part of i" and refers to `meta.md`
-(§11.9). It needs its own section; see the owner list.
+The macro and Lisp-surface design is now §14 of the spec (today's rows), with
+a staged syntax-three version of §14 beside it.
 
 ## records.md (T3 structural records)
 
@@ -145,14 +144,14 @@ but the spec still calls macros "not yet part of i" and refers to `meta.md`
 | Decision | Status | Spec | New syntax |
 |---|---|---|---|
 | N1 native is the default target of `i build` | USER ("Native proposal ADOPTED", §8 item 4) | yes §2.6.2 table | no |
-| N2 a native package is a prebuilt runner plus AOT program bytes; one executable | USER (adopted) + lane/pack implementation (L 11-13 02:01) | **added in place** (§2.6.2) | no |
-| Executables written by `i build` are statically linked | USER L 11-13 02:04 | **added in place** (§2.6.2) | no |
-| `--target` values `native` (default), `js`, `nodejs`, `wasi`, `host` (`ilang` alias); plain `i build` no longer writes `.wasm` | USER (N1) + lane/pack | yes §2.6.2 (values); **added in place** (artifacts per target) | no |
+| N2 a native package is a prebuilt runner plus AOT program bytes; one executable | USER (adopted) + lane/pack implementation (L 11-13 02:01) | yes §2.6.2 (folded on this branch) | no |
+| Executables written by `i build` are statically linked | USER L 11-13 02:04 | yes §2.6.2 (folded on this branch) | no |
+| `--target` values `native` (default), `js`, `nodejs`, `wasi`, `host` (`ilang` alias); plain `i build` no longer writes `.wasm` | USER (N1) + lane/pack | yes §2.6.2 | no |
 | N3 native uses ABI v3 wire, not WASI | coord | n/a (host implementation) | — |
 | N4 reject only required imports the runner cannot supply | coord | yes §10.1.2 (link rule) | no |
 | N5–N8, N10–N12 one Store per worker, tasks never move, one shared queue encoded at `go`, one lock, FIFO fast path, one encoded format, a stop closes the whole run | USER (adopted) / coord | partly: §11.9 states the observable rules (workers cannot be seen, first stop wins); the mechanisms are n/a | no |
 | N9 IO values are private nominal wrappers over Int; ResourceContext; numbers never reissued | USER (adopted §8 item 2) | yes §9.12 (wrappers), mechanisms n/a | no |
-| "No TLS, UDP, HTTP or DNS in v1" | superseded by USER L 11-11 (DNS, TLS, HTTP client delivered) and L 11-12 17:55 (UDP) | spec has `i/tls` §9.12; no UDP | no |
+| "No TLS, UDP, HTTP or DNS in v1" | superseded by USER L 11-11 (DNS, TLS, HTTP client delivered) and L 11-12 17:55 (UDP) | yes §9.7, §9.12 (`i/tls`, UDP in `i/net`) | no |
 
 ## multicore.md
 
@@ -162,7 +161,7 @@ but the spec still calls macros "not yet part of i" and refers to `meta.md`
 | D4 `control.keep_env` | coord; superseded at stage E6 by `..env` service patterns and library `keep` (O28) | yes §9.4 (today); staged §9.4 states `keep` | yes |
 | D5–D7, D9, D13 scheduler and copy mechanics | coord | n/a | — |
 | D8 cooperative stealing | superseded by native N7 (shared queue at `go`) | n/a | — |
-| §8 `scope.share` | coord | no (spec has no `share`) — see owner list | no |
+| §8 `share` | coord | yes §9.9 (task table) | no |
 
 ## runtime.md (random, tasks, IO)
 
@@ -205,11 +204,10 @@ but the spec still calls macros "not yet part of i" and refers to `meta.md`
 
 ## For the owner
 
-1. Built-in type names: the ledger (L 11-12 21:02) says built-in types are exports of `i/core` (`Int = core.Int`); syntax-3.md §1.3a and §5.2.3 still say "no qualified name for a built-in type". The staged spec follows the ledger — confirm?
-2. Macros and the Lisp surface (meta.md, macro-budget.md) are implemented but the spec says macros are "not yet part of i". Fold meta.md into the spec as a new section (normal today, with syntax-three Lisp rows staged)?
-3. `share` (multicore.md §8) is exported by `lib/i/task.i` but not described in spec §9.9. Add it to the spec as designed, or is it internal?
-4. host-concurrency.md D4 (no Wasmtime fibers) asked for the user's explicit approval; no USER entry exists. Is it approved (it is implemented)?
-5. syntax-3.md §1.3 rules "accepted without explicit owner confirmation" (Opaque position/invariance, `A(..)` whole-sum export, rest needs a known shape, D3, D5 `None()` an error, D9–D11, selected-domain checking): staged as normative. Confirm as a group?
-6. syntax-3.md §8 item 1: `Node(..)` exports only `Node` and its constructor (members listed one by one). Staged as recommended — confirm?
-7. "Never resolve an ambiguity by adding a comma" (USER L 11-11) is a design principle; should the spec state it, or is it only a rule for language designers?
-8. The bench gate of O30 (`catch` ≤ 1.25x) and the numeric performance gates are left out of the spec as non-normative. Agree?
+The coordinator answered the first list on 2026-11-13: built-in types follow the
+ledger (`core.Int`); meta.md is folded (§14); `share` was already in §9.9; the
+syntax-3 rules of its §1.3 are decided; `T(..)` follows D8 and the note's §8
+recommendation; the comma principle and the performance gates stay out of the
+spec. One question stays open:
+
+1. host-concurrency.md D4 (no Wasmtime fibers) asked for the user's explicit approval and has no USER entry; it is implemented and is not spec material. Is it approved?
