@@ -2078,9 +2078,20 @@ impl<'a> Resolver<'a> {
             } => TypeKind::Fn {
                 params: params
                     .iter()
-                    .map(|p| FnParamType {
-                        label: p.label.clone(),
-                        ty: self.ty(&p.ty),
+                    .map(|p| {
+                        if let Some(label) = &p.label
+                            && crate::syn3_facts::on()
+                        {
+                            crate::syn3_facts::record(crate::syn3_facts::Fact::FnTypeLabel {
+                                module: self.cur,
+                                label: label.span,
+                                ty: p.ty.span,
+                            });
+                        }
+                        FnParamType {
+                            label: p.label.clone(),
+                            ty: self.ty(&p.ty),
+                        }
                     })
                     .collect(),
                 ret: Box::new(self.ty(ret)),
@@ -3744,7 +3755,15 @@ impl<'a> Resolver<'a> {
                 let ctor = self.ctor(module.as_ref(), name);
                 let args: Vec<Pattern> = args
                     .iter()
-                    .map(|a| self.pattern(a, binders, shared))
+                    .map(|a| match same_name_part(a) {
+                        // §7.1: `label = label` writes the label of a part
+                        // and binds the name once.
+                        Some(inner) => Pattern {
+                            span: a.span,
+                            ..self.pattern(inner, binders, shared)
+                        },
+                        None => self.pattern(a, binders, shared),
+                    })
                     .collect();
                 match ctor {
                     Some(ctor) => PatternKind::Constructor {
@@ -4344,5 +4363,20 @@ fn projectable_body(
         | TypeKind::Hole
         | TypeKind::Error
         | TypeKind::Of { .. } => None,
+    }
+}
+
+/// A constructor pattern part `name = name` or `name = name: T`: the part
+/// after the written label.
+fn same_name_part(p: &ast::Pattern) -> Option<&ast::Pattern> {
+    let ast::PatternKind::Named { name, pattern } = &p.kind else {
+        return None;
+    };
+    match &pattern.kind {
+        ast::PatternKind::Var(n) if *n == name.name => Some(pattern),
+        ast::PatternKind::Typed { binder, .. } if !binder.discard && binder.name == name.name => {
+            Some(pattern)
+        }
+        _ => None,
     }
 }

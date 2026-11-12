@@ -13,6 +13,7 @@ pub mod order;
 pub mod providers;
 pub mod query;
 pub mod resolve;
+pub mod syn3_facts;
 pub mod types;
 mod unused;
 
