@@ -19,7 +19,10 @@ eval =
 	| (Add(a, b)) { eval(a) + eval(b) }
 	| (Mul(a, b)) { eval(a) * eval(b) }
 
-main = () { stdio.print(int.to_string(eval(Mul(Add(Num(1), Num(5)), Num(7))))) }
+main = () {
+	expr = Mul(Add(Num(1), Num(5)), Num(7))
+	expr |> eval |> int.to_string |> stdio.print
+}
 ```
 
 `i run` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `|` are one function that matches its argument. No type is written, and every type is checked.
@@ -46,7 +49,8 @@ remaining = (deadline) <- (clock: Clock) {
 test("a test gives its own clock", () {
 	{
 		assert(remaining(42) == 2)
-		assert(fail.catch(() { remaining(30) }) == Error(Late(by = 10)))
+		late = fail.catch(() { remaining(30) })
+		assert(late == Error(Late(by = 10)))
 	} <- (Clock(now = () { 40 }))
 })
 ```
@@ -55,7 +59,8 @@ test("a test gives its own clock", () {
 
 ```text
 (, if)
-(@ macro (= if (-> (, test then else) _ `(|> ~test (| (-> (, True) _ ~then) (-> (, False) _ ~else))))))
+(= _branches (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+(@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
 ```
 
 A module that imports it with `sugar = (if) = tour/sugar` writes `sign = (n) { if(n < 0, "negative", "not negative") }`, and `i expand` prints the code after expansion.
@@ -92,8 +97,10 @@ serve = (listener, scope) {
 // Program entry.
 main = () {
 	listener = net.listen("127.0.0.1", 0)
-	stdio.print("listening " <> core.inspect(net.local_port(listener)))
-	task.run(() { task.scope((scope) { serve(listener, scope) }) })
+	port = net.local_port(listener)
+	stdio.print("listening " <> core.inspect(port))
+	server = () { task.scope((scope) { serve(listener, scope) }) }
+	task.run(server)
 }
 ```
 

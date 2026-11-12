@@ -22,5 +22,6 @@ remaining = (deadline, clock ! Clock) {
 test("a test gives its own clock", () {
 	! Clock = Clock(now: () { 40 })
 	assert(remaining(42) == 2)
-	assert(fail.catch(() { remaining(30) }) == Error(Late(by: 10)))
+	late = fail.catch(() { remaining(30) })
+	assert(late == Error(Late(by: 10)))
 })
