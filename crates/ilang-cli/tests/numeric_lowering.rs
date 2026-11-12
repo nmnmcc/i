@@ -216,13 +216,267 @@ fn corpus() -> Vec<Case> {
         stop: true,
         events: vec!["before".into()],
     });
+    cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    cases.push(Case {
+        body: "{ f = make_float(x) g = make_float(x) r = (value: x, callback: f) s = (value: x, callback: f) t = (value: x, callback: g) core.inspect(f == f && f != g && r == s && r != t) }".into(),
+        input: Value::Float(-0.0), expected: "True".into(), stop: false, events: vec![],
+    });
+    for (x, expected) in [(-1.0, -0.5), (1.0, 0.0)] {
+        cases.push(float_case("{ a = { x <. 0.0 } |> { True -> x False -> \"s\" } a |> { v: Float -> v +. 0.5 _ -> 0.0 } }", x, expected));
+    }
+    // N5: exact rounded chains under dominating bounds, and chains whose
+    // middle result overflows even though the final expression would be finite.
+    for n in 0..24 {
+        let x = n as f64 * 0.125 - 1.5;
+        let t = x + n as f64 / 32.0;
+        let expected = if (-1.0..=1.0).contains(&t) {
+            let a = t * 0.5 + 0.25;
+            a * 0.5 - 0.125
+        } else {
+            t
+        };
+        cases.push(float_case(
+            &format!("bounded_float(x +. {n}.0 /. 32.0)"),
+            x,
+            expected,
+        ));
+        cases.push(Case {
+            body: format!("core.inspect({{ a = x *. 2.0 b = a /. 0.0 b +. {n}.0 }})"),
+            input: Value::Float(1.0e308),
+            expected: "float: result is not finite".into(),
+            stop: true,
+            events: vec![],
+        });
+    }
+    for x in [
+        f64::from_bits(1),
+        -f64::from_bits(1),
+        f64::MAX,
+        -f64::MAX,
+        -0.0,
+    ] {
+        let expected = if (-1.0..=1.0).contains(&x) {
+            let a = x * 0.5 + 0.25;
+            a * 0.5 - 0.125
+        } else {
+            x
+        };
+        cases.push(float_case("bounded_float(x)", x, expected));
+    }
+    // N4: carry the current accumulator through promotion and demotion. The
+    // effect trace checks that leaving a guarded worker never replays a step.
+    for n in 0..24 {
+        let x = BigInt::from(1073741823_i64 - n);
+        let count = n + 1;
+        let sum = count * (count + 1) / 2;
+        cases.push(int_case(
+            format!("loop_int({count}, x)"),
+            x.clone(),
+            &x + sum,
+        ));
+        cases.push(int_case(format!("loop_down({count}, x)"), -&x, -&x - sum));
+    }
+    let start = BigInt::from(1073741821_i64);
+    let mut acc = start.clone();
+    let mut events = Vec::new();
+    for n in (1..=7).rev() {
+        events.push(acc.to_string());
+        acc += n;
+    }
+    cases.push(Case {
+        body: "core.inspect(loop_effect(7, x))".into(),
+        input: Value::Int(start),
+        expected: acc.to_string(),
+        stop: false,
+        events,
+    });
+    cases.push(int_case(
+        "control.boundary((b) { suspend_int(b, x) })",
+        1073741822.into(),
+        1073741825.into(),
+    ));
+    // N3: cross-call pairs, structural and nominal numeric records, including
+    // joins and repeated projections. Shapes carry actual labels/constructors.
+    for n in 0..24 {
+        let x = n as f64 * 0.125 - 1.5;
+        cases.push(float_case(
+            &format!("{{ p = Left(x, {n}.0) p.x +. p.x }}"),
+            x,
+            x + x,
+        ));
+        cases.push(float_case(
+            &format!("{{ p = Right({n}.0, x) p.x +. p.x }}"),
+            x,
+            x + x,
+        ));
+        cases.push(float_case(
+            &format!("{{ (a, b) = numeric_pair(x +. {n}.0) a +. b }}"),
+            x,
+            ((x + n as f64) + 0.25) + (x + n as f64) * 0.5,
+        ));
+        cases.push(float_case(
+            &format!("{{ r = (a: x, b: x *. {n}.0) r.a +. r.a +. r.b }}"),
+            x,
+            (x + x) + x * n as f64,
+        ));
+        cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> {{ True -> (a: x, b: {n}.0) False -> (a: x, b: {}.0) }} r.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
+    }
+    // N2: cross-call scalar chains and closures with different captures share
+    // code without sharing identity or the capture values.
+    for n in 0..32 {
+        let x = n as f64 * 0.125 - 2.0;
+        cases.push(float_case(
+            &format!("step_float(step_float(x +. {n}.0))"),
+            x,
+            ((x + n as f64) * 0.5 + 0.25) * 0.5 + 0.25,
+        ));
+        cases.push(float_case(
+            &format!("{{ f = (v: Float) -> Float {{ v *. 0.5 +. x }} apply(f, {n}.0) }}"),
+            x,
+            n as f64 * 0.5 + x,
+        ));
+    }
+    // Inlined helpers whose operations stop must keep every pending logical
+    // frame; an inlined tail call keeps its tail site. Mixed Int/Float workers
+    // leave the i31 region mid-loop. Range proofs at the exact overflow tie.
+    let stop = |body: String, input: Value| Case {
+        body: format!("core.inspect({body})"),
+        input,
+        expected: "float: result is not finite".into(),
+        stop: true,
+        events: vec![],
+    };
+    for (i, x) in [3.0_f64, 1.0e200, 1.0e154, 1.5e154].into_iter().enumerate() {
+        let y = x * x;
+        let finite = y.is_finite() && (y + 1.0).is_finite();
+        let body = format!("helper_g(x) +. {i}.0");
+        if finite {
+            cases.push(float_case(&body, x, y + 1.0 + i as f64));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+        let deep = format!("helper_deep(x *. {i}.0 +. 1.0)");
+        let z = x * i as f64 + 1.0;
+        let w = ((z * z) * (z * z)) * ((z * z) * (z * z));
+        if w.is_finite() {
+            cases.push(float_case(&deep, x, w));
+        } else {
+            cases.push(stop(deep, Value::Float(x)));
+        }
+    }
+    for n in 0..8 {
+        let x = 10f64.powi(n * 40 - 300);
+        let mut y = x;
+        let mut ok = true;
+        for _ in 0..5 {
+            y *= 1.0e100;
+            ok &= y.is_finite();
+        }
+        let body = format!("helper_outer(x) -. {n}.0");
+        if ok && (y + 2.0).is_finite() {
+            cases.push(float_case(&body, x, (y + 2.0) - n as f64));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+    }
+    for n in 0..8 {
+        // acc crosses the i31 boundary after the first step; f overflows
+        // after six steps, while the Int part has already been promoted.
+        let body = format!("mixed_worker({n}, 1073741000, x)");
+        let mut f = 1.0f64;
+        let mut acc = 1073741000i64;
+        let mut ok = true;
+        for _ in 0..n {
+            acc += 1073741000;
+            f *= 1.0e60;
+            ok &= f.is_finite();
+        }
+        if ok {
+            cases.push(float_case(&body, 1.0, f + acc as f64));
+        } else {
+            cases.push(stop(body, Value::Float(1.0)));
+        }
+        cases.push(int_case(
+            format!("mixed_int({n}, x)"),
+            BigInt::from(-1073741824 + n),
+            BigInt::from(-1073741824 + n) + BigInt::from(1073741000) * n,
+        ));
+        cases.push(int_case(
+            format!("halve_int({n}, x)"),
+            BigInt::from(1) << (25 + n),
+            BigInt::from(1) << 25,
+        ));
+    }
+    for (i, (text, k)) in [
+        ("2.0", 2.0_f64),
+        ("3.0", 3.0),
+        ("0.5", 0.5),
+        ("1.0e200", 1.0e200),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let body = format!("twice(scale_by({text}), x) +. {i}.0");
+        let y = 1.5 * k * k;
+        if y.is_finite() {
+            cases.push(float_case(&body, 1.5, y + i as f64));
+        } else {
+            cases.push(stop(body, Value::Float(1.5)));
+        }
+    }
+    for (i, x) in [2.0_f64, 1.0e200, -0.0].into_iter().enumerate() {
+        let body = format!("unused_field(x) +. {i}.0");
+        if (x * x).is_finite() {
+            cases.push(float_case(&body, x, 1.0 + i as f64));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+    }
+    let two970 = 2f64.powi(970);
+    for (i, x) in [two970, f64::from_bits(two970.to_bits() - 1), 0.0, 1.0]
+        .into_iter()
+        .enumerate()
+    {
+        let body = format!("tie_add(x) +. {i}.0 *. 0.0");
+        let y = if (0.0..=1.0e292).contains(&x) {
+            x + f64::MAX
+        } else {
+            0.0
+        };
+        if y.is_finite() {
+            cases.push(float_case(&body, x, y));
+        } else {
+            cases.push(stop(body, Value::Float(x)));
+        }
+    }
+    for (i, y) in [0.0_f64, -0.0, 1.0e-300, -1.0e-300, 1.0e-310]
+        .into_iter()
+        .enumerate()
+    {
+        let body = format!("bounded_div(0.5 +. {i}.0 *. 0.0, x)");
+        let q = if y == 0.0 { 0.0 } else { 0.5 / y };
+        if q.is_finite() {
+            cases.push(float_case(&body, y, q));
+        } else {
+            cases.push(stop(body, Value::Float(y)));
+        }
+    }
     cases
 }
 
 #[test]
 fn numeric_corpus_agrees_at_o0_o2_o3() {
     let cases = corpus();
-    assert!(cases.len() >= 60);
+    assert!(cases.len() >= 200);
+    assert!(
+        cases
+            .iter()
+            .map(|case| &case.body)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            >= 200,
+        "corpus must contain at least 200 different source programs"
+    );
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     let exports = (0..cases.len())
@@ -238,7 +492,20 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
 (i/core, i/control, i/resource)
 @external("numeric:events", "record")
 record: (String) -> Nil
+make_float = (x: Float) { (v: Float) -> Float { v +. x } }
+bounded_float = (x: Float) -> Float {
+ { x >=. -.1.0 } |> { False -> x True -> {
+  { x <=. 1.0 } |> { False -> x True -> { a = x *. 0.5 +. 0.25 a *. 0.5 -. 0.125 } }
+ } }
+}
+Pair { Left(x: Float, y: Float) Right(y: Float, x: Float) }
+relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ -> relay(f, n - 1, x) } }
+numeric_pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
+step_float = (x: Float) -> Float { x *. 0.5 +. 0.25 }
 apply = (f: (Float) -> Float, x: Float) -> Float { f(x) }
+suspend_int = (b, x: Int) -> Int { a = x + 1 control.suspend(b, (k) { control.resume(k, Nil) }) a + 2 }
+loop_down = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> loop_down(n - 1, acc - n) } }
+loop_effect = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> { record(core.inspect(acc)) loop_effect(n - 1, acc + n) } } }
 loop_int = (n: Int, sum: Int) -> Int { n |> { 0 -> sum _ -> loop_int(n - 1, sum + n) } }
 fact = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> fact(n - 1, acc * n) } }
 loop_float = (n: Int, sum: Float) -> Float { n |> { 0 -> sum _ -> loop_float(n - 1, sum +. 0.25) } }
@@ -250,6 +517,26 @@ resumed_f = (b, x: Float) -> Float { y = resumed_g(b, x) y +. 0.25 }
 resumed_h = (x: Float) -> Float {
  control.boundary((b) { y = resumed_f(b, x) y +. 0.5 })
 }
+helper_sq = (x: Float) -> Float { x *. x }
+helper_g = (x: Float) -> Float {
+ y = helper_sq(x)
+ y +. 1.0
+}
+helper_deep = (x: Float) -> Float { helper_sq(helper_sq(helper_sq(x))) }
+helper_loop = (n: Int, x: Float) -> Float { n |> { 0 -> x _ -> helper_loop(n - 1, x *. 1.0e100) } }
+helper_tail = (x: Float) -> Float { helper_loop(5, x) }
+helper_outer = (x: Float) -> Float {
+ a = helper_tail(x)
+ a +. 2.0
+}
+mixed_worker = (n: Int, acc: Int, f: Float) -> Float { n |> { 0 -> f +. core.to_float(acc) _ -> mixed_worker(n - 1, acc + 1073741000, f *. 1.0e60) } }
+mixed_int = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> mixed_int(n - 1, acc + 1073741000) } }
+halve_int = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> halve_int(n - 1, acc / 2) } }
+scale_by = (k: Float) -> (Float) -> Float { (v: Float) -> Float { v *. k } }
+twice = (f: (Float) -> Float, x: Float) -> Float { f(f(x)) }
+unused_field = (x: Float) -> Float { r = (a: x *. x, b: 1.0) r.b }
+tie_add = (x: Float) -> Float { { x <=. 1.0e292 } |> { True -> { x >=. 0.0 } |> { True -> x +. 1.7976931348623157e308 False -> 0.0 } False -> 0.0 } }
+bounded_div = (x: Float, y: Float) -> Float { { y >=. -.1.0e-300 } |> { True -> { y <=. 1.0e-300 } |> { True -> x /. y False -> 0.0 } False -> 0.0 } }
 "#,
     );
     source = source.replacen(
@@ -322,6 +609,11 @@ resumed_h = (x: Float) -> Float {
             );
         }
         let wasm = ilang_cli::optimize(&wasm, ilang_cli::level(opt).unwrap()).unwrap();
+        if let Some(path) = std::env::var_os("NUMERIC_WASM_DUMP") {
+            let path = std::path::PathBuf::from(path);
+            std::fs::create_dir_all(&path).unwrap();
+            std::fs::write(path.join(format!("o{opt}-{mode:?}.wasm")), &wasm).unwrap();
+        }
         let compiled = Program::from_bytes(&wasm).unwrap();
         let mut observations = Vec::new();
         for (i, case) in cases.iter().enumerate() {
@@ -377,6 +669,30 @@ resumed_h = (x: Float) -> Float {
         } else {
             oracle = Some(observations);
         }
+    }
+    if let Some(path) = std::env::var_os("NUMERIC_WASM_DUMP") {
+        let cases = cases
+            .iter()
+            .enumerate()
+            .map(|(i, case)| {
+                let input = match &case.input {
+                    Value::Int(n) => serde_json::json!({ "kind": "int", "value": n.to_string() }),
+                    Value::Float(x) => {
+                        serde_json::json!({ "kind": "float", "bits": x.to_bits().to_string() })
+                    }
+                    _ => unreachable!(),
+                };
+                serde_json::json!({ "export": exports[i], "input": input, "stop": case.stop })
+            })
+            .collect::<Vec<_>>();
+        std::fs::write(
+            std::path::PathBuf::from(path).join("cases.json"),
+            serde_json::to_vec(
+                &serde_json::json!({ "cases": cases, "observations": oracle.unwrap() }),
+            )
+            .unwrap(),
+        )
+        .unwrap();
     }
 }
 
@@ -477,4 +793,54 @@ fn representation_facts_follow_code_identity_not_debug_names() {
         without_comments(&after),
         "debug names must not decide parameter/local representations"
     );
+}
+
+/// The review's exact resumed-stop fixture. Lines and columns are normative.
+#[test]
+fn transitive_suspend_preserves_pending_logical_frames() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"trace\"\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x: Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x: Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x: Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n Nil\n}\n").unwrap();
+    let (graph, diags) = ilang_package::load(dir.path());
+    assert!(diags.is_empty());
+    let checked = ilang_check::check(&graph);
+    let wat = ilang_wasm::compile_wat_numeric(
+        &graph,
+        checked.program.as_ref().unwrap(),
+        checked.types.as_ref().unwrap(),
+        Options::default().numeric(Numeric::Scalars),
+    )
+    .unwrap();
+    for name in ["f", "h"] {
+        assert!(
+            wat.lines().any(|line| line.contains("numeric: code")
+                && line.contains(&format!(".{name})"))
+                && line.contains("inline=false suspend=true")),
+            "transitive exclusion for {name}: {}",
+            wat.lines()
+                .filter(|l| l.contains("numeric: code"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+    for opt in ["0", "2", "3"] {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args([
+                "run",
+                "--project",
+                dir.path().to_str().unwrap(),
+                "--opt",
+                opt,
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(1), "O{opt}");
+        assert!(output.stdout.is_empty(), "O{opt}: {:?}", output.stdout);
+        assert_eq!(
+            String::from_utf8(output.stderr).unwrap(),
+            "float: result is not finite\ntrace/main:4:2\ntrace/main:7:6\ntrace/main:11:6\ntrace/main:16:2\n",
+            "O{opt}"
+        );
+    }
 }
