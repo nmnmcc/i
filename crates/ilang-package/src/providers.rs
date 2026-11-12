@@ -392,7 +392,7 @@ pub struct SelectedRow<'a> {
     pub cells: BTreeMap<Target, SelectedCell<'a>>,
 }
 impl crate::PackageGraph {
-    /// Select explicit root cells over inherited cells. Resolution of names to
+    /// Selects explicit root cells over inherited cells. Resolution of names to
     /// nominal identities and access checking belongs to the provider checker.
     pub fn selected_provider_rows(&self) -> Vec<SelectedRow<'_>> {
         let mut rows: Vec<SelectedRow<'_>> = Vec::new();

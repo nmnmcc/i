@@ -152,7 +152,7 @@ impl Resolver<'_> {
         }
     }
 
-    /// The commit of a version, and the dependencies in its `i.toml`
+    /// The commit of a version, and the dependencies in its `i.toml`.
     /// Its path dependencies are not followed: a package got by location may
     /// not have path dependencies, so they are an error when the version is
     /// used.

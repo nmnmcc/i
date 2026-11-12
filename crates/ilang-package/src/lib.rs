@@ -159,7 +159,7 @@ impl Sources {
         self.files[id.0 as usize].text = text;
     }
 
-    /// `path:line:col: error[CODE]: message`.
+    /// Renders one diagnostic as `path:line:col: error[CODE]: message`.
     pub fn render(&self, d: &Diagnostic) -> String {
         let mut out = String::new();
         if let Some(id) = d.source {
@@ -212,9 +212,9 @@ pub type PackageId = usize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModuleKind {
-    /// Under `src/`.
+    /// A module under `src/`.
     Src,
-    /// Under `test/`.
+    /// A module under `test/`.
     Test,
     /// The built-in names, written in i. It is in the package `i`, but
     /// it may not be imported.
@@ -295,11 +295,13 @@ pub struct PackageGraph {
     pub sources: Sources,
     pub packages: Vec<Package>,
     pub library: PackageId,
-    /// `None` when the compiled package could not be read.
+    /// The compiled package, or `None` when it could not be read.
     pub root: Option<PackageId>,
-    /// An explicit [entries] selection; None uses the source convention.
+    /// The entry named by the caller from `[entries]`; `None` uses the
+    /// default entry.
     pub entry: Option<String>,
-    /// Compile for test execution rather than normal entries and host exports.
+    /// Whether the program is compiled for test execution rather than with
+    /// its normal entries and host exports.
     pub test_run: bool,
 }
 

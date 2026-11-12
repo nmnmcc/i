@@ -73,7 +73,7 @@ pub struct Lock {
 /// A line of `i.lock` that is not correct.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LockError {
-    /// From 1.
+    /// The number of the line, counted from 1.
     pub line: usize,
     /// The byte offset of the line in the file.
     pub offset: usize,
