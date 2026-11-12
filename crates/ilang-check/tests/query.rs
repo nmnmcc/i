@@ -171,20 +171,20 @@ fn type_of_top_level_names() {
     let f = fixture();
     assert_eq!(
         f.hover("app/main", "add = ", 0),
-        "add: (x: Int, y: Int) -> Int"
+        "add: (x = Int, y = Int) -> Int"
     );
     assert_eq!(
         f.hover("app/main", "add(1", 0),
-        "add: (x: Int, y: Int) -> Int"
+        "add: (x = Int, y = Int) -> Int"
     );
-    assert_eq!(f.hover("app/main", "id = ", 0), "id: (a: A) -> A");
+    assert_eq!(f.hover("app/main", "id = ", 0), "id: (a = A) -> A");
     assert_eq!(f.hover("app/main", "total", 0), "total: Int");
     // A name of another module, after `m.`.
-    assert_eq!(f.hover("app/main", "double", 0), "double: (n: Int) -> Int");
+    assert_eq!(f.hover("app/main", "double", 0), "double: (n = Int) -> Int");
     // Imported by name.
     assert_eq!(
         f.hover("app/main", "greet(u)", 0),
-        "greet: (u: User) -> String"
+        "greet: (u = User) -> String"
     );
 }
 
@@ -409,7 +409,7 @@ fn types_in_a_program_with_errors() {
     )]);
     assert!(f.checked.diags.iter().any(|d| d.is_error()));
     assert_eq!(f.hover("app/main", "m = ", 0), "m: Int");
-    assert_eq!(f.hover("app/main", "f = ", 0), "f: (n: Int) -> Int");
+    assert_eq!(f.hover("app/main", "f = ", 0), "f: (n = Int) -> Int");
 }
 
 #[test]
@@ -425,15 +425,15 @@ fn types_of_parameters_that_share_a_type_variable() {
     // The parameter type of `f` is the type of `x`, which the scheme names.
     assert_eq!(
         f.hover("app/main", "h3", 0),
-        "h3: (f: (A) -> Int ^ E ! N, x: A) -> Int ^ E ! N"
+        "h3: (f = (A) <- (Fail(E), ..N) -> Int, x = A) <- (Fail(E), ..N) -> Int"
     );
-    assert_eq!(f.hover("app/main", "f, x", 0), "f: (A) -> Int ^ E ! N");
-    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (A) -> Int ^ E ! N");
+    assert_eq!(f.hover("app/main", "f, x", 0), "f: (A) <- (Fail(E), ..N) -> Int");
+    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (A) <- (Fail(E), ..N) -> Int");
     assert_eq!(f.hover("app/main", "x)", 0), "x: A");
-    assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) -> B ^ E ! N");
+    assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(f.hover("app/main", "v)", 0), "v: A");
     // Not shared: as before.
-    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) -> A ^ E ! N");
+    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) <- (Fail(E), ..N) -> A");
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
 }
 
@@ -451,13 +451,13 @@ fn local_types_use_the_names_of_the_scheme() {
     // The value of `f` is `y`, and the value of `k`.
     assert_eq!(
         f.hover("app/main", "k = ", 0),
-        "k: (f: (A) -> B ^ E ! N, x: A) -> B ^ E ! N"
+        "k: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "y = ", 0), "y: B");
     assert_eq!(f.hover("app/main", "y\n}", 0), "y: B");
     assert_eq!(
         f.hover("app/main", "f, x) {\n  y", 0),
-        "f: (A) -> B ^ E ! N"
+        "f: (A) <- (Fail(E), ..N) -> B"
     );
     // The second parameter of `compose` is named as in its scheme.
     let compose = f.hover("app/main", "compose", 0);
@@ -466,21 +466,21 @@ fn local_types_use_the_names_of_the_scheme() {
         "compose: (f: (A) -> B ^ E ! N, g: (B) -> C ^ E2 ! N2) -> \
          (x: A) -> C ^ E | E2 ! N | N2"
     );
-    assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) -> B ^ E ! N");
-    assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) -> C ^ E2 ! N2");
+    assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) <- (Fail(E2), ..N2) -> C");
     assert_eq!(f.hover("app/main", "x) { g", 0), "x: A");
-    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (B) -> C ^ E2 ! N2");
+    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (B) <- (Fail(E2), ..N2) -> C");
     // The names of the parameters are not the names of their types.
     assert_eq!(
         f.hover("app/main", "pairup", 0),
-        "pairup: (a: A, b: B) -> (B, A)"
+        "pairup: (a = A, b = B) -> (B, A)"
     );
     assert_eq!(f.hover("app/main", "a, b)", 0), "a: A");
     assert_eq!(f.hover("app/main", "b) {", 0), "b: B");
     assert_eq!(f.hover("app/main", "b, a)", 0), "b: B");
     assert_eq!(
         f.hover("app/main", "twice", 0),
-        "twice: (f: (A | B) -> B & C ^ E ! N) -> (z: A) -> C ^ E ! N"
+        "twice: (f = (A | B) -> B & C ^ E ! N) -> (z = A) <- (Fail(E), ..N) -> C"
     );
     assert_eq!(f.hover("app/main", "z) {", 0), "z: A");
     assert_eq!(
@@ -491,9 +491,9 @@ fn local_types_use_the_names_of_the_scheme() {
     // scheme, and has a name that is not used there.
     assert_eq!(
         f.hover("app/main", "both = ", 0),
-        "both: (f: (A) -> B ^ E ! N, x: A) -> (B, (q: C) -> (C, A)) ^ E ! N"
+        "both: (f = (A) <- (Fail(E), ..N) -> B, x = A) -> (B, (q = C) -> (C, A)) ^ E ! N"
     );
-    assert_eq!(f.hover("app/main", "w = ", 0), "w: (q: D) -> (D, A)");
+    assert_eq!(f.hover("app/main", "w = ", 0), "w: (q = D) -> (D, A)");
     assert_eq!(f.hover("app/main", "q) {", 0), "q: D");
     assert_eq!(f.hover("app/main", "x) {\n  w", 0), "x: A");
 }
@@ -511,23 +511,23 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
          effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
-    assert_eq!(f.hover("app/main", "one", 0), "one: (x: A) -> 1");
+    assert_eq!(f.hover("app/main", "one", 0), "one: (x = A) -> 1");
     assert_eq!(f.hover("app/main", "x) {\n  y = x\n  1", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  1", 0), "y: A");
     assert_eq!(f.hover("app/main", "x\n  1", 0), "x: A");
     assert_eq!(
         f.hover("app/main", "drop =", 0),
-        "drop: (x: A, g: (1) -> B ^ E ! N) -> B ^ E ! N"
+        "drop: (x = A, g = (1) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: A");
     assert_eq!(
         f.hover("app/main", "g) {\n  y = x", 0),
-        "g: (1) -> B ^ E ! N"
+        "g: (1) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(
         f.hover("app/main", "drop2", 0),
-        "drop2: (x: A, g: (1) -> B ^ E ! N, h: C) -> B ^ E ! N"
+        "drop2: (x = A, g = (1) <- (Fail(E), ..N) -> B, h = C) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x, g, h", 0), "x: A");
     assert_eq!(f.hover("app/main", "h) {", 0), "h: C");
@@ -536,14 +536,14 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
     assert_eq!(f.hover("app/main", "h)\n", 0), "h: C");
     assert_eq!(
         f.hover("app/main", "effonly", 0),
-        "effonly: (f: (A) -> B ^ E ! N, x: A) -> Nil ^ E ! N"
+        "effonly: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> Nil"
     );
     assert_eq!(
         f.hover("app/main", "f, x) {\n  r", 0),
-        "f: (A) -> B ^ E ! N"
+        "f: (A) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: A");
-    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (A) -> B ^ E ! N");
+    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(f.hover("app/main", "r = ", 0), "r: B");
 }
 

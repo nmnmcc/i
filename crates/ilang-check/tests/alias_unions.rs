@@ -56,7 +56,7 @@ fn nominal_union_recursive_match_scales() {
         eprintln!("{n} members: {took:?}");
         assert!(took < bound, "{n} members took {took:?}");
         assert!(
-            lines.contains(&"app/main.f0 : (e: E(Int)) -> Int".to_string()),
+            lines.contains(&"app/main.f0 : (e = E(Int)) -> Int".to_string()),
             "{n} members: {lines:?}"
         );
     }
@@ -75,8 +75,8 @@ main = () { first([pick(True)]) }
 ";
     let lines = lines(source);
     for expected in [
-        "app/main.first : (xs: List(Option(Int))) -> Int",
-        "app/main.pick : (b: Bool) -> Option(1)",
+        "app/main.first : (xs = List(Option(Int))) -> Int",
+        "app/main.pick : (b = Bool) -> Option(1)",
     ] {
         assert!(lines.contains(&expected.to_string()), "{lines:?}");
     }
