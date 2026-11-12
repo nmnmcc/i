@@ -13,7 +13,10 @@ Yes {
 }
 
 pair = (No, () {
-	(Yes(n), _) = pair
+	// Written `Choice`: inferred, the recursive `pair` would make the part
+	// `Yes` (syntax three D4 widens only with known other values).
+	c: Choice = pair.0
+	Yes(n) = c
 	n
 })
 

@@ -34,7 +34,9 @@ catch_assert = () {
 
 test("catch_assert", () { catch_assert() })
 
-first = (r) {
+// With an unknown `r`, `Ok(v) = r` would make `r : Ok(v)` (syntax three
+// D4 widens only when other constructors' values are known).
+first = (r: Result(Int, String)) {
 	Ok(v) = r
 	v
 }
