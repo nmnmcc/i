@@ -34,6 +34,9 @@ pub struct ParseStats {
 /// far as the source allows; the diagnostics say what was wrong, sorted by
 /// position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
+    if crate::syn3::enabled() {
+        return crate::syn3::parse_lowered(source);
+    }
     let (module, diags, _) = run(source, true);
     (module, diags)
 }

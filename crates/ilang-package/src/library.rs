@@ -36,7 +36,21 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         .chain(MODULES.iter().map(|&m| (m, ModuleKind::Src)));
     for ((path, text), kind) in all {
         let file = path.strip_prefix("i/").unwrap_or(path);
-        let source = graph.sources.add(format!("<i>/{file}.i"), text.to_string());
+        // Transition to syntax three (stage 8 to stage 12): the library in
+        // this binary is in today's syntax, so a converted copy of `lib` is
+        // read from the directory `I_SYNTAX3_LIB` beside `I_SYNTAX=3`.
+        let text = match std::env::var_os("I_SYNTAX3_LIB") {
+            Some(dir) => {
+                let at = std::path::Path::new(&dir).join(match kind {
+                    ModuleKind::Prelude => "prelude.i".to_string(),
+                    _ => format!("{path}.i"),
+                });
+                std::fs::read_to_string(&at)
+                    .unwrap_or_else(|e| panic!("I_SYNTAX3_LIB: cannot read {}: {e}", at.display()))
+            }
+            None => text.to_string(),
+        };
+        let source = graph.sources.add(format!("<i>/{file}.i"), text);
         modules.push(ModuleSource {
             path: path.to_string(),
             source,

@@ -408,8 +408,16 @@ impl Encoder<'_> {
             .iter()
             .take_while(|t| t.span.start <= range.end)
             .find(|t| t.span.end <= range.end && matches(&t.kind))
-            .unwrap_or_else(|| panic!("parsed syntax has no expected token in {range:?}"))
-            .span
+            .map(|t| t.span)
+            .unwrap_or_else(|| {
+                // Transition to syntax three: the tree is today's and the
+                // text is not, so a symbol of today's rows may not be
+                // written; it is placed at the start of its node.
+                if crate::syn3::enabled() {
+                    return Span::new(range.start, range.start);
+                }
+                panic!("parsed syntax has no expected token in {range:?}")
+            })
     }
     fn operator(&self, spelling: &str, range: Span) -> Syntax {
         let span = self.token_span(range, |kind| {
@@ -421,14 +429,18 @@ impl Encoder<'_> {
     }
     fn bracket(&self, range: Span, kind: TokenKind) -> Span {
         let start = self.positions[range.start as usize];
-        let (i, token) = self
+        let found = self
             .tokens
             .iter()
             .enumerate()
             .skip(start)
             .take_while(|(_, t)| t.span.start <= range.end)
-            .find(|(_, t)| t.span.end <= range.end && t.kind == kind)
-            .unwrap_or_else(|| panic!("parsed syntax has no expected bracket in {range:?}"));
+            .find(|(_, t)| t.span.end <= range.end && t.kind == kind);
+        if found.is_none() && crate::syn3::enabled() {
+            return range;
+        }
+        let (i, token) =
+            found.unwrap_or_else(|| panic!("parsed syntax has no expected bracket in {range:?}"));
         let close = self.close[i].expect("parsed syntax has an unmatched bracket") as usize;
         token.span.to(self.tokens[close].span)
     }
