@@ -7,6 +7,7 @@ Rust; this script checks their identical assertions in other targets/engines.
 """
 from pathlib import Path
 import re
+import json
 import subprocess
 import sys
 
@@ -39,19 +40,28 @@ if (process.argv[2] === 'ilang') {{
   process.exitCode = wasi.start(guest);
 }}
 ''')
+    heavy = ROOT / '.rd/cache/heavy' if (ROOT / '.rd/cache/heavy').is_file() else ROOT.parent / 'cache/heavy'
+    shell = ROOT if (ROOT / '.rd/cache/heavy').is_file() else ROOT.parent.parent
+    run(heavy, 'direnv', 'exec', shell, 'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked')
+    inspector = ROOT / 'target/debug/examples/migrate-tests'
     combinations = 0
     for name in ['laws', 'vectors', 'interface']:
         source = Path(__file__).with_name(name + '.i').read_text()
         # Preserve the literal macro bodies as ordinary named functions for
         # command targets, which execute one main rather than the test runner.
-        tests = re.findall(r'test\("([^"\n]+)",\s*\(\)\s*\{', source)
-        assert tests
+        result = subprocess.run([str(inspector)], input=json.dumps(source) + '\n', text=True, capture_output=True, check=True)
+        calls = json.loads(result.stdout)['calls']
+        assert calls
+        data = source.encode()
+        tests = [f'_replay_{index}' for index, _ in enumerate(calls)]
+        for call, target in reversed(list(zip(calls, tests))):
+            body = data[call['body_start']:call['body_end']]
+            data = data[:call['start']] + target.encode() + b' = ' + body + data[call['end']:]
+        source = data.decode()
         project = WORK / name
         (project / 'src').mkdir(parents=True, exist_ok=True)
         (project / 'i.toml').write_text('name = "replay"\n')
         source = re.sub(r'\s*testlib\s*=\s*\(test\)\s*=\s*std/test\s*,?', '', source)
-        source = re.sub(r'test\("([^"\n]+)",\s*(\(\)\s*\{)', r'\1 = \2', source)
-        source = re.sub(r'(?m)^\}\)\s*$', '}', source)
         source += '\nmain = () {\n' + ''.join('\t' + t + '()\n' for t in tests) + '\tNil\n}\n'
         (project / 'src/main.i').write_text(source)
         for level in [0, 2]:

@@ -792,6 +792,7 @@ fn independent_review_reproducers() {
         let (g, ds) = ilang_package::load_with(
             &root.join(name),
             &ilang_package::LoadOptions {
+                tests: false,
                 write_lock: false,
                 offline: true,
                 ..Default::default()

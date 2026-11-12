@@ -46,7 +46,31 @@ fn inspect(source: &str) -> Value {
             );
         }
     }
-    json!({"tests": tests, "imports":module.imports_span.map(|s| json!([s.start,s.end])),
+    let calls: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|item| {
+            let ItemKind::MacroItem {
+                module: None,
+                name,
+                args,
+            } = &item.kind
+            else {
+                return None;
+            };
+            if name.name != "test" || args.len() != 2 {
+                return None;
+            }
+            let ExprKind::String(label) = &args[0].value.kind else {
+                return None;
+            };
+            Some(
+                json!({"name":label, "start":item.span.start, "end":item.span.end,
+            "body_start":args[1].value.span.start, "body_end":args[1].value.span.end}),
+            )
+        })
+        .collect();
+    json!({"tests": tests, "calls": calls, "imports":module.imports_span.map(|s| json!([s.start,s.end])),
         "has_test_import":module.imports.iter().any(|i| i.path.iter().map(|p|p.name.as_str()).collect::<Vec<_>>() == ["std", "test"]),
         "test_name_taken":module.items.iter().any(|item| matches!(&item.kind, ItemKind::Binding(b) if matches!(&b.pattern.kind, PatternKind::Var(n) if n == "test")))})
 }
