@@ -2875,7 +2875,7 @@ fn raw_request(c: &mut Client, method: &str, params: Value) {
     }
 }
 
-const BROKEN: &str = /* old-syntax-check: E0010,E0010,E0101,E0010,E0101,E0010,E0002 */
+const BROKEN: &str = /* old-syntax-check: E0010,E0101,E0010,E0010,E0101,E0010,E0002 */
     "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
 
 #[test]

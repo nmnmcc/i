@@ -1,4 +1,4 @@
-// old-syntax-check: E0101
+// old-syntax-check: E0101,E0001,E0101,E0001,E0101,E0001,E0101,E0001,E0101,E0001,E0101,E0101,E0001,E0001,E0001,E0101,E0001,E0001,E0101,E0001,E0001
 S(N) { S(() -> Nil ! N, (N) -> Nil) }
 T(N) { T(() -> Nil ! N, (N) -> Nil) }
 use(N) = (s ! S(N)) { S(f, _) = s f() }

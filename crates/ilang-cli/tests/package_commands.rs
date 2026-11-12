@@ -1254,7 +1254,7 @@ fn add_over_a_dependency_written_as_a_table_keeps_its_comments() {
 fn build_and_check_explain_an_old_syntax_dependency_tag() {
     let w = World::new();
     // old-syntax-check: intentional old tag; parser E0101 for the old match.
-    let old = /* old-syntax-check: E0101 */ "import ((inspect) = i/core)\nexport (f)\nf = () { case 1 { 0 -> 0  _ -> 1 } }\n";
+    let old = /* old-syntax-check: E0101,E0101 */ "import ((inspect) = i/core)\nexport (f)\nf = () { case 1 { 0 -> 0  _ -> 1 } }\n";
     w.repo(
         "legacy",
         &[(

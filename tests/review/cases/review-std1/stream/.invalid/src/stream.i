@@ -1,4 +1,4 @@
-// old-syntax-check: E0101,E0101,E0101,E0102,E0101,E0101,E0102,E0102
+// old-syntax-check: E0101,E0101,E0001,E0101,E0001,E0101,E0102,E0001,E0001,E0102,E0001,E0102,E0001,E0101,E0101,E0101,E0101,E0101,E0101,E0101,E0001,E0001,E0102,E0001,E0102,E0001
 import (i/fail, std/list)
 export (Stream, Step(..), new, wrap, make, pull, map, append, attempt, map_environment, to_list)
 Stream(a, e, n) { Stream(() -> Step(a, e, n) ? e ! n, (n) -> Nil) }

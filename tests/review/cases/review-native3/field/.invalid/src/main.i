@@ -1,4 +1,4 @@
-// old-syntax-check: E0101
+// old-syntax-check: E0101,E0001,E0101
 import (r = app/resource, i/core, (Io) = i/io)
 raw_number = (raw: r.Raw) { raw.open() }
 

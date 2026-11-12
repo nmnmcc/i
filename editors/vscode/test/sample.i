@@ -1,4 +1,4 @@
-// old-syntax-check: E0003,E0106
+// old-syntax-check: E0101,E0101,E0003,E0001,E0102,E0001,E0001,E0101,E0101
 //// The module documentation.
 
 (

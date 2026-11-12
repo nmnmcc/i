@@ -1,4 +1,4 @@
-// old-syntax-check: E0106
+// old-syntax-check: E0111,E0102
 // spec: 1.7
 // expect: compile-error E0106
 (main)

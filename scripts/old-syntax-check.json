@@ -414,9 +414,6 @@
   "crates/ilang-package/tests/manifest.rs:d9884b98c49565c3": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-syntax/tests/parse.rs:926d5ba87661e6fa": {
-    "not_source": "Printer output prefix assertion"
-  },
   "crates/ilang-wasm/src/runtime/bitarrays.rs:5af6ada165d7d7ca": {
     "not_source": "Host or test-runner diagnostic text"
   },
@@ -666,14 +663,14 @@
   "crates/ilang-cli/tests/check.rs:453fcde653a95c85": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`"
     ]
   },
   "crates/ilang-cli/tests/check.rs:b2331ec9454567b3": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is an old clause guard, replace `if condition` with `? condition`",
-      "E0101: expected an expression, found `->`; if this is an old clause guard, replace `if condition` with `? condition`"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "crates/ilang-cli/tests/fmt.rs:ca6a73fbf8762710": {
@@ -685,7 +682,8 @@
   "crates/ilang-cli/tests/package_commands.rs:015b3139e860bcaf": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "crates/ilang-lsp/src/change.rs:4cdfb1ce888445e2": {
@@ -697,307 +695,11 @@
   "crates/ilang-lsp/src/change.rs:9667352dda5e2a7d": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `}`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_arg_order.i:93680fe2e84a3b6c": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0110: an argument by position may not come after an argument by label",
-      "E0110: an argument by position may not come after an argument by label"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_attr_same_line.i:ba368ee323f45dc2": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_attribute_line.i:9483c10d4ca6f3c0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_bang_line.i:dd1938c197d21bc0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `!`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_block_end.i:6c38c9db4df2ec93": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0105: a block ends with an expression",
-      "E0105: a block ends with an expression"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_body_next_line.i:5db9dbfe97b69389": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `{`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_brackets.i:507cb1b768566c5f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0010: `(` is not closed",
-      "E0009: `]` does not close `(`",
-      "E0101: expected `,` or `)`, found `]`",
-      "E0010: `[` is not closed",
-      "E0101: expected `,` or `]`, found the end of the file"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_clause_tuple_note.i:154a0f55b382a61f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_clause_tuple_type.i:a69e2e3ad4d5098a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_discard.i:ff3954a6a2381ebc": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_form_feed.i:69969675eefc17f6": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0001: unexpected character U+000C"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_guard_word.i:d9ca0efb02727105": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `v`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_header_empty.i:bc7cf48d1732417b": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_header_order.i:162b4fae374453a8": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_import_late.i:b6fadc29ba4279c1": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_list.i:ca87955470970801": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an expression, found `,`",
-      "E0107: `..rest` comes after the parts of a list",
-      "E0101: expected `]`, found `2`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_pattern.i:744689f5c04c6278": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal",
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_pipe_group.i:b21ad312873fd189": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`",
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_pipe_target.i:f211c96492c6d0ca": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_record.i:fb0701e8893b9a62": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_recover.i:d6cdf02d84cb49fc": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an expression, found `=`",
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_segment_type.i:6f40cce0b0d3184f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a name, found `Int`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_spread.i:35e981cd82014d7b": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0107: `..rest` comes after the parts of a list"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_toplevel.i:f129fa05d8f322be": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_trailing.i:59909053e90d2f0e": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a type, found `,`",
-      "E0101: expected a type, found `,`",
-      "E0101: expected a part, found `)`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_type_group_break.i:8e5c19981e03ffda": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0112: a line break directly inside a `{ }` that groups a type is a compile error",
-      "E0112: a line break directly inside a `{ }` that groups a type is a compile error"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/literal_errors.i:70aae17e0ddfb0c0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0005: `_` may only be between two digits",
-      "E0005: `_` may only be between two digits",
-      "E0006: expected digits",
-      "E0005: `_` may only be between two digits",
-      "E0006: `2` is not a digit of base 2",
-      "E0007: this float literal is not a finite binary64 number",
-      "E0003: unknown escape",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0006: `12px` is not a number",
-      "E0008: `fooBar` is not a name, a discard, or an UpName",
-      "E0008: `Foo_bar` is not a name, a discard, or an UpName",
-      "E0008: `_1` is not a name, a discard, or an UpName",
-      "E0006: `1.0E5` is not a number",
-      "E0006: `G` is not a digit of base 16",
-      "E0006: `1.0e` is not a number",
-      "E0003: unknown escape",
-      "E0001: unexpected character `$`",
-      "E0002: this string is not closed"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:61e1e25bf9a2a4dc": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:e79adbe2811820c8": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:8babff013ab10019": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a name, found `Int`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:5214d3f67359d688": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:3330b7891521d6fc": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:62eabf4bc4d2293e": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:763c28c907fd0507": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a file has at most one imports group and one exports group"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:bd69aee627dca9be": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:be23c4ff74c9f73f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:04e24b46baf5040e": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:3ce334bfd693e428": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:b6a4ae21a4ba6902": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
+      "E0101: expected a label or a decimal after `.`, found `}`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ad4393882ff472b2": {
     "not_source": "TOML dependency-name test template"
-  },
-  "crates/ilang-syntax/tests/parse.rs:6ff9c37b544076f6": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{word}",
-        "if"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
   },
   "crates/ilang-package/tests/manifest.rs:d942f64886578d87": {
     "not_source": "TOML manifest or package-name token"
@@ -1010,49 +712,6 @@
   },
   "crates/ilang-package/tests/manifest.rs:a2c749a6a7e359fb": {
     "not_source": "TOML manifest or package-name token"
-  },
-  "crates/ilang-syntax/tests/parse.rs:d942f64886578d87": {
-    "prefix": "x = ",
-    "reason": "An ordinary name used by the lexical and naming regression"
-  },
-  "crates/ilang-syntax/tests/parse.rs:d46aee08cc49f6d1": {
-    "prefix": "x = ",
-    "reason": "An ordinary name used by the lexical and naming regression"
-  },
-  "crates/ilang-syntax/tests/parse.rs:bbfcd4160a1e8674": {
-    "prefix": "x = ",
-    "reason": "An ordinary name used by the lexical and naming regression"
-  },
-  "crates/ilang-syntax/tests/parse.rs:79d44e974dbc8474": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:96422ef1f554e5e2": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `{`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:180492297ecd3956": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `case`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:c1f607c4a9dd9c9d": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:b8cc3731431cdb8c": {
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
   },
   "crates/ilang-check/tests/types.rs:ce1f7bfbe647f15b": {
     "prefix": "f = (b, x) {\n  a0 = x\n",
@@ -1180,56 +839,28 @@
     "suffix": " []\n",
     "reason": "Hover locator fragment, completed with a value for parsing."
   },
-  "crates/ilang-syntax/tests/parse.rs:3518e3031dffcd42": {
-    "diagnostics": [
-      "E0101: Float has no literal types"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:b75557568ec562c8": {
-    "diagnostics": [
-      "E0101: Float has no literal types"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:8f873166378c94ef": {
-    "diagnostics": [
-      "E0101: Float has no literal types"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:cd6c009a54a14c8c": {
-    "diagnostics": [
-      "E0101: expected an integer literal after `-` in a type, found `x`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:c6eca6b04e22224f": {
-    "diagnostics": [
-      "E0101: expected an integer literal after `-` in a type, found `(`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:dcd481589ffd28e9": {
-    "diagnostics": [
-      "E0101: expected an integer literal after `-` in a type, found `-`"
-    ]
-  },
   "crates/ilang-check/tests/value_types.rs:d46aee08cc49f6d1": {
     "not_source": "Diagnostic message substring, not i source"
   },
   "tests/review/cases/review-a1/_loose/capture/original/.invalid/src/main.i:ce52e71b11ac93a4": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/capture/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/03_mixed_headers/original/.invalid/src/main.i:a9d9b44168dfeedb": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/04_header_order/original/.invalid/src/main.i:bc7528f08f9c0a6a": {
@@ -1247,43 +878,37 @@
   "tests/review/cases/review-a1/_loose/cases/11_attributed_header/original/.invalid/src/main.i:b5e2e8844dc75630": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/17_old_unbound_fn_group/original/.invalid/src/main.i:c0c365581d9f9e49": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/_loose/cases/18_old_expected_fn_group/original/.invalid/src/main.i:fc7e2229e11ead73": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/_loose/cases/20_old_alias_returns_fn/original/.invalid/src/main.i:aa26a225a69b2113": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/21_old_alias_typed_fn/original/.invalid/src/main.i:bd4205ecf70c889e": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i:964f0e757bb34246": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `:`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i:6fae0c21e165c75b": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression"
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/33_lower_constructor_pattern/original/.invalid/src/main.i:ddb34885a030720f": {
@@ -1295,20 +920,23 @@
   "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i:5162b76efcb2dfae": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0102: expected the function body, a `{` on the same line, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original/.invalid/src/main.i:9160f49b02878079": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: `|` joins only function literals: it may follow only the `}` of a function body",
+      "E0101: expected an expression, found `->`",
+      "E0106: a discard binds nothing, so it may not be used as a value"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/61_old_type_alias_join/original/.invalid/src/main.i:c78910db9cef477f": {
@@ -1320,43 +948,50 @@
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/capture/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i:bc7528f08f9c0a6a": {
@@ -1374,25 +1009,22 @@
   "tests/review/cases/review-a1/cases/11_attributed_header/.invalid/src/main.i:b5e2e8844dc75630": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
     ]
   },
   "tests/review/cases/review-a1/cases/18_old_expected_fn_group/.invalid/src/main.i:fc7e2229e11ead73": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/cases/21_old_alias_typed_fn/.invalid/src/main.i:bd4205ecf70c889e": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression"
     ]
   },
   "tests/review/cases/review-a1/cases/29_param_shadow/.invalid/src/main.i:6fae0c21e165c75b": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression"
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
   },
   "tests/review/cases/review-a1/cases/33_lower_constructor_pattern/.invalid/src/main.i:ddb34885a030720f": {
@@ -1404,37 +1036,42 @@
   "tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i:5162b76efcb2dfae": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0102: expected the function body, a `{` on the same line, found `->`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-from-old/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-keep-layout/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-plain/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`"
     ]
   },
   "tests/review/cases/review-k4c/cases/plain_1/.invalid/src/main.i:bd5b9fa7651d1619": {
@@ -1452,72 +1089,116 @@
   "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:36b001eec0ad49d6": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected a pattern, found `=`",
-      "E0101: expected a pattern, found `=`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
   },
   "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:78a3e8315e3cc25b": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0105: a block ends with an expression"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
   },
   "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:9a220740438b34de": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `!`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
   },
   "tests/review/cases/review-native3/injection_control/.invalid/src/resource.i:681a205b48798d32": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `,`, `?` or `)`, found `!`"
     ]
   },
   "tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i:21150877805e373b": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
-      "E0101: expected an expression, found `..`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
       "E0101: expected `}`, found `:`"
     ],
     "track": "T3"
@@ -1529,16 +1210,18 @@
       "E0101: expected `}`, found `:`",
       "E0101: expected `}`, found `:`",
       "E0101: expected `}`, found `:`",
-      "E0101: expected a type, found `..`",
-      "E0101: expected a type, found `..`"
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ],
     "track": "T3"
   },
   "tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i:5988d6050671f785": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
       "E0101: expected `}`, found `:`"
     ],
     "track": "T3"
@@ -1546,33 +1229,72 @@
   "tests/review/cases/review-runtime/echo-types/.invalid/src/main.i:033c3a6c2411563f": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0110: an item by position may not come after an item by label",
+      "E0110: an item by position may not come after an item by label",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-std1/stream/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: `:` is not written in a type: a label is `label = Type`, and a function type has no parameter names",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
   },
   "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:2bd0f8ec00250ab9": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `,` or `)`, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0102: expected the function body, a `{` on the same line, found `?`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: `:` is not written in a type: a label is `label = Type`, and a function type has no parameter names",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
   },
   "tests/browser/r2-laws.mjs:e3c0158bcdafc3f6": {
@@ -1819,129 +1541,92 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-syntax/tests/syn2.rs:a8f52cf6f8aec263": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:f34407eab7e7e309": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:9ae72ee3455756b6": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:8acdab015f1921c9": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:df058adca6eccda0": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a name, found `2`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:112761caa62e7257": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:6100ddd868490a15": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file",
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:6167fd29bbd38815": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:40c04e1066476b93": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:eb2f2775666edf45": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:b40bf9426d491496": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:25e81878720e617c": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected an expression, found `:`"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:ea9bf08abd8374b6": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `True`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: `|` joins only function literals: it may follow only the `}` of a function body",
+      "E0101: expected an expression, found `->`",
+      "E0106: a discard binds nothing, so it may not be used as a value"
     ]
   },
   "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:1de15bf30cc2d4ba": {
@@ -1951,147 +1636,252 @@
     ]
   },
   "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:40c04e1066476b93": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0105: a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0105: a block ends with an expression"
     ]
   },
   "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:677bf7e20bf770ff": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `,`, `?` or `)`, found `!`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
       "E0101: expected an expression, found `*`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `{` or `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
     ]
   },
   "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:3184611861f533da": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `,`, `?` or `)`, found `!`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found a line break before `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found a line break before `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found a line break before `!`",
       "E0101: expected an expression, found `*`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0101: expected `=`, found a line break before `app`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `{` or `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
     ]
   },
   "tests/review/cases/review-native3/alias/.invalid/src/main.i:29277826a986d622": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/direct/.invalid/src/main.i:2fcdef033b2b0fe3": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/external/.invalid/src/main.i:d502a7a7a4d34576": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/field/.invalid/src/main.i:9cca1d56794833b3": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `,`, `?` or `)`, found `!`"
     ]
   },
   "tests/review/cases/review-native3/injection_control/.invalid/src/main.i:abb9cd95ff009b02": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: expected `,` or `)`, found `=`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `,`, `?` or `)`, found `!`"
     ]
   },
   "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:72c356b5fbc3c09c": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/positive/.invalid/src/main.i:05223b2c9df25096": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected an expression, found `!`"
     ]
   },
   "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:d1e513c0f4edab11": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/update/.invalid/src/main.i:ce5ff1a67fbb1ae9": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
     ]
   },
   "tests/spec/1.7/a1_same_line_negative.i:13c31898de80a63a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: expected a pattern, found `->`"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/spec/1.7/a1_same_line_tuple.i:ad30ee59732b5c6a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0102: expected the function body, a `{` on the same line, found `->`"
     ]
   },
   "tests/spec/2.2/a1_empty_header.i:1e1dadc9eac538e0": {
@@ -2115,19 +1905,17 @@
   "tests/spec/6/a1_wrong_pattern.i:b85b9d281734af03": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/spec/6/syn2_empty_tuple_type.i:4dfd264ad80b24c8": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/spec/6/syn2_mixed_tuple.i:4434f59aa351dc4c": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
+      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
     ]
   },
   "crates/ilang-wasm/tests/control_lazy.rs:7111383378a50a4c": {
@@ -2193,16 +1981,6 @@
     ],
     "reason": "Render Rust format string with a representative port."
   },
-  "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`"
-    ]
-  },
   "tests/spec/3/syn2_old_empty_record_type.i:8e197a393e555c9d": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
@@ -2230,14 +2008,11 @@
   "tests/spec/6/syn2_old_mixed_tuple.i:6d95780125acbe2f": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
-      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
+      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
     ]
   },
   "tests/spec/7/syn2_old_empty_tuple_pattern.i:e2dca65404826320": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0108: the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record"
-    ]
+    "reason": "Intentional legacy migration or rejection fixture. (valid in syntax three)"
   },
   "crates/ilang-check/tests/front_end.rs:1b999808f689275a": {
     "reason": "Checker rejects the removed attribute.",
@@ -2270,7 +2045,7 @@
   },
   "crates/ilang-cli/tests/entries.rs:e030cd5ab195b536": {
     "diagnostics": [
-      "E0101: expected an expression, found `|`"
+      "E0101: `|` joins only function literals: it may follow only the `}` of a function body"
     ],
     "reason": "Intentional invalid bare pipe"
   },
@@ -2725,8 +2500,15 @@
   "editors/vscode/test/sample.i:c502997562f7493a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0003: unknown escape",
+      "E0001: `^` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `^`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `,`, `?` or `)`, found `!`",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
   },
   "crates/ilang-cli/src/commands/package.rs:df747cb87930f0f2": {
@@ -2738,43 +2520,42 @@
   "crates/ilang-syntax/tests/string_forms.rs:d8f95b5fb6532cf4": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected `,` or `)`, found `:`"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:46feaf394748b272": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected a type, found `a string`"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:cc4dd6b69b368079": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected a type, found `a string`"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:cbd9f653790dabf1": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is not allowed in patterns"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:d2e4ebd2c9e65f33": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is not allowed in attribute arguments"
-    ]
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern. (valid in syntax three)"
   },
   "crates/ilang-syntax/tests/string_forms.rs:f7892fa942823195": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected an UpName, found `a string`"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:e2bc8a6c691e2917": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:5c703ec833151f17": {
@@ -2802,39 +2583,37 @@
     ]
   },
   "tests/spec/6/interpolation_attribute.i:c48412aaddaa5301": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is not allowed in attribute arguments"
-    ]
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern. (valid in syntax three)"
   },
   "tests/spec/6/interpolation_import.i:ecd8ff798c1c584a": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected an UpName, found `a string`"
     ]
   },
   "tests/spec/6/interpolation_literal_type.i:75bb4c7f93c42554": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected a type, found `a string`"
     ]
   },
   "tests/spec/6/interpolation_pattern.i:88e260862f055ddf": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is not allowed in patterns"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/spec/6/interpolation_record_label.i:eeb9f0c09edfea15": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected `,` or `)`, found `:`"
     ]
   },
   "tests/spec/6/interpolation_type_label.i:45c2037bb33cc260": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
+      "E0101: expected a type, found `a string`"
     ]
   },
   "tests/spec/6/multiline_close.i:5e7a109bf6e238cc": {
@@ -2870,13 +2649,15 @@
   "tests/spec/7/suffix_nonliteral.i:08a91b960c1bc656": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0101: expected a string literal in a string pattern, found `x`"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/spec/7/suffix_two_binders.i:09f5fa9e575099c6": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
-      "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
+      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
+      "E0101: expected an expression, found `->`"
     ]
   },
   "crates/ilang-cli/tests/numeric_lowering.rs:49d6c886ab6b1ef2": {
@@ -2998,8 +2779,8 @@
     "reason": "Robustness test: broken input on purpose",
     "diagnostics": [
       "E0010: `{` is not closed",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
       "E0010: `(` is not closed",
-      "E0101: expected `,` or `)`, found `=`",
       "E0010: `{` is not closed",
       "E0101: expected a closed `{`, found `{`",
       "E0010: `(` is not closed",
