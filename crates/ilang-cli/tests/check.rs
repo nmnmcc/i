@@ -1,5 +1,8 @@
 //! `i check --types` prints the type of every top-level name.
 
+#[path = "common/test_project.rs"]
+mod test_project;
+
 use std::process::Command;
 
 #[test]
@@ -329,11 +332,11 @@ fn migration_flags_are_removed() {
 fn disjoint_comparisons_are_warnings_in_check_and_test() {
     // W520/§6.9: warning-only programs succeed; both comparisons have Bool.
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/comparison.i"),
-        "value = 1 == 2\n@test\ncomparison = () { assert(1 != 2) }\n",
+        "(testlib = (test) = std/test)\n\nvalue = 1 == 2\n\ntest(\"comparison\", () { assert(1 != 2) })\n",
     )
     .unwrap();
     for args in [

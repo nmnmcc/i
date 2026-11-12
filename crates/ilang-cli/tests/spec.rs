@@ -24,7 +24,7 @@
 //! those, in order.
 //!
 //! - `pass`: the entry, when there is one, ends without a stop, and every
-//!   `@test` passes.
+//!   collected test passes.
 //! - `warning <code>`: as `pass`, and the compiler gives that warning.
 //! - `stop "…"`: the entry stops, and the first line of the stop message is
 //!   the text. With `at` lines, the other lines of the message are exactly
@@ -34,9 +34,9 @@
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
 
-use ilang_cli::{BuildError, BuildOptions, Level, build_entry, build_tests, run_test_with};
+use ilang_cli::{BuildError, BuildOptions, Level, build_entry, build_tests};
 use ilang_host::services::{Log, testing};
-use ilang_host::{HostOptions, Outcome, Program, TestResult};
+use ilang_host::{HostOptions, Outcome, Program};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -234,7 +234,12 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
     let result = if collection.is_some() {
         build_tests(project, options, collection)
     } else {
-        build_entry(project, options, spec_entry::named_entry(project, true).as_deref()).map(|built| (built, Vec::new()))
+        build_entry(
+            project,
+            options,
+            spec_entry::named_entry(project, true).as_deref(),
+        )
+        .map(|built| (built, Vec::new()))
     };
     let (built, entries) = match result {
         Ok(value) => value,
@@ -259,17 +264,6 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
         }),
     };
     let mut tests = Vec::new();
-    for t in &program.abi().tests {
-        if t.name.starts_with("i.tool.") {
-            continue;
-        }
-        let r = match run_test_with(&program, &t.name, options(&Log::default())) {
-            TestResult::Passed => Ok(()),
-            TestResult::Stopped(stop) => Err(stop_text(&stop)),
-            TestResult::Failed(e) => return Err(format!("{}: {e:#}", t.name)),
-        };
-        tests.push((t.name.clone(), r));
-    }
     for entry in entries {
         let index = entry.handle.rsplit(':').next().unwrap();
         let export = format!("i.tool.{index}");
@@ -347,7 +341,7 @@ fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
                 return Err(format!("the entry stopped:\n{m}"));
             }
             if main.is_none() && tests.is_empty() {
-                return Err("the case has no entry and no @test".into());
+                return Err("the case has no entry and no collected test".into());
             }
             for (name, r) in tests {
                 if let Err(m) = r {

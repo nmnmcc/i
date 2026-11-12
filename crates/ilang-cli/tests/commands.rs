@@ -2,6 +2,8 @@
 
 use ilang_cli::{BuildOptions, Level, build};
 use ilang_host::{BitArray, HostOptions, Outcome, Program, Value};
+#[path = "common/test_project.rs"]
+mod test_project;
 use std::path::Path;
 use std::process::Command;
 
@@ -11,6 +13,9 @@ fn package(files: &[(&str, &str)]) -> tempfile::TempDir {
         let path = dir.path().join(path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
+    }
+    if files.iter().any(|(_, source)| source.contains("std/test")) {
+        test_project::configure(dir.path());
     }
     dir
 }
@@ -116,7 +121,7 @@ fn test_runs_each_test() {
         ("src/lib.i", " (twice)\n\ntwice = (n: Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            " (app/lib)\n\n@test\ngood = () {  lib.twice(2) |> { 4 -> Nil  _ -> panic(\"no\") } }\n\n@test\nbad = () { panic(\"bad\") }\n",
+            " (\n\ttestlib = (test) = std/test\n\tapp/lib)\n\n\ntest(\"good\", () {  lib.twice(2) |> { 4 -> Nil  _ -> panic(\"no\") } })\n\n\ntest(\"bad\", () { panic(\"bad\") })\n",
         ),
     ]);
     let out = i(&["test"], dir.path());
@@ -503,7 +508,7 @@ fn async_entry_points_and_needed_services() {
             "@host(\"test:unused/v1\")\nUnused { Unused(f: () -> Nil) }\n\n\nmain = () { Nil }\n",
         ),
     ]);
-    let built = build(
+    let (built, _) = ilang_cli::build_tests(
         dir.path(),
         BuildOptions {
             tests: true,
@@ -511,6 +516,7 @@ fn async_entry_points_and_needed_services() {
             offline: false,
             target: Default::default(),
         },
+        Some("std/test.tests"),
     )
     .unwrap();
     let program = Program::from_bytes(&built.wasm).unwrap();
@@ -521,13 +527,7 @@ fn async_entry_points_and_needed_services() {
         .iter()
         .map(|t| (t.name.as_str(), t.is_async))
         .collect();
-    assert_eq!(
-        tests,
-        [
-            ("spec/fake_service.with_fakes", false),
-            ("spec/fake_service.with_the_host", true)
-        ]
-    );
+    assert_eq!(tests, [("i.tool.0", false), ("i.tool.1", true)]);
     // `Kv` is given by a fake in both tests, and nothing needs `Unused`.
     assert_eq!(abi.services.keys().collect::<Vec<_>>(), ["test:async/v1"]);
 }
@@ -570,7 +570,7 @@ fn run_gives_the_standard_services() {
         ),
         (
             "test/main_test.i",
-            " (i/io)\n\n@test\nprints = (out ! io.Io) { out.print(\"in a test\") }\n",
+            " (\n\ttestlib = (test) = std/test\n\ti/io)\n\n\ntest(\"prints\", (out ! io.Io) { out.print(\"in a test\") })\n",
         ),
     ]);
     let out = i(&["run"], dir.path());
@@ -598,11 +598,11 @@ fn an_error_stops_a_test() {
         ("i.toml", "name = \"app\"\n"),
         (
             "test/app_test.i",
-            " (i/fail)\n\nf = (n) { fail.raise(n) }\n\n@test\nraises = () {\n  f(\"oops\")\n  Nil\n}\n",
+            " (\n\ttestlib = (test) = std/test\n\ti/fail)\n\nf = (n) { fail.raise(n) }\n\n\ntest(\"raises\", () {\n  f(\"oops\")\n  Nil\n})\n",
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
-        let built = build(
+        let (built, _) = ilang_cli::build_tests(
             dir.path(),
             BuildOptions {
                 tests: true,
@@ -610,13 +610,14 @@ fn an_error_stops_a_test() {
                 offline: false,
                 target: Default::default(),
             },
+            Some("std/test.tests"),
         )
         .unwrap();
         let program = Program::from_bytes(&built.wasm).unwrap();
-        match ilang_cli::run_test(&program, "app/app_test.raises") {
+        match ilang_cli::run_test(&program, "i.tool.0") {
             ilang_host::TestResult::Stopped(stop) => assert_eq!(
                 stop.message.as_deref(),
-                Some("error: \"oops\"\napp/app_test:6:1")
+                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from std/test:5:73")
             ),
             other => panic!("{other:?}"),
         }

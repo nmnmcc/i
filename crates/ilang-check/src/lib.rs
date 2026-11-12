@@ -221,7 +221,6 @@ pub fn check_compiler_exports(
     for module in &mut program.modules {
         for binding in &mut module.bindings {
             binding.main = false;
-            binding.test = false;
         }
     }
     program.host_exports.clear();
@@ -308,7 +307,6 @@ pub fn check_parsed_for_tools(graph: &PackageGraph, parsed: &[Parsed]) -> Checke
     for module in &mut program.modules {
         for binding in &mut module.bindings {
             binding.main = false;
-            binding.test = false;
         }
     }
     program.host_exports.clear();

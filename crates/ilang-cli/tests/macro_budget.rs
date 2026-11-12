@@ -1,4 +1,6 @@
 //! Resource accounting is a property of the macro language, not Wasm fuel.
+#[path = "common/test_project.rs"]
+mod test_project;
 use ilang_host::macro_budget::{Limit, Limits, MacroBudget, Usage};
 use ilang_host::{HostImports, HostOptions, Outcome, Program};
 
@@ -67,7 +69,8 @@ fn run(wasm: &[u8], limits: Limits) -> (Result<Outcome, anyhow::Error>, MacroBud
 
 #[test]
 fn charges_are_identical_before_and_after_optimization() {
-    let source = "f = (n) { n |> { 0 -> [\"end\"] _ -> [\"x\", ..f(n - 1)] } }\n\nmain = () { f(5) Nil }\n";
+    let source =
+        "f = (n) { n |> { 0 -> [\"end\"] _ -> [\"x\", ..f(n - 1)] } }\n\nmain = () { f(5) Nil }\n";
     let a = compile(source, false);
     let b = compile(source, true);
     let (out_a, count_a) = run(&a, Limits::default());
@@ -145,9 +148,8 @@ fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
 
 #[test]
 fn data_dependent_work_and_allocation_grow_with_values() {
-    let program = |content: &str| {
-        format!("f = (s) {{ s <> s }}\n\nmain = () {{ f(\"{content}\") Nil }}\n")
-    };
+    let program =
+        |content: &str| format!("f = (s) {{ s <> s }}\n\nmain = () {{ f(\"{content}\") Nil }}\n");
     let small = compile(&program("a"), false);
     let large = compile(&program(&"a".repeat(512)), false);
     let (a, small_budget) = run(&small, Limits::default());
@@ -174,15 +176,13 @@ fn frame_accounting_restores_after_errors_and_continuation_resume() {
 fn control_and_error_handlers_preserve_frame_accounting() {
     let source = include_str!("../../../tests/spec/9/control.i");
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(dir.path().join("test/main.i"), source).unwrap();
-    let (graph, diags) = ilang_package::load(dir.path());
-    assert!(diags.is_empty(), "{diags:?}");
-    let checked = ilang_check::check(&graph);
-    let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
-    assert!(errors.is_empty(), "{errors:?}");
-    let (wasm, _) = ilang_wasm::compile_macro(
+    let selected = test_project::selected(dir.path(), false);
+    let graph = selected.graph;
+    let checked = selected.checked;
+    let (wasm, _) = ilang_wasm::compile_macro_tests(
         &graph,
         checked.program.as_ref().unwrap(),
         checked.types.as_ref().unwrap(),
@@ -190,6 +190,7 @@ fn control_and_error_handlers_preserve_frame_accounting() {
             tests: true,
             ..Default::default()
         },
+        &selected.exports,
     )
     .unwrap();
     let optimized = ilang_cli::optimize(&wasm, ilang_binaryen::Level::O2).unwrap();
@@ -237,27 +238,27 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
     };
     use std::collections::BTreeSet;
     let source = r#"
-      (syntax = i/syntax)
+      (
+	testlib = (test) = std/test
+	syntax = i/syntax)
       @external("test:syntax", "source")
       source: () -> syntax.Syntax
-      @test
-      exercise = () {
+
+      test("exercise", () {
         x = source()
         assert(syntax.same_code(x, x))
         assert(syntax.show(x) != "")
         Nil
-      }
+      })
     "#;
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(dir.path().join("test/main.i"), source).unwrap();
-    let (graph, diags) = ilang_package::load(dir.path());
-    assert!(diags.is_empty(), "{diags:?}");
-    let checked = ilang_check::check(&graph);
-    let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
-    assert!(errors.is_empty(), "{errors:?}");
-    let (wasm, _) = ilang_wasm::compile_macro(
+    let selected = test_project::selected(dir.path(), false);
+    let graph = selected.graph;
+    let checked = selected.checked;
+    let (wasm, _) = ilang_wasm::compile_macro_tests(
         &graph,
         checked.program.as_ref().unwrap(),
         checked.types.as_ref().unwrap(),
@@ -265,6 +266,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
             tests: true,
             ..Default::default()
         },
+        &selected.exports,
     )
     .unwrap();
     let optimized = ilang_cli::optimize(&wasm, ilang_binaryen::Level::O2).unwrap();

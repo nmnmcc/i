@@ -3,6 +3,8 @@
 //! (`ILANG_GIT_URLS`) and a cache in a temporary directory (`ILANG_CACHE`).
 //! Nothing here uses the network.
 
+#[path = "common/test_project.rs"]
+mod test_project;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -206,11 +208,11 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     let out = w.ok(&["new", "demo"]);
     assert!(out.contains("demo"), "{out}");
     let dir = w.path().join("demo");
-    assert_eq!(read(&dir.join("i.toml")), "name = \"demo\"\n");
+    assert_eq!(read(&dir.join("i.toml")), test_project::manifest("demo"));
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
     assert!(read(&dir.join("src/main.i")).contains("main = (io ! Io)"));
-    assert!(read(&dir.join("test/main_test.i")).contains("@test"));
+    assert!(read(&dir.join("test/main_test.i")).contains("test(\"greets\""));
 
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);
@@ -561,10 +563,11 @@ fn published(w: &World, src: &str) -> PathBuf {
             ("src/api.i", src),
             (
                 "test/api_test.i",
-                " (pub/api)\n\n@test\nworks = () {\n   api.one |> {\n    1 -> Nil\n    other -> panic(\"no\")\n  }\n}\n",
+                " (\n\ttestlib = (test) = std/test\n\tpub/api)\n\n\ntest(\"works\", () {\n   api.one |> {\n    1 -> Nil\n    other -> panic(\"no\")\n  }\n})\n",
             ),
         ],
     );
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     dir
@@ -858,6 +861,7 @@ fn two_types(w: &World, name: &str, api: &str) -> PathBuf {
             ("src/api.i", api),
         ],
     );
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -960,6 +964,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
     );
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     w.ok(&["publish", "1.0.0", "--project", &project]);
@@ -989,6 +994,7 @@ fn publish_sees_what_the_host_must_give() {
             ("src/api.i", api),
         ],
     );
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1036,6 +1042,7 @@ fn publish_sees_the_standard_service_of_i_io() {
             ("src/api.i", api),
         ],
     );
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1092,6 +1099,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
     );
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     w.ok(&["publish", "1.0.0", "--project", &project]);
@@ -1127,6 +1135,7 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
             ("src/api.i", api),
         ],
     );
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1318,6 +1327,7 @@ fn publish_keeps_literal_alias_values_beyond_hover_limits() {
             ("src/api.i", &api),
         ],
     );
+    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();

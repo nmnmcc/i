@@ -66,8 +66,8 @@ copied or built.
   only that name; its body still counts as references to other bindings.
 - Spec §2.5 says a top-level value is worked out at start. The warning is
   about unused names and never removes initialization or changes Wasm.
-- Scope rule 5's hint is confined to test modules: spec §2.2 permits `@test`
-  only there. Environment parameters are allowed on test entries (§10.2).
+- Scope rule 5's hint is confined to test modules and recommends registering
+  the function with the ordinary `test` macro. Environment parameters are allowed on test entries (§10.2).
   The result must be inferred as the prelude's nominal `Nil`, not a type
   merely spelled `Nil`, and must not be `Never` or a union containing `Nil`.
 - Each pattern name is checked separately (scope rule 1, "a top-level

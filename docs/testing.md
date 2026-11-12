@@ -22,7 +22,7 @@ CLI. The existing `old-syntax-check` still scans and asserts their exact parser
 diagnostics; no parser-negative input is treated as a successful parse.
 
 After the original type check, accepted packages run from a temporary copy with
-one extra `@test` returning Nil. This uses the existing test runner to exercise
+one extra `test("qa_startup", () { Nil })`. This uses the existing test runner to exercise
 top-level initialization (§2.5), including libraries that otherwise run zero
 tests. Original mains and tests still run; the shown-type baseline comes from
 the original package. Dependencies keep their original absolute locations.

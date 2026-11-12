@@ -74,7 +74,7 @@ fn entries_tests_and_ordinary_exports_retain_their_helpers() {
             ("src/api.i", "(api)\napi = () { hidden }\nhidden = 1"),
             (
                 "test/check.i",
-                "(app/api)\nhelper = () { api.api() }\n@test check = () { helper()\nNil }"
+                "(app/api)\nhelper = () { api.api() }\n_check = () { helper()\nNil }"
             ),
         ])
         .is_empty()
@@ -93,7 +93,7 @@ fn test_exports_need_reachable_package_uses() {
             ),
             (
                 "test/check.i",
-                "((used, imported_only) = app/helpers)\n@test check = () { used() }\ndead_caller = () { helpers.dead() }"
+                "((used, imported_only) = app/helpers)\n_check = () { used() }\ndead_caller = () { helpers.dead() }"
             ),
         ]),
         ["dead_caller", "imported_only"]
@@ -126,7 +126,7 @@ fn each_pattern_name_is_checked_without_retaining_its_siblings() {
 
 #[test]
 fn hint_requires_test_module_no_value_parameters_and_exact_nil() {
-    // Rule 5: only a function that could have @test gets the hint.
+    // Rule 5: only a function that could be passed to the test macro gets the hint.
     let ws = warnings(&[
         ("src/main.i", "ordinary = () { Nil }"),
         (
@@ -163,7 +163,7 @@ with_environment = (a ! Assert) { assert(True) }
             format!(
                 "top-level binding `{n}` is not used{}",
                 if hint {
-                    "; did you forget `@test`?"
+                    "; did you forget to register this function with `test`?"
                 } else {
                     ""
                 }

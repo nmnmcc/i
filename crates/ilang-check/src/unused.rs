@@ -24,12 +24,8 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
                 index: di as u32,
             };
             match &d.kind {
-                DefKind::Binding { binding, .. } => {
-                    let b = &m.bindings[*binding as usize];
-                    if (d.exported && m.kind != ModuleKind::Test)
-                        || is_package_entry(p, id)
-                        || b.test
-                    {
+                DefKind::Binding { .. } => {
+                    if (d.exported && m.kind != ModuleKind::Test) || is_package_entry(p, id) {
                         references.pending.push(id);
                     }
                 }
@@ -69,7 +65,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
             let mut message = format!("top-level binding `{}` is not used", d.name);
             if m.kind == ModuleKind::Test && test_shaped.contains(&id) {
-                message.push_str("; did you forget `@test`?");
+                message.push_str("; did you forget to register this function with `test`?");
             }
             diags.push(Diagnostic::warning(
                 code::UNUSED_BINDING,

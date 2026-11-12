@@ -1,3 +1,4 @@
 src/main.i:3:1: error[E0304]: a program entry is on a binding whose value is a function expression
-src/main.i:17:1: error[E0305]: `@test` may only be in a module under `test/`
-test/ok_test.i:4:1: error[E0312]: an entry point has no parameters but environment parameters, so `@test` may not be on this function
+src/main.i:13:1: error[E0301]: the attribute `@test` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`
+test/ok_test.i:2:1: error[E0301]: the attribute `@test` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`
+test/ok_test.i:5:1: error[E0301]: the attribute `@test` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`

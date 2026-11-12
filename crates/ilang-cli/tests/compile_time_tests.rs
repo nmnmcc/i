@@ -1,4 +1,7 @@
 //! Compile-time bindings are selected by ordinary dependency reachability.
+#[path = "common/test_project.rs"]
+mod test_project;
+
 use std::path::Path;
 
 fn write(root: &Path, path: &str, text: &str) {
@@ -12,6 +15,16 @@ fn build(
     tests: bool,
     opt: ilang_cli::Level,
 ) -> Result<ilang_cli::Built, ilang_cli::BuildError> {
+    let options = ilang_cli::BuildOptions {
+        tests,
+        opt,
+        offline: true,
+        target: ilang_cli::Target::Native,
+    };
+    if tests {
+        return ilang_cli::build_tests(root, options, Some("std/test.tests"))
+            .map(|(built, _)| built);
+    }
     ilang_cli::build(
         root,
         ilang_cli::BuildOptions {
@@ -116,6 +129,7 @@ fn tests_use_each_builds_unmarked_quote_templates() {
     for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
         let dir = fixture();
         let root = dir.path();
+        test_project::configure(root);
         // The ordinary entry is not executed by i test and may itself use the
         // same helper while the test instance has the syntax service.
         write(
@@ -126,18 +140,19 @@ fn tests_use_each_builds_unmarked_quote_templates() {
         write(
             root,
             "test/check.i",
-            "(app/forward, syntax = i/syntax)\n@test\ncheck = () { assert(syntax.show(forward.forward()) == \"(f x)\") Nil }\n",
+            "(\n\ttestlib = (test) = std/test\n\tapp/forward, syntax = i/syntax)\n\ntest(\"check\", () { assert(syntax.show(forward.forward()) == \"(f x)\") Nil })\n",
         );
         write(
             root,
             "test/quote.is",
-            "(, (= syntax (/ i syntax)))\n(= quoted `(a b))\n(@ test (= quote_test (-> () _ { (assert (== ((. syntax show) quoted) \"(a b)\")) Nil })))\n",
+            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> () _ { (assert (== ((. syntax show) quoted) \"(a b)\")) Nil }))\n",
         );
         let built = build(root, true, opt).unwrap();
-        assert!(built.templates.len() >= 2);
-        assert!(built.templates.iter().all(|s| s.scope().marks.is_empty()));
+        let templates = built.templates.iter().filter(|s| matches!(s.show().as_str(), "(f x)" | "(a b)")).collect::<Vec<_>>();
+        assert_eq!(templates.len(), 2, "both fixture quotes must survive");
+        assert!(templates.iter().all(|s| s.scope().marks.is_empty()));
         let modules: std::collections::HashSet<_> =
-            built.templates.iter().map(|s| s.scope().module).collect();
+            templates.iter().map(|s| s.scope().module).collect();
         assert_eq!(modules.len(), 2, "templates must keep their source module");
         let program = built.host_program().unwrap();
         let names: Vec<_> = program.abi().tests.iter().map(|t| t.name.clone()).collect();

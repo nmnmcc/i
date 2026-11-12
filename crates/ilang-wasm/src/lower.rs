@@ -1188,7 +1188,7 @@ impl<'a> Lowerer<'a> {
                 continue;
             }
             for b in &m.bindings {
-                if !(b.main || b.test) || b.defs.len() != 1 {
+                if !b.main || b.defs.len() != 1 {
                     continue;
                 }
                 let d = b.defs[0];
@@ -1205,11 +1205,7 @@ impl<'a> Lowerer<'a> {
                     site,
                     async_body,
                 });
-                if b.main {
-                    entry = Some((name, is_async));
-                } else {
-                    tests.push((name, is_async));
-                }
+                entry = Some((name, is_async));
             }
         }
         for (d, name) in self.extra_tests.clone() {

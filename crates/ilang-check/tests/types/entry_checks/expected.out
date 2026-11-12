@@ -19,7 +19,6 @@ app/main_test.gives_int : () -> 1
 app/main_test.needs_clock : () -> Nil ! Assert | Clock
 app/main_test.never : () -> Never
 src/main.i:65:37: error[E0515]: `1` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 65:26 needs it)
-test/main_test.i:14:1: error[E0521]: `gives_int` is a test, so it gives `Nil` (§10.2), but it gives `1`
 src/main.i:55:1: error[E0521]: `never` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `Never`
 src/main.i:57:1: error[E0521]: `never_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `Never`
 src/main.i:59:1: error[E0521]: `bad_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `List(Int)`
@@ -29,3 +28,4 @@ src/main.i:63:1: error[E0521]: `generic` is a host export, so the value must be 
 src/main.i:65:1: error[E0521]: `bad_errors` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `(Int, Int)`
 src/main.i:67:1: error[E0521]: `twice_error` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `Handle`
 src/main.i:70:1: error[E0521]: `number` is a host export, so it is a function (§10.2), but its type is `1`
+test/main_test.i:11:1: error[E0521]: the selected entry `gives_int` must give `Nil` for this consumer, but it gives `1`

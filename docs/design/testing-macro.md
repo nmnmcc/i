@@ -23,17 +23,11 @@ execute application code. Suites and cases compose.
 
 A package opts in with `[test] collection = "std/test.tests"` in `i.toml` and
 a dependency on `std`. The runner reads the general collection manifest, selects
-entries with that qualified collection identity, and compiles and runs each
-selected root. Metadata supplies display names and modes, not type information.
-`only` selects focused entries; `skip` is reported without execution. Legacy
-`@test` entries remain available during migration.
+entries with that qualified collection identity, and compiles all selected roots into one artifact, then runs each in a fresh instance. Metadata supplies display names and modes, not type information.
+`only` selects focused entries; `skip` is reported without execution.
 
-The existing 3,015 `@test` functions can be migrated mechanically: add the
-import and test collection configuration, replace each `@test name = () { body }`
-with `test("name", () { body })`, preserve the body and comments, and then run
-`i fmt` and `i test`. Scripts should use the parser, rather than regular
-expressions, to preserve multiline bodies and annotations. The old attribute is
-removed only after all packages have migrated.
+`@test` has been removed. Only the configured collection supplies tests; there is
+no attribute discovery or compatibility path.
 
 Prior art: ExUnit's `case.ex` defines a function and registers its metadata;
 Rust's `library/test` executes a collected descriptor list; Effect Vitest's
@@ -43,7 +37,9 @@ Rust's `library/test` executes a collected descriptor list; Effect Vitest's
 ## Migration
 
 Run `scripts/test-macro-migrate <dir>...` on package directories or individual
-`.i` files. The tool uses parser spans, keeps the original body and comments,
+`.i` files. Use `--embedded --standalone` to include Rust and JavaScript
+literals, Markdown i fences, and editor corpus sections. Embedded temporary
+package manifests must also configure the collection and depend on `std`. The tool uses parser spans, keeps the original body and comments,
 and adds the collection and a `std` dependency where needed. It preserves a
 function when its name is referenced or exported. Re-running it is idempotent.
 
@@ -53,7 +49,4 @@ with tests, and source files without a package manifest (except standalone spec
 fixtures). In particular, a fixture testing the validity of `@test` itself
 cannot be converted without changing the subject of that fixture.
 
-On a copy of `std`, 1,845 tests passed at `--opt 0` both before and after
-migration. The copied spec corpus contains 239 migrated test functions; all 83 cases
-passed at `--opt 0` and `--opt 2`. One fixture retains its invalid
-`@main`/`@test` combination for manual review.
+See `test-migrate-report.md` for repository migration counts and validation.

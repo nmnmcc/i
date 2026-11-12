@@ -144,7 +144,6 @@ struct Attrs {
     external: Option<(String, String)>,
     host: Option<Host>,
     main: bool,
-    test: bool,
     deprecated: Option<String>,
 }
 
@@ -459,21 +458,6 @@ impl<'a> Resolver<'a> {
                 remaining.attributes.retain(|attribute| {
                     !(attribute.module.is_none() && attribute.name.name == "macro")
                 });
-                for attribute in &remaining.attributes {
-                    if attribute.module.is_none()
-                        && matches!(attribute.name.name.as_str(), "main" | "test")
-                    {
-                        self.error(
-                            code::ATTRIBUTE_PLACE,
-                            attribute.span,
-                            format!("`@{}` cannot be put on a macro", attribute.name.name),
-                        );
-                    }
-                }
-                remaining.attributes.retain(|attribute| {
-                    attribute.module.is_some()
-                        || !matches!(attribute.name.name.as_str(), "main" | "test")
-                });
                 self.attributes(&remaining);
                 if let ast::ItemKind::Binding(binding) = &item.kind {
                     let mut names = Vec::new();
@@ -519,25 +503,12 @@ impl<'a> Resolver<'a> {
                     None => default,
                 };
                 if default || !declared.is_empty() {
-                    self.entry_form("entry", b.pattern.span, b, true);
+                    self.entry_form(b.pattern.span, b);
                 }
                 if self.graph.entry.is_some() {
                     attrs.main = selected;
                 } else if selected {
                     attrs.main = true;
-                }
-                if attrs.main
-                    && attrs.test
-                    && !item
-                        .attributes
-                        .iter()
-                        .any(|a| a.module.is_none() && a.name.name == "main")
-                {
-                    self.error(
-                        code::EXPORT_NAME_TWICE,
-                        b.pattern.span,
-                        "a function cannot be both the program entry and a test",
-                    );
                 }
             }
             let slot = match &item.kind {
@@ -601,7 +572,6 @@ impl<'a> Resolver<'a> {
                         },
                         defs,
                         main: attrs.main,
-                        test: attrs.test,
                     });
                     Slot::Binding(index)
                 }
@@ -771,15 +741,14 @@ impl<'a> Resolver<'a> {
     fn attributes(&mut self, item: &ast::Item) -> Attrs {
         let mut out = Attrs::default();
         let mut seen = HashSet::new();
-        let is_test_module = self.p.module(self.cur).kind == ModuleKind::Test;
         for a in &item.attributes {
             let name = a.name.name.as_str();
             let written = a
                 .module
                 .as_ref()
                 .map_or_else(|| format!("@{name}"), |m| format!("@{}.{name}", m.name));
-            if a.module.is_some() || !matches!(name, "external" | "host" | "test" | "deprecated") {
-                self.error(code::UNKNOWN_ATTRIBUTE, a.span, format!("the attribute `{written}` is kept for macros; the built-in attributes are `@external`, `@host`, `@test`, and `@deprecated`"));
+            if a.module.is_some() || !matches!(name, "external" | "host" | "deprecated") {
+                self.error(code::UNKNOWN_ATTRIBUTE, a.span, format!("the attribute `{written}` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`"));
                 continue;
             }
             if !seen.insert(name) {
@@ -802,18 +771,12 @@ impl<'a> Resolver<'a> {
                     matches!(item.kind, ast::ItemKind::TypeDef(_)),
                     "a type definition",
                 ),
-                "test" => (
-                    &[0],
-                    matches!(item.kind, ast::ItemKind::Binding(_)),
-                    "a binding",
-                ),
                 "deprecated" => (&[1], true, "any item"),
                 _ => unreachable!(),
             };
             let form = match name {
                 "external" => r#"`@external("module", "function")`"#,
                 "host" => r#"`@host("namespace")` or `@host("namespace", "async")`"#,
-                "test" => "`@test`, with no arguments",
                 _ => r#"`@deprecated("note")`"#,
             };
             if let Some((args, _)) = &a.call {
@@ -870,28 +833,6 @@ impl<'a> Resolver<'a> {
                         });
                     }
                 }
-                "test" => {
-                    let ast::ItemKind::Binding(b) = &item.kind else {
-                        unreachable!()
-                    };
-                    let compiled = Some(self.p.module(self.cur).package) == self.graph.root;
-                    if !self.entry_form(name, a.span, b, compiled) {
-                        continue;
-                    }
-                    if name == "test" && !is_test_module {
-                        if out.main {
-                            self.error(code::EXPORT_NAME_TWICE, a.span,
-                                "this function is the program entry and also a test, so their export names would be the same (B.5)");
-                        }
-                        self.error(
-                            code::TEST_OUTSIDE_TEST,
-                            a.span,
-                            "`@test` may only be in a module under `test/`",
-                        );
-                        continue;
-                    }
-                    out.test = true;
-                }
                 _ => out.deprecated = Some(args[0].to_string()),
             }
         }
@@ -911,15 +852,11 @@ impl<'a> Resolver<'a> {
         out
     }
 
-    /// Entries and tests bind one name to a function; compiled entries take no value parameters.
-    fn entry_form(&mut self, name: &str, span: Span, b: &ast::Binding, compiled: bool) -> bool {
+    /// Entries bind one name to a function; compiled entries take no value parameters.
+    fn entry_form(&mut self, span: Span, b: &ast::Binding) -> bool {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
-        let written = if name == "entry" {
-            "a program entry".to_string()
-        } else {
-            format!("`@{name}`")
-        };
+        let written = "a program entry";
         let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
             self.error(
                 code::ENTRY_FORM,
@@ -936,7 +873,7 @@ impl<'a> Resolver<'a> {
             );
             return false;
         }
-        if compiled && f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
+        if f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
             self.error(
                 code::ENTRY_PARAMS,
                 span,
@@ -4097,11 +4034,11 @@ impl<'a> Resolver<'a> {
                         && self.p.module(d.module).package == root
                     {
                         let b = &self.p.module(d.module).bindings[binding as usize];
-                        if b.main || b.test {
+                        if b.main {
                             problem = Some((
                                 code::WASM_EXPORT_ENTRY,
                                 format!(
-                                    "`{}.{}` is a host export and also the program entry or a test, so their export names would be the same",
+                                    "`{}.{}` is a host export and also the program entry, so their export names would be the same",
                                     e.module, e.function
                                 ),
                             ));

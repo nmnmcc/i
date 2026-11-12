@@ -17,6 +17,6 @@ fn unused_binding_warning_keeps_check_successful() {
     assert!(result.status.success(), "{result:?}");
     assert_eq!(
         String::from_utf8(result.stderr).unwrap(),
-        "test/forgotten.i:1:1: warning[W0504]: top-level binding `forgotten` is not used; did you forget `@test`?\n"
+        "test/forgotten.i:1:1: warning[W0504]: top-level binding `forgotten` is not used; did you forget to register this function with `test`?\n"
     );
 }

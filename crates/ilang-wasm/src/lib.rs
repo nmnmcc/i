@@ -90,7 +90,7 @@ fn add_provider_section(wasm: &mut Vec<u8>, bindings: &[serde_json::Value]) {
     );
 }
 
-/// Compile ordinary tests and collected test roots into one artifact.
+/// Compile consumer-selected test roots into one artifact.
 pub fn compile_tests_with_bindings(
     graph: &PackageGraph,
     program: &hir::Program,
@@ -152,6 +152,27 @@ pub fn compile_macro(
     options.target = Target::Host;
     let (ir, bindings) =
         lower::lower_with_bindings(graph, program, typed, options).map_err(Error::Diagnostics)?;
+    compile_metered(ir, bindings)
+}
+
+/// Compile consumer-selected test roots with the macro resource meter.
+pub fn compile_macro_tests(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    mut options: Options,
+    tests: &[(hir::DefId, String)],
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    options.target = Target::Host;
+    let (ir, bindings) = lower::lower_tests_with_bindings(graph, program, typed, options, tests)
+        .map_err(Error::Diagnostics)?;
+    compile_metered(ir, bindings)
+}
+
+fn compile_metered(
+    ir: ir::Program,
+    bindings: Vec<serde_json::Value>,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
     let (text, cost) = emit::wat_metered(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);

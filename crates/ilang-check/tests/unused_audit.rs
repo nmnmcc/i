@@ -35,13 +35,8 @@ fn unused_audit() {
         let text = std::fs::read_to_string(&path).unwrap();
         let (module, _) = ilang_syntax::parse_module(&text);
         for item in module.items {
-            let ast::ItemKind::Binding(b) = &item.kind else {
-                continue;
-            };
-            if item
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "test")
+            if matches!(&item.kind, ast::ItemKind::MacroItem { name, .. }
+                if matches!(name.name.as_str(), "test" | "skip" | "only" | "fails"))
             {
                 tests += 1;
                 let group = if relative.starts_with("tests/review/") {
@@ -51,6 +46,7 @@ fn unused_audit() {
                 };
                 *test_counts.entry(group.to_string()).or_default() += 1;
             } else if relative.contains("/test/")
+                && let ast::ItemKind::Binding(b) = &item.kind
                 && let ast::ExprKind::Fn(f) = &b.value.kind
                 && f.params.iter().all(|p| matches!(p, ast::Param::Env { .. }))
             {
@@ -83,7 +79,7 @@ fn unused_audit() {
     let mut warnings = BTreeSet::new();
     let mut statuses = Vec::new();
     std::fs::write(out.join("unmarked-zero.tsv"), zero.join("\n") + "\n").unwrap();
-    std::fs::write(out.join("counts.txt"), format!("@test bindings: {tests}\nunmarked test-module functions without value parameters: {}\nprojects: {}\nstandalone files: {}\n", zero.len(), projects.len(), singles.len())).unwrap();
+    std::fs::write(out.join("counts.txt"), format!("test macro declarations: {tests}\nunmarked test-module functions without value parameters: {}\nprojects: {}\nstandalone files: {}\n", zero.len(), projects.len(), singles.len())).unwrap();
     std::fs::write(
         out.join("test-counts.tsv"),
         test_counts

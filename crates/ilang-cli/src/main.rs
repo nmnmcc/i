@@ -4,7 +4,7 @@ mod commands;
 
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, level};
-use ilang_host::{Outcome, TestResult};
+use ilang_host::Outcome;
 use ilang_package::Diagnostic;
 use ilang_wasm::Target;
 use std::path::{Path, PathBuf};
@@ -504,53 +504,9 @@ fn cmd_test(
         }
     }
     let program = b.host_program()?;
-    let tests: Vec<String> = program
-        .abi()
-        .tests
-        .iter()
-        .map(|t| t.name.clone())
-        .filter(|n| !n.starts_with("i.tool."))
-        .filter(|n| filter.is_none_or(|f| n.contains(f)))
-        .collect();
     let mut failed = 0;
     let mut passed = 0;
     let mut skipped = 0;
-    for name in &tests {
-        if focused {
-            skipped += 1;
-            println!("skip {name}");
-            continue;
-        }
-        let start = (std::time::Instant::now(), cpu_seconds());
-        let result = ilang_cli::run_test_with(&program, name, b.host_options());
-        let took = if time {
-            let wall = start.0.elapsed().as_secs_f64();
-            match (start.1, cpu_seconds()) {
-                (Some(a), Some(b)) => format!(" ({wall:.3} s, cpu {:.2} s)", b - a),
-                _ => format!(" ({wall:.3} s)"),
-            }
-        } else {
-            String::new()
-        };
-        match result {
-            TestResult::Passed => {
-                passed += 1;
-                println!("pass {name}{took}");
-            }
-            TestResult::Stopped(stop) => {
-                failed += 1;
-                println!("FAIL {name}{took}");
-                for line in stop.to_string().lines() {
-                    println!("  {line}");
-                }
-            }
-            TestResult::Failed(e) => {
-                failed += 1;
-                println!("FAIL {name}{took}");
-                println!("  {e:#}");
-            }
-        }
-    }
     {
         for entry in entries {
             let get = |key: &str| {
@@ -580,6 +536,7 @@ fn cmd_test(
                 .next()
                 .expect("collection handle index");
             let export = format!("i.tool.{index}");
+            let start = (std::time::Instant::now(), cpu_seconds());
             let outcome = ilang_host::block_on(async {
                 let mut instance = program.instantiate(b.host_options())?;
                 if program
@@ -593,13 +550,22 @@ fn cmd_test(
                     instance.run(&export)
                 }
             });
+            let took = if time {
+                let wall = start.0.elapsed().as_secs_f64();
+                match (start.1, cpu_seconds()) {
+                    (Some(a), Some(b)) => format!(" ({wall:.3} s, cpu {:.2} s)", b - a),
+                    _ => format!(" ({wall:.3} s)"),
+                }
+            } else {
+                String::new()
+            };
             let success = matches!(outcome, Ok(Outcome::Ok(_)));
             if outcome.is_ok() && success != (mode == "fails") {
                 passed += 1;
-                println!("pass {name}");
+                println!("pass {name}{took}");
             } else {
                 failed += 1;
-                println!("FAIL {name}");
+                println!("FAIL {name}{took}");
                 match outcome {
                     Ok(Outcome::Stop(stop)) => println!("  {stop}"),
                     Ok(Outcome::Err(error)) => println!("  error: {:?}", error.0),

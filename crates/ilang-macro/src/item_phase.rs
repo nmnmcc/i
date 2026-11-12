@@ -31,7 +31,7 @@ fn builtin(attribute: &Attribute) -> bool {
     attribute.module.is_none()
         && matches!(
             attribute.name.name.as_str(),
-            "external" | "js" | "host" | "deprecated" | "macro" | "main" | "test" | "wasm"
+            "external" | "js" | "host" | "deprecated" | "macro" | "main" | "wasm"
         )
 }
 

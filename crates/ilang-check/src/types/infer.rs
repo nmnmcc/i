@@ -745,21 +745,21 @@ impl<'a> Checker<'a> {
         };
         let mut entries = Vec::new();
         for m in p.modules.iter().filter(|m| m.package == root) {
-            for b in m.bindings.iter().filter(|b| b.main || b.test) {
-                entries.extend(b.defs.first().map(|d| (*d, b.test, false, false)));
+            for b in m.bindings.iter().filter(|b| b.main) {
+                entries.extend(b.defs.first().map(|d| (*d, false, false)));
             }
         }
-        entries.extend(p.host_exports.iter().map(|d| (*d, false, true, false)));
-        entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false, true)));
-        for (d, test, export, tool) in entries {
-            self.entry_point(d, test, export, tool);
+        entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
+        entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false)));
+        for (d, require_nil, export) in entries {
+            self.entry_point(d, require_nil, export);
         }
     }
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
     /// take. Target provider planning validates its inferred environment later.
-    fn entry_point(&mut self, d: DefId, test: bool, export: bool, tool: bool) {
+    fn entry_point(&mut self, d: DefId, require_nil: bool, export: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
         let (name, span) = (def.name.clone(), def.span);
@@ -813,12 +813,12 @@ impl<'a> Checker<'a> {
         services.dedup();
         self.out.entry_services.insert(d, services);
         let nil = Ty::named(self.b.nil, Vec::new());
-        if test && f.ret != nil && f.ret != Ty::Never {
+        if require_nil && f.ret != nil && f.ret != Ty::Never {
             let r = show(self, &f.ret);
             self.error(
                 code::ENTRY_TYPE,
                 span,
-                if tool { format!("the selected entry `{name}` must give `Nil` for this consumer, but it gives `{r}`") } else { format!("`{name}` is a test, so it gives `Nil` (§10.2), but it gives `{r}`") },
+                format!("the selected entry `{name}` must give `Nil` for this consumer, but it gives `{r}`"),
             );
         }
         if !export {

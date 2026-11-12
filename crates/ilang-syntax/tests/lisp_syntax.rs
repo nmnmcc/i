@@ -1482,10 +1482,10 @@ fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
 
 #[test]
 fn show_as_attribute_item_uses_only_required_line_breaks() {
-    let item = root("(@ test (= f (-> () _ { Nil })))");
+    let item = root("(@ custom (= f (-> () _ { Nil })))");
     assert_eq!(
         item.show_as(Position::Item).unwrap(),
-        "@test f = () { Nil }"
+        "@custom f = () { Nil }"
     );
     let (module, errors) =
         ilang_syntax::parse_module(&format!("{}\n", item.show_as(Position::Item).unwrap()));
@@ -1493,9 +1493,9 @@ fn show_as_attribute_item_uses_only_required_line_breaks() {
     assert_eq!(module.items.len(), 1);
     assert_eq!(module.items[0].attributes.len(), 1);
 
-    let tuple = root("(@ test (= (, x y) (, 1 2)))");
+    let tuple = root("(@ custom (= (, x y) (, 1 2)))");
     let text = tuple.show_as(Position::Item).unwrap();
-    assert_eq!(text, "@test\n(x, y) = (1, 2)");
+    assert_eq!(text, "@custom\n(x, y) = (1, 2)");
     let (module, errors) = ilang_syntax::parse_module(&format!("{text}\n"));
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(module.items[0].attributes.len(), 1);

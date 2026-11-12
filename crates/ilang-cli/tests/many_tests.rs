@@ -22,7 +22,7 @@ fn ordinary_and_collected_tests_share_summary_and_filter() {
     let std = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
     std::fs::write(dir.path().join("i.toml"), format!("name = \"mixed\"\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n", std.to_str().unwrap())).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
-    std::fs::write(dir.path().join("test/mixed.i"), "(testlib = (test, skip, fails) = std/test)\n@test\nordinary = () { assert(True) }\ntest(\"collected\", () { assert(True) })\nskip(\"ignored\", () { assert(False) })\nfails(\"expected\", () { assert(False) })\n").unwrap();
+    std::fs::write(dir.path().join("test/mixed.i"), "(testlib = (test, skip, fails) = std/test)\n\ntest(\"ordinary\", () { assert(True) })\ntest(\"collected\", () { assert(True) })\nskip(\"ignored\", () { assert(False) })\nfails(\"expected\", () { assert(False) })\n").unwrap();
     let run = |filter: Option<&str>| {
         let mut command = Command::new(env!("CARGO_BIN_EXE_i"));
         command

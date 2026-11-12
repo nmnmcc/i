@@ -13,7 +13,38 @@ use std::fs;
 use std::path::Path;
 
 fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
-    let checked = ilang_check::check(graph);
+    let checked = if graph
+        .packages
+        .iter()
+        .any(|p| p.dir.as_ref().is_some_and(|d| d.ends_with("entry_checks")))
+    {
+        let (program, diags) = ilang_check::resolve_program(graph);
+        let p = program.as_ref().expect("entry fixture resolves");
+        let selected = p
+            .modules
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.path == "app/main_test")
+            .flat_map(|(mi, m)| {
+                m.defs
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, d)| matches!(d.kind, DefKind::Binding { .. }))
+                    .map(move |(di, _)| {
+                        (
+                            DefId {
+                                module: ModuleId(mi as u32),
+                                index: di as u32,
+                            },
+                            true,
+                        )
+                    })
+            })
+            .collect::<Vec<_>>();
+        ilang_check::check_resolved_selected(graph, program, diags, &selected)
+    } else {
+        ilang_check::check(graph)
+    };
     let mut out = String::new();
     if let (Some(program), Some(types)) = (&checked.program, &checked.types) {
         same_as_text(program, types);
@@ -59,7 +90,12 @@ fn same_as_text(program: &Program, types: &Typed) {
             let wanted = d.exported || matches!(d.kind, DefKind::External { .. });
             match (types.schemes.get(&id), types.scheme_types.get(&id)) {
                 (Some(text), Some(tree)) => {
-                    assert!(wanted, "{}.{} has a tree", m.path, d.name);
+                    assert!(
+                        wanted || types.entry_services.contains_key(&id),
+                        "{}.{} has a tree",
+                        m.path,
+                        d.name
+                    );
                     assert_eq!(&tree.text(&names), text, "{}.{}", m.path, d.name);
                 }
                 (Some(_), None) => assert!(!wanted, "{}.{} has no tree", m.path, d.name),

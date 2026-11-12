@@ -126,8 +126,17 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     if dir.exists() && std::fs::read_dir(&dir)?.next().is_some() {
         bail!("`{}` is already there and is not empty", dir.display());
     }
+    let std = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../std")
+        .canonicalize()?;
     let files = [
-        ("i.toml".to_string(), format!("name = \"{name}\"\n")),
+        (
+            "i.toml".to_string(),
+            format!(
+                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
+                std.to_str().expect("standard library path is UTF-8")
+            ),
+        ),
         (".gitignore".to_string(), "/build/\n".to_string()),
         ("src/main.i".to_string(), formatted(main_module(name))),
         ("test/main_test.i".to_string(), formatted(test_module(name))),
@@ -172,15 +181,17 @@ main = (io ! Io) {{
 
 fn test_module(name: &str) -> String {
     format!(
-        r#"({name}/main)
+        r#"(
+	testlib = (test) = std/test
+	{name}/main)
 
-@test
-greets = () {{
+
+test("greets", () {{
   main.greeting("i") |> {{
     "Hello, i!" -> Nil
     other -> panic(other)
   }}
-}}
+}})
 "#
     )
 }
@@ -909,44 +920,68 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
 
 /// Builds the package with its tests and runs them, as `i test` does.
 fn check_and_test(project: &Path) -> Result<()> {
-    let built = crate_build(project)?;
-    let program = ilang_host::Program::from_bytes(&built)?;
-    let names: Vec<String> = program.abi().tests.iter().map(|t| t.name.clone()).collect();
-    let mut failed = Vec::new();
-    for name in &names {
-        match ilang_cli::run_test(&program, name) {
-            ilang_host::TestResult::Passed => {}
-            ilang_host::TestResult::Stopped(stop) => failed.push(format!("FAIL {name}\n  {stop}")),
-            ilang_host::TestResult::Failed(e) => failed.push(format!("FAIL {name}\n  {e:#}")),
-        }
-    }
-    if !failed.is_empty() {
-        bail!(
-            "{}\n{} of {} tests failed",
-            failed.join("\n"),
-            failed.len(),
-            names.len()
-        );
-    }
-    println!(
-        "ok: the package checks, and its {} test{} passed",
-        names.len(),
-        if names.len() == 1 { "" } else { "s" }
-    );
-    Ok(())
-}
-
-fn crate_build(project: &Path) -> Result<Vec<u8>> {
+    let manifest: toml_edit::DocumentMut =
+        std::fs::read_to_string(project.join("i.toml"))?.parse()?;
+    let collection = manifest
+        .get("test")
+        .and_then(|t| t.get("collection"))
+        .and_then(|v| v.as_str());
     let options = ilang_cli::BuildOptions {
         tests: true,
         opt: ilang_cli::Level::O0,
         offline: false,
         target: Default::default(),
     };
-    match ilang_cli::build(project, options) {
-        Ok(b) => Ok(b.wasm),
-        Err(e) => Err(anyhow!("{e}").context("the package does not check")),
+    let (built, entries) = ilang_cli::build_tests(project, options, collection)
+        .map_err(|e| anyhow!("{e}").context("the package does not check"))?;
+    let program = built.host_program()?;
+    let focused = entries
+        .iter()
+        .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
+    let mut failed = Vec::new();
+    let mut count = 0;
+    for entry in entries {
+        let get = |key: &str| {
+            entry
+                .data
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, v)| v.as_str())
+        };
+        let mode = get("mode").unwrap_or("test");
+        if mode == "skip" || (focused && mode != "only") {
+            continue;
+        }
+        count += 1;
+        let name = format!("{}.{}", entry.module, get("name").expect("test name"));
+        let index = entry
+            .handle
+            .rsplit(':')
+            .next()
+            .expect("collection handle index");
+        let result =
+            ilang_cli::run_test_with(&program, &format!("i.tool.{index}"), built.host_options());
+        let passed = match &result {
+            ilang_host::TestResult::Passed => mode != "fails",
+            ilang_host::TestResult::Stopped(_) => mode == "fails",
+            ilang_host::TestResult::Failed(_) => false,
+        };
+        if !passed {
+            failed.push(format!("FAIL {name}\n  {result:?}"));
+        }
     }
+    if !failed.is_empty() {
+        bail!(
+            "{}\n{} of {count} tests failed",
+            failed.join("\n"),
+            failed.len()
+        );
+    }
+    println!(
+        "ok: the package checks, and its {count} test{} passed",
+        if count == 1 { "" } else { "s" }
+    );
+    Ok(())
 }
 
 /// Compares the interface `now` with the one of the tag `v<previous>`, and
