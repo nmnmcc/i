@@ -100,6 +100,14 @@ No language or library surface was added, including state mechanisms.
   For now-source-valid inputs, verified all observed O0/O2 target phases
   reject with E0523 and that inferred types agree apart from `^` spelling
   before updating their observations.
+- The unchanged mutual100/150/200/300 fixtures also timed out (saved caps
+  10/10/10/60 seconds). A second isolated mutual100 run reproduced it:
+  `scripts/review-corpus run --filter review-k4d/perf/mutual100 --binary
+  target/release/i`. A debugger sample found repeated structural equality in
+  `Coalescer::go`: alias-class members shared identical stored bounds, which
+  were recursively expanded before the resulting trees were deduplicated.
+  Deduplicate those identical input bounds on the same active path before
+  expansion. Cycle detection and path-sensitive memoization remain intact.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.

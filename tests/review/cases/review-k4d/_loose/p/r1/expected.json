@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "cc02dc36481b29de48de9db520056cc950174d3e",
+  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,9 +9,49 @@
         "check",
         "--types"
       ],
-      "exit": 1,
+      "exit": 0,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.fw : () -> Int ! N | S(N)\napp/main.fr : () -> Int ! N | S(N)\napp/main.tell : (x: Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.main : () -> Nil ! N | S(N)\n",
-      "stderr": "src/main.i:21:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `S(a)`, which must be given before it gets to the entry point\nsrc/main.i:21:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `a`, which must be given before it gets to the entry point\n2 errors\n"
+      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: warning[W0504]: top-level binding `fr` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `tell` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: warning[W0504]: top-level binding `fr` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `tell` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+    },
+    "run0": {
+      "command": [
+        "run",
+        "--opt",
+        "0"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: warning[W0504]: top-level binding `fr` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `tell` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: warning[W0504]: top-level binding `fr` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `tell` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+    },
+    "run2": {
+      "command": [
+        "run",
+        "--opt",
+        "2"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: warning[W0504]: top-level binding `fr` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `tell` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
     }
   }
 }
