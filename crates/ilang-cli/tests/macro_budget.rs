@@ -176,7 +176,7 @@ fn frame_accounting_restores_after_errors_and_continuation_resume() {
 fn control_and_error_handlers_preserve_frame_accounting() {
     let source = include_str!("../../../tests/spec/9/control.i");
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(dir.path().join("test/main.i"), source).unwrap();
     let selected = test_project::selected(dir.path(), false);
@@ -252,7 +252,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
       })
     "#;
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), &test_project::manifest("app")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(dir.path().join("test/main.i"), source).unwrap();
     let selected = test_project::selected(dir.path(), false);

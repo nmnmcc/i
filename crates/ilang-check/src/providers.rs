@@ -720,10 +720,10 @@ impl Schema {
                         &supplies.iter().map(as_type).collect::<Vec<_>>(),
                         &requires.iter().map(as_type).collect::<Vec<_>>(),
                     )?;
-                    if let Some(previous) = out.adapters.get(&binding) {
-                        if previous.supplies != supplies || previous.requires != requires {
-                            return Err(format!("ambiguous adapter declaration {}", a.function));
-                        }
+                    if let Some(previous) = out.adapters.get(&binding)
+                        && (previous.supplies != supplies || previous.requires != requires)
+                    {
+                        return Err(format!("ambiguous adapter declaration {}", a.function));
                     }
                     out.adapters.insert(
                         binding,
@@ -1158,6 +1158,9 @@ impl Builder<'_> {
         for id in 0..self.nodes.len() {
             visit(&self.nodes, id, &mut vec![])?;
         }
+        // ShownType graphs refer to immutable interned nodes. The pool's lock
+        // permits allocation, but cannot change a key's equality or hash.
+        #[allow(clippy::mutable_key_type)]
         let mut seeded = HashSet::new();
         if let Some(a) = self.adapter {
             seeded.extend(

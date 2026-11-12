@@ -715,6 +715,12 @@ pub fn lower_selected_with_bindings(
     }
 }
 
+/// Runtime inputs captured for one invocation of a provider plan.
+struct ProviderInputs<'a> {
+    key: Option<Atom>,
+    seeds: &'a HashMap<TypeId, Atom>,
+}
+
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
     plans: std::collections::BTreeMap<DefId, ResolvedPlan>,
@@ -1321,8 +1327,10 @@ impl<'a> Lowerer<'a> {
             &mut fx,
             &mut body,
             &mut values,
-            key.clone(),
-            &HashMap::new(),
+            ProviderInputs {
+                key: key.clone(),
+                seeds: &HashMap::new(),
+            },
         );
         let result = if let Some(adapter) = &plan.adapter {
             let guard = let_value(
@@ -1392,8 +1400,7 @@ impl<'a> Lowerer<'a> {
                                 fx,
                                 out,
                                 &mut values,
-                                key,
-                                &seeds,
+                                ProviderInputs { key, seeds: &seeds },
                             );
                             this.provider_entry_call(
                                 &plan,
@@ -1689,8 +1696,7 @@ impl<'a> Lowerer<'a> {
         fx: &mut Fx,
         out: &mut Vec<Stmt>,
         values: &mut [Option<Atom>],
-        key: Option<Atom>,
-        seeds: &HashMap<TypeId, Atom>,
+        inputs: ProviderInputs<'_>,
     ) {
         for position in range {
             let step = &plan.steps[position];
@@ -1700,7 +1706,7 @@ impl<'a> Lowerer<'a> {
                 match argument {
                     ResolvedArgument::Seed(seed) => {
                         let seed = if seed.is_some() {
-                            let value = seeds[&step.service.constructor].clone();
+                            let value = inputs.seeds[&step.service.constructor].clone();
                             let_value(fx, out, Value::Cons(value, Atom::EmptyList), None)
                         } else {
                             Atom::EmptyList
@@ -1708,7 +1714,7 @@ impl<'a> Lowerer<'a> {
                         args.push(seed);
                     }
                     ResolvedArgument::EntryRootKey => {
-                        args.push(key.clone().expect("plan registers initial root"))
+                        args.push(inputs.key.clone().expect("plan registers initial root"))
                     }
                     ResolvedArgument::Service(i) => dependencies.push(*i),
                 }
