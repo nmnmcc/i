@@ -1010,13 +1010,13 @@ Operators are part of the syntax. They are not functions, and they may not be us
 
 | Level | Operators | Operand type | Result type |
 |---|---|---|---|
-| 1 | `\|\|` | Bool | Bool |
-| 2 | `&&` | Bool | Bool |
-| 3 | `==` `!=` | Any two types; see below | Bool |
-| 4 | `<` `<=` `>` `>=` | Int | Bool |
-| 4 | `<.` `<=.` `>.` `>=.` | Float | Bool |
-| 5 | `<>` | String | String |
-| 6 | `\|>` | See below | |
+| 1 | `\|>` | See below | |
+| 2 | `\|\|` | Bool | Bool |
+| 3 | `&&` | Bool | Bool |
+| 4 | `==` `!=` | Any two types; see below | Bool |
+| 5 | `<` `<=` `>` `>=` | Int | Bool |
+| 5 | `<.` `<=.` `>.` `>=.` | Float | Bool |
+| 6 | `<>` | String | String |
 | 7 | `+` `-` | Int | Int |
 | 7 | `+.` `-.` | Float | Float |
 | 8 | `*` `/` `%` | Int | Int |
@@ -1028,9 +1028,9 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 
 - Int and Float have different operators. One is never changed into the other without a function such as `core.to_float` (§13).
 - `a |> f` is `f(a)`, and `a |> f(b, …)` is `f(a, b, …)`. The right side of `|>` must be a name, a call, a function, or a clause block.
-- `|>` is weaker than `+` and stronger than the operators of levels 1 to 5: `||`, `&&`, `==`, `!=`, comparisons, and `<>`. So the left side of `|>` that is made with those operators is put in a group: `{ a == b } |> { True -> …  False -> … }`.
+- `|>` is the weakest operator, below `||`, and goes from left to right. Its whole left expression is its left operand: `a == b |> f` is `{ a == b } |> f`, and `a |> f |> g` is `{ a |> f } |> g`. Its right side is made with stronger operators only, so `x |> g == 2` is a compile error; the group is written: `{ x |> g } == 2`.
 - `e |> { … }`, where the right side is a clause block, is a match (§6.12).
-- A match is an operation at level 6, so an operator of level 7 or 8, `.f`, `.k`, or a call after the clause block is part of the right side: in `n |> { 0 -> 1  _ -> 2 } * 10`, the right side is `{ 0 -> 1  _ -> 2 } * 10`, and in `opt |> { … }.name`, it is `{ … }.name`. In the same way, the left side of `1 + n |> { … }` is `1 + n`, as in `{ 1 + n } |> { … }`, and the left side of `-n |> { … }` is `-n`. So a match that is an operand of such an operator or of `-` or `-.`, or that has `.f`, `.k`, or a call after it, is put in a group: `{ n |> { 0 -> 1  _ -> 2 } } * 10`, `1 + { n |> { … } }`, `-{ n |> { … } }`, `{ opt |> { … } }.name`.
+- A match is an operation at level 1, so an operator, `.f`, `.k`, or a call after the clause block is part of the right side: in `n |> { 0 -> 1  _ -> 2 } * 10`, the right side is `{ 0 -> 1  _ -> 2 } * 10`, and in `opt |> { … }.name`, it is `{ … }.name`. In the same way, the left side of `1 + n |> { … }` is `1 + n`, as in `{ 1 + n } |> { … }`, and the left side of `-n |> { … }` is `-n`. So a match that is an operand of such an operator or of `-` or `-.`, or that has `.f`, `.k`, or a call after it, is put in a group: `{ n |> { 0 -> 1  _ -> 2 } } * 10`, `1 + { n |> { … } }`, `-{ n |> { … } }`, `{ opt |> { … } }.name`.
 - When both sides of `==` or `!=` have known types (§4.8), and these are disjoint (§4.5 rule 3), the compiler gives warning W0503, showing both types: the two sides can never be equal. The comparison is well defined and has type `Bool`: `==` is always `False` and `!=` is always `True`. A member of a known type that is `_` or a type variable is never disjoint from anything. Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s: String) { s == 1 }` give the warning, but `(s: String) { s == "a" }`, `(m: "a" | "b") { m == "b" }`, `x == Nil` with `x: Int | Nil`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` do not. Only the top members of the two types are compared (§4.5 rule 3), so `(1, 2) == (3, 4)` and `Some(1) == Some(2)` give no warning, though they are always `False`. Literal types are not widened. The warning adds no narrowing fact. A clause guard `? x == 2` with `x: 1` is always false; coverage treats it as any guard (§7.4). What `==` does is in §11.4.
 
 ### 6.10 Blocks and bindings

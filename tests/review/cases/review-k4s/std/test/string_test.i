@@ -68,7 +68,7 @@ test("reverse_skin_tone_emoji_test", () {
 })
 
 test("reverse_skin_tone_roundtrip_test", () {
-	assert("👶🏿" |> string.reverse |> string.reverse == "👶🏿")
+	assert({ "👶🏿" |> string.reverse |> string.reverse } == "👶🏿")
 	Nil
 })
 
@@ -194,7 +194,7 @@ test("repeat_three_test", () {
 })
 
 test("repeat_large_test", () {
-	assert(string.repeat("a", times: 10_001) |> string.length == 10_001)
+	assert({ string.repeat("a", times: 10_001) |> string.length } == 10_001)
 	Nil
 })
 
@@ -759,17 +759,21 @@ test("to_utf_codepoints_rainbow_flag_test", () {
 })
 
 test("from_utf_codepoints_empty_test", () {
-	assert("" |> string.to_codepoints |> string.from_codepoints == "")
+	assert({ "" |> string.to_codepoints |> string.from_codepoints } == "")
 	Nil
 })
 
 test("from_utf_codepoints_basic_test", () {
-	assert("gleam" |> string.to_codepoints |> string.from_codepoints == "gleam")
+	assert(
+		{ "gleam" |> string.to_codepoints |> string.from_codepoints } == "gleam"
+	)
 	Nil
 })
 
 test("from_utf_codepoints_emoji_test", () {
-	assert("🏳️‍🌈" |> string.to_codepoints |> string.from_codepoints == "🏳️‍🌈")
+	assert(
+		{ "🏳️‍🌈" |> string.to_codepoints |> string.from_codepoints } == "🏳️‍🌈"
+	)
 	Nil
 })
 

@@ -41,7 +41,7 @@ g = (x) {
 	}
 	r = call(a: // after a label
 		1)
-	s = xs |> g == // after a pipeline
+	s = { xs |> g } == // after a pipeline
 		ys
 	t = x // one
 		// two

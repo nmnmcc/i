@@ -819,8 +819,8 @@
   "crates/ilang-syntax/tests/golden/err_pipe_group.i:b21ad312873fd189": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`",
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`",
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_pipe_target.i:f211c96492c6d0ca": {
@@ -964,19 +964,19 @@
   "crates/ilang-syntax/tests/parse.rs:04e24b46baf5040e": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:3ce334bfd693e428": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:b6a4ae21a4ba6902": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ad4393882ff472b2": {
@@ -1295,7 +1295,7 @@
   "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -1404,7 +1404,7 @@
   "tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -2722,7 +2722,7 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "editors/vscode/test/sample.i:1b4b9e4de98c425f": {
+  "editors/vscode/test/sample.i:c502997562f7493a": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
