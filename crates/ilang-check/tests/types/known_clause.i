@@ -20,7 +20,7 @@ field = (v) {
 	}
 }
 
-use_field = () { field(S1(1)) }
+use_field = () { field(S1(k: 1)) }
 
 // With other values at a catch-all.
 field_rest = (v) {
@@ -30,20 +30,20 @@ field_rest = (v) {
 	}
 }
 
-use_rest = () { (field_rest("s"), field_rest(B(1))) }
+use_rest = () { (field_rest("s"), field_rest(B(h: 1))) }
 
 // A record update, with a union for the type of `v`.
 update = (v: T | S) {
 	v |> {
 		A(..) -> A(..v, f: 1)
-		_     -> B(0)
+		_     -> B(h: 0)
 	}
 }
 
 update_open = (v) {
 	v |> {
 		A(..) -> A(..v, g: "x")
-		_     -> B(0)
+		_     -> B(h: 0)
 	}
 }
 
@@ -62,7 +62,7 @@ item = (b) {
 	}
 }
 
-use_item = () { item(Full(2)) + 1 }
+use_item = () { item(Full(item: 2)) + 1 }
 
 // Problems: the field must still be in the constructor of the clause.
 wrong = (v) {

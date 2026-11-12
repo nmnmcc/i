@@ -74,6 +74,7 @@
 
 pub mod bindings;
 pub mod macro_budget;
+pub mod native;
 mod requests;
 pub mod resources;
 mod run;
@@ -823,6 +824,7 @@ pub struct Program {
     epochs: bool,
 }
 
+#[cfg(feature = "compiler")]
 /// Where compiled machine code is kept between processes: the directory
 /// named by `ILANG_COMPILE_CACHE`. Unset, empty or `0`, there is no cache.
 /// Nothing removes old entries; the caller owns the directory.
@@ -832,9 +834,11 @@ fn compile_cache_dir() -> Option<std::path::PathBuf> {
         .map(Into::into)
 }
 
+#[cfg(feature = "compiler")]
 /// Feeds a `Hash` value into SHA-256.
 struct Sha256Hasher(sha2::Sha256);
 
+#[cfg(feature = "compiler")]
 impl std::hash::Hasher for Sha256Hasher {
     fn write(&mut self, bytes: &[u8]) {
         sha2::Digest::update(&mut self.0, bytes);
@@ -844,6 +848,7 @@ impl std::hash::Hasher for Sha256Hasher {
     }
 }
 
+#[cfg(feature = "compiler")]
 /// The identity of this executable (path, size, modification time), part of
 /// every cache key so that a rebuilt compiler never reads code that an older
 /// one stored.
@@ -857,6 +862,7 @@ fn executable_identity() -> &'static str {
     })
 }
 
+#[cfg(feature = "compiler")]
 fn hex_digest(parts: &[&[u8]]) -> String {
     use sha2::Digest;
     let mut hasher = sha2::Sha256::new();
@@ -871,6 +877,7 @@ fn hex_digest(parts: &[&[u8]]) -> String {
         .collect()
 }
 
+#[cfg(feature = "compiler")]
 /// The key of a compiled module: the Wasm bytes and everything about the
 /// engine that the machine code depends on (Wasmtime's version and the
 /// compiler settings, from `precompile_compatibility_hash`), plus the identity
@@ -889,11 +896,13 @@ fn compile_cache_key(engine: &Engine, bytes: &[u8]) -> String {
     ])
 }
 
+#[cfg(feature = "compiler")]
 /// Cranelift's per-function cache (its key covers the function's IR and the
 /// compiler flags), kept as one file per function in the cache directory.
 #[derive(Debug)]
 struct FunctionCache(std::path::PathBuf);
 
+#[cfg(feature = "compiler")]
 impl wasmtime::CacheStore for FunctionCache {
     fn get(&self, key: &[u8]) -> Option<std::borrow::Cow<'_, [u8]>> {
         std::fs::read(self.path(key)).ok().map(Into::into)
@@ -903,6 +912,7 @@ impl wasmtime::CacheStore for FunctionCache {
     }
 }
 
+#[cfg(feature = "compiler")]
 impl FunctionCache {
     fn path(&self, key: &[u8]) -> std::path::PathBuf {
         self.0.join(hex_digest(&[
@@ -913,6 +923,7 @@ impl FunctionCache {
     }
 }
 
+#[cfg(feature = "compiler")]
 /// Writes `bytes` to `path` through a temporary file and a rename, so that a
 /// reader never sees a partial entry. Failure leaves the entry unwritten.
 fn store_atomically(path: &std::path::Path, bytes: &[u8]) -> bool {
@@ -936,6 +947,7 @@ fn store_atomically(path: &std::path::Path, bytes: &[u8]) -> bool {
     stored
 }
 
+#[cfg(feature = "compiler")]
 /// Compiles `bytes`, reusing machine code that an earlier process compiled
 /// from the same bytes with the same engine settings and executable.
 fn compiled_module(engine: &Engine, bytes: &[u8]) -> Result<Module> {
@@ -957,8 +969,21 @@ fn compiled_module(engine: &Engine, bytes: &[u8]) -> Result<Module> {
     Ok(module)
 }
 
-impl Program {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+/// What a [`Program`] reads from the custom sections of its module, apart
+/// from the code: the same for a module compiled here and for a native
+/// package, which keeps these sections beside its precompiled code.
+pub(crate) struct Metadata {
+    pub(crate) abi: Abi,
+    embedded_abi: bool,
+    pub(crate) artifact_digest: String,
+    provider_registrations: Vec<ProviderRegistration>,
+    macro_static_cost: Option<(u64, u64)>,
+}
+
+impl Metadata {
+    /// Read the custom sections of `bytes`; `artifact_digest` identifies the
+    /// complete module that they came from.
+    pub(crate) fn read(bytes: &[u8], artifact_digest: String) -> Result<Self> {
         let embedded = Abi::from_wasm(bytes)?;
         let mut macro_static_cost = None;
         for payload in wasmparser::Parser::new(0).parse_all(bytes) {
@@ -1011,28 +1036,116 @@ impl Program {
                 "the module was built for the {target} target; run it with a WASI host such as `wasmtime run`"
             );
         }
-        let mut config = Config::new();
-        config.wasm_gc(true);
-        config.wasm_function_references(true);
-        config.wasm_tail_call(true);
-        config.wasm_exceptions(true);
-        config.max_wasm_stack(WASM_STACK);
-        // Only checked against `max_wasm_stack`: the host does not use
-        // Wasmtime's async support.
-        config.async_stack_size(THREAD_STACK);
+        Ok(Self {
+            abi,
+            embedded_abi,
+            artifact_digest,
+            provider_registrations,
+            macro_static_cost,
+        })
+    }
+}
+
+/// Check that `imports` give every function the module imports, with the
+/// authority of `plan`, before anything is linked.
+fn check_imports(
+    abi: &Abi,
+    provider_registrations: &[ProviderRegistration],
+    artifact_digest: &str,
+    plan: Option<&bindings::BindingPlan>,
+    imports: &HostImports,
+) -> Result<()> {
+    {
+        for table in [&abi.services, &abi.externals] {
+            for (namespace, fields) in table {
+                for name in fields.keys() {
+                    ensure!(
+                        imports
+                            .functions
+                            .contains_key(&(namespace.clone(), name.clone())),
+                        "missing host function {namespace} {name}{}",
+                        {
+                            let services: Vec<_> = provider_registrations
+                                .iter()
+                                .filter(|d| d.namespace == *namespace && d.name == *name)
+                                .map(|d| d.service.as_str())
+                                .collect();
+                            if services.is_empty() {
+                                String::new()
+                            } else {
+                                format!(" for service {}", services.join(", "))
+                            }
+                        }
+                    );
+                }
+            }
+        }
+        // Check every declaration before linking the coalesced import names.
+        if let Some(plan) = plan {
+            plan.validate(artifact_digest, abi)?;
+            for declaration in &plan.declarations {
+                let key = (declaration.namespace.clone(), declaration.name.clone());
+                ensure!(
+                    imports.unrestricted.contains(&key) || imports.grants.allows(plan, declaration),
+                    "ungranted host import {} {} declared by {} {}",
+                    declaration.namespace,
+                    declaration.name,
+                    declaration.module,
+                    declaration.declaration
+                );
+            }
+        } else {
+            for table in [&abi.services, &abi.externals] {
+                for (namespace, fields) in table {
+                    for name in fields.keys() {
+                        ensure!(
+                            imports
+                                .unrestricted
+                                .contains(&(namespace.clone(), name.clone())),
+                            "ungranted host import {namespace} {name}: a trusted binding plan or explicit declaration grant is required"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The engine settings that do not depend on the compiler, shared by
+/// [`Program::from_bytes`] and native packages ([`native`]).
+fn runtime_config(collector: wasmtime::Collector, heap: u64) -> Config {
+    let mut config = Config::new();
+    config.wasm_gc(true);
+    config.wasm_function_references(true);
+    config.wasm_tail_call(true);
+    config.wasm_exceptions(true);
+    config.max_wasm_stack(WASM_STACK);
+    // Only checked against `max_wasm_stack`: the host does not use
+    // Wasmtime's async support.
+    config.async_stack_size(THREAD_STACK);
+    config.collector(collector);
+    config.gc_heap_initial_size(heap);
+    config
+}
+
+impl Program {
+    /// Compile a module in this process, for the CPU it runs on.
+    #[cfg(feature = "compiler")]
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let metadata = Metadata::read(bytes, bindings::artifact_digest(bytes))?;
+        let (collector, heap) = gc_settings()?;
+        let mut config = runtime_config(collector, heap);
         // Compile independent functions concurrently while preserving the
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-        let workers = if macro_static_cost.is_some() {
+        let workers = if metadata.macro_static_cost.is_some() {
             1
         } else {
             worker_count()
         };
         config.epoch_interruption(workers > 1);
-        let (collector, heap) = gc_settings()?;
-        config.collector(collector);
-        config.gc_heap_initial_size(heap);
         if let Some(dir) = compile_cache_dir() {
             config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(
                 dir.join("functions"),
@@ -1041,24 +1154,31 @@ impl Program {
         let engine = Engine::new(&config)?;
         let module =
             compiled_module(&engine, bytes).context("compiling the i WebAssembly module")?;
+        let mut program = Self::from_parts(engine, module, metadata)?;
+        program.workers = workers;
+        program.epochs = workers > 1;
+        Ok(program)
+    }
+
+    fn from_parts(engine: Engine, module: Module, metadata: Metadata) -> Result<Self> {
         let has_macro_hooks = module
             .imports()
             .any(|import| import.module() == "ilang:macro/budget/v1");
         ensure!(
-            has_macro_hooks == macro_static_cost.is_some(),
+            has_macro_hooks == metadata.macro_static_cost.is_some(),
             "macro accounting hooks and static budget section must occur together"
         );
         Ok(Self {
             engine,
             module,
-            abi,
-            embedded_abi,
-            artifact_digest: bindings::artifact_digest(bytes),
+            abi: metadata.abi,
+            embedded_abi: metadata.embedded_abi,
+            artifact_digest: metadata.artifact_digest,
             binding_plan: None,
-            provider_registrations,
-            macro_static_cost,
-            workers,
-            epochs: workers > 1,
+            provider_registrations: metadata.provider_registrations,
+            macro_static_cost: metadata.macro_static_cost,
+            workers: 1,
+            epochs: false,
         })
     }
 
@@ -1108,62 +1228,13 @@ impl Program {
                 .context("macro program needs a compiler budget")?;
             budget.charge(work, allocation)?;
         }
-        for table in [&self.abi.services, &self.abi.externals] {
-            for (namespace, fields) in table {
-                for name in fields.keys() {
-                    ensure!(
-                        options
-                            .imports
-                            .functions
-                            .contains_key(&(namespace.clone(), name.clone())),
-                        "missing host function {namespace} {name}{}",
-                        {
-                            let services: Vec<_> = self
-                                .provider_registrations
-                                .iter()
-                                .filter(|d| d.namespace == *namespace && d.name == *name)
-                                .map(|d| d.service.as_str())
-                                .collect();
-                            if services.is_empty() {
-                                String::new()
-                            } else {
-                                format!(" for service {}", services.join(", "))
-                            }
-                        }
-                    );
-                }
-            }
-        }
-        // Check every declaration before linking the coalesced import names.
-        if let Some(plan) = &self.binding_plan {
-            plan.validate(&self.artifact_digest, &self.abi)?;
-            for declaration in &plan.declarations {
-                let key = (declaration.namespace.clone(), declaration.name.clone());
-                ensure!(
-                    options.imports.unrestricted.contains(&key)
-                        || options.imports.grants.allows(plan, declaration),
-                    "ungranted host import {} {} declared by {} {}",
-                    declaration.namespace,
-                    declaration.name,
-                    declaration.module,
-                    declaration.declaration
-                );
-            }
-        } else {
-            for table in [&self.abi.services, &self.abi.externals] {
-                for (namespace, fields) in table {
-                    for name in fields.keys() {
-                        ensure!(
-                            options
-                                .imports
-                                .unrestricted
-                                .contains(&(namespace.clone(), name.clone())),
-                            "ungranted host import {namespace} {name}: a trusted binding plan or explicit declaration grant is required"
-                        );
-                    }
-                }
-            }
-        }
+        check_imports(
+            &self.abi,
+            &self.provider_registrations,
+            &self.artifact_digest,
+            self.binding_plan.as_ref(),
+            &options.imports,
+        )?;
         let mut linker = Linker::new(&self.engine);
         define_builtins(&mut linker)?;
         workers::define_home(&mut linker)?;
@@ -1856,6 +1927,7 @@ pub const GC_HEAP: u64 = 256 << 20;
 /// `drc` or `null`) and `ILANG_GC_HEAP` (MiB) say otherwise, to measure them.
 ///
 /// [`Collector::Copying`]: wasmtime::Collector::Copying
+#[cfg_attr(not(feature = "compiler"), allow(dead_code))]
 fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
     use wasmtime::Collector;
     let collector = match std::env::var("ILANG_GC").as_deref() {

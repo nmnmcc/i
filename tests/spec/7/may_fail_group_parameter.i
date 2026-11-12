@@ -8,6 +8,6 @@ pair = ("b", {
 
 
 main = () {
-	! Assert = Assert((_) { panic("caught group parameter") })
+	! Assert = Assert(fail: (_) { panic("caught group parameter") })
 	pair.1(pair)
 }

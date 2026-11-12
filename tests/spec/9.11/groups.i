@@ -4,7 +4,7 @@
 // Group observations count only producers; cancel-all keeps groups open.
 (i/request)
 @host("test:async/v1", "request")
-Later { Later(echo: (text: String) -> Request(String)) }
+Later { Later(echo: (String) -> Request(String)) }
 make_group = (root: request.Root) {
   ! request.Root = root
   request.open_owner()

@@ -5,8 +5,8 @@ User {
 f = (n: Int) {
 	{
 		n |> {
-			0 -> User("yes")
-			_ -> User("no")
+			0 -> User(name: "yes")
+			_ -> User(name: "no")
 		}
 	}.name
 }

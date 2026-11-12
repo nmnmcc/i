@@ -18,10 +18,10 @@ new(A): () -> Key(A)
 
 /// Marks a value with its key.
 @external("ilang:key", "wrap")
-wrap(A): (k: Key(A), value: A) -> Keyed
+wrap(A): (Key(A), A) -> Keyed
 
 @external("ilang:key", "read")
-read(A): (k: Key(A), value: Keyed) -> Result(A, Nil)
+read(A): (Key(A), Keyed) -> Result(A, Nil)
 
 /// Reads only a value marked by this same key.
 unwrap(A) = (k: Key(A), x: Keyed) -> Lookup(A) {

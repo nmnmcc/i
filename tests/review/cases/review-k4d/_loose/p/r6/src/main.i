@@ -21,9 +21,9 @@ T(N) { T(f: () -> Int ! N, m: (N) -> Nil) }
 uset(N) = (s ! T(N)) { s.f() }
 
 main = () {
-  ! S(Never) = S(() { 1 })
-  ! T(S(Never)) = T(() { fw() }, (_: S(Never)) { Nil })
-  ! S(Dep) = S(() { get() })
+  ! S(Never) = S(f: () { 1 })
+  ! T(S(Never)) = T(f: () { fw() }, m: (_: S(Never)) { Nil })
+  ! S(Dep) = S(f: () { get() })
   uset()
   Nil
 }

@@ -2,7 +2,7 @@ Dep { Dep(v: Int) }
 get = (d ! Dep) { d.v }
 S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
 use(N) = (s ! S(N)) {
-  S(f, ..) = s
+  S(f = f, ..) = s
   f()
 }
 
@@ -13,8 +13,8 @@ wrap = (body, svc: S(Dep)) {
 }
 
 main = () {
-  ! S(Never) = S(() { 1 }, (_: Never) { Nil })
-  wrap(() { use() }, S(() { get() }, (_: Dep) { Nil }))
+  ! S(Never) = S(f: () { 1 }, m: (_: Never) { Nil })
+  wrap(() { use() }, S(f: () { get() }, m: (_: Dep) { Nil }))
   Nil
 }
 

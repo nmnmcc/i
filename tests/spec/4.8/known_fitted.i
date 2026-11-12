@@ -18,7 +18,7 @@ f = (s: String) {
 
 g = (s: String) {
 	x = "a" = s
-	Box(x).value
+	Box(value: x).value
 }
 
 h = (xs: List(String)) {

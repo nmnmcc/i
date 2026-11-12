@@ -23,9 +23,9 @@ StdioError {
 @host("i:stdio/v1", "request")
 Stdio {
 	Stdio(
-		read:        (max_bytes: Int) -> Request(Result(BitArray, String))
-		write:       (bytes: BitArray) -> Request(Result(Nil, String))
-		write_error: (bytes: BitArray) -> Request(Result(Nil, String))
+		read:        (Int) -> Request(Result(BitArray, String))
+		write:       (BitArray) -> Request(Result(Nil, String))
+		write_error: (BitArray) -> Request(Result(Nil, String))
 		flush:       () -> Request(Result(Nil, String))
 		flush_error: () -> Request(Result(Nil, String))
 	)
@@ -34,35 +34,39 @@ Stdio {
 read = (max_bytes: Int, io ! Stdio) {
 	request.await_owned(io.read(max_bytes)) |> {
 		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError("read", code))
+		Error(code) -> fail.raise(StdioError(operation: "read", code: code))
 	}
 }
 
 write = (bytes: BitArray, io ! Stdio) {
 	request.await_owned(io.write(bytes)) |> {
 		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError("write", code))
+		Error(code) -> fail.raise(StdioError(operation: "write", code: code))
 	}
 }
 
 write_error = (bytes: BitArray, io ! Stdio) {
 	request.await_owned(io.write_error(bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError("write_error", code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			StdioError(operation: "write_error", code: code)
+		)
 	}
 }
 
 flush = (io ! Stdio) {
 	request.await_owned(io.flush()) |> {
 		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError("flush", code))
+		Error(code) -> fail.raise(StdioError(operation: "flush", code: code))
 	}
 }
 
 flush_error = (io ! Stdio) {
 	request.await_owned(io.flush_error()) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError("flush_error", code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			StdioError(operation: "flush_error", code: code)
+		)
 	}
 }
 

@@ -61,9 +61,9 @@ test("nested", () {
 		() { read() }
 		(_: Dependency | Inner(Dependency)) { Nil }
 	)
-	! Dependency = Dependency(7)
+	! Dependency = Dependency(value: 7)
 	assert(run(() { read_outer() }) == 7)
-	! Dependency = Dependency(11)
+	! Dependency = Dependency(value: 11)
 	assert(run(() { read_outer() }) == 11)
 })
 
@@ -97,11 +97,11 @@ write_annotated(E, N) = (
 // the installed sink to calls through functions made before installation.
 
 test("logging", () {
-	producer = () { write(Entry("seen")) }
+	producer = () { write(Entry(message: "seen")) }
 	! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
 	assert(fail.catch(producer) == Error("seen"))
 	assert(
-		fail.catch(() { write_annotated(Entry("annotated")) }) ==
+		fail.catch(() { write_annotated(Entry(message: "annotated")) }) ==
 			Error("annotated")
 	)
 })

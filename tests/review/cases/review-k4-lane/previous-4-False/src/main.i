@@ -15,7 +15,7 @@ write(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ^ E ! N | Sink(E, N) {
 	send(entry)
 }
 
-example = () { fail.catch(() { write(Entry("seen")) }) }
+example = () { fail.catch(() { write(Entry(message: "seen")) }) }
 
 
 main = () { example() }

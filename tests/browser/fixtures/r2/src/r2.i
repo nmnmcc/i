@@ -33,12 +33,12 @@
 
 @host("r2:gates/v1", "request")
 Gates {
-	Gates(wait: (id: Int) -> Request(Int))
+	Gates(wait: (Int) -> Request(Int))
 }
 
 @host("r2:control/v1")
 Control {
-	Control(release: (id: Int) -> Nil, check: (phase: Int) -> Nil)
+	Control(release: (Int) -> Nil, check: (Int) -> Nil)
 }
 
 // §6.4: both starts precede release; polls cannot starve the runnable releaser.
