@@ -211,7 +211,7 @@ fn stops_write_the_message_and_exit_with_1() {
         // An error at the entry (§9.3).
         (
             " (i/fail)\n",
-            "Bad = { (Int) }\n\nmain = () { fail.raise(Bad(7)) }\n",
+            "Bad = (Int)\n\nmain = () { fail.raise(Bad(7)) }\n",
         ),
         // A stop while the top-level values are worked out (§2.5).
         ("", "early = panic(\"too early\")\n\nmain = () { early }\n"),
