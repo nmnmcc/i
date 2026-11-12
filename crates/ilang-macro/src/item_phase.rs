@@ -402,7 +402,7 @@ pub enum PhaseError {
 
 struct Slot {
     id: u64,
-    item: Item,
+    item: Arc<Item>,
     ready: bool,
     depth: u16,
     root: Span,
@@ -468,7 +468,7 @@ fn expand_items_inner(
             id: id as u64,
             root: item.span,
             path: vec![id as u32],
-            item,
+            item: Arc::new(item),
             ready: false,
             depth: 0,
         })
@@ -497,20 +497,26 @@ fn expand_items_inner(
             mode = Mode::Normal;
             continue;
         }
-        let mut current = module.clone();
-        current.items = slots.iter().map(|s| s.item.clone()).collect();
-        let snapshot = Snapshot {
-            module: current,
-            ready: slots.iter().map(|s| s.ready).collect(),
-            scoped: engine.scoped.clone(),
-            source: engine.source.0,
-            other_runs: !pending.is_empty(),
-            active: Some(index),
-            epoch,
-            item_overrides: engine.item_overrides.clone(),
+        // Freeze the items by sharing their immutable trees. Most item macros
+        // never query definitions, so materialize the lookup module only when
+        // the run asks for it, while retaining exactly this attempt's view.
+        let current = Module {
+            doc: module.doc.clone(),
+            imports: module.imports.clone(),
+            exports: module.exports.clone(),
+            items: Vec::new(),
+            imports_span: module.imports_span,
+            exports_span: module.exports_span,
         };
+        let items: Vec<_> = slots.iter().map(|s| s.item.clone()).collect();
+        let ready: Vec<_> = slots.iter().map(|s| s.ready).collect();
+        let scoped = engine.scoped.clone();
+        let source = engine.source.0;
+        let other_runs = !pending.is_empty();
+        let snapshot_epoch = epoch;
+        let item_overrides = engine.item_overrides.clone();
+        let snapshot = std::sync::OnceLock::new();
         epoch = epoch.checked_add(1).expect("item snapshot epoch exhausted");
-        definitions.prepare(&snapshot);
         let mark_source = engine.run_mark.clone();
         let collected = Arc::new(Mutex::new(Vec::<Audit>::new()));
         let seen = collected.clone();
@@ -518,7 +524,23 @@ fn expand_items_inner(
         engine.resolver = Arc::new(move |query, budget| {
             let mark = mark_source.load(std::sync::atomic::Ordering::Relaxed);
             let result_query = query.flip_mark(mark);
-            let resolution = defs.resolve(&snapshot, query, &result_query, mode, mark, budget);
+            let snapshot = snapshot.get_or_init(|| {
+                let mut module = current.clone();
+                module.items = items.iter().map(|item| item.as_ref().clone()).collect();
+                let snapshot = Snapshot {
+                    module,
+                    ready: ready.clone(),
+                    scoped: scoped.clone(),
+                    source,
+                    other_runs,
+                    active: Some(index),
+                    epoch: snapshot_epoch,
+                    item_overrides: item_overrides.clone(),
+                };
+                defs.prepare(&snapshot);
+                snapshot
+            });
+            let resolution = defs.resolve(snapshot, query, &result_query, mode, mark, budget);
             if let Some(identity) = resolution.audit {
                 seen.lock()
                     .expect("definition audit lock poisoned")
@@ -540,7 +562,7 @@ fn expand_items_inner(
         let old_transactions = engine.transactions.len();
         let old_overrides = engine.item_overrides.clone();
         let old_replacements = engine.item_replacements.clone();
-        let attempt = engine.item_step(slots[index].item.clone(), definitions.as_ref());
+        let attempt = engine.item_step(slots[index].item.as_ref().clone(), definitions.as_ref());
         match attempt {
             Ok(step) => {
                 waits.retain(|(waiting, _)| *waiting != id);
@@ -554,7 +576,7 @@ fn expand_items_inner(
                 );
                 match step {
                     Step::Finished(item) => {
-                        slots[index].item = item;
+                        slots[index].item = Arc::new(item);
                         slots[index].ready = true;
                     }
                     Step::Expanded {
@@ -576,7 +598,7 @@ fn expand_items_inner(
                             let ready = type_ready(engine, &item)?;
                             replacements.push(Slot {
                                 id: next_id,
-                                item,
+                                item: Arc::new(item),
                                 ready,
                                 depth,
                                 root,
@@ -592,7 +614,7 @@ fn expand_items_inner(
                             let ready = type_ready(engine, &item)?;
                             replacements.push(Slot {
                                 id: next_id,
-                                item,
+                                item: Arc::new(item),
                                 ready,
                                 depth,
                                 root,
@@ -682,8 +704,17 @@ fn expand_items_inner(
             }
         }
     }
-    let mut completed = module.clone();
-    completed.items = slots.into_iter().map(|s| s.item).collect();
+    let mut completed = Module {
+        doc: module.doc.clone(),
+        imports: module.imports.clone(),
+        exports: module.exports.clone(),
+        items: slots
+            .into_iter()
+            .map(|s| Arc::unwrap_or_clone(s.item))
+            .collect(),
+        imports_span: module.imports_span,
+        exports_span: module.exports_span,
+    };
     commit_exports(
         &mut completed,
         &transactions,

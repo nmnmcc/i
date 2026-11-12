@@ -2095,6 +2095,40 @@ fn definition_query_reads_expanded_type_from_dependency() {
 }
 
 #[test]
+fn shared_macro_code_reads_each_callers_definition_context() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        "(, (= syntax (/ i syntax)))\n(, read)\n(@ macro (= read (-> (x) _ (| ((. syntax definition) x) { (-> `(= ~name ~value) value) (-> _ (panic \"expected binding\")) }))))\n",
+    )
+    .unwrap();
+    for (module, ty, value) in [("a", "Int", "20"), ("b", "String", "\"b\"")] {
+        std::fs::write(
+            dir.path().join(format!("src/{module}.i")),
+            format!("(m = app/macros)\n(result)\nT = {ty}\nresult: m.read(T) = {value}\n"),
+        )
+        .unwrap();
+    }
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(app/a, app/b)\nmain = () { assert(a.result == 20) assert(b.result == \"b\") }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn cli_queries_a_dependency_type_after_its_type_macro_expands() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();

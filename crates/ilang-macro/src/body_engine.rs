@@ -42,7 +42,7 @@ pub enum Error {
     Depth(Span),
     InvalidItem(Span, String),
 }
-struct Compiled {
+pub(crate) struct Compiled {
     program: MacroProgram,
     templates: Arc<[Syntax]>,
     export: String,
@@ -60,7 +60,6 @@ pub struct BodyEngine<'a> {
     pub transactions: Vec<Transaction>,
     /// Successful type replacements, with unique virtual occurrence spans.
     pub type_replacements: Vec<(Span, Span, Syntax)>,
-    cache: HashMap<(u32, String, u8), Compiled>,
     pub(crate) item_locals: Vec<Local>,
     pub(crate) item_overrides: HashMap<Span, (Syntax, Span)>,
     pub(crate) item_replacements: Vec<(Span, Span, ilang_host::macro_budget::MacroBudget)>,
@@ -88,7 +87,6 @@ impl<'a> BodyEngine<'a> {
             resolver,
             transactions: Vec::new(),
             type_replacements: Vec::new(),
-            cache: HashMap::new(),
             item_locals: Vec::new(),
             item_overrides: HashMap::new(),
             item_replacements: Vec::new(),
@@ -197,7 +195,7 @@ impl<'a> BodyEngine<'a> {
             MacroPosition::Type => 2,
         };
         let key = (mac.source.0, mac.definition.name.clone(), phase);
-        if !self.cache.contains_key(&key) {
+        if !self.session.compiled.contains_key(&key) {
             let mut graph = self.graph.clone();
             let mut parsed = prepare::import_closure(&graph, self.parsed, mac.source)
                 .map_err(Error::Preparation)?;
@@ -238,16 +236,16 @@ impl<'a> BodyEngine<'a> {
                 }
                 Error::Compile(diagnostics)
             })?;
-            self.cache.insert(
+            self.session.compiled.insert(
                 key.clone(),
-                Compiled {
+                Arc::new(Compiled {
                     program,
                     templates: prepared.templates.into(),
                     export: format!("{path}.{name}"),
-                },
+                }),
             );
         }
-        let compiled = &self.cache[&key];
+        let compiled = self.session.compiled[&key].clone();
         self.run_mark.store(
             self.session.next_mark(),
             std::sync::atomic::Ordering::Relaxed,

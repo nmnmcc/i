@@ -52,6 +52,11 @@ pub type DefinitionResolver =
 pub struct Session {
     next_mark: u64,
     depth: u16,
+    /// Imported macro definitions are stable after dependency-ordered expansion.
+    /// Share compiled code across caller modules; each invocation still starts
+    /// a fresh guest instance and receives its own budget and resolver.
+    pub(crate) compiled:
+        std::collections::HashMap<(u32, String, u8), Arc<crate::body_engine::Compiled>>,
 }
 
 impl Session {
