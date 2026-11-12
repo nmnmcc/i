@@ -1027,7 +1027,7 @@ connection_loop = (stream, handler, buffer) {
 						Error(BadMessage(why)) -> fail.raise(BadMessage(why))
 						Error(_)               -> response(Status(500))
 					}
-					drain_body(reader)
+					drain_body((read: reader.read))
 					tail = task.update(cursor, (state) {
 						(state, state.buffer)
 					})
