@@ -143,7 +143,7 @@ generate = (
 	k: Int
 ) -> (List(Int), Int) {
 	digit = r / s
-	rest = r % s
+	rest = r - digit * s
 	digits = [digit, ..acc]
 	low = rest - minus
 	high = rest + plus - s

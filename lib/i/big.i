@@ -90,7 +90,15 @@ multiply = (a: Int, b: Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |> {
 		True  -> 0
-		False -> from_digits(s, magnitude_multiply(digits(a), digits(b), [], []))
+		False -> {
+			da = digits(a)
+			db = digits(b)
+			// One row for each digit of the shorter one.
+			{ length(da, 0) <= length(db, 0) } |> {
+				True  -> from_digits(s, magnitude_multiply(da, db, [], []))
+				False -> from_digits(s, magnitude_multiply(db, da, [], []))
+			}
+		}
 	}
 }
 
@@ -284,9 +292,23 @@ magnitude_divide = (x: List(Int), y: List(Int)) -> (List(Int), List(Int)) {
 				nx = shift_left(x, s, 0, [])
 				m = length(ny, 0)
 				top = at(ny, m - 1) + 1
-				(q, r) = long_divide(reverse(nx, []), ny, m, top, [], [])
+				// The first m - 1 digits are below the divisor, so they
+				// start the remainder and give no quotient digits.
+				(start, rest) = split_top(reverse(nx, []), m - 1, [])
+				(q, r) = long_divide(rest, ny, m, top, trim(start), [])
 				(q, shift_right(reverse(r, []), s, 0, []))
 			}
+		}
+	}
+}
+
+// The first `n` digits of `top`, least significant first, and the rest.
+split_top = (top: List(Int), n: Int, acc: List(Int)) -> (List(Int), List(Int)) {
+	{ n == 0 } |> {
+		True -> (acc, top)
+		False -> top |> {
+			[]          -> (acc, [])
+			[d, ..rest] -> split_top(rest, n - 1, [d, ..acc])
 		}
 	}
 }
