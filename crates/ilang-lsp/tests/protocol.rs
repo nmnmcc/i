@@ -1185,7 +1185,7 @@ fn lsp_references_type() {
 fn lsp_references_field_label() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let refs = references(&mut c, &ws.main, &ws.main_text, "radius: 2", 0, 0, true);
+    let refs = references(&mut c, &ws.main, &ws.main_text, "radius = 2", 0, 0, true);
     // The label of the field, the label of the call, the part of the
     // pattern in `area`, and the call in the test.
     assert!(
@@ -1213,12 +1213,14 @@ fn lsp_references_type_parameter() {
     let mut c = Client::start();
     c.open(&ws.shapes, SHAPES);
     c.diagnostics(&ws.shapes);
-    let refs = references(&mut c, &ws.shapes, SHAPES, "A) {", 0, 0, true);
+    let refs = references(&mut c, &ws.shapes, SHAPES, "A) =", 0, 0, true);
+    let (l, ch) = find(SHAPES, "item = A", 0);
+    let use_ = lsp::Range::new(lsp::Position::new(l, ch + 7), lsp::Position::new(l, ch + 8));
     assert_eq!(
         refs,
         vec![
-            (ws.shapes.clone(), range_of(SHAPES, "A) {", 0).with_len(1)),
-            (ws.shapes.clone(), range_of(SHAPES, "A) }", 0).with_len(1)),
+            (ws.shapes.clone(), range_of(SHAPES, "A) =", 0).with_len(1)),
+            (ws.shapes.clone(), use_),
         ]
     );
     c.shutdown();
@@ -1402,23 +1404,23 @@ fn lsp_rename_constructor_and_type() {
 fn lsp_rename_field_keeps_pattern_names() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let edit = rename(&mut c, &ws.main, &ws.main_text, "radius: 2", 0, 0, "size").unwrap();
+    let edit = rename(&mut c, &ws.main, &ws.main_text, "radius = 2", 0, 0, "size").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    assert!(shapes.contains("Circle(size: Int)"), "{shapes}");
+    assert!(shapes.contains("Circle = (size = Int)"), "{shapes}");
     // The pattern part keeps its local name and gets the new label.
     assert!(
-        shapes.contains("Circle(radius = size) -> radius * radius * 3"),
+        shapes.contains("(Circle(size = radius)) { radius * radius * 3 }"),
         "{shapes}"
     );
-    assert!(apply(&ws.main_text, &edit, &ws.main).contains("Circle(size: 2)"));
+    assert!(apply(&ws.main_text, &edit, &ws.main).contains("Circle(size = 2)"));
     // Renaming that local name keeps the label.
     let mut c2 = Client::start();
     c2.open(&ws.shapes, SHAPES);
     c2.diagnostics(&ws.shapes);
-    let edit = rename(&mut c2, &ws.shapes, SHAPES, "radius) ->", 0, 0, "r").unwrap();
+    let edit = rename(&mut c2, &ws.shapes, SHAPES, "radius)) {", 0, 0, "r").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
-        shapes.contains("Circle(r = radius) -> r * r * 3"),
+        shapes.contains("(Circle(radius = r)) { r * r * 3 }"),
         "{shapes}"
     );
     c2.shutdown();
@@ -1667,7 +1669,7 @@ fn lsp_definition_implementation_of_a_service() {
         found.contains(&(main.clone(), range_of(text, "Clock(now", 0).with_len(5))),
         "{found:?}"
     );
-    let (l, _) = find(text, "! Clock =", 0);
+    let (l, _) = find(text, "<- (Clock(now", 0);
     assert!(found.iter().any(|(_, r)| r.start.line == l), "{found:?}");
     c.shutdown();
 }
@@ -1817,13 +1819,13 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
-    let items = completion(&mut c, &main, text, "\t\t\n", 0, 2);
+    let items = completion(&mut c, &main, text, "() { 2", 0, 1);
     let circle = item(&items, "Circle");
     assert_eq!(circle.insert_text.as_deref(), Some("Circle(${1:_})"));
     assert_eq!(
@@ -1845,13 +1847,13 @@ fn lsp_completion_constructors_in_a_match() {
 fn lsp_completion_labels_in_a_call() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let typing = ws.main_text.replace("Circle(radius: 2)", "Circle()");
+    let typing = ws.main_text.replace("Circle(radius = 2)", "Circle()");
     c.change(&ws.main, 2, &typing);
     let items = completion(&mut c, &ws.main, &typing, "Circle()", 0, 7);
-    let radius = item(&items, "radius:");
-    assert_eq!(radius.insert_text.as_deref(), Some("radius: "));
+    let radius = item(&items, "radius =");
+    assert_eq!(radius.insert_text.as_deref(), Some("radius = "));
     assert_eq!(radius.detail.as_deref(), Some("Int"));
-    assert_eq!(items[0].label, "radius:");
+    assert_eq!(items[0].label, "radius =");
     // Locals are there too.
     item(&items, "size");
     c.shutdown();
@@ -1904,7 +1906,7 @@ fn lsp_completion_services_in_an_environment() {
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
-    let items = completion(&mut c, &main, text, "! Clock)", 0, 2);
+    let items = completion(&mut c, &main, text, "Clock) {", 0, 0);
     assert_eq!(
         items[0].label,
         "Clock",
@@ -2021,7 +2023,7 @@ fn lsp_signature_with_labels() {
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
-    let s = signature(&mut c, pos(&main, text, "age: 3", 0, 5));
+    let s = signature(&mut c, pos(&main, text, "3)", 0, 0));
     assert_eq!(s.active_parameter, Some(1));
     let s = signature(&mut c, pos(&main, text, "\"a\"", 0, 1));
     assert_eq!(s.active_parameter, Some(0));
@@ -2032,8 +2034,8 @@ fn lsp_signature_with_labels() {
 fn lsp_signature_of_a_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius: 2", 0, 8));
-    assert_eq!(s.signatures[0].label, "Circle(radius: Int) -> Shape");
+    let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius = 2", 0, 9));
+    assert_eq!(s.signatures[0].label, "Circle(radius = Int) -> Shape");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
 }
@@ -2457,20 +2459,13 @@ fn lsp_folding_ranges() {
         json!({ "textDocument": { "uri": ws.shapes } }),
     );
     let ranges: Vec<lsp::FoldingRange> = serde_json::from_value(r).unwrap();
-    let (shape, _) = find(SHAPES, "Shape {", 0);
-    assert!(
-        ranges
-            .iter()
-            .any(|f| f.start_line == shape && f.end_line == shape + 3),
-        "{ranges:?}"
-    );
     let (area, _) = find(SHAPES, "area = ", 0);
-    let (case, _) = find(SHAPES, "s |> {", 0);
+    let (case, _) = find(SHAPES, "s |>", 0);
     assert!(ranges.iter().any(|f| f.start_line == area), "{ranges:?}");
     assert!(
         ranges
             .iter()
-            .any(|f| f.start_line == case && f.end_line == case + 3),
+            .any(|f| f.start_line == case && f.end_line == case + 2),
         "{ranges:?}"
     );
     // Imports.
@@ -2948,9 +2943,9 @@ fn lsp_latency_on_std() {
     let mut times = Vec::new();
     for round in 0..3 {
         for (name, p) in [
-            ("hover", at("\nmap(A")),
-            ("definition", at("-> reverse(acc)")),
-            ("completion", at("-> reverse(acc)")),
+            ("hover", at("\nmap = <A")),
+            ("definition", at("{ reverse(acc)")),
+            ("completion", at("{ reverse(acc)")),
         ] {
             let started = Instant::now();
             let r = match name {
