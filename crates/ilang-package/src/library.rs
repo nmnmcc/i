@@ -27,6 +27,11 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/stdio", include_str!("../../../lib/i/stdio.i")),
 ];
 
+/// The library modules whose functions the runtime calls
+/// (`ilang_wasm::ir::RUNTIME_CALLS`). Every program has them, also a
+/// compiler program that selects only an import closure.
+pub const RUNTIME: &[&str] = &["i/float_text"];
+
 pub const PRELUDE: (&str, &str) = ("i/prelude", include_str!("../../../lib/prelude.i"));
 
 /// Adds the package `i` to an empty graph, as package 0.

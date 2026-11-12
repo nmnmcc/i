@@ -141,6 +141,7 @@ fn graph_with_path_dependencies() {
             "i/request",
             "i/key",
             "i/core",
+            "i/float_text",
             "i/record",
             "i/io",
             "i/task",

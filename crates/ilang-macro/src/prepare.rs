@@ -101,6 +101,13 @@ pub(crate) fn import_indices(
         .position(|m| m.package == graph.library && m.path == "i/syntax")
         .expect("loaded graph includes compiler syntax module");
     let mut queue = VecDeque::from([start, prelude, syntax]);
+    // The runtime calls these library modules, so every program has them.
+    queue.extend(ilang_package::library::RUNTIME.iter().map(|&path| {
+        parsed
+            .iter()
+            .position(|m| m.package == graph.library && m.path == path)
+            .unwrap_or_else(|| panic!("loaded graph includes runtime module {path}"))
+    }));
     let mut selected = BTreeSet::new();
     let mut errors = Vec::new();
     while let Some(index) = queue.pop_front() {
