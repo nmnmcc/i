@@ -70,6 +70,8 @@ if [ -n "$unexpected" ]; then
 fi
 [ "$status" = 0 ] || [ -s "$out/failed.txt" ] || exit "$status"
 echo "syn3-convert-all: $(wc -l < "$out/failed.txt") files left as they are (scripts/syn3-unconvertible.txt)"
+# The staged syntax-three text of the spec takes the place of the old text.
+"$repo/scripts/syn3-spec-fold"
 "$repo/scripts/syn3-convert-embedded" "$bin" "${ctors[@]}" 2> "$out/embedded.txt" || {
 	grep FAILED "$out/embedded.txt" >&2
 	exit 1
