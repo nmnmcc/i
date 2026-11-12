@@ -211,17 +211,8 @@ fn mentioned(
                 atom_uses(bits, &mut add);
                 num_uses(start, &mut add);
             }
-            Stmt::If {
-                cond,
-                then,
-                otherwise,
-            } => {
-                cond_uses(cond, &mut add);
-                mentioned(then, set, goes_on);
-                mentioned(otherwise, set, goes_on);
-            }
-            Stmt::Block { body, .. } => mentioned(body, set, goes_on),
-            Stmt::Break(_) | Stmt::Unreachable | Stmt::Logical(_) => {}
+            Stmt::If { cond, .. } => cond_uses(cond, &mut add),
+            Stmt::Block { .. } | Stmt::Break(_) | Stmt::Unreachable | Stmt::Logical(_) => {}
             Stmt::Return(a) | Stmt::SetGlobal(_, a) => atom_uses(a, &mut add),
             Stmt::TailCall {
                 callee, args, env, ..
@@ -238,6 +229,7 @@ fn mentioned(
                 atom_uses(value, &mut add);
             }
         }
+        s.bodies().for_each(|b| mentioned(b, set, goes_on));
         set.extend(uses);
     }
 }
@@ -286,7 +278,7 @@ fn suspends(v: &Value, may: &[bool]) -> bool {
 }
 
 fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
-    stmts.iter().any(|s| match s {
+    each_stmt(stmts).any(|s| match s {
         Stmt::Let { value, .. } => suspends(value, may),
         Stmt::TailCall {
             callee: Callee::Value(_),
@@ -296,10 +288,6 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
             callee: Callee::Direct(f) | Callee::Known { func: f, .. },
             ..
         } => may[f.0 as usize],
-        Stmt::If {
-            then, otherwise, ..
-        } => any_suspends(then, may) || any_suspends(otherwise, may),
-        Stmt::Block { body, .. } => any_suspends(body, may),
         Stmt::Suspendable { .. } => true,
         _ => false,
     })
@@ -319,14 +307,7 @@ fn mark(stmts: &mut [Stmt], may: &[bool], next: &mut PointId) {
                 };
                 *next += 1;
             }
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                mark(then, may, next);
-                mark(otherwise, may, next);
-            }
-            Stmt::Block { body, .. } => mark(body, may, next),
-            _ => {}
+            _ => s.bodies_mut().for_each(|b| mark(b, may, next)),
         }
     }
 }
@@ -334,21 +315,12 @@ fn mark(stmts: &mut [Stmt], may: &[bool], next: &mut PointId) {
 /// The environment statements of a function: each environment local is
 /// made once.
 fn env_defs(stmts: &[Stmt], out: &mut HashMap<Local, (Env, u32)>) {
-    for s in stmts {
-        match s {
-            Stmt::LetEnv {
-                dst, env, service, ..
-            } => {
-                out.insert(*dst, (*env, *service));
-            }
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                env_defs(then, out);
-                env_defs(otherwise, out);
-            }
-            Stmt::Block { body, .. } => env_defs(body, out),
-            _ => {}
+    for s in each_stmt(stmts) {
+        if let Stmt::LetEnv {
+            dst, env, service, ..
+        } = s
+        {
+            out.insert(*dst, (*env, *service));
         }
     }
 }
@@ -372,14 +344,7 @@ struct Found<'a> {
 }
 
 fn has_point(stmts: &[Stmt]) -> bool {
-    stmts.iter().any(|s| match s {
-        Stmt::Suspendable { .. } => true,
-        Stmt::If {
-            then, otherwise, ..
-        } => has_point(then) || has_point(otherwise),
-        Stmt::Block { body, .. } => has_point(body),
-        _ => false,
-    })
+    each_stmt(stmts).any(|s| matches!(s, Stmt::Suspendable { .. }))
 }
 
 fn find<'a>(stmts: &'a [Stmt], path: &mut Path<'a>, out: &mut Found<'a>) {

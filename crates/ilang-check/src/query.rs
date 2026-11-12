@@ -2123,29 +2123,7 @@ fn contains(span: Span, offset: u32) -> bool {
 }
 
 fn pattern_binders(p: &Pattern, out: &mut Vec<Binder>) {
-    match &p.kind {
-        PatternKind::Quote { captures, .. } => {
-            captures.iter().for_each(|(_, p)| pattern_binders(p, out))
-        }
-        PatternKind::Var(b) => out.push(b.clone()),
-        PatternKind::Typed { binder, .. } => out.extend(binder.clone()),
-        PatternKind::Named { binder, pattern } => {
-            out.push(binder.clone());
-            pattern_binders(pattern, out);
-        }
-        PatternKind::Prefix { rest, .. } => out.extend(rest.clone()),
-        PatternKind::Constructor { args: ps, .. }
-        | PatternKind::Tuple(ps)
-        | PatternKind::Error(ps) => ps.iter().for_each(|q| pattern_binders(q, out)),
-        PatternKind::List { items, rest } => {
-            items.iter().for_each(|q| pattern_binders(q, out));
-            if let Some(Some(b)) = rest {
-                out.push(b.clone());
-            }
-        }
-        PatternKind::BitArray(segs) => segs.iter().for_each(|s| pattern_binders(&s.value, out)),
-        _ => {}
-    }
+    crate::hir::pattern_binders(p, &mut |b| out.push(b.clone()));
     out.retain(|b| !b.name.starts_with('%'));
 }
 

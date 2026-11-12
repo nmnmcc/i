@@ -51,36 +51,22 @@ pub(super) fn float_operation(op: Op, args: &[String], check: bool) -> Option<St
 }
 
 pub(crate) fn has_float(stmts: &[Stmt]) -> bool {
-    let mut work = vec![stmts];
-    while let Some(stmts) = work.pop() {
-        for stmt in stmts {
-            match stmt {
-                Stmt::Let {
-                    value: Value::Op(op, _) | Value::Finite(op, _),
-                    ..
-                }
-                | Stmt::Suspendable {
-                    value: Value::Op(op, _) | Value::Finite(op, _),
-                    ..
-                } if matches!(
-                    op,
-                    Op::FloatAdd | Op::FloatSub | Op::FloatMul | Op::FloatDiv | Op::FloatNeg
-                ) =>
-                {
-                    return true;
-                }
-                Stmt::If {
-                    then, otherwise, ..
-                } => {
-                    work.push(then);
-                    work.push(otherwise);
-                }
-                Stmt::Block { body, .. } => work.push(body),
-                _ => {}
+    each_stmt(stmts).any(|stmt| {
+        matches!(
+            stmt,
+            Stmt::Let {
+                value: Value::Op(op, _) | Value::Finite(op, _),
+                ..
             }
-        }
-    }
-    false
+            | Stmt::Suspendable {
+                value: Value::Op(op, _) | Value::Finite(op, _),
+                ..
+            } if matches!(
+                op,
+                Op::FloatAdd | Op::FloatSub | Op::FloatMul | Op::FloatDiv | Op::FloatNeg
+            )
+        )
+    })
 }
 
 /// A local encoding, never a source type. Int uses an i64 containing a proved
@@ -106,22 +92,9 @@ impl Plan {
         worker: Option<&crate::numeric::Worker>,
     ) -> Self {
         let mut definitions: HashMap<Local, Vec<&Value>> = HashMap::new();
-        let mut work = vec![f.body.as_slice()];
-        while let Some(stmts) = work.pop() {
-            for stmt in stmts {
-                match stmt {
-                    Stmt::Let { dst, value, .. } | Stmt::Suspendable { dst, value, .. } => {
-                        definitions.entry(*dst).or_default().push(value)
-                    }
-                    Stmt::If {
-                        then, otherwise, ..
-                    } => {
-                        work.push(then);
-                        work.push(otherwise);
-                    }
-                    Stmt::Block { body, .. } => work.push(body),
-                    _ => {}
-                }
+        for stmt in each_stmt(&f.body) {
+            if let Stmt::Let { dst, value, .. } | Stmt::Suspendable { dst, value, .. } = stmt {
+                definitions.entry(*dst).or_default().push(value)
             }
         }
         let mut plan = Self::default();
