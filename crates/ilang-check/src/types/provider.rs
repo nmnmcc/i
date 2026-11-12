@@ -173,6 +173,8 @@ impl Typed {
             .iter()
             .map(concrete)
             .collect::<Result<Vec<_>, _>>()?;
+        let required = s.env_union(requires.clone());
+        let supplied_only = s.env_union(supplies.clone());
         let rest = s.env_diff(n.clone(), supplies.clone());
         let env = s.env_union(requires.into_iter().chain([rest]).collect());
         let supplied = s.env_union(supplies);
@@ -293,8 +295,10 @@ impl Typed {
         match actual.compare(&expected, &mut |r| name(r), &mut |r| name(r))? {
             SchemeComparison::Equivalent(_) => Ok(()),
             other => {
-                // The solver's own subtype check, both ways, each side
-                // instantiated fresh (simplification U4).
+                // The solver's own subtype check both ways, each side
+                // instantiated fresh, and a supplied service given to the
+                // body must not reach the adapter's own environment beyond
+                // what it requires.
                 let mut t = expected
                     .catalog
                     .solver
@@ -306,6 +310,17 @@ impl Typed {
                 t.constrain(&a, &expected.scheme.ty);
                 let e = t.freshen(&expected.scheme.ty, 0, &mut Default::default());
                 t.constrain(&e, &actual.scheme.ty);
+                let leak = t.freshen(&actual.scheme.ty, actual.scheme.level, &mut Default::default());
+                match &leak {
+                    Ty::Fn(f) => match f.params.as_slice() {
+                        [(_, Ty::Fn(body))] => {
+                            t.constrain_env(&supplied_only, &body.env);
+                            t.constrain_env(&f.env, &required);
+                        }
+                        _ => t.constrain(&leak, &Ty::Never),
+                    },
+                    _ => t.constrain(&leak, &Ty::Never),
+                }
                 if t.failures.is_empty() {
                     Ok(())
                 } else {
