@@ -4238,7 +4238,10 @@ notice_hops = (notice: ForeignNotice) -> List(Hop) {
 }
 
 // Selected by package data with this module's private authority.
-_provider_runner = (seeds: List(Runner), root ! request.Root) -> Runner ! request.Root {
+_provider_runner = (
+	seeds: List(Runner)
+	root ! request.Root
+) -> Runner ! request.Root {
 	seeds |> {
 		[runner] -> runner
 		[]       -> initial(root)

@@ -2,4 +2,5 @@
 ("[" @open "]" @close)
 ("{" @open "}" @close)
 ("<<" @open ">>" @close)
-("\"" @open "\"" @close)
+(string (string_start) @open (string_end) @close)
+(interpolation (interpolation_start) @open (interpolation_end) @close)

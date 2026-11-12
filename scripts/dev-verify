@@ -38,6 +38,8 @@ i() {
 }
 
 js() {
+  binaryen
+  cargo build --locked -p ilang-cli
   npm ci --ignore-scripts
   npm test
   npm run test:browser
