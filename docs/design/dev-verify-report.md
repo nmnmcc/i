@@ -87,9 +87,24 @@ Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
 - `cargo test -p ilang-syntax --test format --locked`: passed, both tests.
 - `cargo test -p ilang-syntax --test format format_properties --locked` with
   the original task source copy: passed.
+- `UPDATE=1 cargo test -p ilang-check --test types library --locked`: passed;
+  inspected the snapshot changes (private scheduler constructor plus removal
+  of the accidental Root requirements).
+- Rebuilt the debug CLI; `i check --project bench --types` and
+  `i test --project bench --opt 0`: passed, all 15 benchmark tests.
+- `cargo test -p ilang-cli --test spec --locked -- 9.9`: passed, 78 cases at
+  both optimization levels.
+- `scripts/test-generation --mode short --binary target/debug/i`: passed,
+  32 cases (20 accepted, 12 rejected by the model), 64 declaration
+  permutations, 32 annotation removals, zero failures.
 - `scripts/dev-verify js`: passed, 104 Node tests and 60 browser tests across
   Chromium, Firefox and WebKit.
 - `scripts/dev-verify editors`: passed, including query compilation,
   repository parsing, generated parser equality and Zed cargo check.
-- Full Rust/i verification and the clean-worktree acceptance run are recorded
-  below after completion.
+
+The exact supplied clean-worktree acceptance script runs after this report
+is committed. Its combined output is captured in `/tmp/js-acceptance.log`;
+individual part outputs are `/tmp/dv-{rust,i,js,editors}.<shell-pid>`. It runs
+each part separately through the heavy wrapper, requires each exit status to
+be zero, compares the verification script against `lane/integ`, and checks
+that this report exists. No check or existing test was removed or disabled.
