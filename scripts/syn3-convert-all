@@ -5,13 +5,16 @@
 # JavaScript strings and Markdown fences (scripts/syn3-convert-embedded), then
 # the hand rewrites (scripts/syn3-hand-rewrites).
 #
-#   scripts/syn3-convert-all [--since REV]
+#   scripts/syn3-convert-all [--since REV | --all]
 #
 # The conversion can run again on a newer tree: a file already in syntax three
-# is left as it is (see `migrate-syntax3 convert`). With `--since REV` (the
-# commit of an earlier conversion) only the files changed since REV and the new
-# files are read, which also settles the few texts that both syntaxes read to
-# different trees (`T = (A)` is an alias before and a labelled type after).
+# is left as it is (see `migrate-syntax3 convert`). Only the files changed
+# since the last conversion commit (the newest commit whose subject begins
+# "Convert the repository to syntax three" or "Re-run the conversion"), and new
+# files, are read; this settles the few texts that both syntaxes read to
+# different trees (`T = (A)` is an alias before and a labelled type after),
+# because a converted file that nobody changed is not read again. `--since REV`
+# names that commit; `--all` reads every file (a tree with no conversion yet).
 #
 # Fails (exit 1, and says which) when a file cannot be converted and is not in
 # scripts/syn3-unconvertible.txt, the files that neither syntax reads (parse
@@ -21,10 +24,13 @@
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
-since=
+since=$(git log -1 --format=%H -E --grep='^(Convert the repository to syntax three|Re-run the conversion)' || true)
 if [ "${1:-}" = --since ]; then
 	since=$2
 	shift 2
+elif [ "${1:-}" = --all ]; then
+	since=
+	shift
 fi
 bin=${SYN3_MIGRATE:-}
 if [ -z "$bin" ]; then
