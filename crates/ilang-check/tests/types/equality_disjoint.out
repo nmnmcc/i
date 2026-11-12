@@ -1,17 +1,17 @@
 literals : Bool
-typed : (s: String) -> Bool
-with_nil : (x: Int | Nil) -> Bool
+typed : (s = String) -> Bool
+with_nil : (x = Int | Nil) -> Bool
 lists : Bool
-type_var : (a: A, b: B) -> Bool
-type_var_literal : (a: A) -> Bool
-untyped : (s: A) -> Bool
+type_var : (a = A, b = B) -> Bool
+type_var_literal : (a = A) -> Bool
+untyped : (s = A) -> Bool
 not_equal : Bool
-shared : (x: Int | String, y: String | Nil) -> Bool
-apart : (x: Int | String, y: Float | Nil) -> Bool
+shared : (x = Int | String, y = String | Nil) -> Bool
+apart : (x = Int | String, y = Float | Nil) -> Bool
 sizes : Bool
 same_size : Bool
-function : (f: (Int) -> Int) -> Bool
-holes : (x: A) -> Bool
+function : (f = (Int) -> Int) -> Bool
+holes : (x = A) -> Bool
 6:12: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
 8:23: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 22:13: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `!=` is always `True` (§6.9)

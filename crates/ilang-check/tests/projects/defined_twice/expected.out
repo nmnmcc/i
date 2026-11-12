@@ -1,5 +1,5 @@
 src/main.i:3:1: error[E0208]: `x` is defined more than once in this module
 src/main.i:7:1: error[E0208]: `z` is defined more than once in this module
 src/main.i:14:1: error[E0208]: the type `T` is defined more than once in this module
-src/main.i:19:2: error[E0208]: `A` is defined more than once in this module
-src/main.i:29:1: error[E0208]: `w` is defined more than once in this module
+src/main.i:16:1: error[E0208]: `A` is defined more than once in this module
+src/main.i:26:1: error[E0208]: `w` is defined more than once in this module

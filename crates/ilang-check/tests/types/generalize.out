@@ -1,20 +1,20 @@
-id : (x: A) -> A
+id : (x = A) -> A
 both : (1, "a")
-ids : (x: 1 | "a") -> 1 | "a"
+ids : (x = 1 | "a") -> 1 | "a"
 use_ids : () -> (1 | "a", 1 | "a")
 local : () -> (1, "a")
 local_mono : () -> (1 | "a", 1 | "a")
-param : (f: (1 | "a") -> A & B ^ E ! N) -> (A, B) ^ E ! N
-fact : (n: Int) -> Int
-loop : (x: A) -> Never
-even : (n: Int) -> Bool
-odd : (n: Int) -> Bool
-f : (x: A) -> Never
-g : (x: A) -> Never
+param : (f = (1 | "a") <- (Fail(E), ..N) -> A & B) <- (Fail(E), ..N) -> (A, B)
+fact : (n = Int) -> Int
+loop : (x = A) -> Never
+even : (n = Int) -> Bool
+odd : (n = Int) -> Bool
+f : (x = A) -> Never
+g : (x = A) -> Never
 uses : (Bool, Never, Never)
 5:1: warning[W0504]: top-level binding `both` is not used
 9:1: warning[W0504]: top-level binding `use_ids` is not used
 12:1: warning[W0504]: top-level binding `local` is not used
 17:1: warning[W0504]: top-level binding `local_mono` is not used
 23:1: warning[W0504]: top-level binding `param` is not used
-42:1: warning[W0504]: top-level binding `uses` is not used
+37:1: warning[W0504]: top-level binding `uses` is not used
