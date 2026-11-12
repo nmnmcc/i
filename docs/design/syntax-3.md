@@ -1928,8 +1928,8 @@ absurd = (x: Never) { x |> {} }            absurd = (x: Never) { core.never(x) }
 | §6.6 | Replaced (§5.2.6). |
 | §6.7 | Replaced (§5.2.6). |
 | §6.8 | "`! N` must have the types of the environment parameters" becomes "the need after `<-` contains the types of its head's service pattern". |
-| §6.9 | Table: `\|>` moves to a new level 0 below `\|\|`. The `\|>` bullets are replaced by §2.11. The bullet on a match at level 6 is removed. |
-| §6.10 | Add the environment read; "`name = pattern` is itself a pattern" becomes the conjunction rule; direct values: "a function expression or a chain; … data whose items are direct values …"; the record example goes. |
+| §6.9 | Table: `\|>` moves to a new level 0 below `\|\|`, and the provide `<-` is a new level below it, the weakest, left associative, whose right operand is one postfix expression (§3.3). The `\|>` bullets are replaced by §2.11. The bullet on a match at level 6 is removed. |
+| §6.10 | Remove the environment statement; a binding's value may be a provide (§2.10.5); "`name = pattern` is itself a pattern" becomes the conjunction rule; direct values: "a function expression or a chain; … data whose items are direct values …"; the record example goes. |
 | §6.11 | Replaced (§5.2.7). Labels of parameters and environment parameters are removed. |
 | §6.12 | Replaced by "Branches and matching" (§5.2.7). `{}` removed. |
 | §6.13 | Removed. |
