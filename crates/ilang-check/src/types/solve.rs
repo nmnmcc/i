@@ -1655,6 +1655,14 @@ impl Solver {
                         // bounds that the entries reach.
                         if var == Variance::Inv {
                             self.equal(x, y, FailKind::EnvForms);
+                        } else if var == Variance::Co
+                            && is_lower_bound
+                            && x.is_headed()
+                            && y.is_headed()
+                            && x.head() != y.head()
+                        {
+                            // Rule A: a covariant meet with no values.
+                            self.fail(FailKind::EnvForms, a, b);
                         } else if (var == Variance::Contra && lower)
                             || (var == Variance::Co && !is_lower_bound && first)
                         {
