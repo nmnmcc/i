@@ -168,14 +168,19 @@ pub fn build_entry(
         return Err(program_error(&graph, &diags));
     }
     let warnings: Vec<Diagnostic> = diags.iter().filter(|d| !d.is_error()).cloned().collect();
-    let (wasm, declarations) = match ilang_wasm::compile_with_bindings(
+    let (wasm, declarations) = match ilang_wasm::compile_with_bindings_numeric(
         &graph,
         program,
         typed,
         ilang_wasm::Options {
             tests: options.tests,
             target: options.target,
-        },
+        }
+        .numeric(if options.opt == Level::O0 {
+            ilang_wasm::Numeric::Reference
+        } else {
+            ilang_wasm::Numeric::Scalars
+        }),
     ) {
         Ok(w) => w,
         Err(ilang_wasm::Error::Diagnostics(more)) => {
@@ -247,14 +252,19 @@ pub fn build_tests(
         .map(|(_, target, name)| (*target, name.clone()))
         .collect();
     let warnings: Vec<Diagnostic> = diags.iter().filter(|d| !d.is_error()).cloned().collect();
-    let (wasm, declarations) = match ilang_wasm::compile_tests_with_bindings(
+    let (wasm, declarations) = match ilang_wasm::compile_tests_with_bindings_numeric(
         &graph,
         program,
         typed,
         ilang_wasm::Options {
             tests: options.tests,
             target: options.target,
-        },
+        }
+        .numeric(if options.opt == Level::O0 {
+            ilang_wasm::Numeric::Reference
+        } else {
+            ilang_wasm::Numeric::Scalars
+        }),
         &exports,
     ) {
         Ok(w) => w,
@@ -574,14 +584,19 @@ pub fn build_collection(
         })?;
     }
     let export = format!("i.tool.{index}");
-    let (wasm, declarations, is_async) = match ilang_wasm::compile_selected_with_bindings(
+    let (wasm, declarations, is_async) = match ilang_wasm::compile_selected_with_bindings_numeric(
         &graph,
         program,
         &typed,
         ilang_wasm::Options {
             tests: options.tests,
             target: options.target,
-        },
+        }
+        .numeric(if options.opt == Level::O0 {
+            ilang_wasm::Numeric::Reference
+        } else {
+            ilang_wasm::Numeric::Scalars
+        }),
         target,
         &export,
     ) {

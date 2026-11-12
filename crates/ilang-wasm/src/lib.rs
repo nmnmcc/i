@@ -10,7 +10,8 @@
 //! - `emit`: from the intermediate form to a Wasm module with the binary
 //!   interface of Appendix B.
 //!
-//! The code is simple and not optimized: `ilang-binaryen` optimizes it.
+//! Numeric emission can select local scalar encodings at O2/O3. The existing
+//! `ilang-binaryen` pipeline performs the remaining Wasm optimization.
 
 pub mod budget;
 pub mod control;
@@ -25,6 +26,41 @@ use ilang_package::{Diagnostic, PackageGraph};
 
 pub use ir::Target;
 pub use lower::{Options, code};
+
+/// Internal numeric lowering stages. Reference preserves the O0 oracle;
+/// Visible exposes boxes to Binaryen; Scalars also selects local representations.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Numeric {
+    #[default]
+    Reference,
+    Visible,
+    Scalars,
+}
+
+/// Code generation choices, separate from source-language lowering options.
+#[derive(Clone, Copy, Debug)]
+pub struct CompilationOptions {
+    pub lower: Options,
+    pub numeric: Numeric,
+}
+
+impl From<Options> for CompilationOptions {
+    fn from(lower: Options) -> Self {
+        Self {
+            lower,
+            numeric: Numeric::Reference,
+        }
+    }
+}
+
+impl Options {
+    pub fn numeric(self, numeric: Numeric) -> CompilationOptions {
+        CompilationOptions {
+            lower: self,
+            numeric,
+        }
+    }
+}
 
 /// Why a program could not be compiled.
 #[derive(Debug)]
@@ -65,8 +101,18 @@ pub fn compile_with_bindings(
     typed: &Typed,
     options: Options,
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
-    let (ir, bindings) =
-        lower::lower_with_bindings(graph, program, typed, options).map_err(Error::Diagnostics)?;
+    compile_with_bindings_numeric(graph, program, typed, options.into())
+}
+
+pub fn compile_with_bindings_numeric(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: CompilationOptions,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    let (mut ir, bindings) = lower::lower_with_bindings(graph, program, typed, options.lower)
+        .map_err(Error::Diagnostics)?;
+    ir.numeric = options.numeric;
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);
@@ -98,8 +144,20 @@ pub fn compile_tests_with_bindings(
     options: Options,
     tests: &[(hir::DefId, String)],
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
-    let (ir, bindings) = lower::lower_tests_with_bindings(graph, program, typed, options, tests)
-        .map_err(Error::Diagnostics)?;
+    compile_tests_with_bindings_numeric(graph, program, typed, options.into(), tests)
+}
+
+pub fn compile_tests_with_bindings_numeric(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: CompilationOptions,
+    tests: &[(hir::DefId, String)],
+) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    let (mut ir, bindings) =
+        lower::lower_tests_with_bindings(graph, program, typed, options.lower, tests)
+            .map_err(Error::Diagnostics)?;
+    ir.numeric = options.numeric;
     let mut wasm = wat::parse_str(emit::wat(&ir)).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);
     add_provider_section(&mut wasm, &bindings);
@@ -117,9 +175,21 @@ pub fn compile_selected_with_bindings(
     target: hir::DefId,
     export: &str,
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>, bool), Error> {
-    let (ir, bindings, is_async) =
-        lower::lower_selected_with_bindings(graph, program, typed, options, target, export)
+    compile_selected_with_bindings_numeric(graph, program, typed, options.into(), target, export)
+}
+
+pub fn compile_selected_with_bindings_numeric(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: CompilationOptions,
+    target: hir::DefId,
+    export: &str,
+) -> Result<(Vec<u8>, Vec<serde_json::Value>, bool), Error> {
+    let (mut ir, bindings, is_async) =
+        lower::lower_selected_with_bindings(graph, program, typed, options.lower, target, export)
             .map_err(Error::Diagnostics)?;
+    ir.numeric = options.numeric;
     let text = emit::wat(&ir);
     let mut wasm = wat::parse_str(&text).map_err(|e| Error::Internal(e.to_string()))?;
     emit::add_abi_section(&mut wasm, &ir.abi_json);
@@ -135,7 +205,17 @@ pub fn compile_wat(
     typed: &Typed,
     options: Options,
 ) -> Result<String, Error> {
-    let ir = lower::lower(graph, program, typed, options).map_err(Error::Diagnostics)?;
+    compile_wat_numeric(graph, program, typed, options.into())
+}
+
+pub fn compile_wat_numeric(
+    graph: &PackageGraph,
+    program: &hir::Program,
+    typed: &Typed,
+    options: CompilationOptions,
+) -> Result<String, Error> {
+    let mut ir = lower::lower(graph, program, typed, options.lower).map_err(Error::Diagnostics)?;
+    ir.numeric = options.numeric;
     Ok(emit::wat(&ir))
 }
 
