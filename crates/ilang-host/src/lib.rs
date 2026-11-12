@@ -1,19 +1,19 @@
-//! Wasmtime embedding of the i binary interface, version 3 (spec Appendix B).
+//! Wasmtime embedding of the i binary interface, version 3.
 //!
 //! A [`Program`] is a compiled module with its `ilang.abi` metadata. Every
 //! [`Instance`] runs `ilang_start` once before anything else. Calls give an
 //! [`Outcome`]: a value, an error of the function (`? E`), or a [`Stop`] with
-//! the stop message of spec §11.7. After a stop, or any other trap, an
-//! instance refuses further calls (B.5); make a new one.
+//! the stop message. After a stop, or any other trap, an
+//! instance refuses further calls; make a new one.
 //!
-//! Buffers follow B.3: the host makes the buffers of export parameters with
+//! Buffers have one owner: the host makes the buffers of export parameters with
 //! `ilang_alloc` and frees them after the call, and it frees the result
 //! buffers after copying them. For imports, the host makes the result buffers.
 //!
 //! # Requests
 //!
 //! An async export may keep many requests of async host functions
-//! outstanding (B.4, B.5). The host keeps their work in the store, keyed by
+//! outstanding. The host keeps their work in the store, keyed by
 //! the request id that the module chose, and answers them one at a time in
 //! the order their work finishes. When the entry point ends, traps or a
 //! host function fails, the requests that are left are dropped, and so is
@@ -26,7 +26,7 @@
 //! `max_wasm_stack`, 32 MiB). A frame of a small i function takes about 60
 //! bytes, so this is about 500,000 frames of such functions, and fewer of
 //! bigger ones; more traps as "call stack exhausted", which is a stop with
-//! no message (spec §11.7). Every call into the module runs on a thread with
+//! no message. Every call into the module runs on a thread with
 //! a native stack of [`THREAD_STACK`] bytes, so that the Wasm stack always
 //! fits in it, whatever thread calls the host.
 //!
@@ -105,11 +105,11 @@ use wasmtime::{
 
 pub const ABI_VERSION: u32 = 3;
 pub const HOST_MODULE: &str = "ilang:host/v1";
-/// The stop reason for a value from the host that is not correct (B.2).
+/// The stop reason for a value from the host that is not correct.
 pub const HOST_VALUE_REASON: &str = "host: value is not correct";
 
-/// Types that the host can take (spec §10.3), in the canonical order of B.2
-/// for the members of an error type.
+/// Types that the host can take, in the canonical order for the members of an
+/// error type.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AbiType {
@@ -175,7 +175,7 @@ impl Signature {
             .collect()
     }
 
-    /// The results of B.2: the tag when there are errors, the value, then
+    /// The Wasm results: the tag when there are errors, the value, then
     /// every error member.
     fn result_types(&self) -> Vec<ValType> {
         let mut types = Vec::new();
@@ -202,7 +202,7 @@ impl Signature {
     }
 }
 
-/// The program entry or a test (B.5).
+/// The program entry or a test.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EntryPoint {
@@ -220,7 +220,7 @@ impl EntryPoint {
     }
 }
 
-/// The `ilang.abi` metadata (B.6).
+/// The `ilang.abi` metadata.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Abi {
@@ -230,7 +230,7 @@ pub struct Abi {
     pub exports: BTreeMap<String, Signature>,
     pub services: BTreeMap<String, BTreeMap<String, Signature>>,
     pub externals: BTreeMap<String, BTreeMap<String, Signature>>,
-    /// `"wasi"` for a module of the WASI target (B.7), which this host does
+    /// `"wasi"` for a module of the WASI target, which this host does
     /// not run; absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
@@ -265,7 +265,7 @@ impl Abi {
         Ok(found)
     }
 
-    /// Parse and check metadata in the JSON form of B.6. Every field must be
+    /// Parse and check metadata in the JSON form of the `ilang.abi` section. Every field must be
     /// there; `entry` is `null` when the program has no entry.
     pub fn from_json(json: &[u8]) -> Result<Self> {
         let value: serde_json::Value =
@@ -424,7 +424,7 @@ impl Value {
         }
     }
 
-    /// Is this a correct value of `kind` (B.2)?
+    /// Is this a correct value of `kind`?
     fn is_correct(&self, kind: AbiType) -> bool {
         self.abi_type() == kind
             && match self {
@@ -439,7 +439,7 @@ impl Value {
 #[derive(Clone, Debug)]
 pub struct GuestError(pub Value);
 
-/// The program stopped (spec §11.7). The instance cannot be used again.
+/// The program stopped. The instance cannot be used again.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Stop {
     /// The stop message from the `panic` import, or `None` when the module
@@ -479,7 +479,7 @@ impl Outcome {
     }
 }
 
-/// The result of a test (spec §10.2).
+/// The result of a test.
 #[derive(Debug)]
 pub enum TestResult {
     Passed,
@@ -510,7 +510,7 @@ impl TestReport {
 /// thread of its own and join it.
 pub type ServiceFunction =
     Arc<dyn Fn(&[Value]) -> Result<std::result::Result<Value, Value>> + Send + Sync>;
-/// The work of an async host service function (B.4).
+/// The work of an async host service function.
 pub type ServiceFuture =
     Pin<Box<dyn Future<Output = Result<std::result::Result<Value, Value>>> + Send>>;
 /// A function of an async host service: it starts the work of one request.
@@ -523,7 +523,7 @@ pub type ServiceFuture =
 /// its result is thrown away, so it must not hold anything the program still
 /// needs.
 pub type AsyncServiceFunction = Arc<dyn Fn(&[Value]) -> ServiceFuture + Send + Sync>;
-/// An external function (spec §10.1).
+/// An external function.
 pub type ExternalFunction = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
 
 type ContextServiceFunction = Arc<
@@ -741,12 +741,12 @@ impl HostImports {
 #[derive(Clone, Default)]
 pub struct HostOptions {
     pub imports: HostImports,
-    /// Check the answers of host functions in the host (B.2), and stop the
+    /// Check the answers of host functions in the host, and stop the
     /// program there, with no positions, when one is not correct. Off by
     /// default: an answer of the right type is given to the module as it
     /// is, also when it is not correct (a `Float` that is not finite, a
     /// `BitArray` with bits after the end), and the module checks it and
-    /// stops with the positions of the call (B.2, §11.7). An answer of
+    /// stops with the positions of the call. An answer of
     /// another type cannot be given to the module, so the host stops the
     /// program for it in both cases.
     pub check_replies: bool,
@@ -770,7 +770,7 @@ struct State {
     stop_message: Option<String>,
     /// A failure of the host or an incorrect guest value inside an import.
     failure: Option<anyhow::Error>,
-    /// The requests of async host functions that are outstanding (B.4).
+    /// The requests of async host functions that are outstanding.
     requests: Requests,
 }
 
@@ -1055,7 +1055,7 @@ impl Program {
         &self.abi
     }
 
-    /// Make an instance and call `ilang_start` (B.1). When the program stops
+    /// Make an instance and call `ilang_start`. When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
         if let Some((work, allocation)) = self.macro_static_cost {
@@ -1208,7 +1208,7 @@ impl Program {
         })
     }
 
-    /// Run every test of the metadata, each in a new instance (spec §10.2).
+    /// Run every test of the metadata, each in a new instance.
     pub fn run_tests(&self, options: &HostOptions) -> Vec<TestReport> {
         self.abi
             .tests
@@ -1220,8 +1220,8 @@ impl Program {
             .collect()
     }
 
-    /// Run one test by its export name in a new instance (spec §10.2), on
-    /// one `ilang` thread ([`block_on`]). An async test is waited for (B.5).
+    /// Run one test by its export name in a new instance, on
+    /// one `ilang` thread ([`block_on`]). An async test is waited for.
     pub fn run_test_with(&self, name: &str, options: HostOptions) -> TestResult {
         let is_async = self
             .abi
@@ -1340,7 +1340,7 @@ impl Instance {
     }
 
     /// `invoke` for a call in which the module may start and cancel
-    /// requests (B.4).
+    /// requests.
     fn invoke_accepting(
         &mut self,
         function: Func,
@@ -1354,7 +1354,7 @@ impl Instance {
         self.settle(invoked)
     }
 
-    /// A fault of the module: the instance is not used again (B.5).
+    /// A fault of the module: the instance is not used again.
     fn fault(&mut self, text: String) -> anyhow::Error {
         self.unusable = Some(text.clone());
         anyhow!(text)
@@ -1412,7 +1412,7 @@ impl Instance {
         stop
     }
 
-    /// Run the program entry or a test by its export name (B.5).
+    /// Run the program entry or a test by its export name.
     pub fn run(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
         let _invocation = self.begin_invocation();
@@ -1433,7 +1433,7 @@ impl Instance {
         }
     }
 
-    /// Call a host export (B.2). The arguments must be correct values of the
+    /// Call a host export. The arguments must be correct values of the
     /// parameter types; otherwise the program stops (`host: value is not
     /// correct`) without running.
     pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
@@ -1485,7 +1485,7 @@ impl Instance {
         outcome.inspect_err(|error| self.unusable = Some(format!("{error:#}")))
     }
 
-    /// Call an async host export (B.5). Each async host function that the
+    /// Call an async host export. Each async host function that the
     /// program waits for is answered by awaiting its future, then calling
     /// `ilang_resume:namespace:label`; the value comes from `ilang_result:name`.
     ///
@@ -1579,7 +1579,7 @@ impl Instance {
         }
     }
 
-    /// Answer the requests of the module until the status is 0 (B.5). Every
+    /// Answer the requests of the module until the status is 0. Every
     /// return drops the requests that are left, and so does dropping the
     /// future while it waits, which also makes the instance unusable.
     async fn wait(&mut self, name: &str, status: [Val; 1]) -> Result<Option<Stop>> {
@@ -1593,7 +1593,7 @@ impl Instance {
     }
 
     async fn wait_inner(&mut self, name: &str, mut status: [Val; 1]) -> Result<Option<Stop>> {
-        // Resumes were checked during their imports (B.5). Cache the
+        // Resumes were checked during their imports. Cache the
         // functions used here, and check ilang_continue on the first status 2.
         let mut resume_continue: Option<Func> = None;
         let mut resumes: HashMap<String, HashMap<String, Func>> = HashMap::new();
@@ -1689,7 +1689,7 @@ impl Instance {
             let checked = self.checked;
             let invoked = {
                 let mut scope = RootScope::new(&mut self.store);
-                // Result buffers are made just before the resume (B.5).
+                // Result buffers are made just before the resume.
                 let mut values = vec![Val::I32(id as i32)];
                 match lower_reply(
                     &mut scope,
@@ -1885,7 +1885,7 @@ fn allocation_failed(
 }
 
 /// `invoke_in` for a call in which the module may start and cancel requests
-/// (B.4): an async entry point, a resume or `ilang_continue`.
+/// (an async entry point, a resume or `ilang_continue`).
 fn invoke_accepting(
     context: &mut (impl AsContextMut<Data = State> + Send),
     function: Func,
@@ -1923,7 +1923,7 @@ fn lower_all(
     Ok(params)
 }
 
-/// Read the results, then free the parameter and result buffers (B.3).
+/// Read the results, then free the parameter and result buffers.
 fn finish(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -1971,7 +1971,7 @@ fn guest_fault(what: impl fmt::Display) -> anyhow::Error {
 }
 
 /// Runs the body of an import wrapper with requests refused, and gives it
-/// whether a request could start when the import was called (B.4).
+/// whether a request could start when the import was called.
 fn guarded<T>(
     caller: &mut Caller<'_, State>,
     body: impl FnOnce(&mut Caller<'_, State>, bool) -> T,
@@ -2074,7 +2074,7 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
             Ok(())
         },
     )?;
-    // Drops an outstanding request (B.4).
+    // Drops an outstanding request.
     linker.func_wrap(
         HOST_MODULE,
         "cancel",
@@ -2094,7 +2094,7 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
             guarded(&mut caller, |caller, _| reference_id(caller, reference))
         },
     )?;
-    // The module traps right after this call (B.4). Only the first message of
+    // The module traps right after this call. Only the first message of
     // an instance counts.
     linker.func_wrap(
         HOST_MODULE,
@@ -2176,7 +2176,7 @@ fn define_import(
     function: HostFunction,
     checked: bool,
 ) -> Result<()> {
-    // An async import takes the request id first, and has no results (B.4).
+    // An async import takes the request id first, and has no results.
     let (params, results) = if signature.is_async {
         let mut params = vec![ValType::I32];
         params.extend(signature.param_types());
@@ -2197,7 +2197,7 @@ fn define_import(
                 ));
             }
             let mut offset = 0;
-            // The request id is checked before the service runs (B.4).
+            // The request id is checked before the service runs.
             let id = if signature.is_async {
                 let id = parameters[0].i32().unwrap_or(-1);
                 offset = 1;
@@ -2239,7 +2239,7 @@ fn define_import(
                     let id = id.expect("an async import has a request id");
                     caller.data_mut().requests.insert(id, request, work);
                     // A started request requires this export even if the
-                    // module cancels it or returns status 0 next (B.5).
+                    // module cancels it or returns status 0 next.
                     let resume_name = format!("ilang_resume:{module_name}:{label}");
                     let fits = caller
                         .get_export(&resume_name)
@@ -2298,7 +2298,7 @@ fn define_import(
     Ok(())
 }
 
-/// Encode the answer of a host function as results of B.2. `Ok(false)` when
+/// Encode the answer of a host function as Wasm results. `Ok(false)` when
 /// the answer is not a correct value: the program then stops. Unless
 /// `checked`, a value of the right type is given to the module even when it
 /// is not correct, and the module stops.
@@ -2327,7 +2327,7 @@ fn lower_reply(
     if tag == 0 && !fits(value, signature.result) {
         return Ok(false);
     }
-    // The buffers belong to the module after a successful return (B.3).
+    // The buffers belong to the module after a successful return.
     let mut allocations = Vec::new();
     let lowered = (|| -> Result<()> {
         if !signature.errors.is_empty() {
@@ -2574,7 +2574,7 @@ fn lift_results(
     Ok(outcome.expect("the tag selects one of the kinds"))
 }
 
-/// Read a value that the module gave, checking that it is correct (B.2).
+/// Read a value that the module gave, checking that it is correct.
 fn lift(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
