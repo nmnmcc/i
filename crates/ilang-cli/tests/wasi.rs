@@ -406,7 +406,7 @@ fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
             Err(e) => panic!("{e}"),
             Ok(_) => panic!("built"),
         };
-        assert!(e.contains("src/main.i:2:31: error[E0701]"), "{e}");
+        assert!(e.contains("src/main.i:5:1: error[E0701]"), "{e}");
     }
 }
 
