@@ -992,7 +992,7 @@ fn timers(n: i64, order: &Order) -> impl Fn(&[Value]) -> ServiceFuture + Send + 
 struct GateState {
     rng: u64,
     burst: bool,
-    /// Release nothing at all.
+    /// Releases nothing at all.
     hold_all: bool,
     /// The argument whose gate fails in the host.
     fail: Option<i64>,
@@ -1875,8 +1875,8 @@ fn a_finished_program_does_not_wait_for_blocking_work() {
     }
 }
 
-/// Finding C-1-1: a request whose work wakes itself during its own poll
-/// must not be polled again in the same call; the wait must give the
+/// A request whose work wakes itself during its own poll must not be
+/// polled again in the same call; the wait must give the
 /// executor a turn first.
 mod self_waking_work {
     use crate::requests::{Request, Requests};
@@ -1987,7 +1987,7 @@ mod self_waking_work {
     }
 }
 
-/// H8 and H11a apply to traps during buffer allocation too. The first
+/// Every guest trap has the same outcome, also one during buffer allocation. The first
 /// request is ready; the other two stay pending until the host drops them.
 fn allocation_fault_program(allocation: &str) -> Program {
     let bytes = wat::parse_str(format!(
@@ -2214,8 +2214,8 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
     assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
 }
 
-// BG interpretation: native 3.1 authorizes each resolved declaration before
-// coalescing, including external aliases; N9.1/N9.5 own each invocation.
+// A resolved declaration is authorized before coalescing, including external
+// aliases, and each invocation owns its resources.
 fn bg_plan(program: &Program) -> bindings::BindingPlan {
     let mut declarations = Vec::new();
     for (kind, table) in [

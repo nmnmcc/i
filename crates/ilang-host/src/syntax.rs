@@ -65,7 +65,7 @@ impl DefinitionContext {
             notes: Mutex::new(Vec::new()),
         }
     }
-    /// Take this run's buffered diagnostic notes after a successful commit.
+    /// Takes this run's buffered diagnostic notes after a successful commit.
     pub fn take_notes(&self) -> Vec<String> {
         std::mem::take(&mut *self.notes.lock().expect("diagnostic buffer lock poisoned"))
     }
@@ -88,11 +88,11 @@ fn get<T: Send + Sync + 'static>(value: &Value) -> Result<&T> {
         .downcast_ref::<T>()
         .context("syntax service received the wrong opaque type")
 }
-/// Give a syntax value to a macro instance through the opaque-reference ABI.
+/// Gives a syntax value to a macro instance through the opaque-reference ABI.
 pub fn encode(value: Syntax) -> Value {
     Value::Externref(HostReference(value.host_identity()))
 }
-/// Read a syntax value returned by a macro instance.
+/// Reads a syntax value returned by a macro instance.
 pub fn decode(value: &Value) -> Result<&Syntax> {
     get(value)
 }
@@ -586,17 +586,17 @@ fn charge_text(budget: &MacroBudget, text: &str) -> Result<()> {
     Ok(())
 }
 
-/// Install only the compiler's syntax operations into an otherwise empty host.
+/// Installs only the compiler's syntax operations into an otherwise empty host.
 pub fn install(imports: &mut HostImports) -> Result<()> {
     install_with_templates(imports, Arc::from([]))
 }
 
-/// Install syntax operations with the templates belonging to this instance.
+/// Installs syntax operations with the templates belonging to this instance.
 pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]>) -> Result<()> {
     install_with_context(imports, templates, None)
 }
 
-/// Install syntax operations and an optional per-instance definition resolver.
+/// Installs syntax operations and an optional per-instance definition resolver.
 pub fn install_with_context(
     imports: &mut HostImports,
     templates: Arc<[Syntax]>,
@@ -605,7 +605,7 @@ pub fn install_with_context(
     install_with_items(imports, templates, definition, None)
 }
 
-/// Install compiler syntax operations with a per-run item journal.
+/// Installs compiler syntax operations with a per-run item journal.
 pub fn install_with_items(
     imports: &mut HostImports,
     templates: Arc<[Syntax]>,
@@ -615,7 +615,7 @@ pub fn install_with_items(
     install_inner(imports, templates, definition, items, None)
 }
 
-/// Install the syntax service with the same invocation budget as Wasm.
+/// Installs the syntax service with the same invocation budget as Wasm.
 pub fn install_with_budget(
     imports: &mut HostImports,
     templates: Arc<[Syntax]>,
@@ -627,7 +627,7 @@ pub fn install_with_budget(
     install_inner(imports, templates, definition, items, Some(budget))
 }
 
-/// Install metered syntax services without templates or compiler contexts.
+/// Installs metered syntax services without templates or compiler contexts.
 pub fn install_metered(imports: &mut HostImports, budget: MacroBudget) -> Result<()> {
     install_with_budget(imports, Arc::from([]), None, None, budget)
 }

@@ -251,7 +251,7 @@ impl Default for Abi {
 }
 
 impl Abi {
-    /// Read the metadata of a module; a module without it has none.
+    /// Reads the metadata of a module; a module without it has none.
     pub fn from_wasm(bytes: &[u8]) -> Result<Option<Self>> {
         let mut found = None;
         for payload in wasmparser::Parser::new(0).parse_all(bytes) {
@@ -265,7 +265,7 @@ impl Abi {
         Ok(found)
     }
 
-    /// Parse and check metadata in the JSON form of the `ilang.abi` section. Every field must be
+    /// Parses and checks metadata in the JSON form of the `ilang.abi` section. Every field must be
     /// there; `entry` is `null` when the program has no entry.
     pub fn from_json(json: &[u8]) -> Result<Self> {
         let value: serde_json::Value =
@@ -424,7 +424,7 @@ impl Value {
         }
     }
 
-    /// Is this a correct value of `kind`?
+    /// Reports whether this is a correct value of `kind`.
     fn is_correct(&self, kind: AbiType) -> bool {
         self.abi_type() == kind
             && match self {
@@ -564,12 +564,12 @@ impl Default for HostImports {
 }
 
 impl HostImports {
-    /// Give an instrumented macro instance the same budget as its compiler services.
+    /// Gives an instrumented macro instance the same budget as its compiler services.
     pub fn set_macro_budget(&mut self, budget: macro_budget::MacroBudget) {
         assert!(self.macro_budget.is_none(), "macro budget set twice");
         self.macro_budget = Some(budget);
     }
-    /// Choose an explicit host identity domain. Reuse it across programs/tests.
+    /// Chooses an explicit host identity domain. Reuse it across programs/tests.
     pub fn with_resource_host(mut self, host: ResourceHost) -> Self {
         self.resource_host = host;
         self
@@ -583,8 +583,9 @@ impl HostImports {
         self.grants.grant(plan, declaration);
     }
 
-    /// Approve declarations from trusted package content, never package names.
-    /// Call only with identities authenticated by the compiler/build trust path.
+    /// Approves declarations from trusted package content, never package names.
+    /// It may be called only with identities authenticated by the compiler
+    /// or build trust path.
     pub fn grant_package(&mut self, plan: &bindings::BindingPlan, package: &str) {
         for declaration in &plan.declarations {
             if declaration.package == package {
@@ -648,7 +649,7 @@ impl HostImports {
         Ok(())
     }
 
-    /// A service whose start receives its immutable invocation context (N9.5).
+    /// A service whose start receives its immutable invocation context.
     pub fn context_service(
         &mut self,
         namespace: impl Into<String>,
@@ -741,7 +742,7 @@ impl HostImports {
 #[derive(Clone, Default)]
 pub struct HostOptions {
     pub imports: HostImports,
-    /// Check the answers of host functions in the host, and stop the
+    /// Checks the answers of host functions in the host, and stops the
     /// program there, with no positions, when one is not correct. Off by
     /// default: an answer of the right type is given to the module as it
     /// is, also when it is not correct (a `Float` that is not finite, a
@@ -1028,7 +1029,7 @@ impl Program {
         })
     }
 
-    /// Give the metadata of a module that has no `ilang.abi` section.
+    /// Gives the metadata of a module that has no `ilang.abi` section.
     pub fn with_abi(mut self, abi: Abi) -> Result<Self> {
         ensure!(
             !self.embedded_abi,
@@ -1040,7 +1041,7 @@ impl Program {
         Ok(self)
     }
 
-    /// Attach a complete compiler plan. This checks the artifact and ABI, but
+    /// Attaches a complete compiler plan. This checks the artifact and ABI, but
     /// does not grant authority: the embedding separately approves declarations.
     pub fn with_binding_plan(mut self, plan: bindings::BindingPlan) -> Result<Self> {
         plan.validate(&self.artifact_digest, &self.abi)?;
@@ -1055,7 +1056,7 @@ impl Program {
         &self.abi
     }
 
-    /// Make an instance and call `ilang_start`. When the program stops
+    /// Makes an instance and calls `ilang_start`. When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
         if let Some((work, allocation)) = self.macro_static_cost {
@@ -1191,7 +1192,7 @@ impl Program {
         }
     }
 
-    /// Run the program entry in a new instance, on one `ilang` thread
+    /// Runs the program entry in a new instance, on one `ilang` thread
     /// ([`block_on`]).
     pub fn run_entry(&self, options: HostOptions) -> Result<Outcome> {
         let entry = self.abi.entry.clone().context("the program has no entry")?;
@@ -1208,7 +1209,7 @@ impl Program {
         })
     }
 
-    /// Run every test of the metadata, each in a new instance.
+    /// Runs every test of the metadata, each in a new instance.
     pub fn run_tests(&self, options: &HostOptions) -> Vec<TestReport> {
         self.abi
             .tests
@@ -1220,7 +1221,7 @@ impl Program {
             .collect()
     }
 
-    /// Run one test by its export name in a new instance, on
+    /// Runs one test by its export name in a new instance, on
     /// one `ilang` thread ([`block_on`]). An async test is waited for.
     pub fn run_test_with(&self, name: &str, options: HostOptions) -> TestResult {
         let is_async = self
@@ -1269,7 +1270,8 @@ pub struct Instance {
     checked: bool,
 }
 
-/// Scope guard also runs when an async invocation is abandoned or unwinds.
+/// A scope guard that also runs when an async invocation is abandoned or
+/// unwinds.
 struct Invocation(ResourceContext);
 impl Drop for Invocation {
     fn drop(&mut self) {
@@ -1290,12 +1292,12 @@ impl Instance {
         Invocation(context)
     }
 
-    /// Drain this host's cleanup diagnostics without entering Wasm.
+    /// Drains this host's cleanup diagnostics without entering Wasm.
     pub fn take_cleanup_errors(&self) -> Vec<resources::CleanupFailure> {
         self.resource_host.take_cleanup_errors()
     }
 
-    /// Stop admission and release host work/resources without invoking i code.
+    /// Stops admission and releases host work/resources without invoking i code.
     pub fn dispose(&mut self) {
         self.store.data().resources.teardown();
         self.store.data_mut().requests.drop_all();
@@ -1325,7 +1327,7 @@ impl Instance {
             .with_context(|| format!("the module does not export {name}"))
     }
 
-    /// Call a Wasm function with no references among its parameters.
+    /// Calls a Wasm function with no references among its parameters.
     fn invoke(
         &mut self,
         function: Func,
@@ -1412,7 +1414,7 @@ impl Instance {
         stop
     }
 
-    /// Run the program entry or a test by its export name.
+    /// Runs the program entry or a test by its export name.
     pub fn run(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
         let _invocation = self.begin_invocation();
@@ -1423,7 +1425,7 @@ impl Instance {
         }
     }
 
-    /// Run the program entry of the metadata.
+    /// Runs the program entry of the metadata.
     pub fn run_entry(&mut self) -> Result<Outcome> {
         let entry = self.abi.entry.clone().context("the program has no entry")?;
         if entry.is_async {
@@ -1433,7 +1435,7 @@ impl Instance {
         }
     }
 
-    /// Call a host export. The arguments must be correct values of the
+    /// Calls a host export. The arguments must be correct values of the
     /// parameter types; otherwise the program stops (`host: value is not
     /// correct`) without running.
     pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
@@ -1485,7 +1487,7 @@ impl Instance {
         outcome.inspect_err(|error| self.unusable = Some(format!("{error:#}")))
     }
 
-    /// Call an async host export. Each async host function that the
+    /// Calls an async host export. Each async host function that the
     /// program waits for is answered by awaiting its future, then calling
     /// `ilang_resume:namespace:label`; the value comes from `ilang_result:name`.
     ///
@@ -1556,7 +1558,7 @@ impl Instance {
         self.after_finish(outcome.expect("a finished call has an outcome"))
     }
 
-    /// Run an async program entry or test by its export name.
+    /// Runs an async program entry or test by its export name.
     pub async fn run_async(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
         let _invocation = self.begin_invocation();
@@ -1579,7 +1581,7 @@ impl Instance {
         }
     }
 
-    /// Answer the requests of the module until the status is 0. Every
+    /// Answers the requests of the module until the status is 0. Every
     /// return drops the requests that are left, and so does dropping the
     /// future while it waits, which also makes the instance unusable.
     async fn wait(&mut self, name: &str, status: [Val; 1]) -> Result<Option<Stop>> {
@@ -1729,7 +1731,7 @@ impl Instance {
         Ok(signature)
     }
 
-    /// Collect now; useful for embedders checking that opaque references remain
+    /// Collects now; useful for embedders checking that opaque references remain
     /// alive exactly while retained by a guest object.
     pub fn collect_garbage(&mut self) -> Result<()> {
         self.store.gc(None)?;
@@ -1813,7 +1815,7 @@ fn live_context(context: &impl AsContext<Data = State>) -> Result<()> {
     Ok(())
 }
 
-/// Call a Wasm function inside the root scope of its arguments, on a thread
+/// Calls a Wasm function inside the root scope of its arguments, on a thread
 /// with a stack of [`THREAD_STACK`] bytes: directly on the `ilang` thread of
 /// [`block_on`] when no other Wasm call runs on it, and otherwise on a new
 /// thread, which enters the tokio runtime of the caller if there is one.
@@ -1857,8 +1859,8 @@ fn invoke_in(
 }
 
 /// Every guest trap has the same outcome, including traps in the allocator
-/// while the host prepares a reply (H8, H11a). Keep the first import failure
-/// rather than replacing it with the trap that carried it out of Wasm (H2).
+/// while the host prepares a reply. The first import failure is kept rather
+/// than replaced with the trap that carried it out of Wasm.
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
     let mut context = context.as_context_mut();
     let state = context.data_mut();
@@ -1906,7 +1908,7 @@ fn invoke_accepting(
     invoked
 }
 
-/// Lower the arguments into new buffers. A trap of `ilang_alloc` ends the call.
+/// Lowers the arguments into new buffers. A trap of `ilang_alloc` ends the call.
 fn lower_all(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -1923,7 +1925,7 @@ fn lower_all(
     Ok(params)
 }
 
-/// Read the results, then free the parameter and result buffers.
+/// Reads the results, then frees the parameter and result buffers.
 fn finish(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -2298,7 +2300,7 @@ fn define_import(
     Ok(())
 }
 
-/// Encode the answer of a host function as Wasm results. `Ok(false)` when
+/// Encodes the answer of a host function as Wasm results. `Ok(false)` when
 /// the answer is not a correct value: the program then stops. Unless
 /// `checked`, a value of the right type is given to the module even when it
 /// is not correct, and the module stops.
@@ -2403,7 +2405,7 @@ impl Bridge {
         Ok(bytes[range].to_vec())
     }
 
-    /// Copy into a new buffer from `ilang_alloc`; empty buffers have address 0.
+    /// Copies into a new buffer from `ilang_alloc`; empty buffers have address 0.
     fn write(
         self,
         context: &mut impl AsContextMut<Data = State>,
@@ -2483,7 +2485,7 @@ fn bytes_for_bits(bits: u32) -> usize {
     (u64::from(bits).div_ceil(8)) as usize
 }
 
-/// Encode a correct value; buffers come from `ilang_alloc`.
+/// Encodes a correct value; buffers come from `ilang_alloc`.
 fn lower(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -2531,7 +2533,7 @@ fn lower(
     Ok(())
 }
 
-/// Read the results of an export: the tag, the value or one error.
+/// Reads the results of an export: the tag, the value or one error.
 fn lift_results(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -2574,7 +2576,7 @@ fn lift_results(
     Ok(outcome.expect("the tag selects one of the kinds"))
 }
 
-/// Read a value that the module gave, checking that it is correct.
+/// Reads a value that the module gave, checking that it is correct.
 fn lift(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
