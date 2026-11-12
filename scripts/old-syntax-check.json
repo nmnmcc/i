@@ -228,9 +228,6 @@
   "crates/ilang-lsp/tests/protocol.rs:cdda16fea1a67ac8": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-lsp/tests/protocol.rs:75d37f7acc0cfed5": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
   "crates/ilang-lsp/tests/protocol.rs:bbfcd4160a1e8674": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
@@ -688,29 +685,6 @@
   "crates/ilang-package/tests/manifest.rs:a2c749a6a7e359fb": {
     "not_source": "TOML manifest or package-name token"
   },
-  "crates/ilang-check/tests/types.rs:ce1f7bfbe647f15b": {
-    "prefix": "f = (b, x) {\n  a0 = x\n",
-    "suffix": "  a1\n}\n",
-    "substitutions": [
-      [
-        "{i}",
-        "1"
-      ],
-      [
-        "{p}",
-        "0"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
-  },
   "crates/ilang-wasm/tests/codegen.rs:b08e50fe7ba33d85": {
     "prefix": "f = (b, x) {\n  a0 = x\n",
     "suffix": "  a1\n}\n",
@@ -754,52 +728,6 @@
   },
   "crates/ilang-check/tests/literal_types.rs:8a7cb2c96d8ba744": {
     "not_source": "Rendered diagnostic substring with format placeholders"
-  },
-  "crates/ilang-check/tests/literal_types.rs:bf0979699c1ddd46": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{need}",
-        "String"
-      ],
-      [
-        "{annotation}",
-        "String"
-      ],
-      [
-        "{pattern}",
-        "\"a\""
-      ],
-      [
-        "{catch}",
-        "t"
-      ]
-    ],
-    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
-  },
-  "crates/ilang-check/tests/literal_types.rs:bdd9ba51653f2a19": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{ty}",
-        "String"
-      ]
-    ],
-    "reason": "Host-service declaration template; scalar instances are checked by the interpretation test."
   },
   "crates/ilang-check/tests/query.rs:e8fc72457a9ae4b7": {
     "substitutions": [
@@ -2386,9 +2314,6 @@
       "E0002: this string is not closed"
     ]
   },
-  "tests/spec/6/interpolation_attribute.i:c48412aaddaa5301": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern. (valid in syntax three)"
-  },
   "tests/spec/6/interpolation_import.i:ecd8ff798c1c584a": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
@@ -2548,9 +2473,6 @@
   "crates/ilang-lsp/tests/protocol.rs:40ccea3ebc617547": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-lsp/tests/protocol.rs:6108f6cf17bc9fe1": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
   "crates/ilang-lsp/tests/protocol.rs:c9130ec0e015aa50": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
@@ -2561,9 +2483,6 @@
     "not_source": "Position/search substring inside a complete source fixture"
   },
   "crates/ilang-lsp/tests/protocol.rs:9fa8dccc56811613": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:1418cff66c7679a7": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
   "crates/ilang-lsp/tests/protocol.rs:02f4d82a1d1b5450": {
@@ -2650,12 +2569,6 @@
     ],
     "reason": "Render the existing source template; runtime tests still exercise the full generator"
   },
-  "tests/spec/7/suffix_two_binders.i:12dad9a8f81d08ba": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: expected `,`, `?` or `)`, found `<>`"
-    ]
-  },
   "tests/spec/1.7/a1_same_line_tuple.i:bb17b44ae2201195": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -2676,5 +2589,63 @@
     "diagnostics": [
       "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
     ]
+  },
+  "crates/ilang-check/tests/literal_types.rs:7791fb31d9b11242": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{need}",
+        "String"
+      ],
+      [
+        "{annotation}",
+        "String"
+      ],
+      [
+        "{pattern}",
+        "\"a\""
+      ],
+      [
+        "{catch}",
+        "t"
+      ]
+    ],
+    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
+  },
+  "tests/spec/7/suffix_two_binders.i:4c3e608318a03133": {
+    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
+    "diagnostics": [
+      "E0101: expected `,`, `?` or `)`, found `<>`"
+    ]
+  },
+  "crates/ilang-check/tests/types.rs:b08e50fe7ba33d85": {
+    "prefix": "f = (b, x) {\n  a0 = x\n",
+    "suffix": "  a1\n}\n",
+    "substitutions": [
+      [
+        "{i}",
+        "1"
+      ],
+      [
+        "{p}",
+        "0"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
   }
 }
