@@ -987,6 +987,28 @@ impl<'a> Lowerer<'a> {
         self.out.shapes = self.shapes.take();
     }
 
+    /// Records that the function of the group closure `value` has a shape
+    /// with labels, so that its closure shows its labels (field 2 of
+    /// `$clo{n}`, syntax-3.md §6.4). The value is a constant closure or the
+    /// closure just made.
+    fn label_shape(&mut self, out: &[Stmt], value: &Atom, id: ShapeId) {
+        let func = match value {
+            Atom::Func(f) => Some(*f),
+            Atom::Local(l) => match out.last() {
+                Some(Stmt::Let {
+                    dst,
+                    value: Value::Closure { func, .. },
+                    ..
+                }) if dst == l => Some(*func),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(f) = func {
+            self.out.func_shapes.insert(f, id);
+        }
+    }
+
     /// The index of the label set of a data shape (`ir::Program::shapes`).
     fn shape_set(&self, shape: ilang_check::types::ShapeId) -> u32 {
         let labels = shape.labels().to_vec();
@@ -2627,7 +2649,11 @@ impl<'a> Lowerer<'a> {
                         .map(|g| {
                             let set = if g.shape.has_labels() { self.shape_set(g.shape) } else { 0 };
                             let id = crate::ir::shape_id(g.shape.positions(), set);
-                            (id, self.expr(fx, out, &g.value))
+                            let value = self.expr(fx, out, &g.value);
+                            if set != 0 {
+                                self.label_shape(out, &value, id);
+                            }
+                            (id, value)
                         })
                         .collect();
                     let_value(fx, out, Value::Multi(parts), None)
