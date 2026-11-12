@@ -2660,5 +2660,31 @@
   },
   "crates/ilang-check/src/types/shown.rs:ccfaa87f19759eaf": {
     "not_source": "a format string that builds a type name or an attribute head, not i source"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:35565046fc018469": {
+    "substitutions": [
+      [
+        "{i}",
+        "1"
+      ]
+    ],
+    "reason": "Render the source template; the test still exercises the generator"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:9f7bba4b52c6036a": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{}",
+        "\t\t| (C1(a, r)) { a + f0(r) }"
+      ]
+    ],
+    "reason": "Render the source template; the test still exercises the generator"
   }
 }
