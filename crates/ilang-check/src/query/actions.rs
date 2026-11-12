@@ -632,7 +632,8 @@ pub(crate) fn lisp_clause(clause: &str) -> Option<String> {
         return None;
     }
     let printed = ilang_syntax::lisp::print_module(&module);
-    let start = printed.find("(->")?;
+    // The clauses are in the `{ }` of the match: `(. s {(-> p e) …})`.
+    let start = printed.find("{(->")? + 1;
     let b = printed.as_bytes();
     let mut depth = 0i32;
     let mut quoted = false;
