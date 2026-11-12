@@ -38,7 +38,7 @@ op_string = (a, b) { a <> b == 1 }
 
 op_neg = (a) { -.a == 1 }
 
-op_pipe = () { 1 |> core.to_float == 1 }
+op_pipe = () { { 1 |> core.to_float } == 1 }
 
 // A a match has the union of its clause expressions, when they all have one.
 case_union = (b: Bool) {
