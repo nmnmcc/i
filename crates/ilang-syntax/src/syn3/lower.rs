@@ -218,7 +218,11 @@ pub fn shape_text(positions: usize, labels: &[&str]) -> String {
     text
 }
 
-/// The callee of the transition form of a multi chain (see `Cx::multi`).
+/// The label of the one parameter of a multi-shape function type in the
+/// transition tree.
+pub const DATA: &str = "%data";
+
+/// The callee of the transition form of a multi chain (see `multi_expr`).
 pub const MULTI: &str = "%multi";
 
 /// The hidden binding of group `index` of the chain bound to `name`.
@@ -1429,10 +1433,13 @@ impl Cx {
                     }
                 }
             }
-            _ => self.error(
-                f.param.span.0,
-                "a function type whose parameter is not written as data needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
-            ),
+            // A multi-shape function type `{ (A) | (B, C) } -> R`: in the
+            // transition tree, one parameter with the reserved label
+            // `%data` whose type is the parameter data type.
+            _ => params.push(o::FnParamType {
+                label: Some(ident(DATA, f.param.span.0)),
+                ty: self.ty(&f.param),
+            }),
         }
         let mut err: Option<o::TypeExpr> = None;
         let mut env: Vec<o::TypeExpr> = Vec::new();
