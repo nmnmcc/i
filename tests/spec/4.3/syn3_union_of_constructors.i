@@ -8,8 +8,8 @@ Shape = Circle | Square
 
 area = (s: Shape) -> Float {
   s |> {
-    Circle(radius: r) -> 3.0 *. r *. r
-    Square(side: a) -> a *. a
+    c = Circle(..) -> 3.0 *. c.radius *. c.radius
+    q = Square(..) -> q.side *. q.side
   }
 }
 
