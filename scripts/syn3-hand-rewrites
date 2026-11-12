@@ -23,7 +23,21 @@ def rewrite(path, edits):
         text = text.replace(old, new)
     p.write_text(text)
 
-# None left: the annotation of `std/test/list_test.i` `collect` (§7.3, a
-# written need wider than the body's) is made by the migrator now
-# (convert.rs `annotated`). New entries: rewrite(path, [(old, new)]).
+# The annotation of `std/test/list_test.i` `collect` (§7.3, a written need
+# wider than the body's) is made by the migrator now (convert.rs `annotated`).
+
+# §7.3 "labelled call of a function": the function is a value (`f = add`),
+# so the text does not show its parameters (note `labelled-call`); stage 4's
+# resolver-aware migrator would make it positional. `add(a, b)`.
+rewrite("tests/spec/10.1/externals.i", [(
+    "core.inspect(f(b = 1, a = 2))",
+    "core.inspect(f(2, 1))",
+)])
+# `! Name = name` gave the key by its written type; `{ … } <- (name)` keys it
+# by the type of `name`, which must be known there (E0225): the type goes on
+# the parameter.
+rewrite("tests/spec/9/environment.i", [(
+    "count = (n, acc, name) {",
+    "count = (n, acc, name: Name) {",
+)])
 PY

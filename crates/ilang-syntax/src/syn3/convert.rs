@@ -627,21 +627,34 @@ impl Cx<'_> {
                 self.vars.truncate(saved);
                 let last = defs.len() - 1;
                 let mut attributes = Some(attributes);
+                // The members come first, with an empty span, so the comments
+                // before the definition stay before the sum. When the
+                // definition is the first item and has no documentation, the
+                // comments before it are the file's header: the first member
+                // takes the span, so they stay first. The documentation and
+                // attributes stay with the sum.
+                let header = out.is_empty() && item.doc.is_empty();
                 for (i, def) in defs.into_iter().enumerate() {
                     if i == last {
-                        out.push(make(
+                        let mut sum = make(
                             n::ItemKind::TypeDef(def),
                             item.doc.clone(),
                             attributes.take().unwrap(),
-                        ));
+                        );
+                        if last > 0 && header {
+                            sum.span = n::Sp(Span::default());
+                        }
+                        out.push(sum);
                     } else {
-                        // The members come first and have an empty span, so
-                        // the comments before the definition stay before it.
                         out.push(n::Item {
                             doc: Vec::new(),
                             attributes: Vec::new(),
                             kind: n::ItemKind::TypeDef(def),
-                            span: n::Sp(Span::default()),
+                            span: n::Sp(if i == 0 && header {
+                                item.span
+                            } else {
+                                Span::default()
+                            }),
                         });
                     }
                 }

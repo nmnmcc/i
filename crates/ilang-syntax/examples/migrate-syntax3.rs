@@ -327,7 +327,12 @@ fn convert_command(args: &[String]) -> i32 {
                 } else {
                     syn3::format(&source)
                 };
-                let text = formatted.unwrap_or_else(|_| source.clone());
+                // A text with carriage returns keeps them (fixtures of the
+                // line rule): it is left as it is.
+                let text = match formatted {
+                    Ok(text) if !source.contains('\r') => text,
+                    _ => source.clone(),
+                };
                 if !write {
                     print!("{text}");
                 } else if text != source {
