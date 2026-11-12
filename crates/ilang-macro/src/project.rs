@@ -203,6 +203,15 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
             return Err(diagnostics);
         }
     }
+    if parsed.iter().any(|p| {
+        ilang_syntax::lisp::expansion::definitions(&p.ast, true)
+            .is_ok_and(|ds| ds.iter().any(|d| d.signature.is_some()))
+    }) {
+        let driver = Arc::new(crate::typed::Driver::new(graph, &parsed));
+        for p in &mut parsed {
+            p.typed_macros = Some(driver.clone());
+        }
+    }
     Ok(Expanded {
         parsed,
         diagnostics,

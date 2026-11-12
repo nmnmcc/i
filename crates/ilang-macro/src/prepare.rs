@@ -9,6 +9,7 @@ pub struct MacroBinding {
     pub module: String,
     pub name: String,
     pub parameters: Vec<String>,
+    pub typed: bool,
 }
 
 /// Macro bindings and source-located template nodes for one compiler program.
@@ -48,6 +49,25 @@ pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, 
     let mut bindings = Vec::new();
     let mut templates = Vec::new();
     for (module, definitions) in parsed.iter_mut().zip(found) {
+        for definition in &definitions {
+            if let Some(index) = definition.signature {
+                module.ast.items[index].attributes.clear();
+                // The runtime signature is not part of the compiler program.
+                module.ast.items[index].kind =
+                    ilang_syntax::ast::ItemKind::Binding(ilang_syntax::ast::Binding {
+                        pattern: ilang_syntax::ast::Pattern {
+                            kind: ilang_syntax::ast::PatternKind::Discard("_".into()),
+                            span: module.ast.items[index].span,
+                        },
+                        value: ilang_syntax::ast::Expr {
+                            kind: ilang_syntax::ast::ExprKind::Int(0u32.into()),
+                            span: module.ast.items[index].span,
+                        },
+                        type_params: Vec::new(),
+                        span: module.ast.items[index].span,
+                    });
+            }
+        }
         for definition in definitions {
             let item = &mut module.ast.items[definition.item];
             item.attributes
@@ -56,6 +76,7 @@ pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, 
                 module: module.path.clone(),
                 name: definition.name,
                 parameters: definition.parameters,
+                typed: definition.signature.is_some(),
             });
         }
         quote_lower::lower_expression_quotes(&mut module.ast, module.source.0, &mut templates);
@@ -228,7 +249,9 @@ pub fn add_wrapper(
         .collect::<Vec<_>>()
         .join(", ");
     let arguments = args.join(", ");
-    let (item_service, item_row) = if position == MacroPosition::Item {
+    let (item_service, item_row) = if binding.typed {
+        ("  ! syntax.Types = syntax._types()\n", " | syntax.Types")
+    } else if position == MacroPosition::Item {
         ("  ! syntax.Items = syntax._items()\n", " | syntax.Items")
     } else {
         ("", "")
@@ -270,6 +293,7 @@ _entry = ({parameters}) -> syntax.Syntax {{
         ast,
         scoped: None,
         compiler_generated: true,
+        typed_macros: None,
     });
     (path, "_entry".into())
 }

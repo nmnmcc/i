@@ -52,6 +52,7 @@ pub type DefinitionResolver =
 pub struct Session {
     next_mark: u64,
     depth: u16,
+    pub(crate) types: Option<Arc<ilang_host::syntax::TypeCallback>>,
     /// Imported macro definitions are stable after dependency-ordered expansion.
     /// Share compiled code across caller modules; each invocation still starts
     /// a fresh guest instance and receives its own budget and resolver.
@@ -114,6 +115,12 @@ impl Session {
                 other => other,
             }
         }));
+        if let Some(types) = self.types.clone() {
+            let cache = std::sync::Mutex::new(ilang_syntax::lisp::syntax::MarkCache::new(mark));
+            context.set_types(Arc::new(move |op, args| {
+                types(op, args).map(|xs| cache.lock().expect("typed answer marks").flip(&xs))
+            }));
+        }
         let items = (position == MacroPosition::Item)
             .then(|| Arc::new(ItemContext::new(marked.clone().into(), call.clone())));
         self.depth += 1;

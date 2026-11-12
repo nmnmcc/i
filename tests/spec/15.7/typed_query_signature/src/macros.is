@@ -1,0 +1,4 @@
+(, (= syntax (/ i syntax)) (= fail (/ i fail)))
+(, m)
+(@ macro (: (m A) (-> (A) A)))
+(@ macro (= m (-> (value) _ { (= s ((. syntax signature))) (| ((. syntax subtype) s s) { (-> (. syntax Yes) value) (-> _ ((. fail raise) ((. syntax SyntaxError) "signature must be reflexive" value))) }) })))

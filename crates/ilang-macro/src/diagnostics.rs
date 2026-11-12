@@ -69,7 +69,11 @@ pub fn body(source: SourceId, error: Error) -> Vec<Diagnostic> {
                 Failure::Host(error) => (source, invocation_span, format!("{error:#}")),
             };
             vec![Diagnostic::error(
-                code,
+                if message.starts_with("E0546:") {
+                    ilang_check::code::TYPE_RESOURCE_LIMIT
+                } else {
+                    code
+                },
                 Some(location),
                 span,
                 format!("macro `{macro_name}`: {message}"),

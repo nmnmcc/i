@@ -1,0 +1,4 @@
+(, (= syntax (/ i syntax)) (= fail (/ i fail)))
+(, m)
+(@ macro (: m (-> (Int) _)))
+(@ macro (= m (-> (value) _ value)))
