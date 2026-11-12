@@ -545,6 +545,42 @@ required_code = (a: Ast, n: Int, next: Int, b: Build) -> (Int, Build) {
 	}
 }
 
+nullable = (a: Ast) -> Bool {
+	a |> {
+		Empty | Look(_)         -> True
+		Atom(_, _)              -> False
+		Sequence(xs)            -> list.all(xs, nullable)
+		Alternate(a, b)         -> nullable(a) || nullable(b)
+		Capture(_, body)        -> nullable(body)
+		Repeat(body, low, _, _) -> low == 0 || nullable(body)
+	}
+}
+
+at_least_code = (
+	body: Ast
+	low: Int
+	lazy: Bool
+	next: Int
+	b: Build
+) -> (Int, Build) {
+	loop = b.size
+	(child, end) = lower(body, loop, Build(b.code, b.size + 1))
+	fork = lazy |> {
+		True  -> Fork(next, child)
+		False -> Fork(child, next)
+	}
+	tail = Build(..end, code: dict.insert(end.code, loop, fork))
+	{ low > 0 } |> {
+		True -> required_code(body, low - 1, child, tail)
+		False -> nullable(body) |> {
+			// Rust regex compiler c_at_least: nullable x* must be (x+)? to
+			// preserve first-path priority when an epsilon loop is deduplicated.
+			True  -> emit(fork, tail)
+			False -> (loop, tail)
+		}
+	}
+}
+
 lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
 	a |> {
 		Empty -> (next, b)
@@ -568,24 +604,13 @@ lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
 			emit(Save(id * 2, pc), more)
 		}
 		Repeat(body, low, high, lazy) -> {
-			(pc, tail) = { high == -1 } |> {
-				True -> {
-					// Reserve the loop's state number before lowering its body.
-					loop = b.size
-					reserved = Build(b.code, b.size + 1)
-					(child, end) = lower(body, loop, reserved)
-					fork = lazy |> {
-						True  -> Fork(next, child)
-						False -> Fork(child, next)
-					}
-					(
-						loop
-						Build(..end, code: dict.insert(end.code, loop, fork))
-					)
+			{ high == -1 } |> {
+				True -> at_least_code(body, low, lazy, next, b)
+				False -> {
+					(pc, tail) = optional_code(body, high - low, lazy, next, b)
+					required_code(body, low, pc, tail)
 				}
-				False -> optional_code(body, high - low, lazy, next, b)
 			}
-			required_code(body, low, pc, tail)
 		}
 	}
 }
@@ -613,7 +638,7 @@ compile = (pattern: String) -> Result(Regex, RegexError) {
 }
 
 // Unicode 16 property tables and simple folds follow regex-syntax's UCD data.
-// Their balanced range trees make property membership logarithmic in table size.
+// Binary search over packed range endpoints is logarithmic in table size.
 in_ranges = (table: BitArray, c: Int) -> Bool {
 	go = (low, high) {
 		{ low >= high } |> {

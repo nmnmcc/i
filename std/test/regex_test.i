@@ -768,3 +768,248 @@ test("catastrophic_5000", () {
 	assert(regex.is_match(compile("(a*)*b"), string.repeat("a", 5000)) == False)
 	Nil
 })
+
+// Rust regex testdata/empty.toml, 100.
+test("rust_empty_100", () {
+	assert(
+		regex.find_all(compile("|b"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 110.
+test("rust_empty_110", () {
+	assert(
+		regex.find_all(compile("b|"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 2, "b")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 120.
+test("rust_empty_120", () {
+	assert(
+		regex.find_all(compile("|z"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 130.
+test("rust_empty_130", () {
+	assert(
+		regex.find_all(compile("z|"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 200.
+test("rust_empty_200", () {
+	assert(
+		regex.find_all(compile("|"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 210.
+test("rust_empty_210", () {
+	assert(
+		regex.find_all(compile("||"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 220.
+test("rust_empty_220", () {
+	assert(
+		regex.find_all(compile("||b"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 230.
+test("rust_empty_230", () {
+	assert(
+		regex.find_all(compile("b||"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 2, "b")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 240.
+test("rust_empty_240", () {
+	assert(
+		regex.find_all(compile("||z"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 300.
+test("rust_empty_300", () {
+	assert(
+		regex.find_all(compile("(?:)|b"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 310.
+test("rust_empty_310", () {
+	assert(
+		regex.find_all(compile("b|(?:)"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 2, "b")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 320.
+test("rust_empty_320", () {
+	assert(
+		regex.find_all(compile("(?:|)"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 330.
+test("rust_empty_330", () {
+	assert(
+		regex.find_all(compile("(?:|)|z"), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 400.
+test("rust_empty_400", () {
+	assert(
+		regex.find_all(compile("a(?:)|b"), "abc") ==
+			[regex.Match(0, 1, "a"), regex.Match(1, 2, "b")]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 500.
+test("rust_empty_500", () {
+	assert(regex.find_all(compile(""), "") == [regex.Match(0, 0, "")])
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 510.
+test("rust_empty_510", () {
+	assert(
+		regex.find_all(compile(""), "a") ==
+			[regex.Match(0, 0, ""), regex.Match(1, 1, "")]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 520.
+test("rust_empty_520", () {
+	assert(
+		regex.find_all(compile(""), "abc") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 600.
+test("rust_empty_600", () {
+	assert(
+		regex.find_all(compile("(?:|a)*"), "aaa") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})
+
+// Rust regex testdata/empty.toml, 610.
+test("rust_empty_610", () {
+	assert(
+		regex.find_all(compile("(?:|a)+"), "aaa") ==
+			[
+				regex.Match(0, 0, "")
+				regex.Match(1, 1, "")
+				regex.Match(2, 2, "")
+				regex.Match(3, 3, "")
+			]
+	)
+	Nil
+})

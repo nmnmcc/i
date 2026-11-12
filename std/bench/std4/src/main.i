@@ -23,8 +23,7 @@ measure = (label, size, body) {
 			" bytes=" <>
 			int.to_string(size) <>
 			" ns=" <>
-			int.to_string(elapsed) <>
-			"\n"
+			int.to_string(elapsed)
 	)
 }
 

@@ -383,7 +383,7 @@ test("print_crlf", () {
 
 test("print_custom_delimiter", () {
 	assert(
-		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\",c\n"
+		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\";c\n"
 	)
 	Nil
 })
@@ -955,5 +955,13 @@ test("schema_error", () {
 test("large_roundtrip", () {
 	rows = list.repeat(["hello", "quoted,field", "é🦀"], 2000)
 	assert(csv.parse(csv.print(rows)) == Ok(rows))
+	Nil
+})
+
+test("width_error_record_line", () {
+	assert(
+		csv.parse("a,b\n\nc\n") ==
+			Error(csv.CsvError(3, 1, "wrong number of fields"))
+	)
 	Nil
 })

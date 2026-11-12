@@ -112,6 +112,15 @@ text = (reversed: List(Int)) -> String {
 	}))
 }
 
+ReadRow {
+	ReadRow(List(String), Int)
+}
+
+cursor_line(E, N) = (cursor: Cursor(E, N)) -> Int {
+	Cursor(_, _, line, _) = cursor
+	line
+}
+
 // Modes: 0 field start, 1 bare field, 2 quoted field, 3 closing quote.
 read_row(E, N) = (
 	cursor: Cursor(E, N)
@@ -120,7 +129,8 @@ read_row(E, N) = (
 	field: List(Int)
 	fields: List(String)
 	started: Bool
-) -> Result((Option(List(String)), Cursor(E, N)), CsvError) ^ E ! N {
+	startline: Int
+) -> Result((Option(ReadRow), Cursor(E, N)), CsvError) ^ E ! N {
 	Cursor(_, _, line, column) = cursor
 	(c, tail) = next(cursor)
 	c |> {
@@ -128,14 +138,38 @@ read_row(E, N) = (
 			2 -> Error(CsvError(line, column, "unterminated quoted field"))
 			_ -> started |> {
 				False -> Ok((None, tail))
-				True  -> Ok((Some(list.reverse([text(field), ..fields])), tail))
+				True -> Ok((
+					Some(
+						ReadRow(
+							list.reverse([text(field), ..fields])
+							startline
+						)
+					)
+					tail
+				))
 			}
 		}
 		Some(ch) -> {
 			{ mode == 2 } |> {
 				True -> ch |> {
-					34 -> read_row(tail, config, 3, field, fields, True)
-					_  -> read_row(tail, config, 2, [ch, ..field], fields, True)
+					34 -> read_row(
+						tail
+						config
+						3
+						field
+						fields
+						True
+						startline
+					)
+					_ -> read_row(
+						tail
+						config
+						2
+						[ch, ..field]
+						fields
+						True
+						startline
+					)
 				}
 				False -> { ch == config.delimiter } |> {
 					True -> read_row(
@@ -145,17 +179,39 @@ read_row(E, N) = (
 						[]
 						[text(field), ..fields]
 						True
+						startline
 					)
 					False -> ch |> {
 						10 -> started |> {
-							False -> read_row(tail, config, 0, [], [], False)
+							False -> read_row(
+								tail
+								config
+								0
+								[]
+								[]
+								False
+								cursor_line(tail)
+							)
 							True -> Ok((
-								Some(list.reverse([text(field), ..fields]))
+								Some(
+									ReadRow(
+										list.reverse([text(field), ..fields])
+										startline
+									)
+								)
 								tail
 							))
 						}
 						34 -> mode |> {
-							0 -> read_row(tail, config, 2, field, fields, True)
+							0 -> read_row(
+								tail
+								config
+								2
+								field
+								fields
+								True
+								startline
+							)
 							3 -> read_row(
 								tail
 								config
@@ -163,6 +219,7 @@ read_row(E, N) = (
 								[34, ..field]
 								fields
 								True
+								startline
 							)
 							_ -> Error(CsvError(line, column, "bare quote"))
 						}
@@ -181,6 +238,7 @@ read_row(E, N) = (
 								[ch, ..field]
 								fields
 								True
+								startline
 							)
 						}
 					}
@@ -196,12 +254,11 @@ row_stream(E, N) = (
 	width: Int
 ) -> stream.Stream(Result(List(String), CsvError), E, N) {
 	stream.make(() {
-		parsed = read_row(cursor, config, 0, [], [], False)
+		parsed = read_row(cursor, config, 0, [], [], False, cursor_line(cursor))
 		parsed |> {
 			Error(e)      -> stream.Next(Error(e), stream.new())
 			Ok((None, _)) -> stream.Done
-			Ok((Some(row), tail)) -> {
-				Cursor(_, _, line, column) = tail
+			Ok((Some(ReadRow(row, startline)), tail)) -> {
 				n = list.length(row)
 				expected = { width == 0 } |> {
 					True  -> n
@@ -209,7 +266,7 @@ row_stream(E, N) = (
 				}
 				{ expected > 0 && n != expected } |> {
 					True -> stream.Next(
-						Error(CsvError(line, column, "wrong number of fields"))
+						Error(CsvError(startline, 1, "wrong number of fields"))
 						stream.new()
 					)
 					False -> stream.Next(
