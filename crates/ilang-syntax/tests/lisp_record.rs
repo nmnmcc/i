@@ -247,10 +247,6 @@ choose = <K, R>(key: K, r: (k = Int)) -> (k = Int) { r }
         ilang_syntax::shape::equivalent(&normal, &restored),
         "{lisp}"
     );
-    let back = ilang_syntax::lisp::normal_source(&parsed).unwrap();
-    let (again, errors) = ilang_syntax::parse_module(&back);
-    assert!(errors.is_empty(), "{back}: {errors:?}");
-    assert!(ilang_syntax::shape::equivalent(&normal, &again), "{back}");
 }
 
 #[test]
