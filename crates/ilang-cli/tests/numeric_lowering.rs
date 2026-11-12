@@ -478,3 +478,20 @@ fn representation_facts_follow_code_identity_not_debug_names() {
         "debug names must not decide parameter/local representations"
     );
 }
+
+/// The review's exact resumed-stop fixture. Lines and columns are normative.
+#[test]
+fn transitive_suspend_preserves_pending_logical_frames() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"trace\"\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x: Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x: Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x: Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n Nil\n}\n").unwrap();
+    for opt in ["0", "2", "3"] {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["run", "--project", dir.path().to_str().unwrap(), "--opt", opt])
+            .output().unwrap();
+        assert_eq!(output.status.code(), Some(1), "O{opt}");
+        assert!(output.stdout.is_empty(), "O{opt}: {:?}", output.stdout);
+        assert_eq!(String::from_utf8(output.stderr).unwrap(), "float: result is not finite\ntrace/main:4:2\ntrace/main:7:6\ntrace/main:11:6\ntrace/main:16:2\n", "O{opt}");
+    }
+}
