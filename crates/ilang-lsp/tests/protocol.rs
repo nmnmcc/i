@@ -2085,7 +2085,7 @@ fn lsp_hover_value_of_a_constant() {
 #[test]
 fn lsp_hover_errors_and_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) <- (Clock, Fail(String)) -> Int { 0 }\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) <- (clock: Clock, fail: Fail(String)) -> Int { 0 }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
