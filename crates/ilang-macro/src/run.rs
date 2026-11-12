@@ -86,8 +86,9 @@ pub fn compile(
     // Compiler wrappers install the sandbox capabilities lexically. Runtime
     // target plans belong to the user program, not this separate compiler
     // program and its deliberately restricted import closure (§8).
-    graph.packages[root].provider_plan = Default::default();
-    graph.packages[graph.library].provider_plan = Default::default();
+    for package in &mut graph.packages {
+        package.provider_plan = Default::default();
+    }
     let checked = ilang_check::check_compiler_exports(&graph, parsed, entries);
     let mut diags = checked.diags;
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {

@@ -11,6 +11,7 @@ use std::fmt::Write as _;
 mod control;
 mod host;
 mod numeric;
+mod wasi;
 
 pub(super) const FIXED_MAX: usize = 10_000;
 
@@ -156,7 +157,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     }
     // The imports of B.4, before every definition.
     for (i, x) in p.imports.iter().enumerate() {
-        if x.kind == ImportKind::WasiStdout {
+        if matches!(x.kind, ImportKind::WasiStdout | ImportKind::WasiAdapter) {
             continue;
         }
         let mut params: Vec<&str> = x
@@ -186,7 +187,12 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         );
     }
     if wasi {
-        m.push_str(runtime::WASI_RUNTIME);
+        m.push_str(&wasi::imports(p));
+        m.push_str(&runtime::WASI_RUNTIME.replace(
+            "(call $wasi_proc_exit",
+            &format!("{} (call $wasi_proc_exit", wasi::teardown(p)),
+        ));
+        m.push_str(&wasi::runtime(p));
         if !references {
             m.push_str(runtime::WASI_REFERENCE_ID);
         }
@@ -201,8 +207,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         if let Some(entry) = &p.entry {
             let _ = writeln!(
                 m,
-                "(func (export \"_start\") (call $ilang_start) (call $entry_{}))",
-                export_id(entry)
+                "(func (export \"_start\") (call $ilang_start) (call $entry_{}) {})",
+                export_id(entry),
+                wasi::teardown(p)
             );
         }
     }
@@ -876,6 +883,12 @@ impl<'p> Emitter<'p> {
                 args,
                 result,
             } => {
+                if self.p.imports[*import as usize].kind == ImportKind::WasiAdapter {
+                    return wasi::call(
+                        &self.p.imports[*import as usize],
+                        &args.iter().map(|a| self.atom(a)).collect::<Vec<_>>(),
+                    );
+                }
                 let call = self.host_call(*import, args);
                 let reply = self.host_reply(*import, *result);
                 format!("(block (result eqref)\n{call}\n{reply})")

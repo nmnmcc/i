@@ -7,7 +7,9 @@ input separately from invalid input and preserves unconsumed bytes for the
 next message. Framing supports content lengths and chunked transfer encoding.
 
 `http.get(url)`, `http.post(url, bytes)` and `http.send(request)` use the
-network provider. Request targets supplied to the client are absolute URLs;
+target-selected `Client` service. Native and Node select the network provider;
+JS selects host fetch through ordinary provider-plan cells in std/i.toml.
+The compiler has no HTTP-specific selection. Request targets supplied to the client are absolute URLs;
 the transport sends the path and query as the HTTP request target. HTTPS
 uses TLS with the host name for certificate verification and SNI, and requests
 ALPN `http/1.1`. Redirects are resolved against the current URL with a limit
@@ -15,7 +17,9 @@ of ten; DNS resolution failures use `Dns` and connection failures use `Connect`.
 schema decoding. `send_timeout(provider, request, nanoseconds)` races the
 request against a scheduler-friendly clock sleep.
 
-A provider is an ordinary record with a `send` function. `client()` returns
+A provider is an ordinary record with a `send` function. The target default is
+the ordinary nominal `Client` service; `client()` returns its send/close record.
+Root plans can replace this service like any application service. The native default returns
 the network provider, and `send_with(provider, request)` calls a supplied
 provider. Each client owns an idle connection pool keyed by scheme, host and
 port. Fully framed keep-alive responses return their connection to that pool;
@@ -47,3 +51,17 @@ Pool and body-reader state use ordinary scope-owned `task.ref` values and
 pure atomic `task.update` callbacks. No HTTP state is held in the compiler or
 host. The general service-row checker preserves arbitrary services when a
 network client is passed through `send_timeout`.
+
+`send_stream(request)` returns `(head, read, close)`: read(max_bytes) pulls at
+most that many bytes, with empty bytes at EOF. The fetch provider delivers
+chunks incrementally as ReadableStream data arrives; the native provider
+exposes its buffered response through the same interface. Always close the
+reader, preferably through resource.ensure; the run context also owns fetch
+responses and closes them on teardown. Native Client instances share their
+connection pool across calls during an entry invocation.
+
+Fetch uses the host's redirect and decompression policy, visible headers,
+CORS and forbidden-header restrictions; trailers are empty. Non-2xx status
+is returned unchanged. Timeout and task cancellation abort fetch through an
+AbortController. Observable DNS causes map to Dns, other network failures to
+Connect; browser fetch deliberately hides DNS details, so it reports Connect.

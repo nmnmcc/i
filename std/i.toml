@@ -2,3 +2,8 @@ name = "std"
 
 [test]
 collection = "std/test.tests"
+
+[providers."std/http.Client"]
+native = "std/http.native_client"
+nodejs = "std/http.native_client"
+js = "std/http.fetch_client"

@@ -151,6 +151,7 @@ fn graph_with_path_dependencies() {
             "i/process",
             "i/net",
             "i/tls",
+            "i/fetch",
             "i/stdio"
         ]
     );
@@ -230,7 +231,7 @@ fn standard_library_modules() {
 }
 
 #[test]
-fn provider_dependency_cells_do_not_supply_root_entries() {
+fn provider_dependency_defaults_keep_authority_under_root_overrides() {
     use ilang_package::providers::{Cell, Target};
     let dir = tempfile::tempdir().unwrap();
     write(
@@ -251,8 +252,8 @@ fn provider_dependency_cells_do_not_supply_root_entries() {
     let root = graph.root.unwrap();
     let rows = graph.selected_provider_rows();
     let row = rows.iter().find(|r| r.row.service == "dep/main.S").unwrap();
-    assert_eq!(row.package, root);
-    assert!(!row.cells.contains_key(&Target::Js));
+    assert_ne!(row.package, root);
+    assert_ne!(row.cells[&Target::Js].package, root);
     assert_eq!(row.cells[&Target::Host].package, root);
     assert!(
         matches!(row.cells[&Target::Host].cell, Cell::Factory { factory, .. } if factory == "app/main.fake")

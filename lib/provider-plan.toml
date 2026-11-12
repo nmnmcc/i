@@ -6,16 +6,19 @@ js = {host=true}
 wasi = {host=true}
 
 [providers."i/clock.Clock"]
+wasi = {host=true}
 native = {host=true}
 nodejs = {host=true}
 js = {host=true}
 
 [providers."i/stdio.Stdio"]
+wasi = {host=true}
 native = {host=true}
 nodejs = {host=true}
 js = {host=true}
 
 [providers."i/fs.Fs"]
+wasi = {host=true}
 native = {host=true}
 nodejs = {host=true}
 
@@ -28,10 +31,12 @@ native = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.Arguments"]
+wasi = {host=true}
 native = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.Environment"]
+wasi = {host=true}
 native = {host=true}
 nodejs = {host=true}
 
@@ -40,6 +45,7 @@ native = {host=true}
 nodejs = {host=true}
 
 [providers."i/process.Entropy"]
+wasi = {host=true}
 native = {host=true}
 nodejs = {host=true}
 js = {host=true}
@@ -90,3 +96,7 @@ host = {factory="i/task._provider_scheduler", arguments=["seed"], seed_required=
 [provider_adapters."i/task.run"]
 supplies = ["i/task.Scheduler", "i/task.Runner", "i/request.Await", "i/request.Owner", "i/request.Root"]
 requires = ["i/task.Runner"]
+
+[providers."i/fetch.Fetch"]
+js = {host=true}
+nodejs = {host=true}

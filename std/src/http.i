@@ -1,6 +1,8 @@
 //// HTTP/1.1 messages, incremental framing, clients and scoped servers.
 (
 	i/fail
+	requests = i/request
+	fetch = i/fetch
 	i/net
 	i/tls
 	i/clock
@@ -18,6 +20,11 @@
 )
 
 (
+	Client(..)
+	ResponseStream
+	native_client
+	fetch_client
+	send_stream
 	Method(..)
 	Status(..)
 	Headers(..)
@@ -1160,8 +1167,156 @@ drain_body = (reader) {
 	}
 }
 
+// Target providers capture transport services; callers retain one principal type.
+ResponseStream = (
+	head: Response
+	read: (
+		max: Int
+	) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+)
+
+Client {
+	Client(
+		stream: (
+			req: Request
+		) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		send: (
+			req: Request
+		) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	)
+}
+
+native_client = (n ! net.Net, t ! tls.Tls) {
+	provider = network_client()
+	Client(stream: (req) {
+		! net.Net = n
+		! tls.Tls = t
+		res = provider.send(req)
+		cursor = task.ref(res.body)
+		(head: res, read: (max) {
+			{ max <= 0 } |> {
+				True  -> fail.raise(Protocol("invalid read size"))
+				False -> Nil
+			}
+			task.update(cursor, (body) {
+				size = bit_array.byte_size(body)
+				count = { max < size } |> {
+					True  -> max
+					False -> size
+				}
+				body |> {
+					<<part:bytes(count), rest:bits>> -> (rest, part)
+					_                                -> panic("http: invalid buffered body extent")
+				}
+			})
+		}, close: () { Nil })
+	}, send: (req) {
+		! net.Net = n
+		! tls.Tls = t
+		// Keep the raw service bindings across suspension (spec 9.4).
+		res = provider.send(req)
+		res
+	}, close: () {
+		! net.Net = n
+		! tls.Tls = t
+		closed = provider.close()
+		closed
+	})
+}
+
+client = (c ! Client) { (send: c.send, close: c.close) }
+
+send = (req: Request, c ! Client) { c.send(req) }
+
+fetch_error = (code: String) {
+	string.split(code, ":") |> {
+		["dns", .._]      -> fail.raise(Dns(code))
+		["protocol", .._] -> fail.raise(Protocol(code))
+		_                 -> fail.raise(Connect(code))
+	}
+}
+
+fetch_reply(A, N) = (body: () -> A ^ String ! N) -> A ^ HttpError ! N {
+	fail.catch(body) |> {
+		Ok(value)   -> value
+		Error(code) -> fetch_error(code)
+	}
+}
+
+fetch_headers = (pairs: List(String)) -> List((String, String)) {
+	pairs |> {
+		[name, value, ..rest] -> [(name, value), ..fetch_headers(rest)]
+		_                     -> []
+	}
+}
+
+fetch_open = (req: Request) {
+	Method(method) = req.method
+	hs = req.headers |> {
+		Headers(pairs) -> pairs
+		RawHeaders(pairs) -> list.map(pairs, (pair) {
+			(name, value) = pair
+			(name, bit_array.to_string(value) |> {
+				Ok(text) -> text
+				Error(_) -> fail.raise(Protocol("invalid header UTF-8"))
+			})
+		})
+	}
+	encoded = list.fold(hs, "", (acc, pair) {
+		(name, value) = pair
+		acc <> name <> "\u{0}" <> value <> "\u{0}"
+	})
+	id = fetch_reply(() { fetch.open(method, req.target, encoded, req.body) })
+	id
+}
+
+fetch_stream = (req: Request, f ! fetch.Fetch) {
+	id = fetch_open(req)
+	// The host context also owns the response if this task is cancelled.
+	status = fetch_reply(() { fetch.status(id) })
+	encoded = fetch_reply(() { fetch.headers(id) })
+	hs = Headers(fetch_headers(string.split(encoded, "\u{0}")))
+	(
+		head: Response(Status(status), reason(status), hs, <<>>, Headers([]))
+		read: (max) {
+			! fetch.Fetch = f
+			fetch_reply(() { fetch.read(id, max) })
+		}
+		close: () {
+			! fetch.Fetch = f
+			fetch.close(id)
+		}
+	)
+}
+
+fetch_client = (f ! fetch.Fetch) {
+	Client(stream: (req) {
+		! fetch.Fetch = f
+		// Keep Fetch across suspension; task services still come from the caller.
+		reader = fetch_stream(req)
+		reader
+	}, send: (req) {
+		! fetch.Fetch = f
+		reader = fetch_stream(req)
+		resource.ensure(() {
+			h = reader.head
+			Response(
+				h.status
+				h.reason
+				h.headers
+				collect_body(reader, [])
+				h.trailers
+			)
+		}, reader.close)
+	}, close: () { Nil })
+}
+
+send_stream = (req: Request, c ! Client) { c.stream(req) }
+
 /// A provider is a record containing a send function, so callers can replace it.
-client = () {
+network_client = () {
 	pool = task.ref(Pool([], []))
 	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
 }
@@ -1228,11 +1383,6 @@ post = (url: String, body: BitArray) {
 }
 
 body_text = (res: Response) { bit_array.to_string(res.body) }
-
-send = (req: Request) {
-	provider = client()
-	resource.ensure(() { provider.send(req) }, provider.close)
-}
 
 follow = (pool: task.Ref(Pool), req: Request, count: Int) {
 	{ count > 10 } |> {

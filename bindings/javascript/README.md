@@ -260,3 +260,35 @@ Run a compiled entry on Node with:
 ```sh
 node bindings/javascript/run.mjs path/to/program.wasm -- arg1 arg2
 ```
+
+## Fetch HTTP and WASI preview 1
+
+Build `i build --project examples/http-get --target js` and instantiate with
+`{standardServices: true}`. The ordinary `std/http.Client` provider uses host
+fetch; `i deps --project examples/http-get --target js` shows Fetch and no
+Net/Tls dependency. NodeJS keeps the native-style Net/Tls client by default.
+Fetch supports request headers/body, response status/visible headers, buffered
+bodies and `http.send_stream`. Browser CORS and forbidden-header restrictions
+apply, trailers are empty, and redirects/decompression follow host fetch.
+Timeout/task cancellation aborts pending fetch and body reads. Network errors
+use Connect; available host DNS causes use Dns. Responses belong to the run
+resource context and must be closed after streaming.
+
+`i build --project examples/io-fs --target wasi` produces a preview-1 command.
+Run with a preview-1 runner (for example `wasmtime run --dir /tmp app.wasm`),
+or the included Node runner with explicit preopens:
+
+```sh
+node bindings/javascript/wasi-run.mjs examples/io-fs/build/io_fs.wasm '{"preopens":{"/tmp":"/tmp"}}'
+```
+
+The runner options also accept args and env. Defaults provide Io, Stdio,
+Clock, Entropy, Arguments, Environment and Fs. Fs resolves paths against
+preopened directories; temp_dir chooses /tmp or the first preopen. Net, Tls,
+Process spawn and WorkingDirectory require explicit providers on WASI and
+otherwise fail at compile time. Custom WASI imports keep the blocking ABI.
+Checked adapters keep pointers/iovecs/dirents private and validate host extents.
+
+Run `npm test` from this directory (the root package supplies the script).
+Focused tests: `node --test bindings/javascript/test/{fetch,wasi}.test.mjs`.
+Browser fixture: `npm run test:browser -- tests/browser/fetch.spec.mjs`.

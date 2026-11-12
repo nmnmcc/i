@@ -683,9 +683,11 @@ impl Schema {
             adapters: HashMap::new(),
             errors: vec![],
         };
-        // Dependencies never participate in selection. Each inherited cell retains
-        // the authority of its declaration, just as a layer retains its closure.
-        let authorities = std::iter::once(g.library).chain(g.root.filter(|r| *r != g.library));
+        // Packages may default their own services. Only the root may override a
+        // different package; dependency plans cannot replace application choices.
+        let authorities = (0..g.packages.len())
+            .filter(|id| Some(*id) != g.root)
+            .chain(g.root);
         for authority in authorities {
             let plan = &g.packages[authority].provider_plan;
             let mut adapters_seen = HashSet::new();
@@ -755,6 +757,12 @@ impl Schema {
                             ));
                         }
                         id = *alias;
+                    }
+                    if Some(authority) != g.root && p.module(p.ty(id).module).package != authority {
+                        return Err(format!(
+                            "dependency provider {} must belong to its declaring package",
+                            row.service
+                        ));
                     }
                     if !matches!(p.ty(id).body, hir::TypeBody::Custom(_)) {
                         return Err(format!(

@@ -307,3 +307,53 @@ test.test("configured", () { worker() })
         assert!(String::from_utf8_lossy(&tests.stdout).contains("1 passed, 0 failed"));
     }
 }
+
+#[test]
+fn dependency_defaults_own_services_and_root_override_keeps_authority() {
+    let dir = project(
+        "(dep = dep/main)\nmain = (s ! dep.Service) { assert(s.read() == 42) }",
+        "[dependencies]\ndep = {path=\"dep\"}\n",
+    );
+    std::fs::create_dir_all(dir.path().join("dep/src")).unwrap();
+    std::fs::write(
+        dir.path().join("dep/i.toml"),
+        "name=\"dep\"\n[providers.\"dep/main.Service\"]\nnative=\"dep/main.make\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("dep/src/main.i"),
+        "(Service(..))\nService { Service(read: () -> Int) }\nmake = () { Service(() { 42 }) }",
+    )
+    .unwrap();
+    let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
+    assert!(matches!(
+        b.host_program()
+            .unwrap()
+            .run_entry(b.host_options())
+            .unwrap(),
+        Outcome::Ok(_)
+    ));
+    std::fs::write(dir.path().join("src/main.i"), "(dep = dep/main)\nfake = () { dep.Service(() { 7 }) }\nmain = (s ! dep.Service) { assert(s.read() == 7) }").unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name=\"app\"\n[dependencies]\ndep={path=\"dep\"}\n[providers.\"dep/main.Service\"]\nnative=\"app/main.fake\"\n").unwrap();
+    let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
+    assert!(matches!(
+        b.host_program()
+            .unwrap()
+            .run_entry(b.host_options())
+            .unwrap(),
+        Outcome::Ok(_)
+    ));
+    std::fs::write(
+        dir.path().join("dep/i.toml"),
+        "name=\"dep\"\n[providers.\"i/clock.Clock\"]\nnative={host=true}\n",
+    )
+    .unwrap();
+    let error = match build(dir.path(), options(Target::Native)) {
+        Ok(_) => panic!("dependency replaced another package's capability"),
+        Err(e) => e.to_string(),
+    };
+    assert!(
+        error.contains("must belong to its declaring package"),
+        "{error}"
+    );
+}

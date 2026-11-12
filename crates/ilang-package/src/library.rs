@@ -22,6 +22,7 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/process", include_str!("../../../lib/i/process.i")),
     ("i/net", include_str!("../../../lib/i/net.i")),
     ("i/tls", include_str!("../../../lib/i/tls.i")),
+    ("i/fetch", include_str!("../../../lib/i/fetch.i")),
     ("i/stdio", include_str!("../../../lib/i/stdio.i")),
 ];
 

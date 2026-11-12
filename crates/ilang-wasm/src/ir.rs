@@ -715,6 +715,8 @@ pub enum ImportKind {
     /// `print` of the standard service, `Io` of `i/io`, on the WASI target:
     /// the module defines it, with `fd_write` to the standard output (B.7).
     WasiStdout,
+    /// Checked, blocking preview-1 capability adapter.
+    WasiAdapter,
 }
 
 /// The host a module is made for.

@@ -337,7 +337,7 @@ A target provider plan maps resolved service type identities to ordinary i facto
 Every factory has an ordinary checked type, returns its service and has no uncaught typed errors. Construction may stop, but cannot add an error to the source entry's ABI error row. All source factories are type-checked; only the chosen factories' needs are provisioned. A reference to an unchosen factory in executable source still follows §10.1.2. Construct each graph node once per entry invocation, after top-level initialization. Captured services do not change when another service is later substituted (§9.2).
 
 This is the full version-1 schema; string cells are its nullary shorthand. A service key or factory value is a fully qualified module path, a dot and its type or binding name, resolved through the package graph.
-The package plan is data, not executable macro code. The root package selects target cells over the shipped plan; dependency packages cannot override its selections. There is no wildcard or implicit service discovery. The shipped capability registry is plan data: a registered row without a cell for this target is unsupplied, including user-registered capabilities. An absent root cell inherits the shipped cell when one exists. A plan is resolved with
+The package plan is data, not executable macro code. The root package selects target cells over the shipped plan; dependency packages cannot override its selections. A package may declare default cells for its own nominal service constructors; these retain that package's authority, and root cells override them. A dependency row for another package's service is an error. There is no wildcard or implicit service discovery. The shipped capability registry is plan data: a registered row without a cell for this target is unsupplied, including user-registered capabilities. An absent root cell inherits the shipped cell when one exists. A plan is resolved with
 its declaring package's authority: it may name that package's private bindings;
 references into dependencies must be exported. Inherited cells keep their
 original declaring authority. Copying a dependency's private path into a
@@ -1454,7 +1454,7 @@ The initial synchronous JS milestone supplies Io, Target and its root. Further d
 |---|---|
 | js | Io, Clock, Entropy |
 | nodejs | Io, Clock, Entropy, Arguments, Environment, WorkingDirectory, Fs, Net, Process, Stdio |
-| wasi | Io; Clock, Entropy, Arguments, Environment, Fs and Stdio need separately approved preview-1 adapters |
+| wasi | Io, Clock, Entropy, Arguments, Environment, Fs over preopened directories, Stdio; Net, Tls, Process and WorkingDirectory have no default |
 | native | The native runner's ordinary standard registrations, split by capability below |
 | host | An explicit embedder/provider plan; no arbitrary default services |
 
@@ -2717,6 +2717,31 @@ Js service; a custom outgoing converter cannot change an export's ABI.
 - Tests are not compiled: a test needs a new instance (§10.2), and a command runs one entry.
 
 When the program runs out of memory or stack (§11.7), there is no stop message: the host gives its own error. The host also decides how deep the stack may be, so ordinary recursion that is not in tail position may stop earlier than in another host.
+
+Preview-1 defaults also supply Stdio, Clock, Entropy, Arguments, Environment
+and Fs. Required Net, Tls, Process or WorkingDirectory without an explicit
+provider is a compile error naming the service, target and entry. Custom
+imports retain the blocking ABI above. Standard capability adapters operate
+on checked i values: they copy strings/whole-byte bit arrays, validate integer
+ranges, construct pointer-bearing layouts privately, check host result extents,
+and release scratch allocations on returning paths. No guest-supplied bytes
+are interpreted as pointers. Request operations return completed requests.
+
+| Capability | Raw preview-1 imports and checked layouts |
+|---|---|
+| Stdio | fd_read/fd_write: one private 8-byte iovec and 4-byte count; count must not exceed the requested extent; writes retry positive short progress; zero progress is io |
+| Clock | clock_time_get: private u64 timestamp; poll_oneoff: zeroed 48-byte clock subscription, 32-byte event and u32 count; check count/error and recheck the monotonic deadline |
+| Entropy | random_get: private byte allocation, size 0..16777216; return a copy |
+| Arguments / Environment | args_sizes_get/args_get and environ_sizes_get/environ_get: private u32 pointer vector and byte buffer, checked NUL-terminated UTF-8 extents; args excludes argv[0]; environment lookup validates its name |
+| Fs | fd_prestat_get/dir_name selects the longest matching preopen; path_open uses private UTF-8 path and u32 output; fd_read/write/sync/close; path_create_directory/unlink_file/remove_directory/rename/filestat_get; fd_readdir uses checked 24-byte dirents and cookies, retrying truncated entries |
+
+Fs exposes fresh run-local Int tokens, never raw descriptors or addresses.
+Closed tokens never name a reused descriptor. Paths outside all preopens give
+denied; the WASI host enforces traversal and symlink confinement. temp_dir
+selects the /tmp preopen when present, otherwise the first preopen; no preopens
+gives not_found. Preview-1 errno values map to the same standard string error
+codes as native IO (not_found, denied, exists, invalid, closed, interrupted,
+or io). IO failures do not become runtime traps.
 
 #### B.7.1 Checked Wasi adapter
 

@@ -85,8 +85,8 @@ pub enum PackageCommand {
     Deps {
         #[arg(long, default_value = ".")]
         project: PathBuf,
-        #[arg(long, value_enum, default_value_t = crate::TargetArg::Native)]
-        target: crate::TargetArg,
+        #[arg(long, value_enum)]
+        target: Option<crate::TargetArg>,
     },
 }
 
@@ -109,7 +109,7 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
             project,
         } => publish(&project, &version, dry_run),
         PackageCommand::Deps { project, target } => {
-            deps(&project, ilang_wasm::Target::from(target))
+            deps(&project, target.map(ilang_wasm::Target::from))
         }
     }
 }
@@ -737,22 +737,25 @@ fn library_hosts<'a>(
         .filter(|&t| program.ty(t).host.is_some())
 }
 
-fn deps(project: &Path, target: ilang_wasm::Target) -> Result<ExitCode> {
+fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> {
     let (mut graph, diags) = load(project, true);
     if diags.iter().any(Diagnostic::is_error) || graph.root.is_none() {
         return Err(problems(&graph, &diags));
     }
     let r = report(&graph)?;
-    for p in r.packages.values() {
-        println!("{}{}", p.shown, if p.dev { " (dev)" } else { "" });
-        if p.permissions.is_empty() {
-            println!("  no host services and no external functions");
-        }
-        for (what, at) in &p.permissions {
-            let at: Vec<&str> = at.iter().map(String::as_str).collect();
-            println!("  {what} ({})", at.join(", "));
+    if target.is_none() {
+        for p in r.packages.values() {
+            println!("{}{}", p.shown, if p.dev { " (dev)" } else { "" });
+            if p.permissions.is_empty() {
+                println!("  no host services and no external functions");
+            }
+            for (what, at) in &p.permissions {
+                let at: Vec<&str> = at.iter().map(String::as_str).collect();
+                println!("  {what} ({})", at.join(", "));
+            }
         }
     }
+    let target = target.unwrap_or(ilang_wasm::Target::Native);
     let expanded = ilang_macro::project::check(&mut graph);
     let checked = ilang_check::Checked {
         program: expanded.program,

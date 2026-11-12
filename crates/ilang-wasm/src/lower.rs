@@ -1815,6 +1815,19 @@ impl<'a> Lowerer<'a> {
             ImportKind::AsyncService
         } else if self.options.target == ir::Target::Wasi && is_standard_service(program, t) {
             ImportKind::WasiStdout
+        } else if self.options.target == ir::Target::Wasi
+            && self.graph.packages[self.program.module(def.module).package].name == "i"
+            && matches!(
+                host.namespace.as_str(),
+                "i:clock/v1"
+                    | "i:stdio/v1"
+                    | "i:fs/v1"
+                    | "i:entropy/v1"
+                    | "i:arguments/v1"
+                    | "i:environment/v1"
+            )
+        {
+            ImportKind::WasiAdapter
         } else {
             ImportKind::Service
         };
@@ -1936,7 +1949,7 @@ impl<'a> Lowerer<'a> {
                 ),
             ));
         }
-        if kind != ImportKind::WasiStdout {
+        if !matches!(kind, ImportKind::WasiStdout | ImportKind::WasiAdapter) {
             let source_module = self.program.module(site.0);
             let package = &self.graph.packages[source_module.package];
             use ilang_package::lock::{FileKind, PackageFile, hash};
@@ -3915,7 +3928,7 @@ fn abi_json(
     for x in imports {
         let (table, sig) = match x.kind {
             // The module gives it itself (B.7).
-            ImportKind::WasiStdout => continue,
+            ImportKind::WasiStdout | ImportKind::WasiAdapter => continue,
             ImportKind::External => (
                 &mut externals,
                 serde_json::json!({

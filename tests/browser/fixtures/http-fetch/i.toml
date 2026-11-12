@@ -1,0 +1,7 @@
+name = "http_fetch"
+
+[dependencies]
+std = {path = "../../../../std"}
+
+[wasm]
+exports = ["http_fetch/main.get"]

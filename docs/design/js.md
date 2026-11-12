@@ -14,6 +14,33 @@ F2 certification and P1's separate compiler track; these are not open questions.
 Code anchors below were checked against merged redesign 681ad65. Historical
 probe results are labelled separately. All i examples use accepted syntax.
 
+## Implemented JS step 02
+
+`std/http.Client` now has package-owned provider defaults: native and Node
+capture Net/Tls, JS captures `i/fetch.Fetch`. Selection uses the general plan
+resolver. Dependency packages may default only their own nominal services;
+the root can override those cells. `i deps --target js` shows the chosen entry
+plan, excluding declarations from unchosen factories. Untargeted `i deps`
+retains the package permission inventory.
+
+The fetch adapter sends method, URL, headers and bytes, and exposes status,
+visible headers and a pull reader. Each request has an AbortController wired
+to requestSignal; cancelling a pending start or read aborts it, and response
+cleanup aborts/cancels the reader. `send_timeout` uses the ordinary task race.
+Completed and abandoned responses remain owned by the run context until close
+or teardown. Browser CORS/forbidden-header rules apply, and fetch supplies no
+trailers. Host DNS error codes map to Dns when available; browsers conceal the
+cause of network failures, so these use Connect. Non-2xx status remains a response.
+
+Preview-1 defaults now supply Clock, Entropy, Arguments, Environment, Stdio
+and Fs over preopens in addition to Io. Their checked layouts are specified
+in spec B.7. Net/Tls/Process/WorkingDirectory remain unavailable by default.
+The existing blocking ABI and custom imports remain. These capability
+adapters use internal copied buffers and private layouts; this step does not
+claim the separate public Wasi root/token API in section 6 has shipped.
+Tests: `bindings/javascript/test/fetch.test.mjs`, `wasi.test.mjs`, and
+`tests/browser/fetch.spec.mjs`. The runner is `bindings/javascript/wasi-run.mjs`.
+
 ## 1. Problem and criteria
 
 i runs on its own under `i run`. A browser or Wasm embedder is one place to
