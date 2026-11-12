@@ -4,7 +4,7 @@ import { ResourceHost, ResourceError } from "./resources.mjs";
 export { ResourceHost, ResourceContext, ResourceError } from "./resources.mjs";
 const defaultResourceHost = new ResourceHost();
 /**
- * The binary interface of i, version 3 (docs/spec.md, Appendix B). Language
+ * The host side of the binary interface of i, version 3. Language
  * values live in the guest; this module loads modules and copies values
  * across the host boundary.
  * SPDX-License-Identifier: Apache-2.0
@@ -14,7 +14,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const lossy = new TextDecoder("utf-8");
 const kinds = new Set(["nil", "bool", "int", "float", "string", "bit_array", "externref"]);
-/** The canonical order of the members of an error type (B.2). */
+/** The canonical order of the members of an error type. */
 const canonical = ["nil", "bool", "int", "float", "string", "bit_array"];
 const namespace = "ilang:host/v1";
 const version = 3;
@@ -34,7 +34,7 @@ let currentSignal = null;
 /**
  * The AbortSignal of the async request whose service is starting. Call it
  * before the first `await` of the service; it is aborted when the request is
- * dropped (B.4, B.5).
+ * dropped.
  */
 export function requestSignal() {
   if (!currentSignal) throw new AbiError("requestSignal() may only be called while an async service starts");
@@ -48,7 +48,7 @@ export function requestSignal() {
 let macrotaskChannel = null;
 const macrotaskWaiters = [];
 
-/** Wait for one macrotask, so that timers and IO of the host can run. */
+/** Waits for one macrotask, so that timers and IO of the host can run. */
 function macrotask() {
   if (typeof setImmediate === "function") return new Promise((resolve) => setImmediate(resolve));
   if (!macrotaskChannel) {
@@ -64,12 +64,12 @@ function macrotask() {
   });
 }
 
-/** Does this engine have GC, typed function references, tail calls and exnref? */
+/** Reports whether this engine has GC, typed function references, tail calls and exnref. */
 export function supportsRequiredFeatures() {
   return typeof WebAssembly === "object" && WebAssembly.validate(featureProbe);
 }
 
-/** The program stopped (spec §11.7). `stopMessage` is null for a trap without one. */
+/** The program stopped. `stopMessage` is null for a trap without one. */
 export class Stop extends Error {
   constructor(stopMessage, options) {
     super(stopMessage ?? `trap: ${options?.cause?.message ?? "the module trapped"}`, options);
@@ -140,9 +140,8 @@ function typedFunction(fn, params, results, location) {
 
 // The import of a host function: a tiny Wasm function that calls the
 // JavaScript callback, then asks `broken` whether the callback failed, and
-// traps when it did. A JavaScript exception is never thrown into the module
-// (B.1): the callback catches everything, and a trap runs no handler of the
-// module. The callback gives results of the right types also when it fails.
+// traps when it did. A JavaScript exception is never thrown into the module:
+// the callback catches everything, and a trap runs no handler of the module. The callback gives results of the right types also when it fails.
 const guardModules = new Map();
 function guardedFunction(fn, broken, params, results, location) {
   const key = `${params.join(",")}:${results.join(",")}`;
@@ -185,7 +184,7 @@ function validateFunction(module, exports, name, params, results) {
 }
 
 const paramTypes = (signature) => signature.params.flatMap((type) => wasmTypes[type]);
-/** B.2: the tag when E has members, the value, then every member of E. */
+/** The result types: the tag when E has members, the value, then every member of E. */
 const resultTypes = (signature) => [
   ...(signature.errors.length ? [0x7f] : []),
   ...wasmTypes[signature.result],
@@ -242,7 +241,7 @@ function functions(value, location, external) {
   return Object.freeze(result);
 }
 
-/** Read a consumer-selected collection artifact, if present. */
+/** Reads a consumer-selected collection artifact, if present. */
 export function readCollections(module) {
   const sections = WebAssembly.Module.customSections(module, "ilang.collections");
   expect(sections.length <= 1, "Duplicate ilang.collections sections");
@@ -259,7 +258,7 @@ export function readCollections(module) {
   return artifact;
 }
 
-/** Read and check the ilang.abi metadata (B.6), or the metadata `supplied` for a module without it. */
+/** Reads and checks the ilang.abi metadata, or the metadata `supplied` for a module without it. */
 export function readAbi(module, supplied) {
   if (supplied === undefined && embeddedAbis.has(module)) return embeddedAbis.get(module);
   const sections = WebAssembly.Module.customSections(module, "ilang.abi");
@@ -313,7 +312,7 @@ function unsigned(value, label) {
   return value >>> 0;
 }
 
-/** Encode an integer without converting it through a JavaScript Number. */
+/** Encodes an integer without converting it through a JavaScript Number. */
 export function integerToLimbs(value) {
   if (typeof value !== "bigint") throw new TypeError("Int arguments must be JavaScript bigint values");
   const sign = value < 0n ? -1 : value > 0n ? 1 : 0;
@@ -329,7 +328,7 @@ export function integerToLimbs(value) {
   return { sign, bytes };
 }
 
-/** Decode the canonical sign/magnitude little-endian integer representation. */
+/** Decodes the canonical sign/magnitude little-endian integer representation. */
 export function integerFromLimbs(sign, bytes) {
   expect(sign === -1 || sign === 0 || sign === 1, "Invalid integer sign");
   expect(bytes instanceof Uint8Array && bytes.byteLength % 4 === 0, "Integer limbs must contain complete 32-bit words");
@@ -354,7 +353,7 @@ function correctBits(value) {
 
 /**
  * Is this JavaScript value of the type, so that it can be given to the module
- * as it is, also when it is not correct (B.2)? The module then checks it.
+ * as it is, also when it is not correct? The module then checks it.
  */
 function ofType(type, value) {
   switch (type) {
@@ -385,7 +384,7 @@ function utf8(text) {
   return Uint8Array.from(bytes);
 }
 
-/** Is this JavaScript value a correct value of the type (B.2)? */
+/** Reports whether this JavaScript value is a correct value of the type. */
 function correct(type, value) {
   switch (type) {
     case "nil": return value === undefined || value === null;
@@ -400,10 +399,10 @@ function correct(type, value) {
   }
 }
 
-/** A fault of the module: the instance is not used again (B.4, B.5). */
+/** A fault of the module: the instance is not used again. */
 class ModuleFault extends AbiError {}
 
-/** A value that the module gave and that is not correct (B.2). */
+/** A value that the module gave and that is not correct. */
 class GuestFault extends ModuleFault {
   constructor(message) {
     super(`The module gave a value that is not correct: ${message}`);
@@ -414,24 +413,24 @@ class Bridge {
   resources;
   ending = false;
   instance;
-  /** Set while an async export waits (B.5). */
+  /** Whether an async export is waiting. */
   waiting = false;
   /** Why the instance cannot be used any more. */
   unusable = null;
   stopMessage = null;
   /** `{ error }` of a host function that threw, given to the caller after the module traps. */
   failure = null;
-  /** Set by a host function that failed or stopped the program: its guard traps. */
+  /** Whether a host function failed or stopped the program; its guard then traps. */
   broken = false;
-  /** Check the answers of host functions in the host (`checkReplies`). */
+  /** Checks the answers of host functions in the host (`checkReplies`). */
   checkReplies = false;
-  /** The outstanding requests by id: `{ namespace, label, signature, abort }` (B.4). */
+  /** The outstanding requests by id: `{ namespace, label, signature, abort }`. */
   requests = new Map();
   /** Answers whose work is done, in the order they settled: `{ id, entry, outcome }` or `{ id, entry, failure }`. */
   settled = [];
   /** Resolves the wait for the next settled answer. */
   wake = null;
-  /** Whether a request may start now: only during an async call, and not inside an import (B.4). */
+  /** Whether a request may start now: only during an async call, and not inside an import. */
   accepting = false;
   /** The Wasm calls of the host that are running. */
   depth = 0;
@@ -483,14 +482,14 @@ class Bridge {
 
   usable() {
     expect(!this.unusable, `The instance cannot be used after it stopped (${this.unusable}); make a new instance`);
-    expect(this.depth === 0, "The instance is running Wasm; a host function may not call it (§B.3)");
+    expect(this.depth === 0, "The instance is running Wasm; a host function may not call it");
     expect(!this.waiting, "An async call is waiting; only its host functions may answer now");
     expect(!this.ending, "An invocation is tearing down; cleanup may not enter Wasm");
   }
 
   /**
    * An import callback that gets, first, whether a request could start when
-   * the import was called. No request may start while it runs (B.4).
+   * the import was called. No request may start while it runs.
    */
   admitting(callback) {
     return (...raw) => {
@@ -504,7 +503,7 @@ class Bridge {
     };
   }
 
-  /** Run Wasm in which the module may start and cancel requests (B.4). */
+  /** Runs Wasm in which the module may start and cancel requests. */
   enterAccepting(operation) {
     return this.enter(() => {
       this.accepting = true;
@@ -516,14 +515,14 @@ class Bridge {
     });
   }
 
-  /** Keep the answer of a request, unless the request was dropped. */
+  /** Keeps the answer of a request, unless the request was dropped. */
   settle(id, entry, result) {
     if (this.requests.get(id) !== entry) return;
     this.settled.push({ id, entry, ...result });
     this.wake?.();
   }
 
-  /** Drop every request: abort its signal and forget its answer. */
+  /** Drops every request: aborts its signal and forgets its answer. */
   dropRequests() {
     // The table is empty before any abort listener runs.
     const dropped = [...this.requests.values()];
@@ -554,7 +553,7 @@ class Bridge {
     }
   }
 
-  /** Gate each actual guest call, including calls nested in argument lowering. */
+  /** Gates each actual guest call, including calls nested in argument lowering. */
   guestCall(operation) {
     this.liveContext();
     this.depth++;
@@ -565,7 +564,7 @@ class Bridge {
     } finally { this.depth--; }
   }
 
-  /** Translate a trap once at the enclosing SDK boundary. */
+  /** Translates a trap once at the enclosing SDK boundary. */
   enter(operation) {
     try { return this.guestCall(operation); }
     catch (error) { throw this.trapped(error); }
@@ -624,7 +623,7 @@ class Bridge {
     }
   }
 
-  /** Read one value that the module gave, checking it (B.2). */
+  /** Reads one value that the module gave, checking it. */
   lift(type, values, owned) {
     switch (type) {
       case "nil": return undefined;
@@ -688,11 +687,11 @@ class Bridge {
   }
 
   /**
-   * The answer of a host function as results of B.2, or null when the host
+   * The answer of a host function as Wasm results, or null when the host
    * stops the program for it: when it is not of its type, or, with
    * `checkReplies`, not a correct value. Without `checkReplies`, a value of
    * the type that is not correct is given to the module, which checks it and
-   * stops with the positions of the call (B.2, §11.7). Successfully returned
+   * stops with the positions of the call. Successfully returned
    * buffers belong to the module.
    */
   lowerReply(signature, reply) {
@@ -866,7 +865,7 @@ function checkBindings(module, abi, options) {
 }
 
 /**
- * Load a module, link its imports and call `ilang_start` once (B.1).
+ * Loads a module, links its imports and calls `ilang_start` once.
  * `imports[module][name]` are the host service functions and external
  * functions of the metadata. They take and give ordinary JavaScript values; a
  * service function throws `GuestError(value)` to give an error of its `? E`,
@@ -898,7 +897,7 @@ export async function instantiate(source, options = {}) {
     imports[name] = { ...values };
   }
   imports[namespace] = {
-    // Drops an outstanding request (B.4).
+    // Drops an outstanding request.
     cancel: guardedFunction(bridge.admitting((admitted, id) => {
       const nothing = { result: "nil", errors: [] };
       if (bridge.broken) return importResult(bridge.breakIn(nothing, null));
@@ -929,13 +928,16 @@ export async function instantiate(source, options = {}) {
     // `i/task` never publishes a record (multicore D12).
     mc_publish: () => 0n,
     mc_claim: () => 1,
-    mc_poll: () => 2,
-    mc_take: () => { throw new ModuleFault("mc_take without workers"); },
-    mc_forget: () => undefined,
+    mc_adopt: () => { throw new ModuleFault("mc_adopt without workers"); },
+    mc_send: () => { throw new ModuleFault("mc_send without workers"); },
+    mc_inbox: () => 0n,
+    mc_message: () => { throw new ModuleFault("mc_message without workers"); },
+    mc_pending: () => 0,
+    mc_wait: () => undefined,
     mc_share_put: () => undefined,
     mc_share_get: () => 0n,
     mc_share_drop: () => undefined,
-    // The module traps right after this call (B.4).
+    // The module traps right after this call.
     panic: typedFunction(bridge.admitting((_, pointer, length) => {
       let message;
       try {
@@ -958,7 +960,7 @@ export async function instantiate(source, options = {}) {
         const service = services.length ? ` for service ${services.join(", ")}` : "";
         expect(typeof (contextFn ?? legacy) === "function", `Missing host function ${moduleName} ${name}${service}`);
         expect(!Object.hasOwn(imports[moduleName], name), `Host function ${moduleName} ${name} is registered twice`);
-        // Nothing is thrown into the module (B.1): an exception of the
+        // Nothing is thrown into the module: an exception of the
         // host function, or an answer that stops the program, is kept, and
         // the guard of the import traps.
         const callback = (admitted, ...raw) => {
@@ -967,7 +969,7 @@ export async function instantiate(source, options = {}) {
           if (!resources.live) return importResult(bridge.breakIn(signature, { error: new AbiError("The resource context has ended") }));
           const fn = contextFn ? (...args) => contextFn(resources, ...args) : legacy;
           // An async import takes the request id first, which is checked
-          // before the service runs (B.4).
+          // before the service runs.
           const id = signature.async ? raw.shift() : undefined;
           if (signature.async) {
             const refused = !admitted ? `the module started request ${id} outside an async call`
@@ -979,7 +981,7 @@ export async function instantiate(source, options = {}) {
             const args = bridge.liftAll(signature.params, raw);
             if (signature.async) {
               // The service runs now, during the import, with the signal of
-              // this request (D6 of docs/design/host-concurrency.md).
+              // this request.
               const abort = resources.abortController();
               const target = new WeakRef(bridge);
               const detach = resources.ownRequest(() => { abort.abort(); target.deref()?.wake?.(); });
@@ -1003,7 +1005,7 @@ export async function instantiate(source, options = {}) {
               // disposal. Each reply still checks the original request entry.
               work.then((outcome) => target.deref()?.settle(id, entry, { outcome }), (failure) => target.deref()?.settle(id, entry, { failure }));
               // A started request requires its resume even if the module
-              // cancels it or returns status 0 next (B.5).
+              // cancels it or returns status 0 next.
               const resume = `ilang_resume:${moduleName}:${name}`;
               try {
                 validateFunction(module, bridge.instance.exports, resume, [0x7f, ...resultTypes(signature)], [0x7f]);
@@ -1058,8 +1060,8 @@ export async function instantiate(source, options = {}) {
   };
 
   /**
-   * Answer the requests of the module, in the order their work settles,
-   * until the status is 0 (B.5). Every exit drops the requests that are left.
+   * Answers the requests of the module, in the order their work settles,
+   * until the status is 0. Every exit drops the requests that are left.
    */
   const wait = async (name, status) => {
     bridge.waiting = true;
@@ -1102,7 +1104,7 @@ export async function instantiate(source, options = {}) {
         }
         const resume = `ilang_resume:${entry.namespace}:${entry.label}`;
         exportOrFault(resume, [0x7f, ...resultTypes(entry.signature)], [0x7f], `the module does not export ${resume}`);
-        // Result buffers are made just before the resume (B.5).
+        // Result buffers are made just before the resume.
         const values = bridge.enter(() => bridge.lowerReply(entry.signature, next.outcome));
         if (!values) throw bridge.hostValueStop();
         status = bridge.enterAccepting(() => instance.exports[resume](id, ...values));
@@ -1148,7 +1150,7 @@ export async function instantiate(source, options = {}) {
     /** Why the instance cannot be used any more, or null. */
     get unusable() { return bridge.unusable; },
     /**
-     * Call a host export. Gives its value, throws GuestError for an error of
+     * Calls a host export. Gives its value, throws GuestError for an error of
      * its `? E`, and Stop when the program stops. Arguments that are not
      * correct values stop the program with `host: value is not correct`.
      */
@@ -1164,7 +1166,7 @@ export async function instantiate(source, options = {}) {
       });
       return finish(signature, raw, owned);
     },
-    /** Call an async host export; the Promise settles like `call`. */
+    /** Calls an async host export; the Promise settles like `call`. */
     async callAsync(name, args = []) {
       bridge.usable();
       const signature = signatureOf(name, args);
@@ -1186,24 +1188,24 @@ export async function instantiate(source, options = {}) {
       const raw = bridge.enter(() => instance.exports[result]());
       return finish(signature, raw, owned);
     },
-    /** Run the program entry; a Promise when it is async. */
+    /** Runs the program entry; a Promise when it is async. */
     run() {
       expect(abi.entry, "The program has no entry");
       return runPoint(abi.entry);
     },
-    /** Run an entry point by name: the program entry or a test. */
+    /** Runs an entry point by name: the program entry or a test. */
     runEntryPoint(name) {
       const point = [...(abi.entry ? [abi.entry] : []), ...abi.tests].find((candidate) => candidate.name === name);
       expect(point, `${name} is not an entry point of the metadata`);
       return runPoint(point);
     },
-    /** Run the selected contribution in this artifact. */
+    /** Runs the selected contribution in this artifact. */
     runCollection(handle) {
       expect(collections && collections.selected === handle, "The collection handle is not selected by this artifact");
       validateFunction(module, instance.exports, collections.export, [], collections.is_async ? [0x7f] : []);
       return runPoint({ name: collections.export, async: collections.is_async });
     },
-    /** Abandon a live invocation and clean up host resources without i callbacks. */
+    /** Abandons a live invocation and cleans up host resources without i callbacks. */
     takeCleanupErrors() { return resourceHost.takeCleanupErrors(); },
     dispose() {
       bridge.unusable ??= "the instance was disposed";
@@ -1239,7 +1241,7 @@ export async function instantiate(source, options = {}) {
   return Object.freeze(guest);
 }
 
-/** Run each test in a new instance (spec §10.2); a stop fails only its own test. */
+/** Runs each test in a new instance; a stop fails only its own test. */
 export async function runTests(source, options = {}) {
   const module = await compile(source);
   const abi = readAbi(module, options.abi);

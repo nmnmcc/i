@@ -30,7 +30,7 @@ pub struct Entry {
     pub ordinal: u32,
 }
 
-/// Resolve after successful type checking, before consumers select roots.
+/// Resolves after successful type checking, before consumers select roots.
 pub fn resolve(
     parsed: &[Parsed],
     program: &Program,

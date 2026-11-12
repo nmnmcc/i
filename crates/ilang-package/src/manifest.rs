@@ -1,4 +1,4 @@
-//! The package file `i.toml` (§2.6).
+//! The package file `i.toml`.
 
 use crate::{Diagnostic, code, is_name};
 use ilang_syntax::span::Span;
@@ -20,7 +20,7 @@ pub struct Manifest {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dependency {
-    /// The dependency name: the key (§2.6).
+    /// The dependency name: the key.
     pub name: String,
     pub source: DependencySource,
     /// The span of the key.
@@ -44,8 +44,8 @@ pub struct Location {
 
 impl Location {
     /// The location without the version: the repository, then `//` and the
-    /// directory when there is one. This is the location of `i.lock` (§2.8)
-    /// and of source positions (§11.7).
+    /// directory when there is one. This is the location in `i.lock` and in
+    /// source positions.
     pub fn place(&self) -> String {
         match &self.dir {
             Some(d) => format!("{}//{d}", self.repository),
@@ -68,7 +68,8 @@ impl std::fmt::Display for Version {
     }
 }
 
-/// `"app/math.add"` in `[wasm] exports` (§2.6, §10.2).
+/// An entry such as `"app/math.add"` in `[wasm] exports`: a module path, a
+/// `.`, and a function name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WasmExport {
     pub module: String,
@@ -86,13 +87,13 @@ fn err(code: &'static str, span: Span, message: impl Into<String>) -> Diagnostic
 
 /// Reads the `i.toml` of the package that is compiled. The manifest is
 /// `None` only when there is no usable `name`. Other problems are reported,
-/// and the bad entries are left out. Unknown keys are not used (§2.6).
+/// and the bad entries are left out. Unknown keys are not used.
 pub fn parse_manifest(text: &str) -> (Option<Manifest>, Vec<Diagnostic>) {
     parse(text, true)
 }
 
 /// Reads the `i.toml` of a package that the compiled package uses. Its
-/// `[dev-dependencies]` and `[wasm]` are not used (§2.6, §10.2), so they
+/// `[dev-dependencies]` and `[wasm]` are not used, so they
 /// are not read, and their shapes give no errors. They are empty in the
 /// manifest.
 pub fn parse_dependency_manifest(text: &str) -> (Option<Manifest>, Vec<Diagnostic>) {
@@ -163,10 +164,10 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
         diags.push(err(
             code::MANIFEST_NAME,
             name_span,
-            format!("the package name `{name}` must be a name (§1.3), and not `i`"),
+            format!("the package name `{name}` must be a name, and not `i`"),
         ));
     }
-    // §2.6: the dependency names.
+    // The dependency names.
     let mut seen = HashSet::new();
     let mut keep = |list: Vec<Dependency>, diags: &mut Vec<Diagnostic>| {
         let mut out = Vec::new();
@@ -220,8 +221,8 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
 }
 
 impl Manifest {
-    /// §2.6: only the compiled package, and the packages that it gets by
-    /// path, may have path dependencies.
+    /// Checks that only the compiled package, and the packages that it gets
+    /// by path, have path dependencies.
     pub fn check_path_dependencies(&self, by_location: bool) -> Vec<Diagnostic> {
         if !by_location {
             return Vec::new();
@@ -403,7 +404,7 @@ fn parse_wasm_export(s: &str) -> Option<(String, String)> {
         .then(|| (module.to_string(), function.to_string()))
 }
 
-/// Parses a location with its version (§2.6): a git repository address
+/// Parses a location with its version: a git repository address
 /// without `https://`, an optional `//dir`, then `@major.minor.patch`.
 pub fn parse_location(s: &str) -> Result<Location, (&'static str, String)> {
     let bad = |why: &str| {

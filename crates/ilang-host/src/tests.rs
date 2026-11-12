@@ -994,7 +994,7 @@ fn timers(n: i64, order: &Order) -> impl Fn(&[Value]) -> ServiceFuture + Send + 
 struct GateState {
     rng: u64,
     burst: bool,
-    /// Release nothing at all.
+    /// Releases nothing at all.
     hold_all: bool,
     /// The argument whose gate fails in the host.
     fail: Option<i64>,
@@ -1698,7 +1698,8 @@ fn fault_imports(gates: &Gates) -> HostImports {
     imports
 }
 
-/// B.5 requires exports when a request starts or status 2 is returned,
+/// A module must have the export that answers a request when a request starts,
+/// or the export `ilang_continue` when status 2 is returned,
 /// even when an answer is ready, the entry ends, or the request is cancelled.
 #[test]
 fn required_exports_are_checked_before_delivery_or_drop() {
@@ -1791,7 +1792,7 @@ fn bad_statuses_are_faults() {
 }
 
 /// `ilang_continue` and `ilang_resume:…` exports of the wrong type are
-/// faults (B.5), like missing ones, and the host never calls them.
+/// faults, like missing ones, and the host never calls them.
 #[test]
 fn exports_of_the_wrong_type_are_faults() {
     let wrong = Program::from_bytes(WRONG_TYPES).unwrap();
@@ -1876,8 +1877,8 @@ fn a_finished_program_does_not_wait_for_blocking_work() {
     }
 }
 
-/// Finding C-1-1: a request whose work wakes itself during its own poll
-/// must not be polled again in the same call; the wait must give the
+/// A request whose work wakes itself during its own poll must not be
+/// polled again in the same call; the wait must give the
 /// executor a turn first.
 mod self_waking_work {
     use crate::requests::{Request, Requests};
@@ -1988,7 +1989,7 @@ mod self_waking_work {
     }
 }
 
-/// H8 and H11a apply to traps during buffer allocation too. The first
+/// Every guest trap has the same outcome, also one during buffer allocation. The first
 /// request is ready; the other two stay pending until the host drops them.
 fn allocation_fault_program(allocation: &str) -> Program {
     let bytes = wat::parse_str(format!(
@@ -2096,7 +2097,7 @@ fn allocation_traps_preserve_stops_and_the_first_failure() {
     }
 }
 
-/// Design §10.1's countdown work wakes itself for a seeded number of
+/// The countdown work wakes itself for a seeded number of
 /// polls. Unlike a gate, it makes no promise about completion order.
 #[test]
 fn countdown_requests_match_the_observed_answer_order() {
@@ -2139,7 +2140,7 @@ fn countdown_requests_match_the_observed_answer_order() {
     }
 }
 
-/// D5's nested-store rule also applies while the host calls ilang_alloc or
+/// The rule for a nested store also applies while the host calls ilang_alloc or
 /// ilang_free outside the entry export itself (parameter/result buffers).
 #[test]
 fn a_nested_store_in_the_allocator_gets_its_own_thread() {
@@ -2215,8 +2216,8 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
     assert!(recorded.iter().all(|(_, id)| *id != outer), "{recorded:?}");
 }
 
-// BG interpretation: native 3.1 authorizes each resolved declaration before
-// coalescing, including external aliases; N9.1/N9.5 own each invocation.
+// A resolved declaration is authorized before coalescing, including external
+// aliases, and each invocation owns its resources.
 fn bg_plan(program: &Program) -> bindings::BindingPlan {
     let mut declarations = Vec::new();
     for (kind, table) in [
@@ -2572,7 +2573,7 @@ fn bg_close_while_a_request_is_outstanding_rejects_its_late_success() {
     );
 }
 
-// Spec 4.1 and 11.4 require distinct nominal constructors to differ, even
+// Distinct nominal constructors are different values, even
 // when the host passes one object (or null) through both declarations.
 #[test]
 fn compiled_opaque_boundaries_preserve_nominal_identity() {

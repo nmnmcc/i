@@ -399,11 +399,30 @@ i/syntax.children : (syntax: Syntax, index: Int, end: Int, result: List(Syntax))
 i/syntax.node : (syntax: Syntax) -> Node
 i/syntax.build_list : (items: List(Syntax), result: SyntaxList) -> SyntaxList
 i/syntax._rebuild : (template: Syntax, children: List(Syntax)) -> Syntax
+i/syntax.raw_type_handle : (Syntax) -> TypeHandle
 i/syntax.make : (node: Node, like: Syntax) -> Syntax ^ SyntaxError
 i/syntax.same_code : (a: Syntax, b: Syntax) -> Bool
 i/syntax.show : (syntax: Syntax) -> String
 i/syntax.position_id : (position: Position) -> Int
 i/syntax.show_as : (syntax: Syntax, position: Position) -> String ^ SyntaxError
+i/syntax.raw_type_of : (Syntax) -> TypeResult
+i/syntax.raw_signature : () -> TypeResult
+i/syntax.raw_subtype : (Syntax, Syntax) -> TypeResult
+i/syntax.raw_members : (Syntax) -> TypeResult
+i/syntax.raw_type_ok : (TypeResult) -> Bool
+i/syntax.raw_type_value : (TypeResult) -> Syntax
+i/syntax.raw_type_truth : (TypeResult) -> Int
+i/syntax.raw_type_len : (TypeResult) -> Int
+i/syntax.raw_type_child : (TypeResult, Int) -> Syntax
+i/syntax.raw_type_message : (TypeResult) -> String
+i/syntax.raw_type_at : (TypeResult) -> Syntax
+i/syntax.type_result : (r: TypeResult) -> Syntax ^ SyntaxError
+i/syntax.type_members : (r: TypeResult, index: Int, count: Int) -> List(Syntax)
+i/syntax._types : () -> Types
+i/syntax.type_of : (s: Syntax) -> Syntax ^ SyntaxError ! Types
+i/syntax.signature : () -> Syntax ! Types
+i/syntax.subtype : (a: Syntax, b: Syntax) -> Truth ^ SyntaxError ! Types
+i/syntax.members : (s: Syntax) -> List(Syntax) ^ SyntaxError ! Types
 i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
 i/fs.open : (path: String, mode: OpenMode) -> File ^ FsError ! Fs | request.Await | request.Owner
 i/fs.read : (File, max_bytes: Int) -> BitArray ^ FsError ! Fs | request.Await | request.Owner
@@ -447,7 +466,7 @@ i/process.close_stdin : (Child) -> Nil ^ ProcessError ! Process | request.Await 
 i/net.listen : (address: String, port: Int) -> Listener ^ NetError ! Net | request.Await | request.Owner
 i/net.connect : (address: String, port: Int) -> Stream ^ NetError ! Net | request.Await | request.Owner
 i/net.accept : (Listener) -> Stream ^ NetError ! Net | request.Await | request.Owner
-i/net.local_port : (Listener) -> Int ^ NetError ! Net | request.Await | request.Owner
+i/net.local_port : (socket: Listener | Datagram) -> Int ^ NetError ! Net | request.Await | request.Owner
 i/net.read : (Stream, max_bytes: Int) -> BitArray ^ NetError ! Net | request.Await | request.Owner
 i/net.write : (Stream, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
 i/net.shutdown_write : (Stream) -> Nil ^ NetError ! Net | request.Await | request.Owner
@@ -458,6 +477,12 @@ i/net.parts : (text: String, start: Int) -> List(String)
 i/net.resolve : (name: String) -> List(String) ^ NetError ! Net | request.Await | request.Owner
 i/net.stream_number : (Stream) -> Int
 i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { Net | request.Await } }, read: (max: Int) -> BitArray ^ NetError ! { request.Owner | { Net | request.Await } }, shutdown_write: () -> Nil ^ NetError ! { request.Owner | { Net | request.Await } }, write: (bytes: BitArray) -> Nil ^ NetError ! { request.Owner | { Net | request.Await } })
+i/net.bind : (address: String, port: Int) -> Datagram ^ NetError ! Net | request.Await | request.Owner
+i/net.send_to : (Datagram, address: String, port: Int, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
+i/net.receive_from : (Datagram, max_bytes: Int) -> (address: String, data: BitArray, port: Int) ^ NetError ! Net | request.Await | request.Owner
+i/net.decode_datagram : (A) -> (address: String, data: BitArray, port: Int)
+i/net.local_address : (Datagram) -> String ^ NetError ! Net | request.Await | request.Owner
+i/net.close_datagram : (Datagram) -> Nil ! Net | request.Await | request.Owner
 i/tls.options : () -> (alpn: List(Never), cert: BitArray, key: BitArray, roots: BitArray)
 i/tls.identity : (cert: BitArray, key: BitArray) -> (cert: BitArray, key: BitArray)
 i/tls.join : (items: List(String)) -> String

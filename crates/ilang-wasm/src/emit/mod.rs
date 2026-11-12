@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 mod control;
 mod host;
-mod numeric;
+pub(crate) mod numeric;
 mod wasi;
 mod workers;
 
@@ -92,6 +92,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         metered,
         numeric_enabled: false,
         numeric_plan: numeric::Plan::default(),
+        worker: None,
         arities: BTreeSet::new(),
         ctors: BTreeSet::new(),
         strings: HashMap::new(),
@@ -124,6 +125,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     // its transport imports (emit/workers.rs).
     let uses_workers = e.out.contains("(call $worker_");
     let mut m = String::from("(module\n");
+    for decision in &p.numeric_log {
+        let _ = writeln!(m, ";; numeric: {}", decision.replace('\n', " "));
+    }
     // A host reference can come into the program only through an import or
     // an export whose types have one (B.2).
     let references = p
@@ -318,6 +322,7 @@ struct Emitter<'p> {
     metered: bool,
     numeric_enabled: bool,
     numeric_plan: numeric::Plan,
+    worker: Option<crate::numeric::Worker>,
     arities: BTreeSet<u32>,
     /// The constructors without fields that are used, as (constructor id,
     /// type id).
@@ -368,14 +373,45 @@ impl<'p> Emitter<'p> {
 
     fn header(&mut self, name: &str, arity: u32, locals: &[LocalType]) {
         self.arities.insert(arity);
-        let _ = write!(
-            self.out,
-            "(func {name} (type $fn{arity}) (param $clo (ref null $obj)) (param $env (ref null $env))"
-        );
-        for i in 0..arity {
-            let _ = write!(self.out, " (param $l{i} eqref)");
+        if self.worker.is_some() {
+            let _ = write!(
+                self.out,
+                "(func {name} (param $clo (ref null $obj)) (param $env (ref null $env))"
+            );
+        } else {
+            let _ = write!(
+                self.out,
+                "(func {name} (type $fn{arity}) (param $clo (ref null $obj)) (param $env (ref null $env))"
+            );
         }
-        self.out.push_str(" (result eqref)\n");
+        for i in 0..arity {
+            if self.worker.as_ref().is_some_and(|w| w.floats[i as usize]) {
+                let _ = write!(self.out, " (param $numeric_f{i} f64)");
+            } else if self.worker.as_ref().is_some_and(|w| w.ints[i as usize]) {
+                let _ = write!(self.out, " (param $numeric_i{i} i64)");
+            } else {
+                let _ = write!(self.out, " (param $l{i} eqref)");
+            }
+        }
+        self.out
+            .push_str(if self.worker.as_ref().is_some_and(|w| w.float_result) {
+                " (result f64)\n"
+            } else {
+                " (result eqref)\n"
+            });
+        if let Some(worker) = &self.worker {
+            for (i, scalar) in worker
+                .floats
+                .iter()
+                .zip(&worker.ints)
+                .map(|(f, i)| *f || *i)
+                .enumerate()
+            {
+                if scalar {
+                    let _ = writeln!(self.out, " (local $l{i} eqref)");
+                }
+            }
+        }
         if self.p.labels.len() > FIXED_MAX / 2 {
             self.out
                 .push_str(" (local $record_pairs (ref null $values))\n");
@@ -388,13 +424,35 @@ impl<'p> Emitter<'p> {
 
     fn code(&mut self, name: &str, f: &Func, id: Option<FuncId>) {
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
+        self.worker = id.and_then(|id| self.p.workers.get(&id)).cloned();
         self.header(name, f.arity, &f.locals);
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
-            numeric::Plan::for_func(f, id.and_then(|id| self.p.numeric_locals.get(&id)))
+            numeric::Plan::for_func(
+                f,
+                id.and_then(|id| self.p.numeric_locals.get(&id)),
+                self.worker.as_ref(),
+            )
         } else {
             numeric::Plan::default()
         };
-        self.out.push_str(&self.numeric_plan.declarations());
+        let mut declarations = self.numeric_plan.declarations();
+        if let Some(worker) = &self.worker {
+            for (i, float) in worker.floats.iter().enumerate() {
+                if *float {
+                    declarations =
+                        declarations.replace(&format!(" (local $numeric_f{i} f64)\n"), "");
+                }
+            }
+        }
+        if let Some(worker) = &self.worker {
+            for (i, int) in worker.ints.iter().enumerate() {
+                if *int {
+                    declarations =
+                        declarations.replace(&format!(" (local $numeric_i{i} i64)\n"), "");
+                }
+            }
+        }
+        self.out.push_str(&declarations);
         self.numeric_enabled =
             self.p.numeric != crate::Numeric::Reference && numeric::has_float(&f.body);
         if self.numeric_enabled {
@@ -415,12 +473,27 @@ impl<'p> Emitter<'p> {
             }
             self.out.push_str("(call $shadow_enter_call)\n");
         }
-        self.out.push_str(&self.numeric_plan.parameters(f.arity));
+        let mut parameters = self.numeric_plan.parameters(f.arity);
+        if let Some(worker) = &self.worker {
+            for (i, float) in worker.floats.iter().enumerate() {
+                if *float {
+                    parameters = parameters.replace(
+                        &format!(
+                            "(local.set $numeric_f{i} {})\n",
+                            numeric::unbox_float(&format!("(local.get $l{i})"))
+                        ),
+                        "",
+                    );
+                }
+            }
+        }
+        self.out.push_str(&parameters);
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
         self.out.push_str(&body);
         self.out.push_str("(unreachable))\n");
         self.numeric_enabled = false;
+        self.worker = None;
         self.numeric_plan = numeric::Plan::default();
     }
 
@@ -466,6 +539,23 @@ impl<'p> Emitter<'p> {
             out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
         }
         match s {
+            Stmt::Logical(action) => match action {
+                Logical::Enter(site) => {
+                    if let Some(site) = site {
+                        let _ =
+                            writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                    }
+                    out.push_str("(call $shadow_enter_call)\n");
+                }
+                Logical::Leave => out.push_str("(call $shadow_leave)\n"),
+                Logical::Tail(site) => {
+                    let _ = writeln!(
+                        out,
+                        "(call $shadow_leave_tail (i32.const {}))",
+                        site.map_or(-1, site_code)
+                    );
+                }
+            },
             Stmt::Let { dst, value, site } => {
                 if let Some(site) = site {
                     let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
@@ -515,7 +605,11 @@ impl<'p> Emitter<'p> {
                 let _ = writeln!(out, "(br $b{label})");
             }
             Stmt::Return(a) => {
-                let a = self.atom(a);
+                let a = if self.worker.as_ref().is_some_and(|w| w.float_result) {
+                    self.float_atom(a)
+                } else {
+                    self.atom(a)
+                };
                 if frame {
                     out.push_str("(call $shadow_leave)\n");
                 }
@@ -577,20 +671,67 @@ impl<'p> Emitter<'p> {
     fn call(&mut self, callee: &Callee, args: &[Atom], tail: bool, env: &str) -> String {
         let n = args.len() as u32;
         self.arities.insert(n);
-        let args: String = args.iter().map(|a| format!(" {}", self.atom(a))).collect();
+        let target = match callee {
+            Callee::Direct(f) | Callee::Known { func: f, .. } => Some(*f),
+            _ => None,
+        };
+        let worker = target.and_then(|f| self.p.workers.get(&f)).cloned();
         let prefix = if tail { "return_" } else { "" };
-        match callee {
-            Callee::Direct(f) => {
-                format!("({prefix}call $f{} (ref.null $obj) {env}{args})", f.0)
+        let closure = match callee {
+            Callee::Known { closure, .. } => {
+                format!("(ref.cast (ref null $obj) {})", self.atom(closure))
+            }
+            _ => "(ref.null $obj)".into(),
+        };
+        let mut guards = Vec::new();
+        let raw_args = args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| {
+                let raw = if worker.as_ref().is_some_and(|w| w.floats[i]) {
+                    self.float_atom(a)
+                } else if worker.as_ref().is_some_and(|w| w.ints[i]) {
+                    let (guard, raw) = self.small_int(a);
+                    guards.push(guard);
+                    raw
+                } else {
+                    self.atom(a)
+                };
+                format!(" {raw}")
+            })
+            .collect::<String>();
+        let call = match callee {
+            Callee::Direct(f) | Callee::Known { func: f, .. } => {
+                format!("({prefix}call $f{} {closure} {env}{raw_args})", f.0)
             }
             Callee::Value(a) => {
                 let a = self.atom(a);
                 format!(
-                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{args} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
+                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
                 )
             }
+        };
+        if guards.is_empty() {
+            return call;
         }
+        let worker = worker.expect("integer guards have a worker");
+        assert!(
+            !worker.float_result,
+            "guarded Int fallback has Value result"
+        );
+        let guard = guards
+            .into_iter()
+            .reduce(|a, b| format!("(i32.and {a} {b})"))
+            .unwrap();
+        let canonical = args
+            .iter()
+            .map(|a| format!(" {}", self.atom(a)))
+            .collect::<String>();
+        let result = if tail { "" } else { " (result eqref)" };
+        format!(
+            "(if{result} {guard} (then {call}) (else ({prefix}call $f{} {closure} {env}{canonical})))",
+            worker.origin.0
+        )
     }
 
     fn string(&mut self, s: &str) -> String {
@@ -615,6 +756,7 @@ impl<'p> Emitter<'p> {
 
     fn atom(&mut self, a: &Atom) -> String {
         match a {
+            Atom::CurrentClosure => "(local.get $clo)".into(),
             Atom::Local(l) => match self.numeric_plan.locals.get(l) {
                 Some(numeric::Repr::Float) => {
                     // Reuse incoming/canonical boxes. A purely scalar definition
@@ -755,7 +897,20 @@ impl<'p> Emitter<'p> {
             Value::Capture(i) => format!(
                 "(array.get $values (ref.as_non_null (struct.get $obj 5 (ref.as_non_null (local.get $clo)))) (i32.const {i}))"
             ),
-            Value::Call { callee, args, env } => self.call(callee, args, false, &env_text(*env)),
+            Value::Call { callee, args, env } => {
+                let raw = self.call(callee, args, false, &env_text(*env));
+                if self.float_call(callee) {
+                    numeric::box_float(&raw)
+                } else {
+                    raw
+                }
+            }
+            Value::Finite(op, args) => {
+                let args = args.iter().map(|a| self.float_atom(a)).collect::<Vec<_>>();
+                numeric::box_float(
+                    &numeric::float_operation(*op, &args, false).expect("proved Float operation"),
+                )
+            }
             Value::Op(op, args) => {
                 if self.numeric_enabled
                     && matches!(
@@ -1009,6 +1164,19 @@ impl<'p> Emitter<'p> {
             Cond::Tuple(a, n) => format!("(call $is_tuple {} (i32.const {n}))", self.atom(a)),
             Cond::Empty(a) => format!("(call $list_is_empty {})", self.atom(a)),
             Cond::Equal(a, b) => format!("(call $equal {} {})", self.atom(a), self.atom(b)),
+            Cond::IsInt(a, n)
+                if self.numeric_plan.locals.get(match a {
+                    Atom::Local(l) => l,
+                    _ => &u32::MAX,
+                }) == Some(&numeric::Repr::Int)
+                    && i64::try_from(n).is_ok_and(|n| (-1073741824..=1073741823).contains(&n)) =>
+            {
+                let (guard, raw) = self.small_int(a);
+                format!(
+                    "(i32.and {guard} (i64.eq {raw} (i64.const {})))",
+                    i64::try_from(n).unwrap()
+                )
+            }
             Cond::IsInt(a, n) => match i64::try_from(n) {
                 // Small Ints are always `i31ref` (`runtime/mod.rs`).
                 Ok(v) if (-(1 << 30)..(1 << 30)).contains(&v) => {
@@ -1167,6 +1335,14 @@ impl<'p> Emitter<'p> {
                 f.0,
                 converted.join(" ")
             ),
+            Callee::Known { func, closure } => {
+                let closure = self.atom(closure);
+                format!(
+                    "(call $f{} (ref.cast (ref null $obj) {closure}) {env} {})",
+                    func.0,
+                    converted.join(" ")
+                )
+            }
             Callee::Value(a) => {
                 let a = self.atom(a);
                 format!(
@@ -1449,7 +1625,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

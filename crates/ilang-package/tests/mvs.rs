@@ -1,4 +1,4 @@
-//! Minimal version selection (§2.7), without git.
+//! Minimal version selection, without git.
 
 use ilang_package::manifest::{Version, parse_version};
 use ilang_package::mvs::{PackageKey, Requirement, select};

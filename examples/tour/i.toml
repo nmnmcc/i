@@ -1,0 +1,7 @@
+name = "tour"
+
+[test]
+collection = "std/test.tests"
+
+[dependencies]
+std = { path = "../../std" }

@@ -206,7 +206,7 @@ impl Registry {
         )
     }
 
-    /// Resolve a name in its source scope, checking exact lexical scopes first.
+    /// Resolves a name in its source scope, checking exact lexical scopes first.
     /// A module-qualified call resolves its alias by the same value lookup.
     pub fn resolve(
         &self,

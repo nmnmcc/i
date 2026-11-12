@@ -109,7 +109,6 @@ struct PoolState {
     next: u64,
     threads: Vec<JoinHandle<()>>,
     spawned: usize,
-    idle: usize,
     shutdown: bool,
     broken: bool,
     /// The first stop of a task on a worker (N12).

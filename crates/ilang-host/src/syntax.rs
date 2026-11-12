@@ -30,6 +30,9 @@ struct SyntaxResult(Result<Syntax, String>);
 struct TextResult(Result<String, (String, Syntax)>);
 struct MatchResult(Option<Vec<Capture>>);
 struct DefinitionResult(Result<Syntax, (String, Syntax)>);
+struct TypeResult(Result<Vec<Syntax>, (String, Syntax)>);
+pub type TypeCallback =
+    dyn Fn(&str, &[Syntax]) -> Result<Vec<Syntax>, (String, Syntax)> + Send + Sync;
 
 /// A compiler definition resolver's answer or control outcome.
 #[derive(Clone, Debug)]
@@ -53,6 +56,7 @@ type DefinitionCallback = dyn Fn(&Syntax) -> DefinitionReply + Send + Sync;
 /// The resolver and uncatchable outcome for one fresh macro instance.
 pub struct DefinitionContext {
     callback: Arc<DefinitionCallback>,
+    types: Mutex<Option<Arc<TypeCallback>>>,
     abort: Mutex<Option<DefinitionAbort>>,
     notes: Mutex<Vec<String>>,
 }
@@ -61,11 +65,15 @@ impl DefinitionContext {
     pub fn new(callback: impl Fn(&Syntax) -> DefinitionReply + Send + Sync + 'static) -> Self {
         Self {
             callback: Arc::new(callback),
+            types: Mutex::new(None),
             abort: Mutex::new(None),
             notes: Mutex::new(Vec::new()),
         }
     }
-    /// Take this run's buffered diagnostic notes after a successful commit.
+    pub fn set_types(&self, callback: Arc<TypeCallback>) {
+        *self.types.lock().expect("typed service") = Some(callback);
+    }
+    /// Takes this run's buffered diagnostic notes after a successful commit.
     pub fn take_notes(&self) -> Vec<String> {
         std::mem::take(&mut *self.notes.lock().expect("diagnostic buffer lock poisoned"))
     }
@@ -88,11 +96,11 @@ fn get<T: Send + Sync + 'static>(value: &Value) -> Result<&T> {
         .downcast_ref::<T>()
         .context("syntax service received the wrong opaque type")
 }
-/// Give a syntax value to a macro instance through the opaque-reference ABI.
+/// Gives a syntax value to a macro instance through the opaque-reference ABI.
 pub fn encode(value: Syntax) -> Value {
     Value::Externref(HostReference(value.host_identity()))
 }
-/// Read a syntax value returned by a macro instance.
+/// Reads a syntax value returned by a macro instance.
 pub fn decode(value: &Value) -> Result<&Syntax> {
     get(value)
 }
@@ -160,9 +168,14 @@ fn invoke(name: &str, args: &[Value]) -> Result<Value> {
                 Node::Quote(_) => 11,
                 Node::Unquote(_) => 12,
                 Node::Splice(_) => 13,
+                Node::TypeView(_) => 14,
             })
             .into(),
         )),
+        ("type_handle", [value]) => match get::<Syntax>(value)?.node() {
+            Node::TypeView(h) => Ok(opaque(*h)),
+            _ => bail!("expected TypeView"),
+        },
         ("text", [value]) => match get::<Syntax>(value)?.node() {
             Node::Name(s) | Node::Discard(s) | Node::Up(s) | Node::Symbol(s) | Node::Text(s) => {
                 Ok(Value::String(s.clone()))
@@ -410,7 +423,7 @@ pub fn charge_tree(budget: &MacroBudget, root: &Syntax, output: bool) -> Result<
                 }
                 bytes
             }
-            Node::Float(_) => 8,
+            Node::Float(_) | Node::TypeView(_) => 8,
             Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
                 // Charge before the traversal stack may grow.
                 budget.charge(xs.len() as u64, 4 + (xs.len() as u64).saturating_mul(8))?;
@@ -586,17 +599,17 @@ fn charge_text(budget: &MacroBudget, text: &str) -> Result<()> {
     Ok(())
 }
 
-/// Install only the compiler's syntax operations into an otherwise empty host.
+/// Installs only the compiler's syntax operations into an otherwise empty host.
 pub fn install(imports: &mut HostImports) -> Result<()> {
     install_with_templates(imports, Arc::from([]))
 }
 
-/// Install syntax operations with the templates belonging to this instance.
+/// Installs syntax operations with the templates belonging to this instance.
 pub fn install_with_templates(imports: &mut HostImports, templates: Arc<[Syntax]>) -> Result<()> {
     install_with_context(imports, templates, None)
 }
 
-/// Install syntax operations and an optional per-instance definition resolver.
+/// Installs syntax operations and an optional per-instance definition resolver.
 pub fn install_with_context(
     imports: &mut HostImports,
     templates: Arc<[Syntax]>,
@@ -605,7 +618,7 @@ pub fn install_with_context(
     install_with_items(imports, templates, definition, None)
 }
 
-/// Install compiler syntax operations with a per-run item journal.
+/// Installs compiler syntax operations with a per-run item journal.
 pub fn install_with_items(
     imports: &mut HostImports,
     templates: Arc<[Syntax]>,
@@ -615,7 +628,7 @@ pub fn install_with_items(
     install_inner(imports, templates, definition, items, None)
 }
 
-/// Install the syntax service with the same invocation budget as Wasm.
+/// Installs the syntax service with the same invocation budget as Wasm.
 pub fn install_with_budget(
     imports: &mut HostImports,
     templates: Arc<[Syntax]>,
@@ -627,7 +640,7 @@ pub fn install_with_budget(
     install_inner(imports, templates, definition, items, Some(budget))
 }
 
-/// Install metered syntax services without templates or compiler contexts.
+/// Installs metered syntax services without templates or compiler contexts.
 pub fn install_metered(imports: &mut HostImports, budget: MacroBudget) -> Result<()> {
     install_with_budget(imports, Arc::from([]), None, None, budget)
 }
@@ -640,8 +653,10 @@ fn install_inner(
     budget: Option<MacroBudget>,
 ) -> Result<()> {
     items::install(imports, items, definition.clone(), budget.clone())?;
+    install_types(imports, definition.clone(), budget.clone())?;
     const NAMES: &[&str] = &[
         "kind",
+        "type_handle",
         "text",
         "int",
         "float",
@@ -780,6 +795,89 @@ fn install_inner(
             .context("syntax template index is out of range")?;
         Ok(encode(syntax.clone()))
     })?;
+    Ok(())
+}
+
+fn install_types(
+    imports: &mut HostImports,
+    context: Option<Arc<DefinitionContext>>,
+    budget: Option<MacroBudget>,
+) -> Result<()> {
+    for operation in ["type_of", "signature", "subtype", "members"] {
+        let context = context.clone();
+        let budget = budget.clone();
+        imports.external("i:compiler/syntax/v1", operation, move |args| {
+            let args: Vec<_> = args
+                .iter()
+                .map(|v| get::<Syntax>(v).cloned())
+                .collect::<Result<_>>()?;
+            if let Some(b) = &budget {
+                b.charge(1, 8)?;
+                for arg in &args {
+                    charge_tree(b, arg, false)?;
+                }
+            }
+            let c = context
+                .as_ref()
+                .expect("compiler instance has no type service context");
+            let callback = c
+                .types
+                .lock()
+                .expect("typed service")
+                .clone()
+                .expect("Types is installed only for typed macros");
+            let result = callback(operation, &args);
+            if let Err((message, at)) = &result
+                && message.starts_with("E0546:")
+            {
+                *c.abort.lock().expect("type query abort") = Some(DefinitionAbort::CompileError {
+                    message: message.clone(),
+                    at: at.clone(),
+                });
+                bail!("type proof resource limit exceeded");
+            }
+            if let (Some(b), Ok(xs)) = (&budget, &result) {
+                for x in xs {
+                    charge_tree(b, x, true)?;
+                }
+            }
+            Ok(opaque(TypeResult(result)))
+        })?;
+    }
+    for operation in [
+        "type_ok",
+        "type_value",
+        "type_truth",
+        "type_len",
+        "type_child",
+        "type_message",
+        "type_at",
+    ] {
+        imports.external("i:compiler/syntax/v1", operation, move |args| {
+            let result = get::<TypeResult>(&args[0])?;
+            Ok(match operation {
+                "type_ok" => Value::Bool(result.0.is_ok()),
+                "type_value" => encode(result.0.as_ref().expect("successful query")[0].clone()),
+                "type_truth" => Value::Int(
+                    match result.0.as_ref().expect("successful query")[0].node() {
+                        Node::Up(s) if s == "Yes" => 0,
+                        Node::Up(s) if s == "No" => 1,
+                        _ => 2,
+                    }
+                    .into(),
+                ),
+                "type_len" => Value::Int(result.0.as_ref().expect("successful query").len().into()),
+                "type_child" => {
+                    encode(result.0.as_ref().expect("successful query")[number(&args[1])?].clone())
+                }
+                "type_message" => {
+                    Value::String(result.0.as_ref().expect_err("failed query").0.clone())
+                }
+                "type_at" => encode(result.0.as_ref().expect_err("failed query").1.clone()),
+                _ => unreachable!("type result operation"),
+            })
+        })?;
+    }
     Ok(())
 }
 

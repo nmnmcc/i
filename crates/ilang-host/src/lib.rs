@@ -1,19 +1,19 @@
-//! Wasmtime embedding of the i binary interface, version 3 (spec Appendix B).
+//! Wasmtime embedding of the i binary interface, version 3.
 //!
 //! A [`Program`] is a compiled module with its `ilang.abi` metadata. Every
 //! [`Instance`] runs `ilang_start` once before anything else. Calls give an
 //! [`Outcome`]: a value, an error of the function (`? E`), or a [`Stop`] with
-//! the stop message of spec §11.7. After a stop, or any other trap, an
-//! instance refuses further calls (B.5); make a new one.
+//! the stop message. After a stop, or any other trap, an
+//! instance refuses further calls; make a new one.
 //!
-//! Buffers follow B.3: the host makes the buffers of export parameters with
+//! Buffers have one owner: the host makes the buffers of export parameters with
 //! `ilang_alloc` and frees them after the call, and it frees the result
 //! buffers after copying them. For imports, the host makes the result buffers.
 //!
 //! # Requests
 //!
 //! An async export may keep many requests of async host functions
-//! outstanding (B.4, B.5). The host keeps their work in the store, keyed by
+//! outstanding. The host keeps their work in the store, keyed by
 //! the request id that the module chose, and answers them one at a time in
 //! the order their work finishes. When the entry point ends, traps or a
 //! host function fails, the requests that are left are dropped, and so is
@@ -26,7 +26,7 @@
 //! `max_wasm_stack`, 32 MiB). A frame of a small i function takes about 60
 //! bytes, so this is about 500,000 frames of such functions, and fewer of
 //! bigger ones; more traps as "call stack exhausted", which is a stop with
-//! no message (spec §11.7). Every call into the module runs on a thread with
+//! no message. Every call into the module runs on a thread with
 //! a native stack of [`THREAD_STACK`] bytes, so that the Wasm stack always
 //! fits in it, whatever thread calls the host.
 //!
@@ -107,11 +107,11 @@ use wasmtime::{
 
 pub const ABI_VERSION: u32 = 3;
 pub const HOST_MODULE: &str = "ilang:host/v1";
-/// The stop reason for a value from the host that is not correct (B.2).
+/// The stop reason for a value from the host that is not correct.
 pub const HOST_VALUE_REASON: &str = "host: value is not correct";
 
-/// Types that the host can take (spec §10.3), in the canonical order of B.2
-/// for the members of an error type.
+/// Types that the host can take, in the canonical order for the members of an
+/// error type.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AbiType {
@@ -177,7 +177,7 @@ impl Signature {
             .collect()
     }
 
-    /// The results of B.2: the tag when there are errors, the value, then
+    /// The Wasm results: the tag when there are errors, the value, then
     /// every error member.
     fn result_types(&self) -> Vec<ValType> {
         let mut types = Vec::new();
@@ -204,7 +204,7 @@ impl Signature {
     }
 }
 
-/// The program entry or a test (B.5).
+/// The program entry or a test.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EntryPoint {
@@ -222,7 +222,7 @@ impl EntryPoint {
     }
 }
 
-/// The `ilang.abi` metadata (B.6).
+/// The `ilang.abi` metadata.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Abi {
@@ -232,7 +232,7 @@ pub struct Abi {
     pub exports: BTreeMap<String, Signature>,
     pub services: BTreeMap<String, BTreeMap<String, Signature>>,
     pub externals: BTreeMap<String, BTreeMap<String, Signature>>,
-    /// `"wasi"` for a module of the WASI target (B.7), which this host does
+    /// `"wasi"` for a module of the WASI target, which this host does
     /// not run; absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
@@ -253,7 +253,7 @@ impl Default for Abi {
 }
 
 impl Abi {
-    /// Read the metadata of a module; a module without it has none.
+    /// Reads the metadata of a module; a module without it has none.
     pub fn from_wasm(bytes: &[u8]) -> Result<Option<Self>> {
         let mut found = None;
         for payload in wasmparser::Parser::new(0).parse_all(bytes) {
@@ -267,7 +267,7 @@ impl Abi {
         Ok(found)
     }
 
-    /// Parse and check metadata in the JSON form of B.6. Every field must be
+    /// Parses and checks metadata in the JSON form of the `ilang.abi` section. Every field must be
     /// there; `entry` is `null` when the program has no entry.
     pub fn from_json(json: &[u8]) -> Result<Self> {
         let value: serde_json::Value =
@@ -426,7 +426,7 @@ impl Value {
         }
     }
 
-    /// Is this a correct value of `kind` (B.2)?
+    /// Reports whether this is a correct value of `kind`.
     fn is_correct(&self, kind: AbiType) -> bool {
         self.abi_type() == kind
             && match self {
@@ -441,7 +441,7 @@ impl Value {
 #[derive(Clone, Debug)]
 pub struct GuestError(pub Value);
 
-/// The program stopped (spec §11.7). The instance cannot be used again.
+/// The program stopped. The instance cannot be used again.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Stop {
     /// The stop message from the `panic` import, or `None` when the module
@@ -481,7 +481,7 @@ impl Outcome {
     }
 }
 
-/// The result of a test (spec §10.2).
+/// The result of a test.
 #[derive(Debug)]
 pub enum TestResult {
     Passed,
@@ -512,7 +512,7 @@ impl TestReport {
 /// thread of its own and join it.
 pub type ServiceFunction =
     Arc<dyn Fn(&[Value]) -> Result<std::result::Result<Value, Value>> + Send + Sync>;
-/// The work of an async host service function (B.4).
+/// The work of an async host service function.
 pub type ServiceFuture =
     Pin<Box<dyn Future<Output = Result<std::result::Result<Value, Value>>> + Send>>;
 /// A function of an async host service: it starts the work of one request.
@@ -525,7 +525,7 @@ pub type ServiceFuture =
 /// its result is thrown away, so it must not hold anything the program still
 /// needs.
 pub type AsyncServiceFunction = Arc<dyn Fn(&[Value]) -> ServiceFuture + Send + Sync>;
-/// An external function (spec §10.1).
+/// An external function.
 pub type ExternalFunction = Arc<dyn Fn(&[Value]) -> Result<Value> + Send + Sync>;
 
 type ContextServiceFunction = Arc<
@@ -566,12 +566,12 @@ impl Default for HostImports {
 }
 
 impl HostImports {
-    /// Give an instrumented macro instance the same budget as its compiler services.
+    /// Gives an instrumented macro instance the same budget as its compiler services.
     pub fn set_macro_budget(&mut self, budget: macro_budget::MacroBudget) {
         assert!(self.macro_budget.is_none(), "macro budget set twice");
         self.macro_budget = Some(budget);
     }
-    /// Choose an explicit host identity domain. Reuse it across programs/tests.
+    /// Chooses an explicit host identity domain. Reuse it across programs/tests.
     pub fn with_resource_host(mut self, host: ResourceHost) -> Self {
         self.resource_host = host;
         self
@@ -585,8 +585,9 @@ impl HostImports {
         self.grants.grant(plan, declaration);
     }
 
-    /// Approve declarations from trusted package content, never package names.
-    /// Call only with identities authenticated by the compiler/build trust path.
+    /// Approves declarations from trusted package content, never package names.
+    /// It may be called only with identities authenticated by the compiler
+    /// or build trust path.
     pub fn grant_package(&mut self, plan: &bindings::BindingPlan, package: &str) {
         for declaration in &plan.declarations {
             if declaration.package == package {
@@ -650,7 +651,7 @@ impl HostImports {
         Ok(())
     }
 
-    /// A service whose start receives its immutable invocation context (N9.5).
+    /// A service whose start receives its immutable invocation context.
     pub fn context_service(
         &mut self,
         namespace: impl Into<String>,
@@ -743,12 +744,12 @@ impl HostImports {
 #[derive(Clone, Default)]
 pub struct HostOptions {
     pub imports: HostImports,
-    /// Check the answers of host functions in the host (B.2), and stop the
+    /// Checks the answers of host functions in the host, and stops the
     /// program there, with no positions, when one is not correct. Off by
     /// default: an answer of the right type is given to the module as it
     /// is, also when it is not correct (a `Float` that is not finite, a
     /// `BitArray` with bits after the end), and the module checks it and
-    /// stops with the positions of the call (B.2, §11.7). An answer of
+    /// stops with the positions of the call. An answer of
     /// another type cannot be given to the module, so the host stops the
     /// program for it in both cases.
     pub check_replies: bool,
@@ -772,7 +773,7 @@ struct State {
     stop_message: Option<String>,
     /// A failure of the host or an incorrect guest value inside an import.
     failure: Option<anyhow::Error>,
-    /// The requests of async host functions that are outstanding (B.4).
+    /// The requests of async host functions that are outstanding.
     requests: Requests,
     /// The other workers of a multicore entry (multicore D8, native N7).
     workers: Option<Arc<workers::Pool>>,
@@ -820,6 +821,140 @@ pub struct Program {
     workers: usize,
     /// The engine is epoch-instrumented, so every store needs a deadline.
     epochs: bool,
+}
+
+/// Where compiled machine code is kept between processes: the directory
+/// named by `ILANG_COMPILE_CACHE`. Unset, empty or `0`, there is no cache.
+/// Nothing removes old entries; the caller owns the directory.
+fn compile_cache_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("ILANG_COMPILE_CACHE")
+        .filter(|value| !value.is_empty() && value != "0")
+        .map(Into::into)
+}
+
+/// Feeds a `Hash` value into SHA-256.
+struct Sha256Hasher(sha2::Sha256);
+
+impl std::hash::Hasher for Sha256Hasher {
+    fn write(&mut self, bytes: &[u8]) {
+        sha2::Digest::update(&mut self.0, bytes);
+    }
+    fn finish(&self) -> u64 {
+        unreachable!("only the full digest is used")
+    }
+}
+
+/// The identity of this executable (path, size, modification time), part of
+/// every cache key so that a rebuilt compiler never reads code that an older
+/// one stored.
+fn executable_identity() -> &'static str {
+    static IDENTITY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    IDENTITY.get_or_init(|| {
+        let executable = std::env::current_exe()
+            .and_then(|path| Ok((std::fs::metadata(&path)?, path)))
+            .map(|(meta, path)| (path, meta.len(), meta.modified().ok()));
+        format!("{executable:?}")
+    })
+}
+
+fn hex_digest(parts: &[&[u8]]) -> String {
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    for part in parts {
+        hasher.update((part.len() as u64).to_le_bytes());
+        hasher.update(part);
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// The key of a compiled module: the Wasm bytes and everything about the
+/// engine that the machine code depends on (Wasmtime's version and the
+/// compiler settings, from `precompile_compatibility_hash`), plus the identity
+/// of this executable.
+fn compile_cache_key(engine: &Engine, bytes: &[u8]) -> String {
+    use sha2::Digest;
+    use std::hash::Hash;
+    let mut hasher = Sha256Hasher(sha2::Sha256::new());
+    engine.precompile_compatibility_hash().hash(&mut hasher);
+    let settings = hasher.0.finalize();
+    hex_digest(&[
+        b"module",
+        executable_identity().as_bytes(),
+        &settings,
+        bytes,
+    ])
+}
+
+/// Cranelift's per-function cache (its key covers the function's IR and the
+/// compiler flags), kept as one file per function in the cache directory.
+#[derive(Debug)]
+struct FunctionCache(std::path::PathBuf);
+
+impl wasmtime::CacheStore for FunctionCache {
+    fn get(&self, key: &[u8]) -> Option<std::borrow::Cow<'_, [u8]>> {
+        std::fs::read(self.path(key)).ok().map(Into::into)
+    }
+    fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
+        store_atomically(&self.path(key), &value)
+    }
+}
+
+impl FunctionCache {
+    fn path(&self, key: &[u8]) -> std::path::PathBuf {
+        self.0.join(hex_digest(&[
+            b"function",
+            executable_identity().as_bytes(),
+            key,
+        ]))
+    }
+}
+
+/// Writes `bytes` to `path` through a temporary file and a rename, so that a
+/// reader never sees a partial entry. Failure leaves the entry unwritten.
+fn store_atomically(path: &std::path::Path, bytes: &[u8]) -> bool {
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    if std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let temporary = dir.join(format!(
+        ".tmp.{}.{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let stored =
+        std::fs::write(&temporary, bytes).is_ok() && std::fs::rename(&temporary, path).is_ok();
+    if !stored {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    stored
+}
+
+/// Compiles `bytes`, reusing machine code that an earlier process compiled
+/// from the same bytes with the same engine settings and executable.
+fn compiled_module(engine: &Engine, bytes: &[u8]) -> Result<Module> {
+    let Some(dir) = compile_cache_dir() else {
+        return Ok(Module::new(engine, bytes)?);
+    };
+    let path = dir.join(compile_cache_key(engine, bytes));
+    if path.is_file() {
+        // SAFETY: the file was written by `Module::serialize` of this same
+        // executable (its identity is part of the name) for these exact bytes
+        // and engine settings; Wasmtime checks its own version and settings
+        // again while loading it.
+        if let Ok(module) = unsafe { Module::deserialize_file(engine, &path) } {
+            return Ok(module);
+        }
+    }
+    let module = Module::new(engine, bytes)?;
+    store_atomically(&path, &module.serialize()?);
+    Ok(module)
 }
 
 impl Program {
@@ -873,7 +1008,7 @@ impl Program {
         }
         if let Some(target) = &abi.target {
             bail!(
-                "the module was built for the {target} target (B.7); run it with a WASI host such as `wasmtime run`"
+                "the module was built for the {target} target; run it with a WASI host such as `wasmtime run`"
             );
         }
         let mut config = Config::new();
@@ -898,10 +1033,14 @@ impl Program {
         let (collector, heap) = gc_settings()?;
         config.collector(collector);
         config.gc_heap_initial_size(heap);
+        if let Some(dir) = compile_cache_dir() {
+            config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(
+                dir.join("functions"),
+            )))?;
+        }
         let engine = Engine::new(&config)?;
-        let module = Module::new(&engine, bytes)
-            .map_err(anyhow::Error::from)
-            .context("compiling the i WebAssembly module")?;
+        let module =
+            compiled_module(&engine, bytes).context("compiling the i WebAssembly module")?;
         let has_macro_hooks = module
             .imports()
             .any(|import| import.module() == "ilang:macro/budget/v1");
@@ -923,14 +1062,14 @@ impl Program {
         })
     }
 
-    /// Run entries on at most `workers` workers (multicore D12: the host's
+    /// Runs entries on at most `workers` workers (multicore D12: the host's
     /// choice). One worker keeps the FIFO fast path (native N10).
     pub fn with_workers(mut self, workers: usize) -> Self {
         self.workers = if self.epochs { workers.max(1) } else { 1 };
         self
     }
 
-    /// Give the metadata of a module that has no `ilang.abi` section.
+    /// Gives the metadata of a module that has no `ilang.abi` section.
     pub fn with_abi(mut self, abi: Abi) -> Result<Self> {
         ensure!(
             !self.embedded_abi,
@@ -942,7 +1081,7 @@ impl Program {
         Ok(self)
     }
 
-    /// Attach a complete compiler plan. This checks the artifact and ABI, but
+    /// Attaches a complete compiler plan. This checks the artifact and ABI, but
     /// does not grant authority: the embedding separately approves declarations.
     pub fn with_binding_plan(mut self, plan: bindings::BindingPlan) -> Result<Self> {
         plan.validate(&self.artifact_digest, &self.abi)?;
@@ -957,7 +1096,7 @@ impl Program {
         &self.abi
     }
 
-    /// Make an instance and call `ilang_start` (B.1). When the program stops
+    /// Makes an instance and calls `ilang_start`. When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
         let pool_options = options.clone();
@@ -1121,7 +1260,7 @@ impl Program {
         Ok(instance)
     }
 
-    /// Run the program entry in a new instance, on one `ilang` thread
+    /// Runs the program entry in a new instance, on one `ilang` thread
     /// ([`block_on`]).
     pub fn run_entry(&self, options: HostOptions) -> Result<Outcome> {
         let entry = self.abi.entry.clone().context("the program has no entry")?;
@@ -1138,7 +1277,7 @@ impl Program {
         })
     }
 
-    /// Run every test of the metadata, each in a new instance (spec §10.2).
+    /// Runs every test of the metadata, each in a new instance.
     pub fn run_tests(&self, options: &HostOptions) -> Vec<TestReport> {
         self.abi
             .tests
@@ -1150,8 +1289,8 @@ impl Program {
             .collect()
     }
 
-    /// Run one test by its export name in a new instance (spec §10.2), on
-    /// one `ilang` thread ([`block_on`]). An async test is waited for (B.5).
+    /// Runs one test by its export name in a new instance, on
+    /// one `ilang` thread ([`block_on`]). An async test is waited for.
     pub fn run_test_with(&self, name: &str, options: HostOptions) -> TestResult {
         let is_async = self
             .abi
@@ -1199,7 +1338,8 @@ pub struct Instance {
     checked: bool,
 }
 
-/// Scope guard also runs when an async invocation is abandoned or unwinds.
+/// A scope guard that also runs when an async invocation is abandoned or
+/// unwinds.
 struct Invocation(ResourceContext);
 impl Drop for Invocation {
     fn drop(&mut self) {
@@ -1220,12 +1360,12 @@ impl Instance {
         Invocation(context)
     }
 
-    /// Drain this host's cleanup diagnostics without entering Wasm.
+    /// Drains this host's cleanup diagnostics without entering Wasm.
     pub fn take_cleanup_errors(&self) -> Vec<resources::CleanupFailure> {
         self.resource_host.take_cleanup_errors()
     }
 
-    /// Stop admission and release host work/resources without invoking i code.
+    /// Stops admission and releases host work/resources without invoking i code.
     pub fn dispose(&mut self) {
         if let Some(pool) = self.store.data_mut().workers.take() {
             pool.shutdown();
@@ -1258,7 +1398,7 @@ impl Instance {
             .with_context(|| format!("the module does not export {name}"))
     }
 
-    /// Call a Wasm function with no references among its parameters.
+    /// Calls a Wasm function with no references among its parameters.
     fn invoke(
         &mut self,
         function: Func,
@@ -1273,7 +1413,7 @@ impl Instance {
     }
 
     /// `invoke` for a call in which the module may start and cancel
-    /// requests (B.4).
+    /// requests.
     fn invoke_accepting(
         &mut self,
         function: Func,
@@ -1287,7 +1427,7 @@ impl Instance {
         self.settle(invoked)
     }
 
-    /// A fault of the module: the instance is not used again (B.5).
+    /// A fault of the module: the instance is not used again.
     fn fault(&mut self, text: String) -> anyhow::Error {
         self.unusable = Some(text.clone());
         anyhow!(text)
@@ -1345,7 +1485,7 @@ impl Instance {
         stop
     }
 
-    /// Run the program entry or a test by its export name (B.5).
+    /// Runs the program entry or a test by its export name.
     pub fn run(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
         let _invocation = self.begin_invocation();
@@ -1356,7 +1496,7 @@ impl Instance {
         }
     }
 
-    /// Run the program entry of the metadata.
+    /// Runs the program entry of the metadata.
     pub fn run_entry(&mut self) -> Result<Outcome> {
         let entry = self.abi.entry.clone().context("the program has no entry")?;
         if entry.is_async {
@@ -1366,7 +1506,7 @@ impl Instance {
         }
     }
 
-    /// Call a host export (B.2). The arguments must be correct values of the
+    /// Calls a host export. The arguments must be correct values of the
     /// parameter types; otherwise the program stops (`host: value is not
     /// correct`) without running.
     pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Outcome> {
@@ -1418,7 +1558,7 @@ impl Instance {
         outcome.inspect_err(|error| self.unusable = Some(format!("{error:#}")))
     }
 
-    /// Call an async host export (B.5). Each async host function that the
+    /// Calls an async host export. Each async host function that the
     /// program waits for is answered by awaiting its future, then calling
     /// `ilang_resume:namespace:label`; the value comes from `ilang_result:name`.
     ///
@@ -1489,7 +1629,7 @@ impl Instance {
         self.after_finish(outcome.expect("a finished call has an outcome"))
     }
 
-    /// Run an async program entry or test by its export name.
+    /// Runs an async program entry or test by its export name.
     pub async fn run_async(&mut self, name: &str) -> Result<Outcome> {
         self.usable()?;
         let _invocation = self.begin_invocation();
@@ -1512,7 +1652,7 @@ impl Instance {
         }
     }
 
-    /// Answer the requests of the module until the status is 0 (B.5). Every
+    /// Answers the requests of the module until the status is 0. Every
     /// return drops the requests that are left, and so does dropping the
     /// future while it waits, which also makes the instance unusable.
     async fn wait(&mut self, name: &str, status: [Val; 1]) -> Result<Option<Stop>> {
@@ -1526,7 +1666,7 @@ impl Instance {
     }
 
     async fn wait_inner(&mut self, name: &str, mut status: [Val; 1]) -> Result<Option<Stop>> {
-        // Resumes were checked during their imports (B.5). Cache the
+        // Resumes were checked during their imports. Cache the
         // functions used here, and check ilang_continue on the first status 2.
         let mut resume_continue: Option<Func> = None;
         let mut resumes: HashMap<String, HashMap<String, Func>> = HashMap::new();
@@ -1622,7 +1762,7 @@ impl Instance {
             let checked = self.checked;
             let invoked = {
                 let mut scope = RootScope::new(&mut self.store);
-                // Result buffers are made just before the resume (B.5).
+                // Result buffers are made just before the resume.
                 let mut values = vec![Val::I32(id as i32)];
                 match lower_reply(
                     &mut scope,
@@ -1662,7 +1802,7 @@ impl Instance {
         Ok(signature)
     }
 
-    /// Collect now; useful for embedders checking that opaque references remain
+    /// Collects now; useful for embedders checking that opaque references remain
     /// alive exactly while retained by a guest object.
     pub fn collect_garbage(&mut self) -> Result<()> {
         self.store.gc(None)?;
@@ -1746,7 +1886,7 @@ fn live_context(context: &impl AsContext<Data = State>) -> Result<()> {
     Ok(())
 }
 
-/// Call a Wasm function inside the root scope of its arguments, on a thread
+/// Calls a Wasm function inside the root scope of its arguments, on a thread
 /// with a stack of [`THREAD_STACK`] bytes: directly on the `ilang` thread of
 /// [`block_on`] when no other Wasm call runs on it, and otherwise on a new
 /// thread, which enters the tokio runtime of the caller if there is one.
@@ -1790,8 +1930,8 @@ fn invoke_in(
 }
 
 /// Every guest trap has the same outcome, including traps in the allocator
-/// while the host prepares a reply (H8, H11a). Keep the first import failure
-/// rather than replacing it with the trap that carried it out of Wasm (H2).
+/// while the host prepares a reply. The first import failure is kept rather
+/// than replaced with the trap that carried it out of Wasm.
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
     let mut context = context.as_context_mut();
     if std::env::var_os("I_WORKERS_TRACE").is_some() {
@@ -1821,7 +1961,7 @@ fn allocation_failed(
 }
 
 /// `invoke_in` for a call in which the module may start and cancel requests
-/// (B.4): an async entry point, a resume or `ilang_continue`.
+/// (an async entry point, a resume or `ilang_continue`).
 fn invoke_accepting(
     context: &mut (impl AsContextMut<Data = State> + Send),
     function: Func,
@@ -1842,7 +1982,7 @@ fn invoke_accepting(
     invoked
 }
 
-/// Lower the arguments into new buffers. A trap of `ilang_alloc` ends the call.
+/// Lowers the arguments into new buffers. A trap of `ilang_alloc` ends the call.
 fn lower_all(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -1859,7 +1999,7 @@ fn lower_all(
     Ok(params)
 }
 
-/// Read the results, then free the parameter and result buffers (B.3).
+/// Reads the results, then frees the parameter and result buffers.
 fn finish(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -1907,7 +2047,7 @@ fn guest_fault(what: impl fmt::Display) -> anyhow::Error {
 }
 
 /// Runs the body of an import wrapper with requests refused, and gives it
-/// whether a request could start when the import was called (B.4).
+/// whether a request could start when the import was called.
 fn guarded<T>(
     caller: &mut Caller<'_, State>,
     body: impl FnOnce(&mut Caller<'_, State>, bool) -> T,
@@ -2010,7 +2150,7 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
             Ok(())
         },
     )?;
-    // Drops an outstanding request (B.4).
+    // Drops an outstanding request.
     linker.func_wrap(
         HOST_MODULE,
         "cancel",
@@ -2030,7 +2170,7 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
             guarded(&mut caller, |caller, _| reference_id(caller, reference))
         },
     )?;
-    // The module traps right after this call (B.4). Only the first message of
+    // The module traps right after this call. Only the first message of
     // an instance counts.
     linker.func_wrap(
         HOST_MODULE,
@@ -2112,7 +2252,7 @@ fn define_import(
     function: HostFunction,
     checked: bool,
 ) -> Result<()> {
-    // An async import takes the request id first, and has no results (B.4).
+    // An async import takes the request id first, and has no results.
     let (params, results) = if signature.is_async {
         let mut params = vec![ValType::I32];
         params.extend(signature.param_types());
@@ -2133,7 +2273,7 @@ fn define_import(
                 ));
             }
             let mut offset = 0;
-            // The request id is checked before the service runs (B.4).
+            // The request id is checked before the service runs.
             let id = if signature.is_async {
                 let id = parameters[0].i32().unwrap_or(-1);
                 offset = 1;
@@ -2175,7 +2315,7 @@ fn define_import(
                     let id = id.expect("an async import has a request id");
                     caller.data_mut().requests.insert(id, request, work);
                     // A started request requires this export even if the
-                    // module cancels it or returns status 0 next (B.5).
+                    // module cancels it or returns status 0 next.
                     let resume_name = format!("ilang_resume:{module_name}:{label}");
                     let fits = caller
                         .get_export(&resume_name)
@@ -2234,7 +2374,7 @@ fn define_import(
     Ok(())
 }
 
-/// Encode the answer of a host function as results of B.2. `Ok(false)` when
+/// Encodes the answer of a host function as Wasm results. `Ok(false)` when
 /// the answer is not a correct value: the program then stops. Unless
 /// `checked`, a value of the right type is given to the module even when it
 /// is not correct, and the module stops.
@@ -2263,7 +2403,7 @@ fn lower_reply(
     if tag == 0 && !fits(value, signature.result) {
         return Ok(false);
     }
-    // The buffers belong to the module after a successful return (B.3).
+    // The buffers belong to the module after a successful return.
     let mut allocations = Vec::new();
     let lowered = (|| -> Result<()> {
         if !signature.errors.is_empty() {
@@ -2339,7 +2479,7 @@ impl Bridge {
         Ok(bytes[range].to_vec())
     }
 
-    /// Copy into a new buffer from `ilang_alloc`; empty buffers have address 0.
+    /// Copies into a new buffer from `ilang_alloc`; empty buffers have address 0.
     fn write(
         self,
         context: &mut impl AsContextMut<Data = State>,
@@ -2419,7 +2559,7 @@ fn bytes_for_bits(bits: u32) -> usize {
     (u64::from(bits).div_ceil(8)) as usize
 }
 
-/// Encode a correct value; buffers come from `ilang_alloc`.
+/// Encodes a correct value; buffers come from `ilang_alloc`.
 fn lower(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -2467,7 +2607,7 @@ fn lower(
     Ok(())
 }
 
-/// Read the results of an export: the tag, the value or one error.
+/// Reads the results of an export: the tag, the value or one error.
 fn lift_results(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
@@ -2510,7 +2650,7 @@ fn lift_results(
     Ok(outcome.expect("the tag selects one of the kinds"))
 }
 
-/// Read a value that the module gave, checking that it is correct (B.2).
+/// Reads a value that the module gave, checking that it is correct.
 fn lift(
     context: &mut impl AsContextMut<Data = State>,
     bridge: Bridge,
