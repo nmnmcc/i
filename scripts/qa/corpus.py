@@ -213,6 +213,8 @@ def invoke(binary, project, command, bound):
     argv = [str(binary), *command, '--offline', '--project', str(project)]
     started = time.monotonic()
     env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1')
+    # A slower machine (a CI runner) scales every bound; the expectations were recorded locally.
+    bound = bound * float(os.environ.get('CORPUS_BOUND_SCALE', '1'))
     cpu = max(1, math.ceil(bound))
     # `prlimit` sets the limit in the child; `preexec_fn` is not safe with the runner's threads.
     argv = ['prlimit', f'--cpu={cpu}:{cpu + 1}', '--', *argv]

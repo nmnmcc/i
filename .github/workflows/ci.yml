@@ -132,9 +132,16 @@ jobs:
         run: devenv shell -- ./scripts/dev-verify rust-lint
 
   test:
-    name: verify (rust-test)
+    name: verify (rust-test, ${{ matrix.group }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # The groups of DEV_VERIFY_TEST_GROUP in scripts/dev-verify.
+        group: [value_types, spec, cli, rest]
+    env:
+      DEV_VERIFY_TEST_GROUP: ${{ matrix.group }}
     steps:
       - name: Free disk space
         run: |
@@ -159,7 +166,7 @@ jobs:
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: test-${{ hashFiles('Cargo.lock') }}
+          key: test-${{ matrix.group }}-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
@@ -244,6 +251,8 @@ jobs:
     env:
       # One thread per i process; the runner's four cores run four cases.
       RAYON_NUM_THREADS: 1
+      # The runner's cores are slower than the machine the expectations were recorded on.
+      CORPUS_BOUND_SCALE: 3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
