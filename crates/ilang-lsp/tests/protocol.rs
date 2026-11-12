@@ -1366,7 +1366,7 @@ fn lsp_rename_top_level_across_files() {
         shapes.contains("\tShape(..)\n\tsurface\n\torigin"),
         "{shapes}"
     );
-    assert!(shapes.contains("surface = (s = Shape)"), "{shapes}");
+    assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
     c.shutdown();
@@ -1622,7 +1622,7 @@ fn lsp_rename_lisp_surface() {
         main.contains("surface s") && !main.contains("area"),
         "{main}"
     );
-    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s = Shape)"));
+    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s: Shape)"));
     // A local.
     let edit = rename(&mut c, &ws.main, &ws.main_text, "(= a ", 0, 3, "total").unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
@@ -1848,7 +1848,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1929,7 +1929,7 @@ fn lsp_completion_import_names() {
 #[test]
 fn lsp_completion_services_in_an_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\nPoint = { (x = Int) }\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n";
+    let text = "Clock = (now = () -> Int)\nPoint = { (x = Int) }\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nrun = (c: Clock) { elapsed(1) <- (c) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1944,6 +1944,13 @@ fn lsp_completion_services_in_an_environment() {
     );
     assert!(!items.iter().any(|i| i.label == "Point"));
     assert!(!items.iter().any(|i| i.label == "elapsed"));
+    // The need of a function type in a type.
+    let items = completion(&mut c, &main, text, "Clock) -> Int)", 0, 0);
+    assert_eq!(items[0].label, "Clock");
+    assert!(!items.iter().any(|i| i.label == "Point"));
+    // After `e <- (` the items are the provided values.
+    let items = completion(&mut c, &main, text, "c) }", 0, 0);
+    item(&items, "c");
     c.shutdown();
 }
 

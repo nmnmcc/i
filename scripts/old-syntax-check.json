@@ -492,7 +492,7 @@
     "substitutions": [
       [
         "{MAIN}",
-        "User { User(name: String, age: Int) }\n"
+        "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n"
       ],
       [
         "{{",
@@ -2687,9 +2687,6 @@
     ],
     "reason": "Render the source template; the test still exercises the generator"
   },
-  "crates/ilang-lsp/tests/protocol.rs:75d37f7acc0cfed5": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
   "crates/ilang-syntax/tests/parse.rs:926d5ba87661e6fa": {
     "not_source": "Printer output prefix assertion"
   },
@@ -3636,12 +3633,6 @@
   "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
     "not_source": "Rust format template with a clause placeholder, not a complete i source"
   },
-  "crates/ilang-lsp/tests/protocol.rs:6108f6cf17bc9fe1": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:1418cff66c7679a7": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
   "docs/spec.md:a12d9a52fd631114": {
     "track": "SYN3",
     "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
@@ -3878,5 +3869,23 @@
   "crates/ilang-cli/build.rs:18f1e7e7ee554c11": {
     "not_source": true,
     "reason": "Cargo build-script directive, not an i module."
+  },
+  "crates/ilang-lsp/tests/protocol.rs:e5b90e5833108100": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:0e58de37207aac87": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:361065f87a85de06": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:0f1c00c95cc031e0": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:71ef2e710ff5278a": {
+    "reason": "Completion test: the last branch `() { 2 }` is the pattern being typed, so the chain has branches of different shapes on purpose",
+    "diagnostics": [
+      "E0101: a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet"
+    ]
   }
 }

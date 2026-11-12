@@ -689,30 +689,33 @@ impl<'a> Query<'a> {
         }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
-            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} {{}}"),
+            // Syntax three (§2.8): `T = Opaque`, a labelled type `T = (…)`,
+            // or one labelled type per constructor and the sum.
+            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} = Opaque"),
             TypeBody::Custom(cs) => {
-                let cs: Vec<String> = cs
-                    .iter()
-                    .map(|c| {
-                        if c.fields.is_empty() {
-                            return c.name.clone();
-                        }
-                        let fs: Vec<String> = c
-                            .fields
-                            .iter()
-                            .map(|f| match &f.label {
-                                Some(l) => format!("{}: {}", l.name, self.show_type(&f.ty)),
-                                None => self.show_type(&f.ty),
-                            })
-                            .collect();
-                        format!("{}({})", c.name, fs.join(", "))
-                    })
-                    .collect();
-                if cs.iter().map(String::len).sum::<usize>() < 60 {
-                    format!("{head} {{ {} }}", cs.join("  "))
-                } else {
-                    format!("{head} {{\n  {}\n}}", cs.join("\n  "))
+                let data = |c: &crate::hir::CtorDef| -> String {
+                    let fs: Vec<String> = c
+                        .fields
+                        .iter()
+                        .map(|f| match &f.label {
+                            Some(l) => format!("{} = {}", l.name, self.show_type(&f.ty)),
+                            None => self.show_type(&f.ty),
+                        })
+                        .collect();
+                    format!("({})", fs.join(", "))
+                };
+                if let [only] = cs.as_slice()
+                    && only.name == def.name
+                {
+                    return format!("{head} = {}", data(only));
                 }
+                let mut lines: Vec<String> = cs
+                    .iter()
+                    .map(|c| format!("{} = {}", c.name, data(c)))
+                    .collect();
+                let members: Vec<&str> = cs.iter().map(|c| c.name.as_str()).collect();
+                lines.push(format!("{head} = {}", members.join(" | ")));
+                lines.join("\n")
             }
         }
     }
@@ -1162,9 +1165,11 @@ impl<'a> Query<'a> {
             let TypeBody::Custom(cs) = &def.body else {
                 continue;
             };
-            let Some(item) = ast.items.iter().find(|i| {
-                matches!(&i.kind, ast::ItemKind::TypeDef(d) if d.name.span == def.span)
-            }) else {
+            let Some(item) = ast
+                .items
+                .iter()
+                .find(|i| matches!(&i.kind, ast::ItemKind::TypeDef(d) if d.name.span == def.span))
+            else {
                 continue;
             };
             let rhs = Span::new(def.span.end, item.span.end);
@@ -1929,10 +1934,10 @@ impl Walk<'_> {
             let b = Span::new(start as u32, end as u32);
             let mut moved = false;
             for (s, t) in self.occ.iter_mut() {
-                if *s == a && matches!(t, Target::Local(_)) {
-                    if let Target::Local(v) = t
-                        && self.binders.get(v) == Some(&a)
-                    {
+                if *s == a
+                    && let Target::Local(v) = t
+                {
+                    if self.binders.get(v) == Some(&a) {
                         self.binders.insert(*v, b);
                     }
                     *s = b;
