@@ -1,2 +1,0 @@
-spec/assert_main.positive : (n: A & Int) -> A ! Assert
-spec/assert_main.main : () -> Nil ! Assert

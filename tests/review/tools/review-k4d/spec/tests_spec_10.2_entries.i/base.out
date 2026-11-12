@@ -1,5 +1,0 @@
-spec/entries.check : (got: String, want: String) -> Nil
-spec/entries.counter : List(Int)
-spec/entries.main : () -> String
-spec/entries.first : () -> Nil
-spec/entries.second : () -> Nil

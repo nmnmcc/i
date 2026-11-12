@@ -1,8 +1,0 @@
-spec/stop_lazy_nested.a1 : (b: Boundary(Paused, Never, Never)) -> Never
-spec/stop_lazy_nested.a2 : (b: Boundary(Paused, Never, Never)) -> Never
-spec/stop_lazy_nested.a_leaf : (b: Boundary(Paused, Never, Never)) -> Never
-spec/stop_lazy_nested.b1 : (c: Boundary(Paused, Never, Never), first: Paused) -> Paused
-spec/stop_lazy_nested.b2 : (c: Boundary(Paused, Never, Never), first: Paused) -> Paused
-spec/stop_lazy_nested.b_leaf : (c: Boundary(Paused, Never, Never), first: Paused) -> Paused
-spec/stop_lazy_nested.resume : (p: Paused) -> Paused
-spec/stop_lazy_nested.main : () -> Nil

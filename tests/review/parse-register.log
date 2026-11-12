@@ -1,7 +1,0 @@
-[0mdirenv: loading ~/Programming/i/.envrc
-[0mdirenv: using devenv --quiet
-• Running devenv:files:cleanup
-✓ Running devenv:files:cleanup in 16.1ms
-• Running devenv:enterShell
-✓ Running devenv:enterShell in 14.2ms
-1926 review modules parsed, 82 exact negative fixtures registered

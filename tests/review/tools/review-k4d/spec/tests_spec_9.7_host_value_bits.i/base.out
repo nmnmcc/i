@@ -1,2 +1,0 @@
-spec/host_value_bits.take : () -> BitArray ! Bad
-spec/host_value_bits.main : () -> Nil ! Bad

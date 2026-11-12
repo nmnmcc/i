@@ -3,8 +3,10 @@
 # parallel; with no arguments, all of them run one after another.
 #
 #   scripts/dev-verify            rust, i, js and editors
-#   scripts/dev-verify rust       Rust formatting, Clippy and the workspace tests
-#                                 (rust-lint: formatting and Clippy; rust-test: the tests)
+#   scripts/dev-verify rust       Rust formatting, Clippy, snippets and the workspace tests
+#                                 (rust-lint: formatting, Clippy and snippets; rust-test: the tests)
+#   scripts/dev-verify snippets   every i snippet in the repository parses, or gives its registered
+#                                 diagnostics (scripts/old-syntax-check and its own tests)
 #   scripts/dev-verify i          the release `i`, and with it the i sources
 #   scripts/dev-verify editors    VS Code tests, tree-sitter tests and Zed build
 #   scripts/dev-verify js         the JavaScript SDK and browser tests
@@ -12,6 +14,22 @@
 # For CI, which builds once and runs the review corpus in shards:
 #   DEV_VERIFY_I_BINARY=path      the i part uses this `i` instead of building it
 #   DEV_VERIFY_SKIP_CORPUS=1      the i part leaves out the review corpus
+#
+# These parts are every test suite of the repository. Where each suite runs:
+#   tests/spec/**                 spec cases with their header        rust-test (ilang-cli --test spec)
+#   crates/*/tests, #[test]       per-crate Rust tests and fixtures   rust-test
+#   tests/perf/many-tests, tests/r2-performance, tests/r2-examples,
+#   tests/t1-blockers             fixtures of ilang-cli/ilang-check tests   rust-test
+#   tests/review/cases/**         review corpus, expected.json and the
+#                                 known failures in requirements.json  i (scripts/review-corpus run)
+#   lib, std, bench, examples     i tests at --opt 0 and 2, formatting i
+#   scripts/qa/generate.py        generated programs                   i (scripts/test-generation)
+#   i snippets in .i/.rs/.js/.md  scripts/old-syntax-check             snippets
+#   bindings/javascript, tests/browser                                 js
+#   editors/**                                                         editors
+# Measurements and one-off comparisons, not suites: scripts/bench, scripts/checker-bench,
+# tests/perf/numeric, tests/t1/*, tests/r2-*.py. tests/syn3/services (expected.txt) is run
+# by hand with I_SYNTAX=3 until syntax three is the default.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
@@ -28,6 +46,12 @@ rust-lint() {
   binaryen
   cargo fmt --all -- --check
   cargo clippy --workspace --all-targets --locked -- -D warnings
+  snippets
+}
+
+snippets() {
+  scripts/old-syntax-check # builds the parser driver that its tests use
+  python3 -I scripts/old-syntax-check-test
 }
 
 # DEV_VERIFY_TEST_GROUP splits the tests for CI, where one job would take close to an hour:
@@ -114,7 +138,7 @@ parts=("$@")
 if [[ ${#parts[@]} -eq 0 ]]; then parts=(rust i js editors); fi
 for part in "${parts[@]}"; do
   case "$part" in
-    rust | rust-lint | rust-test | i | js | editors) "$part" ;;
-    *) echo "dev-verify: unknown part '$part' (rust, rust-lint, rust-test, i, js or editors)" >&2; exit 2 ;;
+    rust | rust-lint | rust-test | snippets | i | js | editors) "$part" ;;
+    *) echo "dev-verify: unknown part '$part' (rust, rust-lint, rust-test, snippets, i, js or editors)" >&2; exit 2 ;;
   esac
 done

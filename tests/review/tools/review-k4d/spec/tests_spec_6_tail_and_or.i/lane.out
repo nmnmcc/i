@@ -1,7 +1,0 @@
-spec/tail_and_or.check : (got: String, want: String) -> Nil
-spec/tail_and_or.show : (x: A) -> String
-spec/tail_and_or.even : (n: Int) -> Bool
-spec/tail_and_or.odd : (n: Int) -> Bool
-spec/tail_and_or.top_level : () -> Nil
-spec/tail_and_or.local : () -> Nil
-spec/tail_and_or.values : () -> Nil

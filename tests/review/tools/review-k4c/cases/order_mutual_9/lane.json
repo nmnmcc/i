@@ -1,6 +1,0 @@
-{
-  "code": 0,
-  "out": "app/main.a : (x: Bool) -> Nil ! N | S(N)\napp/main.b : (x: Bool) -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.use : () -> Nil ! N | S(N)\napp/main.wrap : () -> Nil ! N | S(N)\n",
-  "err": "",
-  "seconds": 0.01946848607622087
-}

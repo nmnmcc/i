@@ -20,7 +20,6 @@ ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / 'tests/review'
 SKIP = {'.git', 'target', 'base-target', 'venv', 'node_modules', 'syntax-debug'}
 SNAPSHOTS = {'base-src', 'redesign', 'mutation', 'baseline-check', 'after-check', 'before-check'}
-TEXT = {'.py', '.mjs', '.js', '.sh', '.rs', '.c', '.cpp', '.wat', '.md', '.txt', '.json', '.jsonl', '.log', '.out', '.types', '.stderr', '.diff', '.toml', '.lock'}
 SOURCES = {
     'review-a1': 'docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12',
     'review-t1': 'docs/spec.md §§4.2, 4.8, 7.4: literal sets and coverage',
@@ -44,7 +43,7 @@ def git(*args):
 
 
 def source_for(review):
-    return SOURCES.get(review, SOURCES['review-k4'] if review.startswith('review-k4') else 'docs/spec.md §§10–11; review criteria preserved under tools/')
+    return SOURCES.get(review, SOURCES['review-k4'] if review.startswith('review-k4') else 'docs/spec.md §§10–11')
 
 
 def walk(root):
@@ -70,22 +69,13 @@ def import_reviews(args):
     roots = sorted(Path(args.source).glob('review-*'))
     if not roots:
         raise SystemExit('no review directories')
-    index = {'schema': 1, 'source_root': str(Path(args.source)), 'compiler_base': git('rev-parse', 'HEAD'), 'programs': [], 'tools': [], 'excluded': []}
+    index = {'schema': 1, 'source_root': str(Path(args.source)), 'compiler_base': git('rev-parse', 'HEAD'), 'programs': [], 'excluded': []}
     projects = {}
     for review in roots:
         for p in walk(review):
             rel = p.relative_to(review)
             if p.suffix != '.i':
-                if p.suffix in TEXT and not any(x in SNAPSHOTS for x in rel.parts):
-                    data = p.read_bytes()
-                    if len(data) > 4_000_000 or b'\0' in data:
-                        index['excluded'].append({'origin': str(p), 'reason': 'large log or binary; not a program'})
-                        continue
-                    # Historical host drivers are data, not active repository snippets.
-                    target = CORPUS / 'tools' / review.name / (str(rel) + ('.source' if p.suffix in {'.rs', '.mjs', '.js', '.sh', '.md'} else ''))
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes(data)
-                    index['tools'].append({'origin': str(p), 'path': str(target.relative_to(ROOT)), 'sha256': sha(data)})
+                # Review drivers, logs and notes are not programs; the corpus keeps programs only.
                 continue
             data = p.read_bytes()
             entry = {'origin': str(p), 'sha256': sha(data), 'source': source_for(review.name)}
@@ -95,18 +85,9 @@ def import_reviews(args):
                 index['programs'].append(entry)
                 continue
             if any(x in SNAPSHOTS for x in rel.parts):
-                # A copied checkout is not a new review program. Preserve its exact
-                # old bytes, with a link to the maintained test at the same path.
-                entry['snapshot'] = True
                 position = next(i for i, part in enumerate(rel.parts) if part in SNAPSHOTS)
-                repository_path = Path(*rel.parts[position + 1:])
-                if (ROOT / repository_path).is_file():
-                    target = CORPUS / 'tools' / review.name / (str(rel) + '.source')
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes(data)
-                    entry['existing'] = [str(repository_path)]
-                    entry['historical_snapshot'] = str(target.relative_to(ROOT))
-                    index['programs'].append(entry)
+                if (ROOT / Path(*rel.parts[position + 1:])).is_file():
+                    # A copied checkout of a maintained file is not a new review program.
                     continue
             parent = p.parent
             while parent != review and not (parent / 'i.toml').exists():
@@ -188,14 +169,6 @@ def import_reviews(args):
         cases.append({'id': case_id, 'project': str(path.relative_to(ROOT)), 'origin': origin, 'context': project.get('context'), 'source': project['source'], 'finding': Path(origin).stem, 'files': [x for x in project['files'] if x.endswith('.i')]})
         for entry in project['origins']:
             entry['case'] = case_id
-    # Record models are review tools; read their committed versions, not another worktree.
-    for name in git('ls-tree', '-r', '--name-only', 'lane/note-rec', '--', 'tests').splitlines():
-        if name.endswith('.py') and '/t3-' in name:
-            data = subprocess.check_output(['git', 'show', 'lane/note-rec:' + name], cwd=ROOT)
-            dest = CORPUS / 'tools/record-models' / Path(name).name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(data)
-            index['tools'].append({'origin': 'lane/note-rec:' + name, 'path': str(dest.relative_to(ROOT)), 'sha256': sha(data)})
     dump(CORPUS / 'inventory.json', index)
     dump(CORPUS / 'manifest.json', {'schema': 1, 'cases': cases})
     retained = {c['project'] for c in cases}
@@ -204,7 +177,7 @@ def import_reviews(args):
         relative = str(stale.relative_to(ROOT))
         if stale.exists() and relative not in retained and not any(p.startswith(relative + '/') for p in retained):
             shutil.rmtree(stale)
-    print(f'imported {len(cases)} projects, {len(index["programs"])} source occurrences, {len(index["tools"])} tools/evidence files')
+    print(f'imported {len(cases)} projects, {len(index["programs"])} source occurrences')
 
 
 def invoke(binary, project, command, bound):
@@ -527,10 +500,6 @@ def report(args):
     incidents = []
     pairs = 0
     mismatches = []
-    for tool in inventory['tools']:
-        if tool['origin'].startswith('/tmp/review-'):
-            review = Path(tool['origin']).parts[2]
-            counts[review]['tools_and_evidence'] += 1
     for entry in inventory['programs']:
         review = Path(entry['origin']).parts[2]
         counts[review]['source_occurrences'] += 1
@@ -606,39 +575,6 @@ def snapshot(args):
     print(f'preserved {len(observations)} observations as {args.label}')
 
 
-def snapshot_tools(args):
-    if os.environ.get('UPDATE') != '1':
-        raise SystemExit('snapshot-tools requires UPDATE=1')
-    path = CORPUS / 'inventory.json'
-    inventory = json.loads(path.read_text())
-    present = {x['path'] for x in inventory['tools']}
-    added = 0
-    code = {'.py', '.mjs', '.js', '.sh', '.rs', '.c', '.cpp', '.wat', '.toml', '.lock'}
-    for review in sorted(Path(args.source).glob('review-*')):
-        for source in walk(review):
-            rel = source.relative_to(review)
-            if source.suffix not in code or 'binaryen' in rel.parts or not any(x in SNAPSHOTS for x in rel.parts):
-                continue
-            position = next(i for i, part in enumerate(rel.parts) if part in SNAPSHOTS)
-            maintained = ROOT / Path(*rel.parts[position + 1:])
-            data = source.read_bytes()
-            if maintained.is_file() and maintained.read_bytes() == data:
-                continue
-            if b'\0' in data or len(data) > 4_000_000:
-                continue
-            target = CORPUS / 'tools' / review.name / (str(rel) + '.source')
-            relative = str(target.relative_to(ROOT))
-            if relative in present:
-                continue
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            inventory['tools'].append({'origin': str(source), 'path': relative, 'sha256': sha(data), 'kind': 'historical snapshot driver or changed source; not an active compiler file'})
-            present.add(relative)
-            added += 1
-    dump(path, inventory)
-    print(f'preserved {added} additional snapshot drivers/source variants; third-party Binaryen sources excluded')
-
-
 def integrity(args):
     """Check original payload fingerprints without depending on /tmp surviving."""
     if os.environ.get('UPDATE') != '1':
@@ -663,9 +599,6 @@ def integrity(args):
                 payloads[identifier] = fingerprints
             matches = entry['sha256'] in payloads[identifier]
             counts['preserved'] += 1
-        elif 'historical_snapshot' in entry:
-            matches = sha((ROOT / entry['historical_snapshot']).read_bytes()) == entry['sha256']
-            counts['mapped'] += 1
         else:
             path = entry['existing'][0]
             if path not in maintained:
@@ -674,10 +607,6 @@ def integrity(args):
             matches = maintained[path] == entry['sha256']
             counts['mapped'] += 1
         if not matches:
-            failures.append(entry['origin'])
-    for entry in inventory['tools']:
-        counts['tools'] += 1
-        if sha((ROOT / entry['path']).read_bytes()) != entry['sha256']:
             failures.append(entry['origin'])
     dump(CORPUS / 'integrity.json', {'counts': dict(counts), 'failures': failures,
          'source': 'Original inventory fingerprints and recorded import revision; only the generated parser metadata prefix is excluded.'})
@@ -752,8 +681,6 @@ def main():
     audit.add_argument('--filter', default='')
     audit = sub.add_parser('integrity')
     audit.add_argument('--filter', default='')
-    salvage = sub.add_parser('snapshot-tools')
-    salvage.add_argument('--source', default='/tmp')
     args = parser.parse_args()
     if args.mode == 'audit-k4':
         from k4_audit import audit
@@ -763,7 +690,6 @@ def main():
         migrate(args.binary)
     elif args.mode == 'import':
         import_reviews(args)
-        snapshot_tools(args)
     elif args.mode == 'run':
         args.binary = args.binary.resolve()
         run_corpus(args)
@@ -775,8 +701,6 @@ def main():
         audit_w520(args)
     elif args.mode == 'integrity':
         integrity(args)
-    elif args.mode == 'snapshot-tools':
-        snapshot_tools(args)
     else:
         report(args)
 

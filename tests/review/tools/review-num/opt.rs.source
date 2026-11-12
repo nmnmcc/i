@@ -1,6 +1,0 @@
-fn main() {
-    let args: Vec<_> = std::env::args().collect();
-    let bytes = std::fs::read(&args[1]).unwrap();
-    let out = ilang_binaryen::optimize(&bytes, ilang_binaryen::Level::O2).unwrap();
-    std::fs::write(&args[2], out).unwrap();
-}

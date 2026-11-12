@@ -1,3 +1,0 @@
-spec/control_lazy_cancel_inner_boundary.check : (got: String, want: String) -> Nil
-spec/control_lazy_cancel_inner_boundary.show : (x: A) -> String
-spec/control_lazy_cancel_inner_boundary.main : () -> Nil

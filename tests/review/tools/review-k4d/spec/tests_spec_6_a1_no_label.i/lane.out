@@ -1,4 +1,0 @@
-spec/a1_no_label.classify : (A) -> A | Int
-spec/a1_no_label.main : () -> Nil ! Assert
-test/a1_no_label.i:8:19: error[E0507]: the function has no parameter with the label `x`
-1 error

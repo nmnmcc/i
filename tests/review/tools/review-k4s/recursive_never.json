@@ -1,6 +1,0 @@
-{
-  "name": "recursive_never",
-  "code": 0,
-  "time": 0.01882790308445692,
-  "out": "app/main.bad : (x: Never) -> Never\n"
-}

@@ -1,4 +1,0 @@
-review/lib.make : (d: (String) -> A, e: (B) -> String) -> Codec(A, B)
-review/lib.size : Codec(Int, Never)
-src/main.i:2:19: error[E0534]: the type of review/lib.size is still open after source completion; use lib.Local, the alias made by review/lib
-1 error

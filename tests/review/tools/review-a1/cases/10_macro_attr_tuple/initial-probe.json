@@ -1,1 +1,0 @@
-{"check":["E0301: the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`"],"parse":[],"roundtrip":true,"wat":false}

@@ -1,2 +1,0 @@
-test/a1_same_line_tuple.i:5:37: error[E0106]: a discard binds nothing, so it may not be used as a value
-1 error
