@@ -192,3 +192,15 @@ was stopped at 30.46 s with peak RSS 2,964,152 KiB, without completing the
 check. This confirms the issue independently of the std test runner.
 
 Validation results are recorded below after the final acceptance run.
+
+Final acceptance run on 45c4972a: release CLI build passed; module counts
+were regex 130, CSV 107, crypto 88; std O0 and O2 each reported 2170 passed,
+0 failed. `scripts/dev-verify rust` failed in `ilang-package` test
+`standard_library_modules`: its exact expected module list omits the three
+new modules. The smallest reproduction is
+`cargo test -p ilang-package --test load standard_library_modules`; actual
+paths include `std/crypto`, `std/csv`, and `std/regex`, while the expected
+list in `crates/ilang-package/tests/load.rs:201` does not. Updating that
+assertion conflicts with the task's acceptance rule forbidding any `crates/`
+diff, so the assertion is unchanged. The full acceptance gate cannot pass
+under both requirements until the coordinator updates that upstream test.
