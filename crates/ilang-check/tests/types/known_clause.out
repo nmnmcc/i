@@ -1,2 +1,11 @@
-58:5: error[E0231]: a type parameter may not have the name of a type
-60:6: error[E0231]: a type parameter may not have the name of a type
+field : (v: A | B | S) -> Int
+use_field : () -> Int
+field_rest : (v: C) -> Int
+use_rest : () -> (Int, Int)
+update : (v: A | B | S) -> T
+update_open : (v: C) -> T
+use_update : () -> T
+item : (b: Box(C)) -> C | 0
+use_item : () -> Int
+wrong : (v: C) -> 0
+80:14: error[E0512]: the constructor `B`, which made this value (§7.5), has no field with the label `f` (§4.8 rule 13)
