@@ -252,7 +252,7 @@ row_stream(E, N) = (
 	cursor: Cursor(E, N)
 	config: Options
 	width: Int
-) -> stream.Stream(Result(List(String), CsvError), E, N) {
+) -> stream.Stream(Result(ReadRow, CsvError), E, N) {
 	stream.make(() {
 		parsed = read_row(cursor, config, 0, [], [], False, cursor_line(cursor))
 		parsed |> {
@@ -270,7 +270,7 @@ row_stream(E, N) = (
 						stream.new()
 					)
 					False -> stream.Next(
-						Ok(row)
+						Ok(ReadRow(row, startline))
 						row_stream(tail, config, expected)
 					)
 				}
@@ -285,7 +285,15 @@ rows(E, N) = (
 	source: stream.Stream(String, E, N)
 	config: Options
 ) -> stream.Stream(Result(List(String), CsvError), E, N) {
-	row_stream(Cursor([], source, 1, 1), config, config.fields)
+	stream.map(
+		row_stream(Cursor([], source, 1, 1), config, config.fields)
+		(result) {
+			result |> {
+				Error(e)            -> Error(e)
+				Ok(ReadRow(row, _)) -> Ok(row)
+			}
+		}
+	)
 }
 
 /// Parses comma-separated text, inferring the width from the first row.
@@ -307,32 +315,37 @@ parse_with = (
 	})
 }
 
-header = (names: List(String)) -> Result(List(String), CsvError) {
+header = (names: List(String), line: Int) -> Result(List(String), CsvError) {
 	{ list.length(list.unique(names)) == list.length(names) } |> {
 		True  -> Ok(names)
-		False -> Error(CsvError(1, 1, "duplicate header"))
+		False -> Error(CsvError(line, 1, "duplicate header"))
 	}
 }
 
 named = (
 	names: List(String)
 	row: List(String)
+	line: Int
 ) -> Result(dict.Dict(String, String), CsvError) {
 	{ list.length(names) != list.length(row) } |> {
-		True  -> Error(CsvError(1, 1, "header width differs from row"))
+		True  -> Error(CsvError(line, 1, "header width differs from row"))
 		False -> Ok(dict.from_list(list.zip(names, row)))
 	}
 }
 
 record_stream(E, N) = (
-	source: stream.Stream(Result(List(String), CsvError), E, N)
+	source: stream.Stream(Result(ReadRow, CsvError), E, N)
 	names: List(String)
 ) -> stream.Stream(Result(dict.Dict(String, String), CsvError), E, N) {
 	stream.make(() {
 		stream.pull(source) |> {
 			stream.Done              -> stream.Done
 			stream.Next(Error(e), _) -> stream.Next(Error(e), stream.new())
-			stream.Next(Ok(row), tail) -> named(names, row) |> {
+			stream.Next(Ok(ReadRow(row, line)), tail) -> named(
+				names
+				row
+				line
+			) |> {
 				Error(e)  -> stream.Next(Error(e), stream.new())
 				Ok(value) -> stream.Next(Ok(value), record_stream(tail, names))
 			}
@@ -346,10 +359,15 @@ records(E, N) = (
 	config: Options
 ) -> stream.Stream(Result(dict.Dict(String, String), CsvError), E, N) {
 	stream.make(() {
-		stream.pull(rows(source, config)) |> {
+		stream.pull(
+			row_stream(Cursor([], source, 1, 1), config, config.fields)
+		) |> {
 			stream.Done              -> stream.Done
 			stream.Next(Error(e), _) -> stream.Next(Error(e), stream.new())
-			stream.Next(Ok(names), tail) -> header(names) |> {
+			stream.Next(Ok(ReadRow(names, line)), tail) -> header(
+				names
+				line
+			) |> {
 				Error(e) -> stream.Next(Error(e), stream.new())
 				Ok(keys) -> stream.pull(record_stream(tail, keys))
 			}

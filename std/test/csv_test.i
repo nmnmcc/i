@@ -965,3 +965,19 @@ test("width_error_record_line", () {
 	)
 	Nil
 })
+
+test("header_width_error_line", () {
+	assert(
+		csv.parse_header("a,b\n\n1\n", config(",", -1, False)) ==
+			Error(csv.CsvError(3, 1, "header width differs from row"))
+	)
+	Nil
+})
+
+test("duplicate_header_error_line", () {
+	assert(
+		csv.parse_header("\n\na,a\n", csv.defaults()) ==
+			Error(csv.CsvError(3, 1, "duplicate header"))
+	)
+	Nil
+})
