@@ -32,7 +32,8 @@ enum WireNode {
         args: Vec<usize>,
     },
     Function {
-        params: Vec<(Option<String>, usize)>,
+        param: usize,
+        labels: Vec<Option<String>>,
         ret: usize,
         err: usize,
         env: usize,
@@ -102,11 +103,8 @@ impl<N: FnMut(TypeRef) -> String, W: FnMut(V) -> String> Encoder<'_, N, W> {
             },
             Ty::Con(Head::Fn, _, _) => unreachable!("a function type is Ty::Fn"),
             Ty::Fn(f) => WireNode::Function {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), self.node(p)))
-                    .collect(),
+                param: self.node(&f.param),
+                labels: f.labels.clone(),
                 ret: self.node(&f.ret),
                 err: self.node(&f.err),
                 env: self.node(&f.env),
@@ -207,15 +205,14 @@ pub(crate) fn decode(
                 Ty::data(ShapeId::new(positions, labels), all(&done, &args)?)
             }
             WireNode::Function {
-                params,
+                param,
+                labels,
                 ret,
                 err,
                 env,
             } => Ty::Fn(Box::new(FnTy {
-                params: params
-                    .into_iter()
-                    .map(|(l, p)| Ok((l, get(&done, p)?)))
-                    .collect::<Result<_, String>>()?,
+                param: get(&done, param)?,
+                labels,
                 ret: get(&done, ret)?,
                 err: get(&done, err)?,
                 env: get(&done, env)?,

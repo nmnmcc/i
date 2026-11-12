@@ -673,12 +673,7 @@ impl Checker<'_> {
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
-                    Head::Fn => Ty::Fn(Box::new(FnTy {
-                        params: args.into_iter().map(|a| (None, a)).collect(),
-                        ret: self.s.fresh(),
-                        err: self.s.fresh(),
-                        env: self.s.fresh(),
-                    })),
+                    Head::Fn => Ty::Fn(Box::new(FnTy::new(args.into_iter().map(|a| (None, a)).collect(), self.s.fresh(), self.s.fresh(), self.s.fresh()))),
                     h => Ty::Con(h, super::lits::ValueSet::ALL, args),
                 });
             }
@@ -919,7 +914,7 @@ impl Checker<'_> {
                                     Some(coverage::scalar_pat(m))
                                 }
                                 Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
-                                Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
+                                Ty::Fn(_) => Some(Pat::Head(Head::Fn, 1)),
                                 _ => None,
                             })
                             .collect(),
@@ -968,7 +963,7 @@ impl Checker<'_> {
                         } else if let Some(h) = m.value_head() {
                             let n = match m {
                                 Ty::Con(_, _, xs) => xs.len(),
-                                Ty::Fn(f) => f.params.len(),
+                                Ty::Fn(_) => 1,
                                 _ => 0,
                             };
                             places[at].seen.push((v.clause, v.unguarded, h, n));

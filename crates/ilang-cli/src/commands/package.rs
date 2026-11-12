@@ -2073,6 +2073,7 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
                 .iter()
                 .map(|(n, t)| (n.clone(), canonical_alias_order(t, key)))
                 .collect(),
+            group: f.group,
             ret: canonical_alias_order(&f.ret, key),
             err: f.err.as_ref().map(|t| canonical_alias_order(t, key)),
             env: f.env.as_ref().map(|t| canonical_alias_order(t, key)),

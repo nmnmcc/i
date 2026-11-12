@@ -198,11 +198,8 @@ impl<'a> Closure<'a> {
                     .collect::<Result<_, _>>()?,
             )),
             Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(n, t)| Ok((n.clone(), self.close(t)?)))
-                    .collect::<Result<_, &'static str>>()?,
+                param: self.close(&f.param)?,
+                labels: f.labels.clone(),
                 ret: self.close(&f.ret)?,
                 err: self.close(&f.err)?,
                 env: self.close(&f.env)?,
@@ -246,11 +243,8 @@ impl<'a> Closure<'a> {
                     .collect::<Result<_, _>>()?,
             ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(n, t)| Ok((n.clone(), self.annotation(t)?)))
-                    .collect::<Result<_, &'static str>>()?,
+                param: self.annotation(&f.param)?,
+                labels: f.labels.clone(),
                 ret: self.annotation(&f.ret)?,
                 err: self.annotation(&f.err)?,
                 env: self.annotation(&f.env)?,
@@ -357,7 +351,7 @@ fn contains_var(t: &Ty) -> bool {
         Ty::Var(_) | Ty::Top => true,
         Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
         Ty::Fn(f) => {
-            f.params.iter().any(|(_, t)| contains_var(t))
+            contains_var(&f.param)
                 || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
         }
         Ty::Diff(t, ts) => contains_var(t) || ts.iter().any(contains_var),
@@ -387,11 +381,8 @@ fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
             ts.iter().map(|t| shape(t, fixed)).collect(),
         ),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), shape(t, fixed)))
-                .collect(),
+            param: shape(&f.param, fixed),
+            labels: f.labels.clone(),
             ret: shape(&f.ret, fixed),
             err: shape(&f.err, fixed),
             env: shape(&f.env, fixed),
@@ -456,11 +447,8 @@ fn completed_in(
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| Ok((n.clone(), completed_in(t, s, fixed, level)?)))
-                .collect::<Result<_, &'static str>>()?,
+            param: completed_in(&f.param, s, fixed, level)?,
+            labels: f.labels.clone(),
             ret: completed_in(&f.ret, s, fixed, level)?,
             err: completed_in(&f.err, s, fixed, level)?,
             env: completed_in(&f.env, s, fixed, level)?,
@@ -1249,8 +1237,8 @@ impl Checker<'_> {
                 ret,
                 err,
                 env,
-            } => Ok(Ty::Fn(Box::new(FnTy {
-                params: params
+            } => Ok(Ty::Fn(Box::new(FnTy::new(
+                params
                     .iter()
                     .map(|p| {
                         Ok((
@@ -1259,14 +1247,12 @@ impl Checker<'_> {
                         ))
                     })
                     .collect::<Result<_, &'static str>>()?,
-                ret: self.closed_written(ret, map, seen)?,
-                err: err
-                    .as_ref()
+                self.closed_written(ret, map, seen)?,
+                err.as_ref()
                     .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
-                env: env
-                    .as_ref()
+                env.as_ref()
                     .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
-            }))),
+            )))),
             TypeKind::Union(ts) | TypeKind::Inter(ts) => {
                 let parts = ts
                     .iter()
@@ -1366,11 +1352,8 @@ fn fixed_scheme(
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| Ok((n.clone(), fixed_scheme(t, s, fixed, level)?)))
-                .collect::<Result<_, &'static str>>()?,
+            param: fixed_scheme(&f.param, s, fixed, level)?,
+            labels: f.labels.clone(),
             ret: fixed_scheme(&f.ret, s, fixed, level)?,
             err: fixed_scheme(&f.err, s, fixed, level)?,
             env: fixed_scheme(&f.env, s, fixed, level)?,
@@ -1423,11 +1406,8 @@ pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
             ts.iter().map(|t| replace_vars(t, map)).collect(),
         ),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), replace_vars(t, map)))
-                .collect(),
+            param: replace_vars(&f.param, map),
+            labels: f.labels.clone(),
             ret: replace_vars(&f.ret, map),
             err: replace_vars(&f.err, map),
             env: replace_vars(&f.env, map),
@@ -1542,8 +1522,7 @@ impl Checker<'_> {
                     ret,
                     err,
                     env,
-                } => Ty::Fn(Box::new(FnTy {
-                    params: params
+                } => Ty::Fn(Box::new(FnTy::new(params
                         .iter()
                         .map(|p| {
                             (
@@ -1551,11 +1530,7 @@ impl Checker<'_> {
                                 written(c, &p.ty, map, seen),
                             )
                         })
-                        .collect(),
-                    ret: written(c, ret, map, seen),
-                    err: err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
-                    env: env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
-                })),
+                        .collect(), written(c, ret, map, seen), err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)), env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen))))),
                 TypeKind::Hole | TypeKind::Error => Ty::Top,
             }
         }
@@ -1579,7 +1554,7 @@ impl Checker<'_> {
                     .zip(s.variances(*h, ts.len()))
                     .any(|(t, v)| invalid(s, t, pol.by(v))),
                 Ty::Fn(f) => {
-                    f.params.iter().any(|(_, t)| invalid(s, t, pol.flip()))
+                    invalid(s, &f.param, pol.flip())
                         || [&f.ret, &f.err, &f.env]
                             .into_iter()
                             .any(|t| invalid(s, t, pol))
@@ -1651,7 +1626,7 @@ impl Checker<'_> {
                     }
                 }
                 Ty::Fn(f) => {
-                    for (_, t) in &f.params {
+                    for t in [&f.param] {
                         collect(t, out);
                     }
                     for t in [&f.ret, &f.err, &f.env] {
@@ -1884,12 +1859,7 @@ mod tests {
         let old = s.fresh_at(0);
         let boundary = s.vars.len();
         let current = s.fresh_at(1);
-        let fun = Ty::Fn(Box::new(FnTy {
-            params: vec![],
-            ret: int(),
-            err: Ty::Never,
-            env: Ty::Var(old),
-        }));
+        let fun = Ty::Fn(Box::new(FnTy::new(vec![], int(), Ty::Never, Ty::Var(old))));
         s.constrain(&Ty::Var(current), &fun);
         let before = s.clone();
         assert!(

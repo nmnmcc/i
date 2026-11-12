@@ -103,8 +103,6 @@ pub(crate) enum FailKind {
     Mismatch,
     /// Only an Int/String value-set inclusion failed.
     Values,
-    /// Function types with different numbers of parameters.
-    Arity,
     /// Two forms of a type constructor whose parameter does not change, with
     /// arguments that cannot be equal (§4.4).
     Invariant,
@@ -269,10 +267,7 @@ impl Solver {
                 }
             }
             Ty::Fn(f) => {
-                for (_, t) in &f.params {
-                    self.observe_type(t);
-                }
-                for t in [&f.ret, &f.err, &f.env] {
+                for t in [&f.param, &f.ret, &f.err, &f.env] {
                     self.observe_type(t);
                 }
             }
@@ -391,11 +386,8 @@ impl Solver {
         match t {
             Ty::Var(v) => self.var(*v).level,
             Ty::Con(_, _, args) => args.iter().map(|a| self.level_of(a)).max().unwrap_or(0),
-            Ty::Fn(f) => f
-                .params
-                .iter()
-                .map(|p| &p.1)
-                .chain([&f.ret, &f.err, &f.env])
+            Ty::Fn(f) => [&f.param, &f.ret, &f.err, &f.env]
+                .into_iter()
                 .map(|a| self.level_of(a))
                 .max()
                 .unwrap_or(0),
@@ -668,11 +660,7 @@ impl Solver {
                 self.same_form_in(a, c, expanding) && self.same_form_in(b, d, expanding)
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                f.params.len() == g.params.len()
-                    && f.params
-                        .iter()
-                        .zip(&g.params)
-                        .all(|(p, q)| self.same_form_in(&p.1, &q.1, expanding))
+                self.same_form_in(&f.param, &g.param, expanding)
                     && self.same_form_in(&f.ret, &g.ret, expanding)
                     && self.same_form_in(&f.err, &g.err, expanding)
                     && self.same_form_in(&f.env, &g.env, expanding)
@@ -698,10 +686,7 @@ impl Solver {
                     }
                 }
                 Ty::Fn(f) => {
-                    for p in &f.params {
-                        parts(&p.1, out);
-                    }
-                    for x in [&f.ret, &f.err, &f.env] {
+                    for x in [&f.param, &f.ret, &f.err, &f.env] {
                         parts(x, out);
                     }
                 }
@@ -961,13 +946,9 @@ impl Solver {
                 }
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if f.params.len() != g.params.len() {
-                    self.fail(FailKind::Arity, l, r);
-                    return;
-                }
-                for (p, q) in f.params.iter().zip(&g.params) {
-                    self.constrain(&q.1, &p.1);
-                }
+                // syntax-3 §6.1: one data parameter; a call of another
+                // shape is a mismatch of the parameter data.
+                self.constrain(&g.param, &f.param);
                 self.constrain(&f.ret, &g.ret);
                 self.constrain_row(&f.err, &g.err);
                 self.constrain_env(&f.env, &g.env);
@@ -1187,11 +1168,7 @@ impl Solver {
         let lower = lower && first;
         match (a, b) {
             (Ty::Fn(f), Ty::Fn(g)) => {
-                if g.params.len() != f.params.len() {
-                    // All function types are one head; their parameters
-                    // must agree in number to be put together.
-                    self.fail(FailKind::Arity, b, a);
-                } else if lower {
+                if lower {
                     self.join(&f.ret, &g.ret, level, Mode::Value);
                     self.join(&f.err, &g.err, level, Mode::Row);
                     self.join(&f.env, &g.env, level, Mode::Env);
@@ -1420,16 +1397,8 @@ impl Solver {
                 )
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(label, p)| {
-                        (
-                            label.clone(),
-                            self.extrude(p, pol.flip(), level, Mode::Value, cache),
-                        )
-                    })
-                    .collect(),
+                param: self.extrude(&f.param, pol.flip(), level, Mode::Value, cache),
+                labels: f.labels.clone(),
                 ret: self.extrude(&f.ret, pol, level, Mode::Value, cache),
                 err: self.extrude(&f.err, pol, level, Mode::Row, cache),
                 env: self.extrude(&f.env, pol, level, Mode::Env, cache),
@@ -1506,11 +1475,8 @@ impl Solver {
                 Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(fun) => Ty::Fn(Box::new(FnTy {
-                params: fun
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), f(self, p, pol.flip())))
-                    .collect(),
+                param: f(self, &fun.param, pol.flip()),
+                labels: fun.labels.clone(),
                 ret: f(self, &fun.ret, pol),
                 err: f(self, &fun.err, pol),
                 env: f(self, &fun.env, pol),
@@ -1723,21 +1689,18 @@ impl Solver {
                     .collect();
                 Ty::Con(h, values, args)
             }
-            (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+            (Ty::Fn(f), Ty::Fn(g)) => {
                 let f = *f;
                 let g = *g;
-                let params = f
-                    .params
-                    .into_iter()
-                    .zip(g.params)
-                    .map(|((l1, p), (l2, q))| {
-                        let label = if l1 == l2 { l1 } else { None };
-                        (
-                            label,
-                            self.merge_arg(p, q, Variance::Contra, union, Mode::Value),
-                        )
-                    })
+                // Functions of different shapes put together by union have
+                // the parameter `Never` (syntax-3 §6.1).
+                let labels = f
+                    .labels
+                    .iter()
+                    .zip(&g.labels)
+                    .map(|(l1, l2)| if l1 == l2 { l1.clone() } else { None })
                     .collect();
+                let param = self.merge_arg(f.param, g.param, Variance::Contra, union, Mode::Value);
                 // The environments of two function types are put together
                 // as environments (§4.4, §9.2).
                 let env = if union {
@@ -1746,16 +1709,14 @@ impl Solver {
                     self.normalize_mode(Ty::Inter(vec![f.env, g.env]), Mode::Env)
                 };
                 Ty::Fn(Box::new(FnTy {
-                    params,
+                    param,
+                    labels,
                     ret: self.merge_arg(f.ret, g.ret, Variance::Co, union, Mode::Value),
                     err: self.merge_arg(f.err, g.err, Variance::Co, union, Mode::Row),
                     env,
                 }))
             }
-            (a, b) => {
-                self.fail(FailKind::Arity, &a, &b);
-                a
-            }
+            (a, b) => unreachable!("members of one head put together: {a:?} and {b:?}"),
         }
     }
 
@@ -1860,11 +1821,8 @@ impl Solver {
                 )
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .into_iter()
-                    .map(|(n, t)| (n, self.normalize_mode(t, Mode::Value)))
-                    .collect(),
+                param: self.normalize_mode(f.param, Mode::Value),
+                labels: f.labels,
                 ret: self.normalize_mode(f.ret, Mode::Value),
                 err: self.normalize_mode(f.err, Mode::Row),
                 env: self.normalize_mode(f.env, Mode::Env),
@@ -2332,9 +2290,7 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
             }
         }
         Ty::Fn(f) => {
-            for p in &f.params {
-                bound_vars(s, &p.1, !pos, true, out);
-            }
+            bound_vars(s, &f.param, !pos, true, out);
             bound_vars(s, &f.ret, pos, true, out);
             env_vars(s, &f.err, pos, true, out);
             env_vars(s, &f.env, pos, true, out);
@@ -2716,7 +2672,7 @@ mod literal_stress_tests {
             let Ty::Fn(f) = &locals.types[&v.var] else {
                 panic!("shared function shape")
             };
-            let Ty::Var(v) = &f.params[0].1 else {
+            let Some([Ty::Var(v)]) = f.parts() else {
                 panic!("one shared parameter")
             };
             let bound = solver.vars[v.0 as usize]
