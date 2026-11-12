@@ -982,7 +982,7 @@ impl Program {
         }
         if let Some(target) = &abi.target {
             bail!(
-                "the module was built for the {target} target (B.7); run it with a WASI host such as `wasmtime run`"
+                "the module was built for the {target} target; run it with a WASI host such as `wasmtime run`"
             );
         }
         let mut config = Config::new();

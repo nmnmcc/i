@@ -164,7 +164,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
         diags.push(err(
             code::MANIFEST_NAME,
             name_span,
-            format!("the package name `{name}` must be a name (§1.3), and not `i`"),
+            format!("the package name `{name}` must be a name, and not `i`"),
         ));
     }
     // The dependency names.

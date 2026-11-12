@@ -367,7 +367,7 @@ pub(crate) fn resolve(
                             source,
                             span,
                             format!(
-                                "`{what}` was got with the commit `{commit}` and the hash `{hash}`, but `i.lock` has the commit `{}` and the hash `{}`; the tag may have been moved, or the files changed on the way (§2.8)",
+                                "`{what}` was got with the commit `{commit}` and the hash `{hash}`, but `i.lock` has the commit `{}` and the hash `{}`; the tag may have been moved, or the files changed on the way",
                                 l.commit, l.hash
                             ),
                         ));

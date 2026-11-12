@@ -482,7 +482,7 @@ class Bridge {
 
   usable() {
     expect(!this.unusable, `The instance cannot be used after it stopped (${this.unusable}); make a new instance`);
-    expect(this.depth === 0, "The instance is running Wasm; a host function may not call it (§B.3)");
+    expect(this.depth === 0, "The instance is running Wasm; a host function may not call it");
     expect(!this.waiting, "An async call is waiting; only its host functions may answer now");
     expect(!this.ending, "An invocation is tearing down; cleanup may not enter Wasm");
   }

@@ -58,7 +58,7 @@ pub(crate) fn collect(
                     Some(source),
                     Span::default(),
                     format!(
-                        "every part of a module path must be a name (§2.1), but `{bad}` is not"
+                        "every part of a module path must be a name, but `{bad}` is not"
                     ),
                 ));
                 continue;

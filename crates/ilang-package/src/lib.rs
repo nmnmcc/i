@@ -497,7 +497,7 @@ impl Loader {
                 from_source,
                 from_span,
                 format!(
-                    "this dependency leads back to the package in `{}`, so the packages are in a circle (§2.6)",
+                    "this dependency leads back to the package in `{}`, so the packages are in a circle",
                     self.display(&dir)
                 ),
             ));
@@ -598,7 +598,7 @@ impl Loader {
                 from_source,
                 from_span,
                 format!(
-                    "this dependency leads back to `{}@{}`, so the packages are in a circle (§2.6)",
+                    "this dependency leads back to `{}@{}`, so the packages are in a circle",
                     loc.location, loc.version
                 ),
             ));

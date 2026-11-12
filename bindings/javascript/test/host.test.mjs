@@ -253,7 +253,7 @@ test("GC, tail calls and exceptions remain available through the adapter", async
   assert.equal(value.exports.gc_sum(10_000), 50_005_000);
 });
 
-test("metadata that does not follow B.6 fails before instantiation", async () => {
+test("metadata that is not correct fails before instantiation", async () => {
   const module = await WebAssembly.compile(customFixture);
   const base = { version: 3, entry: null, tests: [], exports: {}, services: {}, externals: {} };
   assert.equal(readAbi(module, base).entry, null);
@@ -332,7 +332,7 @@ test("a service may not call the instance during the import", async () => {
         return inner instanceof Promise ? inner.then(() => x) : x;
       },
     });
-    await assert.rejects(value.callAsync("app/async.later", [1]), { message: "The instance is running Wasm; a host function may not call it (§B.3)" });
+    await assert.rejects(value.callAsync("app/async.later", [1]), { message: "The instance is running Wasm; a host function may not call it" });
     assert.equal(starts, 1);
     assert.ok(value.unusable);
     assert.throws(() => value.call("nil_roundtrip"), /make a new instance/);
