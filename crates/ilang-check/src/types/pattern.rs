@@ -191,15 +191,26 @@ impl Checker<'_> {
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         if catch_all(q) {
             self.bind_catch_all(q, b, in_case);
+        } else if let PatternKind::Tuple(ps) = &q.kind
+            && !in_case
+        {
+            // The parts of a fitted tuple are fitted one by one, so that a
+            // constructor part may fail as at the top: `(Ok(a), Ok(b)) = …`.
+            let parts: Vec<Ty> = ps.iter().map(|_| self.s.fresh()).collect();
+            self.sub(b, &Ty::tuple(parts.clone()), q.span);
+            for (p, t) in ps.iter().zip(&parts) {
+                self.fit_in(p, t, in_case);
+            }
         } else {
             let t = self.pat(q, in_case);
-            // Syntax three §2.12 (D4): a fitted constructor pattern may
-            // fail, so it needs `B <: Q | r - Q`, not `B <: Q`: `Ok(v) = r`
-            // with `r: Result(A, E) = Ok(A) | Error(E)`.
-            let t = if top_ctor(q).is_some() {
-                self.with_rest(t)
-            } else {
-                t
+            // A constructor part whose known values are also made by other
+            // constructors may fail (syntax three D4, as in `fit`).
+            let t = match top_ctor(q) {
+                Some(c) if !in_case => {
+                    let (others, _) = self.made_by_others(b, Head::Named(TypeRef::Custom(c.ty)));
+                    if others { self.with_rest(t) } else { t }
+                }
+                _ => t,
             };
             self.sub(b, &t, q.span);
         }
@@ -546,13 +557,8 @@ impl Checker<'_> {
         for i in 0..places.len() {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
             let pats = std::mem::take(&mut places[i].pats);
-            // A fitted constructor pattern may fail (syntax three §2.12).
-            let fitted_ctor = fitted
-                && pats
-                    .iter()
-                    .any(|t| matches!(t, Ty::Con(Head::Named(TypeRef::Custom(_)), _, _)));
             let p = self.union(pats, span);
-            let want = if slack[i] || fitted_ctor {
+            let want = if slack[i] {
                 let mut members = Vec::new();
                 super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
                 let r = self.s.fresh();
