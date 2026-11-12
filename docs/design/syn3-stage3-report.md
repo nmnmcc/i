@@ -76,3 +76,36 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
 `Bool = True | False` reaches the host as before: a host export
 `(Int) -> Bool` has `"result":"bool"` in `ilang.abi`, an error `^ Bool` has
 `"errors":["bool"]`, and the JavaScript bindings give `true`/`false`.
+
+## Behaviour changes seen in the tests
+
+- A refutable binding of an unknown value narrows it: `first = (r) { Ok(v) = r  v }`
+  is `(r: Ok(A)) -> A` with no `Assert`, not `(r: Result(A, B)) -> A ! Assert`
+  (lane js's D4 rule widens to `Q | r - Q` only when another constructor's
+  value is known). Fixtures that pass an `Error` give the parameter the type
+  `Result(…)` now (`tests/spec/9/assert.i`, `crates/ilang-check/tests/codegen.rs`);
+  a recursive top-level value needs a written type on the part
+  (`tests/spec/7/may_fail_group_ctor.i`).
+- Types are more precise: `named : (r: Result(A, B)) -> Ok(A | 0)`,
+  `not_known : (s: Shape) -> Circle`; a constructor's type is its own
+  (`Some: (A) -> Some(A)`).
+- A one-clause match that does not cover gives E0501 (`Point` is not a
+  subtype of `Circle | Square`) besides E0516.
+- `Circle(..v, …)` with `v: Shape` gives E0501, not E0517's message.
+- `field_shared` no longer joins the constructors of a former family.
+- A union shown inside a larger union is not folded to its alias:
+  `String | True | False`, `(True | False) -> True | False`.
+- Coverage witnesses show a one-constructor type as its constructor
+  (`("a", False)`).
+
+## Not solved
+
+- Build-discriminant services (`spec.md` §2.6 `discriminant`, §2.4's
+  `i/target` `Target`) are services with several constructors. After stage 3
+  such a service is a union, which a service type may not be (E0225), so
+  `provider_graph.rs` `discriminant_constructor_*` fail. Needs a design
+  decision (for example a service whose one constructor holds the union).
+- `crates/ilang-check/tests/value_types.rs`: schemes checked in reverse order
+  show some unions by their members and in normal order by their alias
+  (`HttpError`), so the order-independence tests differ; two tests panic on a
+  missing key. Display folding of stage 1 depends on checking order.
