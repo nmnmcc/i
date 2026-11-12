@@ -34,15 +34,35 @@ use wasmtime::{Caller, Engine, Linker, Module, Store, UpdateDeadline};
 use crate::{Abi, Bridge, HOST_MODULE, HostOptions, ResourceContext, State, THREAD_STACK};
 
 /// The number of workers of an entry run: `I_WORKERS` when it is set to a
-/// positive number, else the available cores.
+/// positive number, else the available cores, at most one per GiB of
+/// available memory.
 pub fn worker_count() -> usize {
     match std::env::var("I_WORKERS") {
         Ok(text) => match text.trim().parse::<usize>() {
             Ok(n) if n >= 1 => n.min(255),
             _ => panic!("I_WORKERS must be a positive number of workers, not {text:?}"),
         },
-        Err(_) => std::thread::available_parallelism().map_or(1, |n| n.get().min(255)),
+        Err(_) => {
+            let cores = std::thread::available_parallelism().map_or(1, |n| n.get().min(255));
+            // Each worker is an instance with its own GC heap: keep a worker
+            // for each WORKER_MEMORY of available memory, at least one.
+            match available_memory() {
+                Some(bytes) => cores.min((bytes / WORKER_MEMORY).max(1) as usize),
+                None => cores,
+            }
+        }
     }
+}
+
+/// The memory a default worker count reserves for each worker.
+const WORKER_MEMORY: u64 = 1 << 30;
+
+/// `MemAvailable` of Linux, in bytes.
+fn available_memory() -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    let line = text.lines().find(|line| line.starts_with("MemAvailable:"))?;
+    let kib: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
+    Some(kib * 1024)
 }
 
 /// The key id prefix of a worker (D6): worker w takes ids above
@@ -102,6 +122,13 @@ struct PoolState {
     live: Vec<usize>,
     published: u64,
     shares: HashMap<ShareKey, Arc<Vec<u8>>>,
+}
+
+impl PoolState {
+    /// Workers that hold no task now (also those still starting).
+    fn empty(&self) -> usize {
+        (1..=self.spawned).filter(|w| self.live[*w] == 0).count()
+    }
 }
 
 pub(crate) struct Pool {
@@ -218,8 +245,9 @@ impl Pool {
         state.published += 1;
         state.ready.insert(id, Record { bytes, affinity });
         state.queue.push_back(id);
-        // One worker per queued record, up to the count (Go's spinning Ms).
-        if state.spawned < state.queue.len() && state.idle < state.queue.len() {
+        // A new worker when every worker holds tasks (Go starts a spinning M
+        // when no P is idle).
+        if state.empty() < state.queue.len() {
             self.spawn_worker(&mut state);
         }
         drop(state);
@@ -239,7 +267,7 @@ impl Pool {
     /// (Go's runnext stays with its P only when no P spins).
     pub(crate) fn claim(&self, id: u64) -> bool {
         let mut state = self.lock();
-        let free = state.idle + (state.spawned - state.running);
+        let free = state.empty();
         match state.ready.get(&id) {
             Some(record) if record.affinity.is_none() && free == 0 => {
                 state.ready.remove(&id);
@@ -417,7 +445,7 @@ impl Pool {
                         let affinity = state.ready[id].affinity;
                         // A worker that holds tasks leaves new ones to idle
                         // workers (tokio and Go hand work to idle Ps first).
-                        let free = state.idle + (state.spawned - state.running);
+                        let free = state.empty();
                         affinity == Some(index)
                             || affinity.is_none() && (state.live[index] == 0 || free == 0)
                     }) {

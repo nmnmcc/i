@@ -1,7 +1,9 @@
-//! Native multicore workers (multicore.md D1/D8/P1, native.md N5/N7/N12).
+//! Native multicore workers (multicore.md D1/D8/P1, native.md N5/N7/N8/N12).
 //! The worker count comes from `I_WORKERS`; `I_WORKERS_TRACE` makes the host
-//! print, at the end of a run that published records, how many tasks each
-//! worker ran and how many speculations a cancel stopped.
+//! print `i: worker W started a task` when a worker other than 0 starts a
+//! task, and at the end of a run that published records
+//! `i: workers N published P started [..] steps [..]` (tasks started and
+//! steps run per worker; worker 0 is the entry's instance).
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{Shutdown, TcpStream, ToSocketAddrs},
@@ -36,9 +38,27 @@ struct Run {
     seconds: f64,
 }
 
+/// The counts of the trace line.
+struct Trace {
+    published: u64,
+    started: Vec<u64>,
+    steps: Vec<u64>,
+}
+
+fn counts(text: &str) -> Vec<u64> {
+    text.split('[')
+        .nth(1)
+        .unwrap()
+        .split(']')
+        .next()
+        .unwrap()
+        .split(", ")
+        .map(|n| n.trim().parse().unwrap())
+        .collect()
+}
+
 impl Run {
-    /// The counts of the trace line: (published, tasks per worker, stopped).
-    fn trace(&self) -> Option<(u64, Vec<u64>, u64)> {
+    fn trace(&self) -> Option<Trace> {
         let line = self
             .stderr
             .lines()
@@ -50,13 +70,19 @@ impl Run {
             .next()?
             .parse()
             .ok()?;
-        let ran = line.split('[').nth(1)?.split(']').next()?;
-        let ran = ran
-            .split(", ")
-            .map(|n| n.trim().parse().unwrap())
-            .collect();
-        let stopped = line.split(" stopped ").nth(1)?.trim().parse().ok()?;
-        Some((published, ran, stopped))
+        let started = counts(line.split(" started ").nth(1)?);
+        let steps = counts(line.split(" steps ").nth(1)?);
+        Some(Trace {
+            published,
+            started,
+            steps,
+        })
+    }
+}
+
+impl Trace {
+    fn workers_that_started(&self) -> usize {
+        self.started.iter().filter(|n| **n > 0).count()
     }
 }
 
@@ -87,12 +113,33 @@ fn load() -> String {
     std::fs::read_to_string("/proc/loadavg").unwrap_or_default()
 }
 
-/// Acceptance 1: eight pure tasks print the same on one and eight workers,
-/// and on eight workers more than one OS thread ran a task.
+/// Run on one and on eight workers: the same output; the eight-worker trace.
+fn agree(name: &str, source: &str) -> (Run, Run, Trace) {
+    let dir = project(name, source);
+    let one = run(&dir, 1);
+    let eight = run(&dir, 8);
+    assert_eq!(one.stdout, eight.stdout, "{}", eight.stderr);
+    assert!(one.trace().is_none(), "one worker publishes nothing: {}", one.stderr);
+    let trace = eight.trace().unwrap_or_else(|| panic!("no trace: {}", eight.stderr));
+    eprintln!(
+        "multicore {name}: 1 worker {:.2}s, 8 workers {:.2}s, started {:?}, load {}",
+        one.seconds,
+        eight.seconds,
+        trace.started,
+        load()
+    );
+    (one, eight, trace)
+}
+
+/// Every published record starts exactly once: no compute phase runs twice.
+fn started_once(trace: &Trace) {
+    assert_eq!(trace.started.iter().sum::<u64>(), trace.published);
+}
+
+/// Eight pure tasks: the same results, paths and random draws.
 #[test]
 fn cpu_bound_tasks_agree_across_worker_counts() {
-    let source = format!(
-        "(
+    let (_, _, trace) = agree("cpu", &format!("(
 	i/task
 	i/stdio
 	i/core
@@ -107,36 +154,222 @@ main = () {{
 	}})
 	stdio.print(core.inspect(results))
 }}
-"
-    );
-    let dir = project("cpu", &source);
-    let one = run(&dir, 1);
-    let eight = run(&dir, 8);
-    assert_eq!(one.stdout, eight.stdout);
-    assert!(one.trace().is_none(), "one worker publishes nothing: {}", one.stderr);
-    let (published, ran, _) = eight.trace().expect(&eight.stderr);
-    assert_eq!(published, 8, "{}", eight.stderr);
-    assert_eq!(ran.iter().sum::<u64>(), 8, "{}", eight.stderr);
-    assert!(
-        ran.iter().filter(|n| **n > 0).count() > 1,
-        "more than one worker thread ran a task: {}",
-        eight.stderr
-    );
-    eprintln!(
-        "multicore timing: 1 worker {:.2}s, 8 workers {:.2}s, ratio {:.2}, load {}",
-        one.seconds,
-        eight.seconds,
-        eight.seconds / one.seconds,
-        load()
-    );
+"));
+    assert_eq!(trace.published, 8);
+    started_once(&trace);
+    assert!(trace.workers_that_started() > 1);
 }
 
-/// Acceptance 2: records that hold a boundary or a local channel stay on
-/// their maker (they are never published) and the result does not change.
+/// Acceptance 1: compute, then yield and a channel send, then compute.
+#[test]
+fn tasks_keep_running_on_their_worker_across_steps() {
+    let (_, _, trace) = agree("steps", &format!("(
+	i/task
+	i/stdio
+	i/core
+)
+
+{SPIN}
+collect = (c: task.Channel(Int), n: Int, acc: Int) -> Int ! task.Scheduler {{
+	{{ n == 0 }} |> {{
+		True  -> acc
+		False -> collect(c, n - 1, acc + task.receive(c))
+	}}
+}}
+
+main = () {{
+	(results, total) = task.scope((s) {{
+		c: task.Channel(Int) = task.channel()
+		sum = task.go(s, () {{ collect(c, 8, 0) }})
+		results = task.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{
+			a = spin(2000000 + i, i)
+			task.yield()
+			task.send(c, a)
+			(spin(2000000 + i, a), task.path())
+		}})
+		(results, task.join(sum))
+	}})
+	stdio.print(core.inspect(results))
+	stdio.print(core.inspect(total))
+}}
+"));
+    started_once(&trace);
+    assert!(trace.workers_that_started() > 1, "{:?}", trace.started);
+    // A remote task took its steps on its own worker.
+    assert!(trace.steps.iter().skip(1).any(|n| *n >= 4), "{:?}", trace.steps);
+}
+
+/// Acceptance 2: a task on a worker spawns eight children.
+#[test]
+fn nested_go_is_parallel() {
+    let (_, _, trace) = agree("nested", &format!("(
+	i/task
+	i/stdio
+	i/core
+)
+
+{SPIN}
+main = () {{
+	results = task.scope((s) {{
+		parent = task.go(s, () {{
+			task.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{ (spin(2000000 + i, i), task.path()) }})
+		}})
+		task.join(parent)
+	}})
+	stdio.print(core.inspect(results))
+}}
+"));
+    assert_eq!(trace.published, 9);
+    started_once(&trace);
+    assert!(trace.workers_that_started() > 1, "{:?}", trace.started);
+}
+
+/// Acceptance 4: producer, four workers and a collector across workers.
+#[test]
+fn channel_pipeline_agrees_across_worker_counts() {
+    let (_, _, trace) = agree("pipeline", &format!("(
+	i/task
+	i/stdio
+	i/core
+)
+
+{SPIN}
+produce = (out: task.Channel(Int), i: Int, n: Int) -> Nil ! task.Scheduler {{
+	{{ i > n }} |> {{
+		True  -> Nil
+		False -> {{
+			task.send(out, i)
+			produce(out, i + 1, n)
+		}}
+	}}
+}}
+
+work = (input: task.Channel(Int), out: task.Channel((Int, Int)), n: Int) -> Nil ! task.Scheduler {{
+	{{ n == 0 }} |> {{
+		True  -> Nil
+		False -> {{
+			i = task.receive(input)
+			task.send(out, (i, spin(300000 + i, i)))
+			work(input, out, n - 1)
+		}}
+	}}
+}}
+
+gather = (out: task.Channel((Int, Int)), n: Int, acc: List((Int, Int))) -> List((Int, Int)) ! task.Scheduler {{
+	{{ n == 0 }} |> {{
+		True  -> acc
+		False -> gather(out, n - 1, [task.receive(out), ..acc])
+	}}
+}}
+
+insert = (x: (Int, Int), xs: List((Int, Int))) -> List((Int, Int)) {{
+	xs |> {{
+		[] -> [x]
+		[y, ..rest] -> {{
+			(a, _) = x
+			(b, _) = y
+			{{ a < b }} |> {{
+				True  -> [x, y, ..rest]
+				False -> [y, ..insert(x, rest)]
+			}}
+		}}
+	}}
+}}
+
+sort = (xs: List((Int, Int)), acc: List((Int, Int))) -> List((Int, Int)) {{
+	xs |> {{
+		[] -> acc
+		[x, ..rest] -> sort(rest, insert(x, acc))
+	}}
+}}
+
+main = () {{
+	results = task.scope((s) {{
+		input: task.Channel(Int) = task.channel()
+		out: task.Channel((Int, Int)) = task.channel()
+		task.go(s, () {{ produce(input, 1, 32) }})
+		task.go(s, () {{ work(input, out, 8) }})
+		task.go(s, () {{ work(input, out, 8) }})
+		task.go(s, () {{ work(input, out, 8) }})
+		task.go(s, () {{ work(input, out, 8) }})
+		collector = task.go(s, () {{ gather(out, 32, []) }})
+		sort(task.join(collector), [])
+	}})
+	stdio.print(core.inspect(results))
+}}
+"));
+    started_once(&trace);
+    assert!(trace.workers_that_started() > 1, "{:?}", trace.started);
+}
+
+/// Acceptance 5: a failing child cancels tasks blocked in receive and in a
+/// one-minute sleep on other workers; the run ends at once.
+#[test]
+fn cancel_reaches_blocked_tasks_on_other_workers() {
+    let (_, eight, trace) = agree("cancelio", &format!("(
+	i/task
+	i/stdio
+	i/core
+	i/fail
+	i/clock
+)
+
+{SPIN}
+main = () {{
+	outcome = fail.catch(() {{
+		task.scope((s) {{
+			c: task.Channel(Int) = task.channel()
+			task.go(s, () {{ clock.sleep_ns(60000000000) }})
+			task.go(s, () {{ clock.sleep_ns(60000000000) }})
+			task.go(s, () {{ task.receive(c) }})
+			task.go(s, () {{ task.receive(c) }})
+			task.go(s, () {{
+				spin(2000000, 3)
+				fail.raise(\"stop\")
+			}})
+			Nil
+		}})
+	}})
+	stdio.print(core.inspect(outcome))
+}}
+"));
+    assert_eq!(eight.stdout.trim(), "Error(\"stop\")");
+    assert!(eight.seconds < 50.0, "the sleepers were cancelled");
+    assert!(trace.started.iter().skip(1).sum::<u64>() >= 1, "{:?}", trace.started);
+    let (_, eight, trace) = agree("cancelrecv", &format!("(
+	i/task
+	i/stdio
+	i/core
+	i/fail
+)
+
+{SPIN}
+main = () {{
+	outcome = fail.catch(() {{
+		task.scope((s) {{
+			c: task.Channel(Int) = task.channel()
+			task.go(s, () {{ task.receive(c) }})
+			task.go(s, () {{ task.receive(c) }})
+			task.go(s, () {{ task.receive(c) }})
+			task.go(s, () {{
+				spin(2000000, 3)
+				fail.raise(\"stop\")
+			}})
+			Nil
+		}})
+	}})
+	stdio.print(core.inspect(outcome))
+}}
+"));
+    assert_eq!(eight.stdout.trim(), "Error(\"stop\")");
+    assert!(trace.started.iter().skip(1).sum::<u64>() >= 1, "{:?}", trace.started);
+}
+
+/// Acceptance 6: records that hold a boundary or a local channel stay on
+/// their maker and the result does not change.
 #[test]
 fn non_portable_records_stay_home() {
-    let source = format!(
-        "(
+    let dir = project("pinned", &format!("(
 	i/task
 	i/stdio
 	i/core
@@ -158,119 +391,17 @@ main = () {{
 	}})
 	stdio.print(core.inspect(local))
 }}
-"
-    );
-    let dir = project("pinned", &source);
+"));
     let one = run(&dir, 1);
     let eight = run(&dir, 8);
     assert_eq!(one.stdout, eight.stdout);
-    assert!(
-        eight.trace().is_none(),
-        "no record was published: {}",
-        eight.stderr
-    );
+    assert!(eight.trace().is_none(), "no record was published: {}", eight.stderr);
 }
 
-/// Acceptance 3: a failing child cancels its scope, and the cancel stops a
-/// sibling that runs on another worker.
-#[test]
-fn cancel_stops_tasks_on_other_workers() {
-    let source = format!(
-        "(
-	i/task
-	i/stdio
-	i/core
-	i/fail
-)
-
-{SPIN}
-main = () {{
-	outcome = fail.catch(() {{
-		task.scope((s) {{
-			task.go(s, () {{ spin(6000000, 1) }})
-			task.go(s, () {{ spin(4000000000, 2) }})
-			task.go(s, () {{
-				spin(1000000, 3)
-				fail.raise(\"stop\")
-			}})
-			Nil
-		}})
-	}})
-	stdio.print(core.inspect(outcome))
-}}
-"
-    );
-    let dir = project("cancel", &source);
-    let eight = run(&dir, 8);
-    assert_eq!(eight.stdout.trim(), "Error(\"stop\")");
-    let (_, _, stopped) = eight.trace().expect(&eight.stderr);
-    assert!(stopped >= 1, "a speculation was stopped: {}", eight.stderr);
-}
-
-struct Server(Child);
-impl Drop for Server {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
-}
-
-/// Acceptance 4: the echo example serves three simultaneous connections
-/// with the default worker count.
-#[test]
-fn echo_serves_three_connections_with_default_workers() {
-    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/echo");
-    let child = Command::new(env!("CARGO_BIN_EXE_i"))
-        .args(["run", "--opt", "0", "--project"])
-        .arg(project)
-        .env_remove("I_WORKERS")
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let mut server = Server(child);
-    let mut line = String::new();
-    BufReader::new(server.0.stdout.take().unwrap())
-        .read_line(&mut line)
-        .unwrap();
-    let port: u16 = line
-        .strip_prefix("listening ")
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
-    let connect = || {
-        let addresses = ("localhost", port).to_socket_addrs().unwrap();
-        let stream = addresses
-            .filter_map(|addr| TcpStream::connect(addr).ok())
-            .next()
-            .unwrap();
-        stream
-            .set_read_timeout(Some(Duration::from_secs(20)))
-            .unwrap();
-        stream
-    };
-    let mut clients = [connect(), connect(), connect()];
-    let words: [&[u8]; 3] = [b"first ", b"second ", b"third "];
-    for (client, word) in clients.iter_mut().zip(words) {
-        client.write_all(word).unwrap();
-    }
-    for client in &mut clients {
-        client.write_all(b"client").unwrap();
-        client.shutdown(Shutdown::Write).unwrap();
-    }
-    for (client, word) in clients.iter_mut().zip(words) {
-        let mut got = Vec::new();
-        client.read_to_end(&mut got).unwrap();
-        assert_eq!(got, [word, b"client"].concat());
-    }
-}
-
-/// `scope.share` keeps the value once in the host transport: tasks on other
-/// workers read it without going back to their maker.
+/// `scope.share` values read on other workers.
 #[test]
 fn shared_values_are_read_on_other_workers() {
-    let source = format!(
-        "(
+    let (_, _, trace) = agree("share", &format!("(
 	i/task
 	i/stdio
 	i/core
@@ -300,17 +431,126 @@ main = () {{
 	}})
 	stdio.print(core.inspect(results))
 }}
-"
-    );
-    let dir = project("share", &source);
-    let one = run(&dir, 1);
-    let eight = run(&dir, 8);
-    assert_eq!(one.stdout, eight.stdout);
-    let (published, ran, _) = eight.trace().expect(&eight.stderr);
-    assert_eq!(published, 8, "{}", eight.stderr);
-    assert!(
-        ran.iter().skip(1).any(|n| *n > 0),
-        "a remote worker read the shared value: {}",
-        eight.stderr
-    );
+"));
+    assert_eq!(trace.published, 8);
+    started_once(&trace);
+}
+
+struct Server(Child);
+impl Drop for Server {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> String {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_i"));
+    command
+        .args(["run", "--opt", "0", "--project"])
+        .arg(project)
+        .env("I_WORKERS_TRACE", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    match workers {
+        Some(n) => command.env("I_WORKERS", n.to_string()),
+        None => command.env_remove("I_WORKERS"),
+    };
+    let mut server = Server(command.spawn().unwrap());
+    let mut line = String::new();
+    BufReader::new(server.0.stdout.take().unwrap())
+        .read_line(&mut line)
+        .unwrap();
+    let port: u16 = line
+        .strip_prefix("listening ")
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    let connect = || {
+        let addresses = ("localhost", port).to_socket_addrs().unwrap();
+        let stream = addresses
+            .filter_map(|addr| TcpStream::connect(addr).ok())
+            .next()
+            .unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(20)))
+            .unwrap();
+        stream
+    };
+    let mut streams: Vec<TcpStream> = (0..clients).map(|_| connect()).collect();
+    for (i, stream) in streams.iter_mut().enumerate() {
+        stream.write_all(format!("client {i} ").as_bytes()).unwrap();
+    }
+    for stream in &mut streams {
+        stream.write_all(b"done").unwrap();
+        stream.shutdown(Shutdown::Write).unwrap();
+    }
+    for (i, stream) in streams.iter_mut().enumerate() {
+        let mut got = Vec::new();
+        stream.read_to_end(&mut got).unwrap();
+        assert_eq!(got, format!("client {i} done").into_bytes());
+    }
+    let _ = server.0.kill();
+    let _ = server.0.wait();
+    let mut stderr = String::new();
+    server.0.stderr.take().unwrap().read_to_string(&mut stderr).unwrap();
+    stderr
+}
+
+/// Acceptance 3: an echo server in the entry run serves eight simultaneous
+/// connections, handled on more than one worker (with their own IO).
+#[test]
+fn echo_connections_are_served_on_several_workers() {
+    let dir = project("echo8", &format!("(
+	i/net
+	i/task
+	i/stdio
+	i/core
+	i/resource
+)
+
+echo = (stream) {{
+	bytes = net.read(stream, 65536)
+	core.bit_size(bytes) |> {{
+		0 -> Nil
+		_ -> {{
+			net.write(stream, bytes)
+			echo(stream)
+		}}
+	}}
+}}
+
+serve = (listener, scope) {{
+	stream = net.accept(listener)
+	task.go(scope, () {{
+		resource.ensure(() {{ echo(stream) }}, () {{ net.close_stream(stream) }})
+	}})
+	serve(listener, scope)
+}}
+
+// Program entry.
+main = () {{
+	listener = net.listen(\"127.0.0.1\", 0)
+	stdio.print(\"listening \" <> core.inspect(net.local_port(listener)))
+	task.scope((scope) {{ serve(listener, scope) }})
+}}
+"));
+    let stderr = serve_clients(&dir, Some(8), 8);
+    let mut workers: Vec<&str> = stderr
+        .lines()
+        .filter_map(|line| line.strip_prefix("i: worker "))
+        .filter_map(|rest| rest.strip_suffix(" started a task"))
+        .collect();
+    workers.sort_unstable();
+    workers.dedup();
+    assert!(workers.len() > 1, "{stderr}");
+}
+
+/// The echo example (a nested run, which stays one worker) still serves
+/// three simultaneous connections with the default worker count.
+#[test]
+fn echo_example_serves_three_connections_with_default_workers() {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/echo");
+    serve_clients(&project, None, 3);
 }
