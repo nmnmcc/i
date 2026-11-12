@@ -94,3 +94,10 @@ open distribution question.
   and suggests `--target host`. A service replaced by ordinary i code needs no import.
 - Exit status as `i run`: 0 when the entry returns, 1 with the stop or error message.
 - The runner reads only the payload and trailer of its file, not the whole executable.
+- `--target host` (ilang) now has a host cell for the standard host services in
+  lib/provider-plan.toml (Io, Clock, Stdio, Fs, Net, Tls and the process services): an
+  embedding host of ABI v3 gives them as `i run` does, so `i build --target host` of
+  examples/hello writes its module again. This table is expected to be replaced by the
+  fixed platform-service table; packaging does not depend on it.
+- The runner is a separate package built by a nested Cargo invocation (as Substrate's
+  wasm-builder does), and `i` embeds it; `i build` needs no other file next to `i`.
