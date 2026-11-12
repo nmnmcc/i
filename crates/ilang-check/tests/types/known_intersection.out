@@ -1,7 +1,7 @@
-inc : (x: A & Int) -> A
+inc : (x = A & Int) -> A
 same : () -> Bool
 other : () -> Bool
-wide : (v: Int) -> Bool
+wide : (v = Int) -> Bool
 5:2: warning[W0502]: this value is not used, and working it out does nothing
 9:13: warning[W0503]: both sides are constants, `5` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 11:14: warning[W0503]: both sides are constants, `5` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)

@@ -235,6 +235,7 @@ impl ShownGraph {
             .iter()
             .map(|(v, t)| (*v, t.text_with(ty, var)))
             .collect();
+        let node_of: FxHashMap<super::Id, Node> = nodes.iter().cloned().collect();
         for (id, node) in nodes {
             let child = |id| &texts[&id].body;
             let group = |id| {
@@ -286,19 +287,30 @@ impl ShownGraph {
                         .params
                         .into_iter()
                         .map(|(label, id)| match label {
-                            Some(label) => format!("{label}: {}", group(id)),
+                            Some(label) => format!("{label} = {}", group(id)),
                             None => group(id),
                         })
                         .collect::<Vec<_>>()
                         .join(", ");
-                    let mut body = format!("({params}) -> {}", group(fun.ret));
+                    // The need (syntax three §2.10): an error is the service
+                    // `Fail(E)`; a row variable is `..N`.
+                    let mut items = Vec::new();
                     if fun.err != super::Id::NEVER {
-                        body.push_str(&format!(" ^ {}", group(fun.err)));
+                        items.push(format!("Fail({})", child(fun.err)));
                     }
                     if fun.env != super::Id::NEVER {
-                        body.push_str(&format!(" ! {}", group(fun.env)));
+                        let mut stack = vec![fun.env];
+                        while let Some(id) = stack.pop() {
+                            match &node_of[&id] {
+                                Node::Union(a, b) => stack.extend([*b, *a]),
+                                Node::Never => {}
+                                Node::Var(_) => items.push(format!("..{}", child(id))),
+                                _ => items.push(child(id).clone()),
+                            }
+                        }
                     }
-                    (body, false)
+                    let need = crate::types::shown::need_text(items);
+                    (format!("({params}){need} -> {}", child(fun.ret)), false)
                 }
                 Node::Rec(fields) => (
                     if fields.is_empty() {
@@ -308,7 +320,7 @@ impl ShownGraph {
                             "({})",
                             fields
                                 .into_iter()
-                                .map(|(l, id)| format!("{}: {}", label(&l, var), child(id)))
+                                .map(|(l, id)| format!("{} = {}", label(&l, var), child(id)))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )

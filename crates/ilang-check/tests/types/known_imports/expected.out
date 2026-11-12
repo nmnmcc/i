@@ -1,7 +1,7 @@
 app/lib.x : User
 app/lib.xs : List(User)
 app/lib.y : User
-app/lib.mk : (a: A) -> A
+app/lib.mk : (a = A) -> A
 app/main.member : String
 app/main.imported : Int
 app/main.generalized : String

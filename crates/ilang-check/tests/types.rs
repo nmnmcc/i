@@ -214,7 +214,7 @@ fn many_uses_of_a_parameter() {
     let out = output(&graph, true, false);
     let elapsed = start.elapsed();
     assert!(
-        out.contains("f : (b: Boundary(A, B, C), x: Int) -> Int\n") && !out.contains("error"),
+        out.contains("f : (b = Boundary(A, B, C), x = Int) -> Int\n") && !out.contains("error"),
         "{out}"
     );
     assert!(elapsed.as_secs() < 30, "{elapsed:?}");
@@ -235,10 +235,10 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     let (graph, diags) = ilang_package::load(dir.path());
     assert!(diags.is_empty());
     let out = output(&graph, true, false);
-    assert!(out.contains("keep : (v: B) -> B\n"), "{out}");
-    assert!(out.contains("again : (v: B) -> B\n"), "{out}");
+    assert!(out.contains("keep : (v = B) -> B\n"), "{out}");
+    assert!(out.contains("again : (v = B) -> B\n"), "{out}");
     assert!(
-        out.contains("effect : (f: () -> B ^ E2 ! N2) -> B ^ E2 ! N2\n"),
+        out.contains("effect : (f = () <- (Fail(E2), ..N2) -> B) <- (Fail(E2), ..N2) -> B\n"),
         "{out}"
     );
     assert!(!out.contains("error"), "{out}");

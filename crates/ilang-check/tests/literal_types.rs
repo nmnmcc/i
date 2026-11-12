@@ -118,7 +118,7 @@ fn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {
     assert!(
         lines
             .iter()
-            .any(|l| l.ends_with("fit : (String) -> 1 ! Assert")),
+            .any(|l| l.ends_with("fit : (String) <- (Assert) -> 1")),
         "{lines:?}"
     );
 }
@@ -577,7 +577,7 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
     let (ds, lines) = check("f = (0 | 1) { 2 }\n");
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : (Int) -> 2 ! Assert")),
+        lines.iter().any(|l| l.ends_with("f : (Int) <- (Assert) -> 2")),
         "{lines:?}"
     );
     // §7.5: fitting does not narrow the original subject to a constructor.
@@ -656,7 +656,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "W0503");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : (x: 1) -> 0 | 1")),
+        lines.iter().any(|l| l.ends_with("f : (x = 1) -> 0 | 1")),
         "{lines:?}"
     );
     // The impossible guard does not let an invalid body escape checking.

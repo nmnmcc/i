@@ -621,7 +621,7 @@ impl Query<'_> {
                         .into_iter()
                         .enumerate()
                         .map(|(i, text)| {
-                            let (label, ty) = match text.split_once(": ") {
+                            let (label, ty) = match text.split_once(" = ") {
                                 Some((l, t)) if ilang_package::is_name(l) => {
                                     (Some(l.to_string()), t.to_string())
                                 }
@@ -737,7 +737,7 @@ impl Query<'_> {
             }
             let start = label.len() as u32;
             match (l, ty) {
-                (Some(l), Some(t)) => label.push_str(&format!("{l}: {t}")),
+                (Some(l), Some(t)) => label.push_str(&format!("{l} = {t}")),
                 (Some(l), None) => label.push_str(l),
                 (None, Some(t)) => label.push_str(t),
                 (None, None) => label.push('_'),
@@ -750,23 +750,22 @@ impl Query<'_> {
         }
         label.push(')');
         let ret = match &callee.kind {
-            ExprKind::Name(ValueRef::Ctor(c)) => Some(self.type_head(c.ty)),
+            ExprKind::Name(ValueRef::Ctor(c)) => Some(format!(" -> {}", self.type_head(c.ty))),
             ExprKind::Name(ValueRef::Def(d)) => self
                 .def_type(*d)
                 .as_deref()
-                .and_then(split_fn_type)
-                .map(|x| x.1),
+                .and_then(split_fn_type_need)
+                .map(need_and_result),
             ExprKind::Name(ValueRef::Local(v)) => {
                 let t = match self.def_of_var(m, *v) {
                     Some(d) => self.def_type(d),
                     None => self.local_type(m, *v, callee.span.start),
                 };
-                t.as_deref().and_then(split_fn_type).map(|x| x.1)
+                t.as_deref().and_then(split_fn_type_need).map(need_and_result)
             }
             _ => None,
         };
         if let Some(r) = ret {
-            label.push_str(" -> ");
             label.push_str(&r);
         }
         // The argument at the position: by its label, else by place.
@@ -826,6 +825,12 @@ impl Query<'_> {
 
 /// The parameters and the rest of a shown function type `(a, b) -> c`.
 pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
+    split_fn_type_need(t).map(|(p, _, r)| (p, r))
+}
+
+/// The parameter items, the need (the text after `<-`, if any) and the
+/// result of a shown function type `(P) <- S -> R` (syntax three §3.1).
+pub(crate) fn split_fn_type_need(t: &str) -> Option<(Vec<String>, Option<String>, String)> {
     let t = t.trim();
     let t = t
         .strip_prefix("{ ")
@@ -866,12 +871,37 @@ pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
     if !cur.trim().is_empty() {
         parts.push(cur.trim().to_string());
     }
-    let rest = t[close + 1..]
-        .trim_start()
-        .strip_prefix("->")?
-        .trim()
-        .to_string();
-    Some((parts, rest))
+    let mut rest = t[close + 1..].trim_start();
+    let mut need = None;
+    if let Some(n) = rest.strip_prefix("<-") {
+        let n = n.trim_start();
+        let mut depth = 0i32;
+        let mut end = None;
+        for (i, c) in n.char_indices() {
+            match c {
+                '(' | '[' | '{' => depth += 1,
+                ')' | ']' | '}' => depth -= 1,
+                _ if depth == 0 && n[i..].starts_with(" ->") => {
+                    end = Some(i);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let end = end?;
+        need = Some(n[..end].trim().to_string());
+        rest = n[end..].trim_start();
+    }
+    let rest = rest.strip_prefix("->")?.trim().to_string();
+    Some((parts, need, rest))
+}
+
+/// ` <- S -> R`, or ` -> R` when nothing is needed.
+fn need_and_result((_, need, ret): (Vec<String>, Option<String>, String)) -> String {
+    match need {
+        Some(n) => format!(" <- {n} -> {ret}"),
+        None => format!(" -> {ret}"),
+    }
 }
 
 fn word_start(text: &str, offset: u32) -> u32 {

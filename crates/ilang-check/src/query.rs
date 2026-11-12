@@ -472,18 +472,41 @@ impl<'a> Query<'a> {
                 notes.push(format!("Declared as `{declared}`"));
             }
         }
-        // The error and environment rows of a function type (§3, §9).
+        // The need of a function type (syntax three §2.10, §6.6): its
+        // `Fail(…)` entries are the possible errors, the rest services.
         let ty = code.split_once(": ").map_or(code, |x| x.1);
-        if let Some((_, rest)) = complete::split_fn_type(ty) {
-            let (rest, env) = split_top(&rest, " ! ");
-            let (_, err) = split_top(rest, " ^ ");
-            // A row that is only a type variable says nothing.
-            let known = |row: &str| !self.is_type_variable_text(row);
-            if let Some(e) = err.filter(|e| known(e)) {
-                notes.push(format!("Errors: `{e}`"));
+        if let Some((_, Some(need), _)) = complete::split_fn_type_need(ty) {
+            let inner = need
+                .strip_prefix('(')
+                .and_then(|x| x.strip_suffix(')'))
+                .unwrap_or(&need);
+            let mut errors = Vec::new();
+            let mut services = Vec::new();
+            let mut rest = inner;
+            loop {
+                let (head, tail) = split_first_top(rest, ", ");
+                let item = head.trim();
+                if let Some(e) = item.strip_prefix("Fail(").and_then(|x| x.strip_suffix(')')) {
+                    // A row that is only a type variable says nothing.
+                    if !self.is_type_variable_text(e) {
+                        errors.push(e.to_string());
+                    }
+                } else if !item.is_empty()
+                    && !item.starts_with("..")
+                    && !self.is_type_variable_text(item)
+                {
+                    services.push(item.to_string());
+                }
+                match tail {
+                    Some(t) => rest = t,
+                    None => break,
+                }
             }
-            if let Some(n) = env.filter(|n| known(n)) {
-                notes.push(format!("Environment: `{n}`"));
+            if !errors.is_empty() {
+                notes.push(format!("Possible errors: `{}`", errors.join(" | ")));
+            }
+            if !services.is_empty() {
+                notes.push(format!("Services: `{}`", services.join(", ")));
             }
         }
         notes
@@ -1629,24 +1652,20 @@ fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
 }
 
 /// `a sep b` split at the last `sep` outside brackets.
-fn split_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
+fn split_first_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
     let mut depth = 0i32;
     let b = s.as_bytes();
-    let mut last = None;
-    let mut i = 0;
-    while i < b.len() {
+    for i in 0..b.len() {
         match b[i] {
             b'(' | b'[' | b'{' => depth += 1,
             b')' | b']' | b'}' => depth -= 1,
-            _ if depth == 0 && s[i..].starts_with(sep) => last = Some(i),
+            _ if depth == 0 && s[i..].starts_with(sep) => {
+                return (&s[..i], Some(&s[i + sep.len()..]));
+            }
             _ => {}
         }
-        i += 1;
     }
-    match last {
-        Some(i) => (&s[..i], Some(&s[i + sep.len()..])),
-        None => (s, None),
-    }
+    (s, None)
 }
 
 fn with_type(name: &str, ty: Option<&str>) -> String {

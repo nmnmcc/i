@@ -16,7 +16,7 @@ pub enum ShownType {
     Named(TypeRef, Vec<ShownType>),
     /// `(A, B)`.
     Tuple(Vec<ShownType>),
-    /// `(label: A, B) -> R ^ E ! N`.
+    /// `(label = A, B) <- (S, Fail(E), ..N) -> R`.
     Fn(Box<ShownFn>),
     /// A type variable, by its shown name. The variables of one shown type
     /// have different names.
@@ -184,31 +184,37 @@ impl ShownType {
                     }
                     if let Some(l) = l {
                         out.push_str(l);
-                        out.push_str(": ");
+                        out.push_str(" = ");
                     }
                     p.write(0, out, n);
                 }
-                out.push_str(") -> ");
-                // A function type followed by `^` or `!` is put in `{ }`.
-                let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
-                    let braces = followed && matches!(x, ShownType::Fn(_));
-                    if braces {
-                        out.push_str("{ ");
-                    }
-                    x.write(0, out, n);
-                    if braces {
-                        out.push_str(" }");
-                    }
-                };
-                part(&f.ret, f.err.is_some() || f.env.is_some(), out, n);
+                out.push(')');
+                // The need (syntax three §2.10): the services, an error as
+                // the service `Fail(E)`, and row variables as `..N`.
+                let mut items = Vec::new();
                 if let Some(e) = &f.err {
-                    out.push_str(" ^ ");
-                    part(e, f.env.is_some(), out, n);
+                    let mut t = String::new();
+                    e.write(0, &mut t, n);
+                    items.push(format!("Fail({t})"));
                 }
                 if let Some(e) = &f.env {
-                    out.push_str(" ! ");
-                    part(e, false, out, n);
+                    let members: Vec<&ShownType> = match e {
+                        ShownType::Union(ms) => ms.iter().collect(),
+                        ShownType::Never => vec![],
+                        e => vec![e],
+                    };
+                    for m in members {
+                        let mut t = String::new();
+                        m.write(1, &mut t, n);
+                        if matches!(m, ShownType::Var(_)) {
+                            t.insert_str(0, "..");
+                        }
+                        items.push(t);
+                    }
                 }
+                out.push_str(&need_text(items));
+                out.push_str(" -> ");
+                f.ret.write(0, out, n);
                 close(out, 0);
             }
             ShownType::Union(ms) => {
@@ -233,6 +239,24 @@ impl ShownType {
             }
         }
     }
+}
+
+/// The `<- …` part of a function type from its items (syntax three
+/// §3.1): empty when nothing is needed, `<- N` for a lone row variable, and
+/// otherwise the bracket form with the services in byte order of their
+/// names and the row variables last.
+pub(crate) fn need_text(mut items: Vec<String>) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    items.sort_by(|a, b| (a.starts_with("..")).cmp(&b.starts_with("..")).then(a.cmp(b)));
+    items.dedup();
+    if let [one] = items.as_slice()
+        && let Some(row) = one.strip_prefix("..")
+    {
+        return format!(" <- {row}");
+    }
+    format!(" <- ({})", items.join(", "))
 }
 
 /// How the names in a text are found.
