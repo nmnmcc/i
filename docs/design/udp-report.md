@@ -71,5 +71,6 @@ Follow their socket/resource approach rather than adding a task or channel API.
   omitted bind/send_to/receive_from/local_address/close_datagram). Updated that
   expectation to match the specified API.
 
-The final acceptance gate will be recorded after it completes. No feature remains
-unimplemented.
+The full acceptance check passed: release build, UDP example, WASI rejection,
+`scripts/dev-verify rust`, `scripts/dev-verify i`, `scripts/old-syntax-check`, and
+`scripts/dev-verify js`. No feature remains unimplemented.
