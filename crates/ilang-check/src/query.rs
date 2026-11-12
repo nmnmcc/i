@@ -16,6 +16,17 @@ use ilang_package::{Diagnostic, PackageGraph, SourceId};
 use ilang_syntax::ast;
 use ilang_syntax::span::Span;
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, OnceLock};
+
+mod actions;
+mod complete;
+mod nav;
+mod refs;
+
+pub use actions::{CodeFix, InlayHint, MissingClauses};
+pub use complete::{CompletionContext, Signature, SignatureParam};
+pub use nav::{DocumentLink, Folding, MacroCall, WorkspaceSymbol};
+pub use refs::{Edit, Reference, RenameError};
 
 /// [`crate::check`] for editors. The diagnostics are the same. But the
 /// program is resolved even when a module has a syntax error, from the
@@ -75,6 +86,10 @@ pub struct Hover {
     pub code: String,
     /// The documentation comment (`///`) of the definition, if any.
     pub doc: Option<String>,
+    /// More to show, in Markdown: the value of a constant, the declared
+    /// type, the errors and the environment of a function, the expansion of
+    /// a macro call.
+    pub notes: Vec<String>,
 }
 
 /// A place in a file.
@@ -85,13 +100,14 @@ pub struct Location {
     pub span: Span,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum CompletionKind {
     /// A name bound by a pattern or a parameter.
     Local,
     /// A top-level name whose value is a function.
     Function,
     /// Another top-level name.
+    #[default]
     Value,
     Constructor,
     Type,
@@ -100,12 +116,29 @@ pub enum CompletionKind {
     Keyword,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Completion {
     pub label: String,
     pub kind: CompletionKind,
     /// The type, when it is known.
     pub detail: Option<String>,
+    /// The documentation comment of the definition, when it is given at
+    /// once (else see `defined_in`).
+    pub documentation: Option<String>,
+    /// The text to put in, when it is not the label.
+    pub insert: Option<String>,
+    /// `insert` is a snippet, with `${1:…}` places.
+    pub snippet: bool,
+    /// The span of the text that the completion takes the place of, when it
+    /// is not the word at the position.
+    pub replace: Option<Span>,
+    /// Other changes of the file: the import of the name.
+    pub edits: Vec<Edit>,
+    /// The path of the module that defines the name, whose documentation
+    /// [`Query::documentation_of`] gives.
+    pub defined_in: Option<String>,
+    /// Sorted before the other items.
+    pub preferred: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -129,9 +162,10 @@ pub struct Symbol {
     pub children: Vec<Symbol>,
 }
 
-/// What a name or a literal in the source is.
+/// What a name or a literal in the source is: the identity that hover,
+/// references and rename go by.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Target {
+pub enum Target {
     Local(VarId),
     Def(DefId),
     Ctor(CtorRef),
@@ -148,6 +182,38 @@ pub struct Query<'a> {
     graph: &'a PackageGraph,
     program: &'a Program,
     types: Option<&'a Typed>,
+    cache: Option<&'a Cache>,
+}
+
+/// What the queries work out once for each module of a checked program: its
+/// syntax tree and the names in it. Kept with the program by an editor, so
+/// that a request reads them instead of working them out again.
+pub struct Cache {
+    walks: Vec<OnceLock<Arc<Occurrences>>>,
+    asts: Vec<OnceLock<Arc<ast::Module>>>,
+}
+
+impl Cache {
+    pub fn new(program: &Program) -> Cache {
+        let n = program.modules.len();
+        Cache {
+            walks: (0..n).map(|_| OnceLock::new()).collect(),
+            asts: (0..n).map(|_| OnceLock::new()).collect(),
+        }
+    }
+}
+
+/// The names of a module, gathered from the HIR.
+pub(crate) struct Occurrences {
+    /// Every name and literal, with what it is.
+    occ: Vec<(Span, Target)>,
+    /// The binder of every local name.
+    binders: HashMap<VarId, Span>,
+    /// Each field access `e.f`: the span of `f`, and of `e.f`.
+    fields: Vec<(Span, Span)>,
+    /// The binders of constructor pattern parts that are also the label of
+    /// a field, with the field: they are names of both.
+    labels: Vec<(Span, Target)>,
 }
 
 impl<'a> Query<'a> {
@@ -156,7 +222,39 @@ impl<'a> Query<'a> {
             graph,
             program,
             types,
+            cache: None,
         }
+    }
+
+    /// The same queries, reading and keeping what they work out in `cache`,
+    /// which must have been made for this program.
+    pub fn with_cache(mut self, cache: &'a Cache) -> Self {
+        assert_eq!(cache.walks.len(), self.program.modules.len(), "cache of another program");
+        self.cache = Some(cache);
+        self
+    }
+
+    /// Works out the syntax trees and the names of the modules of the
+    /// package and of the expanded modules, so that requests need not.
+    pub fn warm(&self) {
+        for (i, module) in self.program.modules.iter().enumerate() {
+            let m = ModuleId(i as u32);
+            if Some(module.package) == self.graph.root || module.scoped.is_some() {
+                self.walk(m);
+            }
+        }
+    }
+
+    pub fn program(&self) -> &'a Program {
+        self.program
+    }
+
+    pub fn graph(&self) -> &'a PackageGraph {
+        self.graph
+    }
+
+    pub fn types(&self) -> Option<&'a Typed> {
+        self.types
     }
 
     /// The module whose file is `source`.
@@ -177,7 +275,42 @@ impl<'a> Query<'a> {
         &self.graph.sources.get(self.program.module(m).source).text
     }
 
-    fn ast(&self, m: ModuleId) -> ast::Module {
+    /// The text of the file of a module as written, without the text that
+    /// macro expansion added after it.
+    pub fn written_text(&self, m: ModuleId) -> &'a str {
+        let module = self.program.module(m);
+        let text = self.text(m);
+        module
+            .scoped
+            .as_ref()
+            .map_or(text, |scoped| &text[..scoped.original_len() as usize])
+    }
+
+    /// The file of the module is in the Lisp surface (`.is`).
+    pub fn is_lisp(&self, m: ModuleId) -> bool {
+        self.graph
+            .sources
+            .get(self.program.module(m).source)
+            .display
+            .ends_with(".is")
+    }
+
+    /// The syntax tree of a module, as the parser recovered it from the
+    /// written text.
+    pub fn syntax(&self, m: ModuleId) -> Arc<ast::Module> {
+        self.ast(m)
+    }
+
+    fn ast(&self, m: ModuleId) -> Arc<ast::Module> {
+        match self.cache {
+            Some(c) => c.asts[m.0 as usize]
+                .get_or_init(|| Arc::new(self.parse_ast(m)))
+                .clone(),
+            None => Arc::new(self.parse_ast(m)),
+        }
+    }
+
+    fn parse_ast(&self, m: ModuleId) -> ast::Module {
         let module = self.program.module(m);
         let source = self.graph.sources.get(module.source);
         let text = module
@@ -200,13 +333,116 @@ impl<'a> Query<'a> {
     /// constructor its type as a function, for a field its written type,
     /// and for a type its definition.
     pub fn type_at(&self, m: ModuleId, offset: u32) -> Option<Hover> {
+        if let Some(h) = self.macro_hover(m, offset) {
+            return Some(h);
+        }
         let (owner, span, at, target) = self.target_at(m, offset)?;
         let (code, doc_at) = self.describe(owner, at, &target)?;
+        let notes = self.hover_notes(owner, &target, &code);
         Some(Hover {
             span,
             code,
             doc: doc_at.and_then(|(module, span)| self.doc(module, span)),
+            notes,
         })
+    }
+
+    /// A shown type that is only the name of a type variable: an `UpName`
+    /// that names no type of the program.
+    fn is_type_variable_text(&self, s: &str) -> bool {
+        refs::is_up_name(s)
+            && !self.program.types.iter().any(|t| t.name == s)
+            && !BuiltinType::ALL.iter().any(|b| b.name() == s)
+    }
+
+    /// For a macro call: the macro, and the code that the call was
+    /// expanded to.
+    fn macro_hover(&self, m: ModuleId, offset: u32) -> Option<Hover> {
+        let c = self.macro_call_at(m, offset)?;
+        if !contains(c.name, offset) {
+            return None;
+        }
+        let mut notes = vec![format!("Macro from `{}`.", c.module)];
+        if let Some(text) = self.expansion_of(m, c.call) {
+            let text = if text.chars().count() > 400 {
+                format!("{}…", text.chars().take(400).collect::<String>())
+            } else {
+                text
+            };
+            notes.push(format!("Expands to:\n```\n{text}\n```"));
+        }
+        Some(Hover {
+            span: c.name,
+            code: format!("macro {}", c.macro_name),
+            doc: c.doc,
+            notes,
+        })
+    }
+
+    /// What hover shows below the type of a name.
+    fn hover_notes(&self, m: ModuleId, target: &Target, code: &str) -> Vec<String> {
+        let p = self.program;
+        let mut notes = Vec::new();
+        let target = self.canonical(m, target.clone());
+        // The binding of the name, for its value and its declared type.
+        let (pattern, value, module) = match &target {
+            Target::Def(d) => match &p.def(*d).kind {
+                DefKind::Binding { binding, var } => {
+                    let b = &p.module(d.module).bindings[*binding as usize].binding;
+                    (binder_pattern(&b.pattern, *var), Some(&b.value), d.module)
+                }
+                DefKind::External { .. } => (None, None, d.module),
+            },
+            Target::Local(v) => {
+                let mut found = (None, None);
+                nav::visit_module(p, m, &mut |n| {
+                    if let nav::Node::Binding(b) = n
+                        && let Some(pat) = binder_pattern(&b.pattern, *v)
+                    {
+                        found = (Some(pat), Some(&b.value));
+                    }
+                    if let nav::Node::Expr(Expr { kind: ExprKind::Fn(f), .. }) = n {
+                        for param in &f.params {
+                            if let Param::Pattern { pattern, .. } = param
+                                && let Some(pat) = binder_pattern(pattern, *v)
+                            {
+                                found = (Some(pat), None);
+                            }
+                        }
+                    }
+                });
+                (found.0, found.1, m)
+            }
+            _ => (None, None, m),
+        };
+        if let Some(value) = value
+            && matches!(value.kind, ExprKind::Int(_) | ExprKind::Float(_) | ExprKind::String(_))
+            && let Some(text) = self.text(module).get(value.span.start as usize..value.span.end as usize)
+            && !code.ends_with(&format!(": {text}"))
+        {
+            notes.push(format!("Value: `{text}`"));
+        }
+        if let Some(PatternKind::Typed { ty, .. }) = pattern.map(|p| &p.kind) {
+            let declared = self.show_type(ty);
+            if !code.ends_with(&format!(": {declared}")) {
+                notes.push(format!("Declared as `{declared}`"));
+            }
+        }
+        // The error and environment rows of a function type (§3, §9).
+        let ty = code.split_once(": ").map_or(code, |x| x.1);
+        if let Some((_, rest)) = complete::split_fn_type(ty) {
+            let (rest, env) = split_top(&rest, " ! ");
+            let (_, err) = split_top(rest, " ^ ");
+            // A row that is only a type variable says nothing.
+            let known = |row: &str| !self.is_type_variable_text(row);
+            if let Some(e) = err.filter(|e| known(e)) {
+                notes.push(format!("Errors: `{e}`"));
+            }
+            if let Some(n) = env.filter(|n| known(n)) {
+                notes.push(format!("Environment: `{n}`"));
+            }
+        }
+        notes
     }
 
     /// The text for a target at `at`, and the place of the definition
@@ -599,6 +835,11 @@ impl<'a> Query<'a> {
     /// a top-level name, a constructor, a field, or a type at its name, and
     /// a module at the start of its file.
     pub fn definition_at(&self, m: ModuleId, offset: u32) -> Option<Location> {
+        if let Some(c) = self.macro_call_at(m, offset)
+            && contains(c.name, offset)
+        {
+            return Some(c.definition);
+        }
         let (owner, _, _, target) = self.target_at(m, offset)?;
         self.definition(owner, &target)
     }
@@ -688,7 +929,9 @@ impl<'a> Query<'a> {
                 continue;
             }
             let owner = ModuleId(index as u32);
-            for (span, target) in self.walk(owner).occ {
+            let walk = self.walk(owner);
+            for (span, target) in &walk.occ {
+                let (span, target) = (*span, target.clone());
                 let Some(origin) = self.program.origin(owner, span) else {
                     continue;
                 };
@@ -720,7 +963,16 @@ impl<'a> Query<'a> {
 
     /// Every name and literal of a module, and the binder of every local
     /// name.
-    fn walk(&self, m: ModuleId) -> Walk<'_> {
+    fn walk(&self, m: ModuleId) -> Arc<Occurrences> {
+        match self.cache {
+            Some(c) => c.walks[m.0 as usize]
+                .get_or_init(|| Arc::new(self.compute_walk(m)))
+                .clone(),
+            None => Arc::new(self.compute_walk(m)),
+        }
+    }
+
+    fn compute_walk(&self, m: ModuleId) -> Occurrences {
         let mut w = Walk {
             q: self,
             m,
@@ -728,6 +980,7 @@ impl<'a> Query<'a> {
             occ: Vec::new(),
             binders: HashMap::new(),
             fields: Vec::new(),
+            labels: Vec::new(),
         };
         let p = self.program;
         let module = p.module(m);
@@ -777,7 +1030,54 @@ impl<'a> Query<'a> {
             }
         }
         self.walk_imports_exports(m, &mut w.occ);
-        w
+        self.walk_type_params(m, &mut w.occ);
+        Occurrences {
+            occ: w.occ,
+            binders: w.binders,
+            fields: w.fields,
+            labels: w.labels,
+        }
+    }
+
+    /// The type parameters written after the name of a type or a binding,
+    /// which the HIR keeps without their spans.
+    fn walk_type_params(&self, m: ModuleId, occ: &mut Vec<(Span, Target)>) {
+        let ast = self.ast(m);
+        let p = self.program;
+        for item in &ast.items {
+            let (params, from_def): (&[ast::Ident], Option<TypeId>) = match &item.kind {
+                ast::ItemKind::TypeDef(def) => (
+                    &def.params,
+                    p.module(m)
+                        .types
+                        .iter()
+                        .copied()
+                        .find(|t| p.ty(*t).span == def.name.span),
+                ),
+                ast::ItemKind::Binding(b) => (&b.type_params, None),
+                ast::ItemKind::Declaration { type_params, .. } => (type_params, None),
+                ast::ItemKind::MacroItem { .. } => continue,
+            };
+            for (i, param) in params.iter().enumerate() {
+                let var = from_def
+                    .and_then(|t| p.ty(t).params.get(i).map(|(_, v)| *v))
+                    .or_else(|| {
+                        occ.iter().find_map(|(s, t)| match t {
+                            Target::TyVar(v)
+                                if item.span.start <= s.start
+                                    && s.end <= item.span.end
+                                    && self.ty_var_name(*v) == param.name =>
+                            {
+                                Some(*v)
+                            }
+                            _ => None,
+                        })
+                    });
+                if let Some(v) = var {
+                    occ.push((param.span, Target::TyVar(v)));
+                }
+            }
+        }
     }
 
     /// The names in `import` and `export`, which the HIR does not keep.
@@ -868,7 +1168,7 @@ impl<'a> Query<'a> {
             // `{ t }.`: what the checker knew of its value there.
             return self.field_completions(m, start as u32);
         }
-        self.scope_completions(m, offset as u32)
+        self.context_completions(m, offset as u32)
     }
 
     /// The fields that may be written after the dot of the field access
@@ -978,6 +1278,8 @@ impl<'a> Query<'a> {
                     label: label.name.clone(),
                     kind: CompletionKind::Field,
                     detail: Some(self.show_type(&f.ty)),
+                    defined_in: Some(self.program.module(self.program.ty(ctors[0].ty).module).path.clone()),
+                    ..Default::default()
                 });
             }
         }
@@ -1029,6 +1331,8 @@ impl<'a> Query<'a> {
                 CompletionKind::Value
             },
             detail,
+            defined_in: Some(self.program.module(d.module).path.clone()),
+            ..Default::default()
         }
     }
 
@@ -1040,6 +1344,11 @@ impl<'a> Query<'a> {
                 TypeRef::Custom(t) => Some(self.type_definition(t)),
                 TypeRef::Builtin(b) => Some(builtin_head(b)),
             },
+            defined_in: match t {
+                TypeRef::Custom(t) => Some(self.program.module(self.program.ty(t).module).path.clone()),
+                TypeRef::Builtin(_) => None,
+            },
+            ..Default::default()
         }
     }
 
@@ -1054,6 +1363,8 @@ impl<'a> Query<'a> {
                     label: cs[index as usize].name.clone(),
                     kind: CompletionKind::Constructor,
                     detail: Some(self.ctor_type(c)),
+                    defined_in: Some(self.program.module(self.program.ty(t).module).path.clone()),
+                    ..Default::default()
                 }
             })
             .collect()
@@ -1076,6 +1387,7 @@ impl<'a> Query<'a> {
                 label: b.name.clone(),
                 kind: CompletionKind::Local,
                 detail: self.local_type(m, b.var, offset),
+                ..Default::default()
             });
         }
         // The top-level names of the module.
@@ -1095,6 +1407,8 @@ impl<'a> Query<'a> {
                 label: name.clone(),
                 kind: CompletionKind::Module,
                 detail: Some(format!("module {}", p.module(*t).path)),
+                documentation: self.module_doc(*t),
+                ..Default::default()
             });
         }
         let ast = self.ast(m);
@@ -1241,6 +1555,47 @@ impl<'a> Query<'a> {
     }
 }
 
+/// The part of a pattern that binds `v` with its type: `v` or `v: T`.
+fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
+    match &p.kind {
+        PatternKind::Var(b) if b.var == v => Some(p),
+        PatternKind::Typed { binder: Some(b), .. } if b.var == v => Some(p),
+        PatternKind::Named { binder, pattern } => {
+            if binder.var == v {
+                Some(p)
+            } else {
+                binder_pattern(pattern, v)
+            }
+        }
+        PatternKind::Constructor { args: ps, .. } | PatternKind::Tuple(ps) | PatternKind::Error(ps) => {
+            ps.iter().find_map(|q| binder_pattern(q, v))
+        }
+        PatternKind::List { items, .. } => items.iter().find_map(|q| binder_pattern(q, v)),
+        _ => None,
+    }
+}
+
+/// `a sep b` split at the last `sep` outside brackets.
+fn split_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
+    let mut depth = 0i32;
+    let b = s.as_bytes();
+    let mut last = None;
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth -= 1,
+            _ if depth == 0 && s[i..].starts_with(sep) => last = Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    match last {
+        Some(i) => (&s[..i], Some(&s[i + sep.len()..])),
+        None => (s, None),
+    }
+}
+
 fn with_type(name: &str, ty: Option<&str>) -> String {
     match ty {
         Some(t) => format!("{name}: {t}"),
@@ -1332,7 +1687,7 @@ fn named_types(t: &Type, out: &mut Vec<TypeRef>) {
     }
 }
 
-/// The names of a module, gathered from the HIR.
+/// Gathers the names of a module from the HIR.
 struct Walk<'q> {
     q: &'q Query<'q>,
     m: ModuleId,
@@ -1341,9 +1696,100 @@ struct Walk<'q> {
     binders: HashMap<VarId, Span>,
     /// Each field access `e.f`: the span of `f`, and of `e.f`.
     fields: Vec<(Span, Span)>,
+    /// The binders of constructor pattern parts that are also the label of
+    /// a field: the field.
+    labels: Vec<(Span, Target)>,
+}
+
+/// The binder that gives a pattern its label: the last name of the chain
+/// of `=` at its top (§6.11, §7.1).
+pub(crate) fn label_binder(p: &Pattern) -> Option<&Binder> {
+    match &p.kind {
+        PatternKind::Var(b) => Some(b),
+        PatternKind::Typed { binder, .. } => binder.as_ref(),
+        PatternKind::Named { binder, pattern } => label_binder(pattern).or(Some(binder)),
+        _ => None,
+    }
+}
+
+/// The span of the first word in `span`.
+fn first_word(text: &str, span: Span) -> Option<Span> {
+    let bytes = text.as_bytes();
+    let end = (span.end as usize).min(bytes.len());
+    let mut start = (span.start as usize).min(end);
+    while start < end && !is_word_byte(bytes[start]) {
+        start += 1;
+    }
+    let mut stop = start;
+    while stop < end && is_word_byte(bytes[stop]) {
+        stop += 1;
+    }
+    (start < stop).then(|| Span::new(start as u32, stop as u32))
+}
+
+/// The span of the first (or last) whole word `name` in `span`.
+fn find_word(text: &str, span: Span, name: &str, last: bool) -> Option<Span> {
+    let bytes = text.as_bytes();
+    let end = (span.end as usize).min(bytes.len());
+    let start = (span.start as usize).min(end);
+    let hay = &text[start..end];
+    let mut found = None;
+    for (i, _) in hay.match_indices(name) {
+        let a = start + i;
+        let b = a + name.len();
+        let before = a > 0 && is_word_byte(bytes[a - 1]);
+        let after = b < bytes.len() && is_word_byte(bytes[b]);
+        if !before && !after {
+            found = Some(Span::new(a as u32, b as u32));
+            if !last {
+                break;
+            }
+        }
+    }
+    found
 }
 
 impl Walk<'_> {
+    /// A name at `span`, in the written `whole` that may start with the
+    /// name of a module, as `m.x` and `(. m x)` do: that name is the module.
+    fn qualified(&mut self, whole: Span, span: Span, target: Target) {
+        if let Some(first) = first_word(self.text, whole)
+            && first.end <= span.start
+        {
+            let name = &self.text[first.start as usize..first.end as usize];
+            if let Some(t) = self.q.import_module(self.m, name) {
+                self.occ.push((first, Target::Module(t)));
+            }
+        }
+        self.occ.push((span, target));
+    }
+
+    /// The labels of the parts of a constructor pattern that are matched to
+    /// fields with labels: the last name of the chain of `=` at the top of
+    /// the part (§7.1).
+    fn pattern_labels(&mut self, p: &Pattern, ctor: CtorRef, args: &[Pattern]) {
+        let Some(def) = self.q.ctor_def(ctor) else {
+            return;
+        };
+        let fields = self
+            .q
+            .types
+            .and_then(|t| t.pattern_fields.get(&(self.m, p.span)));
+        for (k, a) in args.iter().enumerate() {
+            let index = match fields.and_then(|f| f.get(k)) {
+                Some(&i) if i != u32::MAX => i as usize,
+                Some(_) => continue,
+                None => continue,
+            };
+            if def.fields.get(index).is_none_or(|f| f.label.is_none()) {
+                continue;
+            }
+            if let Some(b) = label_binder(a) {
+                self.labels.push((b.span, Target::Field(vec![(ctor, index as u32)])));
+            }
+        }
+    }
+
     fn binder(&mut self, b: &Binder) {
         if b.name.starts_with('%') {
             return;
@@ -1378,8 +1824,13 @@ impl Walk<'_> {
                 }
             }
             PatternKind::Constructor { ctor, args, .. } => {
-                self.occ
-                    .push((head_word(self.text, p.span), Target::Ctor(*ctor)));
+                let name = self.q.ctor_def(*ctor).map(|c| c.name.clone());
+                let span = name
+                    .as_deref()
+                    .and_then(|n| find_word(self.text, p.span, n, false))
+                    .unwrap_or_else(|| head_word(self.text, p.span));
+                self.qualified(p.span, span, Target::Ctor(*ctor));
+                self.pattern_labels(p, *ctor, args);
                 args.iter().for_each(|a| self.pattern(a));
             }
             PatternKind::Tuple(ps) | PatternKind::Error(ps) => {
@@ -1409,8 +1860,10 @@ impl Walk<'_> {
     fn ty(&mut self, t: &Type) {
         match &t.kind {
             TypeKind::Named { ty, args } => {
-                self.occ
-                    .push((head_word(self.text, t.span), Target::Type(*ty)));
+                let name = self.q.type_ref_name(*ty);
+                let span = find_word(self.text, t.span, &name, false)
+                    .unwrap_or_else(|| head_word(self.text, t.span));
+                self.qualified(t.span, span, Target::Type(*ty));
                 args.iter().for_each(|a| self.ty(a));
             }
             TypeKind::Var(v) => self.occ.push((t.span, Target::TyVar(*v))),
@@ -1475,13 +1928,21 @@ impl Walk<'_> {
                 if e.span.start == e.span.end {
                     return;
                 }
-                let span = last_word(self.text, e.span);
+                let name = match v {
+                    ValueRef::Local(_) => None,
+                    ValueRef::Def(d) => Some(self.q.program.def(*d).name.clone()),
+                    ValueRef::Ctor(c) => self.q.ctor_def(*c).map(|c| c.name.clone()),
+                };
+                let span = name
+                    .as_deref()
+                    .and_then(|n| find_word(self.text, e.span, n, true))
+                    .unwrap_or_else(|| last_word(self.text, e.span));
                 let t = match v {
                     ValueRef::Local(v) => Target::Local(*v),
                     ValueRef::Def(d) => Target::Def(*d),
                     ValueRef::Ctor(c) => Target::Ctor(*c),
                 };
-                self.occ.push((span, t));
+                self.qualified(e.span, span, t);
             }
             ExprKind::Tuple(xs) => xs.iter().for_each(|x| self.expr(x)),
             ExprKind::Record { base, fields } => {
@@ -1534,6 +1995,22 @@ impl Walk<'_> {
             }
             ExprKind::Call { callee, args } => {
                 self.expr(callee);
+                // The labels of a call of a constructor are its fields.
+                if let ExprKind::Name(ValueRef::Ctor(c)) = &callee.kind
+                    && let Some(def) = self.q.ctor_def(*c)
+                {
+                    for a in args {
+                        let Some(label) = &a.label else { continue };
+                        if let Some(i) = def
+                            .fields
+                            .iter()
+                            .position(|f| f.label.as_ref().is_some_and(|l| l.name == label.name))
+                        {
+                            self.occ
+                                .push((label.span, Target::Field(vec![(*c, i as u32)])));
+                        }
+                    }
+                }
                 args.iter().for_each(|a| self.expr(&a.value));
             }
             ExprKind::Field { target, name } => {

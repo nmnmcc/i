@@ -23,6 +23,8 @@ pub(crate) struct Analysis {
     /// are loaded from the file, so their problems are not where they were
     /// found in the document, and are not shown until it is saved.
     pub unsaved_manifests: HashSet<SourceId>,
+    /// What the queries work out for the program, kept for the next request.
+    pub cache: query::Cache,
 }
 
 impl Analysis {
@@ -35,11 +37,7 @@ impl Analysis {
 
     pub fn query(&self) -> Option<Query<'_>> {
         let program = self.checked.program.as_ref()?;
-        Some(Query::new(
-            &self.graph,
-            program,
-            self.checked.types.as_ref(),
-        ))
+        Some(Query::new(&self.graph, program, self.checked.types.as_ref()).with_cache(&self.cache))
     }
 
     pub fn text(&self, source: SourceId) -> &str {
@@ -224,13 +222,18 @@ fn analyze(job: &Job) -> (Analysis, bool) {
         types: None,
         diags: Vec::new(),
     });
+    let cache = query::Cache::new(checked.program.as_ref().unwrap_or(&Default::default()));
     let analysis = Analysis {
         graph,
         checked,
         load_diags,
         paths,
         unsaved_manifests,
+        cache,
     };
+    if let Some(q) = analysis.query() {
+        q.warm();
+    }
     (analysis, ok)
 }
 
@@ -345,12 +348,14 @@ mod expansion_source_tests {
         graph.sources.set_text(id, scoped.text().into());
         module.scoped = Some(scoped);
         let checked = query::check_parsed_for_queries(&graph, &parsed, vec![]);
+        let cache = query::Cache::new(checked.program.as_ref().unwrap());
         let analysis = Analysis {
             graph,
             checked,
             load_diags: vec![],
             paths: HashMap::new(),
             unsaved_manifests: HashSet::new(),
+            cache,
         };
         assert_eq!(analysis.text(id), source);
         assert!(analysis.graph.sources.get(id).text.len() > source.len());

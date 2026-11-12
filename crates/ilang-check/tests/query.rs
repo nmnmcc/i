@@ -637,3 +637,135 @@ fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
             .any(|t| t.contains("m13") && !t.contains('…'))
     );
 }
+
+// ---- The queries for references, rename, navigation and code actions ----
+
+const SHAPES_Q: &str = "(Shape(..), area)\n\nShape {\n  Circle(radius: Int)\n  Dot\n}\n\narea = (s: Shape) -> Int {\n  s |> {\n    Circle(radius) -> radius * 3\n    Dot -> 0\n  }\n}\n";
+const MAIN_Q: &str = "(\n  (Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n  c = Circle(radius: 2)\n  area(c) + area(Circle(radius: 1))\n}\n";
+
+fn shapes_fixture() -> Fixture {
+    Fixture::new(&[("src/shapes.i", SHAPES_Q), ("src/main.i", MAIN_Q)])
+}
+
+fn texts_of(f: &Fixture, refs: &[ilang_check::query::Reference]) -> Vec<(String, String)> {
+    let p = f.checked.program.as_ref().unwrap();
+    refs.iter()
+        .map(|r| {
+            let text = &f.graph.sources.get(r.location.source).text;
+            (
+                p.module(r.location.module).path.clone(),
+                text[r.location.span.start as usize..r.location.span.end as usize].to_string(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn query_references_follow_identity_across_modules() {
+    let f = shapes_fixture();
+    let q = f.query();
+    let m = f.module("app/main");
+    let at = f.at("app/main", "area(c)", 0, 1);
+    let (owner, _, target) = q.target_at_offset(m, at).unwrap();
+    let refs = q.references(&target, owner, &q.own_modules());
+    let found = texts_of(&f, &refs);
+    assert_eq!(found.iter().filter(|(p, _)| p == "app/main").count(), 3, "{found:?}");
+    assert_eq!(found.iter().filter(|(p, _)| p == "app/shapes").count(), 2, "{found:?}");
+    assert!(found.iter().all(|(_, t)| t == "area"), "{found:?}");
+    assert_eq!(refs.iter().filter(|r| r.definition).count(), 1);
+    // A field: the label of the definition, the labels of the calls, and
+    // the pattern part, which also binds a local.
+    let at = f.at("app/main", "radius: 2", 0, 0);
+    let (owner, _, target) = q.target_at_offset(m, at).unwrap();
+    let refs = q.references(&target, owner, &q.own_modules());
+    assert_eq!(refs.len(), 4, "{:?}", texts_of(&f, &refs));
+    assert_eq!(refs.iter().filter(|r| r.label_binder).count(), 1);
+}
+
+#[test]
+fn query_rename_checks_kind_and_scope() {
+    let f = shapes_fixture();
+    let q = f.query();
+    let m = f.module("app/main");
+    let at = f.at("app/main", "c = ", 0, 0);
+    assert!(q.rename(m, at, "Big").is_err());
+    let e = q.rename(m, at, "area").unwrap_err();
+    assert!(e.0.contains("area"), "{e}");
+    let edits = q.rename(m, at, "disk").unwrap();
+    assert_eq!(edits.len(), 2);
+    assert!(edits.iter().all(|e| e.text == "disk"));
+    // A constructor, in both modules.
+    let at = f.at("app/main", "Circle(radius: 2)", 0, 0);
+    let edits = q.rename(m, at, "Disk").unwrap();
+    assert_eq!(edits.len(), 5, "{edits:?}");
+    // Refused for the library.
+    let text = "main = () { panic(\"x\") }\n";
+    let g = Fixture::new(&[("src/main.i", text)]);
+    let e = g.query().prepare_rename(g.module("app/main"), g.at("app/main", "panic", 0, 1)).unwrap_err();
+    assert!(e.0.contains("library"), "{e}");
+}
+
+#[test]
+fn query_missing_clauses_of_a_match() {
+    let text = "Shape {\n  Circle(Int)\n  Dot\n  Line\n}\n\nf = (s: Shape) {\n  s |> {\n    Dot -> 0\n    Circle(1) -> 1\n  }\n}\n";
+    let f = Fixture::new(&[("src/main.i", text)]);
+    let q = f.query();
+    let m = f.module("app/main");
+    let span = ilang_syntax::span::Span::new(f.at("app/main", "s |>", 0, 0), f.at("app/main", "s |>", 0, 1));
+    let c = q.missing_clauses(m, span).unwrap();
+    assert_eq!(c.patterns, vec!["Circle(..)", "Line"]);
+    assert_eq!(c.edit.text, "    Circle(..) -> panic(\"todo\")\n    Line -> panic(\"todo\")\n");
+}
+
+#[test]
+fn query_type_definition_signature_and_hints() {
+    let f = shapes_fixture();
+    let q = f.query();
+    let m = f.module("app/main");
+    let types = q.type_definition_at(m, f.at("app/main", "area(c)", 0, 5));
+    assert_eq!(types.len(), 1);
+    assert_eq!(f.graph.sources.get(types[0].source).text[types[0].span.start as usize..types[0].span.end as usize].to_string(), "Shape");
+    let s = q.signature_help(m, f.at("app/main", "area(c)", 0, 5)).unwrap();
+    assert_eq!(s.label, "area(s: Shape) -> Int");
+    assert_eq!(s.active, Some(0));
+    let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
+    assert_eq!(hints.len(), 1, "{hints:?}");
+    assert_eq!(hints[0].label, ": Shape");
+}
+
+#[test]
+fn query_completion_context() {
+    use ilang_check::query::CompletionContext;
+    let f = shapes_fixture();
+    let q = f.query();
+    let shapes = f.module("app/shapes");
+    assert_eq!(q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)), CompletionContext::Type);
+    match q.completion_context(shapes, f.at("app/shapes", "Dot -> 0", 0, 0)) {
+        CompletionContext::Pattern { types } => assert_eq!(types.len(), 1),
+        other => panic!("{other:?}"),
+    }
+    let main = f.module("app/main");
+    assert!(matches!(
+        q.completion_context(main, f.at("app/main", "app/shapes", 0, 4)),
+        CompletionContext::Import { names_of: None, .. }
+    ));
+    assert!(matches!(
+        q.completion_context(main, f.at("app/main", "radius: 2", 0, 0)),
+        CompletionContext::Expression { call: Some(_) }
+    ));
+}
+
+#[test]
+fn query_unused_imports_and_fixes() {
+    let text = "(\n  app/shapes\n)\n\nmain = () { area(Dot) }\n";
+    let f = Fixture::new(&[("src/shapes.i", SHAPES_Q), ("src/main.i", text)]);
+    let q = f.query();
+    let m = f.module("app/main");
+    let unused = q.unused_imports(m);
+    assert_eq!(unused.len(), 1);
+    assert_eq!(unused[0].1, "app/shapes");
+    let fixes = q.missing_import_fixes(m, ilang_syntax::span::Span::new(f.at("app/main", "area(", 0, 0), f.at("app/main", "area(", 0, 4)));
+    assert_eq!(fixes.len(), 1);
+    assert_eq!(fixes[0].edits[0].text, "(area) = ");
+}
+
