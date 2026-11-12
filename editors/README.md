@@ -39,9 +39,9 @@ A custom Cargo target directory is overridden for the compiler build so that the
 workspace paths remain correct. No compiler or editor installation is attempted
 when opening the repository.
 
-The tree-sitter grammar covers the branch's dual syntax (parenthesised and brace
-records, `^` and legacy `?` errors), while pipes/matches remain `|>`. There are no
-reserved keywords. [Highlight classes](tree-sitter-i/README.md) are shared with
+The tree-sitter and TextMate grammars cover syntax three (data `( )` with
+`name = value`, branches `(p) { e } | …`, `|>` matches, `<-` needs, service
+patterns and provide, `<A>` type parameters). There are no reserved keywords. [Highlight classes](tree-sitter-i/README.md) are shared with
 the TextMate grammar.
 
 References: [Zed extension development](https://zed.dev/docs/extensions/developing-extensions),
