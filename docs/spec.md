@@ -135,7 +135,16 @@ One rule does not depend on lines: in the `->` part of a function, after the `)`
 `i fmt` formats `.i` and `.is` source files in their own surface, including
 both extensions by default in `src/`, `test/` and given directories;
 `--check` reports files that would change. Both surfaces use 80 columns. The
-normal surface indents with one tab per level. The Lisp surface is laid out
+normal surface indents with one tab per level. In the normal surface, the
+**call depth** of an expression is the number of nested function calls on the
+deepest path through call arguments: a call whose callee is an `UpName`
+constructor and data literals do not count, field access and pipes do not add
+depth, and a function literal argument starts again at 0 for its body. A call
+whose call depth is greater than 2 is never laid out on one line: its
+arguments go one per line, indented, with the closing `)` on its own line (the
+layout of a call that does not fit the width), and the rule applies again to
+each argument; a block whose one statement is broken so is over several
+lines. The Lisp surface is laid out
 by Lisp convention (cljfmt indentation): a datum that fits stays on one
 line; closing brackets never begin a line and are gathered at the end of the
 form's last line; indentation is with spaces. A broken block-like form (`=`,
