@@ -1,7 +1,9 @@
 # Syntax three: one meaning per bracket
 
-Status: controlling design note for SYN3, 2026-11-12. Workers implement from
-this note. The base is `redesign` at 5c186400 (worktree `lane/editors`).
+Status: controlling design note for SYN3, 2026-11-12, revised after the third
+and fourth rounds of answers (the owner's decisions on this note, and the
+details settled by the draft author and the coordinator). Workers implement
+from this note. The base is `redesign` at 5c186400 (worktree `lane/editors`).
 Nothing in it has been parsed or checked: no SYN3 parser exists. Statements
 about today's compiler cite files at that commit; statements about the new
 language are derived from the rules below. Every example in the new syntax
@@ -15,8 +17,11 @@ is in a `text` fence, so that `scripts/old-syntax-check`, which parses every
 1. `.rd/cache/syntax-3-draft.md` (the draft, Chinese). Its sections 1 to 7
    are the owner's decisions. Its section 8 is the author's additions.
 2. `.rd/cache/syntax-3-answers.md`: two rounds of answers by the draft author
-   and later owner decisions relayed by the author. Later text overrides
-   earlier text.
+   and later owner decisions relayed by the author; a third round with the
+   owner's decisions on the first version of this note; a fourth round with
+   the remaining details, settled by the draft author and accepted by the
+   coordinator under the owner's instruction "不用什么都问我" (do not ask me
+   about everything). Later text overrides earlier text.
 3. `.rd/cache/gpt/report-eval-syn3.md` (the evaluation): grammar delta,
    attacks G1 to G23, blockers B1 to B5, overloading design (§4.1 to §4.4),
    decisions D1 to D11, staged plan.
@@ -51,6 +56,9 @@ Each line gives the owner's words where the inputs quote them.
 | O17 | The guard `? cond` is inside the parameter group, after all parameters: `(a: Int, b: Int ? a > b) -> Int { a - b }`. | "条件写进参数的括号里" |
 | O18 | A function with several shapes is a first-class value without choosing a shape, and the run time supports it: `fs = [area]; f = list.first(fs); f(2.0); f(3.0, 4.0)` is legal and runs. | "让运行时支持这种函数值，这才是理所当然的逻辑" |
 | O19 | Not every precise overload type has a spelling. The costs of draft §7 are accepted (no "any value with a `name` field" functions, no run-time field addition, the built record machinery is dropped). | Draft §3.4, §7 |
+| O20 | In the Lisp surface, a function body is any one expression; `{ }` itself is a computation. Labels are in a fixed order, and the printed text of a value is a legal expression: `User(age = 36, name = "ada")`. A multi-shape function type is written `{ (Float) \| (Float, Float) } -> Float`. | "函数体是任意一个表达式，{ } 本身就表示一种计算。标签按固定顺序排，打印结果是合法的表达式。{ (Float) \| (Float, Float) } -> Float。" (third round) |
+| O21 | A member of a sum need not be a constructor. `i/syntax` drops its `Int(Int)` and `Float(Float)` wrappers: the built-in types are members directly and are told apart by type tests. Members whose content is `String` (Name, Discard, Up, Symbol, Text) and Round, Square, Curly stay labelled types. `Node` is written with the outer parentheses. | "Node = (Name \| Int \| Float \| Text) 直接写成这样不就行了" (third round) |
+| O22 | Details are decided by the coordinator, or by the draft author and the coordinator together; only what changes a principle the owner stated, or clearly changes the look of the language, goes to the owner. | "不用什么都问我" (fourth round) |
 
 ### 1.3 Rules accepted without explicit owner confirmation
 
@@ -105,11 +113,47 @@ Further author rules the owner did not object to but did not confirm:
   of the owner's two examples.
 - Migration makes function signatures and their labelled calls positional and
   keeps labels on constructor fields (D1).
-- The `db ! Db` lookahead (a type followed by `=` is not a read).
+### 1.3a Settled in the fourth round (draft author and coordinator, under O22)
 
-Rules that this note adds because no input settles them are marked
-"**(this note)**" where they are stated, and the ones that the owner should
-see are repeated as questions in §8.
+These were the open questions Q1 to Q19 of the first version of this note.
+They are not the owner's words; they are binding. Where the rules below state
+one of them, it is marked **[R4]**.
+
+- Q1: `name ! T = e` (a read followed by `=`) is a compile error (§2.10).
+- Q2: in data, a positional item may not follow a labelled item (§2.3).
+- Q3 (owner, O20): labelled values print in a fixed label order, as a legal
+  expression (§2.15).
+- Q4: the fixed order is UTF-8 byte order of the labels, for storage, type
+  display and the text form.
+- Q5 (owner, O20): `{ (Float) | (Float, Float) } -> Float`.
+- Q6: a binding with a written type, `f: T = chain`, has no selection table.
+- Q7: no rest at the top of a parameter group.
+- Q8: the empty-match function is `core.never : (Never) -> A`.
+- Q9: known types are facts; the spec states it (§2.6.6).
+- Q10: no selection in a match on a chain literal.
+- Q11: a function-type member left ungrouped in a result union is not an
+  error; the type error gets a better message (G2).
+- Q12: a data pattern fitted to a union of shapes stays a compile error.
+- Q13 (owner, O21): `Node = (Name | Int | Float | Text …)` with the outer
+  parentheses, a new labelled type holding one item of union type; the `Int`
+  and `Float` wrappers are removed; nothing is renamed (§2.8, §7.3).
+- No qualified names for built-in types are added (§2.8).
+- Q14: `x: T` in a one-branch group of a multi-group chain is an annotation.
+- Q15: errors and environment are shared by the branches of a chain.
+- Q16: host-facing parameter data (`@external`, host exports, host-service
+  fields) has positions only.
+- Q17: `.k` and `.f` read labelled values whose constructor is visible.
+- Q18: variance per labelled type by spec §4.5 rule 6; `In(A) | Out(A)` is
+  more permissive than today, and sound.
+- Q19: no cap on the size of error rows; measured after stage 3.
+- Lisp surface: parameters are written as data destructuring,
+  `(-> (, a b) R e)`; positions Parameters, Parameter, Field and CallArgument
+  merge into one "item of data" position each for values, types and patterns;
+  empty parameters are `(,)`; the empty `()` has no legal position (§6.8).
+
+Rules that this note itself adds, because no input settles them, are marked
+**(this note)**. They are details under O22; none changes a principle or the
+look of the language.
 
 ### 1.4 Contradictions between the inputs and how they are resolved
 
@@ -123,9 +167,11 @@ see are repeated as questions in §8.
 | Answers 1f | The author recommended option 乙 (shape must be chosen) | The owner chose 甲 (run-time support), O18. |
 | Draft §6 against the evaluation §6 | "Function types are untouched", "`e \|> branches` already compiles in place", "delete far more than change" | The evaluation's corrections, accepted by the author. |
 | Draft §8.2 against answers 8.2 | `Nil` "defined by the standard library" | Prelude (`lib/prelude.i`), because `lib/i` cannot import `std`. |
-| Evaluation grammar against the rest | `ParamItem` admits `..rest` at the top of a parameter group | This note forbids rest at the top of a group, because shape groups must be syntactic (§2.4, §8 Q7). |
-| Answers B1 claim against this note's analysis | "Checking against the selected domains is sound whether or not known types are reliable" | Not true in general; see §2.6.6. The choice stands; the guarantee is restated and an invariant is added (§8 Q9). |
-| `meta.md` §2.3 against `spec.md` | The meta table writes a match as `e.{ p -> v }`; the spec and the code write `e \|> { … }` | The spec controls. The new rows in §6.9 replace both. |
+| Evaluation grammar against the rest | `ParamItem` admits `..rest` at the top of a parameter group | No rest at the top of a group, because shape groups must be syntactic (§2.4, [R4] Q7). |
+| Answers B1 claim against this note's analysis | "Checking against the selected domains is sound whether or not known types are reliable" | Not true in general; see §2.6.6. The choice stands; the guarantee is restated and the invariant "known types are facts" is added ([R4] Q9). |
+| Third round against fourth round on Q13 | The third round records `Node = (…)` "pending confirmation against the plain union name `Node = Name \| Int \| …`" | The fourth round settles it: with the outer parentheses, a labelled type. |
+| Today's Lisp surface against the new rows | Today a pipe `a \|> f` is written `(\| a f)` in `.is` files (`lisp/to_ast.rs`:489, `std/src/test.is`), while SYN3 uses `\|` for the branch join | The pipe head becomes `\|>`; `(\| …)` in an expression is a chain (§6.8). |
+| `meta.md` §2.3 against `spec.md` | The meta table writes a match as `e.{ p -> v }`; the spec and the code write `e \|> { … }` | The spec controls. The new rows in §6.8 replace both. |
 
 ## 2. Principles and rules
 
@@ -177,10 +223,10 @@ one  = (pair)                    // shape: 1 position; one is not pair
   subtyping, no `Record`, no field addition or removal at run time.
 - **Items.** `label = e` gives a label, `e` gives the next position,
   `..e` spreads (below). A label may not be given twice.
-- **Order (this note).** In data values, data types and data patterns, an
+- **Order [R4].** In data values, data types and data patterns, an
   explicit positional item may not follow an explicit labelled item:
   `(port = 443, "a.com")` is a compile error. Spreads are exempt. This keeps
-  today's rule for calls (spec §6.6) and is listed as §8 Q2.
+  today's rule for calls (spec §6.6).
 - **No scope (O9).** Items are worked out in the outer scope, left to right in
   written order. A label makes no name. `(w = h, h = w)` swaps the outer `w`
   and `h`.
@@ -231,7 +277,7 @@ connect = (host: String, port = p: Int) -> Conn { open(host, p) }
 - **Parameter items.** `x`, `x: T`, any pattern: a positional item.
   `label = p`: a labelled item whose part is matched by `p`. `(name: T)` is a
   positional binder (O11). There is no rest `..` at the top of a parameter
-  group **(this note)**: the shape of a function must be syntactic for shape
+  group [R4]: the shape of a function must be syntactic for shape
   groups (§2.6). Rest is allowed in nested data patterns with a known shape.
 - **Shape of a branch.** The shape of a function literal is the shape of its
   parameter group: its number of positional items and its set of labels.
@@ -239,11 +285,11 @@ connect = (host: String, port = p: Int) -> Conn { open(host, p) }
   data type: `(Int, Int) -> Int`, `(String) -> User ^ NotFound ! Db`,
   `(String, port = Int) -> Conn`, `() -> Int`. Labels are part of the type
   (O11). `(a: Int) -> Int` is a compile error: write `(Int) -> Int`.
-- **Multi-shape function types (this note).** The parameter part may also be a
+- **Multi-shape function types (O20).** The parameter part may also be a
   group whose members are data types: `{ (Float) | (Float, Float) } -> Float`.
-  This is the type of a multi-shape value (§2.6.5). `((Float) | (Float, Float))
-  -> Float` is a different type: one position whose part is a union of data.
-  §8 Q5 asks whether this spelling is wanted.
+  This is the type of a multi-shape value (§2.6.5).
+  `((Float) | (Float, Float)) -> Float` is a different type: one position
+  whose part is a union of data.
 - **No defaults.** `(port = 80)` in a parameter group means "the label `port`
   must be the literal 80", not a default. Optional parameters are written as
   shape overloading (§4.5).
@@ -286,7 +332,7 @@ cover its parameter type (spec §7.4). `x: T` in it is a type test.
 function type `(B) -> R ^ E ! N`, where `B` is the group's parameter data
 type and `R` the union of its branch results. A chain with several groups has
 the multi-shape type of §2.6.5. Errors `E` and environment `N` are shared by
-all branches of a chain **(this note, §8 Q15)**.
+all branches of a chain [R4].
 
 **Matching.** `e |> C`, where the right side is a chain literal (one or more
 function literals), is a **match**. It works out `e` and calls `C` with the
@@ -297,7 +343,7 @@ a name subject makes that name known to be made by `C` in the branch (spec
 §7.5). So matching uses the group of shape "one position". Branches of other
 shapes in a matched chain literal can never run and give the "never used"
 warning. A match is typed by rule 11 with all branches of that group; there
-is no selection in a match **(this note, §8 Q10)**. A match whose chain has
+is no selection in a match [R4]. A match whose chain has
 one branch and no guard is typed as the binding of that branch's item to
 `e` followed by the body, as today (spec §4.8 rule 11, second paragraph).
 
@@ -347,7 +393,7 @@ The table lists, for each branch in written order: its shape, its written
 parameter pattern (for selection), its domain type `Dom_i` and its result
 type `R_i` (for the solver). A binding with a written type at the top of its
 pattern, `f: T = chain`, has no table: its uses have the type `T`
-**(this note, §8 Q6)**. A chain bound inside a data value or a list, or passed
+[R4]. A chain bound inside a data value or a list, or passed
 as an argument, has no table.
 
 #### 2.6.2 Selection at a direct call
@@ -477,8 +523,10 @@ match, then at every key `k`, `v_k` is in `W_i,k` and its member is not taken
 (else an earlier unguarded branch matches `v`). So selection is sound when
 **known types are facts**: every value an expression can have at run time is
 in its known type. The spec intends this (known types come from written types,
-schemes and matched patterns) but does not state it; this note states it as
-an invariant (§8 Q9).
+schemes and matched patterns) but does not state it. [R4] The spec states it
+as a rule of §4.8: **every value an expression can have at run time is in its
+known type.** It is tested with the generated families of
+`scripts/test-generation`; selection, narrowing and `.k` depend on it.
 
 The solver then checks the argument against the selected domains
 (answers B1). This makes the inferred argument type agree with the selection,
@@ -622,8 +670,104 @@ the data by spec §4.5 rule 6.
   `ParseError = (String)` needs no wrapper. Two definitions of one name in a
   module are an error (spec §2.2). A top-level type covers a built-in type of
   the same name in its module (spec §5), so `Int = (Int)` is a labelled type
-  whose data contains itself, not a wrapper of the built-in `Int` (see §7.3
-  and §8 Q13 for the `i/syntax` names this affects).
+  whose data contains itself, not a wrapper of the built-in `Int`.
+- **No qualified names for built-in types [R4].** There is no spelling such as
+  `i.Int` for a built-in type. So a module that defines a type `Int` cannot
+  name the built-in `Int` anywhere in that module; it can only use a name for
+  it that another module defines and exports (`Integer = Int` there).
+- **Sums whose members are not constructors (O21).** A member of a sum need
+  not be a labelled type made for it: built-in types (`Int`, `Float`,
+  `String`, `List(A)`, …), data types and labelled types of other sums may be
+  members directly, and values are told apart by type tests (spec §7.1) and
+  constructor patterns. This works only when **every two members have
+  different type constructors**: members with one type constructor are put
+  together into one (spec §4.4, `List(Int) | List(String)` is
+  `List(Int | String)`), all function types are one type constructor, all data
+  of one shape is one, and a type test may not have a type variable as a
+  member. A type test that would have to tell such members apart is already
+  a compile error (spec §4.8 rule 11, `x: Box(Int)` against `y: Box(String)`).
+  So the practice is: wrap in a labelled type exactly those members that
+  would share a type constructor with another member, and leave the others
+  bare. `i/syntax.Node` is the example:
+
+```text
+Node = (Name | Discard | Up | Symbol | Int | Float | Text | Round | Square | Curly | Bits | Quote | Unquote | Splice)
+Name = (String)
+Discard = (String)
+Up = (String)
+Symbol = (String)
+Text = (String)
+Round = (List(Syntax))
+Square = (List(Syntax))
+Curly = (List(Syntax))
+Bits = (List(Syntax))
+Quote = (Syntax)
+Unquote = (Syntax)
+Splice = (Syntax)
+```
+
+  `Int` and `Float` are the built-in types. The five `String` members, the
+  four `List(Syntax)` members and the three `Syntax` members stay labelled
+  types, because each group shares one type constructor (O21 names `String`
+  members and Round, Square, Curly; Bits, Quote, Unquote and Splice follow
+  from the same condition). `Node` itself is a labelled type whose data is one
+  position of the union type (O21's outer parentheses): its values are
+  `Node(5)`, `Node(Name("x"))`, and a match takes them apart with
+  `(Node(n: Int))` and `(Node(Name(t)))`. `Node(..)` exports `Node` and its
+  constructor; because its data names `Name` … `Splice`, those must be
+  exported too (spec §2.4), each with `(..)` for macros to use them:
+  `Node(..), Name(..), Discard(..), Up(..), Symbol(..), Text(..), Round(..),
+  Square(..), Curly(..), Bits(..), Quote(..), Unquote(..), Splice(..)`. The
+  whole-sum export `A(..)` (D8) is for names only, so it does not apply to
+  `Node`. `node` and `make` in `lib/i/syntax.i` become:
+
+```text
+node = (syntax: Syntax) -> Node {
+    raw_kind(syntax) |>
+        (0) { Node(Name(raw_text(syntax))) }
+        | (1) { Node(Discard(raw_text(syntax))) }
+        | (2) { Node(Up(raw_text(syntax))) }
+        | (3) { Node(Symbol(raw_text(syntax))) }
+        | (4) { Node(raw_int(syntax)) }
+        | (5) { Node(raw_float(syntax)) }
+        | (6) { Node(Text(raw_text(syntax))) }
+        | (7) { Node(Round(children(syntax, 0, raw_length(syntax), []))) }
+        | (8) { Node(Square(children(syntax, 0, raw_length(syntax), []))) }
+        | (9) { Node(Curly(children(syntax, 0, raw_length(syntax), []))) }
+        | (10) { Node(Bits(children(syntax, 0, raw_length(syntax), []))) }
+        | (11) { Node(Quote(raw_child(syntax, 0))) }
+        | (12) { Node(Unquote(raw_child(syntax, 0))) }
+        | (13) { Node(Splice(raw_child(syntax, 0))) }
+        | (_) { panic("syntax: invalid node kind") }
+}
+
+make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
+    result = node |>
+        (Node(Name(value))) { raw_make_text(0, value, like) }
+        | (Node(Discard(value))) { raw_make_text(1, value, like) }
+        | (Node(Up(value))) { raw_make_text(2, value, like) }
+        | (Node(Symbol(value))) { raw_make_text(3, value, like) }
+        | (Node(value: Int)) { raw_make_int(value, like) }
+        | (Node(value: Float)) { raw_make_float(value, like) }
+        | (Node(Text(value))) { raw_make_text(6, value, like) }
+        | (Node(Round(items))) { raw_make_list(7, build_list(items, raw_list_new()), like) }
+        | (Node(Square(items))) { raw_make_list(8, build_list(items, raw_list_new()), like) }
+        | (Node(Curly(items))) { raw_make_list(9, build_list(items, raw_list_new()), like) }
+        | (Node(Bits(items))) { raw_make_list(10, build_list(items, raw_list_new()), like) }
+        | (Node(Quote(item))) { raw_make_one(11, item, like) }
+        | (Node(Unquote(item))) { raw_make_one(12, item, like) }
+        | (Node(Splice(item))) { raw_make_one(13, item, like) }
+    raw_syntax_ok(result) |>
+        (True) { raw_syntax_value(result) }
+        | (False) { fail.raise(SyntaxError(message = raw_syntax_error(result), at = like)) }
+}
+```
+
+  In `make`, the group has 14 branches, so `value: Int` and `value: Float`
+  are type tests; the place under `Node`'s position 0 has the type of the
+  union and the branches cover it. In `node`, `raw_kind(syntax)` is an `Int`
+  and the last branch is a catch-all. `Int` and `Float` in `i/syntax` now
+  mean the built-in types, so no definition in the module covers them.
 - **Exports** (§5.2.1). `T` exports the type only; `T(..)` exports a labelled
   type and its constructor. A name `A` is exported alone; `A(..)` exports the
   name and each member of its expansion with `(..)`, and is a compile error
@@ -658,10 +802,13 @@ the data by spec §4.5 rule 6.
   `x` has the known type `T`. `T` is one named type, as today for environment
   parameters (spec §9.2).
 - **Provide.** `! T = e` is unchanged.
-- **Lookahead.** A statement that starts `name ! NamedType` is a read only
-  when the named type is not followed by `=`. `db ! Db = make()` on one line
-  is therefore today's reading: the expression statement `db` (warning
-  W0502), then `! Db = make()` (G19, §8 Q1).
+- **No `=` after a read [R4].** A statement that starts `name ! NamedType`
+  is always a read. When the named type is followed by `=`, as in
+  `db ! Db = make()`, it is a compile error whose message says to write the
+  environment statement `! Db = make()` on its own line, then the read. (A
+  line that begins with `=` continues the line before, spec §1.7, so a break
+  does not change this.) Today the same text is silently two statements with
+  only warning W0502 (G19).
 - **Meaning.** A read sees the environment of the place where it runs: the
   caller's environment as changed by earlier environment statements of the
   enclosing blocks. A read at the start of a function body is exactly today's
@@ -720,7 +867,7 @@ rule 9): for a read `x ! T` followed by the rest `r` of the block, if `r`, with
 ### 2.13 The empty match
 
 There is no chain with zero branches. `x |> {}` and `{}` are removed. The core
-function `core.never : (Never) -> A` (D9; the name is §8 Q8) is the match on
+function `core.never : (Never) -> A` (D9; the name [R4]) is the match on
 `Never`: `core.never(x)`, and as a value it replaces `{}`.
 
 ### 2.14 Host, entries and `@external`
@@ -728,7 +875,7 @@ function `core.never : (Never) -> A` (D9; the name is §8 Q8) is the match on
 - A host export, an entry (program entry, test) and the type of an
   `@external` declaration must have exactly one shape (D11). An entry has the
   shape `()`.
-- **(this note, §8 Q16)** Their parameter data, and the parameters of the
+- [R4] Their parameter data, and the parameters of the
   function types of a host service's fields, have positions only, no labels.
   The ABI (spec §B.2) passes parameters in order, and these types are written
   by hand anyway after the migration removes their documentation labels.
@@ -746,7 +893,7 @@ function `core.never : (Never) -> A` (D9; the name is §8 Q8) is the match on
 | Value | Text form (spec §11.8) |
 |---|---|
 | Data | `(`, the positional parts in order, then `label = part` for each label in UTF-8 byte order of the labels, with `, ` between, `)`. `()` when empty. |
-| Labelled value | The constructor name; when its data is not `()`, then the text form of its data: `Some(1)`, `User(age = 36, name = "ada")`, `None`. **(this note, §8 Q3)** |
+| Labelled value | The constructor name; when its data is not `()`, then the text form of its data: `Some(1)`, `User(age = 36, name = "ada")`, `None`. The printed text is a legal expression (O20); labels in UTF-8 byte order [R4]. |
 | Function | `//fn(`, one name per key of its shape: positions `a`, `b`, … as today, then each label as `label = ` followed by the next name of the same sequence, `) { ... }`. A multi-shape value writes each group's part joined by ` \| `: `//fn(a) { ... } \| (a, b) { ... }`, in the written order of the groups' first branches. |
 
 ## 3. Grammar
@@ -875,8 +1022,8 @@ needs a comma.
   only follows a body's `}`, so it never meets a union `|` (G1).
 - **P6 Statements.** In order: (a) `name ( UpName { , UpName } )` followed by
   `=` or `:` is a binding with type parameters (unchanged); (b) `!` begins an
-  environment statement; (c) `name !` followed by a named type that is not
-  followed by `=` is an environment read; (d) otherwise read pattern parts
+  environment statement; (c) `name !` followed by a named type is an
+  environment read, and a `=` after that type is a compile error (§2.10); (d) otherwise read pattern parts
   while each is followed by `=`: if at least one was, the statement is a
   binding, the parts read form its pattern, and the value begins at the first
   part not followed by `=` (that text is read again as an expression); (e)
@@ -916,7 +1063,7 @@ onward are new.
 | # | Form | Resolution under the final rules |
 |---|---|---|
 | G1 | `(p) -> A { e } \| (q) { f }` against a union `\|` | P5: the body's `{` ends the `->` part; `\|` after `}` is a join. No ambiguity. |
-| G2 | A forgotten body: `(a) -> Int \| (b) -> Int { … }` | One function whose result is `Int \| (b) -> Int`. Deterministic; the type error that follows should mention the missing body when a result union has a function type member written without a group. |
+| G2 | A forgotten body: `(a) -> Int \| (b) -> Int { … }` | One function whose result is `Int \| (b) -> Int`. Deterministic and not an error [R4]; the type error that follows mentions the missing body when a result union has a function type member written without a group. |
 | G3 | A leading `\|` on a line | Continues the line before (P13). A line starting with `(` is a new statement. |
 | G4 | `x \|> (p) { e } \| (q) { f }` | `Branches` is a primary, so the whole chain is the right operand (P4, P11). |
 | G5 | `\|>` weakest | `x \|> g == 2` is `x \|> { g == 2 }`, which P11 rejects with a hint; today it is `{ x \|> g } == 2`. `x == 1 \|> core.not` becomes legal. Stage 5 rewrites the 28+ and 3+ lines in std (§7.2). |
@@ -933,7 +1080,7 @@ onward are new.
 | G16 | `T = (A)` against `T = { (A) }` | §2.8: nominal against name. `Pair(A, B) = (A, B)` is an alias today and nominal after (2 in std, 130 in tests); the migrator writes `{ (A, B) }` (§7.3). |
 | G17 | `Wrap = (Int)` against `Wrap = (Int) \| Nil` | The first is a labelled type; the second a name for a union of a data type and `Nil`. Deterministic by the outermost form. |
 | G18 | `User(name = "ada")` as a statement | P6(d): a pattern not followed by `=`, so an expression (a call). |
-| G19 | `db ! Db` | P6(c). `db ! Db = make()` on one line is not a read (§2.10, §8 Q1). |
+| G19 | `db ! Db` | P6(c): always a read. `db ! Db = make()` is a compile error with a message (§2.10, [R4]); today it is silently two statements. |
 | G20 | `(Sat \| Sun, x)` | `\|` is tighter than `,` in a `PItem`. |
 | G21 | `(x: Int \| y)` | P8: `Int \| y` is a type (`y` a value type). A type test is the last alternative: `(True \| _: Int)`. |
 | G22 | `f \| g` with names | Rejected by P4 (D3). |
@@ -1308,6 +1455,12 @@ Grammar as §3.2. Then:
   not used in the data, and every parameter of an opaque type, does not
   change (§4.5 rule 6). The others change as the data says.
 - `Opaque` may not be the name of a type, and may not be used in a type.
+- A sum is a name for a union, or a labelled type whose data is one item of a
+  union type. Its members may be any types, labelled or not, also built-in
+  types; values are told apart by type tests and constructor patterns, so
+  every two members must have different type constructors (§4.4, §7.1).
+- There is no qualified name for a built-in type. A module that defines a
+  type with the name of a built-in type cannot name the built-in type.
 - Blocks have no type definitions.
 
 ```text
@@ -1448,7 +1601,7 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
 5. **Calls.** If `f : {P} -> A ^ E ! N` and the argument data `d : D` with
    `D <: P`, then `f(d) : A`.
    **5a. Selection.** When `f` is a name with a selection table, its type at
-   the call is `F_sel` of §2.6.2 (this note), computed from the known types
+   the call is `F_sel` of §2.6.2, computed from the known types
    before inference constrains the call.
 6. **Data and lists.** If every item `ei : Ti` at key `ki`, the data has the
    data type with `Ti` at `ki`; a spread contributes the parts of the type of
@@ -1733,30 +1886,36 @@ not read.
 
 ### 6.7 `i/syntax` positions
 
-`Position` (lib/i/syntax.i:55-69) becomes, in this order:
+`Position` (lib/i/syntax.i:55-73) becomes, in this order [R4]:
 
 ```text
-ImportItem  ExportItem  Item  Attribute  Field  Type  FunctionResult
-Parameters  Parameter  Expression  Statement  CallArgument  Branch
-Pattern  Segment  Format
+ImportItem  ExportItem  Item  Attribute  Type  TypeItem  FunctionResult
+Expression  ValueItem  Statement  Pattern  PatternItem  Segment  Format
 ```
 
 - `Constructor` is removed (no constructor lists).
-- `Field` is an item of a data type: `T` or `(= label T)`.
-- `Parameters` is the parameter part of a function: a list of items, or
-  `(? (items…) g)`.
-- `Parameter` is an item of a data pattern (also of a constructor pattern):
-  `p`, `(= key p…)`, `(| p…)` (only in `Parameters`), `..`, `.. r`.
-- `CallArgument` is an item of a data value (a call's data or a data
-  literal): `e`, `(= label e)`, `.. e`.
-- `Branch` is a function of a chain.
 - `Clause` and `ClauseHead` are removed.
+- `Parameters`, `Parameter`, `Field` and `CallArgument` (the first version of
+  this note had `Parameters` and `Parameter`; today's list has `Field`,
+  `Parameter` and `CallArgument`) merge into one "item of data" position per
+  kind of data:
+  - `ValueItem`: an item of a data value or of a call's data: `e`,
+    `(= label e)`, `.. e`.
+  - `TypeItem`: an item of a data type: `T`, `(= label T)`.
+  - `PatternItem`: an item of a data pattern or of a constructor pattern:
+    `p`, `(= key p…)`, `..`, `.. r`; and, only in the parameter data of a
+    function, `(| p1 p2 …)`.
+- The parameter part of a function is in position `Pattern`: a data pattern
+  `(, …)`, or, only there, the guard form `(? (, …) g)`.
+- A branch of a chain is in position `Expression`.
 
 `position_id` (lib/i/syntax.i:437) and `show_as` follow the new order.
 
 ### 6.8 Lisp surface (meta.md §2.3): new rows
 
-Rows not listed are unchanged. `d` is a data item.
+Rows not listed are unchanged. A function body is any one expression (O20):
+`{ … }` is one of them, a block, but a body need not be one. The printer of
+the normal surface puts a body that is not a block into `{ }`.
 
 **Files and items**
 
@@ -1777,9 +1936,14 @@ type.
 | Core form | Normal surface | Lisp surface |
 |---|---|---|
 | Data type | `(T1, x = T2)`, `(T)`, `()` | `(, T1 (= x T2))`, `(, T)`, `(,)` |
-| Function type | `(T1, x = T2) -> R` | `(-> (T1 (= x T2)) R)` |
+| Function type | `(T1, x = T2) -> R`, `() -> R` | `(-> (, T1 (= x T2)) R)`, `(-> (,) R)` |
 | Multi-shape function type | `{ (T) \| (T, T) } -> R` | `(-> (\| (, T) (, T T)) R)` |
 | Tuple type, record type | removed | removed |
+
+- The parameter part of a function type is a type whose members are data
+  types: one `(, …)`, a `(| …)` of them, or a name that expands to them. The
+  normal printer writes every parameter part that is not one data type in a
+  group, `{ Args } -> R`.
 
 **Expressions and statements**
 
@@ -1787,21 +1951,23 @@ type.
 |---|---|---|
 | Call | `f(e1, x = e2)`, `f()`, `f(..e)` | `(f e1 (= x e2))`, `(f)`, `(f .. e)` |
 | Data | `(e1, x = e2)`, `(e)`, `()`, `(..e, x = v)` | `(, e1 (= x e2))`, `(, e)`, `(,)`, `(, .. e (= x v))` |
-| Function | `(p1, x = p2) { e }`, `(p) -> R { e }` | `(-> (p1 (= x p2)) _ e)`, `(-> (p) R e)` |
-| Function with a guard | `(p1, p2 ? g) { e }` | `(-> (? (p1 p2) g) _ e)` |
+| Function | `(p1, x = p2) { e }`, `(p) -> R { e }`, `() { e }` | `(-> (, p1 (= x p2)) _ e)`, `(-> (, p) R e)`, `(-> (,) _ e)` |
+| Function with a guard | `(p1, p2 ? g) { e }` | `(-> (? (, p1 p2) g) _ e)` |
 | Chain | `F1 \| F2` | `(\| F1 F2)` |
-| Match | `e \|> F1 \| F2` | `(\|> e (\| F1 F2))` |
+| Pipe, match | `e \|> f`, `e \|> F1 \| F2` | `(\|> e f)`, `(\|> e (\| F1 F2))` |
 | Environment read | `x ! N` | `(! x N)` |
 | Environment statement | `! N = e` | `(! N e)` (unchanged) |
 | Clause block, clause, record, record update, environment parameter | removed | removed |
 
 - `(! x N)` with a lowercase name first is a read; `(! N e)` with a named type
   first is the environment statement.
-- `(| …)` in the position of an expression has two or more parts, each a
-  three-part `(-> …)`.
-- `(,)` is the empty data in value, type and pattern positions. An empty
-  Round `()` is a compile error except as an empty parameter list
-  `(-> () …)`.
+- `(| …)` in the position of an expression is a chain: two or more parts, each
+  a three-part `(-> …)`. Today `(| a f)` is the pipe (`lisp/to_ast.rs`:489,
+  `encode.rs`:969); the pipe's head becomes `|>`, the spelling of its token in
+  the normal surface, as for every other operator.
+- `(,)` is the empty data in value, type and pattern positions, and so the
+  empty parameter data. The empty Round `()` has no legal position; `(f)` is
+  a call with one part, not an empty Round.
 
 **Patterns**
 
@@ -1813,12 +1979,90 @@ type.
 | Alternatives in a parameter item | `p1 \| p2` | `(\| p1 p2)` |
 | Two patterns for one value `x = p` | replaced by the conjunction | |
 
-- In an item position of a data pattern, a constructor pattern or a parameter
-  list, `(= n …)` whose first part is a name is a key item: `n` is the label
-  and the other parts are the pattern (one part) or a conjunction (more). So
-  the normal `(size = whole = (w, h))` is `(, (= size whole (, w h)))`, and
-  `((a, b) = args)` is `(, (= (, a b) args))`. This is P7 in the Lisp surface.
+- In position `PatternItem`, `(= n …)` whose first part is a name is a key
+  item: `n` is the label and the other parts are the pattern (one part) or a
+  conjunction (more). So the normal `(size = whole = (w, h))` is
+  `(, (= size whole (, w h)))`, and `((a, b) = args)` is
+  `(, (= (, a b) args))`. This is P7 in the Lisp surface.
 - The statement `t = (a, b) = e` is `(= (= t (, a b)) e)`.
+
+**Examples, checked against these rows**
+
+```text
+// normal
+connect = (host: String, port = p: Int) -> Conn { open(host, p) }
+pick = (0, y) { y } | (x, _) { x }
+label = (opt) { opt |> (Some(v) ? string.is_empty(v)) { "empty" } | (Some(v)) { v } | (None) { "none" } }
+
+// Lisp
+(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))
+(= pick (| (-> (, 0 y) _ y) (-> (, x _) _ x)))
+(= label (-> (, opt) _
+  (|> opt (| (-> (? (, (Some v)) ((. string is_empty) v)) _ "empty")
+             (-> (, (Some v)) _ v)
+             (-> (, None) _ "none")))))
+```
+
+The bodies `(open host p)`, `y`, `"empty"` are single expressions, not
+blocks; the normal printer writes them as `{ open(host, p) }`, `{ y }`,
+`{ "empty" }`.
+
+#### Cost of the data-form parameters
+
+The fourth round chose `(-> (, a b) R e)` over the first version's
+`(-> (a b) R e)`. Compared plainly:
+
+- **Ambiguity: none found.** The parameter part is an ordinary data pattern
+  node, so a macro reads it with the same code as any `(, …)`; the first form
+  needed a separate "list of parameters" reading of a Round that otherwise
+  reads as a call (`(a b)` is the call `a(b)` everywhere else). Function and
+  function type are still told apart by the number of parts and the position,
+  as today. The guard form `(? (, …) g)` and the multi-shape `(| (, …) …)` have
+  heads that no data pattern has. One-parameter data patterns are distinct:
+  `(-> (, (, a b)) _ e)` takes one pair, `(-> (, a b) _ e)` takes two values.
+- **One asymmetry.** A call keeps its items flat after the head, `(f a b)`,
+  while a function's parameters are a `(, …)` node. So a macro that turns a
+  parameter list into the matching call writes `(f ~..items)` from the items
+  of `(, ~..items)`. The first form had the same asymmetry in another place
+  (parameters as a bare list, data as `(, …)`).
+- **Size.** One token more per function and per function type.
+- **Migration of `.is` files and macros.** There are three `.is` files:
+  `std/src/test.is` (14 lines), its copy
+  `tests/review/cases/review-k4s/std/src/test.is`, and
+  `tests/spec/6/interpolation_macro/src/macros.is` (3 lines). `test.is` has
+  12 function literals with parameters, 4 quoted zero-parameter templates or
+  patterns `` `(-> () _ {…}) `` and 13 clauses; `macros.is` has 1 function.
+  Rust tests embed about 110 more Lisp functions (`(-> (` in
+  `crates/ilang-cli/tests/macro_run.rs` 55, `crates/ilang-syntax/tests/lisp_syntax.rs`
+  16, `lisp_datum.rs` 13, `crates/ilang-check/tests/quote_patterns.rs` 7,
+  `macro_names.rs` 6, `crates/ilang-cli/tests/compile_time_tests.rs` 4, and
+  fewer elsewhere). All of these change in stage 8 anyway: the clauses become
+  branches, the pipe head `|` becomes `|>`, records and labels change, and
+  `Node` patterns gain `Node(…)`. The `,` is one more mechanical edit in the
+  same pass, done by re-rendering the converted tree (`lisp/from_ast.rs`,
+  `render.rs`), so its own cost is small: the converter rows and the review of
+  quote patterns, which must now say `(, ~..ps)` and `(,)` where they said
+  `(~..ps)` and `()`. A quote pattern written in the old form no longer matches
+  converted code; the migrator rewrites quotes in `.is` files and Rust strings
+  with the same rows.
+
+No cost was found that the first form does not also have; the form stays.
+
+For example, two definitions of `std/src/test.is` after the conversion
+(`text` uses the new `Node`):
+
+```text
+(= text (-> (, x) _
+  (|> ((. syntax node) x)
+      (| (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)
+         (-> (, _) _ (panic "test name must be a string literal"))))))
+(= append (-> (, xs ys) _
+  (|> xs (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))
+```
+
+Today they are `(-> (x) _ {(| … {(-> ((. syntax Text) s) s) …})})` and
+`(-> (xs ys) _ {(| xs {(-> [] ys) …})})`. A clause pattern `p` becomes the one
+item of a branch's parameter data, `(, p)`, as in the normal surface (§7.3).
 
 ### 6.9 Macros
 
@@ -1826,6 +2070,15 @@ Typed macros (meta.md §7) that name record graphs (meta.md:730, 818-825) lose
 them; a macro sees data types as `(, …)` Syntax. The schema and codec
 libraries planned in records.md §5.8-5.9 must be built another way (draft §7;
 not studied here).
+
+`meta.md` §2.3 takes the rows of §6.8, §3.1 takes the `Node` and `Position`
+definitions of §2.8 and §6.7 (its `TypeView(TypeHandle)` member, which
+`lib/i/syntax.i` does not define, becomes a labelled member
+`TypeView = (TypeHandle)` if it is kept), and the datum-error paragraph of
+§2.3 says that `()` is an error in every position and `(,)` is the empty
+data. A macro that reads a node writes `(Node(Name(t)))` or `(Node(n: Int))`
+where it wrote `Name(t)` or `Int(n)`, and builds `Node(Text(s))` or
+`Node(5)` for `make`.
 
 ## 7. Migration
 
@@ -1859,12 +2112,12 @@ the new one from stage 8 to stage 12 (SYN2 did the same:
 | 0 | This note; spec replacement text staged in `i future-SYN3` fences | `docs/design/syntax-3.md`, `docs/spec.md`, `scripts/old-syntax-check.json` | `scripts/old-syntax-check` exits 0 | No | Yes |
 | 1 | Solver: unannotated recursive matches over parametric unions of one-constructor types (B2); display folds unions to declared names (D7) | `crates/ilang-check/src/types/solve.rs`, `display.rs`, `shown.rs`, `shown_tree.rs`; new `scripts/gen-syn3-union.py`; new fixtures `tests/spec/4.4/syn3_union_perf/` (12 members, generated) and `tests/spec/4.7/syn3_display_name.i` | `timeout 2 I check --project tests/spec/4.4/syn3_union_perf` exits 0; `cargo test -p ilang-cli --test spec --locked` passes, with the display fixture expecting `first : (xs: List(Option(Int))) -> Int` | No | Yes |
 | 2 | Fitting of constructor patterns `B <: Q \| r - Q`, with the disjointness warning (D4) | `types/pattern.rs`, `infer.rs`, `coverage.rs`; fixtures `tests/spec/4.8/syn3_refutable_member.i` (expects a stop `assertion failed: pattern Some(q) did not match None`) and `tests/spec/4.8/syn3_refutable_disjoint.i` (expects the warning) | `cargo test -p ilang-cli --test spec --locked` | No | Yes |
-| 3 | Types in today's syntax: every multi-constructor type becomes one-constructor types plus an alias, prelude included (`True { True }`, `False { False }`, `Bool = True \| False`, …); `T {}` stays; then a definition with two or more constructors is a compile error | migrator `crates/ilang-syntax/examples/migrate-syntax3.rs` (subcommand `types`); `lib/**`, `std/**`, `tests/**`, `examples/**`, docs; `crates/ilang-wasm/src/lower.rs`:905-940 and `crates/ilang-check/src/resolve.rs`:2423 (prelude representations), `types/infer.rs`:254 | `cargo run -p ilang-syntax --example migrate-syntax3 -- --check types` reports 0 multi-constructor definitions; `scripts/dev-verify` passes | Yes, after 1 and 2; name clashes are a manual list (§7.3) | Yes |
+| 3 | Types in today's syntax: every multi-constructor type becomes one-constructor types plus an alias, prelude included (`True { True }`, `False { False }`, `Bool = True \| False`, …); `T {}` stays; then a definition with two or more constructors is a compile error | migrator `crates/ilang-syntax/examples/migrate-syntax3.rs` (subcommand `types`); `lib/**`, `std/**`, `tests/**`, `examples/**`, docs; `crates/ilang-wasm/src/lower.rs`:905-940 and `crates/ilang-check/src/resolve.rs`:2423 (prelude representations), `types/infer.rs`:254 | `cargo run -p ilang-syntax --example migrate-syntax3 -- --check types` reports 0 multi-constructor definitions; `scripts/dev-verify` passes | Yes, after 1 and 2; wrappers of a built-in of the same name and other name clashes are a manual list (§7.3); `i/syntax.Node` is rewritten by hand to `Node { Node(Name \| Discard \| … \| Int \| Float \| …) }` with one-constructor member types, which is today's spelling of §2.8's `Node` | Yes |
 | 4 | Labels in today's syntax: labelled calls of non-constructor functions become positional (evaluation order kept); constructor calls give every labelled field by label; constructor patterns write every label (no punning); labels in function types removed (also `@external`, host-service fields, doc tables); then a labelled argument to a non-constructor function is a compile error | migrator (subcommand `labels`, resolver-aware: runs on the checked HIR's spans); `types/infer.rs`; fixture `tests/spec/6.6/syn3_label_call_rejected.i` (`t9(second: 1, first: 5)` expects a compile error) | `cargo test -p ilang-cli --test spec --locked`; `scripts/dev-verify` | Yes (needs the resolver) | Yes |
 | 5 | `\|>` level in today's syntax: group every `a \|> f OP b` (OP at levels 1 to 5) as `{ a \|> f } OP b` and every `a OP b \|> f` as `a OP { b \|> f }`; then move `\|>` to the lowest level | migrator (subcommand `pipe`); `crates/ilang-syntax/src/parser.rs`:1005-1056; fixture `tests/spec/6.9/syn3_pipe_weakest.i` | `scripts/dev-verify` passes before and after the level change, with no source edit between | Yes | Yes |
 | 6 | Remove open records in today's syntax: `Record`, type spreads, forgetting, label parameters, string and `UpName` labels, `i/record`, width subtyping; records become closed labelled data; tuples and records share `Head::Shape`; `()` has the type `()`; `Ty::Graph` deleted; record run time deleted; text form `(label = value)` | `crates/ilang-check/src/types/records.rs`, `records/` (deleted), `solve.rs`, `infer.rs`, `known.rs`, `display.rs`, `scheme_wire.rs`, `value_types.rs`, `alias.rs`, `mod.rs`; `crates/ilang-wasm/src/runtime/values/record.rs` (deleted), `values.rs`, `inspect.rs`, `lower.rs`; `lib/i/record.i` (deleted); the 23 test files that use open records rewritten or deleted; `tests/t3-record-*.py` (deleted) | `test ! -e crates/ilang-check/src/types/records.rs && ! grep -rn "Ty::Graph" crates`; `scripts/dev-verify` passes; fixture `tests/spec/11/syn3_data_equality.i` (`(a: 1) == (a: 1)`, `(1, 2) != (a: 1, b: 2)`, inspect `(a = 1)`) | No | Yes |
 | 7 | `FnTy` with one data parameter in today's syntax; arity failure becomes a shape mismatch; unions of functions of different shapes give a `Never` parameter | `types/mod.rs`, `solve.rs`, `known.rs`, `infer.rs`, `display.rs`, `shown.rs`, `scheme_wire.rs`, `pattern.rs`, `coverage.rs`; fixture `tests/spec/4.4/syn3_fn_shapes.i` (`xs = [(a) { a }, (a, b) { a }]` checks with no E0502 and its shown parameter part is `{ Never }`) | `cargo test -p ilang-cli --test spec --locked` | No | Yes |
-| 8 | New parser, AST, printer, formatter, Lisp rows, `i/syntax` positions, tree-sitter, editor grammars, LSP syntax; the migrator converts every `.i`, `.is`, embedded Rust string and doc fence in one commit; spec §§ replaced by §5.2; chains with one shape group only (a chain with two groups is a temporary compile error); environment reads; guards | `crates/ilang-syntax/src/{lexer,parser,parser/*,ast,ast_eq,ast_clone,print,format,shape,walk}.rs`, `lisp/*`, `parser_legacy.rs` (kept); `crates/ilang-check/src/resolve.rs` (chain lowering), `hir.rs`; `lib/i/syntax.i`; `editors/**`; `crates/ilang-lsp`; migrator subcommand `convert` | `cargo run -p ilang-syntax --example migrate-syntax3 -- --verify` (for every file: `ast_eq(new_parse(print(convert(old_parse(f)))), convert(old_parse(f)))`, and no file outside the manual list fails to convert); `scripts/old-syntax-check`; `scripts/dev-verify` | Conversion yes; parser no | No |
+| 8 | New parser, AST, printer, formatter, Lisp rows of §6.8 (data-form parameters, pipe head `\|>`, chain `\|`), `i/syntax` positions, tree-sitter, editor grammars, LSP syntax; the migrator converts every `.i`, `.is`, embedded Rust string and doc fence in one commit; spec §§ replaced by §5.2; chains with one shape group only (a chain with two groups is a temporary compile error); environment reads; guards | `crates/ilang-syntax/src/{lexer,parser,parser/*,ast,ast_eq,ast_clone,print,format,shape,walk}.rs`, `lisp/*`, `parser_legacy.rs` (kept); `crates/ilang-check/src/resolve.rs` (chain lowering), `hir.rs`; `lib/i/syntax.i`; `editors/**`; `crates/ilang-lsp`; migrator subcommand `convert` | `cargo run -p ilang-syntax --example migrate-syntax3 -- --verify` (for every file: `ast_eq(new_parse(print(convert(old_parse(f)))), convert(old_parse(f)))`, and no file outside the manual list fails to convert); `scripts/old-syntax-check`; `scripts/dev-verify` | Conversion yes; parser no | No |
 | 9 | Shape groups in the checker: chains with several groups; direct calls choose the group by shape; the multi-shape value type; a multi-shape value may only be called directly (temporary error) | `types/infer.rs`, `pattern.rs`, `coverage.rs`, `known.rs`, `scheme_wire.rs`; fixtures `tests/spec/6.12/syn3_connect.i` (answers 3c `connect`, runs) and `tests/spec/4.8/syn3_area_value.i` (`fs = [area]` shows `fs : List({ (Float) \| (Float, Float) } -> Float)`) | `cargo test -p ilang-cli --test spec --locked` | No | No |
 | 10 | Run time: `$multi`, shape ids in closures, the slow path at the 11 call sites, display; lift stage 9's temporary error | `crates/ilang-wasm/src/emit/mod.rs`, `emit/control.rs`, `ir.rs`, `lower.rs`, `runtime/values/inspect.rs`; fixtures `tests/spec/11/syn3_multi_value.i` (`fs = [area]`, `Some(f) = list.first(fs)`, prints `f(2.0)` and `f(3.0, 4.0)`), `tests/spec/11/syn3_multi_tail.i` (10^6 tail calls through a multi-shape value, constant stack), `tests/spec/9/syn3_multi_suspend.i` (a call through it across `control.suspend`) | `cargo test -p ilang-cli --test spec --locked` (both optimization levels); `scripts/bench` closure-call case within noise of stage 9 | No | No |
 | 11 | Selection by known types and by expected types; direct aliases | `types/infer.rs`, `known.rs`, `coverage.rs` (taken at every place) | fixture `tests/spec/4.8/syn3_select.i`: `s: String = show(1)` checks; `gcd` checks; `x: String \| Int = f(Some(5))` checks and `y: String = f(Some(5))` is rejected; `g = show; t: String = g(1)` checks; `h = (x) { show(x) }` shows `h : (Int \| String) -> String \| Int`; `list.map([1, 2], show)` shows `List(String)`; then `cargo test -p ilang-cli --test spec --locked` | No | No |
@@ -1885,7 +2138,8 @@ printed unchanged.
 | Form today | Written after | Notes |
 |---|---|---|
 | `T { C1(A) C2 }` | `C1(A) = (A)`, `C2 = ()`, `T(A) = C1(A) \| C2` | Each constructor keeps only the type parameters its fields use (stage 3). Field labels become data labels: `C(x: T)` becomes `C = (x = T)`. A one-constructor type whose constructor has the type's name becomes one labelled type. |
-| A constructor whose new type name clashes | manual list | A constructor named like a type of its module, an imported type, or a built-in type its data uses. Known: `i/syntax.Node`'s `Int(Int)` and `Float(Float)` (lib/i/syntax.i:43-44) would define types `Int` and `Float` covering the built-ins (§8 Q13). |
+| A constructor `C(B)` whose one field is the built-in type named `C` | suggested: drop the wrapper | O21. The migrator does not rewrite it; it lists it with the suggested text: the sum gets `B` as a member directly; `C(e)` becomes `e`; the pattern `C(p)` becomes `p: B` when `p` is a name or a discard, else `(p = _: B)`, and is a type test because the group has several branches. The suggestion is valid only when no other member of the sum then shares `B`'s type constructor (§2.8); otherwise the wrapper stays and is renamed by hand. When the sum has another wrapper whose content is a different built-in, as `i/syntax.Node`'s `Int(Int)` and `Float(Float)` (lib/i/syntax.i:43-44), the sum becomes a labelled type with one union item, `Node = (…)` (§2.8), so that its constructor still marks the values. |
+| A constructor whose new type name clashes otherwise | manual list | A constructor named like another type of its module or an imported type. |
 | `T {}` | `T = Opaque` | |
 | `T = (A, B)`, `T = (x: A)` | `T = { (A, B) }`, `T = { (x = A) }` | Keeps today's alias meaning (G16). |
 | `T(..)` export of a multi-constructor type | `T(..)` | D8 gives the same set. `T` alone becomes `T, C1, C2` (types only). |
@@ -1909,89 +2163,22 @@ printed unchanged.
 | `e \|> (x) { … }` (function literal) | unchanged text | Now a match (§7.1 row 6). The migrator lists these for review of stop-message expectations. |
 | Open records, `Record`, `i/record`, label parameters | not migrated | 23 test files (evaluation), rewritten by hand or deleted in stage 6. |
 | Inspect expectations in tests | regenerated | `(label: value)` becomes `(label = value)`; labelled constructor values gain their labels. |
-| `.is` files | Lisp rows of §6.8 | `{ (-> p e) … }` becomes `(\| (-> (p) _ e) …)`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` moves from the parameters to the body. |
+| `.is` files and Lisp strings in Rust tests | Lisp rows of §6.8 | Parameters `(a b)` become `(, a b)` and `()` becomes `(,)`; the pipe `(\| e f)` becomes `(\|> e f)`; a clause block `{ (-> p e) … }` becomes the chain `(\| (-> (, p) _ e) …)` and a match `(\| s { … })` becomes `(\|> s (\| …))`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` moves from the parameters to the body; `i/syntax` node values gain `Node(…)` and lose the `Int` and `Float` wrappers. Quote patterns and templates are rewritten with the same rows. |
 | Rust-embedded snippets and doc fences | converted | The `old-syntax-check` inventory lists them. |
 
 ## 8. Open questions
 
-Each has a recommended answer and the consequence of the other choice. None
-is decided by this note beyond its recommendation; the owner-level ones are
-marked.
+The questions Q1 to Q19 of the first version are settled (§1.2 O20, O21;
+§1.3a) and their answers are in the rules above. One question raised by this
+revision is still open; it is a detail for the coordinator (O22):
 
-1. **Q1. Should `name ! T = e` on one line be a compile error?** Recommended:
-   yes, with a message to put the provide statement on its own line. Today it
-   is silently two statements with only an unused-value warning. Otherwise the
-   trap of G19 stays.
-2. **Q2. May a positional item follow a labelled item in data?** Recommended:
-   no (§2.3), as calls today. Otherwise `(port = 443, "a.com")` is legal and
-   the printer must keep the written order for evaluation.
-3. **Q3. Text form of labelled values (owner-level).** Recommended: write the
-   data with labels in canonical order, `User(age = 36, name = "ada")`, which
-   is a valid expression. Alternatives: definition order (needs a per-type
-   order table at run time), or today's unlabelled `User(36, "ada")`, which is
-   no longer valid syntax.
-4. **Q4. Canonical label order.** Recommended: UTF-8 byte order of labels, for
-   storage, display of types and text form. Otherwise structural data needs a
-   written order, and `(a = 1, b = 2)` and `(b = 2, a = 1)` would print
-   differently though equal.
-5. **Q5. Spelling of a multi-shape function type (owner-level).**
-   Recommended: `{ (Float) | (Float, Float) } -> Float` (§2.4). Otherwise the
-   type has no spelling: `fs = [area]` works but cannot be annotated, hovers
-   need another notation, and interfaces need an internal one.
-6. **Q6. Does an annotated binding `f: T = chain` keep selection?**
-   Recommended: no; the annotation is the interface. Otherwise an annotation
-   is checked but ignored at call sites, and the type written disagrees with
-   the type used.
-7. **Q7. Rest at the top of a parameter group.** Recommended: forbidden
-   (§2.4). Otherwise a group's shape depends on expected types, and shape
-   groups stop being syntactic.
-8. **Q8. Name of the empty-match function.** Recommended: `core.never`.
-   Any name works; it only needs to be in `i/core` (D9).
-9. **Q9. Known types are facts.** Recommended: state in spec §4.8 that every
-   run-time value of an expression is in its known type, and test it with the
-   generated families of `scripts/test-generation`. Selection (§2.6.6),
-   narrowing and `.k` depend on it. Otherwise selection is unsound whenever a
-   known type is wrong, and the selected-domain check does not repair it.
-10. **Q10. Selection in a match on a chain literal.** Recommended: none; a
-    match is typed by rule 11 as today. Otherwise
-    `1 |> (n: Int) { "a" } | (s: String) { 1 }` is `String`, which is more
-    precise, but a match then differs from a call of the same chain through a
-    parameter.
-11. **Q11. Should a function-type member without a group in a result union be
-    an error?** (G2) Recommended: no, only a better message. Otherwise
-    `(a) -> Int | (b) -> Int { … }` is caught early, at the cost of a rule
-    that has no other use.
-12. **Q12. Data patterns fitted to a union of shapes.** Recommended: keep the
-    error (§2.12). Otherwise `(a, b) = v` with `v: (Int, Int) | Nil` becomes
-    refutable, like constructor patterns, and a typo in a shape becomes an
-    `Assert` failure at run time.
-13. **Q13. Names in `i/syntax.Node` (owner-level, library API).**
-    `Int(Int)` and `Float(Float)` become type definitions that cover the
-    built-ins. Recommended: rename to `IntLit` and `FloatLit` (and change
-    meta.md §3.1). Otherwise the module cannot define them.
-14. **Q14. `x: T` in a one-branch group of a multi-group chain.**
-    Recommended: an annotation (§2.5), because the group is a function of its
-    own. Otherwise every item of an overloaded chain is a test, a one-branch
-    group must cover its parameter type with its tests, and a refutable
-    one-branch group becomes a coverage error instead of an `Assert` report.
-15. **Q15. Errors and environment per branch.** Recommended: shared by the
-    chain; selection refines only the value type. Otherwise `F_sel` can drop
-    the errors of unselected branches, which needs a row per branch in the
-    rule-11 typing.
-16. **Q16. Labels in host-facing types.** (§2.14) Recommended:
-    positions only for `@external`, host exports and host-service field
-    functions. Otherwise the ABI needs a rule for the order of labels.
-17. **Q17. Field reads on positional labelled values.** `Pair(1, 2).0`.
-    Recommended: allowed, with constructor visibility (§2.3). Otherwise
-    positional labelled types can only be read by patterns.
-18. **Q18. Variance for parameters of a labelled type that its data uses
-    only in some places.** No change recommended: spec §4.5 rule 6 applies
-    per labelled type. Note that `In(A) | Out(A)` becomes more permissive than
-    today's invariant sum (evaluation §3); this is sound.
-19. **Q19. Size of error rows.** A former multi-constructor error type is now
-    a union of n heads in every error row (answers 2e). Recommended: no limit;
-    measure after stage 3 with `scripts/checker-bench`. Otherwise a cap
-    would make some programs fail by size.
+1. **Exports of the members of a labelled type whose data is a union.**
+   `Node(..)` exports `Node` and its constructor, and spec §2.4 forces each
+   labelled member (`Name` … `Splice`) to be exported too, so `i/syntax`
+   lists thirteen items (§2.8). Recommended: keep this; D8's whole-sum
+   `A(..)` stays a rule for names only. Otherwise `T(..)` on such a type also
+   exports every labelled member of its data's union defined in the module,
+   which saves the list but makes `(..)` mean two things for labelled types.
 
 Things this note could not determine:
 
