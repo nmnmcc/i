@@ -172,7 +172,7 @@ fn main_module(name: &str) -> String {
 /// The greeting for `who`.
 greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
 
-main = (io ! Io) {{
+main = () <- (io: Io) {{
   io.print(greeting("{name}"))
 }}
 "#
@@ -187,10 +187,9 @@ fn test_module(name: &str) -> String {
 
 
 test("greets", () {{
-  main.greeting("i") |> {{
-    "Hello, i!" -> Nil
-    other -> panic(other)
-  }}
+  main.greeting("i") |>
+    ("Hello, i!") {{ Nil }}
+    | (other) {{ panic(other) }}
 }})
 "#
     )

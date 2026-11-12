@@ -288,6 +288,11 @@ pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
         if !diagnostics.is_empty() {
             return Err(diagnostics);
         }
+        // The printer of syntax three's Lisp rows does not place comments
+        // yet: a file with comments is left as it is rather than lose them.
+        if !crate::lexer::lex3_lisp(source).comments.is_empty() {
+            return Ok(source.to_string());
+        }
         return Ok(crate::syn3::lisp::to_lisp(&module));
     }
     let (_, diagnostics) = parse_source(source);

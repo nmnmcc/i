@@ -614,7 +614,8 @@ impl Query<'_> {
 /// A type shown in the syntax of §3, in the syntax of the Lisp surface: as
 /// the printer of that surface writes it in an annotation.
 fn lisp_type(ty: &str) -> Option<String> {
-    let (module, diags) = ilang_syntax::parse_module(&format!("x: {ty} = 0\n"));
+    // The type is shown in the syntax before syntax three (transition).
+    let (module, diags) = ilang_syntax::parser::parse_module_legacy(&format!("x: {ty} = 0\n"));
     if !diags.is_empty() {
         return None;
     }
@@ -626,8 +627,9 @@ fn lisp_type(ty: &str) -> Option<String> {
 /// A clause `p -> e` of the syntax of §6, in the syntax of the Lisp surface,
 /// as its printer writes it.
 pub(crate) fn lisp_clause(clause: &str) -> Option<String> {
-    let (module, diags) =
-        ilang_syntax::parse_module(&format!("f = (s) {{ s |> {{ {clause}  _ -> 0 }} }}\n"));
+    let (module, diags) = ilang_syntax::parser::parse_module_legacy(&format!(
+        "f = (s) {{ s |> {{ {clause}  _ -> 0 }} }}\n"
+    ));
     if !diags.is_empty() {
         return None;
     }
