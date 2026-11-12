@@ -41,16 +41,27 @@ pub struct Lexed {
 }
 
 pub fn lex(source: &str) -> Lexed {
-    lex_surface(source, false)
+    lex_surface(source, false, false)
 }
 
 /// Lex a Lisp-surface file. Line endings are trivia, and quote tokens are
 /// available only in this surface.
 pub fn lex_lisp(source: &str) -> Lexed {
-    lex_surface(source, true)
+    lex_surface(source, true, false)
 }
 
-fn lex_surface(source: &str, lisp: bool) -> Lexed {
+/// Lex a syntax-three file (docs/design/syntax-3.md): `<-` is one token, and
+/// a line that begins with `<A, …>(` begins a statement.
+pub fn lex3(source: &str) -> Lexed {
+    lex_surface(source, false, true)
+}
+
+/// Lex a syntax-three Lisp-surface file.
+pub fn lex3_lisp(source: &str) -> Lexed {
+    lex_surface(source, true, true)
+}
+
+fn lex_surface(source: &str, lisp: bool, syn3: bool) -> Lexed {
     let mut lexer = Lexer {
         src: source.as_bytes(),
         source,
@@ -60,6 +71,7 @@ fn lex_surface(source: &str, lisp: bool) -> Lexed {
         comments: Vec::new(),
         diags: Vec::new(),
         lisp,
+        syn3,
     };
     if source.starts_with('\u{feff}') {
         lexer.pos = 3;
@@ -72,7 +84,7 @@ fn lex_surface(source: &str, lisp: bool) -> Lexed {
         mut diags,
         ..
     } = lexer;
-    mark_breaks(&mut tokens);
+    mark_breaks(&mut tokens, syn3);
     let close = pair_brackets(&tokens, &mut diags);
     Lexed {
         tokens,
@@ -85,11 +97,38 @@ fn lex_surface(source: &str, lisp: bool) -> Lexed {
 
 /// §1.7: a line end is a break when the token before it can end an expression
 /// and the token after it can begin a statement.
-fn mark_breaks(tokens: &mut [Token]) {
+fn mark_breaks(tokens: &mut [Token], syn3: bool) {
     for i in 1..tokens.len() {
-        let brk = tokens[i].nl && tokens[i - 1].kind.can_end() && tokens[i].kind.can_begin();
+        let begins = tokens[i].kind.can_begin() || syn3 && generics_end(tokens, i).is_some();
+        let brk = tokens[i].nl && tokens[i - 1].kind.can_end() && begins;
         tokens[i].brk = brk;
     }
+}
+
+/// Syntax three: `<` followed by `UpName { , UpName } > (` begins the type
+/// parameters of a function. Returns the index of the `(`.
+pub(crate) fn generics_end(tokens: &[Token], at: usize) -> Option<usize> {
+    if tokens.get(at)?.kind != T::Lt {
+        return None;
+    }
+    let mut i = at + 1;
+    loop {
+        if !matches!(tokens.get(i)?.kind, T::UpName(_)) {
+            return None;
+        }
+        i += 1;
+        match tokens.get(i)?.kind {
+            T::Comma => {
+                i += 1;
+                if tokens.get(i)?.kind == T::Gt {
+                    break;
+                }
+            }
+            T::Gt => break,
+            _ => return None,
+        }
+    }
+    (tokens.get(i + 1)?.kind == T::LParen).then_some(i + 1)
 }
 
 fn opener(kind: &T) -> Option<T> {
@@ -179,6 +218,7 @@ struct Lexer<'a> {
     comments: Vec<Comment>,
     diags: Vec<Diagnostic>,
     lisp: bool,
+    syn3: bool,
 }
 
 fn is_word(b: u8) -> bool {
@@ -297,6 +337,18 @@ impl Lexer<'_> {
     }
 
     fn symbol(&mut self, c: u8) -> Option<T> {
+        if self.syn3 && (c == b'^' || c == b'!' && self.at(1) != b'=') {
+            // Syntax three P0: `^` and `!` alone are no symbols of i.
+            let span = Span::new(self.pos as u32, self.pos as u32 + 1);
+            self.error(
+                Code::UnexpectedChar,
+                span,
+                format!(
+                    "`{}` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+                    c as char
+                ),
+            );
+        }
         let (kind, len) = match (c, self.at(1), self.at(2)) {
             (b'=', b'=', _) => (T::EqEq, 2),
             (b'=', _, _) => (T::Eq, 1),
@@ -324,6 +376,7 @@ impl Lexer<'_> {
             (b'{', _, _) => (T::LBrace, 1),
             (b'}', _, _) => (T::RBrace, 1),
             (b'<', b'<', _) => (T::LtLt, 2),
+            (b'<', b'-', _) if self.syn3 => (T::LArrow, 2),
             (b'<', b'=', b'.') => (T::LtEqDot, 3),
             (b'<', b'=', _) => (T::LtEq, 2),
             (b'<', b'.', _) => (T::LtDot, 2),
@@ -579,6 +632,7 @@ impl Lexer<'_> {
                         comments: Vec::new(),
                         diags: Vec::new(),
                         lisp: self.lisp,
+                        syn3: self.syn3,
                     };
                     child.run(true);
                     if child.pos == child.src.len() && child.src.last() != Some(&b')') {
@@ -590,7 +644,7 @@ impl Lexer<'_> {
                     }
                     self.pos = child.pos;
                     self.diags.extend(child.diags);
-                    mark_breaks(&mut child.tokens);
+                    mark_breaks(&mut child.tokens, self.syn3);
                     let span = Span::new(
                         expression_start as u32,
                         child

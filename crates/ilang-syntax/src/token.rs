@@ -25,6 +25,8 @@ pub enum TokenKind {
     Dot,
     DotDot,
     Arrow,
+    /// `<-`, only in syntax three.
+    LArrow,
     Question,
     Caret,
     Bang,
@@ -126,6 +128,7 @@ impl TokenKind {
             Dot => ".",
             DotDot => "..",
             Arrow => "->",
+            LArrow => "<-",
             Question => "?",
             Caret => "^",
             Bang => "!",

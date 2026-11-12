@@ -225,7 +225,15 @@ impl IntoIterator for Document {
 
 /// Read all datums, ignoring the normal surface's line break rule.
 pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    let lexed = lex_lisp(source);
+    parse_lexed(lex_lisp(source))
+}
+
+/// Read all datums of a syntax-three Lisp file, where `<-` is one symbol.
+pub fn parse3(source: &str) -> Result<Document, Vec<Diagnostic>> {
+    parse_lexed(crate::lexer::lex3_lisp(source))
+}
+
+fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> {
     if !lexed.diagnostics.is_empty() {
         return Err(lexed.diagnostics);
     }
