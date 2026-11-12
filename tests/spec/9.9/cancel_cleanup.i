@@ -11,31 +11,31 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-print = (text: String, out ! Out) { out.print(text) }
-
+print = (text: String) <- (out: Out) { out.print(text) }
 
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
 			gate: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(() {
-					task.send(gate, Nil)
-					task.sync(task.never())
-				}, () {
-					task.scope((cleanup) {
-						task.go(cleanup, () {
+				resource.ensure(
+					() {
+						task.send(gate, Nil)
+						task.sync(task.never())
+					},
+					() {
+						task.scope((cleanup) {
+							task.go(cleanup, () {
+								task.yield()
+								print("cleanup-child")
+							})
 							task.yield()
-							print("cleanup-child")
 						})
-						task.yield()
-					})
-					print("cleanup-parent")
-				})
+						print("cleanup-parent")
+					},
+				)
 			})
 			task.go(s, () {
 				task.receive(gate)

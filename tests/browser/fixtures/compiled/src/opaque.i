@@ -32,31 +32,23 @@
 	async_ab
 )
 
-A {}
+A = Opaque
 
-B {}
+B = Opaque
 
 Alias = A
 
 @host("app:opaque-sync/v1")
-SyncA {
-	SyncA(get_a: () -> A)
-}
+SyncA = (get_a = () -> A)
 
 @host("app:opaque-sync/v1")
-SyncB {
-	SyncB(get_b: () -> B)
-}
+SyncB = (get_b = () -> B)
 
 @host("app:opaque-async/v1", "async")
-AsyncA {
-	AsyncA(get_a: () -> A)
-}
+AsyncA = (get_a = () -> A)
 
 @host("app:opaque-async/v1", "async")
-AsyncB {
-	AsyncB(get_b: () -> B)
-}
+AsyncB = (get_b = () -> B)
 
 @external("app:opaque/v1", "get")
 get_a: () -> A
@@ -70,7 +62,7 @@ echo_a: (A) -> A
 @external("app:opaque/v1", "echo")
 echo_b: (A) -> B
 
-equal(X, Y) = (a: X, b: Y) { a == b }
+equal = <X, Y>(a: X, b: Y) { a == b }
 
 direct_aa = (a: A, b: A) { a == b }
 
@@ -108,10 +100,10 @@ import_aa = () { equal(get_a(), get_a()) }
 
 import_ab = () { equal(get_a(), get_b()) }
 
-sync_aa = (a ! SyncA) { equal(a.get_a(), a.get_a()) }
+sync_aa = () <- (a: SyncA) { equal(a.get_a(), a.get_a()) }
 
-sync_ab = (a ! SyncA, b ! SyncB) { equal(a.get_a(), b.get_b()) }
+sync_ab = () <- (a: SyncA, b: SyncB) { equal(a.get_a(), b.get_b()) }
 
-async_aa = (a ! AsyncA) { equal(a.get_a(), a.get_a()) }
+async_aa = () <- (a: AsyncA) { equal(a.get_a(), a.get_a()) }
 
-async_ab = (a ! AsyncA, b ! AsyncB) { equal(a.get_a(), b.get_b()) }
+async_ab = () <- (a: AsyncA, b: AsyncB) { equal(a.get_a(), b.get_b()) }

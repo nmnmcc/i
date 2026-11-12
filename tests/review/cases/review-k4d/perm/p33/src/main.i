@@ -1,52 +1,49 @@
-run(A, N) = (body: () -> A ! N) { body() }
+run = <A, N>(body: () <- N -> A) { body() }
 
 fw = () { use() }
 
 pong = (n: Int) { ping(n) + uset(1) }
 
-both(N) = () -> Int ! N | S(N) | T(Int, N) { pong(2) }
+both = () -> Int { pong(2) }
 
-uset(A, N) = (x: A, t ! T(A, N)) -> A ! N | T(A, N) {
-  T(g = g, ..) = t
-  g(x)
+uset = <A, N>(x: A) <- (t: T(A, N)) -> A {
+	T(g = g, ..) = t
+	g(x)
 }
 
 loop = (x) { x(x) }
 
 closed = () {
-  ! Dep = Dep(v: 1)
-  ! T(Int, Dep) = T(g: (x: Int) { x + get() }, m: (_: Dep) { Nil })
-  ! S(Dep) = S(f: () { get() })
-  both()
+	both() <- (
+		Dep(v = 1),
+		T(g = (x: Int) { x + get() }, m = (_: Dep) { Nil }),
+		S(f = () { get() }),
+	)
 }
 
-use(N) = (s ! S(N)) {
-  S(f = f) = s
-  f()
+use = <N>() <- (s: S(N)) {
+	S(f = f) = s
+	f()
 }
 
-bad(N) = (s ! S(N)) -> Int ! N {
-  S(f = f) = s
-  f()
+bad = <N>() <- (s: S(N)) -> Int {
+	S(f = f) = s
+	f()
 }
 
-get = (d ! Dep) { d.v }
+get = () <- (d: Dep) { d.v }
 
-T(A, N) { T(g: (A) -> A ! N, m: (N) -> Nil) }
-
+T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
 
 main = () {
-  closed()
-  Nil
+	closed()
+	Nil
 }
 
-Dep { Dep(v: Int) }
+Dep = (v = Int)
 
-S(N) { S(f: () -> Int ! N) }
+S(N) = (f = () <- N -> Int)
 
-ping = (n: Int) { n |> {
-  0 -> use()
-  _ -> pong(n - 1)
-} }
+ping = (n: Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
 
 fr = () { run(() { use() }) }

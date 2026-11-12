@@ -9,12 +9,9 @@
 )
 
 @host("test:async/v1", "request")
-Later {
-	Later(echo: (String) -> Request(String))
-}
+Later = (echo = (String) -> Request(String))
 
-
-main = (later ! Later) {
+main = () <- (later: Later) {
 	r = later.echo("borrowed")
 	assert(task.run(() { request.await_owned(r) }) == "borrowed")
 }

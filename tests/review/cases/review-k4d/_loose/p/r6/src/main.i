@@ -1,29 +1,33 @@
 (
 	(Io) = i/io
 )
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(f: () -> Int ! N) }
-use(N) = (s ! S(N)) { s.f() }
-run(A, N) = (body: () -> A ! N) { body() }
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (f = () <- N -> Int)
+use = <N>() <- (s: S(N)) { s.f() }
+run = <A, N>(body: () <- N -> A) { body() }
 fw = () { use() }
 fr = () { run(() { use() }) }
-tell = (x: Int) { x |> {
-  0 -> "zero"
-  1 -> "one"
-  2 -> "two"
-  3 -> "three"
-  4 -> "four"
-  _ -> "many"
-} }
+tell = (x: Int) {
+	x |>
+		(0) { "zero" }
+		| (1) { "one" }
+		| (2) { "two" }
+		| (3) { "three" }
+		| (4) { "four" }
+		| (_) { "many" }
+}
 
-T(N) { T(f: () -> Int ! N, m: (N) -> Nil) }
-uset(N) = (s ! T(N)) { s.f() }
+T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+uset = <N>() <- (s: T(N)) { s.f() }
 
 main = () {
-  ! S(Never) = S(f: () { 1 })
-  ! T(S(Never)) = T(f: () { fw() }, m: (_: S(Never)) { Nil })
-  ! S(Dep) = S(f: () { get() })
-  uset()
-  Nil
+	{
+		uset()
+		Nil
+	} <- (
+		S(f = () { 1 }),
+		T(f = () { fw() }, m = (_: S(Never)) { Nil }),
+		S(f = () { get() }),
+	)
 }

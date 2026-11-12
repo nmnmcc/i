@@ -1,3 +1,3 @@
-Cell(A) {Cell(run:(A)->A)}
-make=(){Cell(run: (x){x})}
-Same=make
+Cell(A) = (run = (A) -> A)
+make = () { Cell(run = (x) { x }) }
+Same = make

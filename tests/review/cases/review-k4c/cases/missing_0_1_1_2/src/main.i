@@ -1,8 +1,10 @@
-Dep { Dep }
-get = (d ! Dep) { Nil }
-run(E,N) = (body: () -> Nil ^ E ! N) { body() }
-S(N) { S(f: () -> Nil ! N) }
-use(N) = (s ! S(N)) { s.f() }
+Dep = ()
+get = () <- (d: Dep) { Nil }
+run = <N>(body: () <- N -> Nil) { body() }
+S(N) = (f = () <- N -> Nil)
+use = <N>() <- (s: S(N)) { s.f() }
 
-main(N) = () { local2 = () { ! S(Dep) = S(f: () { get() })
-run(() { use() }) } run(local2) }
+main = <N>() {
+	local2 = () { run(() { use() }) <- (S(f = () { get() })) }
+	run(local2)
+}

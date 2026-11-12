@@ -11,15 +11,15 @@
 
 /// Read a field identified by one known key.
 @external("ilang:record", "get")
-get(K, V): ((K: V), K) -> V
+get: <K, V>((k = V), K) -> V
 
 /// Set a field, replacing any previous value.
 @external("ilang:record", "put")
-put(R, K, V): (R & Record, K, V) -> (..R, K: V)
+put: <R, K, V>(R & Record, K, V) -> (k = V)
 
 /// Remove a field if it is present.
 @external("ilang:record", "remove")
-remove(R, K): (R & Record, K) -> (..R, -K)
+remove: <R, K>(R & Record, K) -> ()
 
 /// Test whether a field exists, including fields hidden by the static type.
 @external("ilang:record", "has")

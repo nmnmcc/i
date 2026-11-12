@@ -1,5 +1,4 @@
 //// Errors (§9.3).
-
 (
 	raise
 	catch
@@ -9,27 +8,21 @@
 
 /// Ends the computation with `error`.
 @external("ilang:fail", "raise")
-raise(E): (E) -> Never ^ E
+raise: <E>(E) <- (Fail(E)) -> Never
 
 /// Changes every error into `Error(…)`.
 @external("ilang:fail", "catch")
-catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N
+catch: <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E)
 
 /// Gives the error `x` for `Error(x)`.
-from_result(A, E) = (result: Result(A, E)) -> A ^ E {
-	result |> {
-		Ok(value)    -> value
-		Error(error) -> raise(error)
-	}
+from_result = <A, E>(result: Result(A, E)) -> A {
+	result |> (Ok(value)) { value } | (Error(error)) { raise(error) }
 }
 
 /// Changes the errors.
-map_error(A, E, N, E2) = (
-	body: () -> A ^ E ! N
-	with: (E) -> E2 ! N
-) -> A ^ E2 ! N {
-	catch(body) |> {
-		Ok(value)    -> value
-		Error(error) -> raise(with(error))
-	}
+map_error = <A, E, N, E2>(
+	body: () <- (Fail(E), ..N) -> A,
+	with: (E) <- N -> E2
+) -> A {
+	catch(body) |> (Ok(value)) { value } | (Error(error)) { raise(with(error)) }
 }

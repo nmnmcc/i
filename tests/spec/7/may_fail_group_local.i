@@ -2,16 +2,15 @@
 // expect: stop "panic: caught group local"
 
 // literal-types §5.3: deferred fitted failure in its own effect frame.
-pair = ("b", () {
-	g = () {
-		("a", _) = pair
-		1
-	}
-	g()
-})
+pair = (
+	"b",
+	() {
+		g = () {
+			("a", _) = pair
+			1
+		}
+		g()
+	},
+)
 
-
-main = () {
-	! Assert = Assert(fail: (_) { panic("caught group local") })
-	pair.1()
-}
+main = () { pair.1() <- (Assert(fail = (_) { panic("caught group local") })) }

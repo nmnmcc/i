@@ -10,20 +10,20 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-
-main = (out ! Out) {
+main = () <- (out: Out) {
 	result = fail.catch(() {
 		task.scope((s) {
 			task.go(s, () { fail.raise("first") })
 			unstarted = task.go(s, () { panic("dropped sibling ran") })
-			resource.ensure(() { task.join(unstarted) }, () {
-				task.yield()
-				out.print("body-final")
-			})
+			resource.ensure(
+				() { task.join(unstarted) },
+				() {
+					task.yield()
+					out.print("body-final")
+				},
+			)
 		})
 	})
 	assert(result == Error("first"))

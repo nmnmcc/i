@@ -2,13 +2,12 @@
 // expect: stop "panic: caught group call"
 
 // literal-types §5.3: deferred fitted failure in its own effect frame.
-pair = ((x) { x }, () {
-	"a" = pair.0("b")
-	1
-})
+pair = (
+	(x) { x },
+	() {
+		"a" = pair.0("b")
+		1
+	},
+)
 
-
-main = () {
-	! Assert = Assert(fail: (_) { panic("caught group call") })
-	pair.1()
-}
+main = () { pair.1() <- (Assert(fail = (_) { panic("caught group call") })) }

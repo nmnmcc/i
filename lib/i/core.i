@@ -1,5 +1,4 @@
 //// The operations that are not written in i (§13).
-
 (
 	not
 	to_float
@@ -143,12 +142,12 @@ bit_array_concat: (List(BitArray)) -> BitArray
 
 /// The text form of the value (§11.8).
 @external("ilang:core", "inspect")
-inspect(A): (A) -> String
+inspect: <A>(A) -> String
 
 /// A number from 0 to 2^32 - 1; values that are the same give the same number.
 @external("ilang:core", "hash")
-hash(A): (A) -> Int
+hash: <A>(A) -> Int
 
 /// Whether this value and every capture or held value can cross workers.
 @external("ilang:core", "portable")
-portable(A): (A) -> Bool
+portable: <A>(A) -> Bool

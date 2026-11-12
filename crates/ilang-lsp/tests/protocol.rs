@@ -1346,7 +1346,7 @@ fn lsp_rename_top_level_across_files() {
         shapes.contains("\tShape(..)\n\tsurface\n\torigin"),
         "{shapes}"
     );
-    assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
+    assert!(shapes.contains("surface = (s = Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
     c.shutdown();
@@ -1602,7 +1602,7 @@ fn lsp_rename_lisp_surface() {
         main.contains("surface s") && !main.contains("area"),
         "{main}"
     );
-    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s: Shape)"));
+    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s = Shape)"));
     // A local.
     let edit = rename(&mut c, &ws.main, &ws.main_text, "(= a ", 0, 3, "total").unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);

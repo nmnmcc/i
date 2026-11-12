@@ -479,14 +479,13 @@ fn imports_the_runner_cannot_supply_are_rejected() {
     // A service replaced with an ordinary i value needs no import (N4).
     let project = package(
         dir.path(),
-        r#"((Io) = i/io)
+        r#"(
+	(Io) = i/io
+)
 
-greet = (io ! Io) { io.print("quiet") }
+greet = () <- (io: Io) { io.print("quiet") }
 
-main = () {
-	! Io = Io(print: (text) { Nil })
-	greet()
-}
+main = () { greet() <- (Io(print = (text) { Nil })) }
 "#,
     );
     let exe = build(&project, dir.path(), "quiet");

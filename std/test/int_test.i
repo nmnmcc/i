@@ -314,37 +314,51 @@ test("is_even_large_test", () {
 })
 
 test("is_even_one_false_test", () {
-	assert(core.not(int.is_even(1)))
+	assert(
+		core.not(int.is_even(1)),
+	)
 	Nil
 })
 
 test("is_even_negative_three_false_test", () {
-	assert(core.not(int.is_even(-3)))
+	assert(
+		core.not(int.is_even(-3)),
+	)
 	Nil
 })
 
 test("is_even_large_odd_false_test", () {
-	assert(core.not(int.is_even(10_005)))
+	assert(
+		core.not(int.is_even(10_005)),
+	)
 	Nil
 })
 
 test("is_odd_zero_false_test", () {
-	assert(core.not(int.is_odd(0)))
+	assert(
+		core.not(int.is_odd(0)),
+	)
 	Nil
 })
 
 test("is_odd_two_false_test", () {
-	assert(core.not(int.is_odd(2)))
+	assert(
+		core.not(int.is_odd(2)),
+	)
 	Nil
 })
 
 test("is_odd_negative_two_false_test", () {
-	assert(core.not(int.is_odd(-2)))
+	assert(
+		core.not(int.is_odd(-2)),
+	)
 	Nil
 })
 
 test("is_odd_large_even_false_test", () {
-	assert(core.not(int.is_odd(10_006)))
+	assert(
+		core.not(int.is_odd(10_006)),
+	)
 	Nil
 })
 
@@ -876,13 +890,12 @@ test("power_pipe_test", () { assert({ 3 |> int.power(4) } == Ok(81)) })
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
-
 test("parse_more_test", () {
 	assert(int.parse("+7") == Ok(7))
 	assert(int.parse("-0") == Ok(0))
 	assert(
 		int.parse("123456789012345678901234567890") ==
-			Ok(123456789012345678901234567890)
+			Ok(123456789012345678901234567890),
 	)
 	assert(int.parse("") == Error(Nil))
 	assert(int.parse("-") == Error(Nil))
@@ -911,7 +924,9 @@ test("to_base_more_test", () {
 	assert(int.to_base(1, 1) == Error(Nil))
 	big = 1267650600228229401496703205376
 	assert(int.to_base(big, 2) == Ok("1" <> string.repeat("0", 100)))
-	assert(int.parse_base(int.to_base16(big), 16) == Ok(big))
+	assert(
+		int.parse_base(int.to_base16(big), 16) == Ok(big),
+	)
 })
 
 test("digits_more_test", () {

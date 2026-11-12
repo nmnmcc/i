@@ -8,8 +8,6 @@
 )
 
 @host("test:kv/v1")
-Kv {
-	Kv(get: (List(String)) -> String)
-}
+Kv = (get = (List(String)) -> String)
 
 test("t", () { Nil })

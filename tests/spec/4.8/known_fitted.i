@@ -6,9 +6,7 @@
 	testlib = (test) = std/test
 )
 
-Box(A) {
-	Box(value: A)
-}
+Box(A) = (value = A)
 
 f = (s: String) {
 	x = "a" = s
@@ -18,31 +16,20 @@ f = (s: String) {
 
 g = (s: String) {
 	x = "a" = s
-	Box(value: x).value
+	Box(value = x).value
 }
 
-h = (xs: List(String)) {
-	xs |> {
-		[x = "a", ..] -> (x, 0).0
-		_             -> ""
-	}
-}
+h = (xs: List(String)) { xs |> ([x = "a", ..]) { (x, 0).0 } | (_) { "" } }
 
-kind = {
-	"a" -> 1
-	"b" -> 2
-}
+kind = ("a") { 1 } | ("b") { 2 }
 
-apply(A, B) = (x: A, f: (A) -> B) { (f, f(x)) }
+apply = <A, B>(x: A, f: (A) -> B) { (f, f(x)) }
 
 test("fitted", () {
 	assert(f("a") == "a")
 	assert(g("a") == "a")
 	assert(h(["a"]) == "a")
 	assert((kind, 0).1 == 0)
-	p = apply("a", {
-		"a" -> 1
-		"b" -> 2
-	})
+	p = apply("a", ("a") { 1 } | ("b") { 2 })
 	assert(p.1 == 1)
 })

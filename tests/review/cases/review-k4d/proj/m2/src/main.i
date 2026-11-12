@@ -1,17 +1,13 @@
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
-T(N) { T(f: () -> Int ! N) }
-use(N) = (s ! S(N)) {
-  s.f()
-}
-uset(N) = (s ! T(N)) {
-  s.f()
-}
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+T(N) = (f = () <- N -> Int)
+use = <N>() <- (s: S(N)) { s.f() }
+uset = <N>() <- (s: T(N)) { s.f() }
 
 main = () {
-  ! S(Dep) = S(f: () { get() }, m: (_: Dep) { Nil })
-  ! T(S(Dep)) = T(f: () { use() })
-  uset()
-  Nil
+	{
+		uset()
+		Nil
+	} <- (S(f = () { get() }, m = (_: Dep) { Nil }), T(f = () { use() }))
 }

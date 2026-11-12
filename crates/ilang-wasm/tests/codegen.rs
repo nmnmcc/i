@@ -309,10 +309,17 @@ fn segments_grow_linearly() {
 /// wire import. B.2/B.6 still describe each of them as one externref.
 #[test]
 fn opaque_decoders_keep_the_declared_type_on_both_targets() {
-    let source = r#"
-(A, B, same, repeated, different, same_a, echo)
-A = Opaque
-B = Opaque
+    let source = r#"(
+	A
+	B
+	same
+	repeated
+	different
+	same_a
+	echo
+)
+A = { Opaque }
+B = { Opaque }
 Alias = A
 @external("opaque", "get")
 get_a: () -> A
