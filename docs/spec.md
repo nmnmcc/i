@@ -636,7 +636,7 @@ A **member** of a type (§4.4) is a type constructor, its type arguments, and a 
 
 ### 4.2 Built-in types
 
-These types may be used in every module:
+These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. The prelude custom types may be named through `i/prelude`.
 
 | Type | Values |
 |---|---|
@@ -2513,6 +2513,8 @@ These names may be used in every module. Other names may cover them.
 These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/key` (§9.8), `i/task` (§9.9), `i/random` (§9.10), `i/request` (§9.11), `i/core` (§13), and `i/record` (§14) give the other names. The IO module list is extended with its service definitions.
 
 ## 13. The module `i/core`
+
+The module exports the built-in types `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`, `Record`, `Boundary`, `Continuation`, `Key`, `Keyed`, `Request`, and `Ticket`. These are the same types as the unqualified built-in names.
 
 These are normal functions: they are called, given, and compared like any other function. Only their bodies are not written in i. Most of them do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). Some, such as `index_of` and `bit_array_concat`, could be written in i, but the runtime does them much faster. They have no errors and need no environment.
 
