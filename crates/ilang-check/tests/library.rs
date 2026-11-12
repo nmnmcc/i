@@ -33,6 +33,7 @@ fn library_resolves_cleanly() {
             "i/process",
             "i/net",
             "i/tls",
+            "i/fetch",
             "i/stdio"
         ]
     );
@@ -253,6 +254,7 @@ fn library_names() {
                 "byte_stream",
             ],
         ),
+        ("i/fetch", &["open", "status", "headers", "read", "close"]),
         (
             "i/stdio",
             &[
@@ -388,7 +390,7 @@ fn hello_example_checks() {
     assert!(checked.program.is_some() && checked.types.is_some());
 }
 
-const RESERVED: [&str; 6] = ["i/clock", "i/fs", "i/process", "i/net", "i/tls", "i/stdio"];
+const RESERVED: [&str; 7] = ["i/clock", "i/fs", "i/process", "i/net", "i/tls", "i/fetch", "i/stdio"];
 
 /// User code imports every reserved module with no problems.
 ///
