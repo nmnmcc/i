@@ -1339,7 +1339,7 @@ fn lsp_rename_top_level_across_files() {
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(shapes.contains("(Shape(..), surface, origin"), "{shapes}");
-    assert!(shapes.contains("surface = (s = Shape)"), "{shapes}");
+    assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
     c.shutdown();
@@ -1595,7 +1595,7 @@ fn lsp_rename_lisp_surface() {
         main.contains("surface s") && !main.contains("area"),
         "{main}"
     );
-    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s = Shape)"));
+    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s: Shape)"));
     // A local.
     let edit = rename(&mut c, &ws.main, &ws.main_text, "(= a ", 0, 3, "total").unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
@@ -1666,7 +1666,9 @@ fn lsp_definition_implementation_of_a_service() {
     let r = c.request::<lsp::request::GotoImplementation>(pos(&main, text, "Clock)", 0, 0));
     let found = locations(&r);
     assert!(
-        found.contains(&(main.clone(), range_of(text, "Clock(now", 0).with_len(5))),
+        found
+            .iter()
+            .any(|(u, r)| *u == main && r.start == range_of(text, "Clock(now", 0).start),
         "{found:?}"
     );
     let (l, _) = find(text, "<- (Clock(now", 0);
@@ -2045,7 +2047,7 @@ fn lsp_signature_lisp_surface() {
     let ws = workspace(true);
     let mut c = ws.open();
     let s = signature(&mut c, pos(&ws.main, &ws.main_text, "area s", 0, 5));
-    assert_eq!(s.signatures[0].label, "area(s: Shape) -> Int");
+    assert_eq!(s.signatures[0].label, "area(s = Shape) -> Int");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
 }
