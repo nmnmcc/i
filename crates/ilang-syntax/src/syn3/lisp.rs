@@ -1510,3 +1510,156 @@ fn split_result(ret: &Datum) -> (&Datum, Option<&Datum>, Option<&Datum>) {
         _ => (ret, None, env),
     }
 }
+
+/// The reverse of [`convert_quote`]: a quoted datum in the rows of §6.8 is
+/// rewritten to the older rows, which the macro engine of this stage reads
+/// (the transition front keeps the current tree, so the syntax that a macro
+/// sees and gives is in the older rows).
+pub fn unconvert_quote(d: &Datum) -> Datum {
+    let span = d.span;
+    let all = |xs: &[Datum]| xs.iter().map(unconvert_quote).collect::<Vec<_>>();
+    // `(-> (, p) _ e)` or `(-> (? (, p) g) _ e)`: a branch of one position.
+    fn branch(c: &Datum) -> Option<(&Datum, Option<&Datum>, &Datum)> {
+        let [params, ret, body] = round(c, "->")? else {
+            return None;
+        };
+        if !matches!(ret.kind, K::Discard(_)) {
+            return None;
+        }
+        let (data, guard) = match round(params, "?") {
+            Some([data, g]) => (data, Some(g)),
+            _ => (params, None),
+        };
+        match round(data, ",") {
+            Some([p]) => Some((p, guard, body)),
+            _ => None,
+        }
+    }
+    let clause = |c: &Datum| -> Datum {
+        let (p, guard, body) = branch(c).unwrap();
+        let head = match guard {
+            Some(g) => node(
+                K::Round(vec![sym("?", p.span), unconvert_quote(p), unconvert_quote(g)]),
+                p.span,
+            ),
+            None => unconvert_quote(p),
+        };
+        node(
+            K::Round(vec![sym("->", c.span), head, unconvert_quote(body)]),
+            c.span,
+        )
+    };
+    // The result of a function or a function type: `(<- R (, needs…))`.
+    let needs = |ret: &Datum| -> (Datum, Vec<Datum>) {
+        match round(ret, "<-") {
+            Some([r, group]) => match round(group, ",") {
+                Some(items) => (unconvert_quote(r), items.to_vec()),
+                None => (unconvert_quote(r), vec![group.clone()]),
+            },
+            _ => (unconvert_quote(ret), Vec::new()),
+        }
+    };
+    let kind = match &d.kind {
+        K::Round(parts) => match (parts.first().and_then(symbol), &parts[..]) {
+            (Some("->"), [arrow, params, ret, body]) if round(params, ",").is_some() => {
+                let mut ps = all(round(params, ",").unwrap());
+                let (result, services) = needs(ret);
+                for s in services {
+                    match round(&s, ":") {
+                        Some([x, n]) => ps.push(node(
+                            K::Round(vec![sym("!", s.span), x.clone(), unconvert_quote(n)]),
+                            s.span,
+                        )),
+                        _ => ps.push(unconvert_quote(&s)),
+                    }
+                }
+                K::Round(vec![
+                    arrow.clone(),
+                    node(K::Round(ps), params.span),
+                    result,
+                    unconvert_quote(body),
+                ])
+            }
+            (Some("->"), [arrow, params, ret]) if round(params, ",").is_some() => {
+                let ps = all(round(params, ",").unwrap());
+                let (mut result, items) = needs(ret);
+                let mut env = Vec::new();
+                let mut error = None;
+                for item in items {
+                    match &item.kind {
+                        K::Round(xs)
+                            if xs.len() == 2 && matches!(&xs[0].kind, K::UpName(s) if s == "Fail") =>
+                        {
+                            error = Some(unconvert_quote(&xs[1]));
+                        }
+                        _ => env.push(unconvert_quote(&item)),
+                    }
+                }
+                if let Some(e) = error {
+                    result = node(K::Round(vec![sym("^", ret.span), result, e]), ret.span);
+                }
+                if !env.is_empty() {
+                    let v = if env.len() == 1 {
+                        env.pop().unwrap()
+                    } else {
+                        let mut parts = vec![sym("|", ret.span)];
+                        parts.extend(env);
+                        node(K::Round(parts), ret.span)
+                    };
+                    result = node(K::Round(vec![sym("!", ret.span), result, v]), ret.span);
+                }
+                K::Round(vec![arrow.clone(), node(K::Round(ps), params.span), result])
+            }
+            (Some("|>"), [_, subject, rhs]) => {
+                let clauses: Option<Vec<&Datum>> = match round(rhs, "|") {
+                    Some(cs) if !cs.is_empty() && cs.iter().all(|c| branch(c).is_some()) => {
+                        Some(cs.iter().collect())
+                    }
+                    _ if branch(rhs).is_some() => Some(vec![rhs]),
+                    _ => None,
+                };
+                match clauses {
+                    Some(cs) => K::Round(vec![
+                        sym("|", span),
+                        unconvert_quote(subject),
+                        node(K::Curly(cs.into_iter().map(clause).collect()), rhs.span),
+                    ]),
+                    None => K::Round(vec![
+                        sym("|", span),
+                        unconvert_quote(subject),
+                        unconvert_quote(rhs),
+                    ]),
+                }
+            }
+            (Some("|"), [_, cs @ ..]) if cs.len() > 1 && cs.iter().all(|c| branch(c).is_some()) => {
+                K::Curly(cs.iter().map(clause).collect())
+            }
+            (Some(","), [_, items @ ..])
+                if items
+                    .first()
+                    .is_some_and(|p| round(p, "=").is_some() || symbol(p) == Some("..")) =>
+            {
+                let mut out = Vec::new();
+                for p in items {
+                    match round(p, "=") {
+                        Some([l, v]) => out.push(node(
+                            K::Round(vec![sym(":", p.span), l.clone(), unconvert_quote(v)]),
+                            p.span,
+                        )),
+                        _ => out.push(unconvert_quote(p)),
+                    }
+                }
+                K::Curly(out)
+            }
+            _ => K::Round(all(parts)),
+        },
+        K::Square(parts) => K::Square(all(parts)),
+        K::Curly(parts) => K::Curly(all(parts)),
+        K::Bits(parts) => K::Bits(all(parts)),
+        K::Quote(x) => K::Quote(Box::new(unconvert_quote(x))),
+        K::Unquote(x) => K::Unquote(x.clone()),
+        K::Splice(x) => K::Splice(x.clone()),
+        other => other.clone(),
+    };
+    node(kind, span)
+}
