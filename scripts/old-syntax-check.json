@@ -2193,30 +2193,6 @@
     ],
     "reason": "Render Rust format string with a representative port."
   },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:d162de7b30d5d39d": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:04a3d99efcbda47b": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `?`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:eb648ea1f46a27c1": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:d29dbdfffc876b3c": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
   "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
