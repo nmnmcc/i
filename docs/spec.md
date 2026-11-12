@@ -1484,7 +1484,9 @@ The process module separates its capabilities as follows, keeping its existing o
 
 The first four have public constructors for ordinary fakes. Process keeps private raw fields and a private nominal Child wrapper over Int. The same private Int representation is used for other IO resources. Neither these wrappers nor their constructed errors add a boundary type (§10.3). Request ownership and raw signatures are the accepted [runtime.md §§5/7](design/runtime.md) contract, installed by R2/IO; this split adds no new field or error.
 
-`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`; UDP is not in v1.
+`i/net` includes DNS: `connect` accepts a host name or numeric address, and `resolve(name)` returns addresses. The native host uses the system resolver and tries addresses in order, without IPv4/IPv6 racing. TLS belongs to `i/tls`. UDP datagrams are part of `i/net`: `bind(address, port)` returns a private nominal `Datagram` over Int, `send_to(socket, address, port, bytes)` sends one datagram, and `receive_from(socket, max_bytes)` returns `(data: BitArray, address: String, port: Int)` with the numeric sender address and port. `local_address(socket)` and `local_port(socket)` return the bound numeric address and port; `close_datagram(socket)` closes it. Bind accepts IPv4, IPv6 and host names; port 0 asks the OS to choose a port. Send accepts a numeric address or host name and port 1..65535; addresses are resolved and tried in system order as for TCP. Receive requires a positive bound, capped at 65536 bytes; it consumes exactly one datagram and discards any excess bytes. An empty datagram is data, not EOF. Sends require whole bytes and are atomic; expected host failures give `NetError` values through the ordinary error axis. UDP provides no delivery or ordering guarantee.
+
+Datagrams follow TCP's resource identity, owner, creation guard, teardown and lease rules (native N9). One send and one receive may overlap; a second operation in the same direction gives `busy`. Close is idempotent and error-free and wakes a blocked receive with `closed` unless its answer already committed. Scope cancellation cancels an owned blocked receive and releases its lease, leaving the socket usable until close or entry teardown. The Rust host uses tokio and Node uses `node:dgram`; browser and WASI have no Net provider and compilation fails naming `i/net.Net`. No automatic unsupported provider is installed.
 
 ### 9.8 Keys
 
@@ -2192,8 +2194,13 @@ These ordinary functions use the services described in §9.7; their definitions 
 
 | Function | What it does |
 |---|---|
+| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). |
+| `send_to` | Send one datagram to an address and port. |
+| `receive_from` | Receive one datagram and its sender address and port. |
+| `local_address` | Read a datagram socket's numeric local address. |
+| `close_datagram` | Close a datagram socket. |
 | `listen` | Listen for TCP connections. |
-| `local_port` | Read the listener’s local port. |
+| `local_port` | Read a listener or datagram socket’s local port. |
 | `accept` | Accept a TCP connection. |
 | `connect` | Connect to a host and port. |
 | `resolve` | Resolve a host name to addresses. |
