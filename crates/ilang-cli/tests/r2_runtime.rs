@@ -352,15 +352,19 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     let begin = source
         .find("@external(\"ilang:worker\", \"enabled\")")
         .unwrap();
-    let end = source[begin..].find("\n/// The completion of a published task").unwrap() + begin;
+    let end = source[begin..].find("\ndrop_shares = ").unwrap() + begin;
     let source = source[..begin].to_string()
         + "worker_enabled = () -> Bool { False }\n\
            worker_publish = (_job: Job) -> Int { 0 }\n\
            worker_claim = (_ticket: Int) -> Bool { True }\n\
-           worker_poll = (_ticket: Int) -> Int { 2 }\n\
-           worker_take = (_ticket: Int) -> Completion { panic(\"no workers\") }\n\
-           worker_forget = (_ticket: Int) -> Nil { Nil }\n\
-           worker_abort = () -> Never { panic(\"no workers\") }\n\
+           worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
+           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\n\
+           worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
+           worker_inbox = () -> Int { 0 }\n\
+           worker_message = () -> Remote { panic(\"no workers\") }\n\
+           worker_pending = () -> Bool { False }\n\
+           worker_wait = () -> Nil { Nil }\n\
            worker_share_put = (_run: Key(Nil), _address: Address, _value: Keyed) -> Nil { Nil }\n\
            worker_share_get = (_run: Key(Nil), _address: Address) -> List(Keyed) { [] }\n\
            worker_share_drop = (_run: Key(Nil), _address: Address) -> Nil { Nil }\n"

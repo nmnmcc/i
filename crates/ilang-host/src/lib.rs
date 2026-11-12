@@ -1793,10 +1793,10 @@ fn invoke_in(
 /// while the host prepares a reply (H8, H11a). Keep the first import failure
 /// rather than replacing it with the trap that carried it out of Wasm (H2).
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
-    if std::env::var_os("I_WORKERS_TRACE").is_some() {
-        eprintln!("i: trap: {error:?}");
-    }
     let mut context = context.as_context_mut();
+    if std::env::var_os("I_WORKERS_TRACE").is_some() {
+        eprintln!("i: trap: {:?} {error:?}", context.data().stop_message);
+    }
     let state = context.data_mut();
     state.resources.teardown();
     state.requests.drop_all();

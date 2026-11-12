@@ -3329,11 +3329,14 @@ loop = (state: State) -> RunReply {
 								True -> run_reply(prepared)
 								False -> {
 									tickets = interests(prepared)
+									// A nested run also waits while a task of the
+									// entry run is away: its next step may end it.
 									possible = request.count_root(
 										prepared.root
 									) >
 										0 ||
-										any(tickets, has_work)
+										any(tickets, has_work) ||
+										core.not(prepared.top) && worker_pending()
 									away = prepared.top && worker_pending()
 									{ away } |> {
 										True -> {
