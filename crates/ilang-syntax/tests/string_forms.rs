@@ -61,12 +61,24 @@ fn formatter_preserves_interpolation_with_nested_expressions() {
         "value = \"\"\"\n  a \\(f(\"x\"))\n  b\n  \"\"\"",
         r#"value = "a\({ // inner comment
 x })b" // outside"#,
-        r#"value = (s) { s |> { "a" <> r <> "b" -> r  r <> "x" -> r  _ -> "" } }"#,
-        r#"value = (s) { s |> { "a" <> // prefix
-r <> // suffix
-"b" -> r  _ -> "" } }"#,
-        r#"value = (s) { s |> { r <> // suffix
-"b" -> r  _ -> "" } }"#,
+        r#"value = (s) { s |> ("a" <> r <> "b") { r } | (r <> "x") { r } | (_) { "" } }"#,
+        r#"value = (s) {
+	s |>
+		("a" <> r <> "b") {
+			// prefix
+			// suffix
+			r
+		}
+		| (_) { "" }
+}"#,
+        r#"value = (s) {
+	s |>
+		(r <> "b") {
+			// suffix
+			r
+		}
+		| (_) { "" }
+}"#,
     ] {
         let (a, ds) = parse_module(source);
         assert!(ds.is_empty(), "{source}: {ds:?}");

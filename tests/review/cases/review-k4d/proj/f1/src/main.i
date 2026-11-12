@@ -1,13 +1,14 @@
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(() -> Int ! N) }
-use(N) = (s ! S(N)) {
-  S(f) = s
-  f()
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (() <- N -> Int)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
 }
 
 main = () {
-  ! S(Never) = S(() { get() })
-  use()
-  Nil
+	{
+		use()
+		Nil
+	} <- (S(() { get() }))
 }

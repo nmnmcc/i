@@ -264,7 +264,7 @@ fn deep_mixed_bodies_patterns_and_types_do_not_use_the_host_stack() {
 #[test]
 fn bit_segment_binders_cover_later_sizes_and_only_their_clause() {
     let (mut module, errors) =
-        ilang_syntax::parse_module("f = { <<m:u(8), _:u(m())>> -> m()  _ -> m() }");
+        ilang_syntax::parse_module("f = (<<m:u(8), _:u(m())>>) { m() } | (_) { m() }");
     assert!(errors.is_empty(), "{errors:?}");
     let mut hook = TestHook::default();
     body_walk::expressions(&mut module, &mut hook).unwrap();

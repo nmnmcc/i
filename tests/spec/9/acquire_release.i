@@ -6,14 +6,12 @@
 )
 
 // `release` gets the resource when `use` ends with an error.
-
 main = () {
 	fail.catch(() {
-		resource.acquire(() { 5 }, (r) {
-			r |> {
-				5 -> panic("released 5")
-				_ -> Nil
-			}
-		}, (r) { fail.raise(r) })
+		resource.acquire(
+			() { 5 },
+			(r) { r |> (5) { panic("released 5") } | (_) { Nil } },
+			(r) { fail.raise(r) },
+		)
 	})
 }

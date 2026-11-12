@@ -27,7 +27,7 @@ fn entry_without_services_has_empty_provider_environment() {
 
 #[test]
 fn entry_retains_ordinary_service_for_provider_planning() {
-    let (needs, program) = entry_needs("Service { Service }\n\nmain = (s ! Service) { Nil }\n");
+    let (needs, program) = entry_needs("Service = ()\n\nmain = () <- (s: Service) { Nil }\n");
     let service = program
         .types
         .iter()
@@ -45,7 +45,7 @@ fn entry_retains_ordinary_service_for_provider_planning() {
 #[test]
 fn entry_retains_generic_service_arguments() {
     let (needs, program) =
-        entry_needs("Service(A) { Service(value: A) }\n\nmain = (s ! Service(Int)) { Nil }\n");
+        entry_needs("Service(A) = (value = A)\n\nmain = () <- (s: Service(Int)) { Nil }\n");
     let service = program
         .types
         .iter()
@@ -66,7 +66,7 @@ fn entry_retains_generic_service_arguments() {
 #[test]
 fn private_factory_scheme_is_available_to_provider_checking() {
     let (graph, _, _) =
-        common::check_files(&[("src/main.i", "Service { Service }\nmake = () { Service }\n")]);
+        common::check_files(&[("src/main.i", "Service = ()\nmake = () { Service }\n")]);
     let checked = ilang_check::check(&graph);
     let program = checked.program.unwrap();
     let typed = checked.types.unwrap();
@@ -88,7 +88,7 @@ fn private_factory_scheme_is_available_to_provider_checking() {
 fn path_fixture() -> (ilang_package::PackageGraph, ilang_check::hir::Program) {
     let (mut graph, program, _) = common::check_files(&[(
         "src/main.i",
-        "(Public(..), public)\nPublic { Public }\nPrivate { Private }\npublic = () { Public }\nprivate = () { Private }\n",
+        "(\n\tPublic(..)\n\tpublic\n)\nPublic = ()\nPrivate = ()\npublic = () { Public }\nprivate = () { Private }\n",
     )]);
     let root = graph.root.unwrap();
     let library = graph.library;

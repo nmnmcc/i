@@ -1,5 +1,5 @@
-Whole = {Int - 0} | 0
-One = {1 | 2} - 2
+Whole = Int - 0 | 0
+One = { 1 | 2 } - 2
 In = Int & 1
 identity = (n: Whole) -> Int { n }
 reverse = (n: Int) -> Whole { n }

@@ -1,2 +1,2 @@
 @host("app")
-Svc { Svc(get: () -> "a" ^ "error") }
+Svc = (get = () <- (Fail("error")) -> "a")

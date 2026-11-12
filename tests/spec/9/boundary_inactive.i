@@ -4,17 +4,10 @@
 	i/assertion
 )
 
-get = (a ! Assert) { a }
+get = () <- (a: Assert) { a }
 
 // The `Assert` of `assertion.catch` is used after `catch` has ended.
-
 main = () {
 	r = assertion.catch(() { get() })
-	r |> {
-		Ok(a) -> {
-			! Assert = a
-			assert(False)
-		}
-		Error(_) -> Nil
-	}
+	r |> (Ok(a)) { assert(False) <- (a) } | (Error(_)) { Nil }
 }

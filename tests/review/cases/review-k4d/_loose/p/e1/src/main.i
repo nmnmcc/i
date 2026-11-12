@@ -1,26 +1,21 @@
-State(A) { State(get: () -> A) }
-read(A) = (s ! State(A)) { s.get() }
+State(A) = (get = () -> A)
+read = <A>() <- (s: State(A)) { s.get() }
 outer = (runner) {
-  inner = () {
-    c = () { read() }
-    runner(c)
-    c
-  }
-  a = inner()
-  b = inner()
-  fa = () {
-    ! State(Int) = State(() { 1 })
-    a() + 1
-  }
-  fb = () {
-    ! State(String) = State(() { "s" })
-    b() <> "t"
-  }
-  (fa(), fb())
+	inner = () {
+		c = () { read() }
+		runner(c)
+		c
+	}
+	a = inner()
+	b = inner()
+	fa = () { a() + 1 <- (State(get = () { 1 })) }
+	fb = () { b() <> "t" <- (State(get = () { "s" })) }
+	(fa(), fb())
 }
 
 main = () {
-  ! State(Int) = State(() { 5 })
-  outer((c: () -> Int ! State(Int)) { c() })
-  Nil
+	{
+		outer((c: () <- (State(Int)) -> Int) { c() })
+		Nil
+	} <- (State(get = () { 5 }))
 }

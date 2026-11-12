@@ -1,16 +1,13 @@
 @inline
 a = () { Nil }
 
-
 b = () { Nil }
 
 @external("only")
 c: (Int) -> Int
 
 @host("app:h/v1", "sync")
-H {
-	H(f: () -> Nil)
-}
+H = (f = () -> Nil)
 
 @deprecated
 d = 1
@@ -18,10 +15,7 @@ d = 1
 @host("app:h/v1")
 e = 1
 
-
-T {
-	T
-}
+T = ()
 
 @deprecated("old")
 @deprecated("older")

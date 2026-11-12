@@ -1,5 +1,7 @@
-S(N) { S(f: () -> Int ! N) }
-use(N) = (s ! S(N)) { s.f() }
-run(N) = (body: () -> Int ! N) { body() }
-fw(N) = () -> Int ! N | S(N) { h = () { use() }
- h() }
+S(N) = (f = () <- N -> Int)
+use = <N>() <- (s: S(N)) { s.f() }
+run = <N>(body: () <- N -> Int) { body() }
+fw = () -> Int {
+	h = () { use() }
+	h()
+}

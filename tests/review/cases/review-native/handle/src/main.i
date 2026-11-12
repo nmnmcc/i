@@ -1,5 +1,5 @@
-File { File(index: Int, generation: Int) }
+File = (index = Int, generation = Int)
 @host("review:fs/v1")
-Fs { Fs(open: () -> File) }
+Fs = (open = () -> File)
 
-main = (fs ! Fs) { fs.open() }
+main = () <- (fs: Fs) { fs.open() }

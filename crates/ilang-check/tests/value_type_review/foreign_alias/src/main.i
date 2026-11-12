@@ -1,2 +1,4 @@
-((Local) = review/lib)
+(
+	(Local) = review/lib
+)
 x: Local = 2

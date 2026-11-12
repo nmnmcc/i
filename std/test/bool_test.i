@@ -11,7 +11,9 @@ test("and_true_true_test", () {
 })
 
 test("and_false_true_test", () {
-	assert(core.not(bool.and(False, True)))
+	assert(
+		core.not(bool.and(False, True)),
+	)
 	Nil
 })
 
@@ -21,7 +23,9 @@ test("and_true_true_2_test", () {
 })
 
 test("and_true_false_test", () {
-	assert(core.not(bool.and(True, False)))
+	assert(
+		core.not(bool.and(True, False)),
+	)
 	Nil
 })
 
@@ -46,7 +50,9 @@ test("or_true_false_2_test", () {
 })
 
 test("negate_true_test", () {
-	assert(core.not(bool.not(True)))
+	assert(
+		core.not(bool.not(True)),
+	)
 	Nil
 })
 
@@ -61,17 +67,23 @@ test("nor_false_false_test", () {
 })
 
 test("nor_false_true_test", () {
-	assert(core.not(bool.nor(False, True)))
+	assert(
+		core.not(bool.nor(False, True)),
+	)
 	Nil
 })
 
 test("nor_true_false_test", () {
-	assert(core.not(bool.nor(True, False)))
+	assert(
+		core.not(bool.nor(True, False)),
+	)
 	Nil
 })
 
 test("nor_true_true_test", () {
-	assert(core.not(bool.nor(True, True)))
+	assert(
+		core.not(bool.nor(True, True)),
+	)
 	Nil
 })
 
@@ -91,17 +103,23 @@ test("nand_true_false_test", () {
 })
 
 test("nand_true_true_test", () {
-	assert(core.not(bool.nand(True, True)))
+	assert(
+		core.not(bool.nand(True, True)),
+	)
 	Nil
 })
 
 test("exclusive_or_true_true_test", () {
-	assert(core.not(bool.xor(True, True)))
+	assert(
+		core.not(bool.xor(True, True)),
+	)
 	Nil
 })
 
 test("exclusive_or_false_false_test", () {
-	assert(core.not(bool.xor(False, False)))
+	assert(
+		core.not(bool.xor(False, False)),
+	)
 	Nil
 })
 
@@ -121,12 +139,16 @@ test("exclusive_nor_false_false_test", () {
 })
 
 test("exclusive_nor_false_true_test", () {
-	assert(core.not(bool.exclusive_nor(False, True)))
+	assert(
+		core.not(bool.exclusive_nor(False, True)),
+	)
 	Nil
 })
 
 test("exclusive_nor_true_false_test", () {
-	assert(core.not(bool.exclusive_nor(True, False)))
+	assert(
+		core.not(bool.exclusive_nor(True, False)),
+	)
 	Nil
 })
 
@@ -145,22 +167,20 @@ test("to_string_false_test", () {
 	Nil
 })
 
-test("guard_when_true_test", () {
-	assert(bool.guard(when: True, return: 2, otherwise: () { 1 }) == 2)
-})
+test("guard_when_true_test", () { assert(bool.guard(True, 2, () { 1 }) == 2) })
 
 test("guard_when_false_test", () {
-	assert(bool.guard(when: False, return: 2, otherwise: () { 1 }) == 1)
+	assert(bool.guard(False, 2, () { 1 }) == 1)
 })
 
 test("lazy_guard_when_true_test", () {
 	oops = () { panic("this shouldn't run!") }
-	assert(bool.lazy_guard(when: True, return: () { 2 }, otherwise: oops) == 2)
+	assert(bool.lazy_guard(True, () { 2 }, oops) == 2)
 })
 
 test("lazy_guard_when_false_test", () {
 	oops = () { panic("this shouldn't run!") }
-	assert(bool.lazy_guard(when: False, return: oops, otherwise: () { 1 }) == 1)
+	assert(bool.lazy_guard(False, oops, () { 1 }) == 1)
 })
 
 test("compare_test", () {

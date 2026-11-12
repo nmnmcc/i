@@ -12,9 +12,9 @@ with_nil = (x: Int | Nil) { x == Nil }
 
 lists = [1] == []
 
-type_var(T) = (a: T, b: T) { a == b }
+type_var = <T>(a: T, b: T) { a == b }
 
-type_var_literal(T) = (a: T) { a == 1 }
+type_var_literal = <T>(a: T) { a == 1 }
 
 untyped = (s) { s == 1 }
 

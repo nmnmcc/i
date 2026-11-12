@@ -917,7 +917,7 @@ Attack generic encoding and recursive result adaptation:
 id = (x) { x }
 probe = () { (id(2.5), id("a")) }
 relay = (f: (Float) -> Float, n: Int, x: Float) -> Float {
-  { n == 0 } |> { True -> f(x) False -> relay(f, n - 1, x) }
+	{ n == 0 } |> (True) { f(x) } | (False) { relay(f, n - 1, x) }
 }
 ```
 

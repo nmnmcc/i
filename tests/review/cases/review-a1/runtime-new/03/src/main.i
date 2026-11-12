@@ -6,12 +6,7 @@
 	f
 )
 
-f = () {
-	2 |> {
-		x -> core.inspect(x)
-	}
-}
-
+f = () { 2 |> (x) { core.inspect(x) } }
 
 main = () {
 	assert(f() == "2")

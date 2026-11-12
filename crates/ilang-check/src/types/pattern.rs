@@ -1294,12 +1294,13 @@ mod shared_place_tests {
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(
             root.path().join("src/main.i"),
-            r#"
-Pair(A) { Pair(A, A) }
-Event(A) { Start(A) Stop(A) }
-Two(A) = (A, A)
-Wrapped(A) { Wrapped(Two(A)) }
-Solo(A) { Solo(A, Int) }
+            r#"Pair(A) = (A, A)
+Start(A) = (A)
+Stop(A) = (A)
+Event(A) = Start(A) | Stop(A)
+Two(A) = { (A, A) }
+Wrapped(A) = (Two(A))
+Solo(A) = (A, Int)
 "#,
         )
         .unwrap();

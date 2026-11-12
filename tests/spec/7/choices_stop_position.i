@@ -4,6 +4,9 @@
 // at: spec/main:9:13
 
 // §6.12: a fitted clause reports its first pattern, like a parameter.
-f = { 0 | 1 -> 2 }
+f = (0 | 1) { 2 }
 
-main = () { f(2)  Nil }
+main = () {
+	f(2)
+	Nil
+}

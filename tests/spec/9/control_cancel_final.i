@@ -11,15 +11,17 @@
 
 // `cancel` unwinds the paused computation: its final functions run (§9.5),
 // on top of the place of `cancel`.
-
 main = () {
 	control.boundary((b) {
-		resource.ensure(() {
-			control.suspend(b, (k) {
-				control.cancel(k)
-				Nil
-			})
-		}, () { panic("final") })
+		resource.ensure(
+			() {
+				control.suspend(b, (k) {
+					control.cancel(k)
+					Nil
+				})
+			},
+			() { panic("final") },
+		)
 		Nil
 	})
 	Nil

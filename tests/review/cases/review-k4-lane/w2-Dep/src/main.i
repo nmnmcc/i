@@ -1,25 +1,14 @@
-Dep {
-	Dep(value: Int)
-}
+Dep = (value = Int)
 
-get = (d ! Dep) { d.value }
+get = () <- (d: Dep) { d.value }
 
-S(N) {
-	S(f: () -> Int ! N)
-}
+S(N) = (f = () <- N -> Int)
 
-use(N) = (s ! S(N)) {
-	S(f, ..) = s
+use = <N>() <- (s: S(N)) {
+	S(f = f, ..) = s
 	f()
 }
 
-wrap(N) = (body: () -> Int ! N | S(N)) {
-	! S(N) = S(() { 1 })
-	body()
-}
+wrap = <N>(body: () <- (S(N), ..N) -> Int) { body() <- (S(f = () { 1 })) }
 
-
-main = () {
-	! Dep = Dep(7)
-	assert(wrap(() { use() }) == 1)
-}
+main = () { assert(wrap(() { use() }) == 1) <- (Dep(value = 7)) }

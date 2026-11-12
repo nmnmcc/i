@@ -23,7 +23,7 @@ fn lines(source: &str) -> Vec<String> {
 /// `n` members: `C0`, and `Ci(A) { Ci(A, E(A)) }` for each other `i`,
 /// joined as `E(A)`, with an unannotated recursive match over all of them.
 fn nominal_union(n: usize) -> String {
-    let mut out = vec!["C0 { C0 }".to_string()];
+    let mut out = vec!["C0 = ()".to_string()];
     for i in 1..n {
         out.push(format!("C{i}(A) {{ C{i}(A, E(A)) }}"));
     }
@@ -64,11 +64,13 @@ fn nominal_union_recursive_match_scales() {
 
 #[test]
 fn union_is_displayed_by_its_declared_name() {
-    let source = "Some(A) { Some(A) }
-None { None }
+    let source = "Some(A) = (A)
+None = ()
 Option(A) = Some(A) | None
-first = (xs: List(Option(Int))) -> Int { xs |> { [Some(x), ..r] -> x  _ -> 0 } }
-pick = (b: Bool) { b |> { True -> Some(1)  False -> None } }
+first = (xs: List(Option(Int))) -> Int {
+	xs |> ([Some(x), ..r]) { x } | (_) { 0 }
+}
+pick = (b: Bool) { b |> (True) { Some(1) } | (False) { None } }
 main = () { first([pick(True)]) }
 ";
     let lines = lines(source);

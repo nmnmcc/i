@@ -1,8 +1,5 @@
 @host("app:clock/v1")
-Clock { Clock(now: () -> Int) }
-now = (clock ! Clock) { clock.now() }
+Clock = (now = () -> Int)
+now = () <- (clock: Clock) { clock.now() }
 
-main = () {
-  ! Clock = Clock(() { 42 })
-  assert(now() == 42)
-}
+main = () { assert(now() == 42) <- (Clock(now = () { 42 })) }

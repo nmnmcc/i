@@ -207,16 +207,18 @@ prescription for entry bootstrap:
 
 
 ```i
-go(A, E, N) = (body: () -> A ^ E ! N | Scheduler, s ! Scheduler) -> Task(A, E) ! N | Scheduler {
-  start = {
-    ! Scheduler = scheduler.detached
-    control.keep_env((own: Scheduler) {
-      ! Scheduler = own
-      r = task.unwind_inside(body)
-      r
-    })
-  }
-  s.spawn(start)
+go = <A, E, N>(body: () <- (Fail(E), Scheduler, ..N) -> A) <- (
+	s: Scheduler,
+) -> Task(A, E) {
+	start = {
+		control.keep_env((own: Scheduler) {
+			{
+				r = task.unwind_inside(body)
+				r
+			} <- (own)
+		}) <- (scheduler.detached)
+	}
+	s.spawn(start)
 }
 ```
 

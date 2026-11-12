@@ -7,7 +7,6 @@
 // still the first position.
 positive = (n: Int) { assert(n > 0) }
 
-
 main = () {
 	positive(-1)
 	Nil

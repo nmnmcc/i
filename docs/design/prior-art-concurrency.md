@@ -245,16 +245,17 @@ These are source arguments and proposed tests, **not executed tests**. Fragments
 ### A. Shared graph: a cost hidden in “small capture”
 
 ```i
-D { End Fork(D, D) }
+End = ()
+Fork = (D, D)
+D = End | Fork
 
 shared = (n: Int) -> D {
-  n |> {
-    0 -> End
-    _ -> {
-      x = shared(n - 1)
-      Fork(x, x)
-    }
-  }
+	n |>
+		(0) { End }
+		| (_) {
+			x = shared(n - 1)
+			Fork(x, x)
+		}
 }
 ```
 
@@ -265,17 +266,17 @@ First attack found a real omission in an initial optimization direction: reducin
 ### B. A tail-resume rewrite can run under the wrong service
 
 ```i
-Read { Read(get: () -> Int) }
+Read = (get = () -> Int)
 
-read = (r ! Read) { r.get() }
+read = () <- (r: Read) { r.get() }
 
 probe = () {
-  ! Read = Read(() { 1 })
-  control.boundary((b) {
-    ! Read = Read(() { 2 })
-    x = control.suspend(b, (k) { control.resume(k, read()) })
-    x
-  })
+	control.boundary((b) {
+		{
+			x = control.suspend(b, (k) { control.resume(k, read()) })
+			x
+		} <- (Read(get = () { 2 }))
+	}) <- (Read(get = () { 1 }))
 }
 ```
 

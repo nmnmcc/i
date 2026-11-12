@@ -6,17 +6,19 @@
 	i/task
 )
 
-
 main = () {
-	assert(task.run(() {
-		task.scope((s) {
-			child = task.go(s, () {
-				task.run(() {
-					task.yield()
-					task.path()
+	assert(
+		task.run(() {
+			task.scope((s) {
+				child = task.go(s, () {
+					task.run(() {
+						task.yield()
+						task.path()
+					})
 				})
+				task.join(child)
 			})
-			task.join(child)
-		})
-	}) == [1, 1, 1])
+		}) ==
+			[1, 1, 1],
+	)
 }

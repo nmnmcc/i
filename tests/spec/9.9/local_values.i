@@ -8,15 +8,26 @@
 	i/core
 )
 
-
 main = () {
 	task.local_scope((s) {
 		c = task.local_channel()
 		task.go(s, () { control.boundary((b) { task.send(c, b) }) })
 		t = task.go(s, () { task.receive(c) })
-		assert(core.not(core.portable(c)))
-		assert(core.not(core.portable(t)))
-		assert(core.not(core.portable(task.join_event(t))))
-		assert(core.not(core.portable(task.join(t))))
+		assert(
+			core.not(core.portable(c)),
+		)
+		assert(
+			core.not(core.portable(t)),
+		)
+		assert(
+			core.not(
+				core.portable(task.join_event(t)),
+			),
+		)
+		assert(
+			core.not(
+				core.portable(task.join(t)),
+			),
+		)
 	})
 }

@@ -496,7 +496,7 @@ fn direct_charge_events(
 #[test]
 fn charge_plan_matches_each_event_without_building_the_answer() {
     use ilang_syntax::lisp::SourceEncoder;
-    let source = "Thing(A) { Item(label: A, number: 123456789012345678901234567890) }\n";
+    let source = "Item(A) = (label = A, number = 123456789012345678901234567890)\nThing(A) = Item(A)\n";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();
@@ -611,7 +611,7 @@ fn charge_events_count_unicode_zero_and_large_integer_exactly() {
 #[test]
 fn records_preserve_labels_spreads_and_streamed_cost() {
     use ilang_syntax::lisp::SourceEncoder;
-    let source = "f(R, K) = (r: (..R, -old, K: Int, -other, \"full name\": String)) { (..r, \"full name\": \"Ada\", x: 1) }\nempty = ()\n";
+    let source = "f = <R, K>(r: (k = Int, full_name = String)) { (..r, full_name = \"Ada\", x = 1) }\nempty = ()\n";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();
@@ -656,7 +656,9 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
 #[test]
 fn charge_events_for_interpolation_and_two_sided_string_patterns() {
     use ilang_syntax::lisp::SourceEncoder;
-    let source = r##"value = (s: String) { s |> { "a" <> r <> "b" -> #"x\#(r)"#  r <> "b" -> r  _ -> "" } }"##;
+    let source = r##"value = (s: String) {
+	s |> ("a" <> r <> "b") { "x\(r)" } | (r <> "b") { r } | (_) { "" }
+}"##;
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();

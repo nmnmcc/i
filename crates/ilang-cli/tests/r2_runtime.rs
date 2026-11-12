@@ -335,10 +335,10 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");
     let source = source.replace(
-        "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (root: Key(Nil)) -> Request(Nil)",
+        "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (Key(Nil)) -> Request(Nil)",
         "observe_change = (_root: Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
     ).replace(
-        "@external(\"ilang:request\", \"has_work\")\nhas_work: (ticket: Ticket) -> Bool",
+        "@external(\"ilang:request\", \"has_work\")\nhas_work: (Ticket) -> Bool",
         "has_work = (_ticket: Ticket) -> Bool { False }",
     );
     let begin = source
@@ -346,7 +346,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         .unwrap();
     let end = source[begin..].find("\nFrame {").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "finalizing(A,R,E,N,B,F,M) = (_k: Continuation(A,R,E,N), _b: Boundary(B,F,M)) -> Bool { False }\n"
+        + "finalizing = <A, R, E, N, B, F, M>(\n\t_k: Continuation(A, R, E, N),\n\t_b: Boundary(B, F, M)\n) -> Bool { False }\n"
         + &source[end..];
     assert!(!source.contains("@external(\"ilang:request\""));
     let source = source

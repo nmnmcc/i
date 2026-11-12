@@ -47,7 +47,6 @@
 //// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback
 //// termination guarantee is added. Generic client use awaits the §7 compiler
 //// IO adapters are explicit and use the same sink service.
-
 (
 	i/core
 	i/stdio
@@ -77,124 +76,119 @@
 	timestamped
 )
 
-Level {
-	Debug
-	Info
-	Warning
-	Failure
-}
+Debug = ()
+Info = ()
+Warning = ()
+Failure = ()
+Level = Debug | Info | Warning | Failure
 
-Entry {
-	Entry(
-		level:   Level
-		message: String
-		fields:  List((String, String))
-		at:      Option(time.Instant)
-	)
-}
+Entry = (
+	level = Level,
+	message = String,
+	fields = List((String, String)),
+	at = Option(time.Instant),
+)
 
-Sink(E, N) {
-	Sink((Level) -> Bool, (Entry) -> Nil ^ E ! N, (N) -> Nil)
-}
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
 
-make(E, N) = (
-	accept: (Level) -> Bool
-	send: (Entry) -> Nil ^ E ! N
+make = <E, N>(
+	accept: (Level) -> Bool,
+	send: (Entry) <- (Fail(E), ..N) -> Nil
 ) -> Sink(E, N) { Sink(accept, send, (_: N) { Nil }) }
 
-silent(N) = () -> Sink(Never, N) {
+silent = <N>() -> Sink(Never, N) {
 	make((_: Level) { False }, (_: Entry) { Nil })
 }
 
-filter(E, N) = (sink: Sink(E, N), accept: (Level) -> Bool) -> Sink(E, N) {
+filter = <E, N>(sink: Sink(E, N), accept: (Level) -> Bool) -> Sink(E, N) {
 	Sink(old_accept, send, marker) = sink
 	Sink((level) { accept(level) && old_accept(level) }, send, marker)
 }
 
-minimum(E, N) = (sink: Sink(E, N), level: Level) -> Sink(E, N) {
+minimum = <E, N>(sink: Sink(E, N), level: Level) -> Sink(E, N) {
 	filter(sink, (candidate) { rank(candidate) >= rank(level) })
 }
 
-enabled(E, N) = (level: Level, sink ! Sink(E, N)) -> Bool ! Sink(E, N) {
+enabled = <E, N>(level: Level) <- (sink: Sink(E, N)) -> Bool {
 	Sink(accept, _, _) = sink
 	accept(level)
 }
 
 // Inferred returns retain the exact public error and environment rows (§7).
-write(E, N) = (entry: Entry, sink ! Sink(E, N)) {
+write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
 	Sink(accept, send, _) = sink
-	accept(entry.level) |> {
-		True  -> send(entry)
-		False -> Nil
-	}
+	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
 }
 
-lazy(E, F, N) = (
-	level: Level
-	message: () -> String ^ F ! N
-	sink ! Sink(E, N)
-) {
+lazy = <E, N>(level: Level, message: () <- N -> String) <- (sink: Sink(E, N)) {
 	Sink(accept, send, _) = sink
-	accept(level) |> {
-		True  -> send(Entry(level, message(), [], None))
-		False -> Nil
-	}
+	accept(level) |>
+		(True) {
+			send(
+				Entry(
+					level = level,
+					message = message(),
+					fields = [],
+					at = None,
+				),
+			)
+		}
+		| (False) { Nil }
 }
 
 format = (entry: Entry) -> String {
-	stamp = entry.at |> {
-		None    -> []
-		Some(t) -> [" @", int.to_string(time.unix_nanoseconds(t))]
-	}
+	stamp = entry.at |>
+		(None) { [] }
+		| (Some(t)) { [" @", int.to_string(time.unix_nanoseconds(t))] }
 	fields = list.flat_map(entry.fields, (field) {
 		(key, value) = field
 		[" ", quote(key), "=", quote(value)]
 	})
 	core.concat(
 		list.append(
-			[level_text(entry.level), " ", quote(entry.message), ..stamp]
-			fields
-		)
+			[level_text(entry.level), " ", quote(entry.message), ..stamp],
+			fields,
+		),
 	)
 }
 
 rank = (level: Level) -> Int {
-	level |> {
-		Debug   -> 0
-		Info    -> 1
-		Warning -> 2
-		Failure -> 3
-	}
+	level |> (Debug) { 0 } | (Info) { 1 } | (Warning) { 2 } | (Failure) { 3 }
 }
 
 level_text = (level: Level) -> String {
-	level |> {
-		Debug   -> "debug"
-		Info    -> "info"
-		Warning -> "warning"
-		Failure -> "failure"
-	}
+	level |>
+		(Debug) { "debug" }
+		| (Info) { "info" }
+		| (Warning) { "warning" }
+		| (Failure) { "failure" }
 }
 
 quote = (text: String) -> String {
-	core.concat([
-		"\""
-		..list.append(list.map(core.codepoints(text), escape), ["\""])
-	])
+	core.concat(
+		[
+			"\"",
+			..list.append(
+				list.map(core.codepoints(text), escape),
+				["\""],
+			),
+		],
+	)
 }
 
 escape = (codepoint: UtfCodepoint) -> String {
-	core.codepoint_to_int(codepoint) |> {
-		34 -> "\\\""
-		92 -> "\\\\"
-		10 -> "\\n"
-		13 -> "\\r"
-		9  -> "\\t"
-		n ? n < 32 || { n >= 127 && n <= 159 } || n == 8232 || n == 8233 -> {
-			core.concat(["\\u{", core.to_lower(int.to_base16(n)), "}"])
+	core.codepoint_to_int(codepoint) |>
+		(34) { "\\\"" }
+		| (92) { "\\\\" }
+		| (10) { "\\n" }
+		| (13) { "\\r" }
+		| (9) { "\\t" }
+		| (n ? n < 32 || { n >= 127 && n <= 159 } || n == 8232 || n == 8233) {
+			core.concat(
+				["\\u{", core.to_lower(int.to_base16(n)), "}"],
+			)
 		}
-		_ -> core.from_codepoints([codepoint])
-	}
+		| (_) { core.from_codepoints([codepoint]) }
 }
 
 /// A sink that writes each formatted entry to standard error.
@@ -209,18 +203,21 @@ stdout = () {
 
 /// A sink that appends each formatted entry to a file.
 file = (path: String) {
-	make((_: Level) { True }, (entry) {
-		resource.acquire(
-			() { fs.open(path, fs.Append) }
-			(i) { fs.close(i) }
-			(i) {
-				text = format(entry) <> "\n"
-				fs.write(i, <<text:utf8>>)
-				fs.flush(i)
-			}
-		)
-	})
+	make(
+		(_: Level) { True },
+		(entry) {
+			resource.acquire(
+				() { fs.open(path, fs.Append) },
+				(i) { fs.close(i) },
+				(i) {
+					text = format(entry) <> "\n"
+					fs.write(i, <<text:utf8>>)
+					fs.flush(i)
+				},
+			)
+		},
+	)
 }
 
 /// Adds the current Unix time to an entry.
-timestamped = (entry: Entry) { Entry(..entry, at: Some(time.now())) }
+timestamped = (entry: Entry) { Entry(..entry, at = Some(time.now())) }

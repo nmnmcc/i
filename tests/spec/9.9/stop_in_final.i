@@ -6,16 +6,21 @@
 	i/resource
 )
 
-
 main = () {
 	task.scope((s) {
 		child = task.go(s, () {
-			resource.ensure(() {
-				resource.ensure(() { Nil }, () {
-					task.yield()
-					panic("final")
-				})
-			}, () { panic("outer must not run") })
+			resource.ensure(
+				() {
+					resource.ensure(
+						() { Nil },
+						() {
+							task.yield()
+							panic("final")
+						},
+					)
+				},
+				() { panic("outer must not run") },
+			)
 		})
 		task.join(child)
 	})

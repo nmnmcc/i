@@ -10,23 +10,23 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (text: String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-
-main = (out ! Out) {
+main = () <- (out: Out) {
 	control.boundary((b) {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(() {
-					task.send(armed, Nil)
-					task.sync(task.never())
-				}, () {
-					task.yield()
-					out.print("child-final")
-				})
+				resource.ensure(
+					() {
+						task.send(armed, Nil)
+						task.sync(task.never())
+					},
+					() {
+						task.yield()
+						out.print("child-final")
+					},
+				)
 			})
 			task.receive(armed)
 			control.suspend(b, (k) { control.cancel(k) })

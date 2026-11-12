@@ -13,12 +13,16 @@ test("is_ok_with_ok_test", () {
 })
 
 test("is_ok_with_error_test", () {
-	assert(core.not(result.is_ok(Error(1))))
+	assert(
+		core.not(result.is_ok(Error(1))),
+	)
 	Nil
 })
 
 test("is_error_with_ok_test", () {
-	assert(core.not(result.is_error(Ok(1))))
+	assert(
+		core.not(result.is_error(Ok(1))),
+	)
 	Nil
 })
 
@@ -49,7 +53,7 @@ test("map_error_ok_test", () {
 
 test("map_error_error_test", () {
 	assert(
-		result.map_error(Error(1), (x) { ("ok", x + 1) }) == Error(("ok", 2))
+		result.map_error(Error(1), (x) { ("ok", x + 1) }) == Error(("ok", 2)),
 	)
 	Nil
 })
@@ -162,7 +166,7 @@ test("lazy_or_error_ok_test", () {
 test("lazy_or_error_error_test", () {
 	assert(
 		result.lazy_or(Error("Error 1"), () { Error("Error 2") }) ==
-			Error("Error 2")
+			Error("Error 2"),
 	)
 	Nil
 })
@@ -190,7 +194,7 @@ test("partition_all_ok_test", () {
 test("partition_all_error_test", () {
 	assert(
 		result.partition([Error("a"), Error("b"), Error("c")]) ==
-			([], ["a", "b", "c"])
+			([], ["a", "b", "c"]),
 	)
 	Nil
 })
@@ -198,7 +202,7 @@ test("partition_all_error_test", () {
 test("partition_mixed_test", () {
 	assert(
 		result.partition([Ok(1), Error("a"), Ok(2), Error("b"), Error("c")]) ==
-			([1, 2], ["a", "b", "c"])
+			([1, 2], ["a", "b", "c"]),
 	)
 	Nil
 })
@@ -253,7 +257,7 @@ test("try_recover_error_to_ok_test", () {
 test("try_recover_error_to_error_test", () {
 	assert(
 		result.recover(Error(1), (_) { Error("failed to recover") }) ==
-			Error("failed to recover")
+			Error("failed to recover"),
 	)
 	Nil
 })
@@ -271,7 +275,7 @@ test("to_option_test", () {
 test("to_error_and_catch_test", () {
 	assert(result.catch(() { result.to_error(Ok(1)) + 1 }) == Ok(2))
 	assert(
-		result.catch(() { result.to_error(Error("bad")) + 1 }) == Error("bad")
+		result.catch(() { result.to_error(Error("bad")) + 1 }) == Error("bad"),
 	)
 	assert(result.catch(() { fail.raise(42) }) == Error(42))
 })
@@ -281,7 +285,7 @@ test("recover_test", () {
 	assert(result.recover(Ok(5), (e) { Ok(e * 10) }) == Ok(5))
 	assert(
 		result.recover(Error(1), (e) { Error("still " <> core.inspect(e)) }) ==
-			Error("still 1")
+			Error("still 1"),
 	)
 })
 
@@ -297,18 +301,10 @@ test("partition_long_test", () {
 	assert(errors == [])
 })
 
-build = (n, acc) {
-	n |> {
-		0 -> acc
-		_ -> build(n - 1, [Ok(n), ..acc])
-	}
-}
+build = (n, acc) { n |> (0) { acc } | (_) { build(n - 1, [Ok(n), ..acc]) } }
 
 build_plain = (n, acc) {
-	n |> {
-		0 -> acc
-		_ -> build_plain(n - 1, [n, ..acc])
-	}
+	n |> (0) { acc } | (_) { build_plain(n - 1, [n, ..acc]) }
 }
 
 test("map_effects_test", () {
@@ -319,10 +315,7 @@ test("map_effects_test", () {
 test("error_union_test", () {
 	// `then` keeps the error type of the first result; a union is fine.
 	r: Result(Int, String | Int) = result.then(Ok(1), (x) {
-		{ x > 0 } |> {
-			True  -> Error(0)
-			False -> Error("negative")
-		}
+		{ x > 0 } |> (True) { Error(0) } | (False) { Error("negative") }
 	})
 	assert(r == Error(0))
 })

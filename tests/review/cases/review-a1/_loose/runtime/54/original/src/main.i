@@ -1,5 +1,9 @@
-f = () { 40
--2 }
+f = () {
+	40
+	-2
+}
 
-
-main = () { assert(f() == -2) Nil }
+main = () {
+	assert(f() == -2)
+	Nil
+}

@@ -7,10 +7,11 @@
 	i/core
 )
 
-
 main = () {
 	control.boundary((b) {
 		result = task.scope((_) { b })
-		assert(core.not(core.portable(result)))
+		assert(
+			core.not(core.portable(result)),
+		)
 	})
 }

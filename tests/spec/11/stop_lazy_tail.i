@@ -5,45 +5,42 @@
 // at: spec/main:13:7
 // at: spec/main:38:5
 // at: spec/main:43:11
-(i/control)
+(
+	i/control
+)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Never))  Done }
+Paused = (Continuation(Nil, Paused, Never, Never))
+Done = ()
+Paused = Paused | Done
 
 w1 = (b) {
-  x = w2(b)
-  x
+	x = w2(b)
+	x
 }
 
 w2 = (b) {
-  x = step(b)
-  x
+	x = step(b)
+	x
 }
 
 // After the resume, the segment of `step` makes a tail call.
 step = (b) {
-  control.suspend(b, (k) { Paused(k) })
-  last(3)
+	control.suspend(b, (k) { Paused(k) })
+	last(3)
 }
 
-last = (n) {
-  n |> {
-    0 -> panic("after")
-    _ -> last(n - 1)
-  }
-}
-
+last = (n) { n |> (0) { panic("after") } | (_) { last(n - 1) } }
 
 main = () {
-  p = control.boundary((b) {
-    w1(b)
-    Done
-  })
-  p |> {
-    Paused(k) -> {
-      x = control.resume(k, Nil)
-      x
-    }
-    Done -> panic("not paused")
-  }
-  Nil
+	p = control.boundary((b) {
+		w1(b)
+		Done
+	})
+	p |>
+		(Paused(k)) {
+			x = control.resume(k, Nil)
+			x
+		}
+		| (Done) { panic("not paused") }
+	Nil
 }

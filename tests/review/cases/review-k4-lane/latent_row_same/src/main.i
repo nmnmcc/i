@@ -1,25 +1,23 @@
-S(A) {
-	S(A)
+S(A) = (A)
+
+T(N) = (f = () <- N -> Nil)
+
+merge = <N, M>(a: T(N), b: T(M)) {
+	T(
+		f = () {
+			a.f()
+			b.f()
+		},
+	)
 }
 
-T(N) {
-	T(f: () -> Nil ! N)
-}
+one = () <- (s: S(Int)) { Nil }
 
-merge(N, M) = (a: T(N), b: T(M)) {
-	T(() {
-		a.f()
-		b.f()
-	})
-}
-
-one = (s ! S(Int)) { Nil }
-
-two = (s ! S(Int)) { Nil }
-
+two = () <- (s: S(Int)) { Nil }
 
 main = () {
-	! S(Int) = S(1)
-	used = merge(T(one), T(two))
-	used.f()
+	{
+		used = merge(T(f = one), T(f = two))
+		used.f()
+	} <- (S(1))
 }

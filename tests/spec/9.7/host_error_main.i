@@ -4,12 +4,9 @@
 
 // An error of a host function that comes to the program entry stops it.
 @host("test:kv/v1")
-Kv {
-	Kv(get: (key: String) -> String ^ String)
-}
+Kv = (get = (String) <- (Fail(String)) -> String)
 
-lookup = (key: String, kv ! Kv) { kv.get(key) }
-
+lookup = (key: String) <- (kv: Kv) { kv.get(key) }
 
 main = () {
 	lookup("missing")

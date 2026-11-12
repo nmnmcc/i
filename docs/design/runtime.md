@@ -331,10 +331,14 @@ exports the following ordinary status/service types, their constructors, and
 functions; it does not redeclare or re-export the primitive types.
 
 ```i
-Await { Await(wait: (ticket: Ticket) -> Nil) }
-Root { Root(key: Key(Nil)) }
-Owner { Owner(key: Key(Nil), root: Root) }
-RequestState(A) { Waiting Ready(A) Cancelled Taken }
+Await = (wait = (Ticket) -> Nil)
+Root = (key = Key(Nil))
+Owner = (key = Key(Nil), root = Root)
+Waiting = ()
+Ready(A) = (A)
+Cancelled = ()
+Taken = ()
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 ```
 
 | Function | Type | Rule |
@@ -592,11 +596,8 @@ separate ownership transfers, not a promise that all raw results are resources.
 The ordinary helper for an owned operation that produces no resource is:
 
 ```i
-await_owned(A) = (r: Request(A)) -> A ! Await {
-  resource.ensure(
-    () { await(r) }
-    () { cancel(ticket(r)) }
-  )
+await_owned = <A>(r: Request(A)) -> A {
+	resource.ensure(() { await(r) }, () { cancel(ticket(r)) })
 }
 ```
 
@@ -811,8 +812,10 @@ cancellation, not destruction of a trapped instance by its host.
 A feasible monomorphic internal protocol is:
 
 ```i
-StepAnswer { Proceed(value: Keyed) Cancel }
-Scheduler { Scheduler(step: (command: Keyed) -> StepAnswer) }
+Proceed = (value = Keyed)
+Cancel = ()
+StepAnswer = Proceed | Cancel
+Scheduler = (step = (Keyed) -> StepAnswer)
 ```
 
 The real representation also carries task path/seed, the current task boundary
@@ -1036,10 +1039,10 @@ The attribute adds request.Owner to callable fields (§5.2). Unwrapped wire
 results/errors obey §10.3; resources cross only as Int. Definitions include:
 
 ```i
-File { File(Int) }
-Listener { Listener(Int) }
-Stream { Stream(Int) }
-Child { Child(Int) }
+File = (Int)
+Listener = (Int)
+Stream = (Int)
+Child = (Int)
 ```
 
 Each definition belongs to its respective module. Before resource IO, enforce
@@ -1110,7 +1113,11 @@ request.ready. Calendar/time conversion is Std-2's job.
 ### 7.2 Files
 
 ```i
-OpenMode { ReadOnly WriteTruncate Append ReadWrite }
+ReadOnly = ()
+WriteTruncate = ()
+Append = ()
+ReadWrite = ()
+OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
 ```
 
 | Raw Fs field | Type |
@@ -1147,30 +1154,35 @@ The resource-bearing parts of the File wrappers are explicit ordinary i; all
 non-creating raw operations use request.await_owned (§5.4):
 
 ```i
-mode_string = {
-  ReadOnly -> "read"
-  WriteTruncate -> "truncate"
-  Append -> "append"
-  ReadWrite -> "read_write"
+mode_string =
+	(ReadOnly) { "read" }
+	| (WriteTruncate) { "truncate" }
+	| (Append) { "append" }
+	| (ReadWrite) { "read_write" }
+
+open = (path, mode) <- (raw: Fs) {
+	File(
+		fail.map_error(
+			() {
+				await_resource(
+					raw.open(path, mode_string(mode)),
+					(n) { request.await_owned(raw.close(n)) },
+				)
+			},
+			(code) { FsError(operation = "open", path = path, code = code) },
+		),
+	)
 }
 
-open = (path, mode, raw ! Fs) {
-  File(fail.map_error(
-    () { await_resource(raw.open(path, mode_string(mode)), (n) {
-      request.await_owned(raw.close(n))
-    }) }
-    (code) { FsError("open", path, code) }
-  ))
+read = (File(number), max_bytes) <- (raw: Fs) {
+	request.await_owned(raw.read(number, max_bytes)) |>
+		(Ok(bytes)) { bytes }
+		| (Error(code)) {
+			fail.raise(FsError(operation = "read", path = "", code = code))
+		}
 }
 
-read = (File(number), max_bytes, raw ! Fs) {
-  request.await_owned(raw.read(number, max_bytes)) |> {
-    Ok(bytes) -> bytes
-    Error(code) -> fail.raise(FsError("read", "", code))
-  }
-}
-
-close = (File(number), raw ! Fs) { request.await_owned(raw.close(number)) }
+close = (File(number)) <- (raw: Fs) { request.await_owned(raw.close(number)) }
 ```
 
 ### 7.3 TCP and UDP networking
@@ -1193,24 +1205,31 @@ same, with NetError, except the error-free close functions. Explicit wrappers
 inside i/net include (await_resource is defined in §8.1):
 
 ```i
-accept = (Listener(number), raw ! Net) {
-  Stream(fail.map_error(
-    () { await_resource(raw.accept(number), (n) {
-      request.await_owned(raw.close_stream(n))
-    }) }
-    (code) { NetError("accept", "", code) }
-  ))
+accept = (Listener(number)) <- (raw: Net) {
+	Stream(
+		fail.map_error(
+			() {
+				await_resource(raw.accept(number), (n) {
+					request.await_owned(raw.close_stream(n))
+				})
+			},
+			(code) {
+				NetError(operation = "accept", endpoint = "", code = code)
+			},
+		),
+	)
 }
 
-read = (Stream(number), max_bytes, raw ! Net) {
-  request.await_owned(raw.read(number, max_bytes)) |> {
-    Ok(bytes) -> bytes
-    Error(code) -> fail.raise(NetError("read", "", code))
-  }
+read = (Stream(number), max_bytes) <- (raw: Net) {
+	request.await_owned(raw.read(number, max_bytes)) |>
+		(Ok(bytes)) { bytes }
+		| (Error(code)) {
+			fail.raise(NetError(operation = "read", endpoint = "", code = code))
+		}
 }
 
-close_stream = (Stream(number), raw ! Net) {
-  request.await_owned(raw.close_stream(number))
+close_stream = (Stream(number)) <- (raw: Net) {
+	request.await_owned(raw.close_stream(number))
 }
 ```
 
@@ -1335,24 +1354,31 @@ ProcessError("spawn", "invalid") for bad input before starting work). The
 resource-bearing wrapper parts are:
 
 ```i
-spawn = (program, args, raw ! Process) {
-  bytes = encode_args(args)
-  Child(fail.map_error(
-    () { await_resource(raw.spawn(program, bytes), (n) {
-      request.await_owned(raw.close(n))
-    }) }
-    (code) { ProcessError("spawn", code) }
-  ))
+spawn = (program, args) <- (raw: Process) {
+	bytes = encode_args(args)
+	Child(
+		fail.map_error(
+			() {
+				await_resource(raw.spawn(program, bytes), (n) {
+					request.await_owned(raw.close(n))
+				})
+			},
+			(code) { ProcessError(operation = "spawn", code = code) },
+		),
+	)
 }
 
-wait = (Child(number), raw ! Process) {
-  request.await_owned(raw.wait(number)) |> {
-    Ok(status) -> status
-    Error(code) -> fail.raise(ProcessError("wait", code))
-  }
+wait = (Child(number)) <- (raw: Process) {
+	request.await_owned(raw.wait(number)) |>
+		(Ok(status)) { status }
+		| (Error(code)) {
+			fail.raise(ProcessError(operation = "wait", code = code))
+		}
 }
 
-close = (Child(number), raw ! Process) { request.await_owned(raw.close(number)) }
+close = (Child(number)) <- (raw: Process) {
+	request.await_owned(raw.close(number))
+}
 ```
 
 ### 7.5 Standard streams
@@ -1500,20 +1526,19 @@ The core of that guard is ordinary i (Request is a built-in type; status constru
 qualified here; no new syntax or polymorphic service field is needed):
 
 ```i
-await_resource(A, E, N) = (
-  r: Request(Result(A, E))
-  release: (A) -> Nil ! N
-) -> A ^ E ! N | request.Await {
-  resource.ensure(
-    () { fail.from_result(request.await(r)) }
-    () {
-      request.state(r) |> {
-        request.Ready(Ok(value)) -> release(value)
-        _ -> Nil
-      }
-      request.cancel(request.ticket(r))
-    }
-  )
+await_resource = <A, E, N>(
+	r: Request(Result(A, E)),
+	release: (A) <- N -> Nil
+) -> A {
+	resource.ensure(
+		() { fail.from_result(request.await(r)) },
+		() {
+			request.state(r) |>
+				(request.Ready(Ok(value))) { release(value) }
+				| (_) { Nil }
+			request.cancel(request.ticket(r))
+		},
+	)
 }
 ```
 
@@ -1599,42 +1624,45 @@ the next acceptor may be claimed by another worker. A started handler and each
 of its Request values still stay on their original worker.
 
 ```i
-(i/task, i/net, i/fail, i/resource)
+(
+	i/task
+	i/net
+	i/fail
+	i/resource
+)
 
 copy = (stream) {
-  net.read(stream, 65536) |> {
-    <<>> -> Nil
-    bytes -> {
-      net.write(stream, bytes)
-      copy(stream)
-    }
-  }
+	net.read(stream, 65536) |>
+		(<<>>) { Nil }
+		| (bytes) {
+			net.write(stream, bytes)
+			copy(stream)
+		}
 }
 
 serve_next = (scope, listener) {
-  resource.acquire(
-    () { net.accept(listener) }
-    (stream) { net.close_stream(stream) }
-    (stream) {
-      task.go(scope, () { serve_next(scope, listener) })
-      fail.catch(() { copy(stream) })
-      Nil
-    }
-  )
+	resource.acquire(
+		() { net.accept(listener) },
+		(stream) { net.close_stream(stream) },
+		(stream) {
+			task.go(scope, () { serve_next(scope, listener) })
+			fail.catch(() { copy(stream) })
+			Nil
+		},
+	)
 }
 
-
 main = () {
-  resource.acquire(
-    () { net.listen("127.0.0.1", 8080) }
-    (listener) { net.close_listener(listener) }
-    (listener) {
-      task.scope((scope) {
-        task.go(scope, () { serve_next(scope, listener) })
-        Nil
-      })
-    }
-  )
+	resource.acquire(
+		() { net.listen("127.0.0.1", 8080) },
+		(listener) { net.close_listener(listener) },
+		(listener) {
+			task.scope((scope) {
+				task.go(scope, () { serve_next(scope, listener) })
+				Nil
+			})
+		},
+	)
 }
 ```
 
@@ -2189,9 +2217,9 @@ This is an inference/buildability attack, not a rejected syntax spelling alone.
 
 ```i
 // Inside i/net; its raw Net service is private.
-leak = (Listener(number), n ! Net) {
-  r = n.accept(number)
-  request.await(r)
+leak = (Listener(number)) <- (n: Net) {
+	r = n.accept(number)
+	request.await(r)
 }
 ```
 
@@ -2223,8 +2251,7 @@ new root Runner makes this program incorrectly reset paths and wait globally:
 
 ```i
 seeded_nested = () {
-  ! task.Runner = task.top(random.from_seed(7))
-  task.run(() { clock.sleep_ns(1) })
+	task.run(() { clock.sleep_ns(1) }) <- (task.top(random.from_seed(7)))
 }
 ```
 
@@ -2470,19 +2497,21 @@ Await/Owner/Root alone do not make such an entry async. These are D5/§6.4 tests
 **Review test O: unawaited request in a custom Owner.**
 
 ```i
-(i/request, i/task)
+(
+	i/request
+	i/task
+)
 
 @host("review:work", "request")
-Work { Work(finish: () -> Request(Nil)) }
+Work = (finish = () -> Request(Nil))
 
-
-main = (w ! Work) {
-  request.within(() {
-    r = w.finish()
-    c: task.Channel(Nil) = task.channel()
-    task.receive(c)
-    request.take(r)
-  })
+main = () <- (w: Work) {
+	request.within(() {
+		r = w.finish()
+		c: task.Channel(Nil) = task.channel()
+		task.receive(c)
+		request.take(r)
+	})
 }
 ```
 

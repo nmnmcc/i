@@ -1,6 +1,5 @@
 // spec: 9.10
 // expect: pass
-
 (
 	testlib = (test) = std/test
 	i/random
@@ -9,7 +8,6 @@
 )
 
 // §9.10: immutable reuse, normalized seeds, and the complete logical identity.
-
 test("identity", () {
 	g = random.from_seed(0)
 	w = 0x1_0000_0000_0000_0000
@@ -28,28 +26,28 @@ test("identity", () {
 })
 
 // §9.10: InvalidPath contains the whole input, including after a valid prefix.
-
 test("invalid", () {
 	g = random.from_seed(19)
 	assert(fail.catch(() { random.int(g, 0) }) == Error(random.InvalidBound(0)))
 	assert(
 		fail.catch(() { random.int(g, -123) }) ==
-			Error(random.InvalidBound(-123))
+			Error(random.InvalidBound(-123)),
 	)
 	assert(
 		fail.catch(() { random.at_path(g, [0]) }) ==
-			Error(random.InvalidPath([0]))
+			Error(random.InvalidPath([0])),
 	)
 	assert(
 		fail.catch(() { random.at_path(g, [3, -1, 2]) }) ==
-			Error(random.InvalidPath([3, -1, 2]))
+			Error(random.InvalidPath([3, -1, 2])),
 	)
-	assert(random.word(g) == random.word(random.from_seed(19)))
+	assert(
+		random.word(g) == random.word(random.from_seed(19)),
+	)
 	Nil
 })
 
 // §9.10: successive path components compose; P and S histories stay distinct.
-
 test("paths", () {
 	g = random.from_seed(7)
 	(a, b) = random.split(g)
@@ -58,34 +56,36 @@ test("paths", () {
 	assert(b != random.at_path(g, [2]))
 	assert(
 		random.at_path(g, [1, 2, 3]) ==
-			random.at_path(random.at_path(g, [1]), [2, 3])
+			random.at_path(random.at_path(g, [1]), [2, 3]),
 	)
 	large = core.shift_left(1, 200) + 1
 	assert(random.at_path(g, [large]) != random.at_path(g, [1]))
 	assert(
 		random.at_path(g, [large, 2]) ==
-			random.at_path(random.at_path(g, [large]), [2])
+			random.at_path(random.at_path(g, [large]), [2]),
 	)
-	assert(random.at_path(a, [1]) != random.split(random.at_path(g, [1])).0)
+	assert(
+		random.at_path(a, [1]) != random.split(random.at_path(g, [1])).0,
+	)
 	// Interleaving reads of other streams does not change a stream's sequence.
 	p = random.at_path(g, [1])
 	q = random.at_path(g, [2])
 	(_, p1) = random.word(p)
 	(_, q1) = random.word(q)
-	assert(random.word(p1) == random.word(random.word(p).1))
-	assert(random.word(q1) == random.word(random.word(q).1))
+	assert(
+		random.word(p1) == random.word(random.word(p).1),
+	)
+	assert(
+		random.word(q1) == random.word(random.word(q).1),
+	)
 	Nil
 })
 
 advance = (g: random.Generator, n: Int) -> random.Generator {
-	{ n == 0 } |> {
-		True  -> g
-		False -> advance(random.word(g).1, n - 1)
-	}
+	{ n == 0 } |> (True) { g } | (False) { advance(random.word(g).1, n - 1) }
 }
 
 // §9.10: k is at least one, even for bound 1; W uses one word, W+1 two.
-
 test("boundaries", () {
 	g = random.from_seed(0)
 	w = core.shift_left(1, 64)
@@ -99,21 +99,16 @@ test("boundaries", () {
 	Nil
 })
 
-check_range = (
-	g: random.Generator
-	below: Int
-	count: Int
-) -> Nil ^ random.RandomError ! Assert {
-	{ count == 0 } |> {
-		True -> Nil
-		False -> {
+check_range = (g: random.Generator, below: Int, count: Int) -> Nil {
+	{ count == 0 } |>
+		(True) { Nil }
+		| (False) {
 			(value, next) = random.int(g, below)
 			assert(value >= 0 && value < below)
 			(f, _) = random.float(g)
 			assert(f >=. 0.0 && f <. 1.0)
 			check_range(next, below, count - 1)
 		}
-	}
 }
 
 test("ranges", () {
@@ -126,44 +121,39 @@ test("ranges", () {
 })
 
 // §9.10: exactly 53 high bits and exactly one draw are used for each Float.
-check_float = (g: random.Generator, count: Int) -> Nil ! Assert {
-	{ count == 0 } |> {
-		True -> Nil
-		False -> {
+check_float = (g: random.Generator, count: Int) -> Nil {
+	{ count == 0 } |>
+		(True) { Nil }
+		| (False) {
 			(u, next) = random.word(g)
 			(f, after) = random.float(g)
 			assert(after == next)
 			assert(
 				core.truncate(f *. 9007199254740992.0) ==
-					core.shift_right(u, 11)
+					core.shift_right(u, 11),
 			)
 			check_float(next, count - 1)
 		}
-	}
 }
 
 test("floats", () { check_float(random.from_seed(1337), 1000) })
 
 // A deterministic smoke check of small-bound frequencies. This is not a proof
 // of independence; the exact rejection and uniform-residue proof are separate.
-histogram = (
-	g: random.Generator
-	count: Int
-	a: Int
-	b: Int
-	c: Int
-) -> (Int, Int, Int) ^ random.RandomError {
-	{ count == 0 } |> {
-		True -> (a, b, c)
-		False -> {
+histogram = (g: random.Generator, count: Int, a: Int, b: Int, c: Int) -> (
+	Int,
+	Int,
+	Int,
+) {
+	{ count == 0 } |>
+		(True) { (a, b, c) }
+		| (False) {
 			(n, next) = random.int(g, 3)
-			n |> {
-				0 -> histogram(next, count - 1, a + 1, b, c)
-				1 -> histogram(next, count - 1, a, b + 1, c)
-				_ -> histogram(next, count - 1, a, b, c + 1)
-			}
+			n |>
+				(0) { histogram(next, count - 1, a + 1, b, c) }
+				| (1) { histogram(next, count - 1, a, b + 1, c) }
+				| (_) { histogram(next, count - 1, a, b, c + 1) }
 		}
-	}
 }
 
 test("small_bound_frequencies", () {
@@ -175,15 +165,16 @@ test("small_bound_frequencies", () {
 })
 
 walk = (g: random.Generator, count: Int) -> random.Generator {
-	{ count == 0 } |> {
-		True  -> g
-		False -> walk(random.split(g).0, count - 1)
-	}
+	{ count == 0 } |>
+		(True) { g }
+		| (False) { walk(random.split(g).0, count - 1) }
 }
 
 test("deep_splits", () {
 	g = random.from_seed(0)
-	assert(walk(walk(g, 64), 64) == walk(g, 128))
+	assert(
+		walk(walk(g, 64), 64) == walk(g, 128),
+	)
 	assert(walk(g, 128) != walk(g, 127))
 	Nil
 })

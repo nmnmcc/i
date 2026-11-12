@@ -6,7 +6,6 @@
 	i/control
 )
 
-
 main = () {
 	control.boundary((b) {
 		c = task.channel()

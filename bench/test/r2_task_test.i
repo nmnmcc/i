@@ -8,44 +8,40 @@
 
 rounds = 1_000
 
-spawns = (n: Int, total: Int) -> Int ! task.Scheduler {
-	n |> {
-		0 -> total
-		_ -> {
+spawns = (n: Int, total: Int) -> Int {
+	n |>
+		(0) { total }
+		| (_) {
 			value = task.scope((s) { task.join(task.go(s, () { 1 })) })
 			spawns(n - 1, total + value)
 		}
-	}
 }
 
-switches = (n: Int, total: Int) -> Int ! task.Scheduler {
-	n |> {
-		0 -> total
-		_ -> {
+switches = (n: Int, total: Int) -> Int {
+	n |>
+		(0) { total }
+		| (_) {
 			task.yield()
 			switches(n - 1, total + 1)
 		}
-	}
 }
 
-sends = (c: task.Channel(Int), n: Int) -> Nil ! task.Scheduler {
-	n |> {
-		0 -> Nil
-		_ -> {
+sends = (c: task.Channel(Int), n: Int) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			task.send(c, n)
 			sends(c, n - 1)
 		}
-	}
 }
 
-receives = (c: task.Channel(Int), n: Int, total: Int) -> Int ! task.Scheduler {
-	n |> {
-		0 -> total
-		_ -> {
+receives = (c: task.Channel(Int), n: Int, total: Int) -> Int {
+	n |>
+		(0) { total }
+		| (_) {
 			value = task.receive(c)
 			receives(c, n - 1, total + value)
 		}
-	}
 }
 
 test("r2_spawn_join_1000", () { assert(spawns(rounds, 0) == rounds) })

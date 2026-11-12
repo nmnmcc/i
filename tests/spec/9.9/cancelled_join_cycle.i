@@ -8,7 +8,6 @@
 	i/fail
 )
 
-
 main = () {
 	task.scope((s) {
 		a: task.Channel(task.Task(Nil, String)) = task.channel()
@@ -16,23 +15,29 @@ main = () {
 		armed: task.Channel(Nil) = task.channel()
 		left = task.go(s, () {
 			other = task.receive(a)
-			resource.ensure(() {
-				task.send(armed, Nil)
-				task.sync(task.never())
-			}, () {
-				fail.catch(() { task.join(other) })
-				Nil
-			})
+			resource.ensure(
+				() {
+					task.send(armed, Nil)
+					task.sync(task.never())
+				},
+				() {
+					fail.catch(() { task.join(other) })
+					Nil
+				},
+			)
 		})
 		right = task.go(s, () {
 			other = task.receive(b)
-			resource.ensure(() {
-				task.send(armed, Nil)
-				task.sync(task.never())
-			}, () {
-				fail.catch(() { task.join(other) })
-				Nil
-			})
+			resource.ensure(
+				() {
+					task.send(armed, Nil)
+					task.sync(task.never())
+				},
+				() {
+					fail.catch(() { task.join(other) })
+					Nil
+				},
+			)
 		})
 		task.send(a, right)
 		task.send(b, left)

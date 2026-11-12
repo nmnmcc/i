@@ -1,6 +1,9 @@
-S(A) { S(value: A) }
-read = (s ! S(String)) { s.value <> "!" }
-read_int = (s ! S(Int)) { s.value + 1 }
+S(A) = (value = A)
+read = () <- (s: S(String)) { s.value <> "!" }
+read_int = () <- (s: S(Int)) { s.value + 1 }
 run = (f) { f() }
-join(N, M) = (f: () -> String ! N, g: () -> Int ! M) { f() g() }
+join = <N, M>(f: () <- N -> String, g: () <- M -> Int) {
+	f()
+	g()
+}
 bad = () { join(read, read_int) }

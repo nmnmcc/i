@@ -1,19 +1,19 @@
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(() -> Int ! N) }
-T(N) { T(() -> Int ! N) }
-use(N) = (s ! S(N)) -> Int ! N | S(N) {
-  S(f) = s
-  f()
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (() <- N -> Int)
+T(N) = (() <- N -> Int)
+use = <N>() <- (s: S(N)) -> Int {
+	S(f) = s
+	f()
 }
-uset(N) = (s ! T(N)) {
-  T(f) = s
-  f()
+uset = <N>() <- (s: T(N)) {
+	T(f) = s
+	f()
 }
 
 main = () {
-  ! S(Dep) = S(() { get() })
-  ! T(S(Dep)) = T(() { use() })
-  uset()
-  Nil
+	{
+		uset()
+		Nil
+	} <- (S(() { get() }), T(() { use() }))
 }

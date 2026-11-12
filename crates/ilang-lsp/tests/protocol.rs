@@ -215,7 +215,7 @@ fn file_uri(path: &Path) -> String {
         .to_string()
 }
 
-const MAIN: &str = " (util = app/util)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser { User(name: String, age: Int) }\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
+const MAIN: &str = "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
 
 const UTIL: &str = " (double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
 
@@ -527,9 +527,14 @@ fn a_new_document() {
 #[test]
 fn completion_after_an_expression() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Point { Point(x: Int, y: Int) }\n\
-                make = () -> Point { Point(1, 2) }\n\
-                f = (t: Point) {\n  a = make().x\n  b = { t }.y\n  a + b\n}\n";
+    let text = "Point = (x = Int, y = Int)\n\
+                make = () -> Point { Point(x = 1, y = 2) }\n\
+                f = (t: Point) {\n\
+                \ta = make().x\n\
+                \tb = { t }.y\n\
+                \ta + b\n\
+                }\n\
+                ";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -874,13 +879,13 @@ fn semantic_tokens_and_hover_inside_raw_interpolation() {
 
 // ---- Features over a package with modules, tests, and a dependency ----
 
-const LIB_TEXT: &str = "(shout, Tone(..))\n\n/// A tone of voice.\nTone {\n\tLoud\n\tQuiet\n}\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
+const LIB_TEXT: &str = "(\n\tshout\n\tTone(..)\n)\n\nLoud = ()\nQuiet = ()\n/// A tone of voice.\nTone = Loud | Quiet\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
 
-const SHAPES: &str = "(Shape(..), area, origin, Clock(..), Box(..))\n\n/// A shape in the plane.\nShape {\n\tCircle(radius: Int)\n\tRect(width: Int, height: Int)\n}\n\n/// A box of a value.\nBox(A) { Box(item: A) }\n\n/// A clock service.\nClock { Clock(now: () -> Int) }\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |> {\n\t\tCircle(radius) -> radius * radius * 3\n\t\tRect(width, height) -> width * height\n\t}\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
+const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n)\n\nCircle = (radius = Int)\nRect = (width = Int, height = Int)\n/// A shape in the plane.\nShape = Circle | Rect\n\n/// A box of a value.\nBox(A) = (item = A)\n\n/// A clock service.\nClock = (now = () -> Int)\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |>\n\t\t(Circle(radius = radius)) { radius * radius * 3 }\n\t\t| (Rect(width = width, height = height)) { width * height }\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
 
-const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(main)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius: 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
+const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(\n\tmain\n)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius = 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
 
-const APP_TEST: &str = "(app/shapes)\n\n_check = () { shapes.area(shapes.Circle(radius: 1)) }\n";
+const APP_TEST: &str = "(\n\tapp/shapes\n)\n\n_check = () { shapes.area(shapes.Circle(radius = 1)) }\n";
 
 /// A workspace with the package `app`, which depends on the package `lib`
 /// next to it. With `lisp`, `src/main` of `app` is in the Lisp surface.
@@ -1267,7 +1272,7 @@ fn lsp_rename_top_level_across_files() {
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(shapes.contains("(Shape(..), surface, origin"), "{shapes}");
-    assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
+    assert!(shapes.contains("surface = (s = Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
     c.shutdown();
@@ -1303,7 +1308,7 @@ fn lsp_rename_constructor_and_type() {
     .unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
     assert!(
-        main.contains("(Shape, Disk, area)") && main.contains("c = Disk(radius: 2)"),
+        main.contains("(Shape, Disk, area)") && main.contains("c = Disk(radius = 2)"),
         "{main}"
     );
     let shapes = apply(SHAPES, &edit, &ws.shapes);
@@ -1523,7 +1528,7 @@ fn lsp_rename_lisp_surface() {
         main.contains("surface s") && !main.contains("area"),
         "{main}"
     );
-    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s: Shape)"));
+    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s = Shape)"));
     // A local.
     let edit = rename(&mut c, &ws.main, &ws.main_text, "(= a ", 0, 3, "total").unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
@@ -1585,7 +1590,7 @@ fn lsp_definition_implementation_of_a_type() {
 #[test]
 fn lsp_definition_implementation_of_a_service() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock { Clock(now: () -> Int) }\n\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n\nfixed = () {\n\t! Clock = Clock(now: () { 42 })\n\telapsed(40)\n}\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nfixed = () { elapsed(40) <- (Clock(now = () { 42 })) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1729,7 +1734,7 @@ fn lsp_completion_module_members() {
 #[test]
 fn lsp_completion_fields_of_a_value() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Point { Point(x: Int, y: Int) }\n\nf = (p: Point) { p.x }\n";
+    let text = "Point = (x = Int, y = Int)\n\nf = (p: Point) { p.x }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1747,7 +1752,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Shape {\n\tCircle(Int)\n\tRect(width: Int, height: Int)\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t\t\n\t}\n}\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1828,7 +1833,7 @@ fn lsp_completion_import_names() {
 #[test]
 fn lsp_completion_services_in_an_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock { Clock(now: () -> Int) }\nPoint = (x: Int)\n\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n";
+    let text = "Clock = (now = () -> Int)\nPoint = { (x = Int) }\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1945,7 +1950,7 @@ fn lsp_signature_of_a_function() {
 #[test]
 fn lsp_signature_with_labels() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "make = (name: String, age: Int) { (name, age) }\n\nmain = () { make(age: 3, name: \"a\") }\n";
+    let text = "make = (name: String, age: Int) { (name, age) }\n\nmain = () { make(\"a\", 3) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2011,7 +2016,7 @@ fn lsp_hover_value_of_a_constant() {
 #[test]
 fn lsp_hover_errors_and_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock { Clock(now: () -> Int) }\n\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n\nparse = (s: String) -> Int ^ String ! Clock { 0 }\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) -> Int { 0 }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2219,7 +2224,7 @@ fn lsp_code_action_removes_an_unused_import() {
 #[test]
 fn lsp_code_action_adds_the_missing_clauses() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Shape {\n\tCircle(Int)\n\tRect(width: Int, height: Int)\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2953,7 +2958,7 @@ fn lsp_capabilities_are_advertised() {
     c.shutdown();
 }
 
-const MATCH: &str = "Shape {\n\tCircle(Int)\n\tRect(width: Int, height: Int)\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
+const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
 
 #[test]
 fn lsp_code_action_missing_clauses_lisp_surface() {

@@ -7,26 +7,46 @@
 	i/fail
 )
 
-
 main = () {
-	assert(fail.catch(() {
-		task.race(() { fail.raise("first") }, () {
+	assert(
+		fail.catch(() {
+			task.race(
+				() { fail.raise("first") },
+				() {
+					task.yield()
+					2
+				},
+			)
+		}) ==
+			Error("first"),
+	)
+	assert(
+		fail.catch(() {
+			task.race(
+				() { 1 },
+				() {
+					task.yield()
+					fail.raise("late")
+				},
+			)
+		}) ==
+			Ok(1),
+	)
+	assert(
+		task.both(
+			() {
+				task.yield()
+				1
+			},
+			() { 2 },
+		) ==
+			(1, 2),
+	)
+	assert(
+		task.map_concurrently([1, 2, 3], (n) {
 			task.yield()
-			2
-		})
-	}) == Error("first"))
-	assert(fail.catch(() {
-		task.race(() { 1 }, () {
-			task.yield()
-			fail.raise("late")
-		})
-	}) == Ok(1))
-	assert(task.both(() {
-		task.yield()
-		1
-	}, () { 2 }) == (1, 2))
-	assert(task.map_concurrently([1, 2, 3], (n) {
-		task.yield()
-		n + 1
-	}) == [2, 3, 4])
+			n + 1
+		}) ==
+			[2, 3, 4],
+	)
 }

@@ -9,22 +9,18 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-Bad {
-	Bad(Int)
-}
+Bad = (Int)
 
-Paused {
-	Paused(Continuation(Nil, Paused, Never, Never))
-	Done
-}
+Paused = (Continuation(Nil, Paused, Never, Never))
+Done = ()
+Paused = Paused | Done
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {
@@ -33,32 +29,29 @@ note = (log, text) {
 
 // `n` frames that wait.
 wait = (n, f) {
-	n |> {
-		0 -> f()
-		_ -> {
+	n |>
+		(0) { f() }
+		| (_) {
 			x = wait(n - 1, f)
 			x + 1
 		}
-	}
 }
 
 // A `resource.ensure` at each of `n` depths, with frames between them,
 // then `last`.
 layer = (log, n, last) {
-	n |> {
-		0 -> last()
-		_ -> {
+	n |>
+		(0) { last() }
+		| (_) {
 			x = resource.ensure(
-				() { wait(3, () { layer(log, n - 1, last) }) }
-				() { note(log, "final " <> show(n)) }
+				() { wait(3, () { layer(log, n - 1, last) }) },
+				() { note(log, "final " <> show(n)) },
 			)
 			x + 1
 		}
-	}
 }
 
 // An error after a resume runs the final functions innermost first.
-
 test("error_runs_finals_innermost_first", () {
 	r = control.boundary((log) {
 		e = fail.catch(() {
@@ -75,7 +68,6 @@ test("error_runs_finals_innermost_first", () {
 })
 
 // So does a cancel.
-
 test("cancel_runs_finals_innermost_first", () {
 	r = control.boundary((log) {
 		p = control.boundary((b) {
@@ -85,10 +77,7 @@ test("cancel_runs_finals_innermost_first", () {
 			})
 			Done
 		})
-		p |> {
-			Paused(k) -> control.cancel(k)
-			Done      -> panic("not paused")
-		}
+		p |> (Paused(k)) { control.cancel(k) } | (Done) { panic("not paused") }
 		"cancelled"
 	})
 	check(r, "final 1 final 2 final 3 cancelled")

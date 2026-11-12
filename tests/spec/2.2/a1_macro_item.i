@@ -1,10 +1,11 @@
 // spec: 2.2
 // expect: compile-error E0234
-(main)
+(
+	main
+)
 make(1)
 
-
 main = () {
-  assert(True)
-  Nil
+	assert(True)
+	Nil
 }

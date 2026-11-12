@@ -14,29 +14,21 @@
 	inferred
 )
 
-Hidden {
-	Hidden
-}
+Hidden = ()
 
-Handle {}
+Handle = Opaque
 
 // The fields of a type exported with `(..)` are shown.
-Hid {
-	Hid(h: Hidden)
-}
+Hid = (h = Hidden)
 
 // A type exported alone does not show its fields.
-Opaque {
-	Opaque(h: Hidden)
-}
+Opaque = (h = Hidden)
 
 Ex = Hidden
 
 ExList = List((Int, Hidden))
 
-Box(A) {
-	Box(A, Int)
-}
+Box(A) = (A, Int)
 
 @external("a", "b")
 dec: (Hidden) -> Int

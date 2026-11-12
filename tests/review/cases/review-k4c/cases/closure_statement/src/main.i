@@ -1,7 +1,13 @@
-Dep { Dep(value: Int) }
-get = (d ! Dep) { d.value }
-S(N) { S(() -> Int ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-run(N) = (f: () -> Int ! N) { f() }
+Dep = (value = Int)
+get = () <- (d: Dep) { d.value }
+S(N) = (() <- N -> Int)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+run = <N>(f: () <- N -> Int) { f() }
 
-main = () { local = () { ! S(Dep) = S(() { get() }) run(() { use() }) } local() }
+main = () {
+	local = () { run(() { use() }) <- (S(() { get() })) }
+	local()
+}

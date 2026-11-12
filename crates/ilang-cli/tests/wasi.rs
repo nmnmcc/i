@@ -211,7 +211,7 @@ fn stops_write_the_message_and_exit_with_1() {
         // An error at the entry (§9.3).
         (
             " (i/fail)\n",
-            "Bad { Bad(Int) }\n\nmain = () { fail.raise(Bad(7)) }\n",
+            "Bad = (Int)\n\nmain = () { fail.raise(Bad(7)) }\n",
         ),
         // A stop while the top-level values are worked out (§2.5).
         ("", "early = panic(\"too early\")\n\nmain = () { early }\n"),
@@ -337,9 +337,12 @@ fn async_services_are_blocking_calls() {
 #[test]
 fn host_references_keep_the_reference_id_import() {
     let dir = package(
-        "Handle { }\n@host(\"app:files/v1\")\n\
-         Files { Files(open: () -> Handle, same: (a: Handle, b: Handle) -> Bool) }\n\
-         \nmain = (f ! Files) { f.open() == f.open() }\n",
+        "Handle = Opaque\n\
+         @host(\"app:files/v1\")\n\
+         Files = (open = () -> Handle, same = (Handle, Handle) -> Bool)\n\
+         \n\
+         main = () <- (f: Files) { f.open() == f.open() }\n\
+         ",
     );
     let wasm = wasi(dir.path(), Level::O0);
     assert!(imports(&wasm).contains(&("ilang:host/v1".into(), "reference_id".into())));
@@ -372,15 +375,21 @@ fn needs_an_entry() {
 /// another field is a normal host service, and stays an import.
 #[test]
 fn the_standard_service_is_the_one_of_i_io() {
-    let twice = "@host(\"i:io/v1\")\nMine { Mine(print: (text: String) -> Nil) }\n\
-                 \nmain = (io ! Mine) { io.print(\"x\") }\n";
+    let twice = "@host(\"i:io/v1\")\n\
+                 Mine = (print = (String) -> Nil)\n\
+                 \n\
+                 main = () <- (io: Mine) { io.print(\"x\") }\n\
+                 ";
     let e = build_error(twice);
     assert!(
         e.contains("E0311") && e.contains("the host service `Io` of `i/io`"),
         "{e}"
     );
-    let other = "@host(\"i:io/v1\")\nInput { Input(read: () -> String) }\n\
-                 \nmain = (input ! Input) { input.read() }\n";
+    let other = "@host(\"i:io/v1\")\n\
+                 Input = (read = () -> String)\n\
+                 \n\
+                 main = () <- (input: Input) { input.read() }\n\
+                 ";
     let dir = package(other);
     let wasm = wasi(dir.path(), Level::O0);
     assert!(imports(&wasm).contains(&("i:io/v1".into(), "read".into())));
@@ -391,7 +400,7 @@ fn the_standard_service_is_the_one_of_i_io() {
 /// declaration in the program, not in the library.
 #[test]
 fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
-    let source = " ((Io) = i/io)\n@external(\"i:io/v1\", \"print\") p: (text: String) -> Nil\n\nmain = (io ! Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
+    let source = "(\n\t(Io) = i/io\n)\n@external(\"i:io/v1\", \"print\")\np: (String) -> Nil\n\nmain = () <- (io: Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
     for target in [Target::Wasi, Target::Native] {
         let dir = package(source);
         let e = match build(dir.path(), options(Level::O0, target)) {
@@ -463,16 +472,23 @@ fn only_wasi_modules_name_their_target() {
 /// final function that suspends to `b2`, and `b0` takes the continuation
 /// k2 of that suspend out of the cancel. Every computation that `put` runs
 /// in needs `Out`, so `main` gives a placeholder `Out` first.
-const CANCEL_OUT: &str = r#"(i/control, i/fail, i/resource)
+const CANCEL_OUT: &str = r#"(
+	i/control
+	i/fail
+	i/resource
+)
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
-Out { Out(put: (k2: Inner) -> Nil) }
-Inner { Inner(Continuation(Nil, Int, Never, Out)) }
-Outer { Paused(Continuation(Nil, Outer, Never, Out))  Done }
-Handed { Handed(Inner)  Lost }
+Out = (put = (Inner) -> Nil)
+Inner = (Continuation(Nil, Int, Never, Out))
+Paused = (Continuation(Nil, Outer, Never, Out))
+Done = ()
+Outer = Paused | Done
+Handed = (Inner)
+Lost = ()
+Handed = Handed | Lost
 
-put = (k2, o ! Out) { o.put(k2) }
-
+put = (k2) <- (o: Out) { o.put(k2) }
 "#;
 
 /// `g` of test 12: its frame waits for the ensure, so its record is pending.
@@ -499,85 +515,77 @@ g = (b, b2) {
 /// over lies between the final record and the record of `g`.
 const G_CATCH: &str = r#"// A code frame with a site, and a `fail.catch` that the cancel passes over.
 g = (b, b2) {
-  x = fail.catch(() {
-    resource.ensure(
-      () {
-        control.suspend(b, (k) { Paused(k) })
-        0
-      },
-      () {
-        control.suspend(b2, (k2) {
-          put(Inner(k2))
-          0
-        })
-      },
-    )
-  })
-  x |> {
-    Ok(n) -> n + 1
-  }
+	x = fail.catch(() {
+		resource.ensure(
+			() {
+				control.suspend(b, (k) { Paused(k) })
+				0
+			},
+			() {
+				control.suspend(b2, (k2) {
+					put(Inner(k2))
+					0
+				})
+			},
+		)
+	})
+	x |> (Ok(n)) { n + 1 }
 }
-
 "#;
 
 /// Gives k2.
 const PAUSED: &str = r#"// The cancel of `k` runs the final function, which suspends to `b2`; `b0`
 // takes the continuation k2 of that suspend out of the cancel.
 paused = () {
-  k = { control.boundary((b) {
-    control.boundary((b2) { g(b, b2) })
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  handed = control.boundary((b0) {
-    ! Out = Out((k2) { control.suspend(b0, (rest) { Handed(k2) }) })
-    control.cancel(k)
-    Lost
-  })
-  handed |> {
-    Handed(Inner(k2)) -> k2
-    Lost -> panic("k2 was not handed out")
-  }
+	k = {
+		control.boundary((b) {
+			control.boundary((b2) { g(b, b2) })
+			Done
+		})
+	} |>
+		(Paused(k)) { k }
+		| (Done) { panic("not paused") }
+	handed = control.boundary((b0) {
+		{
+			control.cancel(k)
+			Lost
+		} <- (Out(print = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
+	})
+	handed |>
+		(Handed(Inner(k2))) { k2 }
+		| (Lost) { panic("k2 was not handed out") }
 }
 "#;
 
 /// Test 12: the resume of k2 runs the end of the final function, which
 /// throws the `$cancel` of `k`. Nothing takes it, and the entry stops.
-const MAIN_OUT: &str = r#"
-// The resumed final function ends, and the `$cancel` of `k` goes out of
+const MAIN_OUT: &str = r#"// The resumed final function ends, and the `$cancel` of `k` goes out of
 // the resume, which nothing takes.
-
 main = () {
-  // The computations need `Out`. This one is never called.
-  ! Out = Out((k2) { Nil })
-  control.resume(paused(), Nil)
-  Nil
+	// The computations need `Out`. This one is never called.
+	{
+		control.resume(paused(), Nil)
+		Nil
+	} <- (Out(print = (k2) { Nil }))
 }
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"
+const THIRD: &str = r#"Third = (Continuation(Nil, Third, Never, Out))
+Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
-Third { Third(Continuation(Nil, Third, Never, Out))  Over }
+Third = Third | Over
 
-keep = (t) {
-  t |> {
-    Over -> Over
-    t -> t
-  }
-}
+keep = (t) { t |> (Over) { Over } | (t) { t } }
 
 // Not in tail position, so the frame waits.
 inner = (k2) { control.resume(k2, Nil) + 1 }
 
 h = (b3, k2) {
-  control.suspend(b3, (k3) { Third(k3) })
-  inner(k2)
-  Over
+	control.suspend(b3, (k3) { Third(k3) })
+	inner(k2)
+	Over
 }
-
 "#;
 
 /// Test 13: the outer frame of k3 waits.
@@ -595,132 +603,145 @@ o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }
 /// The entry of tests 13 and 15.
 const MAIN_THIRD: &str = r#"// k2 is resumed from frames that a resume of k3 entered, while the outer
 // frame of k3 waits.
-
 main = () {
-  // The computations need `Out`. This one is never called.
-  ! Out = Out((k2) { Nil })
-  k2 = paused()
-  k3 = { control.boundary((b3) { o1(b3, k2) }) } |> {
-    Third(k3) -> k3
-    Over -> panic("not paused")
-  }
-  control.resume(k3, Nil)
-  Nil
+	// The computations need `Out`. This one is never called.
+	{
+		k2 = paused()
+		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
+			(Third(k3)) { k3 }
+			| (Over) { panic("not paused") }
+		control.resume(k3, Nil)
+		Nil
+	} <- (Out(print = (k2) { Nil }))
 }
 "#;
 
 /// Test 14, resume: the tail call of `h_tail` leaves no frame that keeps
 /// `! Name = Name("in")`, so `g` sees "resumer", against §9.4 rule 3
 /// (section 7a).
-const ENV_TAIL_RESUME: &str = r#"(i/control)
+const ENV_TAIL_RESUME: &str = r#"(
+	i/control
+)
 
-Name { Name(text: String) }
-Paused { Paused(Continuation(Nil, Paused, Never, Name))  Done }
+Name = (text = String)
+Paused = (Continuation(Nil, Paused, Never, Name))
+Done = ()
+Paused = Paused | Done
 
-name = (n ! Name) { n.text }
+name = () <- (n: Name) { n.text }
 
 g = (b) {
-  control.suspend(b, (k) { Paused(k) })
-  panic(name())
+	control.suspend(b, (k) { Paused(k) })
+	panic(name())
 }
 
 // The call of `g` is a tail call, so no frame keeps the environment
 // statement when `g` is paused (section 7a of docs/design/lazy-reentry.md).
-h_tail = (b) {
-  ! Name = Name("in")
-  g(b)
-}
-
+h_tail = (b) { g(b) <- (Name(text = "in")) }
 
 main = () {
-  ! Name = Name("start")
-  k = { control.boundary((b) {
-    h_tail(b)
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  ! Name = Name("resumer")
-  control.resume(k, Nil)
-  Nil
+	{
+		k = {
+			control.boundary((b) {
+				h_tail(b)
+				Done
+			})
+		} |>
+			(Paused(k)) { k }
+			| (Done) { panic("not paused") }
+		{
+			control.resume(k, Nil)
+			Nil
+		} <- (Name(text = "resumer"))
+	} <- (Name(text = "start"))
 }
 "#;
 
 /// Test 14, cancel: the same for the final function of a cancel.
-const ENV_TAIL_CANCEL: &str = r#"(i/control, i/resource)
+const ENV_TAIL_CANCEL: &str = r#"(
+	i/control
+	i/resource
+)
 
-Name { Name(text: String) }
-Paused { Paused(Continuation(Nil, Paused, Never, Name))  Done }
+Name = (text = String)
+Paused = (Continuation(Nil, Paused, Never, Name))
+Done = ()
+Paused = Paused | Done
 
-name = (n ! Name) { n.text }
+name = () <- (n: Name) { n.text }
 
 g = (b) {
-  resource.ensure(
-    () { control.suspend(b, (k) { Paused(k) })  Nil },
-    () { panic(name()) },
-  )
+	resource.ensure(
+		() {
+			control.suspend(b, (k) { Paused(k) })
+			Nil
+		},
+		() { panic(name()) },
+	)
 }
 
 // The call of `g` is a tail call, so no frame keeps the environment
 // statement when `g` is paused (section 7a of docs/design/lazy-reentry.md).
-h_tail = (b) {
-  ! Name = Name("in")
-  g(b)
-}
-
+h_tail = (b) { g(b) <- (Name(text = "in")) }
 
 main = () {
-  ! Name = Name("start")
-  k = { control.boundary((b) {
-    h_tail(b)
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  ! Name = Name("resumer")
-  control.cancel(k)
-  Nil
+	{
+		k = {
+			control.boundary((b) {
+				h_tail(b)
+				Done
+			})
+		} |>
+			(Paused(k)) { k }
+			| (Done) { panic("not paused") }
+		{
+			control.cancel(k)
+			Nil
+		} <- (Name(text = "resumer"))
+	} <- (Name(text = "start"))
 }
 "#;
 
 /// Test 16: the value of `f` of `inner` goes on into the cancelled code.
-const CANCEL_INNER: &str = r#"(i/control, i/resource, (Io) = i/io)
+const CANCEL_INNER: &str = r#"(
+	i/control
+	i/resource
+	(Io) = i/io
+)
 
-Paused { Paused(Continuation(Nil, Paused, Never, Io))  Done }
+Paused = (Continuation(Nil, Paused, Never, Io))
+Done = ()
+Paused = Paused | Done
 
-say = (text, io ! Io) { io.print(text) }
+say = (text) <- (io: Io) { io.print(text) }
 
 // During the cancel, the final function suspends to `inner`, which is
 // paused inside `k`; the value of its `f` goes on into the code after it.
 body = (outer) {
-  x = control.boundary((inner) {
-    resource.ensure(
-      () {
-        control.suspend(outer, (k) { Paused(k) })
-        "body"
-      },
-      () {
-        say("final")
-        y = control.suspend(inner, (k2) { "f of inner" })
-        say("final again: " <> y)
-      },
-    )
-  })
-  say("after inner: " <> x)
-  Done
+	x = control.boundary((inner) {
+		resource.ensure(
+			() {
+				control.suspend(outer, (k) { Paused(k) })
+				"body"
+			},
+			() {
+				say("final")
+				y = control.suspend(inner, (k2) { "f of inner" })
+				say("final again: " <> y)
+			},
+		)
+	})
+	say("after inner: " <> x)
+	Done
 }
 
-
-main = (io ! Io) {
-  k = { control.boundary((outer) { body(outer) }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  say("cancel")
-  control.cancel(k)
-  say("cancel gave Nil")
+main = () <- (io: Io) {
+	k = { control.boundary((outer) { body(outer) }) } |>
+		(Paused(k)) { k }
+		| (Done) { panic("not paused") }
+	say("cancel")
+	control.cancel(k)
+	say("cancel gave Nil")
 }
 "#;
 
@@ -728,50 +749,62 @@ main = (io ! Io) {
 /// 1). A final function cannot raise an error itself (§9.5), but D15's
 /// cancel through an inner boundary can run ordinary code that raises one.
 /// This is checked against eager, rather than made a conformance rule.
-const ERROR_THROUGH_FINAL: &str = r#"(i/control, i/core, i/fail, i/resource, (Io) = i/io)
+const ERROR_THROUGH_FINAL: &str = r#"(
+	i/control
+	i/core
+	i/fail
+	i/resource
+	(Io) = i/io
+)
 
-Paused { Paused(Continuation(Nil, Paused, Int, Never))  Done }
-Held { Held(Continuation(Nil, Held, Never, Never))  Over }
+Paused = (Continuation(Nil, Paused, Int, Never))
+Done = ()
+Paused = Paused | Done
+Held = (Continuation(Nil, Held, Never, Never))
+Over = ()
+Held = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).
 paused = () {
-  { control.boundary((outer) {
-    control.boundary((inner) {
-      resource.ensure(
-        () { control.suspend(outer, (k) { Paused(k) })  Nil },
-        () { control.suspend(inner, (k2) { Nil }) },
-      )
-    })
-    fail.raise(7)
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
+	{
+		control.boundary((outer) {
+			control.boundary((inner) {
+				resource.ensure(
+					() {
+						control.suspend(outer, (k) { Paused(k) })
+						Nil
+					},
+					() { control.suspend(inner, (k2) { Nil }) },
+				)
+			})
+			fail.raise(7)
+			Done
+		})
+	} |>
+		(Paused(k)) { k }
+		| (Done) { panic("not paused") }
 }
 
 // `cancel` has no errors in its type. Here it runs the ordinary code
 // after `inner`, whose error passes through this final function's record.
 with = (hold, k) {
-  control.suspend(hold, (k2) { Held(k2) })
-  control.cancel(k)
+	control.suspend(hold, (k2) { Held(k2) })
+	control.cancel(k)
 }
 
-
-main = (io ! Io) {
-  k = paused()
-  r = fail.catch(() {
-    held = control.boundary((hold) {
-      resource.ensure(() { 99 }, () { with(hold, k) })
-      Over
-    })
-    held |> {
-      Held(k2) -> control.resume(k2, Nil)
-      Over -> panic("not held")
-    }
-  })
-  io.print(core.inspect(r))
+main = () <- (io: Io) {
+	k = paused()
+	r = fail.catch(() {
+		held = control.boundary((hold) {
+			resource.ensure(() { 99 }, () { with(hold, k) })
+			Over
+		})
+		held |>
+			(Held(k2)) { control.resume(k2, Nil) }
+			| (Over) { panic("not held") }
+	})
+	io.print(core.inspect(r))
 }
 "#;
 

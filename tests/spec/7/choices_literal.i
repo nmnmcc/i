@@ -4,15 +4,9 @@
 	testlib = (test) = std/test
 )
 
-f = {
-	0 | 1 -> 2
-}
+f = (0 | 1) { 2 }
 
-select = (x: Int | String) {
-	x |> {
-		n = 0 | n: String -> n
-	}
-}
+select = (x: Int | String) { x |> (0 = n | n: String) { n } }
 
 test("choices", () {
 	assert(f(0) == 2)

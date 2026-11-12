@@ -13,7 +13,4 @@ generalized = lib.y.name
 
 call = lib.mk(lib.y).name
 
-list = lib.xs |> {
-	[u, ..] -> u.name
-	[]      -> ""
-}
+list = lib.xs |> ([u, ..]) { u.name } | ([]) { "" }

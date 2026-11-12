@@ -10,7 +10,6 @@
 //// `at`, …). Functions that take a function as an argument have the errors
 //// and the environment of that function (`^ E ! N`), so the argument may
 //// itself raise errors or need services.
-
 (
 	dict = (Dict) = std/dict
 	option = (Option, Some, None) = std/option
@@ -88,38 +87,30 @@
 	min
 )
 
+Continue(A) = (A)
+Stop(A) = (A)
 /// What `fold_until` does next: go on with the new accumulator, or stop
 /// with it.
-ContinueOrStop(A) {
-	Continue(A)
-	Stop(A)
-}
+ContinueOrStop(A) = Continue(A) | Stop(A)
 
 /// The number of elements. It walks the whole list.
 ///
 /// ```i
 /// list.length([1, 2, 3])  // 3
 /// ```
-length(A) = (of: List(A)) -> Int {
-	go = (rest, n) {
-		rest |> {
-			[]        -> n
-			[_, ..xs] -> go(xs, n + 1)
-		}
-	}
+length = <A>(of: List(A)) -> Int {
+	go = (rest, n) { rest |> ([]) { n } | ([_, ..xs]) { go(xs, n + 1) } }
 	go(of, 0)
 }
 
 /// The number of elements for which the function gives `True`.
-count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
+count = <A, N>(list: List(A), where: (A) <- N -> Bool) -> Int {
 	go = (rest, n) {
-		rest |> {
-			[] -> n
-			[x, ..xs] -> where(x) |> {
-				True  -> go(xs, n + 1)
-				False -> go(xs, n)
+		rest |>
+			([]) { n }
+			| ([x, ..xs]) {
+				where(x) |> (True) { go(xs, n + 1) } | (False) { go(xs, n) }
 			}
-		}
 	}
 	go(list, 0)
 }
@@ -129,54 +120,38 @@ count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
 /// ```i
 /// list.reverse([1, 2, 3])  // [3, 2, 1]
 /// ```
-reverse(A) = (list: List(A)) -> List(A) { reverse_onto(list, []) }
+reverse = <A>(list: List(A)) -> List(A) { reverse_onto(list, []) }
 
 // Puts the elements of `list`, last first, in front of `acc`.
-reverse_onto(A) = (list: List(A), acc: List(A)) -> List(A) {
-	list |> {
-		[]        -> acc
-		[x, ..xs] -> reverse_onto(xs, [x, ..acc])
-	}
+reverse_onto = <A>(list: List(A), acc: List(A)) -> List(A) {
+	list |> ([]) { acc } | ([x, ..xs]) { reverse_onto(xs, [x, ..acc]) }
 }
 
 /// `True` for the empty list. It takes one step.
-is_empty(A) = (list: List(A)) -> Bool { list == [] }
+is_empty = <A>(list: List(A)) -> Bool { list == [] }
 
 /// `True` when an element is `==` to `any`.
 ///
 /// ```i
 /// list.contains([1, 2], any: 2)  // True
 /// ```
-contains(A) = (list: List(A), any: A) -> Bool {
-	list |> {
-		[]        -> False
-		[x, ..xs] -> x == any || contains(xs, any)
-	}
+contains = <A>(list: List(A), any: A) -> Bool {
+	list |> ([]) { False } | ([x, ..xs]) { x == any || contains(xs, any) }
 }
 
 /// The first element, or `None` for the empty list.
-first(A) = (list: List(A)) -> Option(A) {
-	list |> {
-		[]      -> None
-		[x, ..] -> Some(x)
-	}
+first = <A>(list: List(A)) -> Option(A) {
+	list |> ([]) { None } | ([x, ..]) { Some(x) }
 }
 
 /// The list without its first element, or `None` for the empty list.
-rest(A) = (list: List(A)) -> Option(List(A)) {
-	list |> {
-		[]        -> None
-		[_, ..xs] -> Some(xs)
-	}
+rest = <A>(list: List(A)) -> Option(List(A)) {
+	list |> ([]) { None } | ([_, ..xs]) { Some(xs) }
 }
 
 /// The last element, or `None` for the empty list.
-last(A) = (list: List(A)) -> Option(A) {
-	list |> {
-		[]        -> None
-		[x]       -> Some(x)
-		[_, ..xs] -> last(xs)
-	}
+last = <A>(list: List(A)) -> Option(A) {
+	list |> ([]) { None } | ([x]) { Some(x) } | ([_, ..xs]) { last(xs) }
 }
 
 /// The element at an index, counting from 0, or `None` when the index is
@@ -185,30 +160,27 @@ last(A) = (list: List(A)) -> Option(A) {
 /// ```i
 /// list.at([10, 20, 30], 1)  // Some(20)
 /// ```
-at(A) = (list: List(A), index: Int) -> Option(A) {
-	{ index < 0 } |> {
-		True -> None
-		False -> list |> {
-			[] -> None
-			[x, ..xs] -> index |> {
-				0 -> Some(x)
-				_ -> at(xs, index - 1)
-			}
+at = <A>(list: List(A), index: Int) -> Option(A) {
+	{ index < 0 } |>
+		(True) { None }
+		| (False) {
+			list |>
+				([]) { None }
+				| ([x, ..xs]) {
+					index |> (0) { Some(x) } | (_) { at(xs, index - 1) }
+				}
 		}
-	}
 }
 
 /// The index of the first element that is `==` to `item`, counting from
 /// 0, or `None`.
-index_of(A) = (list: List(A), item: A) -> Option(Int) {
+index_of = <A>(list: List(A), item: A) -> Option(Int) {
 	go = (rest, i) {
-		rest |> {
-			[] -> None
-			[x, ..xs] -> { x == item } |> {
-				True  -> Some(i)
-				False -> go(xs, i + 1)
+		rest |>
+			([]) { None }
+			| ([x, ..xs]) {
+				{ x == item } |> (True) { Some(i) } | (False) { go(xs, i + 1) }
 			}
-		}
 	}
 	go(list, 0)
 }
@@ -219,28 +191,24 @@ index_of(A) = (list: List(A), item: A) -> Option(Int) {
 /// ```i
 /// list.group([1, 2, 3, 4], by: (x) { x % 2 })  // {1 -> [1, 3], 0 -> [2, 4]}
 /// ```
-group(V, K, E, N) = (
-	list: List(V)
-	by: (V) -> K ^ E ! N
-) -> Dict(K, List(V)) ^ E ! N { dict.group(list, by) }
+group = <V, K, N>(list: List(V), by: (V) <- N -> K) -> Dict(K, List(V)) {
+	dict.group(list, by)
+}
 
 /// Keeps the elements for which the function gives `True`, in order.
 ///
 /// ```i
 /// list.filter([1, 2, 3, 4], keeping: int.is_even)  // [2, 4]
 /// ```
-filter(A, E, N) = (
-	list: List(A)
-	keeping: (A) -> Bool ^ E ! N
-) -> List(A) ^ E ! N {
+filter = <A, N>(list: List(A), keeping: (A) <- N -> Bool) -> List(A) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> reverse(acc)
-			[x, ..xs] -> keeping(x) |> {
-				True  -> go(xs, [x, ..acc])
-				False -> go(xs, acc)
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) {
+				keeping(x) |>
+					(True) { go(xs, [x, ..acc]) }
+					| (False) { go(xs, acc) }
 			}
-		}
 	}
 	go(list, [])
 }
@@ -251,18 +219,15 @@ filter(A, E, N) = (
 /// ```i
 /// list.filter_map(["1", "x", "3"], (s) { option.from_result(int.parse(s)) })  // [1, 3]
 /// ```
-filter_map(A, B, E, N) = (
-	list: List(A)
-	with: (A) -> Option(B) ^ E ! N
-) -> List(B) ^ E ! N {
+filter_map = <A, B, N>(list: List(A), with: (A) <- N -> Option(B)) -> List(B) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> reverse(acc)
-			[x, ..xs] -> with(x) |> {
-				Some(y) -> go(xs, [y, ..acc])
-				None    -> go(xs, acc)
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) {
+				with(x) |>
+					(Some(y)) { go(xs, [y, ..acc]) }
+					| (None) { go(xs, acc) }
 			}
-		}
 	}
 	go(list, [])
 }
@@ -272,12 +237,9 @@ filter_map(A, B, E, N) = (
 /// ```i
 /// list.map([1, 2, 3], (x) { x * 2 })  // [2, 4, 6]
 /// ```
-map(A, B, E, N) = (list: List(A), with: (A) -> B ^ E ! N) -> List(B) ^ E ! N {
+map = <A, B, N>(list: List(A), with: (A) <- N -> B) -> List(B) {
 	go = (rest, acc) {
-		rest |> {
-			[]        -> reverse(acc)
-			[x, ..xs] -> go(xs, [with(x), ..acc])
-		}
+		rest |> ([]) { reverse(acc) } | ([x, ..xs]) { go(xs, [with(x), ..acc]) }
 	}
 	go(list, [])
 }
@@ -288,16 +250,15 @@ map(A, B, E, N) = (list: List(A), with: (A) -> B ^ E ! N) -> List(B) ^ E ! N {
 /// ```i
 /// list.map2([1, 2, 3], [4, 5], (x, y) { x + y })  // [5, 7]
 /// ```
-map2(A, B, C, E, N) = (
-	list1: List(A)
-	list2: List(B)
-	with: (A, B) -> C ^ E ! N
-) -> List(C) ^ E ! N {
+map2 = <A, B, C, N>(
+	list1: List(A),
+	list2: List(B),
+	with: (A, B) <- N -> C
+) -> List(C) {
 	go = (xs, ys, acc) {
-		(xs, ys) |> {
-			([x, ..xs], [y, ..ys]) -> go(xs, ys, [with(x, y), ..acc])
-			_                      -> reverse(acc)
-		}
+		(xs, ys) |>
+			(([x, ..xs], [y, ..ys])) { go(xs, ys, [with(x, y), ..acc]) }
+			| (_) { reverse(acc) }
 	}
 	go(list1, list2, [])
 }
@@ -309,34 +270,29 @@ map2(A, B, C, E, N) = (
 /// list.map_fold([1, 2, 3], from: 100, with: (acc, x) { (acc + x, x * 2) })
 /// // (106, [2, 4, 6])
 /// ```
-map_fold(A, Acc, B, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A) -> (Acc, B) ^ E ! N
-) -> (Acc, List(B)) ^ E ! N {
+map_fold = <A, Acc, B, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A) <- N -> (Acc, B)
+) -> (Acc, List(B)) {
 	go = (rest, acc, out) {
-		rest |> {
-			[] -> (acc, reverse(out))
-			[x, ..xs] -> {
+		rest |>
+			([]) { (acc, reverse(out)) }
+			| ([x, ..xs]) {
 				(next, y) = with(acc, x)
 				go(xs, next, [y, ..out])
 			}
-		}
 	}
 	go(over, from, [])
 }
 
 /// Like `map`, and the function also gets the index of the element,
 /// counting from 0.
-index_map(A, B, E, N) = (
-	list: List(A)
-	with: (A, Int) -> B ^ E ! N
-) -> List(B) ^ E ! N {
+index_map = <A, B, N>(list: List(A), with: (A, Int) <- N -> B) -> List(B) {
 	go = (rest, i, acc) {
-		rest |> {
-			[]        -> reverse(acc)
-			[x, ..xs] -> go(xs, i + 1, [with(x, i), ..acc])
-		}
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) { go(xs, i + 1, [with(x, i), ..acc]) }
 	}
 	go(list, 0, [])
 }
@@ -348,18 +304,18 @@ index_map(A, B, E, N) = (
 /// ```i
 /// list.try_map(["1", "2"], int.parse)  // Ok([1, 2])
 /// ```
-try_map(A, B, F, E, N) = (
-	over: List(A)
-	with: (A) -> Result(B, F) ^ E ! N
-) -> Result(List(B), F) ^ E ! N {
+try_map = <A, B, F, N>(over: List(A), with: (A) <- N -> Result(B, F)) -> Result(
+	List(B),
+	F,
+) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> Ok(reverse(acc))
-			[x, ..xs] -> with(x) |> {
-				Ok(y)        -> go(xs, [y, ..acc])
-				Error(error) -> Error(error)
+		rest |>
+			([]) { Ok(reverse(acc)) }
+			| ([x, ..xs]) {
+				with(x) |>
+					(Ok(y)) { go(xs, [y, ..acc]) }
+					| (Error(error)) { Error(error) }
 			}
-		}
 	}
 	go(over, [])
 }
@@ -370,14 +326,10 @@ try_map(A, B, F, E, N) = (
 /// ```i
 /// list.drop([1, 2, 3, 4], up_to: 2)  // [3, 4]
 /// ```
-drop(A) = (from: List(A), up_to: Int) -> List(A) {
-	{ up_to <= 0 } |> {
-		True -> from
-		False -> from |> {
-			[]        -> []
-			[_, ..xs] -> drop(xs, up_to - 1)
-		}
-	}
+drop = <A>(from: List(A), up_to: Int) -> List(A) {
+	{ up_to <= 0 } |>
+		(True) { from }
+		| (False) { from |> ([]) { [] } | ([_, ..xs]) { drop(xs, up_to - 1) } }
 }
 
 /// The first `up_to` elements. When the list is shorter, the whole list.
@@ -385,48 +337,47 @@ drop(A) = (from: List(A), up_to: Int) -> List(A) {
 /// ```i
 /// list.take([1, 2, 3, 4], up_to: 2)  // [1, 2]
 /// ```
-take(A) = (from: List(A), up_to: Int) -> List(A) {
+take = <A>(from: List(A), up_to: Int) -> List(A) {
 	go = (rest, n, acc) {
-		{ n <= 0 } |> {
-			True -> reverse(acc)
-			False -> rest |> {
-				[]        -> reverse(acc)
-				[x, ..xs] -> go(xs, n - 1, [x, ..acc])
+		{ n <= 0 } |>
+			(True) { reverse(acc) }
+			| (False) {
+				rest |>
+					([]) { reverse(acc) }
+					| ([x, ..xs]) { go(xs, n - 1, [x, ..acc]) }
 			}
-		}
 	}
 	go(from, up_to, [])
 }
 
 /// The empty list.
-new(A) = () -> List(A) { [] }
+new = <A>() -> List(A) { [] }
 
 /// A list of one element.
-wrap(A) = (item: A) -> List(A) { [item] }
+wrap = <A>(item: A) -> List(A) { [item] }
 
 /// The elements of `first`, then the elements of `second`.
 ///
 /// ```i
 /// list.append([1, 2], [3])  // [1, 2, 3]
 /// ```
-append(A) = (first: List(A), second: List(A)) -> List(A) {
+append = <A>(first: List(A), second: List(A)) -> List(A) {
 	reverse_onto(reverse(first), second)
 }
 
 /// Puts an element in front of a list.
-prepend(A) = (to: List(A), this: A) -> List(A) { [this, ..to] }
+prepend = <A>(to: List(A), this: A) -> List(A) { [this, ..to] }
 
 /// The elements of all the lists, one list after the other.
 ///
 /// ```i
 /// list.concat([[1], [2, 3], []])  // [1, 2, 3]
 /// ```
-concat(A) = (lists: List(List(A))) -> List(A) {
+concat = <A>(lists: List(List(A))) -> List(A) {
 	go = (rest, acc) {
-		rest |> {
-			[]           -> reverse(acc)
-			[xs, ..more] -> go(more, reverse_onto(xs, acc))
-		}
+		rest |>
+			([]) { reverse(acc) }
+			| ([xs, ..more]) { go(more, reverse_onto(xs, acc)) }
 	}
 	go(lists, [])
 }
@@ -436,15 +387,16 @@ concat(A) = (lists: List(List(A))) -> List(A) {
 /// ```i
 /// list.flat_map([1, 2], (x) { [x, x] })  // [1, 1, 2, 2]
 /// ```
-flat_map(A, B, E, N) = (
-	over: List(A)
-	with: (A) -> List(B) ^ E ! N
-) -> List(B) ^ E ! N {
+flat_map = <A, B, N>(over: List(A), with: (A) <- N -> List(B)) -> List(B) {
 	go = (rest, acc) {
-		rest |> {
-			[]        -> reverse(acc)
-			[x, ..xs] -> go(xs, reverse_onto(with(x), acc))
-		}
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) {
+				go(
+					xs,
+					reverse_onto(with(x), acc),
+				)
+			}
 	}
 	go(over, [])
 }
@@ -454,15 +406,12 @@ flat_map(A, B, E, N) = (
 /// ```i
 /// list.fold([1, 2, 3], from: 0, with: (acc, x) { acc + x })  // 6
 /// ```
-fold(A, Acc, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A) -> Acc ^ E ! N
-) -> Acc ^ E ! N {
-	over |> {
-		[]        -> from
-		[x, ..xs] -> fold(xs, with(from, x), with)
-	}
+fold = <A, Acc, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A) <- N -> Acc
+) -> Acc {
+	over |> ([]) { from } | ([x, ..xs]) { fold(xs, with(from, x), with) }
 }
 
 /// Combines the elements with an accumulator, from the last to the first.
@@ -470,23 +419,20 @@ fold(A, Acc, E, N) = (
 /// ```i
 /// list.fold_right([1, 2, 3], from: [], with: (acc, x) { [x, ..acc] })  // [1, 2, 3]
 /// ```
-fold_right(A, Acc, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A) -> Acc ^ E ! N
-) -> Acc ^ E ! N { fold(reverse(over), from, with) }
+fold_right = <A, Acc, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A) <- N -> Acc
+) -> Acc { fold(reverse(over), from, with) }
 
 /// Like `fold`, and the function also gets the index of the element.
-index_fold(A, Acc, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A, Int) -> Acc ^ E ! N
-) -> Acc ^ E ! N {
+index_fold = <A, Acc, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A, Int) <- N -> Acc
+) -> Acc {
 	go = (rest, acc, i) {
-		rest |> {
-			[]        -> acc
-			[x, ..xs] -> go(xs, with(acc, x, i), i + 1)
-		}
+		rest |> ([]) { acc } | ([x, ..xs]) { go(xs, with(acc, x, i), i + 1) }
 	}
 	go(over, from, 0)
 }
@@ -497,18 +443,18 @@ index_fold(A, Acc, E, N) = (
 /// ```i
 /// list.try_fold([1, 2, 3], from: 0, with: (acc, x) { Ok(acc + x) })  // Ok(6)
 /// ```
-try_fold(A, Acc, F, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A) -> Result(Acc, F) ^ E ! N
-) -> Result(Acc, F) ^ E ! N {
-	over |> {
-		[] -> Ok(from)
-		[x, ..xs] -> with(from, x) |> {
-			Ok(next)     -> try_fold(xs, next, with)
-			Error(error) -> Error(error)
+try_fold = <A, Acc, F, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A) <- N -> Result(Acc, F)
+) -> Result(Acc, F) {
+	over |>
+		([]) { Ok(from) }
+		| ([x, ..xs]) {
+			with(from, x) |>
+				(Ok(next)) { try_fold(xs, next, with) }
+				| (Error(error)) { Error(error) }
 		}
-	}
 }
 
 /// Like `fold`, but the function says whether to go on (`Continue`) or to
@@ -519,18 +465,18 @@ try_fold(A, Acc, F, E, N) = (
 ///   { x < 3 } |> { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
 /// })  // 3
 /// ```
-fold_until(A, Acc, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A) -> ContinueOrStop(Acc) ^ E ! N
-) -> Acc ^ E ! N {
-	over |> {
-		[] -> from
-		[x, ..xs] -> with(from, x) |> {
-			Continue(next) -> fold_until(xs, next, with)
-			Stop(last)     -> last
+fold_until = <A, Acc, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A) <- N -> ContinueOrStop(Acc)
+) -> Acc {
+	over |>
+		([]) { from }
+		| ([x, ..xs]) {
+			with(from, x) |>
+				(Continue(next)) { fold_until(xs, next, with) }
+				| (Stop(last)) { last }
 		}
-	}
 }
 
 /// The first element for which the function gives `True`, or `None`.
@@ -538,49 +484,33 @@ fold_until(A, Acc, E, N) = (
 /// ```i
 /// list.find([1, 2, 3], one_that: (x) { x > 1 })  // Some(2)
 /// ```
-find(A, E, N) = (
-	in: List(A)
-	one_that: (A) -> Bool ^ E ! N
-) -> Option(A) ^ E ! N {
-	in |> {
-		[] -> None
-		[x, ..xs] -> one_that(x) |> {
-			True  -> Some(x)
-			False -> find(xs, one_that)
+find = <A, N>(in: List(A), one_that: (A) <- N -> Bool) -> Option(A) {
+	in |>
+		([]) { None }
+		| ([x, ..xs]) {
+			one_that(x) |> (True) { Some(x) } | (False) { find(xs, one_that) }
 		}
-	}
 }
 
 /// The first `Some` value that the function gives, or `None`.
-find_map(A, B, E, N) = (
-	in: List(A)
-	with: (A) -> Option(B) ^ E ! N
-) -> Option(B) ^ E ! N {
-	in |> {
-		[] -> None
-		[x, ..xs] -> with(x) |> {
-			Some(y) -> Some(y)
-			None    -> find_map(xs, with)
+find_map = <A, B, N>(in: List(A), with: (A) <- N -> Option(B)) -> Option(B) {
+	in |>
+		([]) { None }
+		| ([x, ..xs]) {
+			with(x) |> (Some(y)) { Some(y) } | (None) { find_map(xs, with) }
 		}
-	}
 }
 
 /// `True` when the function gives `True` for every element. It stops at the
 /// first `False`. `True` for the empty list.
-all(A, E, N) = (in: List(A), satisfying: (A) -> Bool ^ E ! N) -> Bool ^ E ! N {
-	in |> {
-		[]        -> True
-		[x, ..xs] -> satisfying(x) && all(xs, satisfying)
-	}
+all = <A, N>(in: List(A), satisfying: (A) <- N -> Bool) -> Bool {
+	in |> ([]) { True } | ([x, ..xs]) { satisfying(x) && all(xs, satisfying) }
 }
 
 /// `True` when the function gives `True` for some element. It stops at the
 /// first `True`. `False` for the empty list.
-any(A, E, N) = (in: List(A), satisfying: (A) -> Bool ^ E ! N) -> Bool ^ E ! N {
-	in |> {
-		[]        -> False
-		[x, ..xs] -> satisfying(x) || any(xs, satisfying)
-	}
+any = <A, N>(in: List(A), satisfying: (A) <- N -> Bool) -> Bool {
+	in |> ([]) { False } | ([x, ..xs]) { satisfying(x) || any(xs, satisfying) }
 }
 
 /// Pairs of the elements of two lists at the same places. When one list is
@@ -589,24 +519,22 @@ any(A, E, N) = (in: List(A), satisfying: (A) -> Bool ^ E ! N) -> Bool ^ E ! N {
 /// ```i
 /// list.zip([1, 2, 3], ["a", "b"])  // [(1, "a"), (2, "b")]
 /// ```
-zip(A, B) = (list: List(A), with: List(B)) -> List((A, B)) {
+zip = <A, B>(list: List(A), with: List(B)) -> List((A, B)) {
 	go = (xs, ys, acc) {
-		(xs, ys) |> {
-			([x, ..xs], [y, ..ys]) -> go(xs, ys, [(x, y), ..acc])
-			_                      -> reverse(acc)
-		}
+		(xs, ys) |>
+			(([x, ..xs], [y, ..ys])) { go(xs, ys, [(x, y), ..acc]) }
+			| (_) { reverse(acc) }
 	}
 	go(list, with, [])
 }
 
 /// Like `zip`, but `Error(Nil)` when the lists have different lengths.
-strict_zip(A, B) = (list: List(A), with: List(B)) -> Result(List((A, B)), Nil) {
+strict_zip = <A, B>(list: List(A), with: List(B)) -> Result(List((A, B)), Nil) {
 	go = (xs, ys, acc) {
-		(xs, ys) |> {
-			([], [])               -> Ok(reverse(acc))
-			([x, ..xs], [y, ..ys]) -> go(xs, ys, [(x, y), ..acc])
-			_                      -> Error(Nil)
-		}
+		(xs, ys) |>
+			(([], [])) { Ok(reverse(acc)) }
+			| (([x, ..xs], [y, ..ys])) { go(xs, ys, [(x, y), ..acc]) }
+			| (_) { Error(Nil) }
 	}
 	go(list, with, [])
 }
@@ -616,12 +544,11 @@ strict_zip(A, B) = (list: List(A), with: List(B)) -> Result(List((A, B)), Nil) {
 /// ```i
 /// list.unzip([(1, "a"), (2, "b")])  // ([1, 2], ["a", "b"])
 /// ```
-unzip(A, B) = (input: List((A, B))) -> (List(A), List(B)) {
+unzip = <A, B>(input: List((A, B))) -> (List(A), List(B)) {
 	go = (rest, xs, ys) {
-		rest |> {
-			[]               -> (reverse(xs), reverse(ys))
-			[(x, y), ..more] -> go(more, [x, ..xs], [y, ..ys])
-		}
+		rest |>
+			([]) { (reverse(xs), reverse(ys)) }
+			| ([(x, y), ..more]) { go(more, [x, ..xs], [y, ..ys]) }
 	}
 	go(input, [], [])
 }
@@ -631,19 +558,17 @@ unzip(A, B) = (input: List((A, B))) -> (List(A), List(B)) {
 /// ```i
 /// list.intersperse([1, 2, 3], with: 0)  // [1, 0, 2, 0, 3]
 /// ```
-intersperse(A) = (list: List(A), with: A) -> List(A) {
-	list |> {
-		[] -> []
-		[x, ..xs] -> {
+intersperse = <A>(list: List(A), with: A) -> List(A) {
+	list |>
+		([]) { [] }
+		| ([x, ..xs]) {
 			go = (rest, acc) {
-				rest |> {
-					[]        -> reverse(acc)
-					[y, ..ys] -> go(ys, [y, with, ..acc])
-				}
+				rest |>
+					([]) { reverse(acc) }
+					| ([y, ..ys]) { go(ys, [y, with, ..acc]) }
 			}
 			go(xs, [x])
 		}
-	}
 }
 
 /// The list without the elements that are `==` to an earlier element. The
@@ -652,15 +577,15 @@ intersperse(A) = (list: List(A), with: A) -> List(A) {
 /// ```i
 /// list.unique([1, 2, 1, 3, 2])  // [1, 2, 3]
 /// ```
-unique(A) = (list: List(A)) -> List(A) {
+unique = <A>(list: List(A)) -> List(A) {
 	go = (rest, seen, acc) {
-		rest |> {
-			[] -> reverse(acc)
-			[x, ..xs] -> dict.has(seen, x) |> {
-				True  -> go(xs, seen, acc)
-				False -> go(xs, dict.insert(seen, x, Nil), [x, ..acc])
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) {
+				dict.has(seen, x) |>
+					(True) { go(xs, seen, acc) }
+					| (False) { go(xs, dict.insert(seen, x, Nil), [x, ..acc]) }
 			}
-		}
 	}
 	go(list, dict.new(), [])
 }
@@ -672,109 +597,101 @@ unique(A) = (list: List(A)) -> List(A) {
 /// ```i
 /// list.sort([3, 1, 2], by: int.compare)  // [1, 2, 3]
 /// ```
-sort(A, E, N) = (
-	list: List(A)
-	by: (A, A) -> Order ^ E ! N
-) -> List(A) ^ E ! N {
-	list |> {
-		[] | [_] -> list
-		_        -> merge_all(runs(list, by, []), by)
-	}
+sort = <A, N>(list: List(A), by: (A, A) <- N -> Order) -> List(A) {
+	list |> ([] | [_]) { list } | (_) { merge_all(runs(list, by, []), by) }
 }
 
 // Cuts a list into runs that are in order. A run that goes down strictly is
 // turned round; one that goes down with equal elements is not taken as one
 // run, so that the sort stays stable. The runs are given in order.
-runs(A, E, N) = (
-	list: List(A)
-	by: (A, A) -> Order ^ E ! N
+runs = <A, N>(
+	list: List(A),
+	by: (A, A) <- N -> Order,
 	acc: List(List(A))
-) -> List(List(A)) ^ E ! N {
-	list |> {
-		[]  -> reverse(acc)
-		[x] -> reverse([[x], ..acc])
-		[x, y, ..rest] -> by(x, y) |> {
-			Greater -> descending(rest, y, [x], by, acc)
-			_       -> ascending(rest, y, [x], by, acc)
+) -> List(List(A)) {
+	list |>
+		([]) { reverse(acc) }
+		| ([x]) { reverse([[x], ..acc]) }
+		| ([x, y, ..rest]) {
+			by(x, y) |>
+				(Greater) { descending(rest, y, [x], by, acc) }
+				| (_) { ascending(rest, y, [x], by, acc) }
 		}
-	}
 }
 
 // `run` is in reverse; `last` comes after it.
-ascending(A, E, N) = (
-	list: List(A)
-	last: A
-	run: List(A)
-	by: (A, A) -> Order ^ E ! N
+ascending = <A, N>(
+	list: List(A),
+	last: A,
+	run: List(A),
+	by: (A, A) <- N -> Order,
 	acc: List(List(A))
-) -> List(List(A)) ^ E ! N {
-	list |> {
-		[] -> reverse([reverse([last, ..run]), ..acc])
-		[x, ..rest] -> by(last, x) |> {
-			Greater -> runs(list, by, [reverse([last, ..run]), ..acc])
-			_       -> ascending(rest, x, [last, ..run], by, acc)
+) -> List(List(A)) {
+	list |>
+		([]) { reverse([reverse([last, ..run]), ..acc]) }
+		| ([x, ..rest]) {
+			by(last, x) |>
+				(Greater) { runs(list, by, [reverse([last, ..run]), ..acc]) }
+				| (_) { ascending(rest, x, [last, ..run], by, acc) }
 		}
-	}
 }
 
 // `run` goes up (it is the strictly falling run, reversed); `last` comes
 // before it.
-descending(A, E, N) = (
-	list: List(A)
-	last: A
-	run: List(A)
-	by: (A, A) -> Order ^ E ! N
+descending = <A, N>(
+	list: List(A),
+	last: A,
+	run: List(A),
+	by: (A, A) <- N -> Order,
 	acc: List(List(A))
-) -> List(List(A)) ^ E ! N {
-	list |> {
-		[] -> reverse([[last, ..run], ..acc])
-		[x, ..rest] -> by(last, x) |> {
-			Greater -> descending(rest, x, [last, ..run], by, acc)
-			_       -> runs(list, by, [[last, ..run], ..acc])
+) -> List(List(A)) {
+	list |>
+		([]) { reverse([[last, ..run], ..acc]) }
+		| ([x, ..rest]) {
+			by(last, x) |>
+				(Greater) { descending(rest, x, [last, ..run], by, acc) }
+				| (_) { runs(list, by, [[last, ..run], ..acc]) }
 		}
-	}
 }
 
-merge_all(A, E, N) = (
-	runs: List(List(A))
-	by: (A, A) -> Order ^ E ! N
-) -> List(A) ^ E ! N {
-	runs |> {
-		[]    -> []
-		[run] -> run
-		_     -> merge_all(merge_pairs(runs, by, []), by)
-	}
+merge_all = <A, N>(runs: List(List(A)), by: (A, A) <- N -> Order) -> List(A) {
+	runs |>
+		([]) { [] }
+		| ([run]) { run }
+		| (_) { merge_all(merge_pairs(runs, by, []), by) }
 }
 
-merge_pairs(A, E, N) = (
-	runs: List(List(A))
-	by: (A, A) -> Order ^ E ! N
+merge_pairs = <A, N>(
+	runs: List(List(A)),
+	by: (A, A) <- N -> Order,
 	acc: List(List(A))
-) -> List(List(A)) ^ E ! N {
-	runs |> {
-		[]             -> reverse(acc)
-		[run]          -> reverse([run, ..acc])
-		[a, b, ..rest] -> merge_pairs(rest, by, [merge(a, b, by, []), ..acc])
-	}
+) -> List(List(A)) {
+	runs |>
+		([]) { reverse(acc) }
+		| ([run]) { reverse([run, ..acc]) }
+		| ([a, b, ..rest]) {
+			merge_pairs(rest, by, [merge(a, b, by, []), ..acc])
+		}
 }
 
 // Merges two sorted lists. On a tie, the element of `xs` comes first.
-merge(A, E, N) = (
-	xs: List(A)
-	ys: List(A)
-	by: (A, A) -> Order ^ E ! N
+merge = <A, N>(
+	xs: List(A),
+	ys: List(A),
+	by: (A, A) <- N -> Order,
 	acc: List(A)
-) -> List(A) ^ E ! N {
-	xs |> {
-		[] -> reverse_onto(acc, ys)
-		[x, ..xs2] -> ys |> {
-			[] -> reverse_onto(acc, xs)
-			[y, ..ys2] -> by(x, y) |> {
-				Greater -> merge(xs, ys2, by, [y, ..acc])
-				_       -> merge(xs2, ys, by, [x, ..acc])
-			}
+) -> List(A) {
+	xs |>
+		([]) { reverse_onto(acc, ys) }
+		| ([x, ..xs2]) {
+			ys |>
+				([]) { reverse_onto(acc, xs) }
+				| ([y, ..ys2]) {
+					by(x, y) |>
+						(Greater) { merge(xs, ys2, by, [y, ..acc]) }
+						| (_) { merge(xs2, ys, by, [x, ..acc]) }
+				}
 		}
-	}
 }
 
 /// The numbers from `from` to `to`, with both ends. It counts down when
@@ -786,13 +703,13 @@ merge(A, E, N) = (
 /// ```
 range = (from: Int, to: Int) -> List(Int) {
 	go = (i, acc) {
-		{ i == from } |> {
-			True -> [i, ..acc]
-			False -> { i < from } |> {
-				True  -> go(i + 1, [i, ..acc])
-				False -> go(i - 1, [i, ..acc])
+		{ i == from } |>
+			(True) { [i, ..acc] }
+			| (False) {
+				{ i < from } |>
+					(True) { go(i + 1, [i, ..acc]) }
+					| (False) { go(i - 1, [i, ..acc]) }
 			}
-		}
 	}
 	go(to, [])
 }
@@ -802,12 +719,9 @@ range = (from: Int, to: Int) -> List(Int) {
 /// ```i
 /// list.repeat("a", times: 3)  // ["a", "a", "a"]
 /// ```
-repeat(A) = (item: A, times: Int) -> List(A) {
+repeat = <A>(item: A, times: Int) -> List(A) {
 	go = (n, acc) {
-		{ n <= 0 } |> {
-			True  -> acc
-			False -> go(n - 1, [item, ..acc])
-		}
+		{ n <= 0 } |> (True) { acc } | (False) { go(n - 1, [item, ..acc]) }
 	}
 	go(times, [])
 }
@@ -817,32 +731,32 @@ repeat(A) = (item: A, times: Int) -> List(A) {
 /// ```i
 /// list.split([1, 2, 3, 4], at: 1)  // ([1], [2, 3, 4])
 /// ```
-split(A) = (list: List(A), at: Int) -> (List(A), List(A)) {
+split = <A>(list: List(A), at: Int) -> (List(A), List(A)) {
 	go = (rest, n, acc) {
-		{ n <= 0 } |> {
-			True -> (reverse(acc), rest)
-			False -> rest |> {
-				[]        -> (reverse(acc), [])
-				[x, ..xs] -> go(xs, n - 1, [x, ..acc])
+		{ n <= 0 } |>
+			(True) { (reverse(acc), rest) }
+			| (False) {
+				rest |>
+					([]) { (reverse(acc), []) }
+					| ([x, ..xs]) { go(xs, n - 1, [x, ..acc]) }
 			}
-		}
 	}
 	go(list, at, [])
 }
 
 /// The first elements for which the function gives `True`, and the rest.
-split_while(A, E, N) = (
-	list: List(A)
-	satisfying: (A) -> Bool ^ E ! N
-) -> (List(A), List(A)) ^ E ! N {
+split_while = <A, N>(list: List(A), satisfying: (A) <- N -> Bool) -> (
+	List(A),
+	List(A),
+) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> (reverse(acc), [])
-			[x, ..xs] -> satisfying(x) |> {
-				True  -> go(xs, [x, ..acc])
-				False -> (reverse(acc), rest)
+		rest |>
+			([]) { (reverse(acc), []) }
+			| ([x, ..xs]) {
+				satisfying(x) |>
+					(True) { go(xs, [x, ..acc]) }
+					| (False) { (reverse(acc), rest) }
 			}
-		}
 	}
 	go(list, [])
 }
@@ -853,26 +767,26 @@ split_while(A, E, N) = (
 /// ```i
 /// list.key_find([("a", 1), ("b", 2)], "b")  // Some(2)
 /// ```
-key_find(K, V) = (in: List((K, V)), find: K) -> Option(V) {
-	in |> {
-		[] -> None
-		[(k, v), ..rest] -> { k == find } |> {
-			True  -> Some(v)
-			False -> key_find(rest, find)
+key_find = <K, V>(in: List((K, V)), find: K) -> Option(V) {
+	in |>
+		([]) { None }
+		| ([(k, v), ..rest]) {
+			{ k == find } |>
+				(True) { Some(v) }
+				| (False) { key_find(rest, find) }
 		}
-	}
 }
 
 /// The values of all the pairs whose key is `==` to `find`, in order.
-key_filter(K, V) = (in: List((K, V)), find: K) -> List(V) {
+key_filter = <K, V>(in: List((K, V)), find: K) -> List(V) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> reverse(acc)
-			[(k, v), ..xs] -> { k == find } |> {
-				True  -> go(xs, [v, ..acc])
-				False -> go(xs, acc)
+		rest |>
+			([]) { reverse(acc) }
+			| ([(k, v), ..xs]) {
+				{ k == find } |>
+					(True) { go(xs, [v, ..acc]) }
+					| (False) { go(xs, acc) }
 			}
-		}
 	}
 	go(in, [])
 }
@@ -883,58 +797,57 @@ key_filter(K, V) = (in: List((K, V)), find: K) -> List(V) {
 /// ```i
 /// list.key_pop([("a", 1), ("b", 2)], "a")  // Some((1, [("b", 2)]))
 /// ```
-key_pop(K, V) = (list: List((K, V)), key: K) -> Option((V, List((K, V)))) {
+key_pop = <K, V>(list: List((K, V)), key: K) -> Option((V, List((K, V)))) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> None
-			[(k, v), ..xs] -> { k == key } |> {
-				True  -> Some((v, reverse_onto(acc, xs)))
-				False -> go(xs, [(k, v), ..acc])
+		rest |>
+			([]) { None }
+			| ([(k, v), ..xs]) {
+				{ k == key } |>
+					(True) { Some((v, reverse_onto(acc, xs))) }
+					| (False) { go(xs, [(k, v), ..acc]) }
 			}
-		}
 	}
 	go(list, [])
 }
 
 /// Sets the value of the first pair whose key is `==` to `key`, or adds the
 /// pair at the end when there is none.
-key_set(K, V) = (list: List((K, V)), key: K, value: V) -> List((K, V)) {
+key_set = <K, V>(list: List((K, V)), key: K, value: V) -> List((K, V)) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> reverse([(key, value), ..acc])
-			[(k, v), ..xs] -> { k == key } |> {
-				True  -> reverse_onto(acc, [(key, value), ..xs])
-				False -> go(xs, [(k, v), ..acc])
+		rest |>
+			([]) { reverse([(key, value), ..acc]) }
+			| ([(k, v), ..xs]) {
+				{ k == key } |>
+					(True) { reverse_onto(acc, [(key, value), ..xs]) }
+					| (False) { go(xs, [(k, v), ..acc]) }
 			}
-		}
 	}
 	go(list, [])
 }
 
 /// Calls a function on every element, in order, for its effects.
-each(A, B, E, N) = (list: List(A), with: (A) -> B ^ E ! N) -> Nil ^ E ! N {
-	list |> {
-		[] -> Nil
-		[x, ..xs] -> {
+each = <A, B, N>(list: List(A), with: (A) <- N -> B) -> Nil {
+	list |>
+		([]) { Nil }
+		| ([x, ..xs]) {
 			with(x)
 			each(xs, with)
 		}
-	}
 }
 
 /// Calls a function that gives a result on every element, in order, and
 /// stops at the first `Error`.
-try_each(A, B, F, E, N) = (
-	over: List(A)
-	with: (A) -> Result(B, F) ^ E ! N
-) -> Result(Nil, F) ^ E ! N {
-	over |> {
-		[] -> Ok(Nil)
-		[x, ..xs] -> with(x) |> {
-			Ok(_)        -> try_each(xs, with)
-			Error(error) -> Error(error)
+try_each = <A, B, F, N>(
+	over: List(A),
+	with: (A) <- N -> Result(B, F)
+) -> Result(Nil, F) {
+	over |>
+		([]) { Ok(Nil) }
+		| ([x, ..xs]) {
+			with(x) |>
+				(Ok(_)) { try_each(xs, with) }
+				| (Error(error)) { Error(error) }
 		}
-	}
 }
 
 /// The elements for which the function gives `True`, and the others, each
@@ -943,18 +856,18 @@ try_each(A, B, F, E, N) = (
 /// ```i
 /// list.partition([1, 2, 3, 4], int.is_odd)  // ([1, 3], [2, 4])
 /// ```
-partition(A, E, N) = (
-	list: List(A)
-	with: (A) -> Bool ^ E ! N
-) -> (List(A), List(A)) ^ E ! N {
+partition = <A, N>(list: List(A), with: (A) <- N -> Bool) -> (
+	List(A),
+	List(A),
+) {
 	go = (rest, yes, no) {
-		rest |> {
-			[] -> (reverse(yes), reverse(no))
-			[x, ..xs] -> with(x) |> {
-				True  -> go(xs, [x, ..yes], no)
-				False -> go(xs, yes, [x, ..no])
+		rest |>
+			([]) { (reverse(yes), reverse(no)) }
+			| ([x, ..xs]) {
+				with(x) |>
+					(True) { go(xs, [x, ..yes], no) }
+					| (False) { go(xs, yes, [x, ..no]) }
 			}
-		}
 	}
 	go(list, [], [])
 }
@@ -967,27 +880,27 @@ partition(A, E, N) = (
 /// list.permutations([1, 2, 3])
 /// // [[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]]
 /// ```
-permutations(A) = (list: List(A)) -> List(List(A)) {
-	list |> {
-		[] -> [[]]
-		_ -> {
+permutations = <A>(list: List(A)) -> List(List(A)) {
+	list |>
+		([]) { [[]] }
+		| (_) {
 			// Each element in turn, with the others in order.
 			picks = (before, after, acc) {
-				after |> {
-					[] -> reverse(acc)
-					[x, ..xs] -> picks(
-						[x, ..before]
-						xs
-						[(x, reverse_onto(before, xs)), ..acc]
-					)
-				}
+				after |>
+					([]) { reverse(acc) }
+					| ([x, ..xs]) {
+						picks(
+							[x, ..before],
+							xs,
+							[(x, reverse_onto(before, xs)), ..acc],
+						)
+					}
 			}
 			flat_map(picks([], list, []), (pick) {
 				(x, others) = pick
 				map(permutations(others), (p) { [x, ..p] })
 			})
 		}
-	}
 }
 
 /// Every run of `by` elements that come one after the other, in order.
@@ -995,23 +908,22 @@ permutations(A) = (list: List(A)) -> List(List(A)) {
 /// ```i
 /// list.window([1, 2, 3, 4], by: 2)  // [[1, 2], [2, 3], [3, 4]]
 /// ```
-window(A) = (list: List(A), by: Int) -> List(List(A)) {
-	{ by <= 0 } |> {
-		True -> []
-		False -> {
+window = <A>(list: List(A), by: Int) -> List(List(A)) {
+	{ by <= 0 } |>
+		(True) { [] }
+		| (False) {
 			go = (rest, acc) {
 				w = take(rest, by)
-				{ length(w) == by } |> {
-					True -> rest |> {
-						[_, ..xs] -> go(xs, [w, ..acc])
-						[]        -> reverse(acc)
+				{ length(w) == by } |>
+					(True) {
+						rest |>
+							([_, ..xs]) { go(xs, [w, ..acc]) }
+							| ([]) { reverse(acc) }
 					}
-					False -> reverse(acc)
-				}
+					| (False) { reverse(acc) }
 			}
 			go(list, [])
 		}
-	}
 }
 
 /// Every pair of elements that come one after the other.
@@ -1019,41 +931,32 @@ window(A) = (list: List(A), by: Int) -> List(List(A)) {
 /// ```i
 /// list.window_by_2([1, 2, 3])  // [(1, 2), (2, 3)]
 /// ```
-window_by_2(A) = (list: List(A)) -> List((A, A)) {
-	list |> {
-		[]        -> []
-		[_, ..xs] -> zip(list, xs)
-	}
+window_by_2 = <A>(list: List(A)) -> List((A, A)) {
+	list |> ([]) { [] } | ([_, ..xs]) { zip(list, xs) }
 }
 
 /// The list without its first elements for which the function gives
 /// `True`.
-drop_while(A, E, N) = (
-	in: List(A)
-	satisfying: (A) -> Bool ^ E ! N
-) -> List(A) ^ E ! N {
-	in |> {
-		[] -> []
-		[x, ..xs] -> satisfying(x) |> {
-			True  -> drop_while(xs, satisfying)
-			False -> in
+drop_while = <A, N>(in: List(A), satisfying: (A) <- N -> Bool) -> List(A) {
+	in |>
+		([]) { [] }
+		| ([x, ..xs]) {
+			satisfying(x) |>
+				(True) { drop_while(xs, satisfying) }
+				| (False) { in }
 		}
-	}
 }
 
 /// The first elements for which the function gives `True`.
-take_while(A, E, N) = (
-	in: List(A)
-	satisfying: (A) -> Bool ^ E ! N
-) -> List(A) ^ E ! N {
+take_while = <A, N>(in: List(A), satisfying: (A) <- N -> Bool) -> List(A) {
 	go = (rest, acc) {
-		rest |> {
-			[] -> reverse(acc)
-			[x, ..xs] -> satisfying(x) |> {
-				True  -> go(xs, [x, ..acc])
-				False -> reverse(acc)
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) {
+				satisfying(x) |>
+					(True) { go(xs, [x, ..acc]) }
+					| (False) { reverse(acc) }
 			}
-		}
 	}
 	go(in, [])
 }
@@ -1065,28 +968,24 @@ take_while(A, E, N) = (
 /// list.chunk([1, 2, 2, 3, 4, 4, 6], by: (x) { x % 2 })
 /// // [[1], [2, 2], [3], [4, 4, 6]]
 /// ```
-chunk(A, K, E, N) = (
-	in: List(A)
-	by: (A) -> K ^ E ! N
-) -> List(List(A)) ^ E ! N {
-	in |> {
-		[] -> []
-		[x, ..xs] -> {
+chunk = <A, K, N>(in: List(A), by: (A) <- N -> K) -> List(List(A)) {
+	in |>
+		([]) { [] }
+		| ([x, ..xs]) {
 			go = (rest, key, current, acc) {
-				rest |> {
-					[] -> reverse([reverse(current), ..acc])
-					[y, ..ys] -> {
+				rest |>
+					([]) { reverse([reverse(current), ..acc]) }
+					| ([y, ..ys]) {
 						k = by(y)
-						{ k == key } |> {
-							True  -> go(ys, key, [y, ..current], acc)
-							False -> go(ys, k, [y], [reverse(current), ..acc])
-						}
+						{ k == key } |>
+							(True) { go(ys, key, [y, ..current], acc) }
+							| (False) {
+								go(ys, k, [y], [reverse(current), ..acc])
+							}
 					}
-				}
 			}
 			go(xs, by(x), [x], [])
 		}
-	}
 }
 
 /// Cuts the list into lists of `into` elements. The last list may be
@@ -1095,30 +994,32 @@ chunk(A, K, E, N) = (
 /// ```i
 /// list.sized_chunk([1, 2, 3, 4, 5], into: 2)  // [[1, 2], [3, 4], [5]]
 /// ```
-sized_chunk(A) = (in: List(A), into: Int) -> List(List(A)) {
-	{ into <= 0 } |> {
-		True -> []
-		False -> {
+sized_chunk = <A>(in: List(A), into: Int) -> List(List(A)) {
+	{ into <= 0 } |>
+		(True) { [] }
+		| (False) {
 			go = (rest, n, current, acc) {
-				rest |> {
-					[] -> current |> {
-						[] -> reverse(acc)
-						_  -> reverse([reverse(current), ..acc])
+				rest |>
+					([]) {
+						current |>
+							([]) { reverse(acc) }
+							| (_) { reverse([reverse(current), ..acc]) }
 					}
-					[x, ..xs] -> { n == 1 } |> {
-						True -> go(
-							xs
-							into
-							[]
-							[reverse([x, ..current]), ..acc]
-						)
-						False -> go(xs, n - 1, [x, ..current], acc)
+					| ([x, ..xs]) {
+						{ n == 1 } |>
+							(True) {
+								go(
+									xs,
+									into,
+									[],
+									[reverse([x, ..current]), ..acc],
+								)
+							}
+							| (False) { go(xs, n - 1, [x, ..current], acc) }
 					}
-				}
 			}
 			go(in, into, [], [])
 		}
-	}
 }
 
 /// Combines the elements with a function, from the first to the last, with
@@ -1127,14 +1028,8 @@ sized_chunk(A) = (in: List(A), into: Int) -> List(List(A)) {
 /// ```i
 /// list.reduce([1, 2, 3], with: (a, b) { a + b })  // Some(6)
 /// ```
-reduce(A, E, N) = (
-	over: List(A)
-	with: (A, A) -> A ^ E ! N
-) -> Option(A) ^ E ! N {
-	over |> {
-		[]        -> None
-		[x, ..xs] -> Some(fold(xs, x, with))
-	}
+reduce = <A, N>(over: List(A), with: (A, A) <- N -> A) -> Option(A) {
+	over |> ([]) { None } | ([x, ..xs]) { Some(fold(xs, x, with)) }
 }
 
 /// Like `fold`, but gives every accumulator after each element.
@@ -1142,19 +1037,18 @@ reduce(A, E, N) = (
 /// ```i
 /// list.scan([1, 2, 3], from: 0, with: (acc, x) { acc + x })  // [1, 3, 6]
 /// ```
-scan(A, Acc, E, N) = (
-	over: List(A)
-	from: Acc
-	with: (Acc, A) -> Acc ^ E ! N
-) -> List(Acc) ^ E ! N {
+scan = <A, Acc, N>(
+	over: List(A),
+	from: Acc,
+	with: (Acc, A) <- N -> Acc
+) -> List(Acc) {
 	go = (rest, acc, out) {
-		rest |> {
-			[] -> reverse(out)
-			[x, ..xs] -> {
+		rest |>
+			([]) { reverse(out) }
+			| ([x, ..xs]) {
 				next = with(acc, x)
 				go(xs, next, [next, ..out])
 			}
-		}
 	}
 	go(over, from, [])
 }
@@ -1164,17 +1058,19 @@ scan(A, Acc, E, N) = (
 /// ```i
 /// list.combinations([1, 2, 3], by: 2)  // [[1, 2], [1, 3], [2, 3]]
 /// ```
-combinations(A) = (items: List(A), by: Int) -> List(List(A)) {
-	{ by <= 0 } |> {
-		True -> [[]]
-		False -> items |> {
-			[] -> []
-			[x, ..xs] -> append(
-				map(combinations(xs, by - 1), (c) { [x, ..c] })
-				combinations(xs, by)
-			)
+combinations = <A>(items: List(A), by: Int) -> List(List(A)) {
+	{ by <= 0 } |>
+		(True) { [[]] }
+		| (False) {
+			items |>
+				([]) { [] }
+				| ([x, ..xs]) {
+					append(
+						map(combinations(xs, by - 1), (c) { [x, ..c] }),
+						combinations(xs, by),
+					)
+				}
 		}
-	}
 }
 
 /// Every pair of two elements, keeping their order.
@@ -1182,12 +1078,16 @@ combinations(A) = (items: List(A), by: Int) -> List(List(A)) {
 /// ```i
 /// list.combination_pairs([1, 2, 3])  // [(1, 2), (1, 3), (2, 3)]
 /// ```
-combination_pairs(A) = (items: List(A)) -> List((A, A)) {
+combination_pairs = <A>(items: List(A)) -> List((A, A)) {
 	go = (rest, acc) {
-		rest |> {
-			[]        -> reverse(acc)
-			[x, ..xs] -> go(xs, reverse_onto(map(xs, (y) { (x, y) }), acc))
-		}
+		rest |>
+			([]) { reverse(acc) }
+			| ([x, ..xs]) {
+				go(
+					xs,
+					reverse_onto(map(xs, (y) { (x, y) }), acc),
+				)
+			}
 	}
 	go(items, [])
 }
@@ -1197,58 +1097,51 @@ combination_pairs(A) = (items: List(A)) -> List((A, A)) {
 /// ```i
 /// list.interleave([[1, 2], [101, 102], [201]])  // [1, 101, 201, 2, 102]
 /// ```
-interleave(A) = (list: List(List(A))) -> List(A) { concat(transpose(list)) }
+interleave = <A>(list: List(List(A))) -> List(A) { concat(transpose(list)) }
 
 /// Turns rows into columns. Shorter lists leave gaps, which are taken out.
 ///
 /// ```i
 /// list.transpose([[1, 2, 3], [101, 102, 103]])  // [[1, 101], [2, 102], [3, 103]]
 /// ```
-transpose(A) = (list_of_lists: List(List(A))) -> List(List(A)) {
+transpose = <A>(list_of_lists: List(List(A))) -> List(List(A)) {
 	go = (rows, acc) {
 		nonempty = filter(rows, (row) { row != [] })
-		nonempty |> {
-			[] -> reverse(acc)
-			_ -> {
+		nonempty |>
+			([]) { reverse(acc) }
+			| (_) {
 				heads = filter_map(nonempty, first)
 				tails = map(nonempty, (row) { drop(row, 1) })
 				go(tails, [heads, ..acc])
 			}
-		}
 	}
 	go(list_of_lists, [])
 }
 
 /// The greatest element by a compare function, or `None` for the empty
 /// list. Of equal greatest elements, the first is given.
-max(A, E, N) = (
-	over: List(A)
-	with: (A, A) -> Order ^ E ! N
-) -> Option(A) ^ E ! N {
-	over |> {
-		[] -> None
-		[x, ..xs] -> Some(fold(xs, x, (best, y) {
-			with(y, best) |> {
-				Greater -> y
-				_       -> best
-			}
-		}))
-	}
+max = <A, N>(over: List(A), with: (A, A) <- N -> Order) -> Option(A) {
+	over |>
+		([]) { None }
+		| ([x, ..xs]) {
+			Some(
+				fold(xs, x, (best, y) {
+					with(y, best) |> (Greater) { y } | (_) { best }
+				}),
+			)
+		}
 }
 
 /// The smallest element by a compare function, or `None` for the empty
 /// list. Of equal smallest elements, the first is given.
-min(A, E, N) = (
-	over: List(A)
-	with: (A, A) -> Order ^ E ! N
-) -> Option(A) ^ E ! N {
-	over |> {
-		[] -> None
-		[x, ..xs] -> Some(fold(xs, x, (best, y) {
-			with(y, best) |> {
-				Less -> y
-				_    -> best
-			}
-		}))
-	}
+min = <A, N>(over: List(A), with: (A, A) <- N -> Order) -> Option(A) {
+	over |>
+		([]) { None }
+		| ([x, ..xs]) {
+			Some(
+				fold(xs, x, (best, y) {
+					with(y, best) |> (Less) { y } | (_) { best }
+				}),
+			)
+		}
 }

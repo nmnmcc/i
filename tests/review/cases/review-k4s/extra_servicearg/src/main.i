@@ -1,4 +1,7 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(A,N) = (f: () -> A ! N) { f() }
-forward(N): () -> Nil ! N | S(N) = (s ! S(N)) { run(() { use() }) }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <A, N>(f: () <- N -> A) { f() }
+forward: <N>() <- (S(N), ..N) -> Nil = <N>() <- (s: S(N)) { run(() { use() }) }

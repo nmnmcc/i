@@ -33,11 +33,9 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-print = (text: String, out ! Out) { out.print(text) }
+print = (text: String) <- (out: Out) { out.print(text) }
 
 probe = (phase: Int, typed: Bool) {
 	result = fail.catch(() {
@@ -46,42 +44,39 @@ probe = (phase: Int, typed: Bool) {
 			never: task.Channel(Nil) = task.channel()
 			child = task.go(s, () {
 				fail.catch(() {
-					resource.ensure(() {
-						phase |> {
-							0 -> task.receive(never)
-							_ -> Nil
-						}
-						typed |> {
-							True  -> fail.raise("child")
-							False -> Nil
-						}
-					}, () {
-						print("start")
-						phase |> {
-							1 -> task.send(gate, Nil)
-							_ -> Nil
-						}
-						resource.ensure(() { task.yield() }, () {
+					resource.ensure(
+						() {
+							phase |> (0) { task.receive(never) } | (_) { Nil }
+							typed |>
+								(True) { fail.raise("child") }
+								| (False) { Nil }
+						},
+						() {
+							print("start")
+							phase |> (1) { task.send(gate, Nil) } | (_) { Nil }
+							resource.ensure(
+								() { task.yield() },
+								() {
+									task.yield()
+									print("inner")
+								},
+							)
 							task.yield()
-							print("inner")
-						})
-						task.yield()
-						print("end")
-					})
+							print("end")
+						},
+					)
 				})
 				Nil
 			})
-			phase |> {
-				0 -> task.yield()
-				1 -> task.receive(gate)
-				_ -> task.join(child)
-			}
+			phase |>
+				(0) { task.yield() }
+				| (1) { task.receive(gate) }
+				| (_) { task.join(child) }
 			fail.raise("parent")
 		})
 	})
 	print(core.inspect(result))
 }
-
 
 main = () {
 	probe(0, False)

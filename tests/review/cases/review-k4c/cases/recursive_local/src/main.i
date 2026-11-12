@@ -1,1 +1,4 @@
-bad = () { f = (x) { x(x) } Nil }
+bad = () {
+	f = (x) { x(x) }
+	Nil
+}

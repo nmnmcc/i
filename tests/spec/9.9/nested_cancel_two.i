@@ -11,12 +11,9 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (text: String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-print = (text: String, out ! Out) { out.print(text) }
-
+print = (text: String) <- (out: Out) { out.print(text) }
 
 main = () {
 	result = fail.catch(() {
@@ -31,13 +28,16 @@ main = () {
 				task.run(() {
 					task.scope((inner) {
 						task.go(inner, () {
-							resource.ensure(() {
-								notify(Nil)
-								task.sync(task.never())
-							}, () {
-								task.yield()
-								print("deepest-final")
-							})
+							resource.ensure(
+								() {
+									notify(Nil)
+									task.sync(task.never())
+								},
+								() {
+									task.yield()
+									print("deepest-final")
+								},
+							)
 						})
 						task.sync(task.never())
 					})

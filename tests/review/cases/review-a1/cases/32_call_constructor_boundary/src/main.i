@@ -1,6 +1,5 @@
-Token {
-	Stop
-}
+Stop = ()
+Token = Stop
 
 send = (x) { x }
 

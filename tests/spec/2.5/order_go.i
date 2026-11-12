@@ -17,5 +17,4 @@ z = p("z")
 
 p = (s: String) { panic(s) }
 
-
 main = () { core.inspect(a) }

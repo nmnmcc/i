@@ -6,13 +6,13 @@ f: (Int) -> Int = g
 _ = 1
 (p, q) = (1, 2)
 body = (n) {
-  (p, q) = pair
-  r = s = t
-  r = s = t == u
-  Ok(v) = result
-  "pre" <> rest = text
-  [h, ..tail] = list
-  -1 = n
-  a = (x, y) = e
-  v
+	(p, q) = pair
+	r = s = t
+	r = s = t == u
+	Ok(v) = result
+	"pre" <> rest = text
+	[h, ..tail] = list
+	-1 = n
+	a = (x, y) = e
+	v
 }

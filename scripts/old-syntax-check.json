@@ -1907,13 +1907,13 @@
       "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:3be21bd923ed7025": {
+  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:6167fd29bbd38815": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected a pattern, found `{`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:f48e6269c5294ec8": {
+  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:40c04e1066476b93": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected a pattern, found `{`"
@@ -1950,7 +1950,7 @@
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
-  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:f48e6269c5294ec8": {
+  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:40c04e1066476b93": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected a pattern, found `{`"
@@ -2028,19 +2028,19 @@
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
     ]
   },
-  "tests/review/cases/review-native3/alias/.invalid/src/main.i:f71902283bf0e419": {
+  "tests/review/cases/review-native3/alias/.invalid/src/main.i:29277826a986d622": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-native3/direct/.invalid/src/main.i:54a84c4e326b9f0a": {
+  "tests/review/cases/review-native3/direct/.invalid/src/main.i:2fcdef033b2b0fe3": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-native3/external/.invalid/src/main.i:cf77c54bb0020029": {
+  "tests/review/cases/review-native3/external/.invalid/src/main.i:d502a7a7a4d34576": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
@@ -2058,7 +2058,7 @@
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:8cc5e6ebb1e74381": {
+  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:72c356b5fbc3c09c": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
@@ -2070,7 +2070,7 @@
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
     ]
   },
-  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:58efcc7552f5fa83": {
+  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:d1e513c0f4edab11": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"

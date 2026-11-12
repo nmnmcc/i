@@ -188,7 +188,7 @@ fn selected_collection_uses_its_target_plan_and_transitive_requests() {
         std::fs::read_to_string(&source_path)
             .unwrap()
             .replacen("(m =", "(i/clock, i/fail, m =", 1);
-    source.push_str("\nService { Service(value: Int) }\nmake = () { fail.catch(() { clock.sleep_ns(1000) }) |> { Ok(_) -> Service(42) Error(_) -> panic(\"clock failed\") } }\nwrong = () { Service(0) }\nread = (s ! Service) { assert(s.value == 42) }\nm.emit(anchor, configured, read())\n");
+    source.push_str("Service = (value = Int)\nmake = () {\n\tfail.catch(() { clock.sleep_ns(1000) }) |>\n\t\t(Ok(_)) { Service(value = 42) }\n\t\t| (Error(_)) { panic(\"clock failed\") }\n}\nwrong = () { Service(value = 0) }\nread = () <- (s: Service) { assert(s.value == 42) }\nm.emit(anchor, configured, read())\n");
     std::fs::write(source_path, source).unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n[providers.\"app/main.Service\"]\nnative = \"app/main.make\"\nnodejs = \"app/main.wrong\"\n").unwrap();
     let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();

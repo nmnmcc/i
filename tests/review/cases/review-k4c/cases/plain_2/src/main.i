@@ -1,1 +1,4 @@
-wrap = (f) { g = (x) { f(x) } g }
+wrap = (f) {
+	g = (x) { f(x) }
+	g
+}

@@ -141,15 +141,14 @@ main = () {{
 #[test]
 fn http_dns() {
     run_http_program(
-        r#"
-(
- i/fail
- std/http
+        r#"(
+	i/fail
+	std/http
 )
 
 main = () {
- result = fail.catch(() { http.get("http://name.invalid/") })
- result |> { Error(http.Dns(_)) -> Nil _ -> panic("expected DNS error") }
+	result = fail.catch(() { http.get("http://name.invalid/") })
+	result |> (Error(http.Dns(_))) { Nil } | (_) { panic("expected DNS error") }
 }
 "#,
     );
@@ -424,40 +423,51 @@ fn http_stream_request_body() {
     .unwrap();
     std::fs::write(
         project.path().join("src/main.i"),
-        r#"
-(i/net, i/task, i/stdio, i/core, std/http, std/bit_array, std/list, std/option)
+        r#"(
+	i/net
+	i/task
+	i/stdio
+	i/core
+	std/http
+	std/bit_array
+	std/list
+	std/option
+)
 read_pieces = (body, acc: List(BitArray), count: Int) {
- piece = body.read(4096)
- { bit_array.byte_size(piece) == 0 } |> {
-  True -> (bit_array.concat(list.reverse(acc)), count)
-  False -> {
-   { count == 0 } |> { True -> stdio.print("piece") False -> Nil }
-   read_pieces(body, [piece, ..acc], count + 1)
-  }
- }
+	piece = body.read(4096)
+	{ bit_array.byte_size(piece) == 0 } |>
+		(True) { (bit_array.concat(list.reverse(acc)), count) }
+		| (False) {
+			{ count == 0 } |> (True) { stdio.print("piece") } | (False) { Nil }
+			read_pieces(body, [piece, ..acc], count + 1)
+		}
 }
 handle = (req: http.Request, body) {
- { req.target == "/ignore" || req.target == "/next" } |> {
-  True -> http.response(http.Status(204))
-  False -> echo_upload(req, body)
- }
+	{ req.target == "/ignore" || req.target == "/next" } |>
+		(True) { http.response(http.Status(204)) }
+		| (False) { echo_upload(req, body) }
 }
 echo_upload = (req: http.Request, body) {
- (bytes, count) = read_pieces(body, [], 0)
- assert(bit_array.byte_size(bytes) == 1048576)
- assert(count >= 256)
- { req.target == "/chunked" } |> {
-  True -> assert(http.header(body.trailers(), "X-End") == option.Some("yes"))
-  False -> assert(body.trailers() == http.Headers([]))
- }
- res = http.response(http.Status(200))
- http.Response(..res, body: bytes)
+	(bytes, count) = read_pieces(body, [], 0)
+	assert(bit_array.byte_size(bytes) == 1048576)
+	assert(count >= 256)
+	{ req.target == "/chunked" } |>
+		(True) {
+			assert(
+				http.header(body.trailers(), "X-End") == option.Some("yes"),
+			)
+		}
+		| (False) { assert(body.trailers() == http.Headers([])) }
+	res = http.response(http.Status(200))
+	http.Response(..res, body = bytes)
 }
 
 main = () {
- listener = net.listen("127.0.0.1", 0)
- stdio.print("listening " <> core.inspect(net.local_port(listener)))
- http.serve_stream(listener, handle)
+	listener = net.listen("127.0.0.1", 0)
+	stdio.print(
+		"listening " <> core.inspect(net.local_port(listener)),
+	)
+	http.serve_stream(listener, handle)
 }
 "#,
     )

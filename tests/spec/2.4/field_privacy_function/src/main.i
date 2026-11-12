@@ -4,5 +4,4 @@
 
 read = secret.raw.read
 
-
 main = () { assert(read() == 42) }

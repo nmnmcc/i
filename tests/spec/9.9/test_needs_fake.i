@@ -8,11 +8,8 @@
 )
 
 @host("test:async/v1", "async")
-Later {
-	Later(echo: (text: String) -> String)
-}
+Later = (echo = (String) -> String)
 
-
-main = (later ! Later) {
+main = () <- (later: Later) {
 	task.test(random.from_seed(1), [], () { later.echo("real") })
 }

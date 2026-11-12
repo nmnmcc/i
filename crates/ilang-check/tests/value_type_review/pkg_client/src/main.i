@@ -1,2 +1,4 @@
-((User)=app/model)
-x: User = ("yes",1)
+(
+	(User) = app/model
+)
+x: User = ("yes", 1)

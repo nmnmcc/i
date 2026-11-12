@@ -4,30 +4,24 @@ f = () {
 	[x, ..x] = [1]
 	y = (z, z) = (1, 2)
 	"a" <> w = "ab"
-	(b = (c, b)) = (1, 2)
+	((c, b) = b) = (1, 2)
 	Nil
 }
 
 params = (p, p) { p }
 
-labels = (x = l, y = l) { x }
+labels = (_ = x = l, _ = y = l) { x }
 
-env = (s ! Assert, s) { s }
+env = (s) <- (s: Assert) { s }
 
-typed = (n: Int, n = m) { n }
+typed = (n: Int, _ = n = m) { n }
 
 choices = (v) {
-	v |> {
-		(a, b) | (a, _)           -> a
-		Ok(x) | Error(y)          -> x
-		Ok(x) | Error(x)          -> x
-		[k, ..] | [_, k, ..] | [] -> 0
-	}
+	v |>
+		((a, b) | (a, _)) { a }
+		| (Ok(x) | Error(y)) { x }
+		| (Ok(x) | Error(x)) { x }
+		| ([k, ..] | [_, k, ..] | []) { 0 }
 }
 
-ctor = (v) {
-	v |> {
-		Nope(x) -> x
-		Ok(n)   -> n
-	}
-}
+ctor = (v) { v |> (Nope(x)) { x } | (Ok(n)) { n } }

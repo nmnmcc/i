@@ -8,10 +8,9 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -19,18 +18,24 @@ show = (x) { core.inspect(x) }
 nothing = () { Nil }
 
 test("values_and_errors_go_through", () {
-	check(show(resource.ensure(() { 1 }, nothing)), "1")
+	check(
+		show(resource.ensure(() { 1 }, nothing)),
+		"1",
+	)
 	r = fail.catch(() { resource.ensure(() { fail.raise("e") }, nothing) })
 	check(show(r), "Error(\"e\")")
 	nested = fail.catch(() {
 		resource.ensure(
-			() { resource.ensure(() { fail.raise(1) }, nothing) + 1 }
-			nothing
+			() { resource.ensure(() { fail.raise(1) }, nothing) + 1 },
+			nothing,
 		)
 	})
 	check(show(nested), "Error(1)")
 	// After an error has gone through `ensure`, the program goes on.
-	check(show(resource.ensure(() { 2 }, nothing)), "2")
+	check(
+		show(resource.ensure(() { 2 }, nothing)),
+		"2",
+	)
 })
 
 acquire = () {
@@ -43,9 +48,9 @@ acquire = () {
 	// An error of `open` runs no `release`.
 	o = fail.catch(() {
 		resource.acquire(
-			() { fail.raise("open") }
-			(r) { panic("released") }
-			(r) { r }
+			() { fail.raise("open") },
+			(r) { panic("released") },
+			(r) { r },
 		)
 	})
 	check(show(o), "Error(\"open\")")

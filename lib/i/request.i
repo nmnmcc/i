@@ -1,5 +1,4 @@
 //// Typed requests, cancellation groups and replaceable waits (§9.11).
-
 (
 	i/resource
 )
@@ -34,60 +33,55 @@
 	poll
 )
 
-Await {
-	Await(wait: (ticket: Ticket) -> Nil)
-}
+Await = (wait = (Ticket) -> Nil)
 
-Root {
-	Root(key: Key(Nil))
-}
+Root = (key = Key(Nil))
 
-Owner {
-	Owner(key: Key(Nil), root: Root)
-}
+Owner = (key = Key(Nil), root = Root)
 
-RequestState(A) {
-	Waiting
-	Ready(A)
-	Cancelled
-	Taken
-}
+Waiting = ()
+Ready(A) = (A)
+Cancelled = ()
+Taken = ()
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 
 @external("ilang:request", "open_root")
-new_root: (parent: Key(Nil)) -> Key(Nil)
+new_root: (Key(Nil)) -> Key(Nil)
 
 @external("ilang:request", "close_root")
-end_root: (root: Key(Nil)) -> Nil
+end_root: (Key(Nil)) -> Nil
 
 @external("ilang:request", "open_owner")
-new_owner: (root: Key(Nil)) -> Key(Nil)
+new_owner: (Key(Nil)) -> Key(Nil)
 
 @external("ilang:request", "close_owner")
-end_owner: (owner: Key(Nil)) -> Nil
+end_owner: (Key(Nil)) -> Nil
 
 @external("ilang:request", "count")
-group_count: (owner: Key(Nil)) -> Int
+group_count: (Key(Nil)) -> Int
 
 @external("ilang:request", "count_root")
-root_count: (root: Key(Nil)) -> Int
+root_count: (Key(Nil)) -> Int
 
 @external("ilang:request", "cancel_all")
-cancel_group: (owner: Key(Nil)) -> Nil
+cancel_group: (Key(Nil)) -> Nil
 
 @external("ilang:request", "cancel_all_root")
-cancel_root: (root: Key(Nil)) -> Nil
+cancel_root: (Key(Nil)) -> Nil
 
 @external("ilang:request", "observe_owner")
-observe_owner: (owner: Key(Nil)) -> Request(Nil)
+observe_owner: (Key(Nil)) -> Request(Nil)
 
 @external("ilang:request", "observe_root")
-observe_root: (root: Key(Nil)) -> Request(Nil)
+observe_root: (Key(Nil)) -> Request(Nil)
 
-open_root = (parent ! Root) -> Root ! Root { Root(new_root(parent.key)) }
+open_root = () <- (parent: Root) -> Root { Root(key = new_root(parent.key)) }
 
 close_root = (root: Root) { end_root(root.key) }
 
-open_owner = (root ! Root) -> Owner ! Root { Owner(new_owner(root.key), root) }
+open_owner = () <- (root: Root) -> Owner {
+	Owner(key = new_owner(root.key), root = root)
+}
 
 close_owner = (owner: Owner) { end_owner(owner.key) }
 
@@ -103,16 +97,11 @@ cancel_all = (owner: Owner) { cancel_group(owner.key) }
 
 cancel_all_root = (root: Root) { cancel_root(root.key) }
 
-retain = {
-	value -> value
-}
+retain = (value) { value }
 
 within = (body) {
 	owner = open_owner()
-	resource.ensure(() {
-		! Owner = owner
-		retain(body())
-	}, () { close_owner(owner) })
+	resource.ensure(() { retain(body()) <- (owner) }, () { close_owner(owner) })
 }
 
 wait_none = (owner: Owner) { await_owned(observe_owner(owner.key)) }
@@ -121,40 +110,38 @@ wait_none_root = (root: Root) { await_owned(observe_root(root.key)) }
 
 /// A fresh completed fake, with no group or host id.
 @external("ilang:request", "ready")
-ready(A): (value: A) -> Request(A)
+ready: <A>(A) -> Request(A)
 
 @external("ilang:request", "ticket")
-ticket(A): (r: Request(A)) -> Ticket
+ticket: <A>(Request(A)) -> Ticket
 
 @external("ilang:request", "state")
-read_state(A): (r: Request(A)) -> Result(A, Int)
+read_state: <A>(Request(A)) -> Result(A, Int)
 
 @external("ilang:request", "take")
-take(A): (r: Request(A)) -> A
+take: <A>(Request(A)) -> A
 
 @external("ilang:request", "settled")
-settled: (r: Ticket) -> Bool
+settled: (Ticket) -> Bool
 
 @external("ilang:request", "cancel")
-cancel: (r: Ticket) -> Nil
+cancel: (Ticket) -> Nil
 
-state(A) = (r: Request(A)) -> RequestState(A) {
-	read_state(r) |> {
-		Ok(value) -> Ready(value)
-		Error(0)  -> Waiting
-		Error(1)  -> Cancelled
-		Error(2)  -> Taken
-		Error(_)  -> panic("request: invalid state")
-	}
+state = <A>(r: Request(A)) -> RequestState(A) {
+	read_state(r) |>
+		(Ok(value)) { Ready(value) }
+		| (Error(0)) { Waiting }
+		| (Error(1)) { Cancelled }
+		| (Error(2)) { Taken }
+		| (Error(_)) { panic("request: invalid state") }
 }
 
 /// Borrows the producer; cancelling this waiter does not cancel its work.
-await = (r, waiter ! Await) {
+await = (r) <- (waiter: Await) {
 	waiter.wait(ticket(r))
-	state(r) |> {
-		Waiting -> panic("request: wait returned early")
-		_       -> take(r)
-	}
+	state(r) |>
+		(Waiting) { panic("request: wait returned early") }
+		| (_) { take(r) }
 }
 
 /// Owns a non-resource-producing operation through all exits.
@@ -162,7 +149,7 @@ await_owned = (r) { resource.ensure(() { await(r) }, () { cancel(ticket(r)) }) }
 
 /// Waits through answers of unlisted requests; terminal tickets return now.
 @external("ilang:request", "wait_any")
-wait_any: (rs: List(Ticket)) -> Nil
+wait_any: (List(Ticket)) -> Nil
 
 /// Gives the host a progress turn even when no request is outstanding.
 @external("ilang:request", "poll")
@@ -177,37 +164,34 @@ entry_root: () -> Key(Nil)
 entry_end: () -> Nil
 
 _entry = (body) {
-	root = Root(entry_root())
-	owner = Owner(new_owner(root.key), root)
-	resource.ensure(() {
-		! Root = root
-		! Owner = owner
-		! Await = Await((r) { wait_any([r]) })
-		retain(body())
-	}, () { entry_end() })
+	root = Root(key = entry_root())
+	owner = Owner(key = new_owner(root.key), root = root)
+	resource.ensure(
+		() {
+			retain(body()) <- (root, owner, Await(wait = (r) { wait_any([r]) }))
+		},
+		() { entry_end() },
+	)
 }
 
 // Plan factories keep replacement values ordinary, including adapter seeds.
 _provider_root = (seeds: List(Root), key: Key(Nil)) -> Root {
-	seeds |> {
-		[root] -> root
-		[]     -> Root(key)
-		_      -> panic("provider: invalid root seed")
-	}
+	seeds |>
+		([root]) { root }
+		| ([]) { Root(key = key) }
+		| (_) { panic("provider: invalid root seed") }
 }
 
-_provider_owner = (seeds: List(Owner), root ! Root) -> Owner ! Root {
-	seeds |> {
-		[owner] -> owner
-		[]      -> Owner(new_owner(root.key), root)
-		_       -> panic("provider: invalid owner seed")
-	}
+_provider_owner = (seeds: List(Owner)) <- (root: Root) -> Owner {
+	seeds |>
+		([owner]) { owner }
+		| ([]) { Owner(key = new_owner(root.key), root = root) }
+		| (_) { panic("provider: invalid owner seed") }
 }
 
 _provider_await = (seeds: List(Await)) -> Await {
-	seeds |> {
-		[waiter] -> waiter
-		[]       -> Await((r) { wait_any([r]) })
-		_        -> panic("provider: invalid await seed")
-	}
+	seeds |>
+		([waiter]) { waiter }
+		| ([]) { Await(wait = (r) { wait_any([r]) }) }
+		| (_) { panic("provider: invalid await seed") }
 }

@@ -1,5 +1,6 @@
 Schema(User, _) = user
-Box(List(A)) { B(Int) }
+B = (Int)
+Box(List(A)) = B
 value = (p: User, q: p.name) { q }
 macro = (x: m(Int, 3, "x"), y: a.m(Int)) { x }
 f(x)

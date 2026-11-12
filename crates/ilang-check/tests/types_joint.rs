@@ -40,7 +40,7 @@ fn alias(c: &Checked, name: &str) -> String {
 fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
     // §2.2: no reconstruction defaults an existing Con's set to All.
     let (_, c) = good(
-        "v=\"GET\"\nx:v=\"GET\"\nMethod=v\nBox(A){Box(value:A)}\nboxed=Box(8080)\nBox(Port)=boxed\nPair(A,B)=(A,B)\nparts=(\"GET\",8080)\nPair(Verb,Number)=parts\nchoice=True |> {True -> Box(1) False -> Box(2)}\nBox(Choice)=choice\nConfig(A,B){Config(method:A,port:B)}\nconfig=Config(\"GET\",8080)\nConfigType=config\nagain:ConfigType=Config(\"GET\",8080)",
+        "v = \"GET\"\nx: v = \"GET\"\nMethod = v\nBox(A) = (value = A)\nboxed = Box(value = 8080)\nBox(Port) = boxed\nPair(A, B) = { (A, B) }\nparts = (\"GET\", 8080)\nPair(Verb, Number) = parts\nchoice = True |> (True) { Box(value = 1) } | (False) { Box(value = 2) }\nBox(Choice) = choice\nConfig(A, B) = (method = A, port = B)\nconfig = Config(method = \"GET\", port = 8080)\nConfigType = config\nagain: ConfigType = Config(method = \"GET\", port = 8080)",
     );
     for (name, want) in [
         ("Method", "\"GET\""),
@@ -52,19 +52,19 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
     ] {
         assert_eq!(alias(&c, name), want);
     }
-    let (_, c) = good("Header(A)=(A,\"GET\")\nv=(8080,\"GET\")\nHeader(Port)=v");
+    let (_, c) = good("Header(A) = { (A, \"GET\") }\nv = (8080, \"GET\")\nHeader(Port) = v");
     assert_eq!(alias(&c, "Port"), "8080");
     bad(
-        "Header(A)=(A,\"GET\")\nv=(8080,\"POST\")\nHeader(Port)=v",
+        "Header(A) = { (A, \"GET\") }\nv = (8080, \"POST\")\nHeader(Port) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     bad("v=\"GET\"\nx:v=\"POST\"", code::TYPE_MISMATCH);
     bad(
-        "Box(A){Box(A)}\nv=Box(1)\nBox(Item)=v\nx:Item=2",
+        "Box(A) = (A)\nv = Box(1)\nBox(Item) = v\nx: Item = 2",
         code::TYPE_MISMATCH,
     );
     bad(
-        "Box(A){Box(A)}\nv=True |> {True -> Box(1) False -> Box(2)}\nBox(Item)=v\nx:Item=3",
+        "Box(A) = (A)\nv = True |> (True) { Box(1) } | (False) { Box(2) }\nBox(Item) = v\nx: Item = 3",
         code::TYPE_MISMATCH,
     );
     let (_, c) = good("v: Int - 0=1\nNonzero=v\nx:Nonzero=2");
@@ -76,9 +76,9 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
 fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
     // J2: inferred access parts come from the bound forms, known parts separately.
     good(
-        "Box(A){Box(value:A)}\ncopy=(s:String){x=\"a\"=s\np=(Box(x),0).0.value\nq:p=\"b\"\nq}\nanswer=(){copy(\"a\")}",
+        "Box(A) = (value = A)\ncopy = (s: String) {\n\tx = \"a\" = s\n\tp = (Box(value = x), 0).0.value\n\tq: p = \"b\"\n\tq\n}\nanswer = () { copy(\"a\") }",
     );
-    good("apply(A,B)=(x:A,f:(A)->B){f(x)}\nf=(){apply(\"a\",(x){y:x=\"b\" y})}");
+    good("apply = <A, B>(x: A, f: (A) -> B) { f(x) }\nf = () {\n\tapply(\"a\", (x) {\n\t\ty: x = \"b\"\n\t\ty\n\t})\n}");
     bad(
         "Sink(A){Sink(put:(A)->Nil)}\nsink:Sink(\"GET\"|\"POST\")=Sink((x:\"GET\"|\"POST\"){Nil})\nbad=(){sink.put(\"DELETE\")}",
         code::TYPE_MISMATCH,
@@ -168,7 +168,7 @@ fn j6_early_context_provenance_wins_over_literal_boundary_checks() {
         "v=1\nA=v\n@external(\"env\",\"f\")\nf:()->A",
         code::VALUE_TYPE_PLACE,
     );
-    bad("v=1\nA=v\nT{T(A)}", code::VALUE_TYPE_PLACE);
+    bad("v = 1\nA = v\nT = (A)", code::VALUE_TYPE_PLACE);
     bad("v=1\nA=v\nf:()->Nil!A=(){Nil}", code::VALUE_TYPE_PLACE);
     // A scheme that already needs an environment can still be read normally.
     good("Env{Env}\nf=(e!Env){e}\ng:f=(e!Env){e}");
@@ -191,7 +191,7 @@ fn j7_invariant_scheme_reads_keep_fresh_instances_and_weak_sharing() {
 
 #[test]
 fn joint_queries_keep_full_literal_aliases_and_nested_head_targets() {
-    let source = "Box(A){Box(A)}\nv=Box(\"GET\")\nBox(Method)=v\nx:Method=\"GET\"";
+    let source = "Box(A) = (A)\nv = Box(\"GET\")\nBox(Method) = v\nx: Method = \"GET\"";
     let (g, c) = good(source);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");

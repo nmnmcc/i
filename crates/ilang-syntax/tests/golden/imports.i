@@ -1,11 +1,16 @@
 //// The module.
 //// Second line.
- (
-  i/fail
-  decode = json/decode
-  opt = (Option, Some) = std/option
-  (a, B) = x/y/z,
+(
+	i/fail
+	decode = json/decode
+	opt = (Option, Some) = std/option
+	(a, B) = x/y/z
 )
- (main, User(..), Thing)
+
+(
+	main
+	User(..)
+	Thing
+)
 
 main = () { Nil }

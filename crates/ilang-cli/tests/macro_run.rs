@@ -1258,7 +1258,7 @@ fn item_phase_runs_imported_calls_and_preserves_written_types() {
     .unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nm.emit(42)\n@m.keep\nf = () { 1 }\n@m.empty\nT { T }\n",
+        "(\n\tm = app/macros\n)\nm.emit(42)\n@m.keep\nf = () { 1 }\n@m.empty\nT = ()\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);

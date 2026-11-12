@@ -9,9 +9,10 @@ f = (m: Int) {
 }
 
 g = (m) {
-	! m.S = S(get: () { 1 })
-	h = (s ! m.S) { 1 }
-	h
+	{
+		h = () <- (s: m.S) { 1 }
+		h
+	} <- (S(get = () { 1 }))
 }
 
 // Not covered before the local is bound: the module.

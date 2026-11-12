@@ -138,13 +138,10 @@ Export `Stream` without its constructor; export `Step(..)`. Export exactly the
 functions below. `Step` is data; its `Next` tail describes later calls.
 
 ```i
-Stream(A, E, N) {
-  Stream(() -> Step(A, E, N) ^ E ! N, (N) -> Nil)
-}
-Step(A, E, N) {
-  Done
-  Next(A, Stream(A, E, N))
-}
+Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> Nil)
+Done = ()
+Next(A, E, N) = (A, Stream(A, E, N))
+Step(A, E, N) = Done | Next(A, E, N)
 ```
 
 ```text
@@ -254,23 +251,28 @@ common environment in their constructors; this is a deliberate ergonomic cost.
 Implementation witnesses, using ordinary constructors and calls:
 
 ```i
-make(A, E, N) = (step: () -> Step(A, E, N) ^ E ! N) -> Stream(A, E, N) {
-  Stream(step, (_: N) { Nil })
+make = <A, E, N>(step: () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
+	A,
+	E,
+	N,
+) { Stream(step, (_: N) { Nil }) }
+pull = <A, E, N>(stream: Stream(A, E, N)) -> Step(A, E, N) {
+	Stream(step, _) = stream
+	step()
 }
-pull(A, E, N) = (stream: Stream(A, E, N)) -> Step(A, E, N) ^ E ! N {
-  Stream(step, _) = stream
-  step()
-}
-map_environment(A, E, N, M) = (
-  stream: Stream(A, E, N),
-  run: { (body: () -> Step(A, E, N) ^ E ! N) -> Step(A, E, N) ^ E ! M }
+map_environment = <A, E, N, M>(
+	stream: Stream(A, E, N),
+	run: (() <- (Fail(E), ..N) -> Step(A, E, N)) <- (Fail(E), ..M) -> Step(
+		A,
+		E,
+		N,
+	)
 ) -> Stream(A, E, M) {
-  make(() {
-    run(() { pull(stream) }) |> {
-      Done -> Done
-      Next(x, tail) -> Next(x, map_environment(tail, run))
-    }
-  })
+	make(() {
+		run(() { pull(stream) }) |>
+			(Done) { Done }
+			| (Next(x, tail)) { Next(x, map_environment(tail, run)) }
+	})
 }
 ```
 
@@ -342,13 +344,10 @@ Use the independent review's factory probe as the compiler regression gate,
 written here in the accepted syntax with Stream/Step as defined in §3.1:
 
 ```i
-new(A, N) = () -> Stream(A, Never, N) {
-  Stream(
-    () -> Step(A, Never, N) ! N { Done },
-    (_: N) { Nil }
-  )
+new = <A, N>() -> Stream(A, Never, N) {
+	Stream(() -> Step(A, Never, N) { Done }, (_: N) { Nil })
 }
-Bias { Bias(value: Int) }
+Bias = (value = Int)
 needs_bias = () -> Stream(Int, Never, Bias) { new() }
 ```
 
@@ -429,23 +428,20 @@ equal(A): (first: Sequence(A), second: Sequence(A)) -> Bool
 One implementable private layout is:
 
 ```i
-Sequence(A) { Sequence(Tree(A)) }
-Node(A) {
-  Leaf(A)
-  Branch2(Int, Node(A), Node(A))
-  Branch3(Int, Node(A), Node(A), Node(A))
-}
-Digit(A) {
-  One(Node(A))
-  Two(Node(A), Node(A))
-  Three(Node(A), Node(A), Node(A))
-  Four(Node(A), Node(A), Node(A), Node(A))
-}
-Tree(A) {
-  EmptyTree
-  Single(Node(A))
-  Deep(Int, Digit(A), Tree(A), Digit(A))
-}
+Sequence(A) = (Tree(A))
+Leaf(A) = (A)
+Branch2(A) = (Int, Node(A), Node(A))
+Branch3(A) = (Int, Node(A), Node(A), Node(A))
+Node(A) = Leaf(A) | Branch2(A) | Branch3(A)
+One(A) = (Node(A))
+Two(A) = (Node(A), Node(A))
+Three(A) = (Node(A), Node(A), Node(A))
+Four(A) = (Node(A), Node(A), Node(A), Node(A))
+Digit(A) = One(A) | Two(A) | Three(A) | Four(A)
+EmptyTree = ()
+Single(A) = (Node(A))
+Deep(A) = (Int, Digit(A), Tree(A), Digit(A))
+Tree(A) = EmptyTree | Single(A) | Deep(A)
 ```
 
 The Ints cache leaf counts, not node counts. A Leaf has measure 1; each branch
@@ -546,7 +542,9 @@ and exactly these functions. Unicode and NUL are ordinary path characters in
 this lexical module. An IO boundary may reject a path for its own reasons.
 
 ```i
-RelativeError { DifferentRoots UnknownParent }
+DifferentRoots = ()
+UnknownParent = ()
+RelativeError = DifferentRoots | UnknownParent
 ```
 
 ```text
@@ -631,48 +629,58 @@ over all short strings from a small alphabet including `/`, `.`, `a`, `é`, `\\`
 are editable candidate data; only parse/build produce a validated Uri.
 
 ```i
-Uri { Uri(Parts) }
-Parts {
-  Parts(
-    scheme: Option(String), authority: Option(Authority), path: String,
-    query: Option(String), fragment: Option(String)
-  )
-}
-Authority {
-  Authority(userinfo: Option(String), host: Host, port: Option(String))
-}
-Host {
-  RegName(String)
-  IpLiteral(String)
-}
-UriPart {
-  WholePart
-  SchemePart
-  AuthorityPart
-  UserInfoPart
-  HostPart
-  PortPart
-  PathPart
-  QueryPart
-  FragmentPart
-}
-UriProblem {
-  BadCharacter
-  BadPercent
-  BadScheme
-  BadAuthority
-  BadHost
-  BadPort
-  BadPath
-  RelativeBase
-}
-UriError { UriError(part: UriPart, offset: Int, problem: UriProblem) }
-CodecError {
-  BadEscape(offset: Int)
-  NonAscii(offset: Int)
-  InvalidUtf8
-  UnalignedBits
-}
+Uri = (Parts)
+Parts = (
+	scheme = Option(String),
+	authority = Option(Authority),
+	path = String,
+	query = Option(String),
+	fragment = Option(String),
+)
+Authority = (userinfo = Option(String), host = Host, port = Option(String))
+RegName = (String)
+IpLiteral = (String)
+Host = RegName | IpLiteral
+WholePart = ()
+SchemePart = ()
+AuthorityPart = ()
+UserInfoPart = ()
+HostPart = ()
+PortPart = ()
+PathPart = ()
+QueryPart = ()
+FragmentPart = ()
+UriPart = WholePart
+	| SchemePart
+	| AuthorityPart
+	| UserInfoPart
+	| HostPart
+	| PortPart
+	| PathPart
+	| QueryPart
+	| FragmentPart
+BadCharacter = ()
+BadPercent = ()
+BadScheme = ()
+BadAuthority = ()
+BadHost = ()
+BadPort = ()
+BadPath = ()
+RelativeBase = ()
+UriProblem = BadCharacter
+	| BadPercent
+	| BadScheme
+	| BadAuthority
+	| BadHost
+	| BadPort
+	| BadPath
+	| RelativeBase
+UriError = (part = UriPart, offset = Int, problem = UriProblem)
+BadEscape = (offset = Int)
+NonAscii = (offset = Int)
+InvalidUtf8 = ()
+UnalignedBits = ()
+CodecError = BadEscape | NonAscii | InvalidUtf8 | UnalignedBits
 ```
 
 ```text
@@ -998,13 +1006,12 @@ nonexistent modules. Names use qualified modules unless imported explicitly.
 and helper are:
 
 ```i
-BadTree(A) { BadEmpty BadDeep(List(A), BadTree(BadNode(A))) }
-BadNode(A) { BadNode(A, A) }
-depth(A) = (tree: BadTree(A)) -> Int {
-  tree |> {
-    BadEmpty -> 0
-    BadDeep(_, middle) -> 1 + depth(middle)
-  }
+BadEmpty = ()
+BadDeep(A) = (List(A), BadTree(BadNode(A)))
+BadTree(A) = BadEmpty | BadDeep(A)
+BadNode(A) = (A, A)
+depth = <A>(tree: BadTree(A)) -> Int {
+	tree |> (BadEmpty) { 0 } | (BadDeep(_, middle)) { 1 + depth(middle) }
 }
 ```
 
@@ -1032,16 +1039,18 @@ cannot be erased by an intermediate combinator.
 **Soundness/source conflict: service variance hidden in a nominal wrapper.**
 
 ```i
-Sink(A) { Sink(put: (A) -> Nil) }
-PlainStream(E, N) { PlainStream(() -> Nil ^ E ! N) }
-need_int = (s ! Sink(Int)) { s.put(1) }
-coerce = (source: PlainStream(Never, Sink(Int))) -> PlainStream(Never, Sink(Never)) {
-  source
-}
+Sink(A) = (put = (A) -> Nil)
+PlainStream(E, N) = (() <- (Fail(E), ..N) -> Nil)
+need_int = () <- (s: Sink(Int)) { s.put(1) }
+coerce = (source: PlainStream(Never, Sink(Int))) -> PlainStream(
+	Never,
+	Sink(Never),
+) { source }
 unsafe = () {
-  ! Sink(Never) = Sink((x: Never) -> Nil { x |> {} })
-  PlainStream(run) = coerce(PlainStream(need_int))
-  run()
+	{
+		PlainStream(run) = coerce(PlainStream(need_int))
+		run()
+	} <- (Sink(put = (x: Never) -> Nil { core.never(x) }))
 }
 ```
 
@@ -1125,7 +1134,13 @@ no imported Haskell laziness claim. The coordinator accepted this cost.
 **Soundness of validation and fidelity: delimiter injection.**
 
 ```i
-candidate = uri.Parts(None, None, "a:b", None, None)
+candidate = uri.Parts(
+	scheme = None,
+	authority = None,
+	path = "a:b",
+	query = None,
+	fragment = None,
+)
 ```
 
 An unchecked public Uri constructor, or print-then-parse builder, would change

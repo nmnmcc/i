@@ -2,7 +2,6 @@
 // expect: stop "bit array: float is not finite"
 // at: spec/main:11:6
 // at: spec/main:17:2
-
 make = (n: Int) {
 	b = <<1:u1>>
 	c = <<0:u7>>
@@ -11,7 +10,6 @@ make = (n: Int) {
 	x = <<1.0e10:f16be>>
 	x
 }
-
 
 main = () {
 	make(-3)

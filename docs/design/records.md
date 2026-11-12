@@ -11,9 +11,14 @@ The examples use the new syntax of `docs/design/syntax.md`.
 i needs records with fields that are not declared in advance:
 
 ```i
-ada = ( name: "ada", age: 36 )          // ( age: 36, name: "ada" )
-name_of = (r) { r.name }                 // (r: ( name: A )) -> A
-name_of(ada)                             // "ada"
+ada = (
+	name = "ada", // ( age: 36, name: "ada" )
+	age = 36,
+)
+name_of = (r) { r.name } // (r: ( name: A )) -> A
+name_of(
+	ada, // "ada"
+)
 ```
 
 A literal has T1's one-value type, so a record literal has a record of one-value types: `( age: 36, name: "ada" )` is a subtype of `( age: Int, name: String )`. The examples below show these types where they matter.
@@ -240,9 +245,9 @@ Expect changes in the `.out` files of schemes: `(u) { u.name }` used to be an er
 ### 5.1 The library types
 
 ```i
-get(K, V): (r: ( K: V ), key: K) -> V
-put(R, K, V): (r: R & Record, key: K, value: V) -> ( ..R, K: V )
-remove(R, K): (r: R & Record, key: K) -> ( ..R, -K )
+get: <K, V>((k = V), K) -> V
+put: <R, K, V>(R & Record, K, V) -> (k = V)
+remove: <R, K>(R & Record, K) -> ()
 ```
 
 ### 5.2 The rules
@@ -314,8 +319,8 @@ remove(R, K): (r: R & Record, key: K) -> ( ..R, -K )
 So a body that writes `K` and then `J` is checked against "they may be equal":
 
 ```i
-both(K, J) = (r: Record, k: K, j: J) -> ( K: Int, J: String ) {
-  r |> record.put(k, 1) |> record.put(j, "s")
+both = <K, J>(r: Record, k: K, j: J) -> (k = Int, j = String) {
+	r |> record.put(k, 1) |> record.put(j, "s")
 }
 ```
 
@@ -355,9 +360,13 @@ Without L2, the body could supply the value. In `g(K) = (r: ( K: Int ), k: K) ->
 With that type, and `put` replacing the field at run time:
 
 ```i
-bump(R) = (r: R) -> R & (age: String) { record.put(r, "age", "old") }
-x = bump((age: 36))     // (age: 36 & String), which has no values
-result = x.age + 1      // checks, and at run time adds 1 to "old"
+bump = <R>(r: R) -> R & (age = String) { record.put(r, "age", "old") }
+x = bump(
+	(
+		age = 36, // (age: 36 & String), which has no values
+	),
+)
+result = x.age + 1 // checks, and at run time adds 1 to "old"
 ```
 
 With `( ..R, age: String )`, `x` has the type `( age: String )`, and the last line is a compile error. A `put` that stops the program on a key that is already there would make `R & ( K: V )` sound, but width subtyping hides fields: a `{ name, age }` value passed as `{ name }` would make code stop that looks correct.
@@ -365,9 +374,21 @@ With `( ..R, age: String )`, `x` has the type `( age: String )`, and the last li
 ### 5.7 The rigid key and forgetting
 
 ```i
-twist(K) = (r: (a: Int), k: K) -> (..(a: Int), K: "s") { record.put(r, k, "s") }
-bad = twist((a: 1), "a").a + 1    // E0501: the type is (a: "s")
-good = twist((a: 1), "b").a + 1   // correct: the type is (a: Int, b: "s")
+twist = <K>(r: (a = Int), k: K) -> (k = "s") { record.put(r, k, "s") }
+bad = twist(
+	(
+		a = 1, // E0501: the type is (a: "s")
+	),
+	"a",
+).a +
+	1
+good = twist(
+	(
+		a = 1, // correct: the type is (a: Int, b: "s")
+	),
+	"b",
+).a +
+	1
 ```
 
 The `->` part is needed: it is what makes `K` a label parameter (L1). Without it, `K` is an ordinary type variable, and the call of `put` in the body is E0541 with the hint of part 11.
@@ -375,9 +396,12 @@ The `->` part is needed: it is what makes `K` a label parameter (L1). Without it
 The result type of `twist` keeps `Without(( a: Int ), {K})` as a form (E4 does not apply, because `a` may be `K`), so each call works it out exactly after `K` is fixed. Inside the body, reading `.a` after the `put` is E0544, "the key `K` may be `a`":
 
 ```i
-peek(K) = (r: ( a: Int ), k: K) -> (( K: "s" ), Int) {
-  x = record.put(r, k, "s")
-  (x, x.a)                    // E0544 at .a
+peek = <K>(r: (a = Int), k: K) -> ((k = "s"), Int) {
+	x = record.put(r, k, "s")
+	(
+		x, // E0544 at .a
+		x.a,
+	)
 }
 ```
 
@@ -386,14 +410,20 @@ The constraint is `Without(R2, {K}) & ( K: "s" ) <: ( a: A )`, both members of t
 ### 5.8 A schema library in plain i
 
 ```i
-Schema(A) { Schema(decode: (Json) -> A ^ DecodeError) }
+Schema(A) = (decode = (Json) <- (Fail(DecodeError)) -> A)
 
-object: Schema(Record) = Schema(decode: (j) { () })
+object: Schema(Record) = Schema(decode = (j) { () })
 
-field(R, K, V) = (s: Schema(R), key: K, value: Schema(V)) -> Schema(( ..R, K: V )) {
-  Schema(decode: (j) {
-    s.decode(j) |> record.put(key, value.decode(json.at(j, key)))
-  })
+field = <R, K, V>(s: Schema(R), key: K, value: Schema(V)) -> Schema((k = V)) {
+	Schema(
+		decode = (j) {
+			s.decode(j)
+				|> record.put(
+					key,
+					value.decode(json.at(j, key)),
+				)
+		},
+	)
 }
 
 user = object |> field("name", string) |> field("age", int)
@@ -419,19 +449,40 @@ The json-schema track needs a codec that decodes and encodes. With one type para
 A codec with two type parameters works, with `&` and no forgetting on the encode side. `D` is the type the decoder makes, and `E` is the type the encoder reads from. The decoded type comes first, so that the plan's alias pattern `Codec(User, _) = user` reads the record type from the first argument:
 
 ```i
-Codec(D, E) { Codec(decode: (Json) -> D ^ DecodeError, encode: (E) -> Json) }
+Codec(D, E) = (
+	decode = (Json) <- (Fail(DecodeError)) -> D,
+	encode = (E) -> Json,
+)
 
-object: Codec(Record, Record) = Codec(decode: (j) { () }, encode: (x) { json.object([]) })
+object: Codec(Record, Record) = Codec(
+	decode = (j) { () },
+	encode = (x) { json.object([]) },
+)
 
-field(R, E, K, V) = (s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec(( ..R, K: V ), E & ( K: V )) {
-  Codec(
-    decode: (j) { s.decode(j) |> record.put(key, value.decode(json.at(j, key))) },
-    encode: (x) { json.set(s.encode(x), key, value.encode(record.get(x, key))) },
-  )
+field = <R, E, K, V>(s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec(
+	(k = V),
+	E & (k = V),
+) {
+	Codec(
+		decode = (j) {
+			s.decode(j)
+				|> record.put(
+					key,
+					value.decode(json.at(j, key)),
+				)
+		},
+		encode = (x) {
+			json.set(
+				s.encode(x),
+				key,
+				value.encode(record.get(x, key)),
+			)
+		},
+	)
 }
 
 user = object |> field("name", string) |> field("age", int)
-Codec(User, _) = user          // User is (age: Int, name: String)
+Codec(User, _) = user // User is (age: Int, name: String)
 ```
 
 - `Codec` is covariant in `D` and contravariant in `E` (`infer.rs:2472`).
@@ -470,9 +521,13 @@ A written type only adds information (§4.7), so it never turns a correct `.f` i
 A custom value that reaches a record function is a mismatch with a hint:
 
 ```i
-User { User(name: String) }
-name_of = (u) { u.name }        // (u: ( name: A )) -> A
-name_of(User("bo"))             // E0501
+User = (name = String)
+name_of = (u) { u.name } // (u: ( name: A )) -> A
+name_of(
+	User(
+		name = "bo", // E0501
+	),
+)
 ```
 
 > `User` is a custom type, not a record. `.name` here reads a record field because `u` has no known type (§4.8 rule 13b). Write `(u: User) { u.name }` to read the field of the constructor.
@@ -660,36 +715,43 @@ A `.f` on a record is a binary search with `ref.eq` and string compares: slower 
 
 ```i
 //// Records (§4.9): reading and setting fields by a key that is one known string.
-
-(get, put, remove, has, keys, size, texts)
+(
+	get
+	put
+	remove
+	has
+	keys
+	size
+	texts
+)
 
 /// The field `key` of `r`.
 @external("ilang:record", "get")
-get(K, V): (r: ( K: V ), key: K) -> V
+get: <K, V>((k = V), K) -> V
 
 /// `r` with the field `key` set to `value`: added, or put in place of the field that is there.
 @external("ilang:record", "put")
-put(R, K, V): (r: R & Record, key: K, value: V) -> ( ..R, K: V )
+put: <R, K, V>(R & Record, K, V) -> (k = V)
 
 /// `r` without the field `key`, if it has one.
 @external("ilang:record", "remove")
-remove(R, K): (r: R & Record, key: K) -> ( ..R, -K )
+remove: <R, K>(R & Record, K) -> ()
 
 /// Whether `r` has a field `key`. It may have more fields than its type shows.
 @external("ilang:record", "has")
-has: (r: Record, key: String) -> Bool
+has: (Record, String) -> Bool
 
 /// The labels of `r`, in the order of their bytes.
 @external("ilang:record", "keys")
-keys: (r: Record) -> List(String)
+keys: (Record) -> List(String)
 
 /// The number of fields of `r`.
 @external("ilang:record", "size")
-size: (r: Record) -> Int
+size: (Record) -> Int
 
 /// Each label of `r`, in the order of its bytes, with the text form of its value (§11.8).
 @external("ilang:record", "texts")
-texts: (r: Record) -> List((String, String))
+texts: (Record) -> List((String, String))
 ```
 
 - `r |> record.put("age", 37)` works because `|>` is a call.
@@ -700,8 +762,12 @@ texts: (r: Record) -> List((String, String))
 - An `update` is plain i:
 
 ```i
-update(R, K, A, B) = (r: R & ( K: A ), key: K, f: (A) -> B) -> ( ..R, K: B ) {
-  record.put(r, key, f(record.get(r, key)))
+update = <R, K, A, B>(r: R & (k = A), key: K, f: (A) -> B) -> (k = B) {
+	record.put(
+		r,
+		key,
+		f(record.get(r, key)),
+	)
 }
 ```
 
@@ -731,8 +797,11 @@ T3 takes the block **E0540–E0549**, whatever order T1, T2 and T3 merge in. T1 
 An example of a union key, in the new syntax:
 
 ```i
-key = flag |> { True -> "a"  False -> "b" }   // known type "a" | "b"
-record.get(r, key)                            // E0541
+key = flag |> (True) { "a" } | (False) { "b" } // known type "a" | "b"
+record.get(
+	r, // E0541
+	key,
+)
 ```
 
 There is no error code for a spread with a type variable in an input place. Such a spread is checked with the sound rule R-without-right, which may only reject programs, so no extra rule is needed.
@@ -1178,9 +1247,9 @@ claim to repair the existing nominal/function algebra.
 ### 20.1 Root cause and choice
 
 ```i
-Gone(A) = ( ..( a: Never ) | ( ..A, b: Never ), -a )
+Gone(A) = { () }
 Empty = Gone(Record)
-impossible = (x: Empty) { x |> {} }
+impossible = (x: Empty) { core.never(x) }
 ```
 
 `Gone(Record)` denotes **Never**: neither alternative has a record value, and
@@ -1379,8 +1448,8 @@ not graph identity or one spelling's distribution, defines closed acceptance.
 These two previously rejected closed annotations now pass:
 
 ```i
-wrap_union = (x: Int | String) -> (a: Int) | (a: String) { (a: x) }
-pair = () -> (data: (Int, Int)) | (error: String) { (data: (1, 2)) }
+wrap_union = (x: Int | String) -> (a = Int) | (a = String) { (a = x) }
+pair = () -> (data = (Int, Int)) | (error = String) { (data = (1, 2)) }
 ```
 
 `wrap` with result `( a: Int | String )` has the same verdict as
@@ -1407,9 +1476,9 @@ runtime.
 The recommended written version is:
 
 ```i
-choose_written(R) = (c: Bool, r: R & Record) -> ( ..R, a: 1 ) | ( b: 2 ) {
-  updated: ( ..R, a: 1 ) = record.put(r, "a", 1)
-  c |> { True -> updated  False -> ( b: 2 ) }
+choose_written = <R>(c: Bool, r: R & Record) -> (a = 1) | (b = 2) {
+	updated: (a = 1) = record.put(r, "a", 1)
+	c |> (True) { updated } | (False) { (b = 2) }
 }
 ```
 
@@ -1426,12 +1495,11 @@ uncovered field case. Resource exhaustion has U6's separate diagnostic.
 **Every-position closed unions.** This complete example is accepted:
 
 ```i
-Schema(A) { Schema(decode: () -> A) }
+Schema(A) = (decode = () -> A)
 make = (c: Bool) {
-  c |> {
-    True -> Schema(decode: () { (a: 1) })
-    False -> Schema(decode: () { (a: "x") })
-  }
+	c |>
+		(True) { Schema(decode = () { (a = 1) }) }
+		| (False) { Schema(decode = () { (a = "x") }) }
 }
 schema = make(True)
 Schema(Row) = schema
@@ -1453,8 +1521,8 @@ whole upper bound on x does not select an alternative. Calling it with a
 closed `( a: 1 )` passes. In contrast:
 
 ```i
-select(A, B) = (x) -> ( a: A ) | ( a: B ) { x }
-bad = select(( a: 1 ))
+select = <A, B>(x) -> (a = A) | (a = B) { x }
+bad = select((a = 1))
 ```
 
 The function declaration may retain its whole union constraint, but this call
@@ -1657,7 +1725,7 @@ algebraic reasoning, not compiler runs):
 i code:
 
 ```i
-map_pair = (r, fa, fb) { (a: fa(r.a), b: fb(r.b)) }
+map_pair = (r, fa, fb) { (a = fa(r.a), b = fb(r.b)) }
 ```
 
 It has a record requirement for a and b and a record of the two result types.
@@ -2209,8 +2277,8 @@ and a record containing `(A) -> A` in another. With Cell from J7, its source
 shape is:
 
 ```i
-shared(A) = (c: Cell(A), f: (A) -> A, flag: Bool) {
-  flag |> { True -> ( cell: c )  False -> ( use: f ) }
+shared = <A>(c: Cell(A), f: (A) -> A, flag: Bool) {
+	flag |> (True) { (cell = c) } | (False) { (use = f) }
 }
 ```
 

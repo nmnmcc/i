@@ -1,14 +1,11 @@
-Svc(A) {
-	Svc(() -> A)
-}
+Svc(A) = (() -> A)
 
-Row(N) = () -> Nil ! N
+Row(N) = () <- N -> Nil
 
-bad(N) = (body: Row(N), one: Svc(Int), two: Svc(Nil)) {
+bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	first: N = one
 	second: N = two
 	second
 }
-
 
 main = () { Nil }

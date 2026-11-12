@@ -5,6 +5,4 @@
 
 T = Int
 
-S {
-	S(get: () -> Int)
-}
+S = (get = () -> Int)

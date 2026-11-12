@@ -117,9 +117,10 @@ Export Duration and Instant without constructors. These private definitions have
 one canonical representation per value:
 
 ```i
-Duration { Duration(Int) }
-Instant { Instant(Int) }
-TimeError { DivisionByZero }
+Duration = (Int)
+Instant = (Int)
+DivisionByZero = ()
+TimeError = DivisionByZero
 ```
 
 Export TimeError(..) and exactly these functions. Units are integer counts.
@@ -217,12 +218,34 @@ Date, TimeOfDay, Offset hide constructors. Civil, CalendarError and Weekday
 export constructors. `time` refers to std/time.
 
 ```i
-Date { Date(Int, Int, Int) }
-TimeOfDay { TimeOfDay(Int, Int, Int, Int) }
-Offset { Offset(Int) }
-Civil { Civil(date: Date, time: TimeOfDay) }
-Weekday { Monday Tuesday Wednesday Thursday Friday Saturday Sunday }
-CalendarError { BadMonth BadDay BadHour BadMinute BadSecond BadNanosecond BadOffset BadText }
+Date = (Int, Int, Int)
+TimeOfDay = (Int, Int, Int, Int)
+Offset = (Int)
+Civil = (date = Date, time = TimeOfDay)
+Monday = ()
+Tuesday = ()
+Wednesday = ()
+Thursday = ()
+Friday = ()
+Saturday = ()
+Sunday = ()
+Weekday = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+BadMonth = ()
+BadDay = ()
+BadHour = ()
+BadMinute = ()
+BadSecond = ()
+BadNanosecond = ()
+BadOffset = ()
+BadText = ()
+CalendarError = BadMonth
+	| BadDay
+	| BadHour
+	| BadMinute
+	| BadSecond
+	| BadNanosecond
+	| BadOffset
+	| BadText
 ```
 
 ```text
@@ -356,18 +379,27 @@ failure is a Result containing a message. That keeps parsing deterministic
 provided the callbacks terminate and obey their own contracts.
 
 ```i
-Names { Names(long: String, short: Option(String)) }
-DefinitionError { InvalidName(String) DuplicateName(String) MisplacedRest }
-CliError {
-  BadDefinition(DefinitionError)
-  UnknownOption(index: Int, token: String)
-  MissingValue(index: Int, name: String)
-  UnexpectedValue(index: Int, name: String)
-  RepeatedOption(index: Int, name: String)
-  MissingArgument(name: String)
-  InvalidArgument(index: Int, name: String, text: String, reason: String)
-  ExtraArgument(index: Int, token: String)
-}
+Names = (long = String, short = Option(String))
+InvalidName = (String)
+DuplicateName = (String)
+MisplacedRest = ()
+DefinitionError = InvalidName | DuplicateName | MisplacedRest
+BadDefinition = (DefinitionError)
+UnknownOption = (index = Int, token = String)
+MissingValue = (index = Int, name = String)
+UnexpectedValue = (index = Int, name = String)
+RepeatedOption = (index = Int, name = String)
+MissingArgument = (name = String)
+InvalidArgument = (index = Int, name = String, text = String, reason = String)
+ExtraArgument = (index = Int, token = String)
+CliError = BadDefinition
+	| UnknownOption
+	| MissingValue
+	| UnexpectedValue
+	| RepeatedOption
+	| MissingArgument
+	| InvalidArgument
+	| ExtraArgument
 ```
 
 ```text
@@ -396,16 +428,23 @@ read(A): (parser: Parser(A)) -> Result(A, CliError) ? process.ProcessError ! pro
 A complete typed description, using only nominal constructors and functions:
 
 ```i
-(cli = std/cli, (None) = std/option)
+(
+	cli = std/cli
+	(None) = std/option
+)
 
-Options { Options(jobs: Int, verbose: Bool) }
+Options = (jobs = Int, verbose = Bool)
 
 options = () {
-  cli.map2(
-    cli.option(cli.Names("jobs", None), "Worker count", cli.integer)
-    cli.flag(cli.Names("verbose", None), "Show progress")
-    Options
-  )
+	cli.map2(
+		cli.option(
+			cli.Names(long = "jobs", short = None),
+			"Worker count",
+			cli.integer,
+		),
+		cli.flag(cli.Names(long = "verbose", short = None), "Show progress"),
+		Options,
+	)
 }
 
 example = () { cli.parse(options(), ["--verbose", "--jobs=4"]) }
@@ -501,12 +540,19 @@ callbacks. No general alternative/backtracking combinator is promised.
 This is a representable choice, not a new public type facility:
 
 ```i
-Token { Token(index: Int, text: String) }
-Kind { Flag Required Optional Repeated Positional Remaining }
-Field { Field(name: String, short: Option(String), help: String, kind: Kind) }
-Parser(A) {
-  Parser(List(Field), (List(List(Token))) -> Result((A, List(List(Token))), CliError))
-}
+Token = (index = Int, text = String)
+Flag = ()
+Required = ()
+Optional = ()
+Repeated = ()
+Positional = ()
+Remaining = ()
+Kind = Flag | Required | Optional | Repeated | Positional | Remaining
+Field = (name = String, short = Option(String), help = String, kind = Kind)
+Parser(A) = (
+	List(Field),
+	(List(List(Token))) -> Result((A, List(List(Token))), CliError),
+)
 ```
 
 The scanner builds one bucket of Token values per Field, in metadata order.
@@ -576,13 +622,18 @@ is the public factory. `time` is std/time. Field pairs are ordered and may repea
 Failure is the error severity; it avoids collision with built-in Error.
 
 ```i
-Level { Debug Info Warning Failure }
-Entry {
-  Entry(level: Level, message: String, fields: List((String, String)), at: Option(time.Instant))
-}
-Sink(E, N) {
-  Sink((Level) -> Bool, (Entry) -> Nil ^ E ! N, (N) -> Nil)
-}
+Debug = ()
+Info = ()
+Warning = ()
+Failure = ()
+Level = Debug | Info | Warning | Failure
+Entry = (
+	level = Level,
+	message = String,
+	fields = List((String, String)),
+	at = Option(time.Instant),
+)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
 ```
 
 ```text
@@ -696,24 +747,26 @@ Here is a self-contained reproduction, deliberately using a minimal Entry. The
 same failure was reproduced with the complete four-field Entry of §6.
 
 ```i
-(i/fail)
+(
+	i/fail
+)
 
-Entry { Entry(message: String) }
-Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
+Entry = (message = String)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
 
-make(E, N) = (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N) {
-  Sink(send, (_: N) { Nil })
+make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
+	Sink(send, (_: N) { Nil })
 }
 
-write(E, N) = (entry: Entry, sink ! Sink(E, N)) {
-  Sink(send, _) = sink
-  send(entry)
+write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
+	Sink(send, _) = sink
+	send(entry)
 }
 // Shown: (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
-
 example = () {
-  ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
-  fail.catch(() { write(Entry("seen")) })
+	fail.catch(() { write(Entry(message = "seen")) }) <- (
+		make((entry) { fail.raise(entry.message) }),
+	)
 }
 // Current compiler: E0505 at example; expected Ok/Error value has type
 // Result(Nil, String), with Error("seen") at run time.
@@ -731,11 +784,12 @@ checker, though it is still not a build of this exact baseline.
 An explicit closed instantiation works with the inferred implementation:
 
 ```i
-send: (Entry) -> Nil ^ String ! Sink(String, Never) = write
+send: (Entry) <- (Fail(String), Sink(String, Never)) -> Nil = write
 
 working = () {
-  ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
-  fail.catch(() { send(Entry("seen")) })
+	fail.catch(() { send(Entry("seen")) }) <- (
+		make((entry) { fail.raise(entry.message) }),
+	)
 }
 // Error("seen")
 ```
@@ -758,7 +812,7 @@ this fix. The eventual positive regression must keep the unsafe-row negative
 case rejected:
 
 ```i
-Consumer(A) { Consumer((A) -> Nil) }
+Consumer(A) = ((A) -> Nil)
 
 bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }
 // Must reject: stored environments preserve exact service arguments.
@@ -1126,10 +1180,10 @@ still gives E0501; incompatible installed Sink error arguments give E0515.
 The smallest rejection needs no logging library:
 
 ```i
-S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) -> Nil ! N | S(N) {
-  S(f) = s
-  f()
+S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) -> Nil {
+	S(f) = s
+	f()
 }
 ```
 

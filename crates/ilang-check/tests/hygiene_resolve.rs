@@ -194,7 +194,7 @@ fn made_answer_name_does_not_reach_marked_definition() {
 #[test]
 fn builtin_identity_bypasses_caller_type_shadow() {
     use ilang_syntax::lisp::syntax::ScopeIdentity;
-    let (mut graph, _, _) = common::check_files(&[("src/main.i", "Int { Int }\nf = () { 0 }\n")]);
+    let (mut graph, _, _) = common::check_files(&[("src/main.i", "Int = ()\nf = () { 0 }\n")]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
     let caller = parsed
@@ -347,7 +347,7 @@ fn definition_parameter_moved_to_another_head_is_rejected() {
 fn an_exported_inferred_type_cannot_leak_a_foreign_private_type() {
     let (mut graph, _, _) = common::check_files(&[
         ("src/main.i", "(f)\nf = () { 0 }\n"),
-        ("src/template.i", "Secret { Secret }\n"),
+        ("src/template.i", "Secret = ()\n"),
     ]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
@@ -626,7 +626,7 @@ fn answer_head_owner_survives_marks_and_freshens_but_make_cannot_copy_it() {
 fn an_exported_written_type_cannot_leak_a_foreign_private_type() {
     let (mut graph, _, _) = common::check_files(&[
         ("src/main.i", "(f)\nf: Int = 1\n"),
-        ("src/template.i", "Secret { Secret }\n"),
+        ("src/template.i", "Secret = ()\n"),
     ]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
@@ -712,7 +712,7 @@ fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
 #[test]
 fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
     use ilang_syntax::lisp::syntax::ScopeIdentity;
-    let (mut graph, _, _) = common::check_files(&[("src/main.i", "Option { Ok }\nf = () { 0 }\n")]);
+    let (mut graph, _, _) = common::check_files(&[("src/main.i", "Ok = ()\nOption = Ok\nf = () { 0 }\n")]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
     let caller = parsed

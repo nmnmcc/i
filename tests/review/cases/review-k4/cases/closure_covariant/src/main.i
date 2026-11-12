@@ -1,5 +1,11 @@
-S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-make(N) = (f: () -> Nil ! N) { () { ! S(N) = S(f) use() } }
+S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+make = <N>(f: () <- N -> Nil) { () { use() <- (S(f)) } }
 
-main = () { f = make(() { Nil }) f() }
+main = () {
+	f = make(() { Nil })
+	f()
+}

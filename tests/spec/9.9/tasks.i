@@ -6,9 +6,9 @@
 	i/task
 )
 
-scoped = () -> Int ! task.Scheduler { task.scope((_) { 1 }) }
+scoped = () -> Int { task.scope((_) { 1 }) }
 
-local_scoped = () -> Int ! task.Scheduler { task.local_scope((_) { 2 }) }
+local_scoped = () -> Int { task.local_scope((_) { 2 }) }
 
 main = () {
 	assert(scoped() == 1)
@@ -24,10 +24,16 @@ main = () {
 	assert(value == 8)
 	assert(task.both(() { 1 }, () { "two" }) == (1, "two"))
 	assert(task.map_concurrently([1, 2, 3], (x) { x + 1 }) == [2, 3, 4])
-	assert(task.race(() {
-		task.yield()
-		1
-	}, () { 2 }) == 2)
+	assert(
+		task.race(
+			() {
+				task.yield()
+				1
+			},
+			() { 2 },
+		) ==
+			2,
+	)
 	// The opener spawned 2 + 2 + 3 + 2 children above, so this run is index 10.
 	assert(task.run(() { task.path() }) == [10])
 }

@@ -286,12 +286,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 ### 2.4 An example
 
 ```i
-fact = (n) {
-  n |> {
-    0 -> 1
-    _ -> n * fact(n - 1)
-  }
-}
+fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
 ```
 
 ```lisp
@@ -308,35 +303,77 @@ fact = (n) {
 The library module `i/syntax` exports these types:
 
 ```i
-Syntax {}
+Syntax = Opaque
 
-Node {
-  Name(String)
-  Discard(String)
-  Up(String)
-  Symbol(String)
-  Int(Int)
-  Float(Float)
-  Text(String)
-  Round(List(Syntax))
-  Square(List(Syntax))
-  Curly(List(Syntax))
-  Bits(List(Syntax))
-  Quote(Syntax)
-  Unquote(Syntax)
-  Splice(Syntax)
-  TypeView(TypeHandle)
-}
+Name = (String)
+Discard = (String)
+Up = (String)
+Symbol = (String)
+Int = (Int)
+Float = (Float)
+Text = (String)
+Round = (List(Syntax))
+Square = (List(Syntax))
+Curly = (List(Syntax))
+Bits = (List(Syntax))
+Quote = (Syntax)
+Unquote = (Syntax)
+Splice = (Syntax)
+TypeView = (TypeHandle)
+Node = Name
+	| Discard
+	| Up
+	| Symbol
+	| Int
+	| Float
+	| Text
+	| Round
+	| Square
+	| Curly
+	| Bits
+	| Quote
+	| Unquote
+	| Splice
+	| TypeView
 
-TypeHandle {}
+TypeHandle = Opaque
 
-Position {
-  ImportItem  ExportItem  Item  Attribute  Constructor  Field  Type  FunctionResult
-  Parameter  Expression  Statement  CallArgument  Clause  ClauseHead  Pattern
-  Segment  Format
-}
+ImportItem = ()
+ExportItem = ()
+Item = ()
+Attribute = ()
+Constructor = ()
+Field = ()
+Type = ()
+FunctionResult = ()
+Parameter = ()
+Expression = ()
+Statement = ()
+CallArgument = ()
+Clause = ()
+ClauseHead = ()
+Pattern = ()
+Segment = ()
+Format = ()
+Position = ImportItem
+	| ExportItem
+	| Item
+	| Attribute
+	| Constructor
+	| Field
+	| Type
+	| FunctionResult
+	| Parameter
+	| Expression
+	| Statement
+	| CallArgument
+	| Clause
+	| ClauseHead
+	| Pattern
+	| Segment
+	| Format
 
-SyntaxError { SyntaxError(message: String, at: Syntax) }
+SyntaxError = (message = String, at = Syntax)
 ```
 
 - A `Syntax` value is one datum of §2.2 with where it came from: its span in a source file, and its **scope**, which says where its names are looked up (§5). `Syntax` has no constructors. Only the compiler, a quote, and `make` give `Syntax` values. Type query handles (§7.4) are an explicit compiler-only extension, not source datums.
@@ -521,12 +558,12 @@ The `Items` service, available only during an item expansion, exports ordinary
 i wrappers with these signatures (these are API types, not external declarations):
 
 ```i
-Items {
-  Items(
-    add: (collection: Syntax, target: Syntax, data: List((String, String)), at: Syntax) -> Nil ^ SyntaxError,
-    expose: (name: Syntax) -> Nil ^ SyntaxError,
-  )
-}
+Items = (
+	add = (Syntax, Syntax, List((String, String)), Syntax) <- (
+		Fail(SyntaxError),
+	) -> Nil,
+	expose = (Syntax) <- (Fail(SyntaxError)) -> Nil,
+)
 ```
 
 `Items` is supplied to syntax macros with `Definitions` and `Assert`. A macro
@@ -652,9 +689,9 @@ From this:
 ## 6. Asking for definitions
 
 ```i
-Definitions { Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError) }
+Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
 
-definition = (of: Syntax, d ! Definitions) { d.definition(of) }
+definition = (of: Syntax) <- (d: Definitions) { d.definition(of) }
 // type: (of: Syntax) -> Syntax ^ SyntaxError ! Definitions
 ```
 
@@ -815,16 +852,17 @@ from the validated output; never re-infer the caller from its expansion.
 ### 7.4 Asking for types
 
 ```i
-Truth { Yes  No  NotKnown }
+Yes = ()
+No = ()
+NotKnown = ()
+Truth = Yes | No | NotKnown
 
-Types {
-  Types(
-    type_of: (Syntax) -> Syntax ^ SyntaxError,
-    signature: () -> Syntax,
-    subtype: (Syntax, Syntax) -> Truth ^ SyntaxError,
-    members: (Syntax) -> List(Syntax) ^ SyntaxError,
-  )
-}
+Types = (
+	type_of = (Syntax) <- (Fail(SyntaxError)) -> Syntax,
+	signature = () -> Syntax,
+	subtype = (Syntax, Syntax) <- (Fail(SyntaxError)) -> Truth,
+	members = (Syntax) <- (Fail(SyntaxError)) -> List(Syntax),
+)
 ```
 
 `Types` is a service type exported by `i/syntax`, with one function of `i/syntax` for each field, as `definition` is for `Definitions`. The compiler gives the service when it runs a typed macro.

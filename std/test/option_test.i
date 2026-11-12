@@ -26,12 +26,16 @@ test("is_some_with_some_test", () {
 })
 
 test("is_some_with_none_test", () {
-	assert(core.not(option.is_some(None)))
+	assert(
+		core.not(option.is_some(None)),
+	)
 	Nil
 })
 
 test("is_none_with_some_test", () {
-	assert(core.not(option.is_none(Some(1))))
+	assert(
+		core.not(option.is_none(Some(1))),
+	)
 	Nil
 })
 
@@ -191,9 +195,9 @@ test("map2_test", () {
 })
 
 test("labels_test", () {
-	assert(option.unwrap(None, or: 5) == 5)
-	assert(option.map(over: Some(1), with: (x) { x * 10 }) == Some(10))
-	assert(option.lazy_unwrap(None, or: () { 7 }) == 7)
+	assert(option.unwrap(None, 5) == 5)
+	assert(option.map(Some(1), (x) { x * 10 }) == Some(10))
+	assert(option.lazy_unwrap(None, () { 7 }) == 7)
 })
 
 test("all_long_test", () {
@@ -201,41 +205,31 @@ test("all_long_test", () {
 	assert(option.all(xs) == Some(build_plain(1_000_000, [])))
 })
 
-build = (n, acc) {
-	n |> {
-		0 -> acc
-		_ -> build(n - 1, [Some(n), ..acc])
-	}
-}
+build = (n, acc) { n |> (0) { acc } | (_) { build(n - 1, [Some(n), ..acc]) } }
 
 build_plain = (n, acc) {
-	n |> {
-		0 -> acc
-		_ -> build_plain(n - 1, [n, ..acc])
-	}
+	n |> (0) { acc } | (_) { build_plain(n - 1, [n, ..acc]) }
 }
 
 test("known_types_test", () {
-	user = Some(User("ann", 30))
+	user = Some(User(name = "ann", age = 30))
 	// The field `name` is known from the type of `option.map`.
 	assert(option.map(user, (u) { u.name }) == Some("ann"))
-	assert(option.then(user, (u) {
-		{ u.age > 18 } |> {
-			True  -> Some(u.age)
-			False -> None
-		}
-	}) == Some(30))
+	assert(
+		option.then(user, (u) {
+			{ u.age > 18 } |> (True) { Some(u.age) } | (False) { None }
+		}) ==
+			Some(30),
+	)
 })
 
-User {
-	User(name: String, age: Int)
-}
+User = (name = String, age = Int)
 
 test("effects_test", () {
 	r = fail.catch(() { option.map(Some(1), (_) { fail.raise("boom") }) })
 	assert(r == Error("boom"))
 	assert(
 		fail.catch(() { option.map(None, (_) { fail.raise("boom") }) }) ==
-			Ok(None)
+			Ok(None),
 	)
 })

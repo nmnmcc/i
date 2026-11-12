@@ -2,4 +2,4 @@
 	A
 )
 
-A {}
+A = Opaque

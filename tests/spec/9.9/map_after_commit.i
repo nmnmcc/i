@@ -8,7 +8,6 @@
 	i/request
 )
 
-
 main = () {
 	task.scope((s) {
 		c: task.Channel(Int) = task.channel()

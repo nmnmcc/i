@@ -7,21 +7,23 @@
 	i/request
 )
 
-ready_wait(A) = (r: Request(A), await ! request.Await) {
+ready_wait = <A>(r: Request(A)) <- (await: request.Await) {
 	await.wait(request.ticket(r))
 }
-
 
 main = () {
 	a = request.ready(42)
 	b = request.ready("answer")
-	winner = task.race(() {
-		ready_wait(a)
-		1
-	}, () {
-		ready_wait(b)
-		2
-	})
+	winner = task.race(
+		() {
+			ready_wait(a)
+			1
+		},
+		() {
+			ready_wait(b)
+			2
+		},
+	)
 	assert(winner == 1)
 	assert(request.await_owned(a) == 42)
 	assert(request.await_owned(b) == "answer")

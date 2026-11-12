@@ -8,7 +8,6 @@
 	i/fail
 )
 
-
 main = () {
 	callback = control.keep_env((_: Nil) {
 		task.scope((s) {
@@ -16,9 +15,12 @@ main = () {
 			task.sync(task.never())
 		})
 	})
-	assert(task.run(() {
-		assert(fail.catch(() { callback(Nil) }) == Error("callback"))
-		task.yield()
-		42
-	}) == 42)
+	assert(
+		task.run(() {
+			assert(fail.catch(() { callback(Nil) }) == Error("callback"))
+			task.yield()
+			42
+		}) ==
+			42,
+	)
 }

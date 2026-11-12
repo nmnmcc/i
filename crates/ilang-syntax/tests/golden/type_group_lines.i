@@ -1,4 +1,2 @@
-T = { Int
-| Nil }
-U = { Int
-  & Nil }
+T = Int | Nil
+U = Int & Nil

@@ -1,9 +1,8 @@
-S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
-use(N) = (s ! S(N)) {
-  S(f, ..) = s
-  f()
+S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f = f, ..) = s
+	f()
 }
-wrap(N) = (body: () -> Int ! N | S(N)) -> Int ! N {
-  ! S(N) = S(() { 1 }, (_: N) { Nil })
-  body()
+wrap = <N>(body: () <- (S(N), ..N) -> Int) -> Int {
+	body() <- (S(f = () { 1 }, m = (_: N) { Nil }))
 }

@@ -488,55 +488,123 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
     )
     .unwrap();
     let mut source = String::from(
-        r#"
-(i/core, i/control, i/resource)
+        r#"(
+	i/core
+	i/control
+	i/resource
+)
 @external("numeric:events", "record")
 record: (String) -> Nil
 make_float = (x: Float) { (v: Float) -> Float { v +. x } }
 bounded_float = (x: Float) -> Float {
- { x >=. -.1.0 } |> { False -> x True -> {
-  { x <=. 1.0 } |> { False -> x True -> { a = x *. 0.5 +. 0.25 a *. 0.5 -. 0.125 } }
- } }
+	{ x >=. -.1.0 } |>
+		(False) { x }
+		| (True) {
+			{ x <=. 1.0 } |>
+				(False) { x }
+				| (True) {
+					a = x *. 0.5 +. 0.25
+					a *. 0.5 -. 0.125
+				}
+		}
 }
-Pair { Left(x: Float, y: Float) Right(y: Float, x: Float) }
-relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ -> relay(f, n - 1, x) } }
+Left = (x = Float, y = Float)
+Right = (y = Float, x = Float)
+Pair = Left | Right
+relay = (f: (Float) -> Float, n: Int, x: Float) -> Float {
+	n |> (0) { f(x) } | (_) { relay(f, n - 1, x) }
+}
 numeric_pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
 step_float = (x: Float) -> Float { x *. 0.5 +. 0.25 }
 apply = (f: (Float) -> Float, x: Float) -> Float { f(x) }
-suspend_int = (b, x: Int) -> Int { a = x + 1 control.suspend(b, (k) { control.resume(k, Nil) }) a + 2 }
-loop_down = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> loop_down(n - 1, acc - n) } }
-loop_effect = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> { record(core.inspect(acc)) loop_effect(n - 1, acc + n) } } }
-loop_int = (n: Int, sum: Int) -> Int { n |> { 0 -> sum _ -> loop_int(n - 1, sum + n) } }
-fact = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> fact(n - 1, acc * n) } }
-loop_float = (n: Int, sum: Float) -> Float { n |> { 0 -> sum _ -> loop_float(n - 1, sum +. 0.25) } }
-resumed_g = (b, x: Float) -> Float {
- y = control.suspend(b, (k) { control.resume(k, 1.0) })
- x *. x +. y
+suspend_int = (b, x: Int) -> Int {
+	a = x + 1
+	control.suspend(b, (k) { control.resume(k, Nil) })
+	a + 2
 }
-resumed_f = (b, x: Float) -> Float { y = resumed_g(b, x) y +. 0.25 }
+loop_down = (n: Int, acc: Int) -> Int {
+	n |> (0) { acc } | (_) { loop_down(n - 1, acc - n) }
+}
+loop_effect = (n: Int, acc: Int) -> Int {
+	n |>
+		(0) { acc }
+		| (_) {
+			record(core.inspect(acc))
+			loop_effect(n - 1, acc + n)
+		}
+}
+loop_int = (n: Int, sum: Int) -> Int {
+	n |> (0) { sum } | (_) { loop_int(n - 1, sum + n) }
+}
+fact = (n: Int, acc: Int) -> Int {
+	n |> (0) { acc } | (_) { fact(n - 1, acc * n) }
+}
+loop_float = (n: Int, sum: Float) -> Float {
+	n |> (0) { sum } | (_) { loop_float(n - 1, sum +. 0.25) }
+}
+resumed_g = (b, x: Float) -> Float {
+	y = control.suspend(b, (k) { control.resume(k, 1.0) })
+	x *. x +. y
+}
+resumed_f = (b, x: Float) -> Float {
+	y = resumed_g(b, x)
+	y +. 0.25
+}
 resumed_h = (x: Float) -> Float {
- control.boundary((b) { y = resumed_f(b, x) y +. 0.5 })
+	control.boundary((b) {
+		y = resumed_f(b, x)
+		y +. 0.5
+	})
 }
 helper_sq = (x: Float) -> Float { x *. x }
 helper_g = (x: Float) -> Float {
- y = helper_sq(x)
- y +. 1.0
+	y = helper_sq(x)
+	y +. 1.0
 }
-helper_deep = (x: Float) -> Float { helper_sq(helper_sq(helper_sq(x))) }
-helper_loop = (n: Int, x: Float) -> Float { n |> { 0 -> x _ -> helper_loop(n - 1, x *. 1.0e100) } }
+helper_deep = (x: Float) -> Float {
+	helper_sq(
+		helper_sq(helper_sq(x)),
+	)
+}
+helper_loop = (n: Int, x: Float) -> Float {
+	n |> (0) { x } | (_) { helper_loop(n - 1, x *. 1.0e100) }
+}
 helper_tail = (x: Float) -> Float { helper_loop(5, x) }
 helper_outer = (x: Float) -> Float {
- a = helper_tail(x)
- a +. 2.0
+	a = helper_tail(x)
+	a +. 2.0
 }
-mixed_worker = (n: Int, acc: Int, f: Float) -> Float { n |> { 0 -> f +. core.to_float(acc) _ -> mixed_worker(n - 1, acc + 1073741000, f *. 1.0e60) } }
-mixed_int = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> mixed_int(n - 1, acc + 1073741000) } }
-halve_int = (n: Int, acc: Int) -> Int { n |> { 0 -> acc _ -> halve_int(n - 1, acc / 2) } }
+mixed_worker = (n: Int, acc: Int, f: Float) -> Float {
+	n |>
+		(0) { f +. core.to_float(acc) }
+		| (_) { mixed_worker(n - 1, acc + 1073741000, f *. 1.0e60) }
+}
+mixed_int = (n: Int, acc: Int) -> Int {
+	n |> (0) { acc } | (_) { mixed_int(n - 1, acc + 1073741000) }
+}
+halve_int = (n: Int, acc: Int) -> Int {
+	n |> (0) { acc } | (_) { halve_int(n - 1, acc / 2) }
+}
 scale_by = (k: Float) -> (Float) -> Float { (v: Float) -> Float { v *. k } }
 twice = (f: (Float) -> Float, x: Float) -> Float { f(f(x)) }
-unused_field = (x: Float) -> Float { r = (a: x *. x, b: 1.0) r.b }
-tie_add = (x: Float) -> Float { { x <=. 1.0e292 } |> { True -> { x >=. 0.0 } |> { True -> x +. 1.7976931348623157e308 False -> 0.0 } False -> 0.0 } }
-bounded_div = (x: Float, y: Float) -> Float { { y >=. -.1.0e-300 } |> { True -> { y <=. 1.0e-300 } |> { True -> x /. y False -> 0.0 } False -> 0.0 } }
+unused_field = (x: Float) -> Float {
+	r = (a = x *. x, b = 1.0)
+	r.b
+}
+tie_add = (x: Float) -> Float {
+	{ x <=. 1.0e292 } |>
+		(True) {
+			{ x >=. 0.0 } |>
+				(True) { x +. 1.7976931348623157e308 }
+				| (False) { 0.0 }
+		}
+		| (False) { 0.0 }
+}
+bounded_div = (x: Float, y: Float) -> Float {
+	{ y >=. -.1.0e-300 } |>
+		(True) { { y <=. 1.0e-300 } |> (True) { x /. y } | (False) { 0.0 } }
+		| (False) { 0.0 }
+}
 "#,
     );
     source = source.replacen(

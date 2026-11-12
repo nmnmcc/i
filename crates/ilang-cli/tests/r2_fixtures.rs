@@ -91,7 +91,7 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
             for (start, end, replacement) in edits {
                 adapted.replace_range(start..end, &replacement);
             }
-            adapted.push_str("\nr2_probe = () {\n result = r2_fail.catch(() { main() })\n result |> { Ok(_) -> Nil Error(e) -> panic(r2_core.inspect(e)) }\n}\n");
+            adapted.push_str("r2_probe = () {\n\tresult = r2_fail.catch(() { main() })\n\tresult |> (Ok(_)) { Nil } | (Error(e)) { panic(r2_core.inspect(e)) }\n}\n");
             let (parsed, diagnostics) = parse_module(&adapted);
             assert!(
                 diagnostics.is_empty(),

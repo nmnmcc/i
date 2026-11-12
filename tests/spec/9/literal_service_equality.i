@@ -2,9 +2,6 @@
 // expect: compile-error E0515
 
 // §5.1 rule 1: arguments of services are compared with equal value sets.
-Counter(A) { Counter(get: () -> A) }
-read = (c ! Counter(0)) { c.get() }
-f = () {
-	! Counter(Int) = Counter(get: () { 1 })
-	read()
-}
+Counter(A) = (get = () -> A)
+read = () <- (c: Counter(0)) { c.get() }
+f = () { read() <- (Counter(get = () { 1 })) }

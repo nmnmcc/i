@@ -4,10 +4,10 @@
 // literal-types §5.3: deferred fitted failure in its own effect frame.
 f = (s: String) -> Int {
 	(a, b) = (1, 2)
-	! Assert = Assert((_) { panic("own") })
-	"a" = s
-	a
+	{
+		"a" = s
+		a
+	} <- (Assert(fail = (_) { panic("own") }))
 }
-
 
 main = () { f("b") }

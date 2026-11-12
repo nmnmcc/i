@@ -678,9 +678,13 @@ These types may be used in every module and named through `i/core`, for example 
 These built-in types are normal custom types (§4.3) with these definitions:
 
 ```i
-Bool { True False }
-Nil { Nil }
-Result(A, E) { Ok(A) Error(E) }
+True = ()
+False = ()
+Bool = True | False
+Nil = ()
+Ok(A) = (A)
+Error(E) = (E)
+Result(A, E) = Ok(A) | Error(E)
 ```
 
 The types `Assert` and `AssertionFailure` are in §9.6. The types `Boundary` and `Continuation` are in §9.4. The types `Key` and `Keyed` are in §9.8. Request(A) and Ticket are built-in types, with operations in i/request (§9.11). Request(A) contains request handles whose answer belongs to A. Ticket is an answer-erased handle. Neither has public constructors.
@@ -726,15 +730,14 @@ TypePattern = UpName | "_"
 - Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
 
 ```i
-Codec(D, E) { Codec(decode: (String) -> D, encode: (E) -> String) }
-make(D, E) = (d: (String) -> D, e: (E) -> String) {
-  Codec(decode: d, encode: e)
+Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
+make = <D, E>(d: (String) -> D, e: (E) -> String) {
+	Codec(decode = d, encode = e)
 }
 size = make((s) { string.length(s) }, (n: Int) { int.to_string(n) })
 Codec(Size, _) = size
 // Size = Int; the distinct encode part is not fixed.
-
-Pair(A, B) = (A, B)
+Pair(A, B) = { (A, B) }
 Pair(Tree, _) = parsed
 // If parsed has the closed type (Ast, List(Warning)), Tree = Ast.
 ```
@@ -1059,12 +1062,7 @@ An expression statement that is not the last, and whose working out can do nothi
 A **direct value** is an expression that is made without running any code: a function expression or a clause block; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `- |> {1.5}`); a name; or a tuple, a list, a record with no `..`, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one tuple binding may make functions that call one another:
 
 ```i future-SYN2
-fact = (n) {
-  n |> {
-    0 -> 1
-    _ -> n * fact(n - 1)
-  }
-}
+fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
 
 (even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
 ```
@@ -1102,8 +1100,8 @@ A clause block `{ clauses }` is a function of one parameter. When it is called w
 `v.f` reads the field `f` (§4.8 rule 13). A field whose label is not a `name` is read with `record.get`. Fields are set and removed with `record.put` and `record.remove` (§14):
 
 ```i
-ada = (name: "ada", age: 36)
-older = (..ada, age: ada.age + 1)
+ada = (name = "ada", age = 36)
+older = (..ada, age = ada.age + 1)
 r = () |> record.put("name", "ada") |> record.put("age", 36)
 ```
 
@@ -1246,14 +1244,14 @@ i has no special effect definitions. Effects are made from normal things: functi
 A function with no parameters, `() -> A ^ E ! N`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i future-SYN2
-retry(A, E, N) = (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N {
-  fail.catch(body) |> {
-    Ok(value) -> value
-    Error(error) -> { times > 1 } |> {
-      True -> retry(times - 1, body)
-      False -> fail.raise(error)
-    }
-  }
+retry = <A, N>(times: Int, body: () <- N -> A) -> A {
+	fail.catch(body) |>
+		(Ok(value)) { value }
+		| (Error(error)) {
+			{ times > 1 } |>
+				(True) { retry(times - 1, body) }
+				| (False) { fail.raise(error) }
+		}
 }
 
 user = () { retry(3, () { load_user("1") }) }
@@ -1267,15 +1265,11 @@ A **service** is a value of a named type, normally a custom type whose construct
 - An **environment statement** `! T = e` in a block (§6.10) puts the value of `e`, which must have the type `T`, in the environment for the rest of the block. `T` is taken out of the environment that the rest of the block needs.
 
 ```i
-Clock { Clock(now: () -> Int) }
+Clock = (now = () -> Int)
 
-elapsed = (start: Int, clock ! Clock) { clock.now() - start }
+elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
 // type: (start: Int) -> Int ! Clock
-
-fixed = () {
-  ! Clock = Clock(now: () { 42 })
-  elapsed(40)
-}
+fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 // type: () -> Int
 ```
 
@@ -1295,15 +1289,15 @@ current Runner. Entry defaults do not change call-site service lookup.
 A provider can capture a service value. Replacing the service later changes calls that take it from their caller, not the captured value. This is the same rule for shipped and user providers:
 
 ```i
-Clock { Clock(now: () -> Int) }
-Reading { Reading(read: () -> Int) }
-make = (clock ! Clock) { Reading(read: () { clock.now() }) }
-now = (clock ! Clock) { clock.now() }
+Clock = (now = () -> Int)
+Reading = (read = () -> Int)
+make = () <- (clock: Clock) { Reading(read = () { clock.now() }) }
+now = () <- (clock: Clock) { clock.now() }
 example = () {
-  ! Clock = Clock(now: () { 1 })
-  saved = make()
-  ! Clock = Clock(now: () { 2 })
-  (saved.read(), now())
+	{
+		saved = make()
+		(saved.read(), now()) <- (Clock(now = () { 2 }))
+	} <- (Clock(now = () { 1 }))
 }
 // example() gives (1, 2).
 ```
@@ -1322,13 +1316,15 @@ The `E` part of a function type is the set of errors the function may give. An e
 ```i future-SYN2
 load = (id) { parse_user(http_get(id)) }
 // inferred: (id: String) -> User ^ HttpError | ParseError ! Http
-
 safe = (id) {
-  fail.catch(() { load(id) }) |> {
-    Ok(user) -> user
-    Error(_: ParseError) -> default_user
-    Error(other) -> fail.raise(other)        // other: HttpError
-  }
+	fail.catch(() { load(id) }) |>
+		(Ok(user)) { user }
+		| (Error(_: ParseError)) { default_user }
+		| (Error(other)) {
+			fail.raise(
+				other, // other: HttpError
+			)
+		}
 }
 // inferred: (id: String) -> User ^ HttpError ! Http
 ```
@@ -1369,14 +1365,21 @@ not active during unwinding.
 Generators, async code, and schedulers are libraries made from services and this operation. For example, a generator:
 
 ```i
-Yield(A) { Yield(emit: (value: A) -> Nil) }
+Yield(A) = (emit = (A) -> Nil)
 
-collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
-  control.boundary((b) {
-    ! Yield(A) = Yield((x) { control.suspend(b, (k) { [x, ..control.resume(k, Nil)] }) })
-    body()
-    []
-  })
+collect = <A, N>(body: () <- (Yield(A), ..N) -> Nil) -> List(A) {
+	control.boundary((b) {
+		{
+			body()
+			[]
+		} <- (
+			Yield(
+				emit = (x) {
+					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+				},
+			),
+		)
+	})
 }
 ```
 
@@ -1404,18 +1407,17 @@ functions; the host instead releases its own work and resources (Appendix B).
 `Assert` and `AssertionFailure` are built-in custom types with these definitions:
 
 ```i
-AssertionFailure { AssertionFailure(message: String) }
-Assert { Assert(fail: (failure: AssertionFailure) -> Never) }
+AssertionFailure = (message = String)
+Assert = (fail = (AssertionFailure) -> Never)
 ```
 
 An `Assert` service is where failures are reported. Its `fail` never gives back a value. The built-in function `assert` is a normal function, which may be written in i:
 
 ```i future-SYN2
-assert = (c: Bool, a ! Assert) {
-  c |> {
-    True -> Nil
-    False -> a.fail(AssertionFailure("assert"))
-  }
+assert = (c: Bool) <- (a: Assert) {
+	c |>
+		(True) { Nil }
+		| (False) { a.fail(AssertionFailure(message = "assert")) }
 }
 // type: (c: Bool) -> Nil ! Assert
 ```
@@ -1426,15 +1428,18 @@ At an entry point (§10.2), the runtime gives an `Assert` whose `fail` stops the
 
 ```i
 catch = (body) {
-  control.boundary((b) {
-    ! Assert = Assert((failure) {
-      control.suspend(b, (k) {
-        control.cancel(k)
-        Error(failure)
-      })
-    })
-    Ok(body())
-  })
+	control.boundary((b) {
+		Ok(body()) <- (
+			Assert(
+				fail = (failure) {
+					control.suspend(b, (k) {
+						control.cancel(k)
+						Error(failure)
+					})
+				},
+			),
+		)
+	})
 }
 // type: (body: () -> A ^ E ! N) -> Result(A, AssertionFailure) ^ E ! N - Assert
 ```
@@ -1447,7 +1452,7 @@ A type definition with the attribute `@host("namespace")` is a **host service**:
 
 ```i future-SYN2
 @host("app:storage/v1", "async")
-Storage { Storage(read: (key: String) -> String ^ String) }
+Storage = (read = (String) <- (Fail(String)) -> String)
 ```
 
 - It has exactly one constructor. Every field has a label and a function type. The parameters, values, and errors of these functions must be types that the host can take (§10.3), and they may not have an environment. Two host services may not have the same namespace and a field with the same label.
@@ -1461,15 +1466,20 @@ Storage { Storage(read: (key: String) -> String ^ String) }
 The ordinary module `i/target` exports this nominal service and its constructors. The modules `i/js` and `i/wasi` export the roots named in it (§10.1, §B.7.1). These are ordinary module types, not built-in names:
 
 ```i
-(js = i/js, wasi = i/wasi)
-(Target(..))
-Target {
-  Js(js: js.Js)
-  NodeJS(js: js.Js)
-  Wasi(wasi: wasi.Wasi)
-  Native
-  Host
-}
+(
+	js = i/js
+	wasi = i/wasi
+)
+
+(
+	Target(..)
+)
+Js = (js = js.Js)
+NodeJS = (js = js.Js)
+Wasi = (wasi = wasi.Wasi)
+Native = ()
+Host = ()
+Target = Js | NodeJS | Wasi | Native | Host
 ```
 
 The shipped plan constructs the actual target through §2.6's discriminant map. Native and Host have no root payload. A Js or Wasi payload can be bound by an ordinary environment statement; a tag cannot discharge any other service requirement. A program may construct a replacement Target. Only §10.1.2's certified entry binding is known to contain the build default.
@@ -1889,7 +1899,9 @@ constructor hidden, the error type below with its constructors, and these
 functions. The signatures describe bindings with bodies.
 
 ```i
-RandomError { InvalidBound(Int) InvalidPath(List(Int)) }
+InvalidBound = (Int)
+InvalidPath = (List(Int))
+RandomError = InvalidBound | InvalidPath
 ```
 
 | Name | Type |
@@ -1964,10 +1976,14 @@ exports the following ordinary status/service types, their constructors, and
 functions; it does not redeclare or re-export the primitive types.
 
 ```i
-Await { Await(wait: (ticket: Ticket) -> Nil) }
-Root { Root(key: Key(Nil)) }
-Owner { Owner(key: Key(Nil), root: Root) }
-RequestState(A) { Waiting Ready(A) Cancelled Taken }
+Await = (wait = (Ticket) -> Nil)
+Root = (key = Key(Nil))
+Owner = (key = Key(Nil), root = Root)
+Waiting = ()
+Ready(A) = (A)
+Cancelled = ()
+Taken = ()
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 ```
 
 | Function | Type | Rule |
@@ -2122,11 +2138,8 @@ separate ownership transfers, not a promise that all raw results are resources.
 The ordinary helper for an owned operation that produces no resource is:
 
 ```i
-await_owned(A) = (r: Request(A)) -> A ! Await {
-  resource.ensure(
-    () { await(r) }
-    () { cancel(ticket(r)) }
-  )
+await_owned = <A>(r: Request(A)) -> A {
+	resource.ensure(() { await(r) }, () { cancel(ticket(r)) })
 }
 ```
 
@@ -2266,7 +2279,7 @@ it is not a target-neutral foreign language feature.
 For example, an opaque type defined by a package needs no library rule:
 
 ```i
-Element {}
+Element = Opaque
 @js("globalThis.document.body")
 body: Element
 ```
@@ -2412,9 +2425,9 @@ Where i code gives a value to the host, an `Int` or `String` member counts as `I
 
 ```i
 @external("app", "mode")
-mode: () -> "on" | "off"           // compile error: the host gives the value
+mode: () -> "on" | "off" // compile error: the host gives the value
 @external("app", "log")
-log: (level: "info" | "warn") -> Nil   // correct: i code gives the value
+log: ("info" | "warn") -> Nil // correct: i code gives the value
 ```
 
 The outer Request and optional Result in a request-mode host declaration describe how work is obtained; they are the declaration forms of [runtime.md §5.2](design/runtime.md), installed by R2, not additional boundary types. Requests, tickets, tasks, scopes, channels and events cannot cross the ABI. IO wrappers over Int and constructed Thrown/Mismatch are not boundary types; their libraries pass Int or opaque Outcome and decode in i. Neither provider plans nor JavaScript value declarations change the value and error lists above. No library-specific exception is added.

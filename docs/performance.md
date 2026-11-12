@@ -261,8 +261,8 @@ A function with many suspend points and no annotations, of this shape
 (`s` suspends):
 
 ```i
-a1 = { a0 % 3 } |> { 0 -> s(b, a0 + 1)  _ -> a0 + 2 }
-a2 = { a1 % 3 } |> { 0 -> s(b, a1 + 1)  _ -> a1 + 2 }
+a1 = { a0 % 3 } |> (0) { s(b, a0 + 1) } | (_) { a0 + 2 }
+a2 = { a1 % 3 } |> (0) { s(b, a1 + 1) } | (_) { a1 + 2 }
 // ...
 ```
 

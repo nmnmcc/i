@@ -1,3 +1,9 @@
-S(A) { S(value: A) }
-use(A) = (s ! S(A)) { s.value }
-wrap(A) = (x: A) { local = () { inner = () { use() } inner() } local() }
+S(A) = (value = A)
+use = <A>() <- (s: S(A)) { s.value }
+wrap = <A>(x: A) {
+	local = () {
+		inner = () { use() }
+		inner()
+	}
+	local()
+}

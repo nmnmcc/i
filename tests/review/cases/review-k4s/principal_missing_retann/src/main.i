@@ -1,5 +1,10 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(A,N) = (f: () -> A ! N) { f() }
-forward(N) = (s ! S(N)) -> Nil ! N | S(N) { local: () -> Nil ! N | S(N) = () { use() } run(local) }
-
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <A, N>(f: () <- N -> A) { f() }
+forward = <N>() <- (s: S(N)) -> Nil {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	run(local)
+}

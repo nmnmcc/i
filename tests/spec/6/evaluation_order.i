@@ -6,8 +6,11 @@
 // written, also with labels.
 pair = (a: Int, b: Int) { a + b }
 
-
 main = () {
 	x = 1
-	pair(b: panic("first"), a: panic("second"))
+	{
+		_syn3_0 = panic("first")
+		_syn3_1 = panic("second")
+		pair(_syn3_1, _syn3_0)
+	}
 }

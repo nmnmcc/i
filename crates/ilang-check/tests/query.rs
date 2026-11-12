@@ -112,32 +112,29 @@ impl Fixture {
     }
 }
 
-const MAIN: &str = r#" (
-  util = app/util
-  (User, greet) = app/user
+const MAIN: &str = r#"(
+	util = app/util
+	(User, greet) = app/user
 )
 
 /// Adds two numbers.
 add = (x, y) {
-  z = x * 2
-  z + y
+	z = x * 2
+	z + y
 }
 
 id = (a) { a }
 
 describe = (u: User) {
-  label = u.name
-  label <> greet(u)
+	label = u.name
+	label <> greet(u)
 }
 
-first = (o) {
-   o |> {
-    Some(v) -> v
-    None -> 0
-  }
-}
+first = (o) { o |> (Some(v)) { v } | (None) { 0 } }
 
-Option(A) { Some(A) None }
+Some(A) = (A)
+None = ()
+Option(A) = Some(A) | None
 
 total = util.double(add(1, 2))
 "#;
@@ -148,9 +145,12 @@ const UTIL: &str = r#" (double)
 double = (n: Int) -> Int { n * 2 }
 "#;
 
-const USER: &str = r#" (User(..), greet)
+const USER: &str = r#"(
+	User(..)
+	greet
+)
 
-User { User(name: String, age: Int) }
+User = (name = String, age = Int)
 
 greet = (u: User) { "hi " <> u.name }
 "#;
@@ -212,7 +212,7 @@ fn type_of_other_things() {
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
-        "User { User(name: String, age: Int) }"
+        "User = (name = String, age = Int)"
     );
     assert_eq!(f.hover("app/main", "2\n", 0), "Int");
     assert_eq!(f.hover("app/main", "util.", 0), "module app/util");
@@ -345,10 +345,16 @@ fn completions_of_members() {
 fn completions_of_fields_from_inference() {
     let f = Fixture::new(&[(
         "src/main.i",
-        "Point { Point(x: Int, y: Int) }\n\
-         origin = Point(0, 0)\n\
-         f = () {\n  p = origin\n  p.x + origin.y\n}\n\
-         g = (o: Point) {\n  o |> {\n    Point(..) ? True -> o.x\n    _ -> panic(\"unreachable\")\n  }\n}\n",
+        "Point = (x = Int, y = Int)\n\
+         origin = Point(x = 0, y = 0)\n\
+         f = () {\n\
+         \tp = origin\n\
+         \tp.x + origin.y\n\
+         }\n\
+         g = (o: Point) {\n\
+         \to |> (Point(..) ? True) { o.x } | (_) { panic(\"unreachable\") }\n\
+         }\n\
+         ",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     // A local name whose type is inferred.
@@ -565,9 +571,14 @@ fn completions_of_the_name_being_bound() {
 fn completions_after_any_expression() {
     let f = Fixture::new(&[(
         "src/main.i",
-        "Point { Point(x: Int, y: Int) }\n\
-         make = () -> Point { Point(1, 2) }\n\
-         f = (t: Point) {\n  a = make().x\n  b = { t }.y\n  a + b\n}\n",
+        "Point = (x = Int, y = Int)\n\
+         make = () -> Point { Point(x = 1, y = 2) }\n\
+         f = (t: Point) {\n\
+         \ta = make().x\n\
+         \tb = { t }.y\n\
+         \ta + b\n\
+         }\n\
+         ",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     let cs = f.completions("app/main", "make().x", 7);
@@ -583,7 +594,7 @@ fn completions_after_any_expression() {
 fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     // A1 §3.12: the made-up binding covers the subject too, and its names
     // enter scope only in the body. Synthetic parameters never appear.
-    let source = "main = () { local = 4\n (x) { local + x } |> { f -> f(local) } }\nmany = { 0 -> 1  _ -> 2 }\nuse_many = () { apply(1,{ 0 -> 1  _ -> 2 }) }\napply = (x, f) { f(x) }";
+    let source = "main = () {\n\tlocal = 4\n\t(x) { local + x } |> (f) { f(local) }\n}\nmany = (0) { 1 } | (_) { 2 }\nuse_many = () { apply(1, (0) { 1 } | (_) { 2 }) }\napply = (x, f) { f(x) }";
     let fixture = Fixture::new(&[("src/main.i", source)]);
     let subject = fixture.completions("app/main", "local + x", 0);
     assert!(subject.iter().any(|(n, _)| n == "local"), "{subject:?}");
@@ -640,8 +651,8 @@ fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
 
 // ---- The queries for references, rename, navigation and code actions ----
 
-const SHAPES_Q: &str = "(Shape(..), area)\n\nShape {\n  Circle(radius: Int)\n  Dot\n}\n\narea = (s: Shape) -> Int {\n  s |> {\n    Circle(radius) -> radius * 3\n    Dot -> 0\n  }\n}\n";
-const MAIN_Q: &str = "(\n  (Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n  c = Circle(radius: 2)\n  area(c) + area(Circle(radius: 1))\n}\n";
+const SHAPES_Q: &str = "(\n\tShape(..)\n\tarea\n)\n\nCircle = (radius = Int)\nDot = ()\nShape = Circle | Dot\n\narea = (s: Shape) -> Int {\n\ts |> (Circle(radius = radius)) { radius * 3 } | (Dot) { 0 }\n}\n";
+const MAIN_Q: &str = "(\n\t(Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n\tc = Circle(radius = 2)\n\tarea(c) + area(Circle(radius = 1))\n}\n";
 
 fn shapes_fixture() -> Fixture {
     Fixture::new(&[("src/shapes.i", SHAPES_Q), ("src/main.i", MAIN_Q)])
@@ -718,7 +729,7 @@ fn query_rename_checks_kind_and_scope() {
 
 #[test]
 fn query_missing_clauses_of_a_match() {
-    let text = "Shape {\n  Circle(Int)\n  Dot\n  Line\n}\n\nf = (s: Shape) {\n  s |> {\n    Dot -> 0\n    Circle(1) -> 1\n  }\n}\n";
+    let text = "Circle = (Int)\nDot = ()\nLine = ()\nShape = Circle | Dot | Line\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");

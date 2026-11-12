@@ -1,9 +1,11 @@
 // spec: 4.9
 // expect: compile-error E0543
-(main)
-f(K) = (r: (K: Int), key: K) {
-  x: key = key
-  x
+(
+	main
+)
+f = <K>(r: (k = Int), key: K) {
+	x: key = key
+	x
 }
 
 main = () { Nil }

@@ -229,7 +229,7 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(
         dir.path().join("src/main.i"),
-        "A { A }\nE { E }\nN { N }\nkeep(Z) = (v: Z) -> Z { v }\nagain(K) = (v: K) -> K { v }\neffect(X, Y, Z) = (f: () -> X ^ Y ! Z) { f() }\n",
+        "A = ()\nE = ()\nN = ()\nkeep = <Z>(v: Z) -> Z { v }\nagain = <K>(v: K) -> K { v }\neffect = <X, Z>(f: () <- Z -> X) { f() }\n",
     )
     .unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
@@ -256,15 +256,15 @@ fn scheme_types_know_each_type_by_what_it_is() {
         fs::write(p, text).unwrap();
     };
     write("dep/i.toml", "name = \"dep\"\n");
-    write("dep/src/u.i", " (T(..))\nT { T(String) }\n");
+    write("dep/src/u.i", "(\n\tT(..)\n)\nT = (String)\n");
     write(
         "app/i.toml",
         "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
     );
-    write("app/src/geo/u.i", " (T(..))\nT { T(Int) }\n");
+    write("app/src/geo/u.i", "(\n\tT(..)\n)\nT = (Int)\n");
     write(
         "app/src/main.i",
-        " (app/geo/u, d = dep/u)\n (f, g, ext)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (n: Int) -> Int\nf(A) = (x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",
+        "(\n\tapp/geo/u\n\td = dep/u\n)\n\n(\n\tf\n\tg\n\text\n)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (Int) -> Int\nf = <A>(x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",
     );
     let (graph, diags) = ilang_package::load(&tmp.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");

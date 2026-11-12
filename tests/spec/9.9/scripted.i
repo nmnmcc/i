@@ -10,15 +10,14 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (text: String) -> Nil)
-}
-
+Out = (print = (String) -> Nil)
 
 main = () {
-	assert(task.test(random.from_seed(7), [[1]], () { task.path() }) == [1])
+	assert(
+		task.test(random.from_seed(7), [[1]], () { task.path() }) == [1],
+	)
 	assert(
 		fail.catch(() { task.test(random.from_seed(7), [[999]], () { 1 }) }) ==
-			Error(task.NotRunnable([999]))
+			Error(task.NotRunnable(path = [999])),
 	)
 }

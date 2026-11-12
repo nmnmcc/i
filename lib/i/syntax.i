@@ -19,76 +19,96 @@
 	Diagnostics(..)
 )
 
-Syntax {}
+Syntax = Opaque
 
-SyntaxList {}
+SyntaxList = Opaque
 
-SyntaxResult {}
+SyntaxResult = Opaque
 
-TextResult {}
+TextResult = Opaque
 
-MatchResult {}
+MatchResult = Opaque
 
-DefinitionResult {}
+DefinitionResult = Opaque
 
-ItemMetadata {}
+ItemMetadata = Opaque
 
-ItemResult {}
+ItemResult = Opaque
 
-Node {
-	Name(String)
-	Discard(String)
-	Up(String)
-	Symbol(String)
-	Int(Int)
-	Float(Float)
-	Text(String)
-	Round(List(Syntax))
-	Square(List(Syntax))
-	Curly(List(Syntax))
-	Bits(List(Syntax))
-	Quote(Syntax)
-	Unquote(Syntax)
-	Splice(Syntax)
-}
+Name = (String)
+Discard = (String)
+Up = (String)
+Symbol = (String)
+Int = (Int)
+Float = (Float)
+Text = (String)
+Round = (List(Syntax))
+Square = (List(Syntax))
+Curly = (List(Syntax))
+Bits = (List(Syntax))
+Quote = (Syntax)
+Unquote = (Syntax)
+Splice = (Syntax)
+Node = Name
+	| Discard
+	| Up
+	| Symbol
+	| Int
+	| Float
+	| Text
+	| Round
+	| Square
+	| Curly
+	| Bits
+	| Quote
+	| Unquote
+	| Splice
 
-Position {
-	ImportItem
-	ExportItem
-	Item
-	Attribute
-	Constructor
-	Field
-	Type
-	FunctionResult
-	Parameter
-	Expression
-	Statement
-	CallArgument
-	Clause
-	ClauseHead
-	Pattern
-	Segment
-	Format
-}
+ImportItem = ()
+ExportItem = ()
+Item = ()
+Attribute = ()
+Constructor = ()
+Field = ()
+Type = ()
+FunctionResult = ()
+Parameter = ()
+Expression = ()
+Statement = ()
+CallArgument = ()
+Clause = ()
+ClauseHead = ()
+Pattern = ()
+Segment = ()
+Format = ()
+Position = ImportItem
+	| ExportItem
+	| Item
+	| Attribute
+	| Constructor
+	| Field
+	| Type
+	| FunctionResult
+	| Parameter
+	| Expression
+	| Statement
+	| CallArgument
+	| Clause
+	| ClauseHead
+	| Pattern
+	| Segment
+	| Format
 
-SyntaxError {
-	SyntaxError(message: String, at: Syntax)
-}
+SyntaxError = (message = String, at = Syntax)
 
-Definitions {
-	Definitions(definition: (of: Syntax) -> Syntax ^ SyntaxError)
-}
+Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
 
 /// Asks the installed definition service for a type's written definition.
-definition = (
-	of: Syntax
-	service ! Definitions
-) -> Syntax ^ SyntaxError ! Definitions { service.definition(of) }
-
-Diagnostics {
-	Diagnostics(note: (String) -> Nil)
+definition = (of: Syntax) <- (service: Definitions) -> Syntax {
+	service.definition(of)
 }
+
+Diagnostics = (note = (String) -> Nil)
 
 @external("i:compiler/syntax/v1", "note")
 raw_note: (String) -> Nil
@@ -96,20 +116,15 @@ raw_note: (String) -> Nil
 /// Constructs the compiler's transactional diagnostic service.
 _diagnostics = () -> Diagnostics {
 	notify = (message: String) -> Nil { raw_note(message) }
-	Diagnostics(notify)
+	Diagnostics(note = notify)
 }
 
-Items {
-	Items(
-		add: (
-			collection: Syntax
-			target:     Syntax
-			data:       List((String, String))
-			at:         Syntax
-		) -> Nil ^ SyntaxError
-		expose: (name: Syntax) -> Nil ^ SyntaxError
-	)
-}
+Items = (
+	add = (Syntax, Syntax, List((String, String)), Syntax) <- (
+		Fail(SyntaxError),
+	) -> Nil,
+	expose = (Syntax) <- (Fail(SyntaxError)) -> Nil,
+)
 
 @external("i:compiler/syntax/v1", "metadata_new")
 raw_metadata_new: () -> ItemMetadata
@@ -133,41 +148,43 @@ raw_items_message: (ItemResult) -> String
 raw_items_at: (ItemResult) -> Syntax
 
 build_metadata = (
-	data: List((String, String))
+	data: List((String, String)),
 	result: ItemMetadata
 ) -> ItemMetadata {
-	data |> {
-		[] -> result
-		[(key, value), ..rest] -> build_metadata(
-			rest
-			raw_metadata_push(result, key, value)
-		)
-	}
+	data |>
+		([]) { result }
+		| ([(key, value), ..rest]) {
+			build_metadata(rest, raw_metadata_push(result, key, value))
+		}
 }
 
-item_result = (result: ItemResult) -> Nil ^ SyntaxError {
-	raw_items_ok(result) |> {
-		True -> Nil
-		False -> fail.raise(
-			SyntaxError(raw_items_message(result), raw_items_at(result))
-		)
-	}
+item_result = (result: ItemResult) -> Nil {
+	raw_items_ok(result) |>
+		(True) { Nil }
+		| (False) {
+			fail.raise(
+				SyntaxError(
+					message = raw_items_message(result),
+					at = raw_items_at(result),
+				),
+			)
+		}
 }
 
 /// Constructs the compiler's transactional item service for one macro run.
 _items = () -> Items {
 	Items(
-		(collection, target, data, at) -> Nil ^ SyntaxError {
+		add = (collection, target, data, at) -> Nil {
 			item_result(
 				raw_items_add(
-					collection
-					target
-					build_metadata(data, raw_metadata_new())
-					at
-				)
+					collection,
+					target,
+					build_metadata(data, raw_metadata_new()),
+					at,
+				),
 			)
-		}
-		(name) -> Nil ^ SyntaxError { item_result(raw_items_expose(name)) }
+		},
+		expose = (name) -> Nil { item_result(raw_items_expose(name)) },
 	)
 }
 
@@ -191,18 +208,21 @@ raw_definition_at: (DefinitionResult) -> Syntax
 
 /// Constructs the compiler's definition service for one macro run.
 _definitions = () -> Definitions {
-	Definitions((of) -> Syntax ^ SyntaxError {
-		result = raw_definition(of)
-		raw_definition_ok(result) |> {
-			True -> raw_definition_value(result)
-			False -> fail.raise(
-				SyntaxError(
-					raw_definition_message(result)
-					raw_definition_at(result)
-				)
-			)
-		}
-	})
+	Definitions(
+		definition = (of) -> Syntax {
+			result = raw_definition(of)
+			raw_definition_ok(result) |>
+				(True) { raw_definition_value(result) }
+				| (False) {
+					fail.raise(
+						SyntaxError(
+							message = raw_definition_message(result),
+							at = raw_definition_at(result),
+						),
+					)
+				}
+		},
+	)
 }
 
 @external("i:compiler/syntax/v1", "match")
@@ -296,29 +316,29 @@ raw_text_error: (TextResult) -> String
 raw_text_error_at: (TextResult) -> Syntax
 
 reverse = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {
-	items |> {
-		[]              -> result
-		[first, ..rest] -> reverse(rest, [first, ..result])
-	}
+	items |>
+		([]) { result }
+		| ([first, ..rest]) { reverse(rest, [first, ..result]) }
 }
 
 match_children = (
-	match: MatchResult
-	capture: Int
-	index: Int
-	end: Int
+	match: MatchResult,
+	capture: Int,
+	index: Int,
+	end: Int,
 	result: List(Syntax)
 ) -> List(Syntax) {
-	{ index == end } |> {
-		True -> reverse(result, [])
-		False -> match_children(
-			match
-			capture
-			index + 1
-			end
-			[raw_match_many_child(match, capture, index), ..result]
-		)
-	}
+	{ index == end } |>
+		(True) { reverse(result, []) }
+		| (False) {
+			match_children(
+				match,
+				capture,
+				index + 1,
+				end,
+				[raw_match_many_child(match, capture, index), ..result],
+			)
+		}
 }
 
 /// Gives a splice capture in source order.
@@ -327,10 +347,9 @@ _match_many = (match: MatchResult, capture: Int) -> List(Syntax) {
 }
 
 prepend_reversed = (items: List(Syntax), result: List(Syntax)) -> List(Syntax) {
-	items |> {
-		[]              -> result
-		[first, ..rest] -> prepend_reversed(rest, [first, ..result])
-	}
+	items |>
+		([]) { result }
+		| ([first, ..rest]) { prepend_reversed(rest, [first, ..result]) }
 }
 
 /// Appends syntax lists while preserving the identity and order of each item.
@@ -338,94 +357,103 @@ _append = (first: List(Syntax), second: List(Syntax)) -> List(Syntax) {
 	prepend_reversed(reverse(first, []), second)
 }
 
-children = (
-	syntax: Syntax
-	index: Int
-	end: Int
-	result: List(Syntax)
-) -> List(Syntax) {
-	{ index == end } |> {
-		True -> reverse(result, [])
-		False -> children(
-			syntax
-			index + 1
-			end
-			[raw_child(syntax, index), ..result]
-		)
-	}
+children = (syntax: Syntax, index: Int, end: Int, result: List(Syntax)) -> List(
+	Syntax,
+) {
+	{ index == end } |>
+		(True) { reverse(result, []) }
+		| (False) {
+			children(
+				syntax,
+				index + 1,
+				end,
+				[raw_child(syntax, index), ..result],
+			)
+		}
 }
 
 /// Gives the node without changing the scopes of its children.
 node = (syntax: Syntax) -> Node {
-	raw_kind(syntax) |> {
-		0  -> Name(raw_text(syntax))
-		1  -> Discard(raw_text(syntax))
-		2  -> Up(raw_text(syntax))
-		3  -> Symbol(raw_text(syntax))
-		4  -> Int(raw_int(syntax))
-		5  -> Float(raw_float(syntax))
-		6  -> Text(raw_text(syntax))
-		7  -> Round(children(syntax, 0, raw_length(syntax), []))
-		8  -> Square(children(syntax, 0, raw_length(syntax), []))
-		9  -> Curly(children(syntax, 0, raw_length(syntax), []))
-		10 -> Bits(children(syntax, 0, raw_length(syntax), []))
-		11 -> Quote(raw_child(syntax, 0))
-		12 -> Unquote(raw_child(syntax, 0))
-		13 -> Splice(raw_child(syntax, 0))
-		_  -> panic("syntax: invalid node kind")
-	}
+	raw_kind(syntax) |>
+		(0) { Name(raw_text(syntax)) }
+		| (1) { Discard(raw_text(syntax)) }
+		| (2) { Up(raw_text(syntax)) }
+		| (3) { Symbol(raw_text(syntax)) }
+		| (4) { Int(raw_int(syntax)) }
+		| (5) { Float(raw_float(syntax)) }
+		| (6) { Text(raw_text(syntax)) }
+		| (7) { Round(children(syntax, 0, raw_length(syntax), [])) }
+		| (8) { Square(children(syntax, 0, raw_length(syntax), [])) }
+		| (9) { Curly(children(syntax, 0, raw_length(syntax), [])) }
+		| (10) { Bits(children(syntax, 0, raw_length(syntax), [])) }
+		| (11) { Quote(raw_child(syntax, 0)) }
+		| (12) { Unquote(raw_child(syntax, 0)) }
+		| (13) { Splice(raw_child(syntax, 0)) }
+		| (_) { panic("syntax: invalid node kind") }
 }
 
 build_list = (items: List(Syntax), result: SyntaxList) -> SyntaxList {
-	items |> {
-		[]              -> result
-		[first, ..rest] -> build_list(rest, raw_list_push(result, first))
-	}
+	items |>
+		([]) { result }
+		| ([first, ..rest]) { build_list(rest, raw_list_push(result, first)) }
 }
 
 /// Rebuilds one quoted template node with its evaluated children.
 _rebuild = (template: Syntax, children: List(Syntax)) -> Syntax {
-	raw_rebuild(template, build_list(children, raw_list_new()))
+	raw_rebuild(
+		template,
+		build_list(children, raw_list_new()),
+	)
 }
 
 /// Makes syntax at the span and scope of `like`.
-make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
-	result = node |> {
-		Name(value)    -> raw_make_text(0, value, like)
-		Discard(value) -> raw_make_text(1, value, like)
-		Up(value)      -> raw_make_text(2, value, like)
-		Symbol(value)  -> raw_make_text(3, value, like)
-		Int(value)     -> raw_make_int(value, like)
-		Float(value)   -> raw_make_float(value, like)
-		Text(value)    -> raw_make_text(6, value, like)
-		Round(items) -> raw_make_list(
-			7
-			build_list(items, raw_list_new())
-			like
-		)
-		Square(items) -> raw_make_list(
-			8
-			build_list(items, raw_list_new())
-			like
-		)
-		Curly(items) -> raw_make_list(
-			9
-			build_list(items, raw_list_new())
-			like
-		)
-		Bits(items) -> raw_make_list(
-			10
-			build_list(items, raw_list_new())
-			like
-		)
-		Quote(item)   -> raw_make_one(11, item, like)
-		Unquote(item) -> raw_make_one(12, item, like)
-		Splice(item)  -> raw_make_one(13, item, like)
-	}
-	raw_syntax_ok(result) |> {
-		True  -> raw_syntax_value(result)
-		False -> fail.raise(SyntaxError(raw_syntax_error(result), like))
-	}
+make = (node: Node, like: Syntax) -> Syntax {
+	result = node |>
+		(Name(value)) { raw_make_text(0, value, like) }
+		| (Discard(value)) { raw_make_text(1, value, like) }
+		| (Up(value)) { raw_make_text(2, value, like) }
+		| (Symbol(value)) { raw_make_text(3, value, like) }
+		| (Int(value)) { raw_make_int(value, like) }
+		| (Float(value)) { raw_make_float(value, like) }
+		| (Text(value)) { raw_make_text(6, value, like) }
+		| (Round(items)) {
+			raw_make_list(
+				7,
+				build_list(items, raw_list_new()),
+				like,
+			)
+		}
+		| (Square(items)) {
+			raw_make_list(
+				8,
+				build_list(items, raw_list_new()),
+				like,
+			)
+		}
+		| (Curly(items)) {
+			raw_make_list(
+				9,
+				build_list(items, raw_list_new()),
+				like,
+			)
+		}
+		| (Bits(items)) {
+			raw_make_list(
+				10,
+				build_list(items, raw_list_new()),
+				like,
+			)
+		}
+		| (Quote(item)) { raw_make_one(11, item, like) }
+		| (Unquote(item)) { raw_make_one(12, item, like) }
+		| (Splice(item)) { raw_make_one(13, item, like) }
+	raw_syntax_ok(result) |>
+		(True) { raw_syntax_value(result) }
+		| (False) {
+			fail.raise(
+				SyntaxError(message = raw_syntax_error(result), at = like),
+			)
+		}
 }
 
 /// Compares datums without comparing source locations or scopes.
@@ -435,34 +463,37 @@ same_code = (a: Syntax, b: Syntax) -> Bool { raw_same_code(a, b) }
 show = (syntax: Syntax) -> String { raw_show(syntax) }
 
 position_id = (position: Position) -> Int {
-	position |> {
-		ImportItem     -> 0
-		ExportItem     -> 1
-		Item           -> 2
-		Attribute      -> 3
-		Constructor    -> 4
-		Field          -> 5
-		Type           -> 6
-		FunctionResult -> 7
-		Parameter      -> 8
-		Expression     -> 9
-		Statement      -> 10
-		CallArgument   -> 11
-		Clause         -> 12
-		ClauseHead     -> 13
-		Pattern        -> 14
-		Segment        -> 15
-		Format         -> 16
-	}
+	position |>
+		(ImportItem) { 0 }
+		| (ExportItem) { 1 }
+		| (Item) { 2 }
+		| (Attribute) { 3 }
+		| (Constructor) { 4 }
+		| (Field) { 5 }
+		| (Type) { 6 }
+		| (FunctionResult) { 7 }
+		| (Parameter) { 8 }
+		| (Expression) { 9 }
+		| (Statement) { 10 }
+		| (CallArgument) { 11 }
+		| (Clause) { 12 }
+		| (ClauseHead) { 13 }
+		| (Pattern) { 14 }
+		| (Segment) { 15 }
+		| (Format) { 16 }
 }
 
 /// Writes syntax in the normal surface at the requested position.
-show_as = (syntax: Syntax, position: Position) -> String ^ SyntaxError {
+show_as = (syntax: Syntax, position: Position) -> String {
 	result = raw_show_as(syntax, position_id(position))
-	raw_text_ok(result) |> {
-		True -> raw_text_value(result)
-		False -> fail.raise(
-			SyntaxError(raw_text_error(result), raw_text_error_at(result))
-		)
-	}
+	raw_text_ok(result) |>
+		(True) { raw_text_value(result) }
+		| (False) {
+			fail.raise(
+				SyntaxError(
+					message = raw_text_error(result),
+					at = raw_text_error_at(result),
+				),
+			)
+		}
 }

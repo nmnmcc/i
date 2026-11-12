@@ -80,7 +80,7 @@ fn brace_decisions_follow_the_ordered_tests() {
     ));
     // T1 §6.1: a literal type starts an annotation, so this is a clause.
     assert!(matches!(
-        value(&module("a = { x: 1 -> 2 }")).kind,
+        value(&module("a = (x: 1) { 2 }")).kind,
         ExprKind::Clauses(_)
     ));
     // §3.5 test 4 and test 5: records vs a clause with a wrong pattern.
@@ -142,7 +142,7 @@ fn header_groups_and_attributes() {
             .iter()
             .any(|d| d.code == Code::Unexpected)
     );
-    let m = module("@custom()\nx = 1\n@a.m(1, b: x)\ny = 2");
+    let m = module("@custom()\nx = 1\n@a.m(1, b = x)\ny = 2");
     assert!(m.items[0].attributes[0].call.is_some());
     assert_eq!(m.items[1].attributes[0].module.as_ref().unwrap().name, "a");
 }
@@ -152,11 +152,11 @@ fn new_forms_and_joined_parentheses() {
     for src in [
         "(i/fail)\nf = 1",
         "f = {}",
-        "f = x |> { n -> n }",
-        "f = { n ? c -> n }",
-        "f(A) = (x: A) { x }",
+        "f = x |> (n) { n }",
+        "f = (n ? c) { n }",
+        "f = <A>(x: A) { x }",
         "f(A): (A) -> A",
-        "Box(A) { B(A) }",
+        "B(A) = (A)\nBox(A) = B(A)",
         "Schema(User, _) = user",
         "f(x)",
         "@m(1)\nf = 1",
@@ -166,9 +166,9 @@ fn new_forms_and_joined_parentheses() {
         module(src);
     }
     for src in [
-        "f(A) = x",
-        "main = () { wrap(A) = x  wrap }",
-        "main = () { k = 1  wrap(A) = (x: A) { Some(x) }  wrap(k) }",
+        "f = x",
+        "main = () {\n\twrap = x\n\twrap\n}",
+        "main = () {\n\tk = 1\n\twrap = <A>(x: A) { Some(x) }\n\twrap(k)\n}",
     ] {
         let m = module(src);
         assert!(format!("{m:?}").contains("type_params: [Ident { name: \"A\""));
@@ -181,8 +181,8 @@ fn new_forms_and_joined_parentheses() {
 fn guards_and_pipe_binding_strength() {
     // §6.1 tests 1a/2 need an immediate arrow after the first pattern.
     // Choices or a guard prevent the function reading of that head.
-    module("f = { n = (x) | n = (x) -> (y) { y } }");
-    module("f = { (x) ? True -> (y) { y } }");
+    module("f = ((x) = n | (x) = n) { (y) { y } }");
+    module("f = ((x) ? True) { (y) { y } }");
     for src in [
         /* old-syntax-check: E0111 */ "a = n |> { 0 -> 1  _ -> 2 } * 10",
         /* old-syntax-check: E0111 */ "a = opt |> { _ -> 1 }.name",
@@ -196,7 +196,7 @@ fn guards_and_pipe_binding_strength() {
             "{src}"
         );
     }
-    let m = module("a = n |> { 0 -> 1  _ -> 2 }()");
+    let m = module("a = n |> (0) { 1 } | (_) { 2 }()");
     assert!(matches!(
         value(&m).kind,
         ExprKind::Binary {
@@ -330,7 +330,7 @@ fn print_core(e: Expr) -> String {
 #[test]
 fn core_printer_adds_only_required_groups() {
     // §3.13: a core match under * and as a callee needs its own group.
-    let match_e = core_value("a = n |> { 0 -> 1  _ -> 2 }");
+    let match_e = core_value("a = n |> (0) { 1 } | (_) { 2 }");
     let e = Expr {
         kind: ExprKind::Binary {
             op: BinOp::Mul,
@@ -358,7 +358,7 @@ fn core_printer_adds_only_required_groups() {
         assert_eq!(text.starts_with("a = {"), grouped, "{text}");
     }
     // New match first (tuple) pattern needs no group; lone Clauses does.
-    let match_fn = core_value("a = v |> { (x) -> (y) { y } }");
+    let match_fn = core_value("a = v |> ((x)) { (y) { y } }");
     let text = print_core(match_fn.clone());
     assert!(text.contains("-> (y)"), "{text}");
     let ExprKind::Case { clauses, .. } = &match_fn.kind else {
@@ -370,15 +370,15 @@ fn core_printer_adds_only_required_groups() {
     };
     assert!(print_core(e).contains("-> (y)"));
     // A chain-to-tuple first pattern still needs a group (§6.1).
-    let m = module("a = v |> { n = (x) -> { (y) { y } } }");
+    let m = module("a = v |> ((x) = n) { (y) { y } }");
     assert!(print_core(value(&m).clone()).contains("-> {"));
     // Negative/tuple patterns are on a new line (§1.7), independent of
     // spans or whether the tree came from the normal surface.
-    let text = print_core(core_value("a = n |> { 0 -> a\n-1 -> b }"));
+    let text = print_core(core_value("a = n |> (0) { a } | (-1) { b }"));
     assert!(text.contains("\n  -1 ->"), "{text}");
     // The function type ending a pattern needs a type group before | or ?.
     print_core(core_value(
-        "a = { f: { (Int) -> Int } ? ok -> f(1)  _ -> 0 }",
+        "a = (f: (Int) -> Int ? ok) { f(1) } | (_) { 0 }",
     ));
 }
 
@@ -386,7 +386,7 @@ fn core_printer_adds_only_required_groups() {
 fn unprintable_core_trees_report_their_span() {
     // §3.13: groups cannot save these trees, and the printer must never
     // invent a g binding (which would take the expected type away).
-    let mut m = module("a = v |> { n = (a) -> { g = (x) -> Int { x }  g } }");
+    let mut m = module("a = v |> ((a) = n) {\n\tg = (x) -> Int { x }\n\tg\n}");
     let body = core_value("a = (x) -> Int { x }");
     let ItemKind::Binding(b) = &mut m.items[0].kind else {
         unreachable!()
@@ -399,7 +399,7 @@ fn unprintable_core_trees_report_their_span() {
     assert_eq!(unprintable(&m), Some(span));
     // D4 excludes functions whose parameters are not patterns. The strict
     // round-trip guarantee of §3.13 applies to these parser trees too.
-    module("a = { (a) -> (n, log ! Log) -> Int { n } }");
+    module("a = ((a)) { (n) <- (log: Log) -> Int { n } }");
 }
 
 #[test]
@@ -426,13 +426,13 @@ fn a_type_annotation_before_another_choice_has_no_same_code_text() {
     // type group cannot keep the next `|` out of the annotation's union.
     // Parentheses would instead make a tuple pattern (§7.1).
     for src in [
-        "a = { f: { (Int) -> Int } ? ok -> f }",
-        "a = { f: Int ? ok -> f }",
-        "a = { whole = f: Int ? ok -> f }",
-        "a = v |> { f: Int ? ok -> f }",
+        "a = (f: (Int) -> Int ? ok) { f }",
+        "a = (f: Int ? ok) { f }",
+        "a = (f: Int = whole ? ok) { f }",
+        "a = v |> (f: Int ? ok) { f }",
     ] {
         let mut m = module(src);
-        let next = core_value("a = { f: String -> f }");
+        let next = core_value("a = (f: String) { f }");
         let ExprKind::Clauses(next) = &next.kind else {
             unreachable!()
         };
@@ -450,7 +450,7 @@ fn a_type_annotation_before_another_choice_has_no_same_code_text() {
     }
     // An annotation in a constructor argument ends at `)`, so this parsed
     // tree is representable and must keep the strict round trip.
-    module("a = { Some(f: Int) | Some(f: String) -> f }");
+    module("a = (Some(f: Int) | Some(f: String)) { f }");
 }
 
 #[test]
@@ -499,7 +499,7 @@ fn structural_shape_keeps_all_string_payloads() {
         "x = \"@1..2\"",
         "/// @1..2\nx = 1",
         "@external(\"@1..2\", \"f\")\nf: () -> Nil",
-        "f = { \"@1..2\" -> 1  _ -> 2 }",
+        "f = (\"@1..2\") { 1 } | (_) { 2 }",
     ] {
         let original = module(source);
         let changed = module(&source.replace("@1..2", "@3..4"));
@@ -513,8 +513,8 @@ fn structural_shape_keeps_all_string_payloads() {
 #[test]
 fn brace_cache_and_uncached_parser_agree() {
     for (path, source) in [
-        ("guards", "f = { (x) ? True -> (y) { y } }"),
-        ("nested", "f = { <<x:u({ 8 })>> -> 0  _ -> 1 }"),
+        ("guards", "f = ((x) ? True) { (y) { y } }"),
+        ("nested", "f = (<<x:u({ 8 })>>) { 0 } | (_) { 1 }"),
         (
             "chain",
             /* old-syntax-check: E0101 */ "f = { n = (a) -> { (x) -> Int { x } } }",

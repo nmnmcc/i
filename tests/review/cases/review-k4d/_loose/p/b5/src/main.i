@@ -1,18 +1,14 @@
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(() -> Int ! N) }
-use(N) = (s ! S(N)) {
-  S(f) = s
-  f()
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (() <- N -> Int)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
 }
-run(A, N) = (body: () -> A ! N) { body() }
-
+run = <A, N>(body: () <- N -> A) { body() }
 
 main = () {
-  g = () {
-    ! S(Never) = S(() { 3 })
-    use()
-  }
-  g()
-  Nil
+	g = () { use() <- (S(() { 3 })) }
+	g()
+	Nil
 }

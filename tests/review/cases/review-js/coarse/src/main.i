@@ -1,4 +1,4 @@
 @host("probe:process/v1")
-Process { Process(args: () -> String, spawn: (String) -> Int) }
+Process = (args = () -> String, spawn = (String) -> Int)
 
-main = (p ! Process) { p.args() }
+main = () <- (p: Process) { p.args() }

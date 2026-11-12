@@ -15,25 +15,26 @@ port: Int = 8080
 
 Port = port
 
-Pair(A, B) = (A, B)
+Pair(A, B) = { (A, B) }
 
 parts: (Int, String) = (1, "a")
 
 Pair(Number, Text) = parts
 
-Composite(A) = (A, port)
+Composite(A) = { (A, port) }
 
-Codec(D, E) {
-	Codec(decode: (String) -> D, encode: (E) -> String)
+Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
+
+make = <D, E>(d: (String) -> D, e: (E) -> String) {
+	Codec(decode = d, encode = e)
 }
 
-make(D, E) = (d: (String) -> D, e: (E) -> String) {
-	Codec(decode: d, encode: e)
-}
-
-size = id(make((s: String) -> Int { string.length(s) }, (n: Int) -> String {
-	int.to_string(n)
-}))
+size = id(
+	make(
+		(s: String) -> Int { string.length(s) },
+		(n: Int) -> String { int.to_string(n) },
+	),
+)
 
 Codec(Size, _) = size
 
@@ -54,10 +55,13 @@ test("inferred_shape", () {
 		y
 	}
 	assert(copy("a") == "b")
-	assert(list.map(["a"], (x) {
-		y: x = "b"
-		y == "b"
-	}) == [True])
+	assert(
+		list.map(["a"], (x) {
+			y: x = "b"
+			y == "b"
+		}) ==
+			[True],
+	)
 })
 
 test("closed_aliases", () {
@@ -73,21 +77,14 @@ test("codec_projection_and_later_encode", () {
 	assert(size.encode(12) == "12")
 })
 
-test_type = (v: Int | String) {
-	v |> {
-		n: Port -> n + 1
-		_       -> 0
-	}
-}
+test_type = (v: Int | String) { v |> (n: Port) { n + 1 } | (_) { 0 } }
 
 test("completed_alias_type_tests", () {
 	assert(test_type(2) == 3)
 	assert(test_type("x") == 0)
 })
 
-Box(A) {
-	Box(A)
-}
+Box(A) = (A)
 
 test("matched_holder_and_original_subject", () {
 	copy = (p: Box(Int)) {
@@ -97,13 +94,12 @@ test("matched_holder_and_original_subject", () {
 	}
 	assert(copy(Box(1)))
 	original = (x) {
-		x |> {
-			_: Int -> {
+		x |>
+			(_: Int) {
 				y: x = "s"
 				y == "s"
 			}
-			_ -> True
-		}
+			| (_) { True }
 	}
 	assert(original(1))
 })

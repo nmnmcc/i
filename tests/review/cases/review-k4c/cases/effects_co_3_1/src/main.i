@@ -1,4 +1,10 @@
-S(A,E,N) { S((A) -> A ^ E ! N) }
-use(A,E,N) = (x: A, s ! S(A,E,N)) { S(f) = s f(x) }
-run(A,E,N) = (body: () -> A ^ E ! N) { body() }
-wrap(A,E,N) = (x: A) -> A ^ E ! N | S(A,E,N) { local: () -> A ^ E ! N | S(A,E,N) = () { use(x) } local() }
+S(A, E, N) = ((A) <- (Fail(E), ..N) -> A)
+use = <A, E, N>(x: A) <- (s: S(A, E, N)) {
+	S(f) = s
+	f(x)
+}
+run = <A, N>(body: () <- N -> A) { body() }
+wrap = <A, E, N>(x: A) -> A {
+	local: () <- (Fail(E), S(A, E, N), ..N) -> A = () { use(x) }
+	local()
+}

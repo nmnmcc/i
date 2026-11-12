@@ -6,6 +6,10 @@ port = 8080
 take = (first: method, last: port) { (first, last) }
 
 main = () {
-    _ = take(last: panic("first written"), first: panic("second written"))
-    Nil
+	_ = {
+		_syn3_0 = panic("first written")
+		_syn3_1 = panic("second written")
+		take(_syn3_1, _syn3_0)
+	}
+	Nil
 }

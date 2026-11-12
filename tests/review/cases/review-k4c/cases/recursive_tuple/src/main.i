@@ -1,1 +1,4 @@
-bad = (x) { local = () { (x, x) } bad(local()) }
+bad = (x) {
+	local = () { (x, x) }
+	bad(local())
+}

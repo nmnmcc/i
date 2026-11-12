@@ -15,8 +15,19 @@ fn declared_frames_hide_outer_variables_and_generalize() {
     // §3.10: every declared frame makes fresh variables, while a variable
     // used from an outer frame remains that variable.
     let (_, c) = checked(
-        "outer(A) = (x: A) { inner(A) = (y: A) { y }
- (inner(1), inner(True), x) }\nnested(A) = (x: A) { inner(B) = (y: B, z: A) { (y, z) }  inner(1, x) }\nid(A) = (x: A) { y: A = x  y }\nuses = () { (id(1), id(True)) }",
+        "outer = <A>(x: A) {
+	inner = <A>(y: A) { y }
+	(inner(1), inner(True), x)
+}
+nested = <A>(x: A) {
+	inner = <B>(y: B, z: A) { (y, z) }
+	inner(1, x)
+}
+id = <A>(x: A) {
+	y: A = x
+	y
+}
+uses = () { (id(1), id(True)) }",
         &["outer", "nested", "uses"],
     );
     let p = c.program.as_ref().unwrap();
@@ -69,7 +80,7 @@ fn new_match_is_a_non_generalized_binding_at_the_pattern() {
     // §3.9(a): resolve subject outside p's scope and keep p.span as the
     // binding span. The subject function must still call the top-level f.
     let (_, c) = checked(
-        "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> { f -> f(1) } }",
+        "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> (f) { f(1) } }",
         &["g"],
     );
     let p = c.program.as_ref().unwrap();
@@ -113,7 +124,7 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
     // and the Case covers clauses only. One clause keeps label_of(p).
     // Spec §4.8 rule 11 permits values outside Int through the catch-all.
     let (_, c) = checked(
-        "one = { n -> n }\nmany = { 0 -> 1  _ -> 2 }\nstring_argument = () { many(\"s\") }",
+        "one = (n) { n }\nmany = (0) { 1 } | (_) { 2 }\nstring_argument = () { many(\"s\") }",
         &["one", "string_argument"],
     );
     let p = c.program.as_ref().unwrap();
@@ -158,18 +169,18 @@ fn kept_form_messages_are_independent_checks() {
     // D7 and §3.11 supply these codes and message fragments; no generated
     // expected output defines them.
     for (src, code, message) in [
-        ("f(A) = (x: A(Int)) { x }", "E0230", "takes no arguments"),
-        ("f(A, A) = 1", "E0226", "declared more than once"),
-        ("f(Int) = 1", "E0231", "name of a type"),
-        ("f(A) = (x: a) { x }", "E0201", "not defined"),
+        ("f = <A>(x: A(Int)) { x }", "E0230", "takes no arguments"),
+        ("f = 1", "E0226", "declared more than once"),
+        ("f = 1", "E0231", "name of a type"),
+        ("f = <A>(x: a) { x }", "E0201", "not defined"),
         (
             "f = (x: Missing) { x }",
             "E0202",
             "declare it after the name",
         ),
-        ("T { T(Missing) }", "E0202", "declare it in the head"),
-        ("Box(Int) { Box(Int) }", "E0231", "name of a type"),
-        ("Box(a, B) { Box }", "E0232", "an `UpName`"),
+        ("T = (Missing)", "E0202", "declare it in the head"),
+        ("Box(Int) = (Int)", "E0231", "name of a type"),
+        ("Box(a, B) = ()", "E0232", "an `UpName`"),
         ("Schema(Int) = Int", "E0231", "name of a type"),
         ("f = (x: p.name) { x }", "E0201", "not defined"),
         ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),

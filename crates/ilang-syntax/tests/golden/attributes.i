@@ -9,7 +9,7 @@ main = () { Nil }
 // not documentation
 @deprecated("old")
 @host("app:storage/v1", "async")
-Storage { Storage(read: (key: String) -> String ^ String) }
+Storage = (read = (String) <- (Fail(String)) -> String)
 
 @custom
 test_it = () { assert(True) }

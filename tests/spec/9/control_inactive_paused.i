@@ -7,7 +7,6 @@
 )
 
 // A boundary is not active while its body is paused in a continuation.
-
 main = () {
 	control.boundary((b) {
 		control.suspend(b, (k) { control.suspend(b, (k2) { Nil }) })

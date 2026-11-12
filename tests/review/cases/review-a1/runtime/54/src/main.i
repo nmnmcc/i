@@ -3,7 +3,6 @@ f = () {
 	-2
 }
 
-
 main = () {
 	assert(f() == -2)
 	Nil

@@ -8,14 +8,14 @@
 	i/fail
 )
 
-
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
 			task.go(s, () {
-				resource.ensure(() { panic("unstarted child ran") }, () {
-					panic("unstarted final ran")
-				})
+				resource.ensure(
+					() { panic("unstarted child ran") },
+					() { panic("unstarted final ran") },
+				)
 			})
 			fail.raise("body")
 		})

@@ -5,15 +5,12 @@
 
 // The answer of an async function is checked with the frames of the call.
 @host("test:async/v1", "async")
-Later {
-	Later(nan: () -> Float)
-}
+Later = (nan = () -> Float)
 
-half = (later ! Later) {
+half = () <- (later: Later) {
 	x = later.nan()
 	x /. 2.0
 }
-
 
 main = () {
 	half()

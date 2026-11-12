@@ -41,19 +41,22 @@ four runtime fixtures in §8 use their original direct comparisons again.
 ## 1. What the programmer sees
 
 ```i
-method = "GET"                            // method : "GET"
-codes = [200, 404]                        // codes : List(200 | 404)
-kind = { "a" -> 1  "b" -> 2 }             // kind : ("a" | "b") -> 1 | 2
-size = (s: String) { s |> { "" -> 0  rest -> string.length(rest) } }
-                                          // rest : String - ""
-send = (m: "GET" | "POST") { m |> { "GET" -> 1  "POST" -> 2 } }
-                                          // covered, no `_` needed
-unequal = "a" == "b"                      // W0503: never equal
-matches = (s: String) { s == "a" }        // correct
-sum = 1 + 2                               // Int, not 3
-negative = -1                             // -1, and so is -{1}
-negate = (x: Int) { -x }                  // Int
-float = 1.5                               // Float; Float has no literal types
+method = "GET" // method : "GET"
+codes = [
+	200, // codes : List(200 | 404)
+	404,
+]
+kind = ("a") { 1 } | ("b") { 2 } // kind : ("a" | "b") -> 1 | 2
+size = (s: String) { s |> ("") { 0 } | (rest) { string.length(rest) } }
+// rest : String - ""
+send = (m: "GET" | "POST") { m |> ("GET") { 1 } | ("POST") { 2 } }
+// covered, no `_` needed
+unequal = "a" == "b" // W0503: never equal
+matches = (s: String) { s == "a" } // correct
+sum = 1 + 2 // Int, not 3
+negative = -1 // -1, and so is -{1}
+negate = (x: Int) { -x } // Int
+float = 1.5 // Float; Float has no literal types
 ```
 
 ## 2. The problem
@@ -548,9 +551,9 @@ Add this example:
 
 ```i
 @external("app", "mode")
-mode: () -> "on" | "off"           // compile error: the host gives the value
+mode: () -> "on" | "off" // compile error: the host gives the value
 @external("app", "log")
-log: (level: "info" | "warn") -> Nil   // correct: i code gives the value
+log: ("info" | "warn") -> Nil // correct: i code gives the value
 ```
 
 ## 7. Files to change

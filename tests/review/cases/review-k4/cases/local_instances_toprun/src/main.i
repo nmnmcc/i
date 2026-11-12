@@ -1,13 +1,17 @@
-S(A, N) { S(() -> A ! N, (N) -> Nil) }
-use(A, N) = (s ! S(A, N)) { S(f, _) = s f() }
+S(A, N) = (() <- N -> A, (N) -> Nil)
+use = <A, N>() <- (s: S(A, N)) {
+	S(f, _) = s
+	f()
+}
 run = (body) { body() }
 
 main = () {
-
- ! S(Int, Never) = S(() { 7 }, (_: Never) { Nil })
- x = run(() { use() })
- ! S(String, Never) = S(() { "yes" }, (_: Never) { Nil })
- y = run(() { use() })
- assert(x == 7)
- assert(y == "yes")
+	{
+		x = run(() { use() })
+		{
+			y = run(() { use() })
+			assert(x == 7)
+			assert(y == "yes")
+		} <- (S(() { "yes" }, (_: Never) { Nil }))
+	} <- (S(() { 7 }, (_: Never) { Nil }))
 }

@@ -6,82 +6,79 @@
 )
 
 // §9.1
-retry(A, E, N) = (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N {
-	fail.catch(body) |> {
-		Ok(value) -> value
-		Error(error) -> { times > 1 } |> {
-			True  -> retry(times - 1, body)
-			False -> fail.raise(error)
+retry = <A, N>(times: Int, body: () <- N -> A) -> A {
+	fail.catch(body) |>
+		(Ok(value)) { value }
+		| (Error(error)) {
+			{ times > 1 } |>
+				(True) { retry(times - 1, body) }
+				| (False) { fail.raise(error) }
 		}
-	}
 }
 
-load_user = (id: String) -> String ^ Int { fail.raise(404) }
+load_user = (id: String) -> String { fail.raise(404) }
 
 user = () { retry(3, () { load_user("1") }) }
 
 // §9.2
-Clock {
-	Clock(now: () -> Int)
-}
+Clock = (now = () -> Int)
 
-elapsed = (start: Int, clock ! Clock) { clock.now() - start }
+elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
 
 // type: (start: Int) -> Int ! Clock
-
-fixed = () {
-	! Clock = Clock(now: () { 42 })
-	elapsed(40)
-}
+fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 
 // type: () -> Int
 
 // §9.4
-Yield(A) {
-	Yield(emit: (value: A) -> Nil)
-}
+Yield(A) = (emit = (A) -> Nil)
 
-collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
+collect = <A, N>(body: () <- (Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
-		! Yield(A) = Yield((x) {
-			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
-		})
-		body()
-		[]
+		{
+			body()
+			[]
+		} <- (
+			Yield(
+				emit = (x) {
+					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+				},
+			),
+		)
 	})
 }
 
 numbers = () {
-	collect((y ! Yield(Int)) {
+	collect(() <- (y: Yield(Int)) {
 		y.emit(1)
 		y.emit(2)
 	})
 }
 
 // §9.6
-my_assert = (c: Bool, a ! Assert) {
-	c |> {
-		True  -> Nil
-		False -> a.fail(AssertionFailure("assert"))
-	}
+my_assert = (c: Bool) <- (a: Assert) {
+	c |>
+		(True) { Nil }
+		| (False) { a.fail(AssertionFailure(message = "assert")) }
 }
 
 // type: (c: Bool) -> Nil ! Assert
-
 catch = (body) {
 	control.boundary((b) {
-		! Assert = Assert((failure) {
-			control.suspend(b, (k) {
-				control.cancel(k)
-				Error(failure)
-			})
-		})
-		Ok(body())
+		Ok(body()) <- (
+			Assert(
+				fail = (failure) {
+					control.suspend(b, (k) {
+						control.cancel(k)
+						Error(failure)
+					})
+				},
+			),
+		)
 	})
 }
 
 // type: (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
-
 checked = () {
 	catch(() {
 		assert(False)

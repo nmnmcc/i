@@ -1,8 +1,26 @@
-Dep { Dep(Int) }
-get = (d ! Dep) { Dep(x) = d x }
-S(N) { S(() -> Int ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-make(N) = (f: () -> Int ! N) { inner = (g) { local = () { g(f) } local() } inner }
-run(N) = (f: () -> Int ! N) { f() }
+Dep = (Int)
+get = () <- (d: Dep) {
+	Dep(x) = d
+	x
+}
+S(N) = (() <- N -> Int)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+make = <N>(f: () <- N -> Int) {
+	inner = (g) {
+		local = () { g(f) }
+		local()
+	}
+	inner
+}
+run = <N>(f: () <- N -> Int) { f() }
 
-main = () { ! Dep = Dep(11) ! S(Dep) = S(() { get() }) wrapped = make(() { use() }) assert(wrapped(run) == 11) Nil }
+main = () {
+	{
+		wrapped = make(() { use() })
+		assert(wrapped(run) == 11)
+		Nil
+	} <- (Dep(11), S(() { get() }))
+}

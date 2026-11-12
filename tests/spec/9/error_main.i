@@ -5,16 +5,10 @@
 	i/fail
 )
 
-HttpError {
-	HttpError(Int, Int)
-}
+HttpError = (Int, Int)
 
 get = (n) {
-	n |> {
-		0 -> fail.raise(HttpError(500, 2))
-		_ -> get(n - 1) + 1
-	}
+	n |> (0) { fail.raise(HttpError(500, 2)) } | (_) { get(n - 1) + 1 }
 }
-
 
 main = () { get(10) }

@@ -1,23 +1,19 @@
-@external("m", "f",)
+@external("m", "f")
 add: Int
 
-@external(
-  "m",
-  "f",
-)
+@external("m", "f")
 now: () -> Int
 
-T(A, B,) { C(A, B) }
+C(A, B) = (A, B)
+T(A, B) = C(A, B)
 
-U(A,) = List(A)
+U(A) = List(A)
 
-V { C(x: Int, y: Int,) }
+C = (x = Int, y = Int)
+V = C
 
-W = Result(
-  Int,
-  String,
-)
+W = Result(Int, String)
 
-f(A, E) = (x: Result(A, E,)) { x }
+f = <A, E>(x: Result(A, E)) { x }
 
-x: Result(Int, Int,) = y
+x: Result(Int, Int) = y

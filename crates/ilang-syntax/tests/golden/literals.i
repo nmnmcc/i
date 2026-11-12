@@ -10,8 +10,7 @@ i = 1.0e10
 j = 2.5e-3
 k = 1.e5
 l = "a\n\t\"\\\f\r\u{1F600}\u{41}é"
-m = "multi
-line"
+m = "multi\nline"
 n = -1
 o = -.1.5
 p = t.0.1

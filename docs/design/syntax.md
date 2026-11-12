@@ -365,12 +365,7 @@ These sentences change:
 The example becomes:
 
 ```i
-fact = (n) {
-  n |> {
-    0 -> 1
-    _ -> n * fact(n - 1)
-  }
-}
+fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
 
 (even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
 ```

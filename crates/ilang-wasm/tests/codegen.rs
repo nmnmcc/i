@@ -60,7 +60,7 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
 #[test]
 fn metered_macro_program_is_valid_wasm() {
     let (graph, c, _dir) = checked(
-        "loop = (n) { n |> { 0 -> [\"x\"] _ -> [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
+        "loop = (n) { n |> (0) { [\"x\"] } | (_) { [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
     );
     let (wasm, _) = ilang_wasm::compile_macro(
         &graph,
@@ -83,7 +83,7 @@ fn function<'a>(wat: &'a str, name: &str) -> &'a str {
 #[test]
 fn tail_calls_are_return_calls() {
     let text = wat(
-        "loop = (n) {\n   n |> {\n    0 -> 0\n    _ -> loop(n - 1)\n  }\n}\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
+        "loop = (n) { n |> (0) { 0 } | (_) { loop(n - 1) } }\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
     );
     let l = function(&text, "app/main.loop");
     assert!(l.contains("(return_call $f"), "{l}");
@@ -157,7 +157,7 @@ fn metadata() {
 /// lists every external function, also one that is not used (B.6).
 #[test]
 fn externals_are_imports() {
-    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (x: Float) -> Float\n";
+    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (Float) -> Float\n";
     for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
         let bytes = wasm(&format!("{external}f = () {{ sqrt(2.0) }}\n\n{main}\n")).unwrap();
         let mut imports = Vec::new();
@@ -218,10 +218,12 @@ fn calls_that_may_suspend_are_split() {
 
 #[test]
 fn environments() {
-    let text = wat("Clock { Clock(now: () -> Int) }\n\
-         f = (c ! Clock) { c.now() }\n\
-         g = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n\
-         \nmain = () { g() }\n");
+    let text = wat("Clock = (now = () -> Int)\n\
+         f = () <- (c: Clock) { c.now() }\n\
+         g = () { f() <- (Clock(now = () { 1 })) }\n\
+         \n\
+         main = () { g() }\n\
+         ");
     // A service's slot is chosen from all services in the compiled program;
     // its read and the corresponding environment statement must agree.
     let f = function(&text, "app/main.f");

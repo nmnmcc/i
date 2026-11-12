@@ -1,3 +1,3 @@
-import ()
-export ()
+import()
+export()
 f = () { 1 }

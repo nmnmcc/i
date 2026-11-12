@@ -6,36 +6,27 @@
 	i/task
 )
 
-spawn = (
-	s: task.Scope(Never)
-	n: Int
-) -> List(task.Task(Int, Never)) ! task.Scheduler {
-	n |> {
-		0 -> []
-		_ -> {
+spawn = (s: task.Scope(Never), n: Int) -> List(task.Task(Int, Never)) {
+	n |>
+		(0) { [] }
+		| (_) {
 			child = task.go(s, () {
 				task.yield()
 				n
 			})
 			[child, ..spawn(s, n - 1)]
 		}
-	}
 }
 
-join_all = (
-	tasks: List(task.Task(Int, Never))
-	sum: Int
-) -> Int ! task.Scheduler | Assert {
-	tasks |> {
-		[] -> sum
-		[child, ..rest] -> {
+join_all = (tasks: List(task.Task(Int, Never)), sum: Int) -> Int {
+	tasks |>
+		([]) { sum }
+		| ([child, ..rest]) {
 			value = task.join(child)
 			assert(task.join(child) == value)
 			join_all(rest, sum + value)
 		}
-	}
 }
-
 
 main = () {
 	value = task.scope((s) { join_all(spawn(s, 513), 0) })

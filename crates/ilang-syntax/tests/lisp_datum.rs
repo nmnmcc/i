@@ -375,12 +375,16 @@ fn dots_and_spreads_are_separate_datums() {
 
 #[test]
 fn core_forms_convert_between_surfaces() {
-    let source = r#"
-(x, Option(..))
-Option(A) { Some(A) None }
+    let source = r#"(
+	x
+	Option(..)
+)
+Some(A) = (A)
+None = ()
+Option(A) = Some(A) | None
 value: (Int) -> Int
 value = (x) -> Int { x + 1 }
-choose = (x) { x |> { 0 -> "zero" _ -> "other" } }
+choose = (x) { x |> (0) { "zero" } | (_) { "other" } }
 "#;
     let (module, diagnostics) = ilang_syntax::parse_module(source);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -478,7 +482,7 @@ fn check_corpus(dir: &std::path::Path) {
 #[test]
 fn record_type_printing_keeps_field_and_removal_order() {
     let (module, errors) =
-        ilang_syntax::parse_module("Thing(R) = (..R, first: Int, -old, second: String, -gone)\n");
+        ilang_syntax::parse_module("Thing(R) = { (first = Int, second = String) }\n");
     assert!(errors.is_empty(), "{errors:?}");
     let text = print_module(&module);
     assert_eq!(

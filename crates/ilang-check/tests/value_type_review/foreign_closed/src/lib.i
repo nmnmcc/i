@@ -1,3 +1,6 @@
-(Box,v)
-Box(A) { Box(A) }
+(
+	Box
+	v
+)
+Box(A) = (A)
 v: Box(Int) = Box(1)

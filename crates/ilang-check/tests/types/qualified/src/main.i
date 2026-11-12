@@ -14,13 +14,9 @@
 	T
 )
 
-T {
-	T(String)
-}
+T = (String)
 
-H {
-	H
-}
+H = ()
 
 both = (m.mk(1), T("s"))
 

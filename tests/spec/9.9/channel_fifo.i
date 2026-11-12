@@ -6,7 +6,6 @@
 	i/task
 )
 
-
 main = () {
 	task.scope((s) {
 		c: task.Channel(Int) = task.channel()
@@ -22,7 +21,7 @@ main = () {
 		task.go(s, () { task.send(b, 22) })
 		reader = task.go(s, () {
 			first = task.sync(
-				task.choose([task.receive_event(b), task.receive_event(a)])
+				task.choose([task.receive_event(b), task.receive_event(a)]),
 			)
 			(first, task.receive(a))
 		})

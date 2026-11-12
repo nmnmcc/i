@@ -1,3 +1,6 @@
-S(A) { S(f: () -> Nil ! A) }
-use(A) = (s ! S(A)) { s.f() }
-wrap(A) = (x: A) { local = () { use() } local() }
+S(A) = (f = () <- A -> Nil)
+use = <A>() <- (s: S(A)) { s.f() }
+wrap = <A>(x: A) {
+	local = () { use() }
+	local()
+}

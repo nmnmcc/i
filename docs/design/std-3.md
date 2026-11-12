@@ -120,23 +120,39 @@ Failure and Report with constructors. Gen's private representation is shown
 for review. No stored callback has errors, services or a polymorphic result.
 
 ```i
-Gen(A) { Gen((Int, random.Generator) -> Option(Tree(A))) }
-Tree(A) { Tree(value: A, children: () -> List(Tree(A))) }
-Config {
-  Config(seed: Int, cases: Int, max_size: Int, max_discards: Int, max_shrinks: Int)
-}
-BuildError { InvalidRange(Int, Int) InvalidLength(Int, Int) EmptyChoice }
-Verdict { Pass Fail(String) Discard }
-Failure(A) {
-  Failure(seed: Int, attempt: Int, size: Int, original: A, smallest: A,
-    reason: String, path: List(Int), checked: Int, limited: Bool)
-}
-Report(A) {
-  Passed(successes: Int, discards: Int)
-  GaveUp(successes: Int, discards: Int)
-  Falsified(Failure(A))
-  InvalidConfig(String)
-}
+Gen(A) = ((Int, random.Generator) -> Option(Tree(A)))
+Tree(A) = (value = A, children = () -> List(Tree(A)))
+Config = (
+	seed = Int,
+	cases = Int,
+	max_size = Int,
+	max_discards = Int,
+	max_shrinks = Int,
+)
+InvalidRange = (Int, Int)
+InvalidLength = (Int, Int)
+EmptyChoice = ()
+BuildError = InvalidRange | InvalidLength | EmptyChoice
+Pass = ()
+Fail = (String)
+Discard = ()
+Verdict = Pass | Fail | Discard
+Failure(A) = (
+	seed = Int,
+	attempt = Int,
+	size = Int,
+	original = A,
+	smallest = A,
+	reason = String,
+	path = List(Int),
+	checked = Int,
+	limited = Bool,
+)
+Passed = (successes = Int, discards = Int)
+GaveUp = (successes = Int, discards = Int)
+Falsified(A) = (Failure(A))
+InvalidConfig = (String)
+Report(A) = Passed | GaveUp | Falsified(A) | InvalidConfig
 ```
 
 ```text
@@ -171,19 +187,24 @@ written recursive result types, never polymorphic recursion. An ordinary client:
 ```i
 (
 	testlib = (test) = std/test
-
-  i/core
-  std/list
-  std/property
+	i/core
+	std/list
+	std/property
 )
 
-
 test("reverse_twice", () {
-  Ok(item) = property.int(-100, 100)
-  Ok(items) = property.list(item, min: 0, max: 50)
-  property.test(items, property.defaults(), (xs) {
-    assert(list.reverse(list.reverse(xs)) == xs)
-  }, core.inspect)
+	Ok(item) = property.int(-100, 100)
+	Ok(items) = property.list(item, 0, 50)
+	property.test(
+		items,
+		property.defaults(),
+		(xs) {
+			assert(
+				list.reverse(list.reverse(xs)) == xs,
+			)
+		},
+		core.inspect,
+	)
 })
 ```
 
@@ -905,12 +926,11 @@ with nonnegative bounds:
 
 ```i
 dependent = (outer: property.Gen(Int)) {
-  property.flat_map(outer, (n) {
-    property.int(0, n) |> {
-      Ok(inner) -> property.map(inner, (k) { (n, k) })
-      Error(_) -> property.constant((0, 0))
-    }
-  })
+	property.flat_map(outer, (n) {
+		property.int(0, n) |>
+			(Ok(inner)) { property.map(inner, (k) { (n, k) }) }
+			| (Error(_)) { property.constant((0, 0)) }
+	})
 }
 ```
 

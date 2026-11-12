@@ -191,8 +191,8 @@ test("header scopes stop at the first item", async () => {
 test("syntax uses the same token classes as tree-sitter", async () => {
   const grammar = await loadGrammar();
   const tokens = tokenize(grammar, `@custom.rule("example")
-new = (name: "i")
-run: () -> Record ^ String ! Console
+new = (name = "i")
+run: () <- (Fail(String), Console) -> Record
 `);
   const has = (text, scope) => assert.ok(scopesOf(tokens, text).some((s) => s.includes(scope)));
   has("^", "keyword.operator.error.i");

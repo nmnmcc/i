@@ -1,5 +1,4 @@
 //// Taking `Assert` failures (§9.6).
-
 (
 	i/control
 )
@@ -12,12 +11,15 @@
 /// type: (body: () -> A ^ E ! N) -> Result(A, AssertionFailure) ^ E ! N - Assert
 catch = (body) {
 	control.boundary((b) {
-		! Assert = Assert((failure) {
-			control.suspend(b, (k) {
-				control.cancel(k)
-				Error(failure)
-			})
-		})
-		Ok(body())
+		Ok(body()) <- (
+			Assert(
+				fail = (failure) {
+					control.suspend(b, (k) {
+						control.cancel(k)
+						Error(failure)
+					})
+				},
+			),
+		)
 	})
 }

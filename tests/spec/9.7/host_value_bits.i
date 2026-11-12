@@ -6,12 +6,9 @@
 // A bit array from the host whose bits after the end are not 0 stops. The
 // call is in tail position, and it is the first position (§11.7).
 @host("test:bad/v1")
-Bad {
-	Bad(bits: () -> BitArray)
-}
+Bad = (bits = () -> BitArray)
 
-take = (bad ! Bad) { bad.bits() }
-
+take = () <- (bad: Bad) { bad.bits() }
 
 main = () {
 	take()

@@ -7,31 +7,50 @@
 )
 
 test("fake_capabilities", () {
-	! process.Arguments = process.Arguments(() {
-		request.ready(Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>))
-	})
-	assert(process.args() == ["a", "bc"])
-	! process.Environment = process.Environment((name) {
-		request.ready(Error(name))
-	})
-	assert(
-		fail.catch(() { process.env("missing") }) ==
-			Error(process.ProcessError("env", "missing"))
+	{
+		assert(process.args() == ["a", "bc"])
+		{
+			assert(
+				fail.catch(() { process.env("missing") }) ==
+					Error(
+						process.ProcessError(
+							operation = "env",
+							code = "missing",
+						),
+					),
+			)
+			{
+				assert(process.entropy(7) == <<7>>)
+				{
+					assert(process.cwd() == "/fake")
+					Nil
+				} <- (
+					process.WorkingDirectory(
+						cwd = () { request.ready(Ok("/fake")) },
+					),
+				)
+			} <- (process.Entropy(entropy = (n) { request.ready(Ok(<<n>>)) }))
+		} <- (process.Environment(env = (name) { request.ready(Error(name)) }))
+	} <- (
+		process.Arguments(
+			args = () {
+				request.ready(
+					Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>),
+				)
+			},
+		),
 	)
-	! process.Entropy = process.Entropy((n) { request.ready(Ok(<<n>>)) })
-	assert(process.entropy(7) == <<7>>)
-	! process.WorkingDirectory = process.WorkingDirectory(() {
-		request.ready(Ok("/fake"))
-	})
-	assert(process.cwd() == "/fake")
-	Nil
 })
 
 test("host_capabilities", () {
-	assert(core.bit_size(process.entropy(16)) == 128)
+	assert(
+		core.bit_size(process.entropy(16)) == 128,
+	)
 	assert(
 		fail.catch(() { process.entropy(-1) }) ==
-			Error(process.ProcessError("entropy", "invalid"))
+			Error(
+				process.ProcessError(operation = "entropy", code = "invalid"),
+			),
 	)
 	child = process.spawn("sh", ["-c", "exit 3"])
 	assert(process.wait(child) == 3)
@@ -39,7 +58,7 @@ test("host_capabilities", () {
 	process.close(child)
 	assert(
 		fail.catch(() { process.wait(child) }) ==
-			Error(process.ProcessError("wait", "closed"))
+			Error(process.ProcessError(operation = "wait", code = "closed")),
 	)
 	Nil
 })

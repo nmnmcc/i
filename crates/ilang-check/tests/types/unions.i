@@ -1,11 +1,9 @@
 // §4.4: members with one type constructor are put together.
-State(S) {
-	State(get: () -> S, set: (S) -> Nil)
-}
+State(S) = (get = () -> S, set = (S) -> Nil)
 
-use_int = (st ! State(Int)) { 1 }
+use_int = () <- (st: State(Int)) { 1 }
 
-use_string = (st ! State(String)) { 1 }
+use_string = () <- (st: State(String)) { 1 }
 
 // An environment with two forms of an invariant type is a compile error.
 both = () {
@@ -30,4 +28,4 @@ sizes = [(1, 2), (1, 2, 3)]
 bad_diff = (x: List(Int | String) - List(String)) { x }
 
 // The right side of `-` may not have a type variable.
-var_diff(A) = (x: Int - A) { x }
+var_diff = <A>(x: Int - A) { x }

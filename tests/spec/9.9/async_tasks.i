@@ -8,14 +8,11 @@
 )
 
 @host("test:async/v1", "async")
-Later {
-	Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String)
-}
+Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
-
-main = (later ! Later) {
+main = () <- (later: Later) {
 	assert(
 		task.both(() { later.double(21) }, () { later.echo("answer") }) ==
-			(42, "answer")
+			(42, "answer"),
 	)
 }

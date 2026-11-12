@@ -12,7 +12,6 @@ make = (b: BitArray) {
 	x
 }
 
-
 main = () {
 	make(<<1>>)
 	Nil

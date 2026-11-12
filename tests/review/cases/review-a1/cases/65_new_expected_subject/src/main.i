@@ -1,9 +1,3 @@
-User {
-	User(name: String)
-}
+User = (name = String)
 
-f = () {
-	(u) { u.name } |> {
-		g: (User) -> String -> g(User("yes"))
-	}
-}
+f = () { (u) { u.name } |> (g: (User) -> String) { g(User(name = "yes")) } }

@@ -1,4 +1,7 @@
-S(N) { S(() -> Nil ! N) }
-use(N) = (s: S(N)) { S(f) = s f() }
+S(N) = (() <- N -> Nil)
+use = <N>(s: S(N)) {
+	S(f) = s
+	f()
+}
 
 example = () { use(S(() { Nil })) }

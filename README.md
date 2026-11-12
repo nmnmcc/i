@@ -52,10 +52,11 @@ and `i test` give every program the standard service `Io` (`i:io/v1`), which
 is declared in the library module `i/io`. A program that prints imports it:
 
 ```i
-((Io) = i/io)
+(
+	(Io) = i/io
+)
 
-
-main = (io ! Io) { io.print("Hello from i!") }
+main = () <- (io: Io) { io.print("Hello from i!") }
 ```
 
 `print` writes the text and a line feed to the standard output; see

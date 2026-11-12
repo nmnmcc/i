@@ -1,4 +1,7 @@
-S(N) { S(f: () -> Nil ! N) }
-use(N) = (s ! S(N)) -> Nil ! N | S(N) { s.f() }
-run(N) = (body: () -> Nil ! N) { body() }
-helper(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }
+S(N) = (f = () <- N -> Nil)
+use = <N>() <- (s: S(N)) -> Nil { s.f() }
+run = <N>(body: () <- N -> Nil) { body() }
+helper = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	local()
+}

@@ -2,13 +2,11 @@
 // expect: stop "float: result is not finite"
 // at: spec/main:9:2
 // at: spec/main:14:2
-
 big = (x: Float) {
 	y = x *. 1.0
 	// The operator is the innermost expression; its position is its first token.
 	y *. 1.0e300
 }
-
 
 main = () {
 	big(1.0e300)

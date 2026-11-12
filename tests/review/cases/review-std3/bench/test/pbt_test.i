@@ -6,28 +6,26 @@
 	(Some) = std/option
 )
 
-walk = (t: pbt.Tree((Int, Int)), depth: Int) -> Nil ! Assert {
+walk = (t: pbt.Tree((Int, Int)), depth: Int) -> Nil {
 	(n, k) = t.value
 	assert(k >= 0 && k <= n)
-	{ depth > 0 } |> {
-		True  -> list.each(t.children(), (c) { walk(c, depth - 1) })
-		False -> Nil
-	}
+	{ depth > 0 } |>
+		(True) { list.each(t.children(), (c) { walk(c, depth - 1) }) }
+		| (False) { Nil }
 }
 
 test("dependent", () {
 	gen = pbt.flat_map(pbt.int(0, 6), (n) {
 		pbt.map(pbt.int(0, n), (k) { (n, k) })
 	})
-	go = (seed: Int) -> Nil ! Assert {
-		{ seed < 20 } |> {
-			True -> {
+	go = (seed: Int) -> Nil {
+		{ seed < 20 } |>
+			(True) {
 				Some(t) = pbt.sample(gen, 10, random.from_seed(seed))
 				walk(t, 4)
 				go(seed + 1)
 			}
-			False -> Nil
-		}
+			| (False) { Nil }
 	}
 	go(0)
 })
@@ -41,16 +39,19 @@ test("greedy", () {
 
 test("zero_budget", () {
 	never = () { never() }
-	(v, path, checked) = pbt.shrink(pbt.Tree(1, () { never() }), 0, (_) {
-		True
-	})
+	(v, path, checked) = pbt.shrink(pbt.Tree(
+		value = 1,
+		children = () { never() },
+	), 0, (_) { True })
 	assert(v == 1)
 	assert(path == [])
 	assert(checked == 0)
 })
 
 test("cyclic_budget", () {
-	cyclic = () -> pbt.Tree(Int) { pbt.Tree(1, () { [cyclic()] }) }
+	cyclic = () -> pbt.Tree(Int) {
+		pbt.Tree(value = 1, children = () { [cyclic()] })
+	}
 	(v, path, checked) = pbt.shrink(cyclic(), 10, (_) { True })
 	assert(v == 1)
 	assert(list.length(path) == 10)

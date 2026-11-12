@@ -9,13 +9,9 @@
 	far
 )
 
-T {
-	T(Int)
-}
+T = (Int)
 
-Shown {
-	Shown
-}
+Shown = ()
 
 mk = (n: Int) { T(n) }
 

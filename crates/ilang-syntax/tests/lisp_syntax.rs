@@ -484,7 +484,7 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
 fn written_definition_answers_give_parameters_their_own_binder() {
     use ilang_syntax::lisp::definitions::source_definition;
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
-    let source = "Pair(A, B) { Pair(left: A, right: List(B)) }";
+    let source = "Pair(A, B) = (left = A, right = List(B))";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let like = root("x");
@@ -520,7 +520,7 @@ fn written_definition_answers_give_parameters_their_own_binder() {
 fn definition_preserves_record_label_parameter_identity() {
     use ilang_syntax::lisp::definitions::source_definition;
     use ilang_syntax::lisp::syntax::Node;
-    let source = "Box(K) = (K: Int)";
+    let source = "Box(K) = { (k = Int) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let like = root("x");
@@ -775,7 +775,7 @@ fn definition_table_distinguishes_waits_catchable_and_compile_errors() {
     use ilang_syntax::lisp::definition_schedule::Mode;
     use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
     let mut table = DefinitionTable::default();
-    let source = "Box(A) { Box(A) }";
+    let source = "Box(A) = (A)";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty());
     let of = root("Box");
@@ -1359,7 +1359,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         Definition, DefinitionCost, DefinitionTable, Lookup,
     };
     let of = root("Box");
-    let source = "Box(A) { Box(A) }";
+    let source = "Box(A) = (A)";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty());
     let mut table = DefinitionTable::default();

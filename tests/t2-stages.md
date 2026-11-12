@@ -458,16 +458,16 @@ x: v = "GET"
 The annotation reads the exact literal type of v. POST would be rejected.
 
 ```i
-Box(A) { Box(A) }
-boxed = True |> { True -> Box(1) False -> Box(2) }
+Box(A) = (A)
+boxed = True |> (True) { Box(1) } | (False) { Box(2) }
 Box(Number) = boxed
 ```
 
 Number is 1 | 2; no alternative is discarded and no literal is widened.
 
 ```i
-Config(M, P) { Config(method: M, port: P) }
-config = Config("GET", 8080)
+Config(M, P) = (method = M, port = P)
+config = Config(method = "GET", port = 8080)
 ConfigType = config
 ```
 

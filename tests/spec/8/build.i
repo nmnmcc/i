@@ -6,10 +6,9 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -63,14 +62,13 @@ test("strings", () {
 	check(show(<<"h":utf32be>>), "<<0, 0, 0, 104>>")
 	check(show(<<"h":utf32le>>), "<<104, 0, 0, 0>>")
 	cps = core.codepoints("é")
-	cps |> {
-		[c] -> {
+	cps |>
+		([c]) {
 			check(show(<<c:utf8_codepoint>>), "<<195, 169>>")
 			check(show(<<c:utf16le_codepoint>>), "<<233, 0>>")
 			check(show(<<c:utf32be_codepoint>>), "<<0, 0, 0, 233>>")
 		}
-		_ -> panic("no")
-	}
+		| (_) { panic("no") }
 })
 
 test("order", () {

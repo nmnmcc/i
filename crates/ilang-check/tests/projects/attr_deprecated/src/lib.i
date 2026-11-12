@@ -7,9 +7,8 @@
 @deprecated("use fresh")
 old = 1
 
+OldC = ()
 @deprecated("use New")
-Old {
-	OldC
-}
+Old = OldC
 
 fresh = old

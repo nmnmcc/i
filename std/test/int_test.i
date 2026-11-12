@@ -19,27 +19,27 @@ test("absolute_value_negative_test", () {
 })
 
 test("clamp_within_range_test", () {
-	assert(int.clamp(40, min: 30, max: 50) == 40)
+	assert(int.clamp(40, 30, 50) == 40)
 	Nil
 })
 
 test("clamp_below_min_test", () {
-	assert(int.clamp(20, min: 30, max: 50) == 30)
+	assert(int.clamp(20, 30, 50) == 30)
 	Nil
 })
 
 test("clamp_above_max_test", () {
-	assert(int.clamp(60, min: 30, max: 50) == 50)
+	assert(int.clamp(60, 30, 50) == 50)
 	Nil
 })
 
 test("clamp_inverted_range_above_test", () {
-	assert(int.clamp(100, min: 50, max: 30) == 50)
+	assert(int.clamp(100, 50, 30) == 50)
 	Nil
 })
 
 test("clamp_inverted_range_within_test", () {
-	assert(int.clamp(40, min: 50, max: 30) == 40)
+	assert(int.clamp(40, 50, 30) == 40)
 	Nil
 })
 
@@ -314,37 +314,51 @@ test("is_even_large_test", () {
 })
 
 test("is_even_one_false_test", () {
-	assert(core.not(int.is_even(1)))
+	assert(
+		core.not(int.is_even(1)),
+	)
 	Nil
 })
 
 test("is_even_negative_three_false_test", () {
-	assert(core.not(int.is_even(-3)))
+	assert(
+		core.not(int.is_even(-3)),
+	)
 	Nil
 })
 
 test("is_even_large_odd_false_test", () {
-	assert(core.not(int.is_even(10_005)))
+	assert(
+		core.not(int.is_even(10_005)),
+	)
 	Nil
 })
 
 test("is_odd_zero_false_test", () {
-	assert(core.not(int.is_odd(0)))
+	assert(
+		core.not(int.is_odd(0)),
+	)
 	Nil
 })
 
 test("is_odd_two_false_test", () {
-	assert(core.not(int.is_odd(2)))
+	assert(
+		core.not(int.is_odd(2)),
+	)
 	Nil
 })
 
 test("is_odd_negative_two_false_test", () {
-	assert(core.not(int.is_odd(-2)))
+	assert(
+		core.not(int.is_odd(-2)),
+	)
 	Nil
 })
 
 test("is_odd_large_even_false_test", () {
-	assert(core.not(int.is_odd(10_006)))
+	assert(
+		core.not(int.is_odd(10_006)),
+	)
 	Nil
 })
 
@@ -434,22 +448,22 @@ test("divide_by_zero_test", () {
 })
 
 test("divide_zero_by_one_test", () {
-	assert(int.divide(0, by: 1) == Ok(0))
+	assert(int.divide(0, 1) == Ok(0))
 	Nil
 })
 
 test("divide_one_by_zero_test", () {
-	assert(int.divide(1, by: 0) == Error(Nil))
+	assert(int.divide(1, 0) == Error(Nil))
 	Nil
 })
 
 test("divide_truncates_test", () {
-	assert(int.divide(5, by: 2) == Ok(2))
+	assert(int.divide(5, 2) == Ok(2))
 	Nil
 })
 
 test("divide_negative_test", () {
-	assert(int.divide(-99, by: 2) == Ok(-49))
+	assert(int.divide(-99, 2) == Ok(-49))
 	Nil
 })
 
@@ -469,22 +483,22 @@ test("remainder_negative_divisor_test", () {
 })
 
 test("remainder_positive_test", () {
-	assert(int.remainder(13, by: 3) == Ok(1))
+	assert(int.remainder(13, 3) == Ok(1))
 	Nil
 })
 
 test("remainder_negative_dividend_test", () {
-	assert(int.remainder(-13, by: 3) == Ok(-1))
+	assert(int.remainder(-13, 3) == Ok(-1))
 	Nil
 })
 
 test("remainder_positive_by_negative_test", () {
-	assert(int.remainder(13, by: -3) == Ok(1))
+	assert(int.remainder(13, -3) == Ok(1))
 	Nil
 })
 
 test("remainder_both_negative_test", () {
-	assert(int.remainder(-13, by: -3) == Ok(-1))
+	assert(int.remainder(-13, -3) == Ok(-1))
 	Nil
 })
 
@@ -504,22 +518,22 @@ test("modulo_negative_divisor_test", () {
 })
 
 test("modulo_positive_test", () {
-	assert(int.modulo(13, by: 3) == Ok(1))
+	assert(int.modulo(13, 3) == Ok(1))
 	Nil
 })
 
 test("modulo_negative_dividend_test", () {
-	assert(int.modulo(-13, by: 3) == Ok(2))
+	assert(int.modulo(-13, 3) == Ok(2))
 	Nil
 })
 
 test("modulo_positive_by_negative_test", () {
-	assert(int.modulo(13, by: -3) == Ok(-2))
+	assert(int.modulo(13, -3) == Ok(-2))
 	Nil
 })
 
 test("modulo_both_negative_test", () {
-	assert(int.modulo(-13, by: -3) == Ok(-1))
+	assert(int.modulo(-13, -3) == Ok(-1))
 	Nil
 })
 
@@ -534,32 +548,32 @@ test("floor_divide_by_zero_test", () {
 })
 
 test("floor_divide_zero_by_one_test", () {
-	assert(int.floor_divide(0, by: 1) == Ok(0))
+	assert(int.floor_divide(0, 1) == Ok(0))
 	Nil
 })
 
 test("floor_divide_one_by_zero_test", () {
-	assert(int.floor_divide(1, by: 0) == Error(Nil))
+	assert(int.floor_divide(1, 0) == Error(Nil))
 	Nil
 })
 
 test("floor_divide_truncates_test", () {
-	assert(int.floor_divide(5, by: 2) == Ok(2))
+	assert(int.floor_divide(5, 2) == Ok(2))
 	Nil
 })
 
 test("floor_divide_negative_divisor_test", () {
-	assert(int.floor_divide(6, by: -4) == Ok(-2))
+	assert(int.floor_divide(6, -4) == Ok(-2))
 	Nil
 })
 
 test("floor_divide_negative_dividend_test", () {
-	assert(int.floor_divide(-99, by: 2) == Ok(-50))
+	assert(int.floor_divide(-99, 2) == Ok(-50))
 	Nil
 })
 
 test("floor_divide_negative_small_test", () {
-	assert(int.floor_divide(-1, by: 2) == Ok(-1))
+	assert(int.floor_divide(-1, 2) == Ok(-1))
 	Nil
 })
 
@@ -820,57 +834,37 @@ test("bitwise_shift_edge_cases_test", () {
 })
 
 test("range_ascending_test", () {
-	assert(
-		int.range(from: 0, to: 3, with: "", run: (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			"012"
-	)
+	assert(int.range(0, 3, "", (acc, i) { acc <> int.to_string(i) }) == "012")
 	Nil
 })
 
 test("range_descending_test", () {
-	assert(
-		int.range(from: 3, to: 0, with: "", run: (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			"321"
-	)
+	assert(int.range(3, 0, "", (acc, i) { acc <> int.to_string(i) }) == "321")
 	Nil
 })
 
 test("range_empty_test", () {
-	assert(
-		int.range(from: 5, to: 5, with: "", run: (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			""
-	)
+	assert(int.range(5, 5, "", (acc, i) { acc <> int.to_string(i) }) == "")
 	Nil
 })
 
 test("range_with_list_prepend_test", () {
-	assert(
-		int.range(from: 1, to: -2, with: [], run: list.prepend) == [-1, 0, 1]
-	)
+	assert(int.range(1, -2, [], list.prepend) == [-1, 0, 1])
 	Nil
 })
 
 test("range_negative_to_positive_test", () {
-	assert(
-		int.range(from: -2, to: 2, with: [], run: (acc, i) { [i, ..acc] }) ==
-			[1, 0, -1, -2]
-	)
+	assert(int.range(-2, 2, [], (acc, i) { [i, ..acc] }) == [1, 0, -1, -2])
 	Nil
 })
 
 test("range_single_element_test", () {
-	assert(int.range(from: 0, to: 1, with: [], run: list.prepend) == [0])
+	assert(int.range(0, 1, [], list.prepend) == [0])
 	Nil
 })
 
 test("range_sum_test", () {
-	assert(int.range(from: 1, to: 5, with: 0, run: int.add) == 10)
+	assert(int.range(1, 5, 0, int.add) == 10)
 	Nil
 })
 
@@ -884,27 +878,24 @@ test("power_zero_exponent_test", () {
 })
 
 test("power_big_test", () {
-	assert(int.power(2, of: 100) == Ok(1267650600228229401496703205376))
-	assert(
-		int.power(10, of: 30) == Ok(1_000_000_000_000_000_000_000_000_000_000)
-	)
+	assert(int.power(2, 100) == Ok(1267650600228229401496703205376))
+	assert(int.power(10, 30) == Ok(1_000_000_000_000_000_000_000_000_000_000))
 })
 
 test("power_negative_exponent_test", () {
 	assert(int.power(2, -1) == Error(Nil))
 })
 
-test("power_pipe_test", () { assert({ 3 |> int.power(of: 4) } == Ok(81)) })
+test("power_pipe_test", () { assert({ 3 |> int.power(4) } == Ok(81)) })
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
-
 test("parse_more_test", () {
 	assert(int.parse("+7") == Ok(7))
 	assert(int.parse("-0") == Ok(0))
 	assert(
 		int.parse("123456789012345678901234567890") ==
-			Ok(123456789012345678901234567890)
+			Ok(123456789012345678901234567890),
 	)
 	assert(int.parse("") == Error(Nil))
 	assert(int.parse("-") == Error(Nil))
@@ -933,7 +924,9 @@ test("to_base_more_test", () {
 	assert(int.to_base(1, 1) == Error(Nil))
 	big = 1267650600228229401496703205376
 	assert(int.to_base(big, 2) == Ok("1" <> string.repeat("0", 100)))
-	assert(int.parse_base(int.to_base16(big), 16) == Ok(big))
+	assert(
+		int.parse_base(int.to_base16(big), 16) == Ok(big),
+	)
 })
 
 test("digits_more_test", () {
@@ -948,19 +941,19 @@ test("digits_more_test", () {
 })
 
 test("division_more_test", () {
-	assert(int.divide(7, by: 2) == Ok(3))
-	assert(int.divide(-7, by: 2) == Ok(-3))
-	assert(int.divide(7, by: 0) == Error(Nil))
-	assert(int.remainder(-13, by: 3) == Ok(-1))
-	assert(int.remainder(13, by: -3) == Ok(1))
-	assert(int.modulo(-13, by: 3) == Ok(2))
-	assert(int.modulo(13, by: -3) == Ok(-2))
-	assert(int.modulo(-13, by: -3) == Ok(-1))
-	assert(int.modulo(12, by: 3) == Ok(0))
-	assert(int.floor_divide(-7, by: 2) == Ok(-4))
-	assert(int.floor_divide(7, by: -2) == Ok(-4))
-	assert(int.floor_divide(-8, by: 2) == Ok(-4))
-	assert(int.floor_divide(1, by: 0) == Error(Nil))
+	assert(int.divide(7, 2) == Ok(3))
+	assert(int.divide(-7, 2) == Ok(-3))
+	assert(int.divide(7, 0) == Error(Nil))
+	assert(int.remainder(-13, 3) == Ok(-1))
+	assert(int.remainder(13, -3) == Ok(1))
+	assert(int.modulo(-13, 3) == Ok(2))
+	assert(int.modulo(13, -3) == Ok(-2))
+	assert(int.modulo(-13, -3) == Ok(-1))
+	assert(int.modulo(12, 3) == Ok(0))
+	assert(int.floor_divide(-7, 2) == Ok(-4))
+	assert(int.floor_divide(7, -2) == Ok(-4))
+	assert(int.floor_divide(-8, 2) == Ok(-4))
+	assert(int.floor_divide(1, 0) == Error(Nil))
 })
 
 test("big_numbers_test", () {
@@ -980,8 +973,5 @@ test("sum_product_long_test", () {
 })
 
 test("range_long_test", () {
-	assert(
-		int.range(from: 0, to: 1_000_000, with: 0, run: int.add) ==
-			499_999_500_000
-	)
+	assert(int.range(0, 1_000_000, 0, int.add) == 499_999_500_000)
 })

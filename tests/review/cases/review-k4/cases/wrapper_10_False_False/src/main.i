@@ -1,7 +1,10 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
 run = (f) { f() }
 id = (x) { x }
-f(N) = ()  { True |> { True -> use() False -> use() } }
+f = <N>() { True |> (True) { use() } | (False) { use() } }
 
-main = () { ! S(Never) = S(() { Nil }, (_: Never) { Nil }) f() }
+main = () { f() <- (S(() { Nil }, (_: Never) { Nil })) }

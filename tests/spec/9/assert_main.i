@@ -2,12 +2,10 @@
 // expect: stop "assertion failed: assert"
 // at: spec/main:7:2
 // at: spec/main:13:2
-
 positive = (n) {
 	assert(n > 0)
 	n
 }
-
 
 main = () {
 	positive(0)

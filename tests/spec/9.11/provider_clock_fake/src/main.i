@@ -1,6 +1,11 @@
-(i/clock, i/request)
-fake = () { clock.Clock(
-  () { request.ready(Ok(42)) }
-  () { request.ready(Ok(42)) }
-  (_duration: Int) { request.ready(Ok(Nil)) }
-) }
+(
+	i/clock
+	i/request
+)
+fake = () {
+	clock.Clock(
+		monotonic_ns = () { request.ready(Ok(42)) },
+		unix_ns = () { request.ready(Ok(42)) },
+		sleep_ns = (_duration: Int) { request.ready(Ok(Nil)) },
+	)
+}

@@ -1,2 +1,4 @@
-(Scalar)
+(
+	Scalar
+)
 Scalar = Int

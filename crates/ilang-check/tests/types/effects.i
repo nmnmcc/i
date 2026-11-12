@@ -4,48 +4,33 @@
 )
 
 // §9.2: environment parameters and environment statements (rule 9).
-Clock {
-	Clock(now: () -> Int)
-}
+Clock = (now = () -> Int)
 
-Log {
-	Log(write: (line: String) -> Nil)
-}
+Log = (write = (String) -> Nil)
 
-elapsed = (start: Int, clock ! Clock) { clock.now() - start }
+elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
 
-fixed = () {
-	! Clock = Clock(now: () { 42 })
-	elapsed(40)
-}
+fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 
-logged = (log ! Log) {
+logged = () <- (log: Log) {
 	log.write("start")
 	elapsed(1)
 }
 
 // Only Clock is given; Log is still needed.
-half = () {
-	! Clock = Clock(now: () { 1 })
-	logged()
-}
+half = () { logged() <- (Clock(now = () { 1 })) }
 
 // A service may be any value of its type.
-given = (c: Clock) {
-	! Clock = c
-	elapsed(0)
-}
+given = (c: Clock) { elapsed(0) <- (c) }
 
 // §9.3: errors come together by union.
-Http {
-	Http(get: (url: String) -> String ^ Int)
-}
+Http = (get = (String) <- (Fail(Int)) -> String)
 
-fetch = (url, http ! Http) { http.get(url) }
+fetch = (url) <- (http: Http) { http.get(url) }
 
 two = () {
 	a = fetch("a")
-	b = core.byte_slice(a, start: 0, length: 1) |> fail.from_result
+	b = core.byte_slice(a, 0, 1) |> fail.from_result
 	(a, b)
 }
 

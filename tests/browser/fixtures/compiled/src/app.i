@@ -2,7 +2,6 @@
 //// (`bindings/javascript/test`) and of the browsers (`tests/browser`). It
 //// uses the host functions of `tests/browser/fixture-abi.mjs`, and the
 //// async `tick` of `app:clock/v1`.
-
 (
 	i/core
 )
@@ -18,43 +17,36 @@
 )
 
 @host("app:console/v1")
-Console {
-	Console(print: (text: String) -> Nil)
-}
+Console = (print = (String) -> Nil)
 
 @host("app:storage/v1")
-Storage {
-	Storage(read: (key: String) -> String ^ String)
-}
+Storage = (read = (String) <- (Fail(String)) -> String)
 
 @host("app:clock/v1", "async")
-Clock {
-	Clock(later: (x: Float) -> Float ^ String, tick: (n: Int) -> Int)
-}
+Clock = (later = (Float) <- (Fail(String)) -> Float, tick = (Int) -> Int)
 
 @external("app:math/v1", "hypot")
-hypot: (a: Float, b: Float) -> Float
+hypot: (Float, Float) -> Float
 
 /// A sync host export with a sync service: prints, and gives the size.
-greet = (name: String, console ! Console) {
+greet = (name: String) <- (console: Console) {
 	console.print("hello " <> name)
 	core.byte_size(name)
 }
 
 /// A sync host export whose service gives errors.
-lookup = (key: String, storage ! Storage) { storage.read(key) }
+lookup = (key: String) <- (storage: Storage) { storage.read(key) }
 
 /// A host export that calls an external function.
 distance = (a: Float, b: Float) { hypot(a, b) }
 
 /// An async host export: it waits for the host two times.
-wait_sum = (a: Float, b: Float, clock ! Clock) {
+wait_sum = (a: Float, b: Float) <- (clock: Clock) {
 	clock.later(a) +. clock.later(b)
 }
 
 /// An async program entry.
-
-main = (console ! Console, clock ! Clock) {
+main = () <- (console: Console, clock: Clock) {
 	n = clock.tick(41)
 	x = clock.later(1.5)
 	console.print("main " <> core.inspect(n) <> " " <> core.inspect(x))

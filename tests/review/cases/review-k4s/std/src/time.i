@@ -30,7 +30,6 @@
 //// Calendar days, months and years are not duration units. hours(24) is a
 //// fixed 86,400 seconds. Operations use O(1) integer operations; bit costs
 //// depend on integer size. This module does not consult a host clock.
-
 (
 	std/int
 	(Order) = std/order
@@ -58,17 +57,12 @@
 	compare_instants
 )
 
-Duration {
-	Duration(Int)
-}
+Duration = (Int)
 
-Instant {
-	Instant(Int)
-}
+Instant = (Int)
 
-TimeError {
-	DivisionByZero
-}
+DivisionByZero = ()
+TimeError = DivisionByZero
 
 /// Makes a duration from an exact count of nanoseconds.
 nanoseconds = (count: Int) -> Duration { Duration(count) }
@@ -105,10 +99,9 @@ scale = (duration: Duration, by: Int) -> Duration {
 
 /// Divides toward zero, or returns DivisionByZero for a zero divisor.
 divide = (duration: Duration, by: Int) -> Result(Duration, TimeError) {
-	{ by == 0 } |> {
-		True  -> Error(DivisionByZero)
-		False -> Ok(Duration(to_nanoseconds(duration) / by))
-	}
+	{ by == 0 } |>
+		(True) { Error(DivisionByZero) }
+		| (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
 }
 
 compare = (first: Duration, second: Duration) -> Order {

@@ -1,19 +1,16 @@
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
-use(N) = (s ! S(N)) {
-  S(f, ..) = s
-  f()
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f = f, ..) = s
+	f()
 }
 
-wrap = (body, svc: S(Dep)) {
-  ! S(Dep) = svc
-  body()
-}
+wrap = (body, svc: S(Dep)) { body() <- (svc) }
 
 main = () {
-  ! S(Never) = S(() { 1 }, (_: Never) { Nil })
-  wrap(() { use() }, S(() { get() }, (_: Dep) { Nil }))
-  Nil
+	{
+		wrap(() { use() }, S(f = () { get() }, m = (_: Dep) { Nil }))
+		Nil
+	} <- (S(f = () { 1 }, m = (_: Never) { Nil }))
 }
-

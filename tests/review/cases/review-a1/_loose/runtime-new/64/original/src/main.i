@@ -1,4 +1,6 @@
-f = {}
+f = core.never
 
-
-main = () { assert(f == f) Nil }
+main = () {
+	assert(f == f)
+	Nil
+}

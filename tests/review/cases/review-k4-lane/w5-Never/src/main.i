@@ -1,16 +1,10 @@
-S(N) {
-	S(f: () -> Int ! N)
-}
+S(N) = (f = () <- N -> Int)
 
-use(N) = (s ! S(N)) {
-	S(f, ..) = s
+use = <N>() <- (s: S(N)) {
+	S(f = f, ..) = s
 	f()
 }
 
-wrap = (body, svc) {
-	! S(_) = svc
-	body()
-}
+wrap = (body, svc) { body() <- (svc) }
 
-
-main = () { assert(wrap(() { use() }, S(() { 1 })) == 1) }
+main = () { assert(wrap(() { use() }, S(f = () { 1 })) == 1) }

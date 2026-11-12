@@ -1,5 +1,4 @@
 //// The operations that are not written in i (§13).
-
 (
 	not
 	to_float
@@ -99,7 +98,7 @@ byte_size: (String) -> Int
 
 /// The bytes from `start`, `length` of them.
 @external("ilang:core", "byte_slice")
-byte_slice: (String, start: Int, length: Int) -> Result(String, Nil)
+byte_slice: (String, Int, Int) -> Result(String, Nil)
 
 /// The characters in order.
 @external("ilang:core", "codepoints")
@@ -127,7 +126,7 @@ to_lower: (String) -> String
 
 /// The byte offset of the first `find` at or after byte `from`.
 @external("ilang:core", "index_of")
-index_of: (in: String, find: String, from: Int) -> Result(Int, Nil)
+index_of: (String, String, Int) -> Result(Int, Nil)
 
 /// The number of bits.
 @external("ilang:core", "bit_size")
@@ -143,12 +142,12 @@ bit_array_concat: (List(BitArray)) -> BitArray
 
 /// The text form of the value (§11.8).
 @external("ilang:core", "inspect")
-inspect(A): (A) -> String
+inspect: <A>(A) -> String
 
 /// A number from 0 to 2^32 - 1; values that are the same give the same number.
 @external("ilang:core", "hash")
-hash(A): (A) -> Int
+hash: <A>(A) -> Int
 
 /// Whether this value and every capture or held value can cross workers.
 @external("ilang:core", "portable")
-portable(A): (value: A) -> Bool
+portable: <A>(A) -> Bool

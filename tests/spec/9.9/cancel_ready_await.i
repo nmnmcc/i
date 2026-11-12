@@ -9,7 +9,7 @@
 	i/fail
 )
 
-probe = (wait: () -> Nil ! request.Await) {
+probe = (wait: () <- (request.Await) -> Nil) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
@@ -27,7 +27,6 @@ probe = (wait: () -> Nil ! request.Await) {
 	})
 	assert(result == Error("boom"))
 }
-
 
 main = () {
 	borrowed = request.ready(Nil)

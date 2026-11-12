@@ -1,13 +1,7 @@
-S(N) {
-	S(f: () -> Int ! N)
-}
+S(N) = (f = () <- N -> Int)
 
-use(N) = (s ! S(N)) -> Int ! S(N) | N { s.f() }
+use = <N>() <- (s: S(N)) -> Int { s.f() }
 
-fw(N) = (s ! S(N)) -> Int ! N | S(N) { use() }
+fw = <N>() <- (s: S(N)) -> Int { use() }
 
-
-main = () {
-	! S(Never) = S(() { 1 })
-	assert(fw() == 1)
-}
+main = () { assert(fw() == 1) <- (S(f = () { 1 })) }

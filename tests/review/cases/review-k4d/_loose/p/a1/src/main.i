@@ -1,2 +1,5 @@
-S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) -> Nil ! N | S(N) { S(f) = s f() }
+S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) -> Nil {
+	S(f) = s
+	f()
+}

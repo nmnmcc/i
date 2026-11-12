@@ -6,7 +6,6 @@
 )
 
 // `with` runs when an error goes through, before the error is taken.
-
 main = () {
 	r = fail.catch(() {
 		resource.ensure(() { fail.raise("e") }, () { panic("final") })

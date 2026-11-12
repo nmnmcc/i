@@ -12,7 +12,7 @@ fn check_types() {
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "id = (x) { x }\nClock { Clock(now: () -> Int) }\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n",
+        "id = (x) { x }\nClock = (now = () -> Int)\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n",
     )
     .unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -85,10 +85,16 @@ fn front_end_project(source: &str) -> tempfile::TempDir {
 fn a_local_annotation_cannot_hide_an_entry_service() {
     // §4.8 retains the service through the local binding; §10.2 requires
     // a provider before entry. Both annotations have the same finite type.
-    let annotated = "S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
+    let annotated = "S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
 
-main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+main = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	local()
+}";
     for source in [
         annotated.to_string(),
         annotated.replace("local: () -> Nil ! N | S(N)", "local"),
@@ -127,13 +133,19 @@ main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
 fn a_captured_service_row_keeps_callback_dependencies() {
     // §4.5 rule 4 keeps S's argument equal across levels; §4.8 rule 9
     // removes the supplied S(Dependency), leaving Dependency itself.
-    let source = "S(N) { S(() -> Nil ! N) }
-Dependency { Dependency }
-read = (d ! Dependency) { Nil }
-use(N) = (s ! S(N)) { S(f) = s f() }
-apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+    let source = "S(N) = (() <- N -> Nil)
+Dependency = ()
+read = () <- (d: Dependency) { Nil }
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+apply = <N>() {
+	local: () <- N -> Nil = () { use() }
+	local()
+}
 
-main = () { ! S(Dependency) = S(() { read() }) apply() }";
+main = () { apply() <- (S(() { read() })) }";
     for supplied in [false, true] {
         let source = if supplied {
             source.replace(
@@ -216,7 +228,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
     // A1 §3.9 / spec §6.12: a top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.
-    let source = "f = { 0 -> 1  _ -> 2 }\nget = (o) { o |> { Ok(x) -> x } }\n\nmain = () { assert(f(1) == 2)  get(Error(Nil))  Nil }\n";
+    let source = "f = (0) { 1 } | (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(Nil))\n\tNil\n}\n";
     let dir = front_end_project(source);
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["build", "--wat", "--opt", "0", "--project"])

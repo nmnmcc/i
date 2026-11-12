@@ -2,7 +2,7 @@ use ilang_syntax::{format::format, parse_module, print::print_module, shape::can
 
 #[test]
 fn pipe_and_match_keep_their_spelling() {
-    let source = "answer = x |> { 0 -> 1 _ -> 2 }";
+    let source = "answer = x |> (0) { 1 } | (_) { 2 }";
     let (tree, diagnostics) = parse_module(source);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     for printed in [format(source).unwrap(), print_module(&tree)] {
@@ -25,10 +25,10 @@ fn pipe_and_match_keep_their_spelling() {
 fn records_tuples_and_guard_are_distinct() {
     for source in [
         "answer = ()",
-        "answer = (name: 1)",
+        "answer = (name = 1)",
         "answer = (1, 2)",
-        "answer = (x) -> Int ^ String { x }",
-        "answer = x |> { f: (Int) -> Int ? ready -> f(1) _ -> 0 }",
+        "answer = (x) -> Int { x }",
+        "answer = x |> (f: (Int) -> Int ? ready) { f(1) } | (_) { 0 }",
     ] {
         let (_, diagnostics) = parse_module(source);
         assert!(diagnostics.is_empty(), "{source}: {diagnostics:?}");

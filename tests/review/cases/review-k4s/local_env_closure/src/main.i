@@ -1,12 +1,25 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-Dep { Dep(value: Int) }
-get = (d ! Dep) { d.value }
-make = (n: Int) {
- () {
-   ! Dep = Dep(n)
-   ! S(Dep) = S(() { get() Nil }, (_: Dep) { Nil })
-   use()
- }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
 }
-example = () { f = make(7) f() }
+Dep = (value = Int)
+get = () <- (d: Dep) { d.value }
+make = (n: Int) {
+	() {
+		use() <- (
+			Dep(value = n),
+			S(
+				() {
+					get()
+					Nil
+				},
+				(_: Dep) { Nil },
+			),
+		)
+	}
+}
+example = () {
+	f = make(7)
+	f()
+}

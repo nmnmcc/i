@@ -6,7 +6,6 @@
 	i/control
 )
 
-
 main = () {
 	task.local_scope((s) {
 		control.boundary((b) {

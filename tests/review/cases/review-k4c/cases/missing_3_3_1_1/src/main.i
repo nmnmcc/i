@@ -1,9 +1,16 @@
-Dep { Dep }
-get = (d ! Dep) { Nil }
-run(E,N) = (body: () -> Nil ^ E ! N) { body() }
-S(A,B) { S(f: () -> Nil ! A, g: () -> Nil ! B) }
-use(A,B) = (s ! S(A,B)) { s.f() s.g() }
-helper(A,B) = () { ! S(Dep,Dep) = S(() { get() }, () { get() })
-local: () -> Nil ! A | B | S(A,B) = () { use() } local() }
+Dep = ()
+get = () <- (d: Dep) { Nil }
+run = <N>(body: () <- N -> Nil) { body() }
+S(A, B) = (f = () <- A -> Nil, g = () <- B -> Nil)
+use = <A, B>() <- (s: S(A, B)) {
+	s.f()
+	s.g()
+}
+helper = <A, B>() {
+	{
+		local: () <- (S(A, B), ..A) -> Nil = () { use() }
+		local()
+	} <- (S(f = () { get() }, g = () { get() }))
+}
 
 main = () { helper() }

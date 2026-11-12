@@ -5,10 +5,11 @@
 	i/task
 )
 
-
 main = () {
 	c: task.Channel(Int) = task.channel()
 	task.run(() {
-		task.sync(task.choose([task.always(1), task.receive_event(c)]))
+		task.sync(
+			task.choose([task.always(1), task.receive_event(c)]),
+		)
 	})
 }

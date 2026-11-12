@@ -36,34 +36,95 @@ test('fetch provider: GET POST headers status timeout cancel refused streamed bo
   try {
     await mkdir(join(dir, 'src'));
     await writeFile(join(dir, 'i.toml'), `name = "app"\n[dependencies]\nstd = {path = ${JSON.stringify(join(root, 'std'))}}\n[wasm]\nexports = ["app/main.get", "app/main.post", "app/main.headers", "app/main.status", "app/main.timeout", "app/main.cancel", "app/main.stream"]\n`);
-    await writeFile(join(dir, 'src/main.i'), `
-(i/fail, i/core, i/clock, i/task, std/http, std/bit_array, (Some, None) = std/option)
-(get, post, headers, status, timeout, cancel, stream)
-checked(A, E, N) = (body: () -> A ^ E ! N) -> A ^ String ! N { fail.catch(body) |> { Ok(value) -> value Error(e) -> fail.raise(core.inspect(e)) } }
-text = (res: http.Response) { http.body_text(res) |> { Ok(s) -> s Error(_) -> panic("bad UTF-8") } }
+    await writeFile(join(dir, 'src/main.i'), `(
+	i/fail
+	i/core
+	i/clock
+	i/task
+	std/http
+	std/bit_array
+	(Some, None) = std/option
+)
+
+(
+	get
+	post
+	headers
+	status
+	timeout
+	cancel
+	stream
+)
+checked = <A, N>(body: () <- N -> A) -> A {
+	fail.catch(body) |>
+		(Ok(value)) { value }
+		| (Error(e)) { fail.raise(core.inspect(e)) }
+}
+text = (res: http.Response) {
+	http.body_text(res) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }
+}
 get = (url: String) { checked(() { text(http.get(url)) }) }
 post = (url: String) { checked(() { text(http.post(url, <<"posted":utf8>>)) }) }
-headers = (url: String) { checked(() {
- initial = http.request(http.Method("GET"), url)
- req = http.Request(initial.method, initial.target, http.Headers([("X-Request", "sent")]), initial.body, initial.trailers)
- res = http.send(req)
- assert(text(res) == "sent")
- http.header(res.headers, "X-Provider") |> { Some(s) -> s None -> panic("missing response header") }
-}) }
-status = (url: String) { checked(() { http.Status(n) = http.get(url).status\n n }) }
-timeout = (url: String) { checked(() { text(http.send_timeout(http.client(), http.request(http.Method("GET"), url), 20000000)) }) }
-cancel = (url: String) { checked(() { task.race(() { text(http.get(url)) }, () { clock.sleep_ns(100000000)\n "cancelled" }) }) }
-stream = (url: String) { checked(() {
- reader = http.send_stream(http.request(http.Method("GET"), url))
- first = reader.read(5)
- assert(first == <<"first":utf8>>)
- assert(text(http.get(url <> "/advance")) == "advanced")
- second = reader.read(6)
- assert(second == <<"second":utf8>>)
- assert(reader.read(1) == <<>>)
- reader.close()
- "stream ok"
-}) }
+headers = (url: String) {
+	checked(() {
+		initial = http.request(http.Method("GET"), url)
+		req = http.Request(
+			method = initial.method,
+			target = initial.target,
+			headers = http.Headers([("X-Request", "sent")]),
+			body = initial.body,
+			trailers = initial.trailers,
+		)
+		res = http.send(req)
+		assert(text(res) == "sent")
+		http.header(res.headers, "X-Provider") |>
+			(Some(s)) { s }
+			| (None) { panic("missing response header") }
+	})
+}
+status = (url: String) {
+	checked(() {
+		http.Status(n) = http.get(url).status
+		n
+	})
+}
+timeout = (url: String) {
+	checked(() {
+		text(
+			http.send_timeout(
+				http.client(),
+				http.request(http.Method("GET"), url),
+				20000000,
+			),
+		)
+	})
+}
+cancel = (url: String) {
+	checked(() {
+		task.race(
+			() { text(http.get(url)) },
+			() {
+				clock.sleep_ns(100000000)
+				"cancelled"
+			},
+		)
+	})
+}
+stream = (url: String) {
+	checked(() {
+		reader = http.send_stream(http.request(http.Method("GET"), url))
+		first = reader.read(5)
+		assert(first == <<"first":utf8>>)
+		assert(
+			text(http.get(url <> "/advance")) == "advanced",
+		)
+		second = reader.read(6)
+		assert(second == <<"second":utf8>>)
+		assert(reader.read(1) == <<>>)
+		reader.close()
+		"stream ok"
+	})
+}
 `);
     execFileSync(cli, ['build', '--project', dir, '--target', 'js', '--opt', '0'], { stdio: 'pipe' });
     const wasm = await readFile(join(dir, 'build/app.wasm'));

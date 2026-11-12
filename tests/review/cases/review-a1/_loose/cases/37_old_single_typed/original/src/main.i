@@ -1,1 +1,5 @@
-f = (v: Int) { case v { x: Int -> x } }
+f = (v: Int) {
+	case
+	v
+	(x: Int) { x }
+}

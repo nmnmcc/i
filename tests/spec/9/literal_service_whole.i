@@ -6,13 +6,8 @@
 	testlib = (test) = std/test
 )
 
-Counter(A) {
-	Counter(get: () -> A)
-}
+Counter(A) = (get = () -> A)
 
-read = (c ! Counter(Int)) { c.get() }
+read = () <- (c: Counter(Int)) { c.get() }
 
-test("whole", () {
-	! Counter(Int) = Counter(get: () { 0 })
-	assert(read() == 0)
-})
+test("whole", () { assert(read() == 0) <- (Counter(get = () { 0 })) })

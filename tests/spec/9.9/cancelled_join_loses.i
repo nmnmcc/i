@@ -8,29 +8,33 @@
 	i/fail
 )
 
-
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(() {
-					task.send(armed, Nil)
-					task.sync(task.never())
-				}, () {
-					dropped = task.go(s, () { Nil })
-					assert(
-						fail.catch(() {
-							task.sync(
-								task.choose([
-									task.always(Nil)
-									task.join_event(dropped)
-								])
-							)
-						}) ==
-							Ok(Nil)
-					)
-				})
+				resource.ensure(
+					() {
+						task.send(armed, Nil)
+						task.sync(task.never())
+					},
+					() {
+						dropped = task.go(s, () { Nil })
+						assert(
+							fail.catch(() {
+								task.sync(
+									task.choose(
+										[
+											task.always(Nil),
+											task.join_event(dropped),
+										],
+									),
+								)
+							}) ==
+								Ok(Nil),
+						)
+					},
+				)
 			})
 			task.receive(armed)
 			fail.raise("boom")
