@@ -508,7 +508,7 @@ fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> Stri
         .stderr(Stdio::piped());
     match workers {
         Some(n) => command.env("I_WORKERS", n.to_string()),
-        None => command.env_remove("I_WORKERS"),
+        None => command.env("I_WORKERS", "auto"),
     };
     let mut server = Server(command.spawn().unwrap());
     let mut line = String::new();
@@ -613,9 +613,9 @@ main = () {{
 }
 
 /// The echo example (a nested run, which stays one worker) still serves
-/// three simultaneous connections with the default worker count.
+/// three simultaneous connections with `I_WORKERS=auto`.
 #[test]
-fn echo_example_serves_three_connections_with_default_workers() {
+fn echo_example_serves_three_connections_with_auto_workers() {
     let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/echo");
     serve_clients(&project, None, 3);
 }

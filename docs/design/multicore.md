@@ -637,58 +637,38 @@ MC-I. These are fixed semantics, not choices left to that prototype.
 
 ## 19. First native implementation (lane mc, 2026-11-13)
 
-What the first native multicore runtime does, and where it is narrower than
-D8/N7/N8. It changes no program: every difference below costs parallelism
-only.
-
-- **Workers.** One module, N instances: the entry's instance is worker 0;
-  workers 1..N-1 each have their own `Store` on their own OS thread
-  (`crates/ilang-host/src/workers.rs`), started lazily when a record is
-  published. N is `I_WORKERS`, else the available cores (native.md N5 left the
-  override open; an environment variable reaches `i run`, `i test` and the
-  native runner alike). Macro programs and the WASI/JS hosts run one worker.
-  More than one worker turns on epoch instrumentation (N12).
-- **Publication (D8/P1).** At `go`, `i/task` (`publish`) encodes the complete
-  record — a kept start function without the task frame, plus a scheduler
-  with the task's run, root, path and generator — with the runtime codec
-  (`crates/ilang-wasm/src/emit/workers.rs`). A record the codec cannot encode
-  (a boundary, continuation, host reference, request, `Syntax` value or a
-  runtime closure without a code number anywhere in it) is not published and
-  stays local, without a stop. One worker never encodes (N10).
-- **Claim once.** The host queue (`mc_publish`) has one locked transition from
-  Ready to Taken. The maker claims at the task's first turn (`mc_claim`) and
-  runs its retained original; otherwise a remote worker has it.
-- **Speculation instead of shared scheduler state.** All scheduler state stays
-  in worker 0's ordinary i scheduler (N8's "one lock" is that loop). A remote
-  worker runs the body as a speculation: its scheduler's every step, and
-  every import of a remote instance (IO, `panic`, assertion stops), ends the
-  speculation, and the maker runs its original from the start. So a remote
-  worker only completes bodies whose whole run is pure up to their result;
-  its result is then the result the maker would have computed, which keeps
-  D1 and "copy versus share cannot be seen". The waiting home task yields
-  (a cancel point that corresponds to a cancel before the body started).
-- **Results and joins.** A finished speculation gives its encoded completion
-  to the maker (`mc_poll`, `mc_take`); the task then ends at home with it, so
-  joins, scope errors (lowest path, D10), results in argument order and
-  cleanup are the M:1 scheduler's.
-- **Cancellation (N12).** A cancelled waiting task forgets its record
-  (`mc_forget`); a remote worker running it is interrupted at its next epoch
-  tick (1 ms) and makes a new instance.
-- **`scope.share`.** On N workers `share` also stores the encoded value once in
-  the host under (run key id, address); a speculation's `get` reads it there
-  and the host records the read. The maker takes a completion only if every
-  value it read is still stored; the value is dropped when its scope ends.
-- **Identity (D6, partly).** Keys carry ids in field 2 (start-up ids are equal
-  on every worker; worker w then takes ids above `(w + 1) << 56` plus an
-  instance generation), and `==`/`key.read` compare ids, so keyed protocol
-  values survive copies. Closures carry their code number in field 3 (1:
-  `$keep_call`, 2: the root `Assert`, `3 + i`: `$f{i}`), which the decoder
-  uses; function ids for `==` across copies are not implemented.
-- **Not done.** Started tasks never move, so a body that takes any step runs
-  at home (twice, when a remote worker already ran its pure prefix); nested
-  `go` inside a published body is therefore not parallel. D7's top-level
-  portability check is not implemented (a remote worker's top level is its
-  own start-up; host calls at start-up disable remote workers). Codec depth is
-  limited to 1500 nested aggregates (deeper records stay local); list tails
-  shared between lists are copied. Browser workers (shared linear memory,
-  N11) are not implemented.
+- **Workers.** One module, N instances: the entry's instance is worker 0; workers
+  1..N-1 each have their own `Store`, host services and OS thread
+  (`crates/ilang-host/src/workers.rs`), started as records are published. N is 1
+  by default; `I_WORKERS=<n>` or `I_WORKERS=auto` (cores, at most one per GiB of
+  available memory) or `Program::with_workers` opt in. Macro programs, WASI and
+  JS run one worker. More than one worker turns on epoch instrumentation (N12).
+- **Publication (D8/P1, N7).** At `go` in the entry run, `i/task` encodes the
+  complete record (start function with kept services, path, run, root, runner)
+  with the runtime codec (`crates/ilang-wasm/src/emit/workers.rs`, keeps sharing
+  and cycles). A record holding values of worker 0 that cannot move stays local;
+  one holding tokens of worker w is published for w only. Nested runs never
+  publish (runtime §6.5).
+- **Claim once, run where claimed.** The maker claims a record only when no
+  worker is free for it (Go: work goes to idle Ps first); otherwise a worker
+  that holds no task claims it. A claimed task runs on that worker to each next
+  step; started tasks never move (N6).
+- **One locked authority (N8).** All shared scheduler state stays in worker 0's
+  i scheduler. A worker sends each step of its task as a message (the command,
+  with the `finalizing` answers of the task's frames); worker 0 answers, and
+  the answer goes back to the worker holding the stack. Values that cannot move
+  travel as tokens of their worker. Shared values are read from the host
+  transport directly while their scope lives.
+- **IO on every worker.** A worker's requests are started in mirrors of the
+  task's request groups, waited for there and settled through `ilang_settle:*`
+  exports; worker 0 sees a cancellable wait that a `Woken` message ends.
+- **Stops (N12).** A stop on a worker stops the run with its message.
+- **Open: scheduling order with several workers.** With N > 1, outcomes that
+  depend on the order of steps can differ from the one-worker FIFO schedule
+  (e.g. spec 9.9/tasks.i's race winner, 9.9/final_cancel_phases.i's first child
+  cancelled before it starts). Whether D1 permits these is an owner question;
+  hence the default of one worker.
+- **Not done.** Function ids for `==` across copies (a copied closure is not
+  `==` its original); D7's top-level portability walk; worker-local Root/Owner
+  counts are not shared with worker 0; worker token tables are never freed;
+  browser workers (N11); the packaged runner runs one worker.
