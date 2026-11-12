@@ -1,6 +1,6 @@
 {
-  "compiler": "d81eb7e217b3401bb00c3ee26d4f884b538bef7d",
-  "binary_sha256": "6035547c503c6ce8c8452e17a735c5bb934ff449e3c9cfb711e448bc008815f4",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -20,7 +20,7 @@
         "0"
       ],
       "exit": 1,
-      "stdout": "FAIL asyncprobe/qa_corpus_runtime_test.qa_startup\n  missing host function review:pause next\n0 passed, 1 failed\n",
+      "stdout": "FAIL asyncprobe/qa_corpus_runtime_test.qa_startup\n  missing host function review:pause next for service asyncprobe/main.Pause\n0 passed, 1 failed\n",
       "stderr": ""
     },
     "test2": {
@@ -30,7 +30,7 @@
         "2"
       ],
       "exit": 1,
-      "stdout": "FAIL asyncprobe/qa_corpus_runtime_test.qa_startup\n  missing host function review:pause next\n0 passed, 1 failed\n",
+      "stdout": "FAIL asyncprobe/qa_corpus_runtime_test.qa_startup\n  missing host function review:pause next for service asyncprobe/main.Pause\n0 passed, 1 failed\n",
       "stderr": ""
     }
   }

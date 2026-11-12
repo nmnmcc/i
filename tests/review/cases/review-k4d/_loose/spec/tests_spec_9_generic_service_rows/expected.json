@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/generic_service_rows.use : () -> Nil ! N | S(N)\nspec/generic_service_rows.annotated : () -> Nil ! N | S(N)\nspec/generic_service_rows.run : (body: () -> A ^ E ! N) -> A ^ E ! N\nspec/generic_service_rows.finite : () -> Nil ! Assert\nspec/generic_service_rows.get : () -> Int ! Dependency\nspec/generic_service_rows.read : () -> Int ! N | Inner(N)\nspec/generic_service_rows.read_outer : () -> Int ! N | Outer(N)\nspec/generic_service_rows.nested : () -> Nil ! Assert\nspec/generic_service_rows.make : (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)\nspec/generic_service_rows.write : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)\nspec/generic_service_rows.write_annotated : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)\nspec/generic_service_rows.logging : () -> Nil ! Assert\n",
+      "stdout": "spec/generic_service_rows.use : () -> Nil ! N | S(N)\nspec/generic_service_rows.annotated : () -> Nil ! N | S(N)\nspec/generic_service_rows.run : (body: () -> A ^ E ! N) -> A ^ E ! N\nspec/generic_service_rows.generated_test : () -> Nil ! Assert\nspec/generic_service_rows.get : () -> Int ! Dependency\nspec/generic_service_rows.read : () -> Int ! N | Inner(N)\nspec/generic_service_rows.read_outer : () -> Int ! N | Outer(N)\nspec/generic_service_rows.generated_test : () -> Nil ! Assert\nspec/generic_service_rows.make : (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)\nspec/generic_service_rows.write : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)\nspec/generic_service_rows.write_annotated : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)\nspec/generic_service_rows.generated_test : () -> Nil ! Assert\n",
       "stderr": ""
     },
     "test0": {

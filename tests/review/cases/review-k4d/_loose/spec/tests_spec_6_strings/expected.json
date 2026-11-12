@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/strings.check : (got: String, want: String) -> Nil\nspec/strings.append : () -> Nil\nspec/strings.escapes : () -> Nil\n",
+      "stdout": "spec/strings.check : (got: String, want: String) -> Nil\nspec/strings.generated_test : () -> Nil\nspec/strings.generated_test : () -> Nil\n",
       "stderr": "test/strings.i:24:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
     },
     "test0": {

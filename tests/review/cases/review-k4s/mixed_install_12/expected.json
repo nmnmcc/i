@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "",
-      "stderr": "src/main.i:8:1: error[E0305]: `@test` may only be in a module under `test/`\n1 error\n"
+      "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int\napp/main.generated_test : () -> Nil\n",
+      "stderr": "src/main.i:14:2: error[E0515]: `S(Int)` and `S(Int | String)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:15:20: error[E0515]: `_` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 15:2 needs it)\nsrc/main.i:21:18: error[E0501]: `Int - 2` is not a subtype of `String` (the type at 25:72 needs it)\n3 errors\n"
     }
   }
 }

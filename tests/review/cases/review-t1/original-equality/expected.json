@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/main_test.check : (got: String, want: String) -> Nil\nspec/main_test.yes : (b: Bool) -> Nil\nspec/main_test.no : (b: Bool) -> Nil\nspec/main_test.top : (x: A) -> A\nspec/main_test.alias : (x: A) -> A\nspec/main_test.make : () -> (x: A) -> A\nspec/main_test.values : () -> Nil\nspec/main_test.structures : () -> Nil\nspec/main_test.mixed : (x: Int | String | Nil) -> Bool\nspec/main_test.different_types : () -> Nil\nspec/main_test.functions : () -> Nil\n",
+      "stdout": "spec/main_test.check : (got: String, want: String) -> Nil\nspec/main_test.yes : (b: Bool) -> Nil\nspec/main_test.no : (b: Bool) -> Nil\nspec/main_test.top : (x: A) -> A\nspec/main_test.alias : (x: A) -> A\nspec/main_test.make : () -> (x: A) -> A\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\nspec/main_test.mixed : (x: Int | String | Nil) -> Bool\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\n",
       "stderr": "test/main_test.i:36:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:38:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:39:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (§6.9)\ntest/main_test.i:44:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False` (§6.9)\n"
     },
     "test0": {

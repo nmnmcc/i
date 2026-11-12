@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -20,7 +20,7 @@
         "0"
       ],
       "exit": 1,
-      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function review:gate/v1 wait\n0 passed, 1 failed\n",
+      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function review:gate/v1 wait for service app/main.Gate\n0 passed, 1 failed\n",
       "stderr": ""
     },
     "run0": {
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "missing host function review:gate/v1 wait\n"
+      "stderr": "missing host function review:gate/v1 wait for service app/main.Gate\n"
     },
     "test2": {
       "command": [
@@ -40,7 +40,7 @@
         "2"
       ],
       "exit": 1,
-      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function review:gate/v1 wait\n0 passed, 1 failed\n",
+      "stdout": "FAIL app/qa_corpus_runtime_test.qa_startup\n  missing host function review:gate/v1 wait for service app/main.Gate\n0 passed, 1 failed\n",
       "stderr": ""
     },
     "run2": {
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "missing host function review:gate/v1 wait\n"
+      "stderr": "missing host function review:gate/v1 wait for service app/main.Gate\n"
     }
   }
 }

@@ -150,6 +150,16 @@ No language or library surface was added, including state mechanisms.
   and 32 change only error-slot spelling or remove scope's accidental Root
   requirement. All saved budgets and semantic requirements stay intact.
 
+- Reviewed the remaining historical observations: eight only rename
+  macro-generated test bindings, seven add the service to missing host import
+  errors, and 17 follow already-migrated test macros, source positions,
+  declared entry names, scope schemes or parser diagnostics. Runtime test
+  names, pass/fail counts, exit status and saved budgets are preserved.
+  Three old `mixed_install` cases now reach E0515/E0501 instead of the removed
+  built-in @test module restriction; they still reject. The cancelled-read
+  source now checks because `i/net` exports Stream/read; its startup tests
+  succeed at both levels. No semantic requirement was changed for these.
+
 ## Verification
 
 Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec

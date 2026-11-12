@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/main_test.check : (got: String, want: String) -> Nil\nspec/main_test.show : (x: A) -> String\nspec/main_test.pair : (a: A, b: B) -> (A, B)\nspec/main_test.shadowing : () -> Nil\nspec/main_test.values_in_every_place : () -> Nil\nspec/main_test.recursion_inside_closures : () -> Nil\nspec/main_test.parameters_that_name_the_whole_value : () -> Nil\n",
-      "stderr": "test/main_test.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:39:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/main_test.i:52:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stdout": "spec/main_test.check : (got: String, want: String) -> Nil\nspec/main_test.show : (x: A) -> String\nspec/main_test.pair : (a: A, b: B) -> (A, B)\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\n",
+      "stderr": "test/main_test.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:38:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/main_test.i:51:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/main_test.shadowing\npass spec/main_test.values_in_every_place\npass spec/main_test.recursion_inside_closures\npass spec/main_test.parameters_that_name_the_whole_value\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
-      "stderr": "test/main_test.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:39:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/main_test.i:52:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "test/main_test.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:38:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/main_test.i:51:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/main_test.shadowing\npass spec/main_test.values_in_every_place\npass spec/main_test.recursion_inside_closures\npass spec/main_test.parameters_that_name_the_whole_value\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
-      "stderr": "test/main_test.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:39:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/main_test.i:52:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "test/main_test.i:28:4: warning[W0503]: both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)\ntest/main_test.i:38:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`\ntest/main_test.i:51:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
     }
   },
   "transitions": [

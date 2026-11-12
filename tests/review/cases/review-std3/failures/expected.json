@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "review/cases.adapter : (property: () -> Nil ! Assert) -> Nil ! Assert\nreview/cases.one_property_failure : () -> Nil ! Assert\nreview/cases.nan_before_library : () -> Nil\nreview/cases.positive_infinity_before_library : () -> Nil\nreview/cases.negative_infinity_before_library : () -> Nil\nreview/cases.caller_can_catch_final_failure : () -> Nil ! Assert\n",
+      "stdout": "review/cases.adapter : (property: () -> Nil ! Assert) -> Nil ! Assert\nreview/cases.generated_test : () -> Nil ! Assert\nreview/cases.generated_test : () -> Nil\nreview/cases.generated_test : () -> Nil\nreview/cases.generated_test : () -> Nil\nreview/cases.generated_test : () -> Nil ! Assert\n",
       "stderr": ""
     },
     "test0": {
@@ -20,7 +20,7 @@
         "0"
       ],
       "exit": 1,
-      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: std/property v1: falsified\n  seed: 0\n  reason: assert\n  review/cases:7:23\nFAIL review/cases.nan_before_library\n  float: result is not finite\n  review/cases:13:27\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\n  review/cases:15:41\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\n  review/cases:17:41\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
+      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: std/property v1: falsified\nseed: 0\nreason: assert\nreview/cases:12:21\nFAIL review/cases.nan_before_library\n  float: result is not finite\nreview/cases:24:2\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\nreview/cases:29:2\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\nreview/cases:34:2\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
       "stderr": ""
     },
     "test2": {
@@ -30,7 +30,7 @@
         "2"
       ],
       "exit": 1,
-      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: std/property v1: falsified\n  seed: 0\n  reason: assert\n  review/cases:7:23\nFAIL review/cases.nan_before_library\n  float: result is not finite\n  review/cases:13:27\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\n  review/cases:15:41\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\n  review/cases:17:41\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
+      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: std/property v1: falsified\nseed: 0\nreason: assert\nreview/cases:12:21\nFAIL review/cases.nan_before_library\n  float: result is not finite\nreview/cases:24:2\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\nreview/cases:29:2\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\nreview/cases:34:2\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
       "stderr": ""
     }
   }

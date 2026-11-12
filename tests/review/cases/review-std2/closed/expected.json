@@ -1,6 +1,6 @@
 {
-  "compiler": "4ef2d5b7658082974c2281397f48ee64c4fb2cdc",
-  "binary_sha256": "537c9098d10837ed9159f32219871a2aa6f71a5667a87a58775db45bc422e37b",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "probe/main.use : () -> Nil ! N | S(N)\nprobe/main.closed : () -> Nil ! S(Never)\nprobe/main.example : () -> Nil\n",
-      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `example` is not used\n"
+      "stderr": ""
     },
     "test0": {
       "command": [
@@ -21,14 +21,13 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `example` is not used\n"
+      "stderr": ""
     },
     "run0": {
       "command": [
         "run",
         "--opt",
         "0",
-        "--entry",
         "legacy"
       ],
       "exit": 0,
@@ -43,14 +42,13 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `example` is not used\n"
+      "stderr": ""
     },
     "run2": {
       "command": [
         "run",
         "--opt",
         "2",
-        "--entry",
         "legacy"
       ],
       "exit": 0,

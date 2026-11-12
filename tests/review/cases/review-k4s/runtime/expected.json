@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
+  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.marker : Nil\napp/cases.get : () -> Int ! Dep\napp/cases.use : (x: A) -> A ^ E ! N | S(A, E, N)\napp/cases.run : (body: () -> A ^ E ! N) -> A ^ E ! N\napp/cases.forward : (x: A & B) -> B ^ E ! N | S(A & B, E, N)\napp/cases.left : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.right : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.integer : () -> Nil\napp/cases.string : () -> Nil\napp/cases.error : () -> Nil\napp/cases.mutual : () -> Nil\napp/cases.make : (x: Int) -> () -> Int\napp/cases.installed_in_closure : () -> Nil\n",
+      "stdout": "app/main.marker : Nil\napp/cases.get : () -> Int ! Dep\napp/cases.use : (x: A) -> A ^ E ! N | S(A, E, N)\napp/cases.run : (body: () -> A ^ E ! N) -> A ^ E ! N\napp/cases.forward : (x: A & B) -> B ^ E ! N | S(A & B, E, N)\napp/cases.left : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.right : (b: Bool) -> Int ! N | S(Int, Never, N)\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.make : (x: Int) -> () -> Int\napp/cases.generated_test : () -> Nil\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     },
     "test0": {
