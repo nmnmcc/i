@@ -15,12 +15,13 @@ pub mod convert;
 pub mod lisp;
 pub mod lower;
 
-/// The switch of the transition (stage 8 to stage 12): with the environment
-/// variable `I_SYNTAX=3`, every source file is read as syntax three and
-/// lowered to the current tree. Deleted in stage 12.
+/// The switch of the transition (stage 8 to stage 12): every source file is
+/// read as syntax three and lowered to the current tree, unless the
+/// environment variable `I_SYNTAX=2` asks for the syntax before it. Deleted in
+/// stage 12.
 pub fn enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("I_SYNTAX").is_ok_and(|v| v == "3"))
+    *ON.get_or_init(|| std::env::var("I_SYNTAX").map_or(true, |v| v != "2"))
 }
 
 /// Reads a normal-surface file of syntax three into the current tree.
