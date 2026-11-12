@@ -502,7 +502,7 @@ pub fn run(p: &mut Program) {
             },
         );
         p.numeric_log.push(format!(
-            "worker {} origin={i} float-result={}",
+            "worker candidate {} origin={i} proposed-float-result={}",
             worker.0, results[i]
         ));
     }
@@ -534,6 +534,12 @@ pub fn run(p: &mut Program) {
             break;
         }
     }
+    for (&id, worker) in &p.workers {
+        p.numeric_log.push(format!(
+            "worker-key id={} code={} floats={:?} small-ints={:?} float-result={}",
+            id.0, worker.origin.0, worker.floats, worker.ints, worker.float_result
+        ));
+    }
     // Include every appended scalar worker in the frozen pre-inlining set.
     let inline_may = crate::control::may_suspend(p);
     // Inline only original, nonrecursive, transitively non-suspending bodies.
@@ -543,10 +549,25 @@ pub fn run(p: &mut Program) {
             continue;
         };
         let size = rewrite::size(&f.body);
+        let mut projections = false;
+        rewrite::walk(&mut f.body, &mut |s| {
+            if matches!(
+                s,
+                Stmt::Let {
+                    value: Value::Field(_, _) | Value::RecGet(_, _),
+                    ..
+                }
+            ) {
+                projections = true;
+            }
+        });
+        // Projected products repay expansion by removing their objects/arrays.
+        // §9.3 permits this bounded heuristic; the collective worker limit stays 2x.
+        let extra = size * if projections { 2 } else { 1 };
         let limit = if i < source_count {
-            size * 2
+            size + extra
         } else {
-            size + size.min(2 * source_size - growth)
+            size + extra.min(2 * source_size - growth)
         };
         let mut used = size;
         let mut labels = 0;
@@ -573,6 +594,7 @@ pub fn run(p: &mut Program) {
             &p.numeric_locals,
         );
         f.body = body;
+        p.numeric_log.push(format!("inline code={i} source-statements={size} expanded-statements={used} limit={limit} projections={projections}"));
         if i >= source_count {
             growth += used - size;
         }
@@ -930,6 +952,7 @@ fn inline(
             }
         });
         expansion.extend(clone);
+        rewrite::copies(&mut expansion, offset);
         let added = rewrite::size(&expansion);
         if *used + added > limit {
             caller.locals.truncate(offset as usize);

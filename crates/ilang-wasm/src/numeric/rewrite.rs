@@ -230,3 +230,58 @@ pub fn size(stmts: &[Stmt]) -> usize {
         })
         .sum()
 }
+
+/// ANF arguments are already evaluated. Forward fresh, single-definition copies
+/// inside an expansion, retaining its checks, captures and logical actions.
+/// Multiple-definition joins are deliberately excluded.
+pub fn copies(body: &mut Vec<Stmt>, first: Local) {
+    let mut definitions = std::collections::BTreeMap::<Local, Vec<(Value, Option<Site>)>>::new();
+    walk(body, &mut |s| {
+        if let Stmt::Let { dst, value, site } = s
+            && *dst >= first
+        {
+            definitions
+                .entry(*dst)
+                .or_default()
+                .push((value.clone(), *site));
+        }
+    });
+    let aliases = definitions
+        .into_iter()
+        .filter_map(|(dst, values)| {
+            if values.len() == 1
+                && let (Value::Atom(a), None) = &values[0]
+                && *a != Atom::Local(dst)
+            {
+                Some((dst, a.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    walk(body, &mut |s| {
+        operands(s, &mut |a| {
+            while let Atom::Local(l) = a
+                && let Some(source) = aliases.get(l)
+            {
+                *a = source.clone();
+            }
+        })
+    });
+    fn prune(body: &mut Vec<Stmt>, aliases: &std::collections::BTreeMap<Local, Atom>) {
+        for s in body.iter_mut() {
+            match s {
+                Stmt::Block { body, .. } => prune(body, aliases),
+                Stmt::If {
+                    then, otherwise, ..
+                } => {
+                    prune(then, aliases);
+                    prune(otherwise, aliases);
+                }
+                _ => {}
+            }
+        }
+        body.retain(|s| !matches!(s, Stmt::Let { dst, .. } if aliases.contains_key(dst)));
+    }
+    prune(body, &aliases);
+}

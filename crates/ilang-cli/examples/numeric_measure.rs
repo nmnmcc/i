@@ -69,16 +69,43 @@ fn main() -> anyhow::Result<()> {
         // Add instrumentation after optimization, with new functions/globals at
         // the end so all numeric indices in the original module stay valid.
         let mut instrumented = String::new();
-        for line in text.lines() {
+        let mut allocation_sites = Vec::new();
+        let mut function = String::new();
+        for (line_number, line) in text.lines().enumerate() {
+            if line.trim_start().starts_with("(func ") {
+                function = line.trim().to_owned();
+            }
             if line.trim_start().starts_with("struct.new")
                 || line.trim_start().starts_with("array.new")
             {
                 instrumented.push_str("    (global.set $numeric_allocations (i64.add (global.get $numeric_allocations) (i64.const 1)))\n");
+                let site = allocation_sites.len();
+                writeln!(
+                    instrumented,
+                    "(global.set $numeric_site{site} (i64.add (global.get $numeric_site{site}) (i64.const 1)))"
+                )?;
+                allocation_sites.push((line_number + 1, function.clone(), line.trim().to_owned()));
             }
             writeln!(instrumented, "{line}")?;
         }
         let end = instrumented.rfind(')').unwrap();
-        instrumented.insert_str(end, "(global $numeric_allocations (mut i64) (i64.const 0))\n(func (export \"numeric_count\") (result i64) (global.get $numeric_allocations))\n(func (export \"numeric_reset\") (global.set $numeric_allocations (i64.const 0)))\n");
+        let mut counters = String::from(
+            "(global $numeric_allocations (mut i64) (i64.const 0))\n(func (export \"numeric_count\") (result i64) (global.get $numeric_allocations))\n",
+        );
+        for site in 0..allocation_sites.len() {
+            writeln!(
+                counters,
+                "(global $numeric_site{site} (mut i64) (i64.const 0))\n(func (export \"numeric_site{site}\") (result i64) (global.get $numeric_site{site}))"
+            )?;
+        }
+        counters.push_str(
+            "(func (export \"numeric_reset\") (global.set $numeric_allocations (i64.const 0))\n",
+        );
+        for site in 0..allocation_sites.len() {
+            writeln!(counters, "(global.set $numeric_site{site} (i64.const 0))")?;
+        }
+        counters.push_str(")\n");
+        instrumented.insert_str(end, &counters);
         let ipath = output.join(format!("{name}-count.wat"));
         std::fs::write(&ipath, instrumented)?;
         let counted = output.join(format!("{name}-count.wasm"));
@@ -110,8 +137,9 @@ fn main() -> anyhow::Result<()> {
                 .call(&mut store, ())?;
             runs.push((store, instance));
         }
-        variants.push((name, bytes.len(), runs));
+        variants.push((name, bytes.len(), runs, allocation_sites));
     }
+    let mut site_observations = Vec::new();
     let mut csv =
         String::from("variant,kernel,batch,sample,net_ns,allocations,result_bits,module_bytes\n");
     let mut summary = String::from("variant,kernel,batch,median_ns,allocations,module_bytes\n");
@@ -127,7 +155,7 @@ fn main() -> anyhow::Result<()> {
         for batch in 0..5 {
             let order = if batch % 2 == 0 { [0, 1, 2] } else { [2, 1, 0] };
             for index in order {
-                let (variant, size, runs) = &mut variants[index];
+                let (variant, size, runs, allocation_sites) = &mut variants[index];
                 let name = format!("ilang:numeric/kernels.{kernel}");
                 // Discover the actual export spelling through the ABI.
                 let abi = ilang_host::Abi::from_wasm(&std::fs::read(
@@ -166,6 +194,20 @@ fn main() -> anyhow::Result<()> {
                 let count = instance
                     .get_typed_func::<(), i64>(&mut *store, "numeric_count")?
                     .call(&mut *store, ())?;
+                if batch == 0 {
+                    let mut sum = 0;
+                    for (site, (line, function, instruction)) in allocation_sites.iter().enumerate()
+                    {
+                        let executed = instance
+                            .get_typed_func::<(), i64>(&mut *store, &format!("numeric_site{site}"))?
+                            .call(&mut *store, ())?;
+                        sum += executed;
+                        if executed != 0 {
+                            site_observations.push(serde_json::json!({ "variant": variant, "kernel": kernel, "site": site, "line": line, "function": function, "instruction": instruction, "count": executed }));
+                        }
+                    }
+                    assert_eq!(sum, count, "per-site allocation counts sum to the total");
+                }
                 let (store, instance) = &mut runs[0];
                 let function = instance.get_func(&mut *store, &export).unwrap();
                 let identity = instance.get_func(&mut *store, &identity).unwrap();
@@ -201,6 +243,10 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
+    std::fs::write(
+        output.join("allocation-sites.json"),
+        serde_json::to_vec_pretty(&site_observations)?,
+    )?;
     std::fs::write(output.join("samples.csv"), csv)?;
     std::fs::write(output.join("medians.csv"), summary)?;
     Ok(())

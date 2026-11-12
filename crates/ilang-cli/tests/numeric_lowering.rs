@@ -217,6 +217,13 @@ fn corpus() -> Vec<Case> {
         events: vec!["before".into()],
     });
     cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    cases.push(Case {
+        body: "{ f = make_float(x) g = make_float(x) r = (value: x, callback: f) s = (value: x, callback: f) t = (value: x, callback: g) core.inspect(f == f && f != g && r == s && r != t) }".into(),
+        input: Value::Float(-0.0), expected: "True".into(), stop: false, events: vec![],
+    });
+    for (x, expected) in [(-1.0, -0.5), (1.0, 0.0)] {
+        cases.push(float_case("{ a = { x <. 0.0 } |> { True -> x False -> \"s\" } a |> { v: Float -> v +. 0.5 _ -> 0.0 } }", x, expected));
+    }
     // N5: exact rounded chains under dominating bounds, and chains whose
     // middle result overflows even though the final expression would be finite.
     for n in 0..24 {
@@ -360,6 +367,7 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
 (i/core, i/control, i/resource)
 @external("numeric:events", "record")
 record: (String) -> Nil
+make_float = (x: Float) { (v: Float) -> Float { v +. x } }
 bounded_float = (x: Float) -> Float {
  { x >=. -.1.0 } |> { False -> x True -> {
   { x <=. 1.0 } |> { False -> x True -> { a = x *. 0.5 +. 0.25 a *. 0.5 -. 0.125 } }
@@ -456,6 +464,11 @@ resumed_h = (x: Float) -> Float {
             );
         }
         let wasm = ilang_cli::optimize(&wasm, ilang_cli::level(opt).unwrap()).unwrap();
+        if let Some(path) = std::env::var_os("NUMERIC_WASM_DUMP") {
+            let path = std::path::PathBuf::from(path);
+            std::fs::create_dir_all(&path).unwrap();
+            std::fs::write(path.join(format!("o{opt}-{mode:?}.wasm")), &wasm).unwrap();
+        }
         let compiled = Program::from_bytes(&wasm).unwrap();
         let mut observations = Vec::new();
         for (i, case) in cases.iter().enumerate() {
@@ -511,6 +524,30 @@ resumed_h = (x: Float) -> Float {
         } else {
             oracle = Some(observations);
         }
+    }
+    if let Some(path) = std::env::var_os("NUMERIC_WASM_DUMP") {
+        let cases = cases
+            .iter()
+            .enumerate()
+            .map(|(i, case)| {
+                let input = match &case.input {
+                    Value::Int(n) => serde_json::json!({ "kind": "int", "value": n.to_string() }),
+                    Value::Float(x) => {
+                        serde_json::json!({ "kind": "float", "bits": x.to_bits().to_string() })
+                    }
+                    _ => unreachable!(),
+                };
+                serde_json::json!({ "export": exports[i], "input": input, "stop": case.stop })
+            })
+            .collect::<Vec<_>>();
+        std::fs::write(
+            std::path::PathBuf::from(path).join("cases.json"),
+            serde_json::to_vec(
+                &serde_json::json!({ "cases": cases, "observations": oracle.unwrap() }),
+            )
+            .unwrap(),
+        )
+        .unwrap();
     }
 }
 

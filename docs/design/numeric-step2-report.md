@@ -35,8 +35,10 @@ Measurements use tests/perf/numeric and the existing numeric_measure example.
 NUMERIC_BASELINE selects the previous stage's optimized Wasm, paired against the
 current compiler, so all variants use the same Wasmtime build and timer. Raw
 samples, five batch medians, optimized WAT and allocation instrumentation are in
-target/numeric-step2/. Counts include the 12-allocation host-wrapper overhead;
-allocation gates below subtract that overhead.
+target/numeric-step2/. Tables show raw allocation counts. The entry/root wrapper
+has 11 nonnumeric allocations; input/result Float boxes remain in the allocation
+gates after subtracting those 11. N1 identity has 12 raw allocations, while the
+scalar-entry adapter currently gives N2–N5 identity 13.
 
 N2 first paired measurement (five batch medians, ns; not a quiet timing claim):
 
@@ -71,8 +73,8 @@ N3 paired batch medians (ns), compared with N2:
 | tuples | [50, 40, 59, 60, 50] | [49, 49, 49, 40, 50] | 13 |
 | closures | [1792, 1723, 1723, 1793, 1753] | [1733, 1743, 1823, 1812, 1744] | 16 |
 
-The tuple allocation target is met: 13 raw allocations, one after subtracting
-the wrapper, with no tuple/backing-array allocation. The sine survivor still
+The tuple allocation target is met: 13 raw allocations, two after subtracting
+the nonnumeric wrapper, with no tuple/backing-array allocation. The sine survivor still
 crosses larger record-returning helpers; out-of-line multivalue is deferred by R5.
 
 N4 adds signed-i31 worker entry guards. Parameter aliases feed widened i64
