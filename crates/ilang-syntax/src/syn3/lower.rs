@@ -960,7 +960,9 @@ impl Cx {
                 name: id(name),
             },
             n::ExprKind::Data(items) => {
-                if items.iter().all(|i| matches!(i, n::DItem::Pos(_))) && !items.is_empty() {
+                // `()` is the empty data, a value and a pattern of the type
+                // `()` (§7.1 row 7): an empty tuple, as its pattern is.
+                if items.iter().all(|i| matches!(i, n::DItem::Pos(_))) {
                     o::ExprKind::Tuple(
                         items
                             .iter()
