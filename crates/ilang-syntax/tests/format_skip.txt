@@ -56,3 +56,4 @@ parse tests/spec/6/syn2_old_mixed_tuple.i
 parse tests/spec/7/suffix_nonliteral.i
 parse tests/spec/7/suffix_two_binders.i
 parse tests/spec/7/syn2_old_empty_tuple_pattern.i
+parse tests/syn3/services/src/main.i
