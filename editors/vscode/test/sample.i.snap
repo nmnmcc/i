@@ -347,12 +347,14 @@
 "{"  punctuation.brackets.curly.i
 "__ignored"  variable.language.discard.i
 "}"  punctuation.brackets.curly.i
+"{"  punctuation.brackets.curly.i
 "1"  constant.numeric.integer.decimal.i
 "|>"  keyword.operator.pipe.i
 "plus"  entity.name.function.call.i
 "("  punctuation.brackets.round.i
 "2"  constant.numeric.integer.decimal.i
 ")"  punctuation.brackets.round.i
+"}"  punctuation.brackets.curly.i
 "=="  keyword.operator.comparison.i
 "3"  constant.numeric.integer.decimal.i
 "!="  keyword.operator.comparison.i
