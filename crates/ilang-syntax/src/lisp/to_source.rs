@@ -136,15 +136,6 @@ fn normal_module(document: &Document) -> Result<(String, Vec<(Span, usize)>)> {
     Ok((output, anchors))
 }
 
-/// Convert to normal source and transfer standalone comments at item and
-/// statement boundaries. Return the spans of comments that cannot be kept.
-pub fn normal_with_comments(source: &str, document: &Document) -> Result<(String, Vec<Span>)> {
-    let (output, anchors) = normal_module(document)?;
-    // Validate the same item and statement forms as the core conversion.
-    let _ = super::to_ast::parse_module(document)?;
-    Ok(super::comments::transfer_anchored(source, output, anchors))
-}
-
 pub(super) fn import_name(d: &Datum) -> Result<String> {
     match &d.kind {
         K::Name(s) | K::UpName(s) => Ok(s.clone()),
@@ -295,104 +286,6 @@ mod deep_tests {
             format!("value = {}x{}\n", "f(".repeat(10000), ")".repeat(10000))
         );
     }
-    #[test]
-    fn deep_comment_conversion_is_linear_and_keeps_the_anchor() {
-        struct Frame {
-            call: usize,
-            curly: usize,
-            stmt: usize,
-        }
-        fn at(kind: K, start: usize, end: usize) -> Datum {
-            Datum {
-                kind,
-                span: Span::new(start as u32, end as u32),
-                docs: vec![],
-            }
-        }
-        let mut source = String::from("(= value ");
-        let mut frames = Vec::new();
-        for depth in 0..10000 {
-            let call = source.len();
-            source.push_str("(f { ");
-            let curly = call + 3;
-            if depth == 5000 {
-                source.push_str("\n// marker\n");
-            }
-            let stmt = source.len();
-            source.push_str("(= v ");
-            frames.push(Frame { call, curly, stmt });
-        }
-        let x = source.len();
-        source.push('x');
-        let mut value = at(K::Name("x".into()), x, x + 1);
-        for frame in frames.into_iter().rev() {
-            source.push(')');
-            let statement = at(
-                K::Round(vec![
-                    at(K::Symbol("=".into()), frame.stmt + 1, frame.stmt + 2),
-                    at(K::Name("v".into()), frame.stmt + 3, frame.stmt + 4),
-                    value,
-                ]),
-                frame.stmt,
-                source.len(),
-            );
-            source.push_str(" v");
-            let tail = at(K::Name("v".into()), source.len() - 1, source.len());
-            source.push_str(" })");
-            let curly = at(
-                K::Curly(vec![statement, tail]),
-                frame.curly,
-                source.len() - 1,
-            );
-            value = at(
-                K::Round(vec![
-                    at(K::Name("f".into()), frame.call + 1, frame.call + 2),
-                    curly,
-                ]),
-                frame.call,
-                source.len(),
-            );
-        }
-        source.push(')');
-        let root = at(
-            K::Round(vec![
-                at(K::Symbol("=".into()), 1, 2),
-                at(K::Name("value".into()), 3, 8),
-                value,
-            ]),
-            0,
-            source.len(),
-        );
-        let document = Document {
-            datums: vec![root],
-            trailing_docs: vec![],
-        };
-        let (output, lost) = normal_with_comments(&source, &document).unwrap();
-        assert!(lost.is_empty(), "{lost:?}");
-        assert_eq!(output.matches("// marker").count(), 1);
-        assert!(output.contains("// marker\nv = "));
-    }
-
-    #[test]
-    fn many_comment_insertions_keep_source_order() {
-        let mut source = String::from("(= f (-> () _ {\n");
-        for n in 0..10000 {
-            source.push_str(&format!("// c{n}\nx\n"));
-        }
-        source.push_str("}))\n");
-        let document = super::super::parse(&source).unwrap();
-        let (output, lost) = normal_with_comments(&source, &document).unwrap();
-        assert!(lost.is_empty(), "{lost:?}");
-        let mut at = 0;
-        for n in 0..10000 {
-            let wanted = format!("// c{n}\n");
-            let found = output[at..]
-                .find(&wanted)
-                .expect("comment remains in order");
-            at += found + wanted.len();
-        }
-    }
-
     #[test]
     fn render_long_list_preserves_each_element() {
         let d = datum(K::Square(

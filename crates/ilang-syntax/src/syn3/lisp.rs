@@ -9,81 +9,120 @@
 
 use super::ast::*;
 use crate::lisp::{Datum, DatumKind as K, show};
-use crate::print::string_literal;
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 
-// ---- The tree as Lisp text ----
+// ---- The tree as Lisp datums ----
+//
+// One builder serves the Lisp printer (`to_lisp` is `show` of each datum),
+// and the syntax given to macros. An atom that stands for a written name has
+// the span of that name; a compound has the span of its node; a symbol that
+// the tree does not keep (`,`, `->`, `=`, an operator) has the empty span at
+// the start of its node.
 
-fn form(head: &str, parts: impl IntoIterator<Item = String>) -> String {
-    let parts = parts.into_iter().collect::<Vec<_>>();
-    if parts.is_empty() {
-        format!("({head})")
-    } else {
-        format!("({head} {})", parts.join(" "))
+fn at(kind: K, span: Span) -> Datum {
+    Datum {
+        kind,
+        span,
+        docs: Vec::new(),
     }
 }
 
-fn braced(open: &str, close: &str, parts: impl IntoIterator<Item = String>) -> String {
-    format!(
-        "{open}{}{close}",
-        parts.into_iter().collect::<Vec<_>>().join(" ")
+fn op(text: &str, span: Span) -> Datum {
+    at(K::Symbol(text.into()), Span::new(span.start, span.start))
+}
+
+/// A name as the reader gives it: `Up`, `_discard`, or `name`.
+fn atom(text: &str, span: Span) -> Datum {
+    let kind = if text.starts_with('_') {
+        K::Discard(text.into())
+    } else if text.chars().next().is_some_and(char::is_uppercase) {
+        K::UpName(text.into())
+    } else {
+        K::Name(text.into())
+    };
+    at(kind, span)
+}
+
+fn name(n: &Ident) -> Datum {
+    atom(&n.name, n.span.0)
+}
+
+fn binder(b: &Binder) -> Datum {
+    atom(&b.name, b.span.0)
+}
+
+fn list(span: Span, parts: Vec<Datum>) -> Datum {
+    at(K::Round(parts), span)
+}
+
+fn form(head: &str, span: Span, parts: impl IntoIterator<Item = Datum>) -> Datum {
+    list(
+        span,
+        std::iter::once(op(head, span)).chain(parts).collect(),
     )
 }
 
-fn name(n: &Ident) -> String {
-    n.name.clone()
+/// `(head parts…)` with a head that is a datum itself (a call).
+fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Datum {
+    list(span, std::iter::once(head).chain(parts).collect())
 }
 
-fn qualified(module: &Option<Ident>, n: &Ident) -> String {
-    module
-        .as_ref()
-        .map_or_else(|| name(n), |m| form(".", [name(m), name(n)]))
-}
-
-fn float(x: f64) -> String {
-    let s = format!("{x:?}");
-    match s.split_once('e') {
-        Some((m, e)) if !m.contains('.') => format!("{m}.0e{e}"),
-        _ => s,
+fn qualified(module: &Option<Ident>, n: &Ident, span: Span) -> Datum {
+    match module {
+        Some(m) => form(".", m.span.0.to(n.span.0).to(span), [name(m), name(n)]),
+        None => name(n),
     }
+}
+
+fn string(s: &str, span: Span) -> Datum {
+    at(K::String(s.into()), span)
 }
 
 /// Writes a module in the Lisp surface, one top-level datum per line.
 pub fn to_lisp(m: &Module) -> String {
+    fn text(head: &str, parts: impl IntoIterator<Item = String>) -> String {
+        let parts = parts.into_iter().collect::<Vec<_>>();
+        if parts.is_empty() {
+            format!("({head})")
+        } else {
+            format!("({head} {})", parts.join(" "))
+        }
+    }
+    let plain = |n: &Ident| n.name.clone();
     let mut lines = Vec::new();
     lines.extend(m.doc.iter().map(|d| format!("////{d}")));
     if !m.imports.is_empty() {
-        lines.push(form(
+        lines.push(text(
             ",",
             m.imports.iter().map(|i| {
-                let path = form("/", i.path.iter().map(name));
+                let path = text("/", i.path.iter().map(plain));
                 match (&i.alias, i.names.is_empty()) {
                     (None, true) => path,
-                    (Some(a), true) => form("=", [name(a), path]),
-                    (None, false) => form("=", [form(",", i.names.iter().map(name)), path]),
+                    (Some(a), true) => text("=", [plain(a), path]),
+                    (None, false) => text("=", [text(",", i.names.iter().map(plain)), path]),
                     (Some(a), false) => {
-                        form("=", [name(a), form(",", i.names.iter().map(name)), path])
+                        text("=", [plain(a), text(",", i.names.iter().map(plain)), path])
                     }
                 }
             }),
         ));
     }
     if !m.exports.is_empty() {
-        lines.push(form(
+        lines.push(text(
             ",",
             m.exports.iter().map(|e| {
                 if e.constructors {
-                    form(&e.name.name, ["..".into()])
+                    text(&e.name.name, ["..".into()])
                 } else {
-                    name(&e.name)
+                    plain(&e.name)
                 }
             }),
         ));
     }
     for item in &m.items {
         lines.extend(item.doc.iter().map(|d| format!("///{d}")));
-        lines.push(item_text(item));
+        lines.push(show(&item_datum(item)));
     }
     if lines.is_empty() {
         String::new()
@@ -92,19 +131,26 @@ pub fn to_lisp(m: &Module) -> String {
     }
 }
 
-fn item_text(item: &Item) -> String {
-    let mut text = match &item.kind {
+/// An item as a datum of the rows of §6.8.
+pub fn item_datum(item: &Item) -> Datum {
+    let span = item.span.0;
+    let mut out = match &item.kind {
         ItemKind::Bind(b) => binding(b),
-        ItemKind::Decl { name: n, ty } => form(":", [name(n), typ(ty)]),
+        ItemKind::Decl { name: n, ty } => form(":", span, [name(n), typ(ty)]),
         ItemKind::TypeDef(def) => {
             let head = if def.head.is_empty() {
                 name(&def.name)
             } else {
-                form(&def.name.name, def.head.iter().map(typ))
+                let end = def.head.last().map_or(def.name.span.0, |t| t.span.0);
+                apply(
+                    name(&def.name),
+                    def.name.span.0.to(end),
+                    def.head.iter().map(typ),
+                )
             };
             let rhs = match &def.rhs {
-                TypeRhs::Opaque => "Opaque".to_string(),
-                TypeRhs::Data(items) => data_type(items),
+                TypeRhs::Opaque => atom("Opaque", Span::new(span.end, span.end)),
+                TypeRhs::Data(items) => data_type(items, def.name.span.0.to(span)),
                 TypeRhs::Type(ty) => {
                     let grouped = match &ty.kind {
                         TypeKind::Data(_) => true,
@@ -116,154 +162,196 @@ fn item_text(item: &Item) -> String {
                         _ => false,
                     };
                     if grouped {
-                        format!("{{{}}}", typ(ty))
+                        at(K::Curly(vec![typ(ty)]), ty.span.0)
                     } else {
                         typ(ty)
                     }
                 }
             };
-            form("=", [head, rhs])
+            form("=", span, [head, rhs])
         }
-        ItemKind::Macro { module, name, args } => form(&qualified(module, name), ditems(args)),
+        ItemKind::Macro { module, name, args } => apply(
+            qualified(module, name, name.span.0),
+            span,
+            ditems(args),
+        ),
     };
     for a in item.attributes.iter().rev() {
-        let n = qualified(&a.module, &a.name);
+        let n = qualified(&a.module, &a.name, a.name.span.0);
         let a = match &a.args {
-            Some(args) => form(&n, ditems(args)),
+            Some(args) => apply(n, a.span.0, ditems(args)),
             None => n,
         };
-        text = form("@", [a, text]);
+        let span = a.span.to(out.span);
+        out = form("@", span, [a, out]);
     }
-    text
+    out
 }
 
-fn binding(b: &Binding) -> String {
-    form("=", [pattern(&b.pattern), expr(&b.value)])
+fn binding(b: &Binding) -> Datum {
+    form("=", b.span.0, [pattern(&b.pattern), expr(&b.value)])
 }
 
-fn data_type(items: &[TItem]) -> String {
+fn data_type(items: &[TItem], span: Span) -> Datum {
     form(
         ",",
+        span,
         items.iter().flat_map(|i| match i {
             TItem::Pos(t) => vec![typ(t)],
-            TItem::Label(n, t) => vec![form("=", [name(n), typ(t)])],
-            TItem::Spread(t) => vec!["..".into(), typ(t)],
+            TItem::Label(n, t) => vec![form("=", n.span.0.to(t.span.0), [name(n), typ(t)])],
+            TItem::Spread(t) => vec![op("..", t.span.0), typ(t)],
         }),
     )
 }
 
-fn generics(gs: &[Ident]) -> Option<String> {
-    (!gs.is_empty()).then(|| braced("[", "]", gs.iter().map(name)))
+fn generics(gs: &[Ident]) -> Option<Datum> {
+    let first = gs.first()?;
+    let last = gs.last()?;
+    Some(at(
+        K::Square(gs.iter().map(name).collect()),
+        first.span.0.to(last.span.0),
+    ))
 }
 
-fn typ(t: &Type) -> String {
+/// A type as a datum of the rows of §6.8.
+pub fn type_datum(t: &Type) -> Datum {
+    typ(t)
+}
+
+fn typ(t: &Type) -> Datum {
+    let span = t.span.0;
     match &t.kind {
-        TypeKind::Lit(LitValue::Int(n)) if n.sign() == num_bigint::Sign::Minus => {
-            form("-", [(-n).to_string()])
+        TypeKind::Lit(LitValue::Int(n)) => {
+            let value = at(K::Int(n.magnitude().clone()), span);
+            if n.sign() == num_bigint::Sign::Minus {
+                form("-", span, [value])
+            } else {
+                value
+            }
         }
-        TypeKind::Lit(v) => v.text(),
+        TypeKind::Lit(LitValue::Str(s)) => string(s, span),
         TypeKind::Named { module, name, args } => {
-            let n = qualified(module, name);
+            let n = qualified(module, name, name.span.0);
             if args.is_empty() {
                 n
             } else {
-                form(&n, args.iter().map(typ))
+                apply(n, span, args.iter().map(typ))
             }
         }
-        TypeKind::Call { module, name, args } => {
-            form(&qualified(module, name), args.iter().map(typ))
-        }
-        TypeKind::ValueOf { module, name } => qualified(module, name),
-        TypeKind::Hole => "_".into(),
-        TypeKind::Data(items) => data_type(items),
+        TypeKind::Call { module, name, args } => apply(
+            qualified(module, name, name.span.0),
+            span,
+            args.iter().map(typ),
+        ),
+        TypeKind::ValueOf { module, name } => qualified(module, name, span),
+        TypeKind::Hole => atom("_", span),
+        TypeKind::Data(items) => data_type(items, span),
         TypeKind::Fn(f) => {
             let ret = typ(&f.ret);
             let ret = match &f.services {
-                Some(s) => form("<-", [ret, typ(s)]),
+                Some(s) => form("<-", f.ret.span.0.to(s.span.0), [ret, typ(s)]),
                 None => ret,
             };
             form(
                 "->",
+                span,
                 generics(&f.generics)
                     .into_iter()
                     .chain([typ(&f.param), ret]),
             )
         }
-        TypeKind::Union(ts) => form("|", ts.iter().map(typ)),
-        TypeKind::Inter(ts) => form("&", ts.iter().map(typ)),
-        TypeKind::Diff(ts) => form("-", ts.iter().map(typ)),
+        TypeKind::Union(ts) => form("|", span, ts.iter().map(typ)),
+        TypeKind::Inter(ts) => form("&", span, ts.iter().map(typ)),
+        TypeKind::Diff(ts) => form("-", span, ts.iter().map(typ)),
     }
 }
 
-fn ditems(items: &[DItem]) -> Vec<String> {
+fn ditems(items: &[DItem]) -> Vec<Datum> {
     items
         .iter()
         .flat_map(|i| match i {
             DItem::Pos(e) => vec![expr(e)],
-            DItem::Label(n, e) => vec![form("=", [name(n), expr(e)])],
-            DItem::Spread(e) => vec!["..".into(), expr(e)],
+            DItem::Label(n, e) => vec![form("=", n.span.0.to(e.span.0), [name(n), expr(e)])],
+            DItem::Spread(e) => vec![op("..", e.span.0), expr(e)],
         })
         .collect()
 }
 
-fn segment<X>(s: &Segment<X>, f: impl Fn(&X) -> String) -> String {
+fn segment<X>(s: &Segment<X>, f: impl Fn(&X) -> Datum) -> Datum {
     let v = f(&s.value);
     match &s.format {
         None => v,
         Some(fmt) => {
-            let fmt = fmt
-                .arg
-                .as_ref()
-                .map_or_else(|| name(&fmt.name), |arg| form(&fmt.name.name, [expr(arg)]));
-            form(":", [v, fmt])
+            let fmt = match &fmt.arg {
+                None => name(&fmt.name),
+                Some(arg) => apply(
+                    name(&fmt.name),
+                    fmt.name.span.0.to(arg.span.0),
+                    [expr(arg)],
+                ),
+            };
+            let span = v.span.to(fmt.span);
+            form(":", span, [v, fmt])
         }
     }
 }
 
-fn function(f: &Function) -> String {
+fn function(f: &Function) -> Datum {
+    let span = f.span.0;
+    let head_end = f.body.span.0.start;
+    let head = Span::new(span.start, head_end.max(span.start));
     let items = form(
         ",",
+        head,
         f.params.iter().map(|p| {
+            let cover = p
+                .choices
+                .iter()
+                .map(|c| c.span.0)
+                .reduce(Span::to)
+                .unwrap_or(head);
             let choices = if p.choices.len() == 1 {
                 pattern_parts(&p.choices[0])
             } else {
-                vec![form("|", p.choices.iter().map(pattern))]
+                vec![form("|", cover, p.choices.iter().map(pattern))]
             };
             match &p.key {
-                Some(k) => form("=", std::iter::once(name(k)).chain(choices)),
+                Some(k) => form(
+                    "=",
+                    k.span.0.to(cover),
+                    std::iter::once(name(k)).chain(choices),
+                ),
                 None if choices.len() == 1 => choices.into_iter().next().unwrap(),
-                None => form("=", choices),
+                None => form("=", cover, choices),
             }
         }),
     );
     let params = match &f.guard {
-        Some(g) => form("?", [items, expr(g)]),
+        Some(g) => form("?", head, [items, expr(g)]),
         None => items,
     };
     let ret = match &f.ret {
-        None => "_".to_string(),
-        Some(t) if matches!(t.kind, TypeKind::Hole) => "{_}".to_string(),
+        None => atom("_", Span::new(head_end, head_end)),
+        Some(t) if matches!(t.kind, TypeKind::Hole) => at(K::Curly(vec![typ(t)]), t.span.0),
         Some(t) => typ(t),
     };
     let ret = match &f.services {
         None => ret,
-        Some(items) => form(
-            "<-",
-            [
-                ret,
-                form(
-                    ",",
-                    items.iter().flat_map(|s| {
-                        let item = form(":", [name(&s.name), typ(&s.ty)]);
-                        if s.rest {
-                            vec!["..".into(), item]
-                        } else {
-                            vec![item]
-                        }
-                    }),
-                ),
-            ],
-        ),
+        Some(items) => {
+            let services = form(
+                ",",
+                head,
+                items.iter().flat_map(|s| {
+                    let item = form(":", s.name.span.0.to(s.ty.span.0), [name(&s.name), typ(&s.ty)]);
+                    if s.rest {
+                        vec![op("..", s.name.span.0), item]
+                    } else {
+                        vec![item]
+                    }
+                }),
+            );
+            form("<-", head, [ret, services])
+        }
     };
     let body = match f.body.stmts.as_slice() {
         [Stmt::Expr(e)] => expr(e),
@@ -271,128 +359,167 @@ fn function(f: &Function) -> String {
     };
     form(
         "->",
+        span,
         generics(&f.generics).into_iter().chain([params, ret, body]),
     )
 }
 
-fn block(b: &Block) -> String {
-    braced(
-        "{",
-        "}",
-        b.stmts.iter().map(|s| match s {
-            Stmt::Bind(b) => binding(b),
-            Stmt::Expr(e) => expr(e),
-        }),
+fn block(b: &Block) -> Datum {
+    at(
+        K::Curly(
+            b.stmts
+                .iter()
+                .map(|s| match s {
+                    Stmt::Bind(b) => binding(b),
+                    Stmt::Expr(e) => expr(e),
+                })
+                .collect(),
+        ),
+        b.span.0,
     )
 }
 
-fn expr(e: &Expr) -> String {
+/// An expression as a datum of the rows of §6.8.
+pub fn expr_datum(e: &Expr) -> Datum {
+    expr(e)
+}
+
+fn expr(e: &Expr) -> Datum {
+    let span = e.span.0;
     match &e.kind {
-        ExprKind::Quote(d) => show(&d.0),
-        ExprKind::Int(n) => n.to_string(),
-        ExprKind::Float(n) => float(*n),
-        ExprKind::String(s) => string_literal(s),
+        ExprKind::Quote(d) => (*d.0).clone(),
+        ExprKind::Int(n) => at(K::Int(n.clone()), span),
+        ExprKind::Float(n) => at(K::Float(*n), span),
+        ExprKind::String(s) => string(s, span),
         ExprKind::Interp(parts) => {
             // The Lisp surface has no interpolation: the `<>` of the parts.
-            let mut operands: Vec<String> = parts
+            let mut operands: Vec<Datum> = parts
                 .iter()
                 .map(|p| match p {
-                    InterpPart::Text(s) => string_literal(s),
+                    InterpPart::Text(s) => string(s, Span::new(span.start, span.start)),
                     InterpPart::Expr(e) => expr(e),
                 })
                 .collect();
             if operands.len() == 1 {
-                operands.insert(0, "\"\"".into());
+                operands.insert(0, string("", Span::new(span.start, span.start)));
             }
             let mut it = operands.into_iter();
-            let first = it.next().unwrap_or_else(|| "\"\"".into());
-            it.fold(first, |acc, x| form("<>", [acc, x]))
+            let first = it
+                .next()
+                .unwrap_or_else(|| string("", Span::new(span.start, span.start)));
+            it.fold(first, |acc, x| form("<>", span, [acc, x]))
         }
-        ExprKind::Name { module, name } => qualified(module, name),
-        ExprKind::Data(items) => form(",", ditems(items)),
-        ExprKind::List { items, rest } => braced(
-            "[",
-            "]",
-            items
-                .iter()
-                .map(expr)
-                .chain(rest.iter().flat_map(|r| ["..".into(), expr(r)])),
+        ExprKind::Name { module, name } => qualified(module, name, span),
+        ExprKind::Data(items) => form(",", span, ditems(items)),
+        ExprKind::List { items, rest } => at(
+            K::Square(
+                items
+                    .iter()
+                    .map(expr)
+                    .chain(rest.iter().flat_map(|r| [op("..", r.span.0), expr(r)]))
+                    .collect(),
+            ),
+            span,
         ),
-        ExprKind::BitArray(xs) if xs.is_empty() => "<<>>".into(),
-        ExprKind::BitArray(xs) => braced("<< ", " >>", xs.iter().map(|s| segment(s, expr))),
+        ExprKind::BitArray(xs) => at(K::Bits(xs.iter().map(|s| segment(s, expr)).collect()), span),
         ExprKind::Block(b) => block(b),
         ExprKind::Chain(fs) if fs.len() == 1 => function(&fs[0]),
-        ExprKind::Chain(fs) => form("|", fs.iter().map(function)),
-        ExprKind::Call { callee, args } => form(&expr(callee), ditems(args)),
-        ExprKind::Provide { target, services } => form("<-", [expr(target), expr(services)]),
-        ExprKind::Field { target, name: n } => form(".", [expr(target), name(n)]),
-        ExprKind::Index { target, index } => form(".", [expr(target), index.to_string()]),
+        ExprKind::Chain(fs) => form("|", span, fs.iter().map(function)),
+        ExprKind::Call { callee, args } => apply(expr(callee), span, ditems(args)),
+        ExprKind::Provide { target, services } => form("<-", span, [expr(target), expr(services)]),
+        ExprKind::Field { target, name: n } => form(".", span, [expr(target), name(n)]),
+        ExprKind::Index { target, index } => form(
+            ".",
+            span,
+            [
+                expr(target),
+                at(K::Int(index.clone()), Span::new(span.end, span.end)),
+            ],
+        ),
         ExprKind::Unary { op, expr: e } => form(
             match op {
                 UnOp::Neg => "-",
                 UnOp::NegFloat => "-.",
             },
+            span,
             [expr(e)],
         ),
-        ExprKind::Binary { op, lhs, rhs } => form(op.text(), [expr(lhs), expr(rhs)]),
-        ExprKind::Pipe { lhs, rhs } => form("|>", [expr(lhs), expr(rhs)]),
+        ExprKind::Binary { op, lhs, rhs } => form(op.text(), span, [expr(lhs), expr(rhs)]),
+        ExprKind::Pipe { lhs, rhs } => form("|>", span, [expr(lhs), expr(rhs)]),
     }
 }
 
 /// The parts of a conjunction, or the one pattern.
-fn pattern_parts(p: &Pattern) -> Vec<String> {
+fn pattern_parts(p: &Pattern) -> Vec<Datum> {
     match &p.kind {
         PatternKind::And(parts) => parts.iter().map(pattern).collect(),
         _ => vec![pattern(p)],
     }
 }
 
-fn dpitems(items: &[DPItem]) -> Vec<String> {
+fn dpitems(items: &[DPItem], span: Span) -> Vec<Datum> {
     items
         .iter()
         .flat_map(|i| match i {
             DPItem::Pos(p) => vec![pattern(p)],
-            DPItem::Key(k, p) => vec![form("=", std::iter::once(name(k)).chain(pattern_parts(p)))],
-            DPItem::Rest(None) => vec!["..".into()],
-            DPItem::Rest(Some(b)) => vec!["..".into(), b.name.clone()],
+            DPItem::Key(k, p) => vec![form(
+                "=",
+                k.span.0.to(p.span.0),
+                std::iter::once(name(k)).chain(pattern_parts(p)),
+            )],
+            DPItem::Rest(None) => vec![op("..", Span::new(span.end, span.end))],
+            DPItem::Rest(Some(b)) => vec![op("..", b.span.0), binder(b)],
         })
         .collect()
 }
 
-fn pattern(p: &Pattern) -> String {
+/// A pattern as a datum of the rows of §6.8.
+pub fn pattern_datum(p: &Pattern) -> Datum {
+    pattern(p)
+}
+
+fn pattern(p: &Pattern) -> Datum {
+    let span = p.span.0;
+    let number = |negative: bool, head: &str, value: Datum| {
+        if negative {
+            form(head, span, [value])
+        } else {
+            value
+        }
+    };
     match &p.kind {
-        PatternKind::Quote(d) => show(&d.0),
-        PatternKind::Var(s) | PatternKind::Discard(s) => s.clone(),
-        PatternKind::Typed { binder, ty } => form(":", [binder.name.clone(), typ(ty)]),
+        PatternKind::Quote(d) => (*d.0).clone(),
+        PatternKind::Var(s) | PatternKind::Discard(s) => atom(s, span),
+        PatternKind::Typed { binder: b, ty } => form(":", span, [binder(b), typ(ty)]),
         PatternKind::Int { negative, value } => {
-            if *negative {
-                form("-", [value.to_string()])
-            } else {
-                value.to_string()
-            }
+            number(*negative, "-", at(K::Int(value.clone()), span))
         }
         PatternKind::Float { negative, value } => {
-            if *negative {
-                form("-.", [float(*value)])
-            } else {
-                float(*value)
-            }
+            number(*negative, "-.", at(K::Float(*value), span))
         }
-        PatternKind::String(s) => string_literal(s),
+        PatternKind::String(s) => string(s, span),
         PatternKind::Prefix {
             prefix,
             suffix,
             rest,
         } => {
             let start = if !prefix.is_empty() || suffix.is_empty() {
-                form("<>", [string_literal(prefix), rest.name.clone()])
+                form(
+                    "<>",
+                    span,
+                    [string(prefix, Span::new(span.start, span.start)), binder(rest)],
+                )
             } else {
-                rest.name.clone()
+                binder(rest)
             };
             if suffix.is_empty() {
                 start
             } else {
-                form("<>", [start, string_literal(suffix)])
+                form(
+                    "<>",
+                    span,
+                    [start, string(suffix, Span::new(span.end, span.end))],
+                )
             }
         }
         PatternKind::Ctor {
@@ -400,23 +527,31 @@ fn pattern(p: &Pattern) -> String {
             name: n,
             args,
         } => {
-            let n = qualified(module, n);
+            let head = qualified(module, n, n.span.0);
             match args {
-                None => n,
-                Some(args) => form(&n, dpitems(args)),
+                None => head,
+                Some(args) => apply(head, span, dpitems(args, span)),
             }
         }
-        PatternKind::Data(items) => form(",", dpitems(items)),
-        PatternKind::List { items, rest } => braced(
-            "[",
-            "]",
-            items.iter().map(pattern).chain(rest.iter().flat_map(|r| {
-                std::iter::once("..".into()).chain(r.iter().map(|b| b.name.clone()))
-            })),
+        PatternKind::Data(items) => form(",", span, dpitems(items, span)),
+        PatternKind::List { items, rest } => at(
+            K::Square(
+                items
+                    .iter()
+                    .map(pattern)
+                    .chain(rest.iter().flat_map(|r| {
+                        std::iter::once(op("..", Span::new(span.end, span.end)))
+                            .chain(r.iter().map(binder))
+                    }))
+                    .collect(),
+            ),
+            span,
         ),
-        PatternKind::BitArray(xs) if xs.is_empty() => "<<>>".into(),
-        PatternKind::BitArray(xs) => braced("<< ", " >>", xs.iter().map(|s| segment(s, pattern))),
-        PatternKind::And(parts) => form("=", parts.iter().map(pattern)),
+        PatternKind::BitArray(xs) => at(
+            K::Bits(xs.iter().map(|s| segment(s, pattern)).collect()),
+            span,
+        ),
+        PatternKind::And(parts) => form("=", span, parts.iter().map(pattern)),
     }
 }
 

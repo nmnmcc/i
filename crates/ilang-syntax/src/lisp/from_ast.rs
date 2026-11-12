@@ -1,8 +1,6 @@
 //! Write the core AST as Lisp datums, following the position tables in meta §2.3.
 use crate::ast::*;
 use crate::print::string_literal;
-use crate::span::Span;
-use crate::walk::{Visitor, Walk};
 
 fn form(head: &str, parts: impl IntoIterator<Item = String>) -> String {
     let parts = parts.into_iter().collect::<Vec<_>>();
@@ -106,80 +104,6 @@ pub fn print_module(m: &Module) -> String {
     } else {
         format!("{}\n", lines.join("\n"))
     }
-}
-
-/// Render a module and transfer standalone comments before items/statements.
-/// The returned spans identify comments which could not be transferred.
-pub fn print_with_comments(source: &str, module: &Module) -> (String, Vec<Span>) {
-    render_comments(source, module, false, false)
-}
-
-fn render_comments(
-    source: &str,
-    module: &Module,
-    lisp: bool,
-    keep_all: bool,
-) -> (String, Vec<Span>) {
-    struct Anchors(Vec<(Span, String)>);
-    impl Visitor for Anchors {
-        fn expr(&mut self, e: &mut Expr, enter: bool) {
-            if !enter {
-                return;
-            }
-            let body = match &e.kind {
-                ExprKind::Block(b) => Some(b),
-                ExprKind::Fn(f) => Some(&f.body),
-                _ => None,
-            };
-            if let Some(body) = body {
-                for stmt in &body.stmts {
-                    let span = match stmt {
-                        Stmt::Bind(b) => b.span,
-                        Stmt::Env { span, .. } => *span,
-                        Stmt::Expr(e) => e.span,
-                    };
-                    self.0.push((span, statement(stmt)));
-                }
-            }
-        }
-    }
-    let mut candidates = Anchors(Vec::new());
-    if let Some(span) = module.imports_span {
-        let mut m = module.clone();
-        m.doc.clear();
-        m.items.clear();
-        m.exports.clear();
-        candidates
-            .0
-            .push((span, print_module(&m).trim_end().to_string()));
-    }
-    if let Some(span) = module.exports_span {
-        let mut m = module.clone();
-        m.doc.clear();
-        m.items.clear();
-        m.imports.clear();
-        candidates
-            .0
-            .push((span, print_module(&m).trim_end().to_string()));
-    }
-    for item in &module.items {
-        let mut m = Module::default();
-        let mut item = item.clone();
-        item.doc.clear();
-        m.items.push(item);
-        candidates
-            .0
-            .push((m.items[0].span, print_module(&m).trim_end().to_string()));
-    }
-    module.clone().walk(&mut candidates);
-    super::comments::transfer(
-        source,
-        print_module(module),
-        candidates.0,
-        lisp,
-        keep_all,
-        true,
-    )
 }
 
 fn head(n: &Ident, params: &[Ident]) -> String {

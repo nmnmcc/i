@@ -40,7 +40,7 @@ longer need) once it reads the new tree.
 | `PatternKind::And` | nested `Named` | Parts that are not names: error. |
 | `Ctor { args: [DPItem] }`, `Data([DPItem])` | `Constructor { args, spread }`, `Tuple`; a key is a `Named` chain ending in the label | `Rest(Some)` in data: error. |
 | `TypeKind::Data` | `Tuple`, `Record` | |
-| `TypeKind::Fn(FnType { generics, param, services, ret })` | `Fn { params, ret, err, env }` | **Needs become rows here** (`fn_type`, lower.rs:1259): a `Fail(E)` member of the needs is `err: E`; the other members are the `env` union; `..N` is the row variable. |
+| `TypeKind::Fn(FnType { generics, param, services, ret })` | `Fn { params, ret, err, env }` | **Needs become rows here** (`Cx::needs_row`, called by `fn_type`): a `Fail(E)` member of the needs is `err: E`; the other members are the `env` union; `..N` is the row variable. |
 | `Attribute.args: Option<Vec<DItem>>` | `args: Vec<(String, Span)>` when all are plain strings, else `call` | |
 | `ExprKind::Quote`, `PatternKind::Quote` (rows of §6.8) | the same datum in the rows before syntax three (`lisp::unconvert_quote`) | The macro engine matches and builds the old rows. |
 
@@ -143,17 +143,32 @@ file sees `(-> (, x) _ e)` against a pattern lowered to `(-> (x) _ e)`.
 
 ## 3. What the new tree needs before consumers can move
 
-1. **Deep trees.** An iterative `Drop` for `Expr`, `Pattern`, `Type` and
-   `Block`, as in ast.rs:497. Readers of macro results (`Datum` → tree) must
-   not recurse on the host stack either.
-2. **Tree → `Datum` with spans.** `syn3/lisp.rs` writes text. A builder that
-   returns `Datum`s whose atoms carry the spans of the written names makes
-   one function serve three users: the Lisp printer (`show` of the datum),
-   the macro argument encoder (`Syntax::from_datum`), and the charge.
+1. **Deep trees.** A tree made by a macro can be deeper than the host stack.
+   The old tree is safe by hand: iterative `Drop` (ast.rs:497), `ast_eq.rs`,
+   `ast_clone.rs`, an explicit work list in `encode.rs`, `to_ast.rs`,
+   `body_walk.rs` and `render.rs`. The new tree drops, compares, prints,
+   reads datums and lowers by recursion, and so does every new pass
+   (`syn3/walk.rs`, `group.rs`, `surface.rs`). Two ways: write every pass
+   with a work list again (about 3,000 lines of today's code are that), or
+   run the passes over a tree on a stack that grows (one helper around the
+   entry points: reading a macro result, walking, resolving, dropping).
+   Decision for step 2c: the second, because it keeps one plain recursive
+   definition per pass; the tests `lisp_deep`, `lisp_encode_deep`,
+   `parser_deep` and the 20,000-deep cases of `source_syntax.rs` and
+   `scoped.rs` are the acceptance.
+2. **Tree → `Datum` with spans.** Done in step 2b: `syn3::lisp::item_datum`,
+   `expr_datum`, `type_datum`, `pattern_datum`. An atom that stands for a
+   written name has that name's span; a compound has its node's span; a
+   symbol that the tree does not keep (`,`, `->`, `=`, an operator) has the
+   empty span at the start of its node. `to_lisp` is `show` of these datums.
+   The macro argument encoder is `Syntax::from_datum` of them; the charge of
+   an item is a walk of the datum.
 3. **Quote nodes.** `PatternKind::Quote` gains the template slot and the
    captures; `quote_lower` works on the new tree.
-4. **A walker** (`Visitor`) over the new tree.
-5. **Missing spans**: bit-array segments, the index of `d.0`, header groups.
+4. **A walker.** Done in step 2a: `syn3::walk::Visitor` (enter and leave
+   for expressions, patterns, types and blocks, in source order).
+5. **Missing spans**: bit-array segments, the index of `d.0`, header groups
+   (`surface.rs` finds the header bracket from the tokens), operator tokens.
 
 ## 4. Order of work
 
@@ -163,12 +178,16 @@ Every step leaves the tree green. A step moves whole consumers.
 
 **Step 2. The Lisp surface and the macro engine.**
 
-- 2a. `i fmt --to is|i` reads and writes the new tree and the §6.8 rows:
-  `syn3::parse_module` → `syn3::lisp` → text, and back, compared with `==` on
-  new trees. After it, `lisp::print_with_comments`, `normal_with_comments`
-  and `shape::canon` have no user in the compiler.
-- 2b. §3 items 1 and 2: iterative drop; the `Datum` builder, with
-  `to_lisp` = `show(builder)`.
+- 2a. Done. `i fmt --to is|i` reads and writes the new tree and the §6.8
+  rows (`syn3/surface.rs`: `normal_to_lisp`, `lisp_to_normal`): the file is
+  read, written in the other surface, read back and compared with `==` on
+  trees without groups (`ungrouped`), and the comments are moved by pairing
+  the items and statements of the two trees. `regroup` moved from the
+  converter to `syn3/group.rs`, because printing a Lisp-read tree needs it.
+  Deleted: `lisp::print_with_comments`, `lisp::normal_with_comments`,
+  `lisp/comments.rs`. `lisp::print_module` (`from_ast.rs`), `normal_source`
+  and `shape::canon` have only tests as users now.
+- 2b. Done. The `Datum` builder of §3 item 2, and `Cx::needs_row`.
 - 2c. **The rows flip** (one commit; it cannot be split, because a macro's
   arguments, its quotes and its results must be in the same rows):
   - arguments: the new node is encoded by the builder of 2b. While the
@@ -204,11 +223,14 @@ on function values, provide as its own HIR node keyed by the type of the
 provided value. `query.rs`, `lits.rs`, `ilang-lsp` `analysis.rs` and
 `ilang-cli` `expand` follow in the same step.
 
-**Needs → rows stays in one function.** Today it is `Cx::fn_type`
-(lower.rs:1259) for types, with `Cx::ret` and `Cx::params_of` for function
-heads. In step 3 it becomes one resolver function, `needs_row`, called from
-`ty` and `function`: the effects lane changes how `Fail(E)` in a need is
-represented by editing that function only.
+**Needs → rows stays in one function.** It is `Cx::needs_row` in
+`syn3/lower.rs`, the only place where the needs of a function type become
+today's two rows (`Fail(E)` → the error channel, the other entries → the
+environment, `..N` → the row variable). A function head does not go through
+it: a service pattern `name: T` is an environment parameter and a written
+`-> R` leaves both rows to inference. In step 3 the function moves to the
+resolver unchanged, called from `ty`; the effects lane changes how `Fail(E)`
+in a need is represented by editing that function only.
 
 **Step 4. Deletion.** `syn3/lower.rs`; `ast.rs`, `ast_eq.rs`, `ast_clone.rs`,
 `walk.rs`, `print.rs`, `shape.rs`; the feature `legacy` (the migrator keeps a
@@ -216,6 +238,45 @@ private copy of the old tree, parser, walker and `convert.rs` under
 `examples/` while it must read old text); `syn3/` becomes the crate's top
 level.
 
-## 5. State of this plan
+## 5. Questions that step 2c must answer first
 
-Kept up to date at the end of each step; see the end of the file.
+These are not mechanical, and each changes what a macro sees.
+
+1. **Definitions of sums.** `definition(T)` answers with the item of `T`.
+   For `T = C1 | C2` over `C1 = (…)`, `C2 = (…)` the old rows answer one
+   item with a constructor list. In the §6.8 rows the answer is
+   `(= T (| C1 C2))`, and `C1` is a type of its own with the answer
+   `(= C1 (, …))`. The built-in definitions (`definitions.rs`: `Bool`, `Nil`,
+   `Result`, `AssertionFailure`, `Assert`) need the same split, and
+   `expanded_definition`, `freshen_parameters` and `freshen_duplicate_heads`
+   read the head of an item by its old position.
+2. **A typed macro's function type.** `types/typed_macro.rs`:656-662 writes
+   a function type as `(-> (params) (! (^ R E) V))`. §6.8 has
+   `(-> (, T…) (<- R (, Fail(E) N…)))`; which entries stand for today's two
+   rows is the same mapping as `needs_row`, reversed.
+3. **Spans of symbols.** `encode.rs` gives an operator the span of its
+   token. The builder gives the empty span at the start of the node. A
+   diagnostic that points at an operator of a macro argument moves to the
+   start of the operand; if that must not move, the builder needs the token
+   index that `SourceEncoder` has.
+4. **`Position` numbers.** `lib/i/syntax.i` `position_id` and
+   `ilang-host/src/syntax.rs` share the numbers 0 to 16 of the old list. The
+   list of §6.7 has 14 members; a compiled macro program and the host must
+   change together (they are built together, so there is no stored form).
+
+## 6. State of this plan
+
+| Step | State |
+|---|---|
+| 1 inventory | done |
+| 2a `i fmt --to` on the new tree | done |
+| 2b datum builder; `needs_row` | done |
+| 2c rows flip | not started |
+| 2d engine on the new tree | not started |
+| 3 resolver | not started |
+| 4 deletion | not started |
+
+Readers of the old tree after 2b: everything in §2 except
+`ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
+`syn3::lisp::{to_lisp, from_lisp}`) is on the new tree; the macro engine's
+`Syntax` values are still in the rows before syntax three.

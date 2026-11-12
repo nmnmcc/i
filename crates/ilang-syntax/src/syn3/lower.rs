@@ -1256,37 +1256,17 @@ impl Cx {
 
     // ---- Types ----
 
-    fn fn_type(&mut self, f: &n::FnType, span: Span, generics_taken: bool) -> o::TypeExpr {
-        if !generics_taken && !f.generics.is_empty() {
-            self.error(
-                f.generics[0].span.0,
-                "type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
-            );
-        }
-        let mut params = Vec::new();
-        match &f.param.kind {
-            n::TypeKind::Data(items) => {
-                for item in items {
-                    match item {
-                        n::TItem::Pos(t) => params.push(o::FnParamType {
-                            label: None,
-                            ty: self.ty(t),
-                        }),
-                        n::TItem::Label(l, t) => params.push(o::FnParamType {
-                            label: Some(id(l)),
-                            ty: self.ty(t),
-                        }),
-                        n::TItem::Spread(t) => {
-                            self.error(t.span.0, "`..` is only written in needs, after `<-`")
-                        }
-                    }
-                }
-            }
-            _ => self.error(
-                f.param.span.0,
-                "a function type whose parameter is not written as data needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
-            ),
-        }
+    /// The needs written after `<-` as the two rows of today's function
+    /// type: the error channel and the environment. This is the only place
+    /// where a need becomes a row: a `Fail(E)` entry is the error `E`, every
+    /// other entry is a member of the environment, and `..N` (or `<- N`) is
+    /// the row variable `N`, which also carries the errors when the
+    /// signature writes no `Fail` beside it (§7.3).
+    fn needs_row(
+        &mut self,
+        services: Option<&n::Type>,
+        span: Span,
+    ) -> (Option<o::TypeExpr>, Option<o::TypeExpr>) {
         let mut err: Option<o::TypeExpr> = None;
         let mut env: Vec<o::TypeExpr> = Vec::new();
         let mut row: Option<String> = None;
@@ -1310,7 +1290,7 @@ impl Cx {
             }
             env.push(cx.ty(t));
         };
-        match f.services.as_ref().map(|s| (&s.kind, s)) {
+        match services.map(|s| (&s.kind, s)) {
             None => {}
             Some((n::TypeKind::Data(items), _)) => {
                 for item in items {
@@ -1348,6 +1328,41 @@ impl Cx {
             1 => env.pop(),
             _ => Some(ty(o::TypeKind::Union(env), span)),
         };
+        (err, env)
+    }
+
+    fn fn_type(&mut self, f: &n::FnType, span: Span, generics_taken: bool) -> o::TypeExpr {
+        if !generics_taken && !f.generics.is_empty() {
+            self.error(
+                f.generics[0].span.0,
+                "type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+            );
+        }
+        let mut params = Vec::new();
+        match &f.param.kind {
+            n::TypeKind::Data(items) => {
+                for item in items {
+                    match item {
+                        n::TItem::Pos(t) => params.push(o::FnParamType {
+                            label: None,
+                            ty: self.ty(t),
+                        }),
+                        n::TItem::Label(l, t) => params.push(o::FnParamType {
+                            label: Some(id(l)),
+                            ty: self.ty(t),
+                        }),
+                        n::TItem::Spread(t) => {
+                            self.error(t.span.0, "`..` is only written in needs, after `<-`")
+                        }
+                    }
+                }
+            }
+            _ => self.error(
+                f.param.span.0,
+                "a function type whose parameter is not written as data needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
+            ),
+        }
+        let (err, env) = self.needs_row(f.services.as_ref(), span);
         ty(
             o::TypeKind::Fn {
                 params,
