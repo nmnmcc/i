@@ -1196,7 +1196,9 @@ test = () { app() <- (..live(), fake_db) }
 
 ### 2.11 `|>`
 
-- `|>` is the weakest binary operator, below `||`, left associative (O15).
+- `|>` is the weakest binary operator but one, below `||`, left associative
+  (O15). Only the provide `<-` is weaker (§3.3): `x |> f <- (s)` is
+  `{ x |> f } <- (s)`.
   `a == b |> f` is `{ a == b } |> f`. `a |> f |> g` is `{ a |> f } |> g`.
 - Its right side is a name (`f`, `m.f`, `v.op`), a call (a postfix
   expression whose last part is a call), or a chain literal. Anything else is
