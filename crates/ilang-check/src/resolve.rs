@@ -254,6 +254,8 @@ fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
 fn label_of(p: &ast::Pattern) -> Option<String> {
     use ast::PatternKind as P;
     match &p.kind {
+        // A compiler-made parameter has no label.
+        P::Var(n) if n.starts_with('%') => None,
         P::Var(n) => Some(n.clone()),
         P::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
         P::Named { name, pattern } => label_of(pattern).or_else(|| Some(name.name.clone())),
@@ -3387,8 +3389,8 @@ impl<'a> Resolver<'a> {
                     if let Some(table) = table {
                         let groups = table
                             .iter()
-                            .map(|(_, g)| match g {
-                                ValueRef::Def(d) => *d,
+                            .map(|(shape, g)| match g {
+                                ValueRef::Def(d) => (*shape, *d),
                                 _ => unreachable!(),
                             })
                             .collect();
@@ -3493,6 +3495,9 @@ impl<'a> Resolver<'a> {
         };
         if let ValueRef::Def(d) = group {
             self.used_def(*d, callee.span);
+        }
+        if let ExprKind::Name(ValueRef::Def(d)) = &callee.kind {
+            self.p.chain_uses.push(*d);
         }
         let callee = Box::new(Expr {
             kind: ExprKind::Name(*group),

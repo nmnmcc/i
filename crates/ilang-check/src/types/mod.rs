@@ -407,6 +407,10 @@ pub struct Typed {
     /// to one of its shape groups, by its span: the index of that group.
     /// Its value is that group's function alone (syntax three §2.6.4).
     pub selected_groups: HashMap<(ModuleId, Span), u32>,
+    /// Each use of the name of a chain with several shape groups that an
+    /// expected type narrows to one group, by its span: the binding of
+    /// that group's function, which the use stands for.
+    pub selected_names: HashMap<(ModuleId, Span), crate::hir::ValueRef>,
     /// Diagnostics retained when coalescing could not produce a finite
     /// type. IDEs may use the partial result; lowering must reject it.
     pub(crate) coalescing_errors: Vec<Diagnostic>,

@@ -130,6 +130,13 @@ pub(crate) struct Checker<'a> {
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
+    /// The rule-11 cases typed in the binding being checked, by span: what
+    /// a selection table is made from (syntax three §2.6.1).
+    pub(super) case_tables: HashMap<(ModuleId, Span), groups::CaseTable>,
+    /// The selection tables of the names bound to a group function.
+    pub(super) branch_tables: HashMap<ValueRef, std::rc::Rc<groups::BranchTable>>,
+    /// The local names bound by `g = name` (direct aliases, §2.6.7).
+    pub(super) local_aliases: HashMap<VarId, ValueRef>,
 }
 
 impl<'a> Checker<'a> {
@@ -181,6 +188,9 @@ impl<'a> Checker<'a> {
             group_level: None,
             pending_failures: Vec::new(),
             shared_fields: HashMap::new(),
+            case_tables: HashMap::new(),
+            branch_tables: HashMap::new(),
+            local_aliases: HashMap::new(),
         }
     }
 
@@ -532,6 +542,7 @@ impl<'a> Checker<'a> {
         }
         self.finish_reads(group, &candidates);
         self.group_level = None;
+        let holder_types: HashMap<DefId, Ty> = types.iter().map(|(d, _, t, _)| (*d, t.clone())).collect();
         for (d, _, t, span) in types {
             self.set_module(d.module);
             let scheme = if direct {
@@ -545,6 +556,18 @@ impl<'a> Checker<'a> {
             self.defs.insert(d, scheme);
         }
         self.group_defs.clear();
+        for b in group {
+            let top = p.binding(*b);
+            if let ([d], PatternKind::Var(_)) = (top.defs.as_slice(), &top.binding.pattern.kind)
+                && let Some(t) = holder_types.get(d)
+            {
+                self.set_module(b.module);
+                let generalized = direct.then_some(0);
+                let (value, span) = (&top.binding.value, top.binding.span);
+                self.keep_branches(ValueRef::Def(*d), value, t, generalized, span);
+            }
+        }
+        self.case_tables.clear();
         for (b, k) in group.iter().zip(knowns) {
             self.out.generalized.insert(*b, direct);
             let top = p.binding(*b);
@@ -1416,6 +1439,11 @@ impl<'a> Checker<'a> {
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
         let result = self.infer_k_inner(e, expected);
+        // A name with a selection table, where a function type is expected.
+        let result = match self.select_by_expected(e, expected) {
+            Some(selected) => selected,
+            None => result,
+        };
         self.numeric_handles
             .insert((self.module, e.span), result.0.clone());
         result
@@ -1785,7 +1813,7 @@ impl<'a> Checker<'a> {
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
         for later in [false, true] {
             for (i, a) in values.iter().enumerate() {
-                if (params.is_some() && known::open_fn(a)) != later {
+                if (params.is_some() && (known::open_fn(a) || self.selects(a))) != later {
                     continue;
                 }
                 let expected = match &params {
@@ -1821,6 +1849,15 @@ impl<'a> Checker<'a> {
                 self.call_known(k, &ks)
             }
             _ => Ty::Top,
+        };
+        // Syntax three §2.6.2: a direct call of a name with a selection
+        // table has the type of the branches that the known types of the
+        // arguments select.
+        let f = if args.iter().all(|a| a.label.is_none()) {
+            let ks: Vec<Ty> = typed.iter().map(|x| x.1.clone()).collect();
+            self.select_at_call(callee, &ks, span).unwrap_or(f)
+        } else {
+            f
         };
         let t = match &f {
             Ty::Fn(ft) if !groups::is_multi(ft) && ft.params.len() == placed.len() => {
@@ -2745,9 +2782,19 @@ impl<'a> Checker<'a> {
         }
         self.check_occurs(mark, b.pattern.span);
         self.fit_known(&b.pattern, &k, false);
+        if let (PatternKind::Var(binder), ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_)))) =
+            (&b.pattern.kind, &b.value.kind)
+        {
+            self.local_aliases.insert(binder.var, *to);
+        }
         if direct {
             self.s.level -= 1;
             let level = self.s.level;
+            if let PatternKind::Var(binder) = &b.pattern.kind
+                && let Some(s) = self.locals.get(&binder.var).cloned()
+            {
+                self.keep_branches(ValueRef::Local(binder.var), &b.value, &s.ty, Some(level), b.pattern.span);
+            }
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
                     let ty = self.generalize(&s.ty, level, b.pattern.span);
@@ -2808,7 +2855,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+    pub(super) fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
         let simple = match display::simplify(&self.s, t, Some(level)) {
             Ok(simple) => simple,
             Err(()) => {

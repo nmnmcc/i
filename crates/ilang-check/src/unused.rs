@@ -41,6 +41,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
         }
     }
+    references.pending.extend(&p.chain_uses);
     references.pending.extend(&p.host_exports);
     references.pending.extend(&p.declared_entries);
     // Exempt definitions still use values through written types (§4.3).
@@ -58,9 +59,9 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
     // A direct call of a chain is a call of one of its shape groups; a use
     // of any of them, or of the name, is a use of the whole chain.
     for (chain, groups) in &p.chain_groups {
-        if used.contains(chain) || groups.iter().any(|g| used.contains(g)) {
+        if used.contains(chain) || groups.iter().any(|(_, g)| used.contains(g)) {
             used.insert(*chain);
-            used.extend(groups);
+            used.extend(groups.iter().map(|(_, g)| *g));
         }
     }
     let mut diags = Vec::new();
