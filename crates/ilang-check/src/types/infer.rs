@@ -3918,7 +3918,13 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
         .types
         .iter()
         .enumerate()
-        .map(|(i, t)| (TypeId(i as u32), vec![Mode::Value; t.params.len()]))
+        .map(|(i, t)| {
+            // The error of `Fail(E)` is a row: unions of errors are sets, as
+            // the error rows of function types were (review Q2).
+            let fail = t.name == "Fail" && Some(t.module) == p.prelude && t.params.len() == 1;
+            let mode = if fail { Mode::Row } else { Mode::Value };
+            (TypeId(i as u32), vec![mode; t.params.len()])
+        })
         .collect();
     loop {
         let mut changed = false;
@@ -4049,9 +4055,38 @@ fn walk_variance(
         } => {
             ps.iter().for_each(|x| go(&x.ty, v.flip(), acc));
             go(ret, v, acc);
-            err.iter().chain(env).for_each(|x| go(x, v, acc));
+            err.iter().for_each(|x| go(x, v, acc));
+            env.iter().for_each(|x| walk_env_variance(p, x, v, params, acc, table, depth));
         }
         TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
+    }
+}
+
+/// The variance of the parameters in an environment of a function type at
+/// variance `v`: a row variable goes with `v`, and the arguments of a member
+/// `C(…)` go the other way round from values (rule A: a need is met by a
+/// form that is a subtype of it).
+fn walk_env_variance(
+    p: &Program,
+    t: &Type,
+    v: Variance,
+    params: &[(String, TyVarId)],
+    acc: &mut [Variance],
+    table: &HashMap<TypeId, Vec<Variance>>,
+    depth: u32,
+) {
+    match &t.kind {
+        TypeKind::Union(ts) | TypeKind::Inter(ts) => ts
+            .iter()
+            .for_each(|a| walk_env_variance(p, a, v, params, acc, table, depth)),
+        TypeKind::Diff(ts) => {
+            walk_env_variance(p, &ts[0], v, params, acc, table, depth);
+            ts[1..]
+                .iter()
+                .for_each(|a| walk_variance(p, a, Variance::Inv, params, acc, table, depth));
+        }
+        TypeKind::Named { .. } => walk_variance(p, t, v.flip(), params, acc, table, depth),
+        _ => walk_variance(p, t, v, params, acc, table, depth),
     }
 }
 

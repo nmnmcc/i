@@ -1451,6 +1451,45 @@ impl Solver {
             "typed expansion mutated a frozen variable"
         );
         self.observe(v);
+        // One canonical entry per (row variable, constructor) for a service
+        // whose parameters all have a direction (review Q2): the first need
+        // `C(x…)` becomes `C(α…)` with fresh arguments, and each need
+        // constrains that entry instead of adding a bound, so a row with k
+        // needs of one constructor has one entry, not k.
+        let t = if env == Mode::Env
+            && lower
+            && let Ty::Con(h, values, args) = &t
+            && !args.is_empty()
+            && self.variances(*h, args.len()).all(|x| x != Variance::Inv)
+        {
+            if let Some(entry) = self
+                .var(v)
+                .lower
+                .iter()
+                .find(|b| b.head() == t.head() && b.values() == t.values())
+                .cloned()
+            {
+                self.constrain_in(&t, &entry, Mode::Env);
+                return false;
+            }
+            let level = self.var(v).level;
+            let modes: Vec<Mode> = self.rows(*h, args.len()).collect();
+            let fresh = modes
+                .into_iter()
+                .map(|m| {
+                    let a = self.fresh_at(level);
+                    if m != Mode::Value {
+                        self.mark_mode(&Ty::Var(a), m);
+                    }
+                    Ty::Var(a)
+                })
+                .collect();
+            let entry = Ty::Con(*h, values.clone(), fresh);
+            self.constrain_in(&t, &entry, Mode::Env);
+            entry
+        } else {
+            t
+        };
         // Only argumentless Con bounds can fuse without touching variables,
         // variance, or service argument comparisons.
         let fusion = if let Ty::Con(h, values, args) = &t {
