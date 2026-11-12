@@ -157,7 +157,10 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
             } else {
                 continue;
             };
-            paths.insert(m.source.0, path);
+            // `.is` modules are in the Lisp form: not rewritten here.
+            if path.extension().is_some_and(|e| e == "i") {
+                paths.insert(m.source.0, path);
+            }
         }
     }
     syn3_facts::take();

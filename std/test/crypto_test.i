@@ -495,8 +495,8 @@ test("sha512_million_a", () {
 test("hmac_sha256_rfc4231_1", () {
 	assert(
 		crypto.hmac_sha256(
-			key:   unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-			input: unhex("4869205468657265")
+			unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			unhex("4869205468657265")
 		) ==
 			Ok(
 				unhex(
@@ -510,8 +510,8 @@ test("hmac_sha256_rfc4231_1", () {
 test("hmac_sha256_rfc4231_2", () {
 	assert(
 		crypto.hmac_sha256(
-			key: unhex("4a656665")
-			input: unhex(
+			unhex("4a656665")
+			unhex(
 				"7768617420646f2079612077616e7420666f72206e6f7468696e673f"
 			)
 		) ==
@@ -527,8 +527,8 @@ test("hmac_sha256_rfc4231_2", () {
 test("hmac_sha256_rfc4231_3", () {
 	assert(
 		crypto.hmac_sha256(
-			key: unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-			input: unhex(
+			unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			unhex(
 				"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 			)
 		) ==
@@ -544,8 +544,8 @@ test("hmac_sha256_rfc4231_3", () {
 test("hmac_sha256_rfc4231_4", () {
 	assert(
 		crypto.hmac_sha256(
-			key: unhex("0102030405060708090a0b0c0d0e0f10111213141516171819")
-			input: unhex(
+			unhex("0102030405060708090a0b0c0d0e0f10111213141516171819")
+			unhex(
 				"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
 			)
 		) ==
@@ -561,8 +561,8 @@ test("hmac_sha256_rfc4231_4", () {
 test("hmac_sha256_rfc4231_5", () {
 	assert(
 		crypto.hmac_sha256(
-			key:   unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
-			input: unhex("546573742057697468205472756e636174696f6e")
+			unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
+			unhex("546573742057697468205472756e636174696f6e")
 		) ==
 			Ok(
 				unhex(
@@ -576,10 +576,10 @@ test("hmac_sha256_rfc4231_5", () {
 test("hmac_sha256_rfc4231_6", () {
 	assert(
 		crypto.hmac_sha256(
-			key: unhex(
+			unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 			)
-			input: unhex(
+			unhex(
 				"54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374"
 			)
 		) ==
@@ -595,10 +595,10 @@ test("hmac_sha256_rfc4231_6", () {
 test("hmac_sha256_rfc4231_7", () {
 	assert(
 		crypto.hmac_sha256(
-			key: unhex(
+			unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 			)
-			input: unhex(
+			unhex(
 				"5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e"
 			)
 		) ==
@@ -614,8 +614,8 @@ test("hmac_sha256_rfc4231_7", () {
 test("hmac_sha512_rfc4231_1", () {
 	assert(
 		crypto.hmac_sha512(
-			key:   unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-			input: unhex("4869205468657265")
+			unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			unhex("4869205468657265")
 		) ==
 			Ok(
 				unhex(
@@ -629,8 +629,8 @@ test("hmac_sha512_rfc4231_1", () {
 test("hmac_sha512_rfc4231_2", () {
 	assert(
 		crypto.hmac_sha512(
-			key: unhex("4a656665")
-			input: unhex(
+			unhex("4a656665")
+			unhex(
 				"7768617420646f2079612077616e7420666f72206e6f7468696e673f"
 			)
 		) ==
@@ -646,8 +646,8 @@ test("hmac_sha512_rfc4231_2", () {
 test("hmac_sha512_rfc4231_3", () {
 	assert(
 		crypto.hmac_sha512(
-			key: unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-			input: unhex(
+			unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			unhex(
 				"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 			)
 		) ==
@@ -663,8 +663,8 @@ test("hmac_sha512_rfc4231_3", () {
 test("hmac_sha512_rfc4231_4", () {
 	assert(
 		crypto.hmac_sha512(
-			key: unhex("0102030405060708090a0b0c0d0e0f10111213141516171819")
-			input: unhex(
+			unhex("0102030405060708090a0b0c0d0e0f10111213141516171819")
+			unhex(
 				"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
 			)
 		) ==
@@ -680,8 +680,8 @@ test("hmac_sha512_rfc4231_4", () {
 test("hmac_sha512_rfc4231_5", () {
 	assert(
 		crypto.hmac_sha512(
-			key:   unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
-			input: unhex("546573742057697468205472756e636174696f6e")
+			unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
+			unhex("546573742057697468205472756e636174696f6e")
 		) ==
 			Ok(
 				unhex(
@@ -695,10 +695,10 @@ test("hmac_sha512_rfc4231_5", () {
 test("hmac_sha512_rfc4231_6", () {
 	assert(
 		crypto.hmac_sha512(
-			key: unhex(
+			unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 			)
-			input: unhex(
+			unhex(
 				"54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374"
 			)
 		) ==
@@ -714,10 +714,10 @@ test("hmac_sha512_rfc4231_6", () {
 test("hmac_sha512_rfc4231_7", () {
 	assert(
 		crypto.hmac_sha512(
-			key: unhex(
+			unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 			)
-			input: unhex(
+			unhex(
 				"5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e"
 			)
 		) ==
@@ -744,10 +744,10 @@ test("hkdf_sha256_rfc5869_1", () {
 	)
 	assert(
 		crypto.hkdf_sha256(
-			input:  unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-			salt:   unhex("000102030405060708090a0b0c")
-			info:   unhex("f0f1f2f3f4f5f6f7f8f9")
-			length: 42
+			unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			unhex("000102030405060708090a0b0c")
+			unhex("f0f1f2f3f4f5f6f7f8f9")
+			42
 		) ==
 			Ok(
 				unhex(
@@ -776,16 +776,16 @@ test("hkdf_sha256_rfc5869_2", () {
 	)
 	assert(
 		crypto.hkdf_sha256(
-			input: unhex(
+			unhex(
 				"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"
 			)
-			salt: unhex(
+			unhex(
 				"606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
 			)
-			info: unhex(
+			unhex(
 				"b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
 			)
-			length: 82
+			82
 		) ==
 			Ok(
 				unhex(
@@ -810,10 +810,10 @@ test("hkdf_sha256_rfc5869_3", () {
 	)
 	assert(
 		crypto.hkdf_sha256(
-			input:  unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-			salt:   unhex("")
-			info:   unhex("")
-			length: 42
+			unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			unhex("")
+			unhex("")
+			42
 		) ==
 			Ok(
 				unhex(
@@ -838,10 +838,10 @@ test("hkdf_sha512_rfc5869_1", () {
 	)
 	assert(
 		crypto.hkdf_sha512(
-			input:  unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-			salt:   unhex("000102030405060708090a0b0c")
-			info:   unhex("f0f1f2f3f4f5f6f7f8f9")
-			length: 42
+			unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			unhex("000102030405060708090a0b0c")
+			unhex("f0f1f2f3f4f5f6f7f8f9")
+			42
 		) ==
 			Ok(
 				unhex(
@@ -870,16 +870,16 @@ test("hkdf_sha512_rfc5869_2", () {
 	)
 	assert(
 		crypto.hkdf_sha512(
-			input: unhex(
+			unhex(
 				"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"
 			)
-			salt: unhex(
+			unhex(
 				"606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
 			)
-			info: unhex(
+			unhex(
 				"b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
 			)
-			length: 82
+			82
 		) ==
 			Ok(
 				unhex(
@@ -904,10 +904,10 @@ test("hkdf_sha512_rfc5869_3", () {
 	)
 	assert(
 		crypto.hkdf_sha512(
-			input:  unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-			salt:   unhex("")
-			info:   unhex("")
-			length: 42
+			unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			unhex("")
+			unhex("")
+			42
 		) ==
 			Ok(
 				unhex(
@@ -921,10 +921,10 @@ test("hkdf_sha512_rfc5869_3", () {
 test("pbkdf2_rfc6070_sha256_1", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password:   unhex("70617373776f7264")
-			salt:       unhex("73616c74")
-			iterations: 1
-			length:     32
+			unhex("70617373776f7264")
+			unhex("73616c74")
+			1
+			32
 		) ==
 			Ok(
 				unhex(
@@ -938,10 +938,10 @@ test("pbkdf2_rfc6070_sha256_1", () {
 test("pbkdf2_rfc6070_sha256_2", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password:   unhex("70617373776f7264")
-			salt:       unhex("73616c74")
-			iterations: 2
-			length:     32
+			unhex("70617373776f7264")
+			unhex("73616c74")
+			2
+			32
 		) ==
 			Ok(
 				unhex(
@@ -955,10 +955,10 @@ test("pbkdf2_rfc6070_sha256_2", () {
 test("pbkdf2_rfc6070_sha256_3", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password:   unhex("70617373776f7264")
-			salt:       unhex("73616c74")
-			iterations: 4096
-			length:     32
+			unhex("70617373776f7264")
+			unhex("73616c74")
+			4096
+			32
 		) ==
 			Ok(
 				unhex(
@@ -972,12 +972,12 @@ test("pbkdf2_rfc6070_sha256_3", () {
 test("pbkdf2_rfc6070_sha256_4", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password: unhex("70617373776f726450415353574f524470617373776f7264")
-			salt: unhex(
+			unhex("70617373776f726450415353574f524470617373776f7264")
+			unhex(
 				"73616c7453414c5473616c7453414c5473616c7453414c5473616c7453414c5473616c74"
 			)
-			iterations: 4096
-			length:     40
+			4096
+			40
 		) ==
 			Ok(
 				unhex(
@@ -991,10 +991,10 @@ test("pbkdf2_rfc6070_sha256_4", () {
 test("pbkdf2_rfc6070_sha256_5", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password:   unhex("7061737300776f7264")
-			salt:       unhex("7361006c74")
-			iterations: 4096
-			length:     16
+			unhex("7061737300776f7264")
+			unhex("7361006c74")
+			4096
+			16
 		) ==
 			Ok(unhex("89b69d0516f829893c696226650a8687"))
 	)
@@ -1004,10 +1004,10 @@ test("pbkdf2_rfc6070_sha256_5", () {
 test("pbkdf2_rfc6070_sha256_6", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password:   unhex("")
-			salt:       unhex("")
-			iterations: 1
-			length:     64
+			unhex("")
+			unhex("")
+			1
+			64
 		) ==
 			Ok(
 				unhex(
@@ -1021,10 +1021,10 @@ test("pbkdf2_rfc6070_sha256_6", () {
 test("pbkdf2_rfc6070_sha256_7", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password:   unhex("70")
-			salt:       unhex("73")
-			iterations: 3
-			length:     0
+			unhex("70")
+			unhex("73")
+			3
+			0
 		) ==
 			Ok(unhex(""))
 	)
@@ -1034,12 +1034,12 @@ test("pbkdf2_rfc6070_sha256_7", () {
 test("pbkdf2_rfc6070_sha256_8", () {
 	assert(
 		crypto.pbkdf2_sha256(
-			password: unhex(
+			unhex(
 				"6c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e67"
 			)
-			salt:       unhex("73616c74")
-			iterations: 2
-			length:     65
+			unhex("73616c74")
+			2
+			65
 		) ==
 			Ok(
 				unhex(
@@ -1170,7 +1170,7 @@ test("pbkdf_alignment", () {
 })
 
 test("random_bytes_fake", () {
-	! process.Entropy = process.Entropy((n) {
+	! process.Entropy = process.Entropy(entropy: (n) {
 		request.ready(Ok(<<7:u(n * 8)>>))
 	})
 	assert(crypto.random_bytes(3) == Ok(<<0, 0, 7>>))
@@ -1179,7 +1179,7 @@ test("random_bytes_fake", () {
 })
 
 test("random_bytes_negative", () {
-	! process.Entropy = process.Entropy((_) {
+	! process.Entropy = process.Entropy(entropy: (_) {
 		panic("must not request negative entropy")
 	})
 	assert(crypto.random_bytes(-1) == Error(crypto.InvalidLength))
@@ -1187,12 +1187,12 @@ test("random_bytes_negative", () {
 })
 
 test("random_bytes_service_error", () {
-	! process.Entropy = process.Entropy((_) {
+	! process.Entropy = process.Entropy(entropy: (_) {
 		request.ready(Error("entropy failed"))
 	})
 	assert(
 		fail.catch(() { crypto.random_bytes(1) }) ==
-			Error(process.ProcessError("entropy", "entropy failed"))
+			Error(process.ProcessError(operation: "entropy", code: "entropy failed"))
 	)
 	Nil
 })
