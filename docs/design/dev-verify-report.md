@@ -46,6 +46,10 @@ No language or library surface was added, including state mechanisms.
   actual output with each saved observation: rejection, code and source
   position are unchanged. Regenerated only these two diagnostic observations
   against the current CLI; their independent requirements remain unchanged.
+- i WASI smoke: its generated stopping program also used removed `@main`
+  and failed with E0301 after the hello module built. Generate the ordinary
+  main binding; retain both engines, both optimization levels, output/stop
+  checks and expected exit codes.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
@@ -115,3 +119,8 @@ individual part outputs are `/tmp/dv-{rust,i,js,editors}.<shell-pid>`. It runs
 each part separately through the heavy wrapper, requires each exit status to
 be zero, compares the verification script against `lane/integ`, and checks
 that this report exists. No check or existing test was removed or disabled.
+
+An extra full-corpus diagnostic run with the debug CLI was stopped after
+50 cases, then restarted with the release CLI used by the i gate. The
+per-case runtime budgets are unchanged; final verification runs the complete
+1973-case corpus with the release CLI.

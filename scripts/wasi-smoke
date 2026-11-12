@@ -8,7 +8,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/stop/src"
 printf 'name = "stop"\n' >"$work/stop/i.toml"
-printf '@main\nmain = () { assert(1 + 1 == 3) }\n' >"$work/stop/src/main.i"
+printf 'main = () { assert(1 + 1 == 3) }\n' >"$work/stop/src/main.i"
 cat >"$work/node-wasi.mjs" <<'JS'
 import { readFile } from "node:fs/promises";
 import { WASI } from "node:wasi";
