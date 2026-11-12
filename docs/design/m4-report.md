@@ -65,4 +65,27 @@ Solver tests include `typed_macro_graph_bundle_gate_preserves_sharing_and_obliga
 difference proofs. Syntax tests reject construction and text round trips of
 TypeView. `typed_macro_hover_and_definition_through_call` exercises the LSP.
 
-Verification results will be recorded after the final acceptance run.
+Each §7.5 restriction has its own message: a result that changes the declared
+result type ("a call's type cannot depend on its expansion"), a guessed
+result-only variable ("has no lower evidence"), a delayed effectful argument,
+a NotKnown type choice inside a generic binding (a note on the macro's error),
+and item or type positions ("cannot make items", "cannot give a type"). Tests:
+`typed_macro_output_cannot_change_result_type`,
+`typed_macro_result_only_variable_cannot_guess`,
+`typed_macro_cannot_delay_effectful_argument`,
+`typed_macro_generic_choice_reports_restriction`,
+`typed_macro_rejects_item_position`, `typed_macro_rejects_type_position`.
+`typed_macro_argument_completion_without_expansion` checks LSP completion in
+the argument of a macro whose expansion fails.
+
+## Verification
+
+- `cargo test -p ilang-cli --test typed_macros`: 35 passed.
+- `cargo test -p ilang-lsp --test protocol typed_macro`: 2 passed.
+- `cargo test -p ilang-check --test types library` blessed for the new
+  `i/syntax` query functions.
+- `i test --project examples/macro-tests`: 9 passed, 0 failed, 1 skipped;
+  `i expand --project examples/macro-tests` exits 0.
+- `scripts/dev-verify rust`: see the final worker report. `scripts/dev-verify i`
+  was not run at the end: the coordinator asked workers not to run it under the
+  current machine load; it runs at merge.
