@@ -24,11 +24,14 @@
 
 /// Imports of the host transport (ABI v3 runtime imports, multicore wave).
 pub(super) const IMPORTS: &str = r#"
-(import "ilang:host/v1" "mc_publish" (func $host_mc_publish (param i32 i32) (result i64)))
+(import "ilang:host/v1" "mc_publish" (func $host_mc_publish (param i32 i32 i32) (result i64)))
 (import "ilang:host/v1" "mc_claim" (func $host_mc_claim (param i64) (result i32)))
-(import "ilang:host/v1" "mc_poll" (func $host_mc_poll (param i64) (result i32)))
-(import "ilang:host/v1" "mc_take" (func $host_mc_take (param i64) (result i64)))
-(import "ilang:host/v1" "mc_forget" (func $host_mc_forget (param i64)))
+(import "ilang:host/v1" "mc_adopt" (func $host_mc_adopt (param i64 i64)))
+(import "ilang:host/v1" "mc_send" (func $host_mc_send (param i64 i32 i32)))
+(import "ilang:host/v1" "mc_inbox" (func $host_mc_inbox (result i64)))
+(import "ilang:host/v1" "mc_message" (func $host_mc_message (result i64)))
+(import "ilang:host/v1" "mc_pending" (func $host_mc_pending (result i32)))
+(import "ilang:host/v1" "mc_wait" (func $host_mc_wait))
 (import "ilang:host/v1" "mc_share_put" (func $host_mc_share_put (param i64 i64 i64 i32 i32)))
 (import "ilang:host/v1" "mc_share_get" (func $host_mc_share_get (param i64 i64 i64) (result i64)))
 (import "ilang:host/v1" "mc_share_drop" (func $host_mc_share_drop (param i64 i64 i64)))
@@ -36,11 +39,14 @@ pub(super) const IMPORTS: &str = r#"
 
 /// The WASI target always runs one worker (D12).
 pub(super) const WASI_STUBS: &str = r#"
-(func $host_mc_publish (param i32 i32) (result i64) (i64.const 0))
+(func $host_mc_publish (param i32 i32 i32) (result i64) (i64.const 0))
 (func $host_mc_claim (param i64) (result i32) (i32.const 1))
-(func $host_mc_poll (param i64) (result i32) (i32.const 2))
-(func $host_mc_take (param i64) (result i64) unreachable)
-(func $host_mc_forget (param i64))
+(func $host_mc_adopt (param i64 i64) unreachable)
+(func $host_mc_send (param i64 i32 i32) unreachable)
+(func $host_mc_inbox (result i64) (i64.const 0))
+(func $host_mc_message (result i64) unreachable)
+(func $host_mc_pending (result i32) (i32.const 0))
+(func $host_mc_wait)
 (func $host_mc_share_put (param i64 i64 i64 i32 i32))
 (func $host_mc_share_get (param i64 i64 i64) (result i64) (i64.const 0))
 (func $host_mc_share_drop (param i64 i64 i64))
@@ -48,6 +54,17 @@ pub(super) const WASI_STUBS: &str = r#"
 
 pub(super) const WAT: &str = r#"
 (global $mc_enabled (mut i32) (i32.const 0))
+;; This instance's worker index, the encoder's mode (0: a published record,
+;; which must not hold values of this worker that cannot move; 1: a message,
+;; where such values become tokens of this worker), and the worker that the
+;; tokens of a record bind it to (-1: none).
+(global $mc_worker (mut i32) (i32.const 0))
+(global $enc_mode (mut i32) (i32.const 0))
+(global $enc_affinity (mut i32) (i32.const -1))
+(global $mc_locals (mut (ref null $values)) (ref.null $values))
+(global $mc_local_count (mut i32) (i32.const 0))
+(global $mc_slots (mut (ref null $values)) (ref.null $values))
+(global $mc_slot_count (mut i32) (i32.const 0))
 (global $enc_ptr (mut i32) (i32.const 0))
 (global $enc_len (mut i32) (i32.const 0))
 (global $enc_cap (mut i32) (i32.const 0))
@@ -90,6 +107,36 @@ pub(super) const WAT: &str = r#"
   (f64.store (i32.add (global.get $enc_ptr) (global.get $enc_len)) (local.get $v))
   (global.set $enc_len (i32.add (global.get $enc_len) (i32.const 8))))
 
+;; A value that cannot leave this worker, in a message: a token (marker 9).
+(func $enc_token (param $v eqref)
+  (local $grown (ref null $values)) (local $n i32)
+  (if (i32.eqz (global.get $enc_mode)) (then (global.set $enc_fail (i32.const 1)) (return)))
+  (if (ref.is_null (global.get $mc_locals))
+    (then (global.set $mc_locals (array.new_default $values (i32.const 64)))))
+  (local.set $n (array.len (ref.as_non_null (global.get $mc_locals))))
+  (if (i32.eq (global.get $mc_local_count) (local.get $n)) (then
+    (local.set $grown (array.new_default $values (i32.shl (local.get $n) (i32.const 1))))
+    (array.copy $values $values (ref.as_non_null (local.get $grown)) (i32.const 0)
+      (ref.as_non_null (global.get $mc_locals)) (i32.const 0) (local.get $n))
+    (global.set $mc_locals (local.get $grown))))
+  (array.set $values (ref.as_non_null (global.get $mc_locals)) (global.get $mc_local_count) (local.get $v))
+  (call $enc_u8 (i32.const 9))
+  (call $enc_i32 (global.get $mc_worker))
+  (call $enc_i32 (global.get $mc_local_count))
+  (global.set $mc_local_count (i32.add (global.get $mc_local_count) (i32.const 1))))
+;; A token of another worker (tag 20) travels as it is; a record that holds
+;; one may only run on that worker.
+(func $enc_foreign (param $o (ref $obj))
+  (local $w i32)
+  (local.set $w (struct.get $obj 1 (local.get $o)))
+  (if (i32.eqz (global.get $enc_mode)) (then
+    (if (i32.and (i32.ge_s (global.get $enc_affinity) (i32.const 0))
+                 (i32.ne (global.get $enc_affinity) (local.get $w)))
+      (then (global.set $enc_fail (i32.const 1)) (return)))
+    (global.set $enc_affinity (local.get $w))))
+  (call $enc_u8 (i32.const 9))
+  (call $enc_i32 (local.get $w))
+  (call $enc_i32 (i32.wrap_i64 (struct.get $obj 2 (local.get $o)))))
 ;; Give `v` the next index and mark its header, as `$core_portable` does.
 (func $enc_mark (param $v eqref) (param $tag i32)
   (local $grown (ref null $values)) (local $tags (ref null $frames)) (local $n i32)
@@ -120,16 +167,18 @@ pub(super) const WAT: &str = r#"
     (call $enc_u8 (i32.const 1))
     (call $enc_i32 (i31.get_s (ref.cast (ref i31) (local.get $v))))
     (return)))
-  (if (i32.eqz (ref.test (ref $val) (local.get $v))) (then (global.set $enc_fail (i32.const 1)) (return)))
+  (if (i32.eqz (ref.test (ref $val) (local.get $v))) (then (call $enc_token (local.get $v)) (return)))
   (local.set $raw (struct.get $val 0 (ref.cast (ref $val) (local.get $v))))
   (if (i32.lt_s (local.get $raw) (i32.const 0)) (then
     (call $enc_u8 (i32.const 2))
     (call $enc_i32 (i32.and (local.get $raw) (i32.const 2147483647)))
     (return)))
   (local.set $tag (local.get $raw))
+  (if (i32.eq (local.get $tag) (i32.const 20))
+    (then (call $enc_foreign (ref.cast (ref $obj) (local.get $v))) (return)))
   (if (i32.or (i32.and (i32.ge_u (local.get $tag) (i32.const 10)) (i32.le_u (local.get $tag) (i32.const 12)))
               (i32.ge_u (local.get $tag) (i32.const 17)))
-    (then (global.set $enc_fail (i32.const 1)) (return)))
+    (then (call $enc_token (local.get $v)) (return)))
   (if (i32.eq (local.get $tag) (i32.const 1)) (then
     (call $enc_u8 (select (i32.const 6) (i32.const 7) (call $bool_get (local.get $v))))
     (return)))
@@ -155,7 +204,7 @@ pub(super) const WAT: &str = r#"
   (local.set $xs (struct.get $obj 5 (local.get $o)))
   (if (i32.eq (local.get $tag) (i32.const 7)) (then
     (local.set $code (i32.trunc_f64_u (struct.get $obj 3 (local.get $o))))
-    (if (i32.eqz (local.get $code)) (then (global.set $enc_fail (i32.const 1)) (return)))
+    (if (i32.eqz (local.get $code)) (then (call $enc_token (local.get $v)) (return)))
     (call $enc_mark (local.get $v) (local.get $tag))
     (call $enc_u8 (i32.const 4))
     (call $enc_i32 (local.get $code))
@@ -174,7 +223,7 @@ pub(super) const WAT: &str = r#"
       (br $each)))
     (return)))
   (if (i32.eqz (ref.is_null (struct.get $obj 7 (local.get $o))))
-    (then (global.set $enc_fail (i32.const 1)) (return)))
+    (then (call $enc_token (local.get $v)) (return)))
   (call $enc_mark (local.get $v) (local.get $tag))
   (call $enc_u8 (i32.const 3))
   (call $enc_i32 (local.get $tag))
@@ -222,6 +271,10 @@ pub(super) const WAT: &str = r#"
 
 ;; Encode `v` into a new buffer at `$enc_ptr`/`$enc_len` (capacity
 ;; `$enc_cap`). Gives 0 when `v` cannot move; the buffer is then freed.
+(func $codec_encode_mode (param $v eqref) (param $mode i32) (result i32)
+  (global.set $enc_mode (local.get $mode))
+  (global.set $enc_affinity (i32.const -1))
+  (call $codec_encode (local.get $v)))
 (func $codec_encode (param $v eqref) (result i32)
   (local $i i32)
   (global.set $enc_ptr (i32.const 0))
@@ -302,6 +355,13 @@ pub(super) const WAT: &str = r#"
   (if (i32.eq (local.get $m) (i32.const 6)) (then (return (global.get $value_true))))
   (if (i32.eq (local.get $m) (i32.const 7)) (then (return (global.get $value_false))))
   (if (i32.eq (local.get $m) (i32.const 8)) (then (return (global.get $value_empty_list))))
+  (if (i32.eq (local.get $m) (i32.const 9)) (then
+    (local.set $flags (call $dec_i32))
+    (local.set $index (call $dec_i32))
+    (if (i32.eq (local.get $flags) (global.get $mc_worker))
+      (then (return (array.get $values (ref.as_non_null (global.get $mc_locals)) (local.get $index)))))
+    (return (struct.new $obj (i32.const 20) (local.get $flags) (i64.extend_i32_u (local.get $index))
+      (f64.const 0) (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))))
   (if (i32.eq (local.get $m) (i32.const 5)) (then
     (local.set $index (call $dec_register (ref.null eq)))
     (local.set $n (call $dec_i32))
@@ -391,26 +451,44 @@ pub(super) const WAT: &str = r#"
 (func $worker_publish (param $job eqref) (result eqref)
   (local $id i64)
   (if (i32.eqz (global.get $mc_enabled)) (then (return (ref.i31 (i32.const 0)))))
-  (if (i32.eqz (call $codec_encode (local.get $job))) (then (return (ref.i31 (i32.const 0)))))
-  (local.set $id (call $host_mc_publish (global.get $enc_ptr) (global.get $enc_len)))
+  (if (i32.eqz (call $codec_encode_mode (local.get $job) (i32.const 0)))
+    (then (return (ref.i31 (i32.const 0)))))
+  (local.set $id (call $host_mc_publish (global.get $enc_ptr) (global.get $enc_len)
+    (global.get $enc_affinity)))
   (call $free (global.get $enc_ptr) (global.get $enc_cap))
   (global.set $enc_cap (i32.const 0))
   (call $int_from_i64 (local.get $id)))
 (func $worker_claim (param $id eqref) (result eqref)
   (call $bool_new (call $host_mc_claim (call $int_to_i64 (local.get $id)))))
-(func $worker_poll (param $id eqref) (result eqref)
-  (ref.i31 (call $host_mc_poll (call $int_to_i64 (local.get $id)))))
-(func $worker_take (param $id eqref) (result eqref)
+(func $worker_adopt (param $id eqref) (param $task eqref) (result eqref)
+  (call $host_mc_adopt (call $int_to_i64 (local.get $id)) (call $int_to_i64 (local.get $task)))
+  (ref.null eq))
+;; The continuation of a task that runs on another worker: none here.
+(func $worker_placeholder (result eqref) (ref.null eq))
+(func $worker_away (param $k eqref) (result eqref)
+  (call $bool_new (ref.is_null (local.get $k))))
+(func $worker_send (param $task eqref) (param $resume eqref) (result eqref)
+  (drop (call $codec_encode_mode (local.get $resume) (i32.const 1)))
+  (call $host_mc_send (call $int_to_i64 (local.get $task)) (global.get $enc_ptr) (global.get $enc_len))
+  (call $free (global.get $enc_ptr) (global.get $enc_cap))
+  (global.set $enc_cap (i32.const 0))
+  (ref.null eq))
+(func $worker_inbox (result eqref)
+  (call $int_from_i64 (call $host_mc_inbox)))
+(func $worker_message (result eqref)
   (local $r i64) (local $p i32) (local $n i32) (local $v eqref)
-  (local.set $r (call $host_mc_take (call $int_to_i64 (local.get $id))))
+  (local.set $r (call $host_mc_message))
   (local.set $p (i32.wrap_i64 (i64.shr_u (local.get $r) (i64.const 32))))
   (local.set $n (i32.wrap_i64 (local.get $r)))
   (local.set $v (call $codec_decode (local.get $p) (local.get $n)))
   (call $free (local.get $p) (local.get $n))
   (local.get $v))
-(func $worker_forget (param $id eqref) (result eqref)
-  (call $host_mc_forget (call $int_to_i64 (local.get $id)))
+(func $worker_pending (result eqref)
+  (call $bool_new (call $host_mc_pending)))
+(func $worker_wait (result eqref)
+  (call $host_mc_wait)
   (ref.null eq))
+
 ;; `scope.share` keeps the encoded value once in the host transport, under
 ;; (run key id, task, index) of its address, until its scope ends.
 (func $worker_key_id (param $k eqref) (result i64)
@@ -443,32 +521,90 @@ pub(super) const WAT: &str = r#"
       (call $int_to_i64 (call $field (local.get $address) (i32.const 0)))
       (call $int_to_i64 (call $field (local.get $address) (i32.const 1))))))
   (ref.null eq))
-;; A speculation reached a scheduler step: the worker gives the record back.
-(func $worker_abort (result eqref)
-  unreachable)
-
-;; The host makes this instance a worker: new keys take ids above `prefix`.
+;; The host makes this instance a worker: new keys take ids above `prefix`,
+;; whose top byte is the worker index plus one.
 (func (export "ilang_mc_setup") (param $prefix i64)
   (global.set $mc_enabled (i32.const 1))
-  (global.set $id_prefix (local.get $prefix)))
-;; Run a claimed record `(start, scheduler)`. 1: the encoded completion is at
-;; `ilang_mc_out`; 2: the record goes back to its maker.
-(func (export "ilang_mc_run") (param $ptr i32) (param $len i32) (result i32)
-  (local $job eqref) (local $r eqref) (local $depth i32)
+  (global.set $mc_worker (i32.sub (i32.wrap_i64 (i64.shr_u (local.get $prefix) (i64.const 56))) (i32.const 1)))
+  (global.set $id_prefix (local.get $prefix))
+  ;; A worker other than 0 starts requests of the tasks it runs, in mirrors
+  ;; of their groups.
+  (if (global.get $mc_worker) (then
+    (global.set $req_mirror (i32.const 1))
+    (global.set $async_live (i32.const 1)))))
+(global $mc_woken (mut eqref) (ref.null eq))
+;; Keep the continuation and the `resume` function of a task of this worker.
+(func $mc_keep (param $slot i32) (param $k eqref) (param $resume eqref) (param $tickets eqref)
+  (local $grown (ref null $values)) (local $n i32) (local $at i32)
+  (if (ref.is_null (global.get $mc_slots))
+    (then (global.set $mc_slots (array.new_default $values (i32.const 96)))))
+  (local.set $n (array.len (ref.as_non_null (global.get $mc_slots))))
+  (local.set $at (i32.mul (local.get $slot) (i32.const 3)))
+  (if (i32.ge_u (i32.add (local.get $at) (i32.const 2)) (local.get $n)) (then
+    (local.set $grown (array.new_default $values (i32.add (i32.shl (local.get $n) (i32.const 1)) (i32.const 3))))
+    (array.copy $values $values (ref.as_non_null (local.get $grown)) (i32.const 0)
+      (ref.as_non_null (global.get $mc_slots)) (i32.const 0) (local.get $n))
+    (global.set $mc_slots (local.get $grown))))
+  (array.set $values (ref.as_non_null (global.get $mc_slots)) (local.get $at) (local.get $k))
+  (array.set $values (ref.as_non_null (global.get $mc_slots)) (i32.add (local.get $at) (i32.const 1)) (local.get $resume))
+  (array.set $values (ref.as_non_null (global.get $mc_slots)) (i32.add (local.get $at) (i32.const 2)) (local.get $tickets)))
+(func $mc_encode_out (param $v eqref)
+  (drop (call $codec_encode_mode (local.get $v) (i32.const 1)))
+  (global.set $mc_out_ptr (global.get $enc_ptr))
+  (global.set $mc_out_len (global.get $enc_len))
+  (global.set $mc_out_cap (global.get $enc_cap))
+  (global.set $enc_cap (i32.const 0)))
+;; The slot of a task whose awaited requests settled, or -1; its `Woken`
+;; message is at `ilang_mc_out`.
+(func (export "ilang_mc_ready") (result i32)
+  (local $slot i32) (local $tickets eqref) (local $xs eqref) (local $at i32)
+  (block $none (loop $each
+    (br_if $none (i32.ge_u (local.get $slot) (global.get $mc_slot_count)))
+    (local.set $at (i32.add (i32.mul (local.get $slot) (i32.const 3)) (i32.const 2)))
+    (local.set $tickets (array.get $values (ref.as_non_null (global.get $mc_slots)) (local.get $at)))
+    (local.set $xs (local.get $tickets))
+    (block $next (loop $scan
+      (br_if $next (ref.is_null (local.get $xs)))
+      (br_if $next (call $list_is_empty (local.get $xs)))
+      (if (call $bool_get (call $request_settled (call $list_head (local.get $xs)))) (then
+        (array.set $values (ref.as_non_null (global.get $mc_slots)) (local.get $at) (ref.null eq))
+        (call $mc_encode_out (global.get $mc_woken))
+        (return (local.get $slot))))
+      (local.set $xs (call $list_tail (local.get $xs)))
+      (br $scan)))
+    (local.set $slot (i32.add (local.get $slot) (i32.const 1)))
+    (br $each)))
+  (i32.const -1))
+;; The message of a step: the encoded `Remote` at `ilang_mc_out`.
+(func $mc_out (param $slot i32) (param $r eqref) (param $resume eqref) (result i32)
+  (call $mc_keep (local.get $slot) (call $field (local.get $r) (i32.const 1)) (local.get $resume)
+    (call $field (local.get $r) (i32.const 2)))
+  (call $mc_encode_out (call $field (local.get $r) (i32.const 0)))
+  ;; 1 when the task ended: its continuation is gone.
+  (ref.is_null (call $field (local.get $r) (i32.const 1))))
+;; Start a claimed record: runs the task to its first step. Gives its slot.
+(func (export "ilang_mc_begin") (param $ptr i32) (param $len i32) (result i64)
+  (local $job eqref) (local $slot i32) (local $ended i32)
   (local.set $job (call $codec_decode (local.get $ptr) (local.get $len)))
-  (local.set $depth (call $shadow_depth))
-  (block $failed
-    (local.set $r (try_table (result eqref) (catch_all $failed)
-      (call $call1 (call $field (local.get $job) (i32.const 0)) (call $field (local.get $job) (i32.const 1))
-        (global.get $root_env))))
-    (if (i32.eqz (call $codec_encode (local.get $r))) (then (return (i32.const 2))))
-    (global.set $mc_out_ptr (global.get $enc_ptr))
-    (global.set $mc_out_len (global.get $enc_len))
-    (global.set $mc_out_cap (global.get $enc_cap))
-    (global.set $enc_cap (i32.const 0))
-    (return (i32.const 1)))
-  (call $shadow_restore (local.get $depth))
-  (i32.const 2))
+  (global.set $mc_woken (call $field (local.get $job) (i32.const 7)))
+  (local.set $slot (global.get $mc_slot_count))
+  (global.set $mc_slot_count (i32.add (local.get $slot) (i32.const 1)))
+  (local.set $ended (call $mc_out (local.get $slot)
+    (call $call1 (call $field (local.get $job) (i32.const 0)) (local.get $job) (global.get $root_env))
+    (call $field (local.get $job) (i32.const 1))))
+  (i64.or (i64.shl (i64.extend_i32_u (local.get $slot)) (i64.const 1)) (i64.extend_i32_u (local.get $ended))))
+;; Answer the step of the task in `slot`: it runs to its next step.
+(func (export "ilang_mc_resume") (param $slot i32) (param $ptr i32) (param $len i32) (result i32)
+  (local $answer eqref) (local $k eqref) (local $resume eqref)
+  (local.set $answer (call $codec_decode (local.get $ptr) (local.get $len)))
+  (local.set $k (array.get $values (ref.as_non_null (global.get $mc_slots)) (i32.mul (local.get $slot) (i32.const 3))))
+  (local.set $resume (array.get $values (ref.as_non_null (global.get $mc_slots))
+    (i32.add (i32.mul (local.get $slot) (i32.const 3)) (i32.const 1))))
+  (call $mc_out (local.get $slot)
+    (call $call1 (local.get $resume)
+      (call $tuple (array.new_fixed $values 2 (local.get $k) (local.get $answer)))
+      (global.get $root_env))
+    (local.get $resume)))
 (func (export "ilang_mc_out_ptr") (result i32) (global.get $mc_out_ptr))
 (func (export "ilang_mc_out_len") (result i32) (global.get $mc_out_len))
 (func (export "ilang_mc_out_cap") (result i32) (global.get $mc_out_cap))
@@ -477,7 +613,11 @@ pub(super) const WAT: &str = r#"
 /// `$codec_make_closure`: a closure of one of the arities of the module from
 /// its code number, and the code table. Code 1 is `$keep_call` (D4), 2 the
 /// runtime's `Assert` function, and `3 + i` the function `$f{i}`.
-pub(super) fn closures(arities: &std::collections::BTreeSet<u32>, funcs: usize) -> String {
+pub(super) fn closures(
+    arities: &std::collections::BTreeSet<u32>,
+    funcs: usize,
+    async_funcs: &[usize],
+) -> String {
     use std::fmt::Write;
     let mut out = String::new();
     let mut names = vec!["$keep_call".to_string(), "$entry_assert_fail".to_string()];
@@ -502,5 +642,16 @@ pub(super) fn closures(arities: &std::collections::BTreeSet<u32>, funcs: usize) 
         );
     }
     out.push_str("  unreachable)\n");
+    // The functions that start host requests: a record that holds one stays
+    // with the IO of its maker.
+    out.push_str("(func $codec_code_async (param $code i32) (result i32)\n");
+    for f in async_funcs {
+        let _ = writeln!(
+            out,
+            "  (if (i32.eq (local.get $code) (i32.const {})) (then (return (i32.const 1))))",
+            f + 3
+        );
+    }
+    out.push_str("  (i32.const 0))\n");
     out
 }

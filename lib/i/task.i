@@ -117,27 +117,51 @@ Completion {
 Turn {
 	Switched(Int, Command, Continuation(StepAnswer, Turn, Never, Never))
 	Finished(Int, Completion)
+	Sent(Int)
 }
 
 Start {
 	Start(
-		body:   (Launch) -> Completion
-		spec:   (Scheduler) -> Completion
+		body:   (Scheduler) -> Completion
 		ticket: Int
 	)
 }
 
-/// How the scheduler starts a task: with its own scheduler and the ticket of
-/// its published record (0 when the record was not published).
-Launch {
-	Launch(own: Scheduler, ticket: Int)
+/// What a task on another worker tells the scheduler (native N7/N8): its
+/// next step with the `finalizing` answers of its frames, or its end.
+Remote {
+	Stepped(Command, List(Bool))
+	Exited(Completion)
+	/// A request that the task waits for on its worker settled.
+	Woken
 }
 
-/// A published task record (multicore D8, native N7): the start function of
-/// the body without the task frame, and the scheduler it runs with on a
-/// worker. Every step of that scheduler gives the record back to its maker.
+/// What the scheduler answers a task on another worker: the step's answer
+/// and the `final` queries of the task's frames, to ask at its next step.
+Resume {
+	Resume(
+		answer: StepAnswer
+		finals: List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool)
+		run:    Key(Nil)
+	)
+}
+
+/// A published task record (multicore D8, native N7). The claiming worker
+/// runs `begin(job)` and later `resume`; the record holds the complete start
+/// function with its kept services, the task's path, run, root and runner.
 Job {
-	Job(start: (Scheduler) -> Completion, own: Scheduler)
+	Job(
+		begin:  (job: Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+		resume: (
+			input: (Continuation(StepAnswer, Turn, Never, Never), Resume)
+		) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+		body:   (Scheduler) -> Completion
+		path:   List(Int)
+		run:    Key(Nil)
+		root:   request.Root
+		runner: Runner
+		woken:  Remote
+	)
 }
 
 Policy {
@@ -240,6 +264,8 @@ Status {
 	)
 	WaitingDrain(Continuation(StepAnswer, Turn, Never, Never))
 	Running
+	/// Running on another worker until its next message.
+	Away
 	Ended
 }
 
@@ -395,6 +421,8 @@ State {
 		outer_cancel:    Maybe(() -> Never)
 		epoch:           Int
 		registration:    Int
+		top:             Bool
+		register_flag:   Bool
 	)
 }
 
@@ -1148,8 +1176,7 @@ make_start(A, E, N) = (
 	! Scheduler = DetachedScheduler
 	! Runner = DetachedRunner
 	! request.Await = request.Await((_) { panic("task: no scheduler") })
-	kept = control.keep_env((launch: Launch) {
-		own = launch.own
+	kept = control.keep_env((own: Scheduler) {
 		own |> {
 			DetachedScheduler -> panic("task: no scheduler")
 			Scheduler(..) -> {
@@ -1159,30 +1186,11 @@ make_start(A, E, N) = (
 				local = control.keep_env((_: Nil) {
 					complete(body, result, errors, check)
 				})
-				ticket = launch.ticket
-				retain(guarded(own, Absent, () {
-					claimed(own, ticket) |> {
-						Present(done) -> done
-						Absent        -> local(Nil)
-					}
-				}))
+				retain(guarded(own, Absent, () { local(Nil) }))
 			}
 		}
 	})
-	// The same body without the task frame, run by another worker as a
-	// speculation: any scheduler step gives the record back (multicore P1).
-	spec = control.keep_env((own: Scheduler) {
-		own |> {
-			DetachedScheduler -> panic("task: no scheduler")
-			Scheduler(..) -> {
-				! Scheduler = own
-				! Runner = own.runner
-				! request.Await = own.waiter
-				retain(complete(body, result, errors, check))
-			}
-		}
-	})
-	Start(kept, spec, 0)
+	Start(kept, 0)
 }
 
 @external("ilang:worker", "enabled")
@@ -1194,17 +1202,29 @@ worker_publish: (job: Job) -> Int
 @external("ilang:worker", "claim")
 worker_claim: (ticket: Int) -> Bool
 
-@external("ilang:worker", "poll")
-worker_poll: (ticket: Int) -> Int
+@external("ilang:worker", "adopt")
+worker_adopt: (ticket: Int, task: Int) -> Nil
 
-@external("ilang:worker", "take")
-worker_take: (ticket: Int) -> Completion
+@external("ilang:worker", "placeholder")
+worker_placeholder: () -> Continuation(StepAnswer, Turn, Never, Never)
 
-@external("ilang:worker", "forget")
-worker_forget: (ticket: Int) -> Nil
+@external("ilang:worker", "away")
+worker_away: (k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
 
-@external("ilang:worker", "abort")
-worker_abort: () -> Never
+@external("ilang:worker", "send")
+worker_send: (task: Int, resume: Resume) -> Nil
+
+@external("ilang:worker", "inbox")
+worker_inbox: () -> Int
+
+@external("ilang:worker", "message")
+worker_message: () -> Remote
+
+@external("ilang:worker", "pending")
+worker_pending: () -> Bool
+
+@external("ilang:worker", "wait")
+worker_wait: () -> Nil
 
 @external("ilang:worker", "share_put")
 worker_share_put: (run: Key(Nil), address: Address, value: Keyed) -> Nil
@@ -1214,50 +1234,6 @@ worker_share_get: (run: Key(Nil), address: Address) -> List(Keyed)
 
 @external("ilang:worker", "share_drop")
 worker_share_drop: (run: Key(Nil), address: Address) -> Nil
-
-/// The completion of a published task that another worker claimed, or Absent
-/// when this task runs its own original: the maker claimed it first, or the
-/// worker gave the record back. Waiting yields, so the scheduler goes on and
-/// a cancel reaches the task (the claimant is then stopped).
-claimed = (own: Scheduler, ticket: Int) -> Maybe(Completion) {
-	{ ticket == 0 } |> {
-		True  -> Absent
-		False -> worker_claim(ticket) |> {
-			True  -> Absent
-			False -> retain(resource.ensure(
-				() { await_worker(own, ticket) }
-				() { worker_forget(ticket) }
-			))
-		}
-	}
-}
-
-await_worker = (own: Scheduler, ticket: Int) -> Maybe(Completion) {
-	worker_poll(ticket) |> {
-		0 -> {
-			ask(own, Yield)
-			await_worker(own, ticket)
-		}
-		1 -> Present(worker_take(ticket))
-		_ -> Absent
-	}
-}
-
-/// The only step a speculation takes itself: reading a value shared in its
-/// own run, from the host transport (`scope.share`). Its maker checks, when
-/// it takes the completion, that every value read is still there.
-speculation_step = (run: Key(Nil), command: Command) -> StepAnswer {
-	command |> {
-		GetShare(handle, _, id) ? handle == run -> worker_share_get(
-			run
-			read(address_key, id)
-		) |> {
-			[value] -> Proceed(value)
-			_       -> worker_abort()
-		}
-		_ -> worker_abort()
-	}
-}
 
 drop_shares = (s: State, ids: List(Address)) {
 	ids |> {
@@ -1269,37 +1245,139 @@ drop_shares = (s: State, ids: List(Address)) {
 	}
 }
 
-speculation_wait = (_: Ticket) -> Nil { worker_abort() }
-
-/// Publish the record of a new task when more than one worker runs. The
-/// scheduler of the record has the task's run, root, path and generator, so
-/// `task.path()` and `task.random()` give what they give at home.
-publish = (s: State, task_path: List(Int), start: Start) -> Start {
-	{ s.scripted || core.not(worker_enabled()) } |> {
-		True  -> start
-		False -> {
-			runner = s.runner
-			run = s.run
-			seed = runner |> {
-				DetachedRunner -> panic("task: no scheduler")
-				Runner(..)     -> runner.seed
+/// A task on a claiming worker runs to its next step there. A `get` of a
+/// value shared in its run is answered from the host transport at once
+/// (the value is there exactly while its scope lives); every other step
+/// goes to the scheduler of the run.
+remote_turn = (
+	turn: Turn
+	finals: List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool)
+	run: Key(Nil)
+) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket)) {
+	turn |> {
+		Switched(_, command, k) -> command |> {
+			GetShare(handle, _, id) ? handle == run -> worker_share_get(
+				run
+				read(address_key, id)
+			) |> {
+				[value] -> remote_turn(control.resume(k, Proceed(value)), finals, run)
+				_ -> (Stepped(command, list_map(finals, (f) { f(k) })), k, [])
 			}
-			own = Scheduler(
+			// Requests of this worker are waited for here; the scheduler
+			// only sees a wait that a `Woken` message or a cancel ends.
+			Wait(tickets) -> (Stepped(Wait([]), list_map(finals, (f) { f(k) })), k, tickets)
+			Register(_, _, _, _, final) -> (
+				Stepped(command, append(list_map(finals, (f) { f(k) }), [final(k)]))
+				k
+				[]
+			)
+			_ -> (Stepped(command, list_map(finals, (f) { f(k) })), k, [])
+		}
+		Finished(_, completion) -> (Exited(completion), worker_placeholder(), [])
+		Sent(_) -> panic("task: a worker task was sent")
+	}
+}
+
+remote_begin = (job: Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket)) {
+	task_path = job.path
+	run = job.run
+	root = job.root
+	runner = job.runner
+	body = job.body
+	remote_turn(control.boundary((b) {
+		own = make_scheduler(b, task_path, 0, run, root, runner)
+		Finished(0, body(own))
+	}), [], run)
+}
+
+remote_resume = (
+	input: (Continuation(StepAnswer, Turn, Never, Never), Resume)
+) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket)) {
+	(k, next) = input
+	remote_turn(control.resume(k, next.answer), next.finals, next.run)
+}
+
+/// Publish the record of a new task of the entry run when more than one
+/// worker runs (D8). A nested run keeps its tasks (runtime §6.5).
+publish = (s: State, task_path: List(Int), start: Start) -> Start {
+	{ s.scripted || core.not(s.top) || core.not(worker_enabled()) } |> {
+		True  -> start
+		False -> Start(
+			..start
+			ticket: worker_publish(Job(
+				remote_begin
+				remote_resume
+				start.body
+				task_path
 				s.run
 				s.root
-				key.wrap(path_key, task_path)
-				() {
-					fail.catch(() { rng.at_path(seed, task_path) }) |> {
-						Ok(g)    -> g
-						Error(_) -> panic("task: invalid task path")
+				s.runner
+				Woken
+			))
+		)
+	}
+}
+
+frame_finals = (frames: List(Frame)) -> List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool) {
+	list_map(frames, (f) { f.final })
+}
+
+/// The answers for the task's frames, then the one for a frame it registers.
+split_flags = (frames: List(Frame), flags: List(Bool)) -> (List(Bool), List(Bool)) {
+	(frames, flags) |> {
+		([_, ..rest], [flag, ..more]) -> {
+			(own, extra) = split_flags(rest, more)
+			([flag, ..own], extra)
+		}
+		_ -> ([], flags)
+	}
+}
+
+apply_finals = (frames: List(Frame), flags: List(Bool)) -> List(Frame) {
+	(frames, flags) |> {
+		([], []) -> []
+		([f, ..rest], [flag, ..more]) -> [
+			Frame(..f, finishing: flag)
+			..apply_finals(rest, more)
+		]
+		_ -> panic("task: frames of a worker task changed")
+	}
+}
+
+/// Take one message of a task on another worker, when no task is current.
+pull = (s: State) -> State {
+	{ s.top && s.current == Absent } |> {
+		False -> s
+		True -> worker_inbox() |> {
+			0 -> s
+			serial -> {
+				t = find_task(s.tasks, serial)
+				running = set_task(s, TaskState(..t, status: Running))
+				worker_message() |> {
+					Stepped(command, flags) -> on_command(
+						running
+						serial
+						command
+						worker_placeholder()
+						Present(flags)
+					)
+					Exited(completion) -> observe_completion(
+						running
+						find_task(running.tasks, serial)
+						completion
+					)
+					Woken -> t.status |> {
+						WaitingTicket(k, _) -> queue(
+							set_task(
+								State(..s, waiting: without(s.waiting, serial))
+								TaskState(..t, status: Runnable(k, Proceed(unit())))
+							)
+							serial
+						)
+						_ -> s
 					}
 				}
-				Portable
-				(command: Command) { speculation_step(run, command) }
-				DetachedRunner
-				request.Await(speculation_wait)
-			)
-			Start(..start, ticket: worker_publish(Job(start.spec, own)))
+			}
 		}
 	}
 }
@@ -1847,7 +1925,7 @@ accept_cancel = (s: State, t: TaskState, c: Cause) -> State {
 					ready_back: without(next.ready_back, t.serial)
 				)
 			}
-			Ended | Running -> s
+			Ended | Running | Away -> s
 			_ -> frame_plan(t.frames, c) |> {
 				Absent -> s
 				Present(plan) -> {
@@ -2510,7 +2588,10 @@ do_command = (
 				foreign
 				exemptions(s, t)
 				final
-				final(k)
+				{ worker_away(k) } |> {
+					True  -> s.register_flag
+					False -> final(k)
+				}
 				Absent
 				False
 				Absent
@@ -2884,14 +2965,24 @@ on_command = (
 	task_path: Int
 	command: Command
 	k: Continuation(StepAnswer, Turn, Never, Never)
+	flags: Maybe(List(Bool))
 ) {
 	original = find_task(s.tasks, task_path)
-	updated = { finals_changed(original.frames, k) } |> {
-		False -> s
-		True -> set_task(
-			s
-			TaskState(..original, frames: update_finals(original.frames, k))
-		)
+	updated = flags |> {
+		Present(answers) -> {
+			(own, extra) = split_flags(original.frames, answers)
+			set_task(
+				State(..s, register_flag: extra == [True])
+				TaskState(..original, frames: apply_finals(original.frames, own))
+			)
+		}
+		Absent -> { finals_changed(original.frames, k) } |> {
+			False -> s
+			True -> set_task(
+				s
+				TaskState(..original, frames: update_finals(original.frames, k))
+			)
+		}
 	}
 	t = find_task(updated.tasks, task_path)
 	prevalidate(updated, t, command)
@@ -2984,6 +3075,10 @@ turn = (s: State, t: TaskState) -> Turn {
 	// Project before the callback: suspended tasks must not retain State or a
 	// TaskState snapshot through the boundary body's closure environment.
 	t.status |> {
+		Dormant(start) ? start.ticket != 0 && core.not(worker_claim(start.ticket)) -> {
+			worker_adopt(start.ticket, t.serial)
+			Sent(t.serial)
+		}
 		Dormant(start) -> {
 			path = t.path
 			id = t.serial
@@ -2991,11 +3086,14 @@ turn = (s: State, t: TaskState) -> Turn {
 			root = s.root
 			runner = s.runner
 			body = start.body
-			ticket = start.ticket
 			control.boundary((b) {
 				own = make_scheduler(b, path, id, run, root, runner)
-				Finished(id, body(Launch(own, ticket)))
+				Finished(id, body(own))
 			})
+		}
+		Runnable(k, value) ? worker_away(k) -> {
+			worker_send(t.serial, Resume(value, frame_finals(t.frames), s.run))
+			Sent(t.serial)
 		}
 		Runnable(k, value) -> control.resume(k, value)
 		_                  -> panic("task: task is not runnable")
@@ -3112,7 +3210,7 @@ choose_turn = (state: State) -> State {
 }
 
 loop = (state: State) -> RunReply {
-	s = maintain(state)
+	s = maintain(pull(state))
 	{ finished_run(s) } |> {
 		True -> run_reply(s)
 		False -> {
@@ -3203,6 +3301,16 @@ loop = (state: State) -> RunReply {
 												path
 												command
 												k
+												Absent
+											)
+										)
+										Sent(path) -> loop(
+											set_task(
+												running
+												TaskState(
+													..find_task(running.tasks, path)
+													status: Away
+												)
 											)
 										)
 										Finished(path, completion) -> loop(
@@ -3226,7 +3334,18 @@ loop = (state: State) -> RunReply {
 									) >
 										0 ||
 										any(tickets, has_work)
-									{ possible } |> {
+									away = prepared.top && worker_pending()
+									{ away } |> {
+										True -> {
+											worker_wait()
+											loop(
+												apply_run_control(
+													prepared
+													runner.poll(prepared.run, tickets, True)
+												)
+											)
+										}
+										False -> { possible } |> {
 										False -> panic("task: deadlock")
 										True -> {
 											{ prepared.scripted } |> {
@@ -3246,6 +3365,7 @@ loop = (state: State) -> RunReply {
 												)
 											)
 										}
+									}
 									}
 								}
 							}
@@ -3660,6 +3780,8 @@ execute_body(A, E, N) = (
 				Absent
 				0
 				0
+				prefix == []
+				False
 			)
 			ended = retain(resource.ensure(() { loop(state) }, () {
 				runner.forget(run_id)

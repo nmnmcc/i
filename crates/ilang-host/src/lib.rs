@@ -960,6 +960,7 @@ impl Program {
     /// Make an instance and call `ilang_start` (B.1). When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
+        let pool_options = options.clone();
         if let Some((work, allocation)) = self.macro_static_cost {
             let budget = options
                 .imports
@@ -1113,6 +1114,8 @@ impl Program {
                 self.engine.clone(),
                 self.module.clone(),
                 self.workers,
+                self.abi.clone(),
+                pool_options,
             ));
         }
         Ok(instance)
@@ -1790,6 +1793,9 @@ fn invoke_in(
 /// while the host prepares a reply (H8, H11a). Keep the first import failure
 /// rather than replacing it with the trap that carried it out of Wasm (H2).
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
+    if std::env::var_os("I_WORKERS_TRACE").is_some() {
+        eprintln!("i: trap: {error:?}");
+    }
     let mut context = context.as_context_mut();
     let state = context.data_mut();
     state.resources.teardown();

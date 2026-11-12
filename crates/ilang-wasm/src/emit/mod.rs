@@ -100,8 +100,13 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     };
     e.arities.insert(0);
     e.arities.insert(1);
+    let mut async_funcs = Vec::new();
     for (i, f) in p.funcs.iter().enumerate() {
+        let at = e.out.len();
         e.func(FuncId(i as u32), f);
+        if e.out[at..].contains("(call $req_start") {
+            async_funcs.push(i);
+        }
     }
     for i in 0..p.points.len() {
         e.point(i as PointId);
@@ -237,7 +242,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
             m.push_str(workers::WASI_STUBS);
         }
         m.push_str(workers::WAT);
-        m.push_str(&workers::closures(&e.arities, p.funcs.len()));
+        m.push_str(&workers::closures(&e.arities, p.funcs.len(), &async_funcs));
     }
     m.push_str(&e.data);
     for (id, label) in p.labels.iter().enumerate() {
