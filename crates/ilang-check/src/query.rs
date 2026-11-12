@@ -689,31 +689,30 @@ impl<'a> Query<'a> {
         }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
-            // Syntax three (§2.8): `T = Opaque`, a labelled type `T = (…)`,
-            // or one labelled type per constructor and the sum.
-            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} = Opaque"),
+            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} {{}}"),
             TypeBody::Custom(cs) => {
-                let data = |c: &crate::hir::CtorDef| -> String {
-                    let fs: Vec<String> = c
-                        .fields
-                        .iter()
-                        .map(|f| match &f.label {
-                            Some(l) => format!("{} = {}", l.name, self.show_type(&f.ty)),
-                            None => self.show_type(&f.ty),
-                        })
-                        .collect();
-                    format!("({})", fs.join(", "))
-                };
-                if let [only] = cs.as_slice()
-                    && only.name == def.name
-                {
-                    return format!("{head} = {}", data(only));
+                let cs: Vec<String> = cs
+                    .iter()
+                    .map(|c| {
+                        if c.fields.is_empty() {
+                            return c.name.clone();
+                        }
+                        let fs: Vec<String> = c
+                            .fields
+                            .iter()
+                            .map(|f| match &f.label {
+                                Some(l) => format!("{}: {}", l.name, self.show_type(&f.ty)),
+                                None => self.show_type(&f.ty),
+                            })
+                            .collect();
+                        format!("{}({})", c.name, fs.join(", "))
+                    })
+                    .collect();
+                if cs.iter().map(String::len).sum::<usize>() < 60 {
+                    format!("{head} {{ {} }}", cs.join("  "))
+                } else {
+                    format!("{head} {{\n  {}\n}}", cs.join("\n  "))
                 }
-                let mut lines: Vec<String> =
-                    cs.iter().map(|c| format!("{} = {}", c.name, data(c))).collect();
-                let members: Vec<&str> = cs.iter().map(|c| c.name.as_str()).collect();
-                lines.push(format!("{head} = {}", members.join(" | ")));
-                lines.join("\n")
             }
         }
     }
