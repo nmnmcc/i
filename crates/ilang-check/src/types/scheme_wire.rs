@@ -1,12 +1,11 @@
-//! Shared-graph scheme bundles retain bounds and scoped label identities.
+//! Scheme bundles retain bounds and shared variables.
 use super::{
-    Head, Ty, V, Variance,
+    Head, Ty, V, Variance, codec, prove,
     infer::Scheme,
     lits::ValueSet,
-    records::{self, Label, Node},
     solve::{Mode, Solver},
 };
-use crate::hir::{TyVarId, TypeRef};
+use crate::hir::TypeRef;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -63,20 +62,13 @@ impl SchemeArtifact {
         result.dedup();
         result
     }
-    /// Whether the scheme includes structural records or retained obligations
-    /// whose meaning is not captured by its displayed type alone.
+    /// Whether the scheme includes retained obligations whose meaning is
+    /// not captured by its displayed type alone.
     pub fn needs_semantic_comparison(&self) -> bool {
         let solver = self.catalog.solver.lock().expect("scheme snapshot");
-        let (vars, _, roots) = scheme_roots(&solver, &self.scheme);
+        let (vars, _, _) = scheme_roots(&solver, &self.scheme);
         vars.iter().any(|v| {
             solver.vars[v.0 as usize].difference || !solver.vars[v.0 as usize].handled.is_empty()
-        }) || roots.iter().any(|ty| {
-            solver
-                .records
-                .graph(ty)
-                .nodes()
-                .iter()
-                .any(|(_, node)| matches!(node, Node::Rec(_) | Node::Without(..)))
         })
     }
     pub fn text_with(&self, type_name: &mut impl FnMut(TypeRef) -> String) -> String {
@@ -102,7 +94,6 @@ impl SchemeArtifact {
 pub struct SchemeEnvironment {
     solver: Solver,
     externals: FxHashMap<usize, V>,
-    next_label: u32,
 }
 
 impl Default for SchemeEnvironment {
@@ -110,7 +101,6 @@ impl Default for SchemeEnvironment {
         Self {
             solver: Solver::new(HashMap::new(), Vec::new()),
             externals: FxHashMap::default(),
-            next_label: 0,
         }
     }
 }
@@ -123,24 +113,17 @@ impl SchemeEnvironment {
     ) -> Result<SchemeArtifact, String> {
         let wire: Bundle = serde_json::from_str(text).map_err(|e| e.to_string())?;
         let mut externals = self.externals.clone();
-        let mut next_label = self.next_label;
         let scheme = decode(
             text,
             &mut self.solver,
             0,
             type_ref,
-            &mut |_| {
-                let id = TyVarId(next_label);
-                next_label = next_label.checked_add(1).expect("label binder overflow");
-                id
-            },
             &mut |index, solver| {
                 let id = wire.variables.get(index)?.external?;
                 Some(*externals.entry(id).or_insert_with(|| solver.fresh_at(0)))
             },
         )?;
         self.externals = externals;
-        self.next_label = next_label;
         let ids: FxHashMap<V, usize> = self.externals.iter().map(|(id, v)| (*v, *id)).collect();
         Ok(SchemeArtifact {
             catalog: Arc::new(SchemeCatalog {
@@ -158,8 +141,6 @@ struct Bundle {
     version: u32,
     graph: String,
     variables: Vec<Variable>,
-    labels: Vec<String>,
-    keys: Vec<(usize, usize)>,
     nominals: Vec<Nominal>,
 }
 
@@ -211,7 +192,6 @@ struct Variable {
     depth: Option<u32>,
     external: Option<usize>,
     name: Option<String>,
-    label: Option<usize>,
     mode: u8,
     difference: bool,
     input: bool,
@@ -222,17 +202,6 @@ struct Variable {
     into: Vec<usize>,
 }
 
-fn add_label(labels: &mut Vec<TyVarId>, names: &mut Vec<String>, id: TyVarId, name: &str) {
-    if let Some(i) = labels.iter().position(|label| *label == id) {
-        if names[i].is_empty() {
-            names[i] = name.to_string();
-        }
-    } else {
-        labels.push(id);
-        names.push(name.to_string());
-    }
-}
-
 fn scheme_roots(s: &Solver, scheme: &Scheme) -> (Vec<V>, FxHashMap<V, usize>, Vec<Ty>) {
     let mut vars = Vec::new();
     let mut index = FxHashMap::default();
@@ -240,8 +209,9 @@ fn scheme_roots(s: &Solver, scheme: &Scheme) -> (Vec<V>, FxHashMap<V, usize>, Ve
     let mut cursor = 0;
     let mut processed = 0;
     while cursor < roots.len() {
-        let graph = s.records.graph(&roots[cursor]);
-        for v in graph.variables() {
+        let mut found = Vec::new();
+        super::display::ty_vars(&roots[cursor], &mut found);
+        for v in found {
             if let std::collections::hash_map::Entry::Vacant(entry) = index.entry(v) {
                 entry.insert(vars.len());
                 vars.push(v);
@@ -275,34 +245,6 @@ pub(super) fn encode(
     external_ids: &FxHashMap<V, usize>,
 ) -> String {
     let (vars, index, roots) = scheme_roots(s, scheme);
-    let mut labels: Vec<TyVarId> = Vec::new();
-    let mut label_names = Vec::new();
-    for (id, _) in &scheme.key_slots {
-        add_label(&mut labels, &mut label_names, *id, "");
-    }
-    for v in &vars {
-        let st = &s.vars[v.0 as usize];
-        if let Some(id) = st.label_key {
-            add_label(
-                &mut labels,
-                &mut label_names,
-                id,
-                st.name.as_deref().unwrap_or(""),
-            );
-        }
-    }
-    for root in &roots {
-        for param in records::label_params(root) {
-            let id = records::label_var(&param).expect("scheme label has a binding identity");
-            add_label(&mut labels, &mut label_names, id, &param.name);
-        }
-    }
-    let label_index = |id: TyVarId| {
-        labels
-            .iter()
-            .position(|v| *v == id)
-            .expect("scheme label recorded")
-    };
     let mut metadata = Vec::new();
     for v in &vars {
         let st = &s.vars[v.0 as usize];
@@ -310,7 +252,6 @@ pub(super) fn encode(
             depth: (st.level > scheme.level).then(|| st.level - scheme.level),
             external: (st.level <= scheme.level).then(|| external_ids[v]),
             name: st.name.clone(),
-            label: st.label_key.map(label_index),
             mode: mode_code(st.row),
             difference: st.difference,
             input: st.input,
@@ -321,25 +262,9 @@ pub(super) fn encode(
             into: st.into.iter().map(|v| index[v]).collect(),
         });
     }
-    let mut envelope = Ty::tuple(roots);
-    let relative = records::label_params(&envelope)
-        .into_iter()
-        .map(|p| {
-            let mut relative = p.clone();
-            relative.level = p.level.saturating_sub(scheme.level);
-            (p, Label::Param(relative))
-        })
-        .collect();
-    envelope = records::map_labels(&envelope, &relative);
-    let graph = s.records.graph(&envelope);
+    let envelope = Ty::tuple(roots);
     let mut nominal_ids = Vec::new();
-    for (_, node) in graph.nodes() {
-        if let Node::Con(Head::Named(TypeRef::Custom(id)), _, _) = node
-            && !nominal_ids.contains(&id)
-        {
-            nominal_ids.push(id);
-        }
-    }
+    named_types(&envelope, &mut nominal_ids);
     let mut nominals: Vec<_> = nominal_ids
         .into_iter()
         .map(|id| Nominal {
@@ -355,31 +280,54 @@ pub(super) fn encode(
         })
         .collect();
     nominals.sort_by(|a, b| a.name.cmp(&b.name));
-    let wire = records::codec::encode(
-        &graph,
-        type_name,
-        &mut |v| index[&v].to_string(),
-        &mut |p| {
-            format!(
-                "{}:{}",
-                label_index(records::label_var(p).expect("label binder")),
-                p.name
-            )
-        },
-    );
+    let wire = codec::encode(&envelope, type_name, &mut |v| index[&v].to_string());
     serde_json::to_string(&Bundle {
-        version: 2,
+        version: 3,
         graph: wire,
         variables: metadata,
-        labels: label_names,
         nominals,
-        keys: scheme
-            .key_slots
-            .iter()
-            .map(|(id, n)| (label_index(*id), *n))
-            .collect(),
     })
     .expect("scheme serialization")
+}
+
+/// The named types in `t`, with repeats.
+fn named_refs(t: &Ty, out: &mut Vec<TypeRef>) {
+    map_types(t, &mut |t| {
+        if let Ty::Con(Head::Named(r), _, _) = &t {
+            out.push(*r);
+        }
+        t
+    });
+}
+
+/// The custom types named in `t`, each once, in the order found.
+fn named_types(t: &Ty, out: &mut Vec<crate::hir::TypeId>) {
+    match t {
+        Ty::Con(h, _, xs) => {
+            if let Head::Named(TypeRef::Custom(id)) = h
+                && !out.contains(id)
+            {
+                out.push(*id);
+            }
+            xs.iter().for_each(|x| named_types(x, out));
+        }
+        Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| named_types(x, out)),
+        Ty::Fn(f) => {
+            f.params.iter().for_each(|(_, p)| named_types(p, out));
+            [&f.ret, &f.err, &f.env]
+                .into_iter()
+                .for_each(|x| named_types(x, out));
+        }
+        Ty::Diff(a, hs) => {
+            named_types(a, out);
+            hs.iter().for_each(|x| named_types(x, out));
+        }
+        Ty::Both(a, b) => {
+            named_types(a, out);
+            named_types(b, out);
+        }
+        Ty::Var(_) | Ty::Never | Ty::Top => {}
+    }
 }
 
 /// Restore a scheme with one allocation map for the visible type, its bounds,
@@ -389,11 +337,10 @@ pub(super) fn decode(
     solver: &mut Solver,
     base: u32,
     type_ref: &mut impl FnMut(&str) -> Option<TypeRef>,
-    fresh_label: &mut impl FnMut(usize) -> TyVarId,
     external: &mut impl FnMut(usize, &mut Solver) -> Option<V>,
 ) -> Result<Scheme, String> {
     let bundle: Bundle = serde_json::from_str(text).map_err(|e| e.to_string())?;
-    if bundle.version != 2 {
+    if bundle.version != 3 {
         return Err("invalid scheme version".into());
     }
     let mut external_ids = std::collections::HashSet::new();
@@ -432,7 +379,6 @@ pub(super) fn decode(
             s.row_params.insert(id, values);
         }
     }
-    let labels: Vec<_> = (0..bundle.labels.len()).map(fresh_label).collect();
     let mut vars = Vec::with_capacity(bundle.variables.len());
     for (i, var) in bundle.variables.iter().enumerate() {
         let v = match var.depth {
@@ -445,50 +391,12 @@ pub(super) fn decode(
         }
         vars.push(v);
     }
-    let pool = s.records.clone();
-    let mut scopes = FxHashMap::default();
-    let graph = records::codec::decode(
-        &bundle.graph,
-        &pool,
-        type_ref,
-        &mut |name| {
-            name.parse::<usize>()
-                .ok()
-                .and_then(|i| vars.get(i).copied())
-        },
-        &mut |scope, _, name| {
-            let index = name.split_once(':')?.0.parse::<usize>().ok()?;
-            let id = *labels.get(index)?;
-            if scopes.values().any(|&other| other == index) {
-                return None;
-            }
-            scopes.insert(scope, index);
-            match records::variable_label(id, "", 0) {
-                Label::Param(p) => Some(p.owner),
-                _ => unreachable!(),
-            }
-        },
-    )?;
-    let mut remap = FxHashMap::default();
-    for p in records::label_params(&graph) {
-        let (index, name) = p.name.split_once(':').ok_or("invalid encoded label")?;
-        let index: usize = index.parse().map_err(|_| "invalid encoded label index")?;
-        let id = *labels.get(index).ok_or("unknown encoded label")?;
-        if records::label_var(&p) != Some(id) {
-            return Err("label scope disagrees with binder".into());
-        }
-        if bundle.labels[index] != name {
-            return Err("label name disagrees with binder".into());
-        }
-        let level = base.checked_add(p.level).ok_or("label level overflow")?;
-        let label = records::variable_label(id, name, level);
-        remap.insert(p, label);
-    }
-    let graph = records::map_labels(&graph, &remap);
-    let Ty::Graph(graph) = graph else {
-        return Err("scheme graph is not an envelope".into());
-    };
-    let Node::Con(Head::Tuple(_), _, roots) = graph.node() else {
+    let graph = codec::decode(&bundle.graph, type_ref, &mut |name| {
+        name.parse::<usize>()
+            .ok()
+            .and_then(|i| vars.get(i).copied())
+    })?;
+    let Ty::Con(Head::Shape(_), _, roots) = graph else {
         return Err("scheme graph is not a tuple".into());
     };
     if roots.len() != 1 + vars.len() * 3 {
@@ -501,23 +409,18 @@ pub(super) fn decode(
             .into_iter()
             .enumerate()
         {
-            let Node::Con(Head::Tuple(_), values, items) = graph.node_at(roots[1 + i * 3 + j])
-            else {
+            let Ty::Con(Head::Shape(_), values, items) = &roots[1 + i * 3 + j] else {
                 return Err("scheme bounds are not a tuple".into());
             };
-            if values != ValueSet::ALL || items.len() != count {
+            if *values != ValueSet::ALL || items.len() != count {
                 return Err("invalid scheme bounds".into());
             }
-            parts.push(items.into_iter().map(|id| pool.ty(id)).collect::<Vec<_>>());
+            parts.push(items.clone());
         }
         bounds.push(parts);
     }
     for (i, meta) in bundle.variables.iter().enumerate() {
         let mode = read_mode(meta.mode)?;
-        let label = meta
-            .label
-            .map(|n| labels.get(n).copied().ok_or("unknown key binder"))
-            .transpose()?;
         let edges = |ids: &[usize]| {
             ids.iter()
                 .map(|id| vars.get(*id).copied().ok_or("unknown variable edge"))
@@ -527,7 +430,6 @@ pub(super) fn decode(
         let into = edges(&meta.into)?;
         let st = &mut s.vars[vars[i].0 as usize];
         st.name = meta.name.clone();
-        st.label_key = label;
         st.row = mode;
         st.difference = meta.difference;
         st.input = meta.input;
@@ -546,24 +448,9 @@ pub(super) fn decode(
             s.has_handlers = true;
         }
     }
-    let keys = bundle
-        .keys
-        .iter()
-        .map(|(i, slot)| {
-            labels
-                .get(*i)
-                .copied()
-                .map(|id| (id, *slot))
-                .ok_or("unknown label key".to_string())
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let ty = pool.ty(roots[0]);
+    let ty = roots[0].clone();
     *solver = s;
-    Ok(Scheme {
-        level: base,
-        ty,
-        key_slots: keys,
-    })
+    Ok(Scheme { level: base, ty })
 }
 
 #[cfg(test)]
@@ -601,7 +488,6 @@ mod tests {
         let scheme = Scheme {
             level: 0,
             ty,
-            key_slots: vec![],
         };
         let text = encode_test(&solver, &scheme, &mut |t| match t {
             TypeRef::Builtin(b) => b.name().into(),
@@ -617,7 +503,6 @@ mod tests {
                 "pkg:api.Box" => Some(TypeRef::Custom(TypeId(99))),
                 _ => None,
             },
-            &mut |_| unreachable!(),
             &mut |_, _| unreachable!(),
         )
         .unwrap();
@@ -642,7 +527,6 @@ mod tests {
         let scheme = Scheme {
             level: 0,
             ty: Ty::Var(row),
-            key_slots: vec![],
         };
         let text = encode_test(&solver, &scheme, &mut |t| match t {
             TypeRef::Builtin(b) => b.name().into(),
@@ -658,7 +542,6 @@ mod tests {
                 "pkg:Svc" => Some(TypeRef::Custom(TypeId(99))),
                 _ => None,
             },
-            &mut |_| unreachable!(),
             &mut |_, _| None,
         )
         .unwrap();
@@ -688,7 +571,6 @@ mod tests {
         let scheme = Scheme {
             level: 0,
             ty: Ty::Var(vars[0]),
-            key_slots: vec![],
         };
         let encoded = encode_test(&solver, &scheme, &mut |_| unreachable!());
         let bundle: Bundle = serde_json::from_str(&encoded).unwrap();
@@ -699,7 +581,6 @@ mod tests {
             &mut decoded,
             0,
             &mut |_| None,
-            &mut |_| unreachable!(),
             &mut |_, _| None,
         )
         .unwrap();
@@ -719,12 +600,10 @@ mod tests {
         let first = Scheme {
             level: 0,
             ty: Ty::Var(shared),
-            key_slots: vec![],
         };
         let second = Scheme {
             level: 0,
             ty: Ty::tuple(vec![Ty::Var(shared)]),
-            key_slots: vec![],
         };
         let catalog = Arc::new(SchemeCatalog {
             solver: Mutex::new(solver),
@@ -769,56 +648,6 @@ mod tests {
     }
 
     #[test]
-    fn scheme_comparison_proves_alpha_renamed_record_labels_without_mutation() {
-        let build = |id: u32, name: &str| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let key = TyVarId(id);
-            let var = solver.fresh_at(1);
-            solver.vars[var.0 as usize].label_key = Some(key);
-            solver.vars[var.0 as usize].name = Some(name.into());
-            let record = solver
-                .records
-                .record(vec![(records::variable_label(key, name, 1), Ty::Var(var))]);
-            let ty = Ty::Fn(Box::new(FnTy {
-                params: vec![(None, record), (None, Ty::Var(var))],
-                ret: Ty::Var(var),
-                err: Ty::Never,
-                env: Ty::Never,
-            }));
-            let scheme = Scheme {
-                level: 0,
-                ty,
-                key_slots: vec![(key, 1)],
-            };
-            let before = solver.vars.clone();
-            (
-                SchemeArtifact {
-                    catalog: Arc::new(SchemeCatalog {
-                        solver: Mutex::new(solver),
-                        schemes: vec![scheme.clone()],
-                        externals: OnceLock::new(),
-                    }),
-                    scheme,
-                },
-                before,
-            )
-        };
-        let (a, before_a) = build(7, "K");
-        let (b, before_b) = build(91, "Key");
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            a.compare(&b, &mut names, &mut other_names).unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-        assert_eq!(a.catalog.solver.lock().unwrap().vars, before_a);
-        assert_eq!(b.catalog.solver.lock().unwrap().vars, before_b);
-    }
-
-    #[test]
     fn scheme_comparison_proves_redundant_bounds() {
         let build = |redundant: bool| {
             let mut solver = Solver::new(HashMap::new(), Vec::new());
@@ -834,7 +663,6 @@ mod tests {
             let scheme = Scheme {
                 level: 0,
                 ty: Ty::Var(v),
-                key_slots: vec![],
             };
             SchemeArtifact {
                 catalog: Arc::new(SchemeCatalog {
@@ -875,7 +703,6 @@ mod tests {
             let scheme = Scheme {
                 level: 0,
                 ty: Ty::Var(a),
-                key_slots: vec![],
             };
             SchemeArtifact {
                 catalog: Arc::new(SchemeCatalog {
@@ -894,184 +721,6 @@ mod tests {
         assert_eq!(
             build(false)
                 .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_collapses_mutually_constrained_visible_variables() {
-        let build = |extra: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let a = solver.fresh_at(1);
-            let b = if extra { solver.fresh_at(1) } else { a };
-            if extra {
-                solver.constrain(&Ty::Var(a), &Ty::Var(b));
-                solver.constrain(&Ty::Var(b), &Ty::Var(a));
-            }
-            assert!(solver.failures.is_empty());
-            let root = solver.records.record(vec![
-                (Label::name("left"), Ty::Var(a)),
-                (Label::name("right"), Ty::Var(b)),
-            ]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false)
-                .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_substitutes_exact_structural_variables() {
-        let build = |extra: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let a = solver.fresh_at(1);
-            let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![Ty::Var(a)]);
-            let value = if extra {
-                let b = solver.fresh_at(1);
-                solver.constrain(&list, &Ty::Var(b));
-                solver.constrain(&Ty::Var(b), &list);
-                Ty::Var(b)
-            } else {
-                list
-            };
-            assert!(solver.failures.is_empty());
-            let root = solver.records.record(vec![
-                (Label::name("value"), value),
-                (Label::name("item"), Ty::Var(a)),
-            ]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false)
-                .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_uses_explicit_nonbijective_union_instantiations() {
-        let build = |two: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let a = solver.fresh_at(1);
-            let value = if two {
-                let b = solver.fresh_at(1);
-                Ty::Union(vec![Ty::Var(a), Ty::Var(b)])
-            } else {
-                Ty::Var(a)
-            };
-            let root = solver.records.record(vec![(Label::name("value"), value)]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false)
-                .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_coverage_preserves_keys_while_instantiating_union_variables() {
-        let build = |two: bool, id: u32, name: &str| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let key = TyVarId(id);
-            let k = solver.fresh_at(1);
-            solver.vars[k.0 as usize].label_key = Some(key);
-            solver.vars[k.0 as usize].name = Some(name.into());
-            let a = solver.fresh_at(1);
-            let value = if two {
-                let b = solver.fresh_at(1);
-                Ty::Union(vec![Ty::Var(a), Ty::Var(b)])
-            } else {
-                Ty::Var(a)
-            };
-            let root = solver
-                .records
-                .record(vec![(records::variable_label(key, name, 1), value)]);
-            let root = Ty::Fn(Box::new(FnTy {
-                params: vec![(None, root), (None, Ty::Var(k))],
-                ret: Ty::Never,
-                err: Ty::Never,
-                env: Ty::Never,
-            }));
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![(key, 1)],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false, 7, "K")
-                .compare(&build(true, 12, "Key"), &mut names, &mut other_names)
                 .unwrap(),
             SchemeComparison::Equivalent(vec![vec![]])
         );
@@ -1110,7 +759,6 @@ mod tests {
             let scheme = Scheme {
                 level: 0,
                 ty: root,
-                key_slots: vec![],
             };
             SchemeArtifact {
                 catalog: Arc::new(SchemeCatalog {
@@ -1169,7 +817,6 @@ mod tests {
             let scheme = Scheme {
                 level: 0,
                 ty: root,
-                key_slots: vec![],
             };
             SchemeArtifact {
                 catalog: Arc::new(SchemeCatalog {
@@ -1216,7 +863,6 @@ mod tests {
             let scheme = Scheme {
                 level: 0,
                 ty: root,
-                key_slots: vec![],
             };
             SchemeArtifact {
                 catalog: Arc::new(SchemeCatalog {
@@ -1237,364 +883,6 @@ mod tests {
                 .compare(&build(BuiltinType::String), &mut names, &mut other_names)
                 .unwrap(),
             SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_uses_explicit_nonbijective_intersection_instantiations() {
-        let build = |two: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let a = solver.fresh_at(1);
-            let value = if two {
-                let b = solver.fresh_at(1);
-                Ty::Inter(vec![Ty::Var(a), Ty::Var(b)])
-            } else {
-                Ty::Var(a)
-            };
-            let root = solver.records.record(vec![(Label::name("value"), value)]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false)
-                .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_coverage_synthesizes_a_union_of_subject_binders() {
-        let build = |two: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let a = solver.fresh_at(1);
-            let b = if two { solver.fresh_at(1) } else { a };
-            let c = if two { solver.fresh_at(1) } else { a };
-            let fun = Ty::Fn(Box::new(FnTy {
-                params: vec![
-                    (Some("a".into()), Ty::Var(a)),
-                    (Some("b".into()), Ty::Var(b)),
-                    (Some("c".into()), Ty::Var(c)),
-                ],
-                ret: Ty::Top,
-                err: Ty::Never,
-                env: Ty::Never,
-            }));
-            let root = solver.records.record(vec![(Label::name("f"), fun)]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false)
-                .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn a_reverse_subtype_failure_is_not_a_coverage_counterexample() {
-        let source = Solver::new(HashMap::new(), Vec::new());
-        let mut target = Solver::new(HashMap::new(), Vec::new());
-        let x = target.fresh_at(1);
-        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
-        let result = source.records.union(&[int.clone(), string.clone()]);
-        let ground = Ty::Fn(Box::new(FnTy {
-            params: vec![(Some("x".into()), int), (Some("y".into()), string)],
-            ret: source.records.record(vec![(Label::name("value"), result)]),
-            err: Ty::Never,
-            env: Ty::Never,
-        }));
-        let generic = Ty::Fn(Box::new(FnTy {
-            params: vec![
-                (Some("x".into()), Ty::Var(x)),
-                (Some("y".into()), Ty::Var(x)),
-            ],
-            ret: target
-                .records
-                .record(vec![(Label::name("value"), Ty::Var(x))]),
-            err: Ty::Never,
-            env: Ty::Never,
-        }));
-        let mut forward = target.scheme_snapshot();
-        forward.constrain(&generic, &ground);
-        assert!(forward.failures.is_empty());
-        let mut backward = target.scheme_snapshot();
-        backward.constrain(&ground, &generic);
-        assert!(definite_failure(&backward));
-        assert_eq!(
-            shared_group_counterexample(&source, &ground, &[], &target, &generic, &[], &[]),
-            Some(false)
-        );
-    }
-
-    #[test]
-    fn scheme_coverage_combines_structured_subject_bounds() {
-        let subject = Solver::new(HashMap::new(), Vec::new());
-        let mut cover = Solver::new(HashMap::new(), Vec::new());
-        let x = cover.fresh_at(1);
-        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
-        let either = subject.records.union(&[int.clone(), string.clone()]);
-        let left = subject.records.record(vec![
-            (Label::name("a"), int.clone()),
-            (Label::name("b"), string.clone()),
-        ]);
-        let right = subject
-            .records
-            .record(vec![(Label::name("a"), string), (Label::name("b"), int)]);
-        let out_a = subject
-            .records
-            .record(vec![(Label::name("a"), either.clone())]);
-        let out_b = subject.records.record(vec![(Label::name("b"), either)]);
-        let fun = |a, b, result| {
-            Ty::Fn(Box::new(FnTy {
-                params: vec![(Some("x".into()), a), (Some("y".into()), b)],
-                ret: result,
-                err: Ty::Never,
-                env: Ty::Never,
-            }))
-        };
-        let subject_root = fun(left, right, Ty::tuple(vec![out_a, out_b]));
-        let cover_root = fun(
-            Ty::Var(x),
-            Ty::Var(x),
-            Ty::tuple(vec![Ty::Var(x), Ty::Var(x)]),
-        );
-        let meta = Variable {
-            depth: Some(1),
-            external: None,
-            name: None,
-            label: None,
-            mode: 0,
-            difference: false,
-            input: true,
-            lower: 0,
-            upper: 0,
-            handled: 0,
-            from: vec![],
-            into: vec![],
-        };
-        let mut demand = records::Demand::new(records::Demand::LIMIT, true);
-        assert_eq!(
-            find_cover(
-                CoverSide {
-                    solver: &cover,
-                    root: &cover_root,
-                    metadata: &[meta]
-                },
-                CoverSide {
-                    solver: &subject,
-                    root: &subject_root,
-                    metadata: &[]
-                },
-                &[],
-                &[],
-                100,
-                &mut demand
-            ),
-            Ok(true)
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_aligns_variables_by_use_not_allocation_order() {
-        let build = |reversed: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let one = solver.fresh_at(1);
-            let two = solver.fresh_at(1);
-            let (a, b) = if reversed { (two, one) } else { (one, two) };
-            let root = solver.records.record(vec![
-                (Label::name("left"), Ty::Var(a)),
-                (Label::name("right"), Ty::Var(b)),
-            ]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(false)
-                .compare(&build(true), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_keeps_twenty_branch_graphs_shared() {
-        let build = |reverse: bool| {
-            let solver = Solver::new(HashMap::new(), Vec::new());
-            let pool = &solver.records;
-            let mut root = pool.record(Vec::new());
-            for i in 0..20 {
-                let a = pool.record(vec![(
-                    Label::name(format!("a{i}")),
-                    Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-                )]);
-                let b = pool.record(vec![(
-                    Label::name(format!("b{i}")),
-                    Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]),
-                )]);
-                let pair = if reverse { [b, a] } else { [a, b] };
-                root = pool.union(&[
-                    pool.inter(&[root.clone(), pair[0].clone()]),
-                    pool.inter(&[root, pair[1].clone()]),
-                ]);
-            }
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let a = build(false);
-        let b = build(true);
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        let start = std::time::Instant::now();
-        assert_eq!(
-            a.compare(&b, &mut names, &mut other_names).unwrap(),
-            SchemeComparison::Equivalent(vec![vec![]])
-        );
-        assert!(start.elapsed() < std::time::Duration::from_secs(1));
-    }
-
-    #[test]
-    fn scheme_comparison_distinguishes_universal_from_monomorphic_function() {
-        let build = |generic: bool| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let arg = if generic {
-                Ty::Var(solver.fresh_at(1))
-            } else {
-                Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![])
-            };
-            let fun = Ty::Fn(Box::new(FnTy {
-                params: vec![(None, arg.clone())],
-                ret: arg,
-                err: Ty::Never,
-                env: Ty::Never,
-            }));
-            let root = solver.records.record(vec![(Label::name("f"), fun)]);
-            let scheme = Scheme {
-                level: 0,
-                ty: root,
-                key_slots: vec![],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(true)
-                .compare(&build(false), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Different
-        );
-    }
-
-    #[test]
-    fn scheme_comparison_detects_changed_label_key_positions() {
-        let build = |slot| {
-            let mut solver = Solver::new(HashMap::new(), Vec::new());
-            let key = TyVarId(1);
-            let v = solver.fresh_at(1);
-            solver.vars[v.0 as usize].label_key = Some(key);
-            let record = solver
-                .records
-                .record(vec![(records::variable_label(key, "K", 1), Ty::Var(v))]);
-            let scheme = Scheme {
-                level: 0,
-                ty: record,
-                key_slots: vec![(key, slot)],
-            };
-            SchemeArtifact {
-                catalog: Arc::new(SchemeCatalog {
-                    solver: Mutex::new(solver),
-                    schemes: vec![scheme.clone()],
-                    externals: OnceLock::new(),
-                }),
-                scheme,
-            }
-        };
-        let mut names = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            TypeRef::Custom(_) => unreachable!(),
-        };
-        let mut other_names = names;
-        assert_eq!(
-            build(0)
-                .compare(&build(1), &mut names, &mut other_names)
-                .unwrap(),
-            SchemeComparison::Different
         );
     }
 
@@ -1628,7 +916,6 @@ mod tests {
             let scheme = Scheme {
                 level: 0,
                 ty: root,
-                key_slots: vec![],
             };
             SchemeArtifact {
                 catalog: Arc::new(SchemeCatalog {
@@ -1652,147 +939,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn bounds_rows_and_label_key_share_one_binder_after_round_trip() {
-        let mut s = Solver::new(HashMap::new(), Vec::new());
-        let var = s.fresh_at(1);
-        let other = s.fresh_at(1);
-        let key = TyVarId(7);
-        let state = &mut s.vars[var.0 as usize];
-        state.name = Some("K".into());
-        state.label_key = Some(key);
-        state.row = Mode::Env;
-        state.difference = true;
-        state.input = true;
-        state
-            .upper
-            .push(Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]));
-        state
-            .handled
-            .push(Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]));
-        state.from.push(other);
-        s.vars[other.0 as usize].into.push(var);
-        s.vars[other.0 as usize]
-            .lower
-            .push(Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]));
-        let ty = s
-            .records
-            .record(vec![(records::variable_label(key, "K", 1), Ty::Var(var))]);
-        let scheme = Scheme {
-            level: 0,
-            ty,
-            key_slots: vec![(key, 1)],
-        };
-        let mut type_name = |t: TypeRef| match t {
-            TypeRef::Builtin(b) => b.name().to_string(),
-            _ => unreachable!(),
-        };
-        let encoded = encode_test(&s, &scheme, &mut type_name);
-        let mut out = Solver::new(HashMap::new(), Vec::new());
-        let decoded = decode(
-            &encoded,
-            &mut out,
-            5,
-            &mut |name| match name {
-                "String" => Some(TypeRef::Builtin(BuiltinType::String)),
-                "Int" => Some(TypeRef::Builtin(BuiltinType::Int)),
-                _ => None,
-            },
-            &mut |_| TyVarId(100),
-            &mut |_, _| None,
-        )
-        .unwrap();
-        assert_eq!(decoded.key_slots, [(TyVarId(100), 1)]);
-        let labels = records::label_params(&decoded.ty);
-        let label = labels.iter().next().unwrap();
-        assert_eq!(records::label_var(label), Some(TyVarId(100)));
-        assert_eq!(label.level, 6);
-        let state = &out.vars[0];
-        assert_eq!(state.label_key, Some(TyVarId(100)));
-        assert_eq!(state.row, Mode::Env);
-        assert!(state.difference && state.input);
-        assert_eq!(state.upper.len(), 1);
-        assert_eq!(state.handled.len(), 1);
-        assert!(out.has_handlers);
-        assert_eq!(out.vars[0].from, vec![V(1)]);
-        assert_eq!(out.vars[1].into, vec![V(0)]);
-        assert_eq!(out.vars[1].lower.len(), 1);
-        // U6 permits different node numbering for the same graph.
-        let again = encode_test(&out, &decoded, &mut type_name);
-        let mut original: serde_json::Value = serde_json::from_str(&encoded).unwrap();
-        let mut rebuilt: serde_json::Value = serde_json::from_str(&again).unwrap();
-        original.as_object_mut().unwrap().remove("graph");
-        rebuilt.as_object_mut().unwrap().remove("graph");
-        assert_eq!(original, rebuilt);
-    }
 
-    #[test]
-    fn decoded_label_scheme_can_be_instantiated_and_called() {
-        let mut original = Solver::new(HashMap::new(), Vec::new());
-        let key = TyVarId(3);
-        let key_type = original.fresh_at(1);
-        original.vars[key_type.0 as usize].label_key = Some(key);
-        original.vars[key_type.0 as usize].name = Some("K".into());
-        original.vars[key_type.0 as usize]
-            .upper
-            .push(Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]));
-        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-        let record = original
-            .records
-            .record(vec![(records::variable_label(key, "K", 1), int.clone())]);
-        let ty = Ty::Fn(Box::new(FnTy {
-            params: vec![(None, record), (None, Ty::Var(key_type))],
-            ret: int.clone(),
-            err: Ty::Never,
-            env: Ty::Never,
-        }));
-        let scheme = Scheme {
-            level: 0,
-            ty,
-            key_slots: vec![(key, 1)],
-        };
-        let encoded = encode_test(&original, &scheme, &mut |t| match t {
-            TypeRef::Builtin(b) => b.name().into(),
-            _ => unreachable!(),
-        });
-        let mut restored = Solver::new(HashMap::new(), Vec::new());
-        let scheme = decode(
-            &encoded,
-            &mut restored,
-            0,
-            &mut |name| match name {
-                "Int" => Some(TypeRef::Builtin(BuiltinType::Int)),
-                "String" => Some(TypeRef::Builtin(BuiltinType::String)),
-                _ => None,
-            },
-            &mut |_| TyVarId(20),
-            &mut |_, _| None,
-        )
-        .unwrap();
-        let instantiated = restored.freshen(&scheme.ty, scheme.level, &mut HashMap::new());
-        let label = records::label_params(&instantiated)
-            .into_iter()
-            .next()
-            .unwrap();
-        assert_eq!(records::label_var(&label), Some(scheme.key_slots[0].0));
-        let actual = restored.records.record(vec![(Label::name("a"), int)]);
-        let labels = [(label, Label::name("a"))].into_iter().collect();
-        let callable = records::map_labels(&instantiated, &labels);
-        let Ty::Graph(graph) = callable else {
-            panic!("decoded callable graph");
-        };
-        let Some(Ty::Fn(function)) = graph.view() else {
-            panic!("decoded callable");
-        };
-        restored.constrain(&actual, &function.params[0].1);
-        assert!(restored.failures.is_empty());
-        let wrong = restored.records.record(vec![(
-            Label::name("b"),
-            Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-        )]);
-        restored.constrain(&wrong, &function.params[0].1);
-        assert!(!restored.failures.is_empty());
-    }
 }
 
 /// An alias template with formal positions retained for package comparison.
@@ -1852,12 +999,10 @@ impl AliasArtifact {
                           source: &Solver,
                           name: &mut dyn FnMut(TypeRef) -> String|
          -> Result<Ty, String> {
-            let graph = source.records.graph(&artifact.template.ty);
+            let mut refs = Vec::new();
+            named_refs(&artifact.template.ty, &mut refs);
             let mut names = HashMap::new();
-            for (_, node) in graph.nodes() {
-                let Node::Con(Head::Named(ty), _, _) = node else {
-                    continue;
-                };
+            for ty in refs {
                 let key = match ty {
                     TypeRef::Builtin(_) => format!("builtin:{}", name(ty)),
                     TypeRef::Custom(_) => format!("nominal:{}", name(ty)),
@@ -1895,27 +1040,16 @@ impl AliasArtifact {
                     return Err("duplicate nominal identity".into());
                 }
             }
-            let wire = records::codec::encode(
-                &graph,
-                &mut |ty| match ty {
-                    TypeRef::Builtin(_) => format!("builtin:{}", name(ty)),
-                    TypeRef::Custom(_) => format!("nominal:{}", name(ty)),
-                },
-                &mut |v| v.0.to_string(),
-                &mut |_| unreachable!("alias label parameter"),
-            );
-            records::codec::decode(
-                &wire,
-                &solver.records,
-                &mut |name| names.get(name).copied(),
-                &mut |name| {
-                    name.parse::<u32>()
-                        .ok()
-                        .filter(|&i| (i as usize) < artifact.template.slots)
-                        .map(V)
-                },
-                &mut |_, _, _| None,
-            )
+            Ok(map_types(&artifact.template.ty, &mut |t| match t {
+                Ty::Con(Head::Named(ty), values, args) => {
+                    let key = match ty {
+                        TypeRef::Builtin(_) => format!("builtin:{}", name(ty)),
+                        TypeRef::Custom(_) => format!("nominal:{}", name(ty)),
+                    };
+                    Ty::Con(Head::Named(names[&key]), values, args)
+                }
+                t => t,
+            }))
         };
         let a = import(self, &left, left_name)?;
         let b = import(other, &right, right_name)?;
@@ -1924,8 +1058,6 @@ impl AliasArtifact {
         // each function in a disjoint tagged wrapper encoding its labels.
         // The ordinary proof then compares both the function type
         // and its call protocol, including inside records and unions.
-        let graph_a = solver.records.graph(&a);
-        let graph_b = solver.records.graph(&b);
         let mut tags = HashMap::<Vec<Option<String>>, crate::hir::TypeId>::new();
         let mut tag = |ty: Ty, _: bool| {
             let Ty::Fn(function) = &ty else {
@@ -1945,23 +1077,18 @@ impl AliasArtifact {
             });
             Ty::named(TypeRef::Custom(id), vec![ty])
         };
-        let a = graph_a.map_nodes(false, &mut tag);
-        let b = graph_b.map_nodes(false, &mut tag);
+        let a = map_types(&a, &mut |t| tag(t, false));
+        let b = map_types(&b, &mut |t| tag(t, false));
         if a == b {
             return Ok(Some(true));
         }
         let prove = |a: &Ty, b: &Ty| {
-            records::prove(
-                &solver,
-                a,
-                b,
-                &mut records::Demand::new(records::Demand::LIMIT, true),
-            )
+            prove::prove(&solver, a, b, &mut prove::Demand::new(prove::Demand::LIMIT))
         };
         match (prove(&a, &b), prove(&b, &a)) {
-            (records::Verdict::Proven, records::Verdict::Proven) => Ok(Some(true)),
-            (records::Verdict::Refuted, _) | (_, records::Verdict::Refuted) => Ok(Some(false)),
-            (records::Verdict::ResourceLimit, _) | (_, records::Verdict::ResourceLimit) => {
+            (prove::Verdict::Proven, prove::Verdict::Proven) => Ok(Some(true)),
+            (prove::Verdict::Refuted, _) | (_, prove::Verdict::Refuted) => Ok(Some(false)),
+            (prove::Verdict::ResourceLimit, _) | (_, prove::Verdict::ResourceLimit) => {
                 Err("alias equivalence exceeded the proof limit".into())
             }
             _ if self.modes.iter().all(|m| *m == Mode::Value)
@@ -1982,8 +1109,8 @@ impl AliasArtifact {
                     };
                     let a = super::alias::map_vars(&a, &mut replace.clone());
                     let b = super::alias::map_vars(&b, &mut replace.clone());
-                    if matches!(prove(&a, &b), records::Verdict::Refuted)
-                        || matches!(prove(&b, &a), records::Verdict::Refuted)
+                    if matches!(prove(&a, &b), prove::Verdict::Refuted)
+                        || matches!(prove(&b, &a), prove::Verdict::Refuted)
                     {
                         return Ok(Some(false));
                     }
@@ -2005,28 +1132,49 @@ pub enum SchemeComparison {
     ResourceLimit,
 }
 
-fn remap_scheme_type(ty: &Ty, vars: &[usize], labels: &[usize], names: &[String]) -> Ty {
-    let ty = super::alias::map_vars(ty, &mut |v| Ty::Var(V(vars[v.0 as usize] as u32)));
-    let remap = records::label_params(&ty)
-        .into_iter()
-        .map(|p| {
-            let index = records::label_var(&p).expect("interface label binder").0 as usize;
-            let target = labels[index];
-            let replacement =
-                records::variable_label(TyVarId(target as u32), &names[target], p.level);
-            (p, replacement)
-        })
-        .collect();
-    records::map_labels(&ty, &remap)
+fn remap_scheme_type(ty: &Ty, vars: &[usize]) -> Ty {
+    super::alias::map_vars(ty, &mut |v| Ty::Var(V(vars[v.0 as usize] as u32)))
+}
+
+/// `ty` with each type changed by `f`, from the leaves up.
+fn map_types(ty: &Ty, f: &mut impl FnMut(Ty) -> Ty) -> Ty {
+    let shallow = match ty {
+        Ty::Con(h, vs, args) => Ty::Con(*h, vs.clone(), args.iter().map(|a| map_types(a, f)).collect()),
+        Ty::Fn(fun) => Ty::Fn(Box::new(super::FnTy {
+            params: fun
+                .params
+                .iter()
+                .map(|(l, p)| (l.clone(), map_types(p, f)))
+                .collect(),
+            ret: map_types(&fun.ret, f),
+            err: map_types(&fun.err, f),
+            env: map_types(&fun.env, f),
+        })),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(|x| map_types(x, f)).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(|x| map_types(x, f)).collect()),
+        Ty::Diff(b, hs) => Ty::Diff(
+            Box::new(map_types(b, f)),
+            hs.iter().map(|x| map_types(x, f)).collect(),
+        ),
+        Ty::Both(a, b) => Ty::Both(Box::new(map_types(a, f)), Box::new(map_types(b, f))),
+        t => t.clone(),
+    };
+    f(shallow)
+}
+
+/// The variables of `ty`.
+fn variables(ty: &Ty) -> Vec<V> {
+    let mut out = Vec::new();
+    super::display::ty_vars(ty, &mut out);
+    out
 }
 
 fn tag_scheme_type(
-    pool: &records::Pool,
     ty: &Ty,
     tags: &mut HashMap<Vec<Option<String>>, crate::hir::TypeId>,
     next: &mut u32,
 ) -> Ty {
-    pool.graph(ty).map_nodes(false, &mut |ty, _| {
+    map_types(ty, &mut |ty| {
         let Ty::Fn(f) = &ty else {
             return ty;
         };
@@ -2050,8 +1198,7 @@ fn tag_scheme_solver(
     tags: &mut HashMap<Vec<Option<String>>, crate::hir::TypeId>,
     next: &mut u32,
 ) -> Ty {
-    let pool = solver.records.clone();
-    let root = tag_scheme_type(&pool, root, tags, next);
+    let root = tag_scheme_type(root, tags, next);
     for state in &mut solver.vars {
         for ty in state
             .lower
@@ -2059,7 +1206,7 @@ fn tag_scheme_solver(
             .chain(&mut state.upper)
             .chain(&mut state.handled)
         {
-            *ty = tag_scheme_type(&pool, ty, tags, next);
+            *ty = tag_scheme_type(ty, tags, next);
         }
     }
     root
@@ -2070,12 +1217,12 @@ fn proves(
     left: &Ty,
     right: &Ty,
     mode: Mode,
-    demand: &mut records::Demand,
+    demand: &mut prove::Demand,
 ) -> Result<bool, ()> {
-    match records::prove_mode(solver, left, right, mode, demand) {
-        records::Verdict::Proven => Ok(true),
-        records::Verdict::ResourceLimit => Err(()),
-        records::Verdict::Refuted | records::Verdict::Unknown => Ok(false),
+    match prove::prove_mode(solver, left, right, mode, demand) {
+        prove::Verdict::Proven => Ok(true),
+        prove::Verdict::ResourceLimit => Err(()),
+        prove::Verdict::Refuted | prove::Verdict::Unknown => Ok(false),
     }
 }
 
@@ -2083,8 +1230,6 @@ fn proves(
 // `target` must follow without adding a bound to either solver.
 struct SchemeMapping<'a> {
     variables: &'a [usize],
-    labels: &'a [usize],
-    names: &'a [String],
 }
 
 fn entails_mapped(
@@ -2093,13 +1238,9 @@ fn entails_mapped(
     target: &Solver,
     target_root: &Ty,
     mapped: SchemeMapping<'_>,
-    demand: &mut records::Demand,
+    demand: &mut prove::Demand,
 ) -> Result<bool, ()> {
-    let SchemeMapping {
-        variables: mapping,
-        labels,
-        names,
-    } = mapped;
+    let SchemeMapping { variables: mapping } = mapped;
     for (i, wanted) in target.vars.iter().enumerate() {
         let actual = &subject.vars[mapping[i]];
         if actual.row != wanted.row
@@ -2108,22 +1249,16 @@ fn entails_mapped(
         {
             return Ok(false);
         }
-        let label = wanted
-            .label_key
-            .map(|id| TyVarId(labels[id.0 as usize] as u32));
-        if actual.label_key != label {
-            return Ok(false);
-        }
         let variable = Ty::Var(V(mapping[i] as u32));
         let mode = actual.row;
         for lower in &wanted.lower {
-            let lower = remap_scheme_type(lower, mapping, labels, names);
+            let lower = remap_scheme_type(lower, mapping);
             if !proves(subject, &lower, &variable, mode, demand)? {
                 return Ok(false);
             }
         }
         for upper in &wanted.upper {
-            let upper = remap_scheme_type(upper, mapping, labels, names);
+            let upper = remap_scheme_type(upper, mapping);
             if !proves(subject, &variable, &upper, mode, demand)? {
                 return Ok(false);
             }
@@ -2151,7 +1286,7 @@ fn entails_mapped(
             }
         }
         for handled in &wanted.handled {
-            let handled = remap_scheme_type(handled, mapping, labels, names);
+            let handled = remap_scheme_type(handled, mapping);
             let mut found = false;
             for own in &actual.handled {
                 if proves(subject, own, &handled, Mode::Env, demand)?
@@ -2166,8 +1301,44 @@ fn entails_mapped(
             }
         }
     }
-    let target_root = remap_scheme_type(target_root, mapping, labels, names);
+    let target_root = remap_scheme_type(target_root, mapping);
     proves(subject, subject_root, &target_root, Mode::Value, demand)
+}
+
+/// Whether `v` occurs in `ty` in an output place and in an input place.
+fn sites(ty: &Ty, v: V) -> (bool, bool) {
+    fn go(ty: &Ty, v: V, pos: bool, out: &mut (bool, bool)) {
+        match ty {
+            Ty::Var(w) if *w == v => {
+                if pos {
+                    out.0 = true;
+                } else {
+                    out.1 = true;
+                }
+            }
+            Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
+                xs.iter().for_each(|x| go(x, v, pos, out))
+            }
+            Ty::Fn(f) => {
+                f.params.iter().for_each(|(_, p)| go(p, v, !pos, out));
+                [&f.ret, &f.err, &f.env]
+                    .into_iter()
+                    .for_each(|x| go(x, v, pos, out));
+            }
+            Ty::Diff(a, hs) => {
+                go(a, v, pos, out);
+                hs.iter().for_each(|x| go(x, v, pos, out));
+            }
+            Ty::Both(a, b) => {
+                go(a, v, true, out);
+                go(b, v, false, out);
+            }
+            _ => {}
+        }
+    }
+    let mut out = (false, false);
+    go(ty, v, true, &mut out);
+    out
 }
 
 // A closed service form supplies an explicit counterexample when the only
@@ -2176,22 +1347,11 @@ fn handler_witness(source: &Solver, source_root: &Ty, target: &Solver, target_ro
     if source.vars.len() != 1 || target.vars.len() != 1 {
         return false;
     }
-    let sites = source.records.graph(source_root).variable_sites(
-        source,
-        super::solve::Pol::Pos,
-        false,
-        false,
-    );
-    let positive = sites.iter().any(|(v, pol, _)| {
-        *v == V(0) && matches!(pol, super::solve::Pol::Pos | super::solve::Pol::Both)
-    });
-    let negative = sites.iter().any(|(v, pol, _)| {
-        *v == V(0) && matches!(pol, super::solve::Pol::Neg | super::solve::Pol::Both)
-    });
+    let (positive, negative) = sites(source_root, V(0));
     if !positive || !negative {
         return false;
     }
-    let mut demand = records::Demand::new(records::Demand::LIMIT, true);
+    let mut demand = prove::Demand::new(prove::Demand::LIMIT);
     if !matches!(
         proves(source, source_root, target_root, Mode::Value, &mut demand),
         Ok(true)
@@ -2217,7 +1377,7 @@ fn handler_witness(source: &Solver, source_root: &Ty, target: &Solver, target_ro
         return false;
     }
     for form in &a.handled {
-        if !source.records.graph(form).variables().is_empty() {
+        if !variables(form).is_empty() {
             continue;
         }
         if !matches!(form.value_head(), Some(Head::Named(TypeRef::Custom(_)))) {
@@ -2245,37 +1405,8 @@ fn definite_failure(solver: &Solver) -> bool {
                     | FailKind::Arity
                     | FailKind::Invariant
                     | FailKind::EnvForms
-                    | FailKind::NoField
             )
         })
-}
-
-fn ground_label_scheme(solver: &Solver, root: &Ty, labels: &[usize]) -> Option<Ty> {
-    if solver.vars.iter().any(|v| {
-        v.label_key.is_none()
-            || v.row != Mode::Value
-            || v.difference
-            || !v.lower.is_empty()
-            || !v.upper.is_empty()
-            || !v.from.is_empty()
-            || !v.into.is_empty()
-            || !v.handled.is_empty()
-    }) {
-        return None;
-    }
-    let key = |id: TyVarId| format!("interface-key-{}", labels[id.0 as usize]);
-    let ty = super::alias::map_vars(root, &mut |v| {
-        let id = solver.vars[v.0 as usize].label_key.expect("label key");
-        Ty::literal(&super::LitValue::Str(key(id)))
-    });
-    let mapped = records::label_params(&ty)
-        .into_iter()
-        .map(|p| {
-            let id = records::label_var(&p).expect("label binder");
-            (p, Label::name(key(id)))
-        })
-        .collect();
-    Some(records::map_labels(&ty, &mapped))
 }
 
 impl SchemeArtifact {
@@ -2327,26 +1458,6 @@ impl SchemeArtifact {
         let mut right_env = SchemeEnvironment::default();
         let left = left_env.read(&left_wire, &mut |name| identities.get(name).copied())?;
         let right = right_env.read(&right_wire, &mut |name| identities.get(name).copied())?;
-        if left_bundle.keys.len() != right_bundle.keys.len() {
-            return Ok(SchemeComparison::Different);
-        }
-        let mut right_labels = vec![usize::MAX; right_bundle.labels.len()];
-        let mut left_labels = vec![usize::MAX; left_bundle.labels.len()];
-        for &(right_label, slot) in &right_bundle.keys {
-            let Some(&(left_label, _)) = left_bundle.keys.iter().find(|(_, at)| *at == slot) else {
-                return Ok(SchemeComparison::Different);
-            };
-            if (right_labels[right_label] != usize::MAX && right_labels[right_label] != left_label)
-                || (left_labels[left_label] != usize::MAX && left_labels[left_label] != right_label)
-            {
-                return Ok(SchemeComparison::Different);
-            }
-            right_labels[right_label] = left_label;
-            left_labels[left_label] = right_label;
-        }
-        if right_labels.contains(&usize::MAX) || left_labels.contains(&usize::MAX) {
-            return Ok(SchemeComparison::Unknown);
-        }
         let mut left_solver = left.catalog.solver.lock().expect("scheme snapshot").clone();
         let mut right_solver = right
             .catalog
@@ -2418,41 +1529,6 @@ impl SchemeArtifact {
         for (id, values) in left_solver.row_params.clone() {
             right_solver.row_params.insert(id, values);
         }
-        let raw_left = left_solver.scheme_snapshot();
-        let raw_right = right_solver.scheme_snapshot();
-        let tag_base = next;
-        let cover = || {
-            let mut demand = records::Demand::new(records::Demand::LIMIT, true);
-            let left = CoverSide {
-                solver: &raw_left,
-                root: &left_type,
-                metadata: &left_bundle.variables,
-            };
-            let right = CoverSide {
-                solver: &raw_right,
-                root: &right_type,
-                metadata: &right_bundle.variables,
-            };
-            let forward = find_cover(
-                left,
-                right,
-                &left_labels,
-                &right_bundle.labels,
-                tag_base,
-                &mut demand,
-            )?;
-            if !forward {
-                return Ok(false);
-            }
-            find_cover(
-                right,
-                left,
-                &right_labels,
-                &left_bundle.labels,
-                tag_base,
-                &mut demand,
-            )
-        };
         let mut tags = HashMap::new();
         let left_root = tag_scheme_solver(&mut left_solver, &left_type, &mut tags, &mut next);
         let right_root = tag_scheme_solver(&mut right_solver, &right_type, &mut tags, &mut next);
@@ -2462,37 +1538,7 @@ impl SchemeArtifact {
             left_solver.comparison_wrappers.insert(*id);
             right_solver.comparison_wrappers.insert(*id);
         }
-        let identity_labels: Vec<_> = (0..left_labels.len()).collect();
-        let witnesses = || {
-            compare_witnesses(
-                WitnessSide {
-                    solver: &left_solver,
-                    root: &left_root,
-                    metadata: &left_bundle.variables,
-                    labels: &identity_labels,
-                },
-                WitnessSide {
-                    solver: &right_solver,
-                    root: &right_root,
-                    metadata: &right_bundle.variables,
-                    labels: &right_labels,
-                },
-            )
-        };
         if left_bundle.variables.len() != right_bundle.variables.len() {
-            match cover() {
-                Ok(true) => return Ok(SchemeComparison::Equivalent(vec![vec![]])),
-                Err(()) => return Ok(SchemeComparison::ResourceLimit),
-                Ok(false) => (),
-            }
-            let all_general = left_bundle
-                .variables
-                .iter()
-                .chain(&right_bundle.variables)
-                .all(|v| v.depth.is_some());
-            if closed_environment || all_general {
-                return Ok(witnesses());
-            }
             return Ok(SchemeComparison::Unknown);
         }
         let count = left_bundle.variables.len();
@@ -2500,13 +1546,11 @@ impl SchemeArtifact {
         for b in &right_bundle.variables {
             let mut matches = Vec::new();
             for (i, a) in left_bundle.variables.iter().enumerate() {
-                let label = b.label.map(|n| right_labels[n]);
                 if a.depth == b.depth
                     && a.external.is_some() == b.external.is_some()
                     && a.mode == b.mode
                     && a.difference == b.difference
                     && a.input == b.input
-                    && a.label == label
                 {
                     matches.push(i);
                 }
@@ -2518,12 +1562,9 @@ impl SchemeArtifact {
         let mut next_candidate = vec![0usize; count];
         let mut depth = 0usize;
         let mut solutions = Vec::new();
-        let mut demand = records::Demand::new(records::Demand::LIMIT, true);
+        let mut demand = prove::Demand::new(prove::Demand::LIMIT);
         loop {
-            let state: Vec<u64> = std::iter::once(u64::MAX)
-                .chain(mapping[..depth].iter().map(|v| *v as u64))
-                .collect();
-            if demand.charge_state(&state).is_err() {
+            if demand.charge().is_err() {
                 return Ok(SchemeComparison::ResourceLimit);
             }
             if depth == count {
@@ -2538,8 +1579,6 @@ impl SchemeArtifact {
                     &right_root,
                     SchemeMapping {
                         variables: &mapping,
-                        labels: &right_labels,
-                        names: &left_bundle.labels,
                     },
                     &mut demand,
                 );
@@ -2551,8 +1590,6 @@ impl SchemeArtifact {
                         &left_root,
                         SchemeMapping {
                             variables: &reverse,
-                            labels: &left_labels,
-                            names: &right_bundle.labels,
                         },
                         &mut demand,
                     )
@@ -2594,23 +1631,6 @@ impl SchemeArtifact {
                     {
                         return Ok(SchemeComparison::Different);
                     }
-                    _ if left_bundle.variables.iter().all(|v| v.depth.is_some())
-                        && right_bundle.variables.iter().all(|v| v.depth.is_some()) =>
-                    {
-                        let identity: Vec<_> = (0..left_labels.len()).collect();
-                        if let (Some(a), Some(b)) = (
-                            ground_label_scheme(&left_solver, &left_root, &identity),
-                            ground_label_scheme(&right_solver, &right_root, &right_labels),
-                        ) {
-                            let mut forward = left_solver.clone();
-                            let mut backward = right_solver.clone();
-                            forward.constrain(&a, &b);
-                            backward.constrain(&b, &a);
-                            if definite_failure(&forward) || definite_failure(&backward) {
-                                return Ok(SchemeComparison::Different);
-                            }
-                        }
-                    }
                     _ => (),
                 }
                 if depth == 0 {
@@ -2644,22 +1664,8 @@ impl SchemeArtifact {
                 chosen[mapping[depth]] = false;
             }
         }
-        let all_general = left_bundle
-            .variables
-            .iter()
-            .chain(&right_bundle.variables)
-            .all(|v| v.depth.is_some());
         if solutions.is_empty() {
-            match cover() {
-                Ok(true) => return Ok(SchemeComparison::Equivalent(vec![vec![]])),
-                Err(()) => return Ok(SchemeComparison::ResourceLimit),
-                Ok(false) => (),
-            }
-            if closed_environment || all_general {
-                Ok(witnesses())
-            } else {
-                Ok(SchemeComparison::Unknown)
-            }
+            Ok(SchemeComparison::Unknown)
         } else {
             Ok(SchemeComparison::Equivalent(solutions))
         }
@@ -2676,7 +1682,7 @@ fn project_hidden(
     closed_environment: bool,
 ) {
     loop {
-        let visible = solver.records.graph(root).variables();
+        let visible = variables(root);
         let candidate = (0..solver.vars.len()).find(|&i| {
             let v = V(i as u32);
             let st = &solver.vars[i];
@@ -2685,14 +1691,13 @@ fn project_hidden(
                 || st.input
                 || st.row != Mode::Value
                 || st.difference
-                || st.label_key.is_some()
                 || !st.handled.is_empty()
             {
                 return false;
             }
             for state in &solver.vars {
                 for ty in state.lower.iter().chain(&state.upper).chain(&state.handled) {
-                    if solver.records.graph(ty).variables().contains(&v)
+                    if variables(ty).contains(&v)
                         && !matches!(ty, Ty::Var(w) if *w == v)
                     {
                         return false;
@@ -2776,7 +1781,7 @@ fn project_hidden(
     }
 }
 
-fn aggregate_schemes(schemes: &[SchemeArtifact], stride: usize) -> Result<SchemeArtifact, String> {
+fn aggregate_schemes(schemes: &[SchemeArtifact]) -> Result<SchemeArtifact, String> {
     let mut identities = HashMap::<String, TypeRef>::new();
     let mut wires = Vec::with_capacity(schemes.len());
     for artifact in schemes {
@@ -2790,22 +1795,13 @@ fn aggregate_schemes(schemes: &[SchemeArtifact], stride: usize) -> Result<Scheme
     }
     let mut environment = SchemeEnvironment::default();
     let mut roots = Vec::with_capacity(schemes.len());
-    let mut keys = Vec::new();
-    for (i, wire) in wires.iter().enumerate() {
+    for wire in &wires {
         let artifact = environment.read(wire, &mut |name| identities.get(name).copied())?;
-        for (id, slot) in artifact.scheme.key_slots {
-            let slot = i
-                .checked_mul(stride)
-                .and_then(|base| base.checked_add(slot))
-                .ok_or("interface key position overflow")?;
-            keys.push((id, slot));
-        }
         roots.push(artifact.scheme.ty);
     }
     let scheme = Scheme {
         level: 0,
         ty: Ty::tuple(roots),
-        key_slots: keys,
     };
     let ids: FxHashMap<V, usize> = environment
         .externals
@@ -2833,464 +1829,9 @@ pub fn compare_scheme_group(
     if left.len() != right.len() {
         return Ok(SchemeComparison::Different);
     }
-    let max_slot = left
-        .iter()
-        .chain(right)
-        .flat_map(|s| s.scheme.key_slots.iter().map(|(_, slot)| *slot))
-        .max()
-        .unwrap_or(0);
-    let stride = max_slot
-        .checked_add(1)
-        .ok_or("interface key position overflow")?;
-    let a = aggregate_schemes(left, stride)?;
-    let b = aggregate_schemes(right, stride)?;
+    let a = aggregate_schemes(left)?;
+    let b = aggregate_schemes(right)?;
     a.compare_impl(&b, left_name, right_name, true)
-}
-
-// Construct concrete interface instances from input choices and the complete
-// lower bounds of non-input variables. A failed proof is not a witness.
-#[derive(Clone)]
-enum WitnessChoice {
-    Type(Ty),
-    Upper,
-    Lower,
-}
-
-fn ground_known_scheme(
-    solver: &Solver,
-    root: &Ty,
-    metadata: &[Variable],
-    mut choices: usize,
-    domain: &[WitnessChoice],
-    labels: &[usize],
-    keys: &[String],
-) -> Option<Ty> {
-    if solver
-        .vars
-        .iter()
-        .any(|state| state.difference && state.handled.is_empty())
-    {
-        return None;
-    }
-    let mut values = vec![None; solver.vars.len()];
-    let mut use_upper = vec![false; solver.vars.len()];
-    for (i, state) in solver.vars.iter().enumerate() {
-        if let Some(label) = state.label_key {
-            values[i] = Some(Ty::literal(&super::LitValue::Str(
-                keys[labels[label.0 as usize]].clone(),
-            )));
-        } else if state.input || metadata[i].depth.is_some() {
-            match &domain[choices % domain.len()] {
-                WitnessChoice::Type(ty) => values[i] = Some(ty.clone()),
-                WitnessChoice::Upper => use_upper[i] = true,
-                WitnessChoice::Lower => (),
-            }
-            choices /= domain.len();
-        }
-    }
-    let mut scratch = solver.scheme_snapshot();
-    loop {
-        let mut progress = false;
-        for (i, state) in solver.vars.iter().enumerate() {
-            if values[i].is_some() {
-                continue;
-            }
-            let parts: Vec<_> = if use_upper[i] {
-                state
-                    .upper
-                    .iter()
-                    .cloned()
-                    .chain(state.into.iter().copied().map(Ty::Var))
-                    .collect()
-            } else {
-                state
-                    .lower
-                    .iter()
-                    .cloned()
-                    .chain(state.from.iter().copied().map(Ty::Var))
-                    .collect()
-            };
-            if parts
-                .iter()
-                .flat_map(|t| solver.records.graph(t).variables())
-                .any(|v| values[v.0 as usize].is_none())
-            {
-                continue;
-            }
-            let parts = parts
-                .iter()
-                .map(|ty| {
-                    let ty = super::alias::map_vars(ty, &mut |v| {
-                        values[v.0 as usize].clone().expect("ground dependency")
-                    });
-                    witness_labels(&ty, labels, keys)
-                })
-                .collect();
-            values[i] = Some(if use_upper[i] {
-                scratch.inter(parts)
-            } else {
-                scratch.union(parts)
-            });
-            progress = true;
-        }
-        if values.iter().all(Option::is_some) {
-            break;
-        }
-        if !progress {
-            return None;
-        }
-    }
-    let ground = |ty: &Ty| {
-        let ty = super::alias::map_vars(ty, &mut |v| {
-            values[v.0 as usize].clone().expect("ground variable")
-        });
-        witness_labels(&ty, labels, keys)
-    };
-    for (i, state) in solver.vars.iter().enumerate() {
-        let value = values[i].as_ref().expect("ground variable");
-        if state.row != Mode::Value && !witness_row_value(solver, value, state.row) {
-            return None;
-        }
-        for lower in &state.lower {
-            witness_constraint(&mut scratch, &ground(lower), value, state.row);
-        }
-        for upper in &state.upper {
-            witness_constraint(&mut scratch, value, &ground(upper), state.row);
-        }
-        for from in &state.from {
-            witness_constraint(
-                &mut scratch,
-                values[from.0 as usize].as_ref().unwrap(),
-                value,
-                state.row,
-            );
-        }
-        for into in &state.into {
-            witness_constraint(
-                &mut scratch,
-                value,
-                values[into.0 as usize].as_ref().unwrap(),
-                state.row,
-            );
-        }
-        for handler in &state.handled {
-            let mut demand = records::Demand::new(records::Demand::LIMIT, true);
-            if !handler_entailed(&scratch, value, &ground(handler), state.row, &mut demand).ok()? {
-                return None;
-            }
-        }
-    }
-    scratch.failures.is_empty().then(|| ground(root))
-}
-
-fn witness_constraint(solver: &mut Solver, left: &Ty, right: &Ty, mode: Mode) {
-    match mode {
-        Mode::Value => solver.constrain(left, right),
-        Mode::Row => solver.constrain_row(left, right),
-        Mode::Env => solver.constrain_env(left, right),
-    }
-}
-
-fn witness_row_value(solver: &Solver, value: &Ty, mode: Mode) -> bool {
-    let graph = solver.records.graph(value);
-    let mut pending = vec![graph.id];
-    while let Some(id) = pending.pop() {
-        match graph.node_at(id) {
-            Node::Never | Node::Con(Head::Named(TypeRef::Custom(_)), _, _) => (),
-            Node::Union(a, b) | Node::Inter(a, b) => pending.extend([a, b]),
-            Node::Con(
-                Head::Named(TypeRef::Builtin(
-                    crate::hir::BuiltinType::Int | crate::hir::BuiltinType::String,
-                )),
-                _,
-                _,
-            ) if mode == Mode::Row => (),
-            _ => return false,
-        }
-    }
-    true
-}
-
-fn witness_labels(ty: &Ty, labels: &[usize], keys: &[String]) -> Ty {
-    let mapping = records::label_params(ty)
-        .into_iter()
-        .map(|p| {
-            let id = records::label_var(&p).expect("interface label binder").0 as usize;
-            (p, Label::name(keys[labels[id]].as_str()))
-        })
-        .collect();
-    records::map_labels(ty, &mapping)
-}
-
-fn shared_group_counterexample(
-    source: &Solver,
-    root: &Ty,
-    metadata: &[Variable],
-    target: &Solver,
-    target_root: &Ty,
-    source_labels: &[usize],
-    target_labels: &[usize],
-) -> Option<bool> {
-    // In this fragment decomposition produces only conjunctive lower and
-    // upper bounds on variables. No record/Boolean branch can require a
-    // different choice, so an incompatible pair of closed bounds refutes
-    // every instantiation of the target.
-    let flat_target = target.vars.iter().all(|state| {
-        state.row == Mode::Value
-            && state.label_key.is_none()
-            && !state.difference
-            && state.handled.is_empty()
-    }) && std::iter::once(target_root)
-        .chain(
-            target
-                .vars
-                .iter()
-                .flat_map(|state| state.lower.iter().chain(&state.upper)),
-        )
-        .all(|ty| {
-            target.records.graph(ty).nodes().iter().all(|(_, node)| {
-                matches!(
-                    node,
-                    Node::Never | Node::Top | Node::Var(_) | Node::Con(..) | Node::Fn(_)
-                )
-            })
-        });
-    let inputs = source
-        .vars
-        .iter()
-        .zip(metadata)
-        .filter(|(state, meta)| state.label_key.is_none() && (state.input || meta.depth.is_some()))
-        .count();
-    let mut labels = std::collections::BTreeSet::new();
-    for (solver, root) in [(source, root), (target, target_root)] {
-        let roots = std::iter::once(root).chain(
-            solver
-                .vars
-                .iter()
-                .flat_map(|s| s.lower.iter().chain(&s.upper).chain(&s.handled)),
-        );
-        for ty in roots {
-            for (_, node) in solver.records.graph(ty).nodes() {
-                if let Node::Rec(fields) = node {
-                    labels.extend(fields.into_iter().filter_map(|(label, _)| match label {
-                        Label::Name(name) => Some(name.to_string()),
-                        _ => None,
-                    }));
-                }
-            }
-        }
-    }
-    let count = source_labels
-        .iter()
-        .chain(target_labels)
-        .copied()
-        .max()
-        .map_or(0, |n| n + 1);
-    let mut nonce = 0usize;
-    let keys = loop {
-        let keys: Vec<_> = (0..count)
-            .map(|i| format!("\0i-comparison-{nonce}-{i}"))
-            .collect();
-        if keys.iter().all(|key| !labels.contains(key)) {
-            break keys;
-        }
-        nonce += 1;
-    };
-    let named_labels: Vec<_> = labels.iter().cloned().collect();
-    let mut scenarios = vec![keys.clone()];
-    for i in 0..keys.len() {
-        for other in 0..i {
-            let mut equal = keys.clone();
-            equal[i] = equal[other].clone();
-            if !scenarios.contains(&equal) {
-                scenarios.push(equal);
-            }
-        }
-        for label in &named_labels {
-            let mut equal = keys.clone();
-            equal[i] = label.clone();
-            if !scenarios.contains(&equal) {
-                scenarios.push(equal);
-            }
-        }
-    }
-    labels.extend(keys.iter().cloned());
-    let integer = Ty::named(TypeRef::Builtin(crate::hir::BuiltinType::Int), Vec::new());
-    let string = Ty::named(
-        TypeRef::Builtin(crate::hir::BuiltinType::String),
-        Vec::new(),
-    );
-    let mut domain = vec![
-        WitnessChoice::Type(integer.clone()),
-        WitnessChoice::Type(string.clone()),
-        WitnessChoice::Type(Ty::Never),
-        WitnessChoice::Type(Ty::Top),
-        WitnessChoice::Type(source.records.record(Vec::new())),
-        WitnessChoice::Upper,
-        WitnessChoice::Lower,
-    ];
-    for solver in [source, target] {
-        for handler in solver.vars.iter().flat_map(|state| &state.handled) {
-            if !solver.records.graph(handler).variables().is_empty() {
-                continue;
-            }
-            domain.push(WitnessChoice::Type(handler.clone()));
-            let view = match handler {
-                Ty::Graph(graph) => graph.view(),
-                other => Some(other.clone()),
-            };
-            if let Some(Ty::Con(head @ Head::Named(TypeRef::Custom(_)), values, args)) = view {
-                for i in 0..args.len() {
-                    for replacement in [&integer, &string] {
-                        let mut alternate = args.clone();
-                        alternate[i] = replacement.clone();
-                        domain.push(WitnessChoice::Type(Ty::Con(
-                            head,
-                            values.clone(),
-                            alternate,
-                        )));
-                    }
-                }
-            }
-        }
-    }
-    for name in &labels {
-        for value in [&integer, &string] {
-            domain.push(WitnessChoice::Type(
-                source
-                    .records
-                    .record(vec![(Label::name(name.as_str()), value.clone())]),
-            ));
-        }
-    }
-    if !labels.is_empty() {
-        for value in [&integer, &string] {
-            domain.push(WitnessChoice::Type(
-                source.records.record(
-                    labels
-                        .iter()
-                        .map(|name| (Label::name(name.as_str()), value.clone()))
-                        .collect(),
-                ),
-            ));
-        }
-    }
-    let combinations = domain.len().checked_pow(u32::try_from(inputs).ok()?)?;
-    let mut work = 0;
-    for keys in scenarios {
-        for choices in 0..combinations {
-            if work == records::Demand::LIMIT {
-                return None;
-            }
-            work += 1;
-            let Some(ground) = ground_known_scheme(
-                source,
-                root,
-                metadata,
-                choices,
-                &domain,
-                source_labels,
-                &keys,
-            ) else {
-                continue;
-            };
-            let mut forward = target.scheme_snapshot();
-            for state in &mut forward.vars {
-                for bound in state
-                    .lower
-                    .iter_mut()
-                    .chain(&mut state.upper)
-                    .chain(&mut state.handled)
-                {
-                    *bound = witness_labels(bound, target_labels, &keys);
-                }
-            }
-            let target_root = witness_labels(target_root, target_labels, &keys);
-            let fixed: Vec<_> = forward
-                .vars
-                .iter()
-                .enumerate()
-                .filter_map(|(i, state)| state.label_key.map(|label| (V(i as u32), label)))
-                .collect();
-            for (var, label) in fixed {
-                let key = Ty::literal(&super::LitValue::Str(
-                    keys[target_labels[label.0 as usize]].clone(),
-                ));
-                forward.constrain(&Ty::Var(var), &key);
-                forward.constrain(&key, &Ty::Var(var));
-            }
-            if !forward.failures.is_empty() {
-                continue;
-            }
-            let closed = forward.vars.iter().all(|state| state.label_key.is_some());
-            let comparable = if closed {
-                super::alias::map_vars(&target_root, &mut |v| {
-                    let label = forward.vars[v.0 as usize]
-                        .label_key
-                        .expect("closed key parameter");
-                    Ty::literal(&super::LitValue::Str(
-                        keys[target_labels[label.0 as usize]].clone(),
-                    ))
-                })
-            } else {
-                target_root.clone()
-            };
-            forward.constrain(&comparable, &ground);
-            let flat_ground = source
-                .records
-                .graph(&ground)
-                .nodes()
-                .iter()
-                .all(|(_, node)| {
-                    matches!(node, Node::Never | Node::Top | Node::Con(..) | Node::Fn(_))
-                });
-            if ((closed || (flat_target && flat_ground)) && definite_failure(&forward))
-                || rejected_service_witness(target, &target_root, &ground)
-            {
-                return Some(true);
-            }
-        }
-    }
-    Some(false)
-}
-
-struct WitnessSide<'a> {
-    solver: &'a Solver,
-    root: &'a Ty,
-    metadata: &'a [Variable],
-    labels: &'a [usize],
-}
-
-fn compare_witnesses(left: WitnessSide<'_>, right: WitnessSide<'_>) -> SchemeComparison {
-    let forward = shared_group_counterexample(
-        left.solver,
-        left.root,
-        left.metadata,
-        right.solver,
-        right.root,
-        left.labels,
-        right.labels,
-    );
-    if forward == Some(true) {
-        return SchemeComparison::Different;
-    }
-    let backward = shared_group_counterexample(
-        right.solver,
-        right.root,
-        right.metadata,
-        left.solver,
-        left.root,
-        right.labels,
-        left.labels,
-    );
-    if backward == Some(true) {
-        return SchemeComparison::Different;
-    }
-    if forward.is_none() || backward.is_none() {
-        SchemeComparison::ResourceLimit
-    } else {
-        SchemeComparison::Unknown
-    }
 }
 
 /// Contract mutually constrained variables while preserving every bound and
@@ -3374,8 +1915,7 @@ fn collapse_equal_variables(
         }
         let first = component[0];
         if component.iter().any(|&i| {
-            solver.vars[i].label_key.is_some()
-                || solver.vars[i].row != solver.vars[first].row
+            solver.vars[i].row != solver.vars[first].row
                 || metadata[i].depth != metadata[first].depth
                 || (metadata[i].external.is_some() && !closed)
         }) {
@@ -3475,7 +2015,6 @@ fn substitute_exact_variables(
                 || state.input
                 || state.row != Mode::Value
                 || state.difference
-                || state.label_key.is_some()
                 || !state.handled.is_empty()
             {
                 return None;
@@ -3487,7 +2026,7 @@ fn substitute_exact_variables(
                 .find(|ty| {
                     !matches!(ty, Ty::Var(_))
                         && state.upper.contains(ty)
-                        && !solver.records.graph(ty).variables().contains(&v)
+                        && !variables(ty).contains(&v)
                 })
                 .cloned()
                 .map(|ty| (i, ty))
@@ -3562,417 +2101,3 @@ fn substitute_exact_variables(
     }
 }
 
-/// Find an explicit, universally valid instantiation of `cover` in terms of
-/// the subject's binders. The subject's constraints are never strengthened.
-#[derive(Clone, Copy)]
-struct CoverSide<'a> {
-    solver: &'a Solver,
-    root: &'a Ty,
-    metadata: &'a [Variable],
-}
-
-fn find_cover(
-    cover: CoverSide<'_>,
-    subject: CoverSide<'_>,
-    label_map: &[usize],
-    label_names: &[String],
-    tag_base: u32,
-    demand: &mut records::Demand,
-) -> Result<bool, ()> {
-    let CoverSide {
-        solver: cover,
-        root: cover_root,
-        metadata: cover_meta,
-    } = cover;
-    let CoverSide {
-        solver: subject,
-        root: subject_root,
-        metadata: subject_meta,
-    } = subject;
-    if cover_meta
-        .iter()
-        .chain(subject_meta)
-        .any(|v| v.depth.is_none() || (v.difference && v.handled == 0))
-    {
-        return Ok(false);
-    }
-    let mut candidates = vec![Ty::Never, Ty::Top];
-    let roots = std::iter::once(subject_root).chain(
-        subject
-            .vars
-            .iter()
-            .flat_map(|s| s.lower.iter().chain(&s.upper)),
-    );
-    for ty in roots {
-        let graph = subject.records.graph(ty);
-        for (id, _) in graph.nodes() {
-            let candidate = graph.pool().ty(id);
-            if !candidates.contains(&candidate) {
-                candidates.push(candidate);
-            }
-        }
-    }
-    // Closed pieces of the covering scheme and Boolean combinations of
-    // subject atoms are valid instantiation expressions even when they do
-    // not occur verbatim in the subject root.
-    let cover_roots = std::iter::once(cover_root).chain(
-        cover
-            .vars
-            .iter()
-            .flat_map(|s| s.lower.iter().chain(&s.upper)),
-    );
-    for ty in cover_roots {
-        let graph = cover.records.graph(ty);
-        for (id, _) in graph.nodes() {
-            let candidate = graph.pool().ty(id);
-            if graph.pool().graph(&candidate).variables().is_empty()
-                && records::label_params(&candidate).is_empty()
-                && !candidates.contains(&candidate)
-            {
-                candidates.push(candidate);
-            }
-        }
-    }
-    let atoms: Vec<_> = candidates
-        .iter()
-        .filter(|ty| match ty {
-            Ty::Var(_) => true,
-            Ty::Con(Head::Named(_), _, args) => args.is_empty(),
-            _ => matches!(subject.records.graph(ty).node(), Node::Rec(_)),
-        })
-        .cloned()
-        .collect();
-    let combine_scope = demand.new_scope();
-    for i in 0..atoms.len() {
-        for j in i + 1..atoms.len() {
-            demand
-                .charge_state(&[u64::MAX - 2, combine_scope, i as u64, j as u64])
-                .map_err(|_| ())?;
-            for candidate in [
-                subject.records.union(&[atoms[i].clone(), atoms[j].clone()]),
-                subject.records.inter(&[atoms[i].clone(), atoms[j].clone()]),
-            ] {
-                if !candidates.contains(&candidate) {
-                    candidates.push(candidate);
-                }
-            }
-        }
-    }
-    let subject_vars: Vec<_> = atoms
-        .iter()
-        .filter(|ty| matches!(ty, Ty::Var(_)))
-        .cloned()
-        .collect();
-    if subject_vars.len() > 2 {
-        for candidate in [
-            subject.records.union(&subject_vars),
-            subject.records.inter(&subject_vars),
-        ] {
-            if !candidates.contains(&candidate) {
-                candidates.push(candidate);
-            }
-        }
-    }
-    let mut choices = Vec::with_capacity(cover.vars.len());
-    for state in &cover.vars {
-        if let Some(label) = state.label_key {
-            let target = TyVarId(label_map[label.0 as usize] as u32);
-            let options = subject
-                .vars
-                .iter()
-                .enumerate()
-                .filter_map(|(i, s)| (s.label_key == Some(target)).then_some(Ty::Var(V(i as u32))))
-                .collect::<Vec<_>>();
-            if options.is_empty() {
-                return Ok(false);
-            }
-            choices.push(options);
-        } else if state.row != Mode::Value {
-            let options = candidates
-                .iter()
-                .filter(|ty| row_candidate(subject, ty, state.row))
-                .cloned()
-                .collect::<Vec<_>>();
-            if options.is_empty() {
-                return Ok(false);
-            }
-            choices.push(options);
-        } else {
-            choices.push(candidates.clone());
-        }
-    }
-    let count = cover.vars.len();
-    let mut positions = vec![0usize; count];
-    let mut depth = 0usize;
-    let scope = demand.new_scope();
-    loop {
-        let state: Vec<u64> = [u64::MAX - 1, scope]
-            .into_iter()
-            .chain(positions[..depth].iter().map(|v| *v as u64))
-            .collect();
-        demand.charge_state(&state).map_err(|_| ())?;
-        if depth == count {
-            let substitute = |ty: &Ty| {
-                let labels = records::label_params(ty)
-                    .into_iter()
-                    .map(|p| {
-                        let id = records::label_var(&p).expect("interface label binder").0 as usize;
-                        let target = label_map[id];
-                        let value = records::variable_label(
-                            TyVarId(target as u32),
-                            &label_names[target],
-                            p.level,
-                        );
-                        (p, value)
-                    })
-                    .collect();
-                let ty = records::map_labels(ty, &labels);
-                super::alias::map_vars(&ty, &mut |v| {
-                    choices[v.0 as usize][positions[v.0 as usize]].clone()
-                })
-            };
-            let mut valid = true;
-            for (i, state) in cover.vars.iter().enumerate() {
-                let value = &choices[i][positions[i]];
-                for lower in &state.lower {
-                    if !proves(subject, &substitute(lower), value, state.row, demand)? {
-                        valid = false;
-                        break;
-                    }
-                }
-                if !valid {
-                    break;
-                }
-                for upper in &state.upper {
-                    if !proves(subject, value, &substitute(upper), state.row, demand)? {
-                        valid = false;
-                        break;
-                    }
-                }
-                if !valid {
-                    break;
-                }
-                for from in &state.from {
-                    if !proves(
-                        subject,
-                        &choices[from.0 as usize][positions[from.0 as usize]],
-                        value,
-                        state.row,
-                        demand,
-                    )? {
-                        valid = false;
-                        break;
-                    }
-                }
-                if !valid {
-                    break;
-                }
-                for into in &state.into {
-                    if !proves(
-                        subject,
-                        value,
-                        &choices[into.0 as usize][positions[into.0 as usize]],
-                        state.row,
-                        demand,
-                    )? {
-                        valid = false;
-                        break;
-                    }
-                }
-                if !valid {
-                    break;
-                }
-                for handler in &state.handled {
-                    if !handler_entailed(subject, value, &substitute(handler), state.row, demand)? {
-                        valid = false;
-                        break;
-                    }
-                }
-                if !valid {
-                    break;
-                }
-            }
-            if valid {
-                let target = substitute(cover_root);
-                let mut solver = subject.scheme_snapshot();
-                let mut tags = HashMap::new();
-                let mut next = tag_base;
-                let left = tag_scheme_type(&solver.records, &target, &mut tags, &mut next);
-                let right = tag_scheme_type(&solver.records, subject_root, &mut tags, &mut next);
-                for id in tags.values() {
-                    solver.variance.insert(*id, vec![Variance::Co]);
-                    solver.comparison_wrappers.insert(*id);
-                }
-                if proves(&solver, &left, &right, Mode::Value, demand)? {
-                    return Ok(true);
-                }
-            }
-            if depth == 0 {
-                return Ok(false);
-            }
-            depth -= 1;
-            positions[depth] += 1;
-            continue;
-        }
-        if positions[depth] >= choices[depth].len() {
-            positions[depth] = 0;
-            if depth == 0 {
-                return Ok(false);
-            }
-            depth -= 1;
-            positions[depth] += 1;
-        } else {
-            depth += 1;
-            if depth < count {
-                positions[depth] = 0;
-            }
-        }
-    }
-}
-
-fn row_candidate(solver: &Solver, ty: &Ty, mode: Mode) -> bool {
-    let graph = solver.records.graph(ty);
-    graph.nodes().into_iter().all(|(_, node)| match node {
-        Node::Never => true,
-        Node::Var(v) => solver.vars[v.0 as usize].row == mode,
-        Node::Union(..) | Node::Inter(..) => true,
-        _ => false,
-    })
-}
-
-/// Prove a retained same-form handler for a candidate row without installing
-/// it into the subject. Every union branch must retain the obligation.
-fn handler_entailed(
-    subject: &Solver,
-    value: &Ty,
-    handler: &Ty,
-    mode: Mode,
-    demand: &mut records::Demand,
-) -> Result<bool, ()> {
-    let graph = subject.records.graph(value);
-    let mut nodes = graph.nodes();
-    nodes.sort_unstable_by_key(|(id, _)| *id);
-    let mut proven = FxHashMap::default();
-    for (id, node) in nodes {
-        let yes = match node {
-            Node::Never => true,
-            Node::Var(v) => {
-                let state = &subject.vars[v.0 as usize];
-                let mut found = false;
-                for own in &state.handled {
-                    if proves(subject, own, handler, mode, demand)?
-                        && proves(subject, handler, own, mode, demand)?
-                    {
-                        found = true;
-                        break;
-                    }
-                }
-                found
-            }
-            Node::Con(head, values, args) => {
-                if Some(head) != handler.value_head() {
-                    true
-                } else {
-                    let ty = subject
-                        .records
-                        .ty(subject.records.intern(Node::Con(head, values, args)));
-                    proves(subject, &ty, handler, mode, demand)?
-                        && proves(subject, handler, &ty, mode, demand)?
-                }
-            }
-            Node::Union(a, b) => proven[&a] && proven[&b],
-            Node::Inter(a, b) => proven[&a] || proven[&b],
-            Node::Diff(base, _) => proven[&base],
-            _ => false,
-        };
-        proven.insert(id, yes);
-    }
-    Ok(proven[&graph.id])
-}
-
-/// A concrete service can distinguish two correlated environment schemes if
-/// every target row binder rejects that form, and the same row is observable
-/// in both input and output positions.
-fn rejected_service_witness(target: &Solver, target_root: &Ty, ground: &Ty) -> bool {
-    use super::solve::Pol;
-    if target.vars.is_empty()
-        || target
-            .vars
-            .iter()
-            .any(|v| v.row != Mode::Env || v.handled.is_empty())
-    {
-        return false;
-    }
-    let graph = target.records.graph(ground);
-    for (id, node) in graph.nodes() {
-        let Node::Con(Head::Named(TypeRef::Custom(ctor)), _, _) = node else {
-            continue;
-        };
-        if target.comparison_wrappers.contains(&ctor) {
-            continue;
-        }
-        let form = target.records.ty(id);
-        let mut all_reject = true;
-        for i in 0..target.vars.len() {
-            let mut trial = target.scheme_snapshot();
-            trial.constrain_env(&form, &Ty::Var(V(i as u32)));
-            if !definite_failure(&trial) {
-                all_reject = false;
-                break;
-            }
-        }
-        if !all_reject {
-            continue;
-        }
-        let mut proof = target.scheme_snapshot();
-        let marker = proof.fresh_at(0);
-        proof.vars[marker.0 as usize].row = Mode::Env;
-        proof.vars[marker.0 as usize].input = true;
-        let target_shape = super::alias::map_vars(target_root, &mut |_| Ty::Var(marker));
-        let form_id = proof.records.import(&form);
-        let source_shape = proof.records.graph(ground).map_nodes(false, &mut |ty, _| {
-            if proof.records.import(&ty) == form_id {
-                Ty::Var(marker)
-            } else {
-                ty
-            }
-        });
-        let sites =
-            proof
-                .records
-                .graph(&target_shape)
-                .variable_sites(&proof, Pol::Pos, false, false);
-        let positive = sites
-            .iter()
-            .any(|(v, p, _)| *v == marker && matches!(p, Pol::Pos | Pol::Both));
-        let negative = sites
-            .iter()
-            .any(|(v, p, _)| *v == marker && matches!(p, Pol::Neg | Pol::Both));
-        if !positive || !negative {
-            continue;
-        }
-        let mut demand = records::Demand::new(records::Demand::LIMIT, true);
-        if matches!(
-            proves(
-                &proof,
-                &target_shape,
-                &source_shape,
-                Mode::Value,
-                &mut demand
-            ),
-            Ok(true)
-        ) && matches!(
-            proves(
-                &proof,
-                &source_shape,
-                &target_shape,
-                Mode::Value,
-                &mut demand
-            ),
-            Ok(true)
-        ) {
-            return true;
-        }
-    }
-    false
-}

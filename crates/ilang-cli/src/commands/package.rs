@@ -1604,39 +1604,15 @@ impl<'a> TypeShow<'a> {
             },
             TypeKind::Hole | TypeKind::Error => "_".to_string(),
             TypeKind::Tuple(ts) => format!("({})", join(ts, ", ", 0)),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let mut parts = Vec::new();
-                if let Some(base) = base {
-                    parts.push(format!("..{}", self.ty(base, 0)));
-                }
-                let label_text = |label: &hir::RecordLabel| match label.parameter {
-                    Some(id) if self.canonical => self
-                        .def
-                        .params
-                        .iter()
-                        .position(|(_, p)| *p == id)
-                        .map(|i| self.param(i))
-                        .unwrap_or_else(|| self.var(id)),
-                    _ => ilang_syntax::print::record_label(&label.name, label.parameter.is_some()),
-                };
+            TypeKind::Record { fields } => {
                 let mut members: Vec<_> = fields
                     .iter()
-                    .map(|(label, ty)| format!("{}: {}", label_text(label), self.ty(ty, 0)))
+                    .map(|(label, ty)| format!("{}: {}", label.name, self.ty(ty, 0)))
                     .collect();
-                members.extend(
-                    removed
-                        .iter()
-                        .map(|label| format!("-{}", label_text(label))),
-                );
                 if self.canonical {
                     members.sort();
                 }
-                parts.extend(members);
-                format!("({})", parts.join(", "))
+                format!("({})", members.join(", "))
             }
             TypeKind::Fn {
                 params,
@@ -2108,8 +2084,11 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
         ShownType::Lit(_)
         | ShownType::Var(_)
         | ShownType::Hole
-        | ShownType::Never
-        | ShownType::Graph(_) => t.clone(),
+        | ShownType::Never => t.clone(),
+        ShownType::Record(keys, ts) => ShownType::Record(
+            keys.clone(),
+            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
+        ),
     }
 }
 
@@ -2221,51 +2200,6 @@ mod value_type_interfaces {
         assert_eq!(a, b);
     }
     #[test]
-    fn record_interfaces_preserve_label_parameters_and_field_sets() {
-        let a = canonical(
-            "(f, Person)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }\nPerson = (name: String, age: Int)",
-        );
-        let b = canonical(
-            "(f, Person)\nf(LabelName) = (r: (LabelName: Int), key: LabelName) -> Int { 1 }\nPerson = (age: Int, name: String)",
-        );
-        assert_eq!(a, b);
-        let changed = canonical(
-            "(f, Person)\nf(LabelName) = (r: (LabelName: String), key: LabelName) -> Int { 1 }\nPerson = (age: Int, name: String)",
-        );
-        assert_ne!(a, changed);
-    }
-
-    #[test]
-    fn record_union_interface_is_independent_of_member_order() {
-        let a = canonical("(T)\nT = (a: Int) | (b: String)");
-        let b = canonical("(T)\nT = (b: String) | (a: Int)");
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn record_union_interface_compares_denoted_sets() {
-        let a = interface("(T)\nT = (a: Int)");
-        let b = interface("(T)\nT = (a: Int) | (a: 1)");
-        assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
-        let joined = interface("(T)\nT = (a: Int | String)");
-        let split = interface("(T)\nT = (a: Int) | (a: String)");
-        assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
-    }
-
-    #[test]
-    fn record_alias_comparison_preserves_formal_positions_and_changed_fields() {
-        let a = interface("(T)\nT(A,B) = (a: A, b: B)");
-        let renamed = interface("(T)\nT(X,Y) = (b: Y, a: X)");
-        let swapped = interface("(T)\nT(X,Y) = (a: Y, b: X)");
-        assert!(Diff::new(&a, &a).unwrap().changed.is_empty());
-        assert!(Diff::new(&a, &renamed).unwrap().changed.is_empty());
-        assert!(!Diff::new(&a, &swapped).unwrap().changed.is_empty());
-        let concrete = interface("(T)\nT = (a: Int)");
-        let different = interface("(T)\nT = (a: String)");
-        assert!(!Diff::new(&concrete, &different).unwrap().changed.is_empty());
-    }
-
-    #[test]
     fn open_alias_proofs_report_representation_without_claiming_a_counterexample() {
         let old = interface("(T)\nT(A) = (..A, -x)");
         let new = interface("(T)\nT(A) = (..A, -y)");
@@ -2279,17 +2213,6 @@ mod value_type_interfaces {
             diff.version_step(),
             (Step::Major, "an interface representation changed")
         );
-    }
-
-    #[test]
-    fn function_labels_inside_record_aliases_are_part_of_the_call_interface() {
-        let a = interface("(T)\nT = (run: (a: Int | String) -> Int)");
-        let same = interface("(T)\nT = (run: (a: String | Int) -> Int)");
-        let changed = interface("(T)\nT = (run: (b: Int | String) -> Int)");
-        let tuple = interface("(T)\nT = (run: ((a: Int | String) -> Int, String))");
-        assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
-        assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
-        assert!(!Diff::new(&a, &tuple).unwrap().changed.is_empty());
     }
 
     #[test]
@@ -2320,84 +2243,6 @@ mod value_type_interfaces {
             "(T)\nT = (a: (a: Int) -> Int)",
             "(T)\nT = (a: (b: Int) -> Int)"
         ));
-    }
-
-    #[test]
-    fn exported_record_schemes_compare_labels_and_value_types() {
-        let a = interface("(f)\nf(K) = (r: (K: Int), key: K) -> Int { 1 }");
-        let same =
-            interface("(f)\nf(LabelName) = (r: (LabelName: Int), key: LabelName) -> Int { 1 }");
-        let changed =
-            interface("(f)\nf(LabelName) = (r: (LabelName: String), key: LabelName) -> Int { 1 }");
-        assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
-        assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
-    }
-
-    #[test]
-    fn inferred_record_polymorphism_is_not_a_concrete_field_scheme() {
-        let generic = interface("(f)\nf = (r) { r.a }");
-        let concrete = interface("(f)\nf = (r: (a: Int)) { r.a }");
-        assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
-        let annotated = interface("(f)\nf(A) = (r: (a: A)) -> A { r.a }");
-        assert!(Diff::new(&generic, &annotated).unwrap().changed.is_empty());
-    }
-
-    #[test]
-    fn key_parameter_and_field_type_parameter_are_compared_together() {
-        let generic =
-            interface("(i/record)\n(f)\nf(K,V) = (r: (K: V), key: K) -> V { record.get(r, key) }");
-        let concrete = interface(
-            "(i/record)\n(f)\nf(K) = (r: (K: Int), key: K) -> Int { record.get(r, key) }",
-        );
-        assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
-        let renamed = interface(
-            "(i/record)\n(f)\nf(LabelName,Item) = (r: (LabelName: Item), key: LabelName) -> Item { record.get(r, key) }",
-        );
-        assert!(Diff::new(&generic, &renamed).unwrap().changed.is_empty());
-    }
-
-    #[test]
-    fn generic_record_update_schemes_compare_after_binder_renaming() {
-        let a = interface(
-            "(i/record)\n(f)\nf(R,K,V) = (r: R & Record, key: K, value: V) -> (..R, K: V) { record.put(r, key, value) }",
-        );
-        let b = interface(
-            "(i/record)\n(f)\nf(Row,LabelName,Item) = (r: Row & Record, key: LabelName, value: Item) -> (..Row, LabelName: Item) { record.put(r, key, value) }",
-        );
-        assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
-    }
-
-    #[test]
-    fn record_scheme_comparison_is_independent_of_distributed_graph_shape() {
-        let joined = interface("(f)\nf = (r: (a: Int | String)) { r }");
-        let split = interface("(f)\nf = (r: (a: Int) | (a: String)) { r }");
-        assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
-    }
-
-    #[test]
-    fn key_parameter_can_collide_with_a_written_record_field() {
-        let both = interface("(f)\nf(K) = (r: (K: Int, fixed: String), key: K) -> Int { 1 }");
-        let override_field =
-            interface("(f)\nf(K) = (r: (..(K: Int), fixed: String), key: K) -> Int { 1 }");
-        assert!(
-            !Diff::new(&both, &override_field)
-                .unwrap()
-                .changed
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn distinct_key_parameters_may_receive_the_same_string() {
-        let both = interface("(f)\nf(K,J) = (r: (K: Int, J: String), k: K, j: J) -> Int { 1 }");
-        let override_field =
-            interface("(f)\nf(K,J) = (r: (..(K: Int), J: String), k: K, j: J) -> Int { 1 }");
-        assert!(
-            !Diff::new(&both, &override_field)
-                .unwrap()
-                .changed
-                .is_empty()
-        );
     }
 
     #[test]

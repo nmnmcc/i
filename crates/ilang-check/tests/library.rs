@@ -23,7 +23,6 @@ fn library_resolves_cleanly() {
             "i/request",
             "i/key",
             "i/core",
-            "i/record",
             "i/io",
             "i/task",
             "i/clock",
@@ -138,10 +137,6 @@ fn library_names() {
             ],
         ),
         ("i/prelude", &["panic", "assert"]),
-        (
-            "i/record",
-            &["get", "put", "remove", "has", "keys", "size", "texts"],
-        ),
         ("i/io", &[]),
         (
             "i/task",

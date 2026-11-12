@@ -2045,25 +2045,36 @@ impl<'a> Resolver<'a> {
                 fields,
                 removed,
             } => {
+                // syntax-3 stage 6: records are closed labelled data.
+                if let Some(base) = base {
+                    self.error(
+                        code::INVALID_RECORD_KEY,
+                        base.span,
+                        "a data type has no spread: records are closed (syntax-3 §2.3)",
+                    );
+                }
+                for label in removed {
+                    self.error(
+                        code::INVALID_RECORD_KEY,
+                        label.span,
+                        "a data type has no forgotten labels: records are closed (syntax-3 §2.3)",
+                    );
+                }
                 let mut labels = HashSet::new();
-                for label in fields.iter().map(|(label, _)| label).chain(removed.iter()) {
-                    if !labels.insert((label.parameter, &label.name)) {
+                for (label, _) in fields {
+                    if !labels.insert(&label.name) {
                         self.error(
                             code::DUPLICATE_RECORD_LABEL,
                             label.span,
                             format!("the record label `{}` is repeated", label.name),
                         );
                     }
+                    self.check_data_label(&label.ident, label.parameter);
                 }
                 TypeKind::Record {
-                    base: base.as_ref().map(|b| Box::new(self.ty(b))),
                     fields: fields
                         .iter()
-                        .map(|(label, ty)| (self.record_label(label), self.ty(ty)))
-                        .collect(),
-                    removed: removed
-                        .iter()
-                        .map(|label| self.record_label(label))
+                        .map(|(label, ty)| (label.ident.clone(), self.ty(ty)))
                         .collect(),
                 }
             }
@@ -2091,28 +2102,23 @@ impl<'a> Resolver<'a> {
         Type { kind, span: t.span }
     }
 
-    fn record_label(&mut self, label: &ast::RecordLabel) -> RecordLabel {
-        let parameter = if label.parameter {
-            let key = self.name_key(&label.name, label.span);
-            let var = self
-                .ty_frames
-                .iter()
-                .rev()
-                .find_map(|frame| frame.names.get(&key).copied());
-            if var.is_none() {
-                self.error(
-                    code::INVALID_LABEL_PARAMETER,
-                    label.span,
-                    format!("`{}` is not a declared label parameter", label.name),
-                );
-            }
-            var
-        } else {
-            None
-        };
-        RecordLabel {
-            ident: label.ident.clone(),
-            parameter,
+    /// A label of data is a `name` (syntax-3 §2.3): not a string that is
+    /// not a name, an `UpName`, or a label parameter.
+    fn check_data_label(&mut self, label: &ast::Ident, parameter: bool) {
+        let name = label.name.as_str();
+        let mut chars = name.chars();
+        let first = chars.next();
+        let is_name = matches!(first, Some('a'..='z' | '_'))
+            && name != "_"
+            && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+        if parameter || !is_name {
+            self.error(
+                code::INVALID_RECORD_KEY,
+                label.span,
+                format!(
+                    "the label `{name}` is not a name; a label of data is a `name` (syntax-3 §2.3)"
+                ),
+            );
         }
     }
 
@@ -2712,90 +2718,7 @@ impl<'a> Resolver<'a> {
             ty_vars,
             span: b.span,
         };
-        self.check_label_binding(&binding);
         (binding, binders)
-    }
-
-    /// Label parameters may occur as ordinary types only on their own key parameter.
-    fn check_label_binding(&mut self, binding: &Binding) {
-        let ExprKind::Fn(function) = &binding.value.kind else {
-            return;
-        };
-        let mut labels = HashSet::new();
-        let mut gather = |ty: &Type| {
-            walk_type(ty, &mut |part| {
-                if let TypeKind::Record {
-                    fields, removed, ..
-                } = &part.kind
-                {
-                    labels.extend(
-                        fields
-                            .iter()
-                            .map(|(label, _)| label)
-                            .chain(removed)
-                            .filter_map(|label| label.parameter),
-                    );
-                }
-            })
-        };
-        binding_types(binding, &mut gather);
-        labels.retain(|var| binding.ty_vars.contains(var));
-        let mut allowed = HashMap::new();
-        for param in &function.params {
-            if let Param::Pattern { pattern, .. } = param {
-                let mut pattern = pattern;
-                let mut named = false;
-                while let PatternKind::Named { pattern: inner, .. } = &pattern.kind {
-                    named = true;
-                    pattern = inner;
-                }
-                if let PatternKind::Typed {
-                    binder,
-                    ty:
-                        Type {
-                            kind: TypeKind::Var(var),
-                            span,
-                        },
-                } = &pattern.kind
-                    && (named || binder.is_some())
-                    && labels.contains(var)
-                {
-                    allowed.entry(*var).or_insert_with(Vec::new).push(*span);
-                }
-            }
-        }
-        for var in &labels {
-            if allowed.get(var).is_none_or(Vec::is_empty) {
-                self.error(
-                    code::INVALID_LABEL_PARAMETER,
-                    binding.span,
-                    format!(
-                        "label parameter `{}` needs a named key parameter",
-                        self.p.ty_var_names[var.0 as usize]
-                    ),
-                );
-            }
-        }
-        let mut invalid = Vec::new();
-        binding_types(binding, &mut |ty| {
-            walk_type(ty, &mut |part| {
-                if let TypeKind::Var(var) = part.kind
-                    && labels.contains(&var)
-                    && !allowed
-                        .get(&var)
-                        .is_some_and(|spans| spans.contains(&part.span))
-                {
-                    invalid.push(part.span);
-                }
-            })
-        });
-        for span in invalid {
-            self.error(
-                code::INVALID_LABEL_PARAMETER,
-                span,
-                "a label parameter may only be the type of its own key parameter",
-            );
-        }
     }
 
     /// §6.10: a direct value is made without running code.
@@ -3176,7 +3099,12 @@ impl<'a> Resolver<'a> {
             E::Name { module, name } => self.name(module.as_ref(), name),
             E::Tuple(items) => ExprKind::Tuple(items.iter().map(|x| self.expr(x)).collect()),
             E::Record { base, fields } => ExprKind::Record {
-                base: base.as_ref().map(|b| Box::new(self.expr(b))),
+                base: {
+                    for (label, _) in fields {
+                        self.check_data_label(label, false);
+                    }
+                    base.as_ref().map(|b| Box::new(self.expr(b)))
+                },
                 fields: fields
                     .iter()
                     .map(|(label, value)| (label.clone(), self.expr(value)))
@@ -4103,10 +4031,7 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(|a| named_types(a, out))
         }
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(base) = base {
-                named_types(base, out);
-            }
+        TypeKind::Record { fields } => {
             for (_, field) in fields {
                 named_types(field, out);
             }
@@ -4138,10 +4063,7 @@ fn is_constructor(e: &ast::Expr) -> bool {
 fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
     match &t.kind {
         TypeKind::Named { args, .. } => args.iter().for_each(f),
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(base) = base {
-                f(base);
-            }
+        TypeKind::Record { fields } => {
             for (_, field) in fields {
                 f(field);
             }
@@ -4195,17 +4117,11 @@ pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
             args: args.iter().map(|a| subst(a, map)).collect(),
         },
         TypeKind::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|a| subst(a, map)).collect()),
-        TypeKind::Record {
-            base,
-            fields,
-            removed,
-        } => TypeKind::Record {
-            base: base.as_ref().map(|base| Box::new(subst(base, map))),
+        TypeKind::Record { fields } => TypeKind::Record {
             fields: fields
                 .iter()
                 .map(|(label, field)| (label.clone(), subst(field, map)))
                 .collect(),
-            removed: removed.clone(),
         },
         TypeKind::Union(ts) => TypeKind::Union(ts.iter().map(|a| subst(a, map)).collect()),
         TypeKind::Inter(ts) => TypeKind::Inter(ts.iter().map(|a| subst(a, map)).collect()),
