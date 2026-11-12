@@ -1,3 +1,3 @@
 // spec: 7.1
-// expect: compile-error E0108
+// expect: compile-error E0101
 main = () { "axb" |> (a <> "x" <> b) { a <> b } | (_) { "" } }
