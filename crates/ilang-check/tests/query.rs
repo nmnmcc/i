@@ -210,7 +210,7 @@ fn type_of_local_names() {
 fn type_of_other_things() {
     let f = fixture();
     assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Some(A)");
-    assert_eq!(f.hover("app/main", "None ->", 0), "None: Option(A)");
+    assert_eq!(f.hover("app/main", "None ->", 0), "None: None");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -382,8 +382,12 @@ fn symbols_of_a_module() {
             ("total", SymbolKind::Value),
         ]
     );
-    let option = &syms[4];
-    let ctors: Vec<&str> = option.children.iter().map(|c| c.name.as_str()).collect();
+    // `Option` is a union (syntax three): its members are types with one
+    // constructor each.
+    let ctors: Vec<&str> = syms[5..7]
+        .iter()
+        .flat_map(|s| s.children.iter().map(|c| c.name.as_str()))
+        .collect();
     assert_eq!(ctors, vec!["Some", "None"]);
     assert_eq!(syms[0].detail.as_deref(), Some("(x: Int, y: Int) -> Int"));
     // The span is the whole item; the name span is the name.
