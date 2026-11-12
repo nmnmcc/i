@@ -1029,6 +1029,14 @@ impl Checker<'_> {
         Some(w)
     }
 
+    /// Whether the values of `t` are known and some have a head other than
+    /// `h`, and whether then none has `h`.
+    pub(crate) fn made_by_others(&self, t: &Ty, h: Head) -> (bool, bool) {
+        let vals = self.col_values(&Col::of(t.clone()));
+        let others = !vals.other && vals.heads.iter().any(|x| x.0 != h);
+        (others, others && !vals.has(h))
+    }
+
     fn col_values(&self, col: &Col) -> Vals {
         match col {
             Col::Any => Vals::any(),
