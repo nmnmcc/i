@@ -245,6 +245,13 @@ pub const TYPES: &str = r#"
  (field (mut i32)) (field i32) (field i64) (field f64)
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
+(type $shapes (array i64))
+;; A multi-shape function value (syntax-3.md §6.4): tag 7, field 2 is -1,
+;; field 5 has the closure of each group, field 8 the shape id of each.
+(type $multi (sub final $obj (struct
+ (field (mut i32)) (field i32) (field i64) (field f64)
+ (field (ref null $bytes)) (field (ref null $values))
+ (field (ref null $limbs)) (field (ref null $call)) (field (ref $shapes)))))
 (type $cons (sub final $val (struct (field (mut i32)) (field eqref) (field eqref))))
 (type $hostref (struct (field externref) (field i32) (field i64)))
 (type $sites (array i32))

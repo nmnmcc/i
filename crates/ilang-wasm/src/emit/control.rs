@@ -75,15 +75,15 @@ pub(super) const EFFECTS: &str = r#"
     (br $each)))
   (local.get $new))
 
-;; Calls a computation (§9.1) with the environment.
+;; Calls a computation (§9.1) with the environment. A function value may be
+;; a closure or a multi-shape value (syntax-3.md §6.4): the dispatcher calls
+;; the group of the shape `()`.
 (func $call0 (param $f eqref) (param $env (ref null $env)) (result eqref)
-  (call_ref $fn0 (ref.cast (ref $clo0) (local.get $f)) (local.get $env)
-    (struct.get $clo0 8 (ref.cast (ref $clo0) (local.get $f)))))
+  (return_call $dispatch0 (local.get $f) (i64.const 0) (local.get $env)))
 
 ;; Calls a function of one parameter with the environment.
 (func $call1 (param $f eqref) (param $a eqref) (param $env (ref null $env)) (result eqref)
-  (call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env) (local.get $a)
-    (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f)))))
+  (return_call $dispatch1 (local.get $f) (i64.const 1) (local.get $env) (local.get $a)))
 
 ;; Adds the frame record `f` at the end of the capture `c` (the list is
 ;; innermost first), and throws `x` again.
@@ -491,11 +491,10 @@ pub(super) const EFFECTS: &str = r#"
         ;; Rule 2: `f(k)` is done in the place of the boundary.
         (call $shadow_restore (local.get $depth))
         (local.set $f (struct.get $cap 1 (local.get $c)))
-        (return_call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env)
+        (return_call $dispatch1 (local.get $f) (i64.const 1) (local.get $env)
           (struct.new $cont (i32.const 12) (i32.const 0) (i64.const 0) (f64.const 0)
             (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))) (ref.null eq))
-          (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f))))))
+            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))) (ref.null eq)))))
     ;; A capture for an outer boundary: this one is paused with it.
     (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $boundary_reenter)
       (local.get $b))
@@ -938,6 +937,8 @@ impl<'p> Emitter<'p> {
         code: &[Stmt],
     ) {
         let ty = |l: Local| local_type(f.locals[l as usize]);
+        let begin = self.out.len();
+        self.call_locals.clear();
         let _ = write!(
             self.out,
             ";; {} {}\n(func ${name} (param $env (ref null $env))",
@@ -966,6 +967,7 @@ impl<'p> Emitter<'p> {
             let _ = write!(self.out, " (local $l{l} {})", ty(l));
         }
         self.out.push('\n');
+        let mark = self.out.len();
         for (j, &l) in params.iter().enumerate() {
             let _ = writeln!(self.out, "(local.set $l{l} (local.get $a{j}))");
         }
@@ -976,6 +978,7 @@ impl<'p> Emitter<'p> {
         self.stmts(&mut body, code, f.frame);
         self.out.push_str(&body);
         self.out.push_str("(unreachable))\n");
+        self.declare_call_locals(begin, mark);
     }
 
     /// The function `$j…` of a join (§9.4).

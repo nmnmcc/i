@@ -817,7 +817,7 @@ impl<'p> Emitter<'p> {
             "(func (export \"{name}\"){sig} (result i32)\n\
              (call $async_begin (i32.const {export}) (i32.const {site}))\n\
              (call $async_run {}))",
-            closure(1, body, &captures, false)
+            closure(1, 1, body, &captures, false)
         );
         let Some(abi) = &e.abi else {
             let _ = writeln!(

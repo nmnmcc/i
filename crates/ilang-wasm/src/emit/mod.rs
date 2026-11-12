@@ -96,6 +96,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         strings: HashMap::new(),
         data: String::new(),
         out: String::new(),
+        dispatch: BTreeSet::new(),
+        call_locals: BTreeSet::new(),
+        blocks: 0,
     };
     e.arities.insert(0);
     e.arities.insert(1);
@@ -114,6 +117,10 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     e.start();
     e.exports();
     e.resume_exports();
+    // `$call0` and `$call1` of the runtime dispatch too.
+    e.dispatch.extend([0, 1]);
+    let dispatchers: String = e.dispatch.iter().map(|&n| dispatcher(n)).collect();
+    e.out.push_str(&dispatchers);
     let mut m = String::from("(module\n");
     // A host reference can come into the program only through an import or
     // an export whose types have one (B.2).
@@ -272,7 +279,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, f, "(ref.null $values)", false)
+            closure(n, p.func_shape(f), f, "(ref.null $values)", false)
         );
     }
     m.push_str(&e.out);
@@ -284,12 +291,45 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m
 }
 
-fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
+/// A closure of the function `f`: field 2 is the id of its shape
+/// (syntax-3.md §6.4), which is its arity when it has no labels.
+fn closure(arity: u32, shape: ShapeId, f: FuncId, captures: &str, patched: bool) -> String {
     let flags = u32::from(patched);
     format!(
-        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const 0) \
+        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {shape}) (f64.const 0) \
          (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
         f.0
+    )
+}
+
+/// `$dispatch{n}`: calls the function value `f` with argument data of the
+/// shape `shape` and `n` keys (syntax-3.md §6.4). A `$clo{n}` is called;
+/// a `$multi` is scanned for the group of the shape, whose closure is
+/// called. Every call is a `return_call_ref`, so the dispatcher leaves no
+/// frame: a tail call through it stays a tail call, and a capture never
+/// sees it. A value of another shape stops, as a closure of another arity
+/// always did.
+fn dispatcher(n: u32) -> String {
+    let params: String = (0..n).map(|i| format!(" (param $a{i} eqref)")).collect();
+    let args: String = (0..n).map(|i| format!(" (local.get $a{i})")).collect();
+    format!(
+        "(func $dispatch{n} (param $f eqref) (param $shape i64) (param $env (ref null $env)){params} (result eqref)\n\
+         (local $c (ref null $clo{n})) (local $m (ref $multi)) (local $shapes (ref $shapes)) (local $i i32)\n\
+         (drop (block $multi (result eqref)\n\
+           (local.set $c (br_on_cast_fail $multi eqref (ref $clo{n}) (local.get $f)))\n\
+           (return_call_ref $fn{n} (local.get $c) (local.get $env){args} (struct.get $clo{n} 8 (local.get $c)))))\n\
+         (local.set $m (ref.cast (ref $multi) (local.get $f)))\n\
+         (local.set $shapes (struct.get $multi 8 (local.get $m)))\n\
+         (loop $scan\n\
+           (if (i32.ge_u (local.get $i) (array.len (local.get $shapes))) (then unreachable))\n\
+           (if (i64.eq (array.get $shapes (local.get $shapes) (local.get $i)) (local.get $shape))\n\
+             (then\n\
+               (local.set $c (ref.cast (ref $clo{n}) (array.get $values\n\
+                 (ref.as_non_null (struct.get $multi 5 (local.get $m))) (local.get $i))))\n\
+               (return_call_ref $fn{n} (local.get $c) (local.get $env){args} (struct.get $clo{n} 8 (local.get $c)))))\n\
+           (local.set $i (i32.add (local.get $i) (i32.const 1)))\n\
+           (br $scan))\n\
+         (unreachable))\n"
     )
 }
 
@@ -305,6 +345,13 @@ struct Emitter<'p> {
     strings: HashMap<Vec<u8>, usize>,
     data: String,
     out: String,
+    /// The arities of the dispatchers that are used (`dispatcher`).
+    dispatch: BTreeSet<u32>,
+    /// The arities of the closure calls of the function being written: it
+    /// declares a local `$cc{n}` for each.
+    call_locals: BTreeSet<u32>,
+    /// A counter for the labels of the blocks of closure calls.
+    blocks: u32,
 }
 
 impl<'p> Emitter<'p> {
@@ -367,6 +414,8 @@ impl<'p> Emitter<'p> {
     }
 
     fn code(&mut self, name: &str, f: &Func, id: Option<FuncId>) {
+        let begin = self.out.len();
+        self.call_locals.clear();
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
         self.header(name, f.arity, &f.locals);
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
@@ -386,6 +435,9 @@ impl<'p> Emitter<'p> {
             // `$slot` keeps the slot of the frame for the frame records of
             // its points.
             self.out.push_str(" (local $slot i32)\n");
+        }
+        let mark = self.out.len();
+        if f.frame {
             if self.metered {
                 let _ = writeln!(
                     self.out,
@@ -400,8 +452,26 @@ impl<'p> Emitter<'p> {
         self.stmts(&mut body, &f.body, f.frame);
         self.out.push_str(&body);
         self.out.push_str("(unreachable))\n");
+        self.declare_call_locals(begin, mark);
         self.numeric_enabled = false;
         self.numeric_plan = numeric::Plan::default();
+    }
+
+    /// Declares the locals `$cc{n}` of the closure calls of the function
+    /// written from `begin` on, at `mark`, after its other declarations.
+    fn declare_call_locals(&mut self, begin: usize, mark: usize) {
+        if self.call_locals.is_empty() {
+            return;
+        }
+        let mut text = self.out.split_off(begin);
+        let locals: String = self
+            .call_locals
+            .iter()
+            .map(|n| format!(" (local $cc{n} (ref null $clo{n}))"))
+            .collect();
+        text.insert_str(mark - begin, &format!("{locals}\n"));
+        self.out.push_str(&text);
+        self.call_locals.clear();
     }
 
     fn stmts(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
@@ -554,23 +624,58 @@ impl<'p> Emitter<'p> {
         }
     }
 
-    fn call(&mut self, callee: &Callee, args: &[Atom], tail: bool, env: &str) -> String {
-        let n = args.len() as u32;
+    /// A call. A call of a function value has a fast path, when the value is
+    /// a closure of the arity of the call: one type test, which keeps the
+    /// closure in the local `$cc{n}`, and `call_ref`. Any other value goes to
+    /// the dispatcher with the shape of the call (syntax-3.md §6.4). At a
+    /// tail site both paths are tail calls.
+    fn call(&mut self, callee: &Callee, args_atoms: &[Atom], tail: bool, env: &str) -> String {
+        let n = args_atoms.len() as u32;
         self.arities.insert(n);
-        let args: String = args.iter().map(|a| format!(" {}", self.atom(a))).collect();
+        let args: String = args_atoms.iter().map(|a| format!(" {}", self.atom(a))).collect();
         let prefix = if tail { "return_" } else { "" };
         match callee {
             Callee::Direct(f) => {
                 format!("({prefix}call $f{} (ref.null $obj) {env}{args})", f.0)
             }
-            Callee::Value(a) => {
+            Callee::Value(a) | Callee::Shaped(a, _) => {
+                let shape = callee.shape(n);
                 let a = self.atom(a);
-                format!(
-                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{args} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
-                )
+                self.dispatch.insert(n);
+                self.call_locals.insert(n);
+                let k = self.blocks;
+                self.blocks += 1;
+                let fast = format!(
+                    "(local.set $cc{n} (br_on_cast_fail $cs{k} eqref (ref $clo{n}) {a}))\n\
+                     ({prefix}call_ref $fn{n} (local.get $cc{n}) {env}{args} (struct.get $clo{n} 8 (local.get $cc{n})))"
+                );
+                let slow = format!("(i64.const {shape}) {env}{args}");
+                if tail {
+                    format!(
+                        "(return_call $dispatch{n} (block $cs{k} (result eqref)\n{fast})\n{slow})"
+                    )
+                } else {
+                    format!(
+                        "(block $cd{k} (result eqref) (call $dispatch{n} (block $cs{k} (result eqref)\n\
+                         (br $cd{k} {fast}))\n{slow}))"
+                    )
+                }
             }
         }
+    }
+
+    /// A call of a function value where no local can be declared (an entry
+    /// point): the dispatcher alone.
+    fn call_dispatched(&mut self, callee: &Callee, args: &[String], env: &str) -> String {
+        let n = args.len() as u32;
+        self.arities.insert(n);
+        self.dispatch.insert(n);
+        let a = self.atom(callee.value().expect("a function value"));
+        format!(
+            "(call $dispatch{n} {a} (i64.const {}) {env} {})",
+            callee.shape(n),
+            args.join(" ")
+        )
     }
 
     fn string(&mut self, s: &str) -> String {
@@ -758,6 +863,16 @@ impl<'p> Emitter<'p> {
             Value::Service(env, id) => {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
+            Value::Multi(groups) => {
+                let closures: String = groups.iter().map(|(_, a)| format!(" {}", self.atom(a))).collect();
+                let shapes: String = groups.iter().map(|(s, _)| format!(" (i64.const {s})")).collect();
+                format!(
+                    "(struct.new $multi (i32.const 7) (i32.const 0) (i64.const -1) (f64.const 0) \
+                     (ref.null $bytes) (array.new_fixed $values {k}{closures}) (ref.null $limbs) (ref.null $call) \
+                     (array.new_fixed $shapes {k}{shapes}))",
+                    k = groups.len()
+                )
+            }
             Value::Closure {
                 func,
                 captures,
@@ -775,7 +890,7 @@ impl<'p> Emitter<'p> {
                         if *patched { " (ref.null eq)" } else { "" }
                     )
                 };
-                closure(n, *func, &caps, *patched)
+                closure(n, self.p.func_shape(*func), *func, &caps, *patched)
             }
             Value::Tuple(parts) => format!(
                 "(call $tuple (array.new_fixed $values {}{}))",
@@ -1069,6 +1184,24 @@ impl<'p> Emitter<'p> {
             names.len(),
             names.join(" ")
         );
+        if !self.p.shapes.is_empty() {
+            let mut entries = Vec::new();
+            for shape in &self.p.shapes {
+                let labels: Vec<String> = shape.labels.iter().map(|l| self.string(l)).collect();
+                entries.push(format!(
+                    "(array.new_fixed $values {} (ref.i31 (i32.const {})) {})",
+                    labels.len() + 1,
+                    shape.positions,
+                    labels.join(" ")
+                ));
+            }
+            let _ = writeln!(
+                self.out,
+                "(call $shapes_install (array.new_fixed $values {} {}))",
+                entries.len(),
+                entries.join(" ")
+            );
+        }
         if self.p.site_notes.iter().any(Option::is_some) {
             assert_eq!(self.p.site_notes.len(), self.p.sites.len());
             let notes: Vec<String> = self
@@ -1117,7 +1250,12 @@ impl<'p> Emitter<'p> {
             }
             match &e.abi {
                 None => {
-                    let call = self.call(&e.callee, &[], false, "(global.get $root_env)");
+                    let call = match &e.callee {
+                        Callee::Direct(_) => {
+                            self.call(&e.callee, &[], false, "(global.get $root_env)")
+                        }
+                        _ => self.call_dispatched(&e.callee, &[], "(global.get $root_env)"),
+                    };
                     let site = e.site.map_or(-1, |s| s as i64);
                     let id = export_id(&e.name);
                     let _ = writeln!(
@@ -1147,14 +1285,7 @@ impl<'p> Emitter<'p> {
                 f.0,
                 converted.join(" ")
             ),
-            Callee::Value(a) => {
-                let a = self.atom(a);
-                format!(
-                    "(call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env} {} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))",
-                    converted.join(" ")
-                )
-            }
+            Callee::Value(_) | Callee::Shaped(..) => self.call_dispatched(callee, &converted, env),
         };
         if abi.errors.is_empty() {
             let (types, out) = abi_out(abi.result, &call);
@@ -1429,7 +1560,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), dispatch:BTreeSet::new(), call_locals:BTreeSet::new(), blocks:0 };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

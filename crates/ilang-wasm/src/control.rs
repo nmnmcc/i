@@ -273,7 +273,7 @@ fn may_suspend(p: &Program) -> Vec<bool> {
 fn suspends(v: &Value, may: &[bool]) -> bool {
     match v {
         Value::Call {
-            callee: Callee::Value(_),
+            callee: Callee::Value(_) | Callee::Shaped(..),
             ..
         } => true,
         Value::Call {
@@ -289,7 +289,7 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
     stmts.iter().any(|s| match s {
         Stmt::Let { value, .. } => suspends(value, may),
         Stmt::TailCall {
-            callee: Callee::Value(_),
+            callee: Callee::Value(_) | Callee::Shaped(..),
             ..
         } => true,
         Stmt::TailCall {
@@ -639,7 +639,7 @@ fn env_uses(e: Env, f: &mut dyn FnMut(Local)) {
 }
 
 fn call_uses(callee: &Callee, args: &[Atom], env: Env, f: &mut dyn FnMut(Local)) {
-    if let Callee::Value(a) = callee {
+    if let Some(a) = callee.value() {
         atom_uses(a, f);
     }
     args.iter().for_each(|a| atom_uses(a, f));
@@ -669,6 +669,7 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         }
         Value::Service(env, _) => env_uses(*env, f),
         Value::Closure { captures, .. } => captures.iter().for_each(|a| atom_uses(a, f)),
+        Value::Multi(groups) => groups.iter().for_each(|(_, a)| atom_uses(a, f)),
         Value::Record { fields, .. } => fields.iter().for_each(|a| atom_uses(a, f)),
         Value::RecNew(fields) => fields.iter().for_each(|(_, a)| atom_uses(a, f)),
         Value::RecWith(base, fields) => {
