@@ -2614,7 +2614,18 @@ Datagrams follow TCP's resource identity, owner, creation guard, teardown and le
 
 ### 9.8 Keys
 
+<!-- syn3-old -->
+
 `Key(A)` and `Keyed` are built-in types. They are not custom types: their values are made only by `key.new` and `key.wrap`. A key is the same only as itself (§11.4). Two `Keyed` values are equal when their keys are the same and their values are equal. `Key(A)` does not change (§4.5 rule 7). A `Keyed` holds its value (§11.9).
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+`Key(A)` and `Keyed` are built-in types. They are not labelled types: their values are made only by `key.new` and `key.wrap`. A key is the same only as itself (§11.4). Two `Keyed` values are equal when their keys are the same and their values are equal. `Key(A)` does not change (§4.5 rule 7). A `Keyed` holds its value (§11.9).
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
 
 | Function | Type | What it does |
 |---|---|---|
@@ -2622,7 +2633,27 @@ Datagrams follow TCP's resource identity, owner, creation guard, teardown and le
 | `wrap` | `(k: Key(A), value: A) -> Keyed` | The value, marked with the key |
 | `unwrap` | `(k: Key(A), x: Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Function | Type | What it does |
+|---|---|---|
+| `new` | `<A>() -> Key(A)` | A new key, the same only as itself |
+| `wrap` | `<A>(Key(A), A) -> Keyed` | The value, marked with the key |
+| `unwrap` | `<A>(Key(A), Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 `Lookup(A) { Found(A) Missing }` is a custom type of `i/key`, not a built-in name.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+`Found(A) = (A)`, `Missing = ()` and `Lookup(A) = Found(A) | Missing` are types of `i/key`, not built-in names.
+
+<!-- /syn3-new -->
 
 ### 9.9 Tasks
 
@@ -2649,6 +2680,8 @@ or whether a handle is used before its owner ends. These order-dependent
 results may change between runs or worker counts. Tests must either avoid
 that dependence or list the allowed outcomes. No task API observes workers.
 
+<!-- syn3-old -->
+
 Export types Scheduler, Runner, Scope(E), Task(A,E), Channel(A), Event(A,E,N),
 Shared(A), Ref(A), and ScheduleError; export only ScheduleError's constructors. The
 other constructors and scheduler protocol are private ordinary custom types,
@@ -2659,6 +2692,24 @@ functions, rather than Key(A) in an output field. A public Event can hold user
 mapping functions and the local handles of its leaves. Such contents affect
 portability by the normal walk. The library creates no event that captures its
 Scheduler or mutable loop state. A join event keeps its task's scope handle.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+Export types Scheduler, Runner, Group(E), Task(A,E), Channel(A), Event(A,E,N),
+Shared(A), Ref(A), and ScheduleError; export only ScheduleError's constructors. The
+other constructors and scheduler protocol are private ordinary labelled types,
+not opaque types. Group, Task, Channel, Shared, and Ref contain invariant keys;
+their parameters are therefore invariant. Event's answer/error/environment
+parameters are covariant. In `Event(A, E, N)`, `E` is the type of the errors that syncing raises through `Fail` and `N` is a row variable for the other services it needs; `Never` in that place means no service: its private representation keeps typed decoding
+functions, rather than Key(A) in an output field. A public Event can hold user
+mapping functions and the local handles of its leaves. Such contents affect
+portability by the normal walk. The library creates no event that captures its
+Scheduler or mutable loop state. A join event keeps its task's scope handle.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
 
 Schemes below declare their capital variables on their bindings. N is the body
 service requirement; supplying Scheduler/Runner/Await/Owner/Root discharges those members.
@@ -2697,12 +2748,52 @@ Assert and user host services remain in N where the body needs them.
 | `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
 
+Each type below writes its type parameters before its parameter part. `N` is the row of the services that a body needs besides those that the function provides to it.
+
+| Binding | Type |
+|---|---|
+| `top` | `(random.Generator) <- (Runner) -> Runner` |
+| `run` | `<A, N>(() <- (..N, Scheduler, Runner, request.Await, request.Owner, request.Root) -> A) <- (..N, Runner) -> A` |
+| `test` | `<A, E, N>(random.Generator, List(List(Int)), () <- (..N, Fail(E), Scheduler, Runner, request.Await, request.Owner, request.Root) -> A) <- (..N, Fail(E \| ScheduleError), Runner) -> A` |
+| `scope` | `<A, E, N>((Group(E)) <- (..N, Fail(E)) -> A) <- (..N, Fail(E), Scheduler) -> A` |
+| `local_scope` | The type of `scope` |
+| `go` | `<A, E, N>(Group(E), () <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A) <- (..N, Scheduler) -> Task(A, E)` |
+| `join` | `<A, E>(Task(A, E)) <- (Fail(E), Scheduler) -> A` |
+| `yield` | `() <- (Scheduler) -> Nil` |
+| `path` | `() <- (Scheduler) -> List(Int)` |
+| `random` | `() <- (Scheduler) -> random.Generator` |
+| `keep` | `<S, A, E, N>((S) <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A) <- (..N, Scheduler) -> (S) <- (Fail(E), Scheduler) -> A` |
+| `channel` | `<A>() <- (Scheduler) -> Channel(A)` |
+| `local_channel` | `<A>() <- (Scheduler) -> Channel(A)` |
+| `send` | `<A>(Channel(A), A) <- (Scheduler) -> Nil` |
+| `receive` | `<A>(Channel(A)) <- (Scheduler) -> A` |
+| `send_event` | `<A>(Channel(A), A) -> Event(Nil, Never, Never)` |
+| `receive_event` | `<A>(Channel(A)) -> Event(A, Never, Never)` |
+| `join_event` | `<A, E>(Task(A, E)) -> Event(A, E, Never)` |
+| `always` | `<A>(A) -> Event(A, Never, Never)` |
+| `never` | `() -> Event(Never, Never, Never)` |
+| `choose` | `<A, E, N>(List(Event(A, E, N))) -> Event(A, E, N)` |
+| `map` | `<A, B, E, F, N, M>(Event(A, E, N), (A) <- (..M, Fail(F)) -> B) -> Event(B, E \| F, N \| M)` |
+| `sync` | `<A, E, N>(Event(A, E, N)) <- (..N, Fail(E), Scheduler) -> A` |
+| `share` | `<A, E>(Group(E), A) <- (Scheduler) -> Shared(A)` |
+| `get` | `<A>(Shared(A)) <- (Scheduler) -> A` |
+| `ref` | `<A>(A) <- (Scheduler) -> Ref(A)` |
+| `update` | `<A, B>(Ref(A), (A) -> (A, B)) <- (Scheduler) -> B` |
+| `both` | `<A, B, E, N>(() <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A, () <- (..N, Fail(E), Scheduler, Runner, request.Await) -> B) <- (..N, Fail(E), Scheduler) -> (A, B)` |
+| `race` | `<A, E, N>(() <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A, () <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A) <- (..N, Fail(E), Scheduler) -> A` |
+| `map_concurrently` | `<A, B, E, N>(List(A), (A) <- (..N, Fail(E), Scheduler, Runner, request.Await) -> B) <- (..N, Fail(E), Scheduler) -> List(B)` |
+
+<!-- /syn3-new -->
 In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
 for combinators use one common E and N; subtyping admits either child's error
 and needs. No union of invariant Task(Int,E) and Task(String,E) is required:
 `both` keeps two separate handles. No local variants of these three combinators
 are exported in v1. Local callers write a local_scope explicitly.
+
+<!-- syn3-old -->
 
 The differences in the go/keep/combinator environments matter: their wrappers
 supply Scheduler/Runner/Await themselves, so requiring all of N at their call
@@ -2717,6 +2808,12 @@ rank quantification. Thus the design reduces inference to the existing rules,
 with the new primitive variance rows. The prototype gate checks that argument
 against the implementation rather than assuming it from the notation.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+`go`, `keep` and the combinators provide `Scheduler`, `Runner` and `Await` to their bodies themselves, so their callers need only the rest of the bodies' needs and `Scheduler`. `Owner` and `Root` are not provided there. `run` and `test` provide a fresh `Root` and a default `Owner`; `test` still needs the calling `Runner` for its nested path and wait route. Host fields add fixed service types to needs, never a constraint that depends on a type. Keys are invariant and obey the value restriction; `Request` and `Event` add no qualified types.
+
+<!-- /syn3-new -->
 No public spawn detaches a task. `go` never checks its closure's portability.
 It increments the calling task's spawn/run counter, beginning at 1; the child
 path is the parent's path with that index appended. A nested run takes an index
@@ -2778,6 +2875,8 @@ of scopes it creates while unwinding. Such new scopes still obey their own
 internal failure/normal-exit rules. The outer cancel waits for them to end.
 A final that waits forever can keep cancellation waiting forever.
 
+<!-- syn3-old -->
+
 R4a. Keep outcome and cleanup completion separate. A task outcome is pending,
 success, failure or cancelled; drop sets cancelled immediately, and a started
 task sets cancelled when its home scheduler accepts cancellation, before running
@@ -2794,6 +2893,28 @@ that cancellation is unwound; it never races between this path and a join panic.
 This includes a final executing a fresh scope body that the fresh scope can
 cancel: unwind that inner body, not the already-shielded outer final. A cleanup
 scope and its children are exempt from the older cancellation as R4 requires.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+R4a. Keep outcome and cleanup completion separate. A task outcome is pending,
+success, failure or cancelled; drop sets cancelled immediately, and a started
+task sets cancelled when its home scheduler accepts cancellation, before running
+its unwind. A mere cancellation request not yet accepted is not a cancelled
+outcome: that task can still finish first. Normal success/failure is recorded
+after its final functions end. Scope exit still waits for cleanup completion,
+independently of the outcome. Keep dropped/cancelled records until scope exit.
+A cancelled outcome retains its causing scope and cancellation epoch, so a join
+can apply that cause even before its caller receives a cancel message. Do not
+use only a worker-local “cancel delivered” flag to decide whether to stop.
+join's type remains `<A, E>(Task(A, E)) <- (Fail(E), Scheduler) -> A`. After the run/chain checks, process any applicable scope cancellation
+before observing a target's cancellation outcome. A joiner still cancellable by
+that cancellation is unwound; it never races between this path and a join panic.
+This includes a final executing a fresh scope body that the fresh scope can
+cancel: unwind that inner body, not the already-shielded outer final. A cleanup
+scope and its children are exempt from the older cancellation as R4 requires.
+
+<!-- /syn3-new -->
 
 A joiner shielded from the target scope's cancellation cannot obtain A or E
 from a dropped/cancelled child. It stops immediately with
@@ -2981,6 +3102,8 @@ return. A nested deadlock is detected from that nested run's own tasks and
 waitable requests. It does not return status 1 from a task stack. Chains do not
 cross run identities.
 
+<!-- syn3-old -->
+
 `task.test(seed, choices, body)` supplies a Runner for a fresh nested run. Before
 a turn, take the next script path, if any; it must be runnable, otherwise raise
 `ScheduleError { NotRunnable(path: List(Int)) }` after structured cleanup. When
@@ -2991,19 +3114,52 @@ values, task paths, selected alternatives and trace on every run. Tests for real
 host overlap use ABI completion gates instead. The testing policy changes only
 which legal runnable step is chosen; it cannot commit an unready event.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+`task.test(seed, choices, body)` supplies a Runner for a fresh nested run. Before
+a turn, take the next script path, if any; it must be runnable, otherwise raise
+`NotRunnable(path = List(Int))`, the one member of `ScheduleError = NotRunnable`, after structured cleanup. When
+the script ends choose FIFO. Do not root-poll or use real clocks. Completed fake
+requests are allowed; reaching a required wait on an unsettled host request stops
+with `panic("task: test needs fake IO")`. Fixed inputs and script give the same
+values, task paths, selected alternatives and trace on every run. Tests for real
+host overlap use ABI completion gates instead. The testing policy changes only
+which legal runnable step is chosen; it cannot commit an unready event.
+
+<!-- /syn3-new -->
+
 ### 9.10 Random generators
+
+<!-- syn3-old -->
 
 The module `i/random` gives pure, repeatable random computations. It needs no
 service and does not import `i/task`. It exports the type `Generator` with its
 constructor hidden, the error type below with its constructors, and these
 functions. The signatures describe bindings with bodies.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The module `i/random` gives pure, repeatable random computations. It needs no
+service and does not import `i/task`. It exports the type `Generator` with its
+constructor hidden, the error type below with its constructors, and these
+functions. The signatures describe bindings with bodies. `RandomError = InvalidBound | InvalidPath`, with `InvalidBound = (Int)` and `InvalidPath = (List(Int))`.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 ```i
 RandomError { InvalidBound(Int) InvalidPath(List(Int)) }
 ```
 
+<!-- /syn3-old -->
+
 | Name | Type |
 |---|---|
+<!-- syn3-old -->
+
 | `from_seed` | `(seed: Int) -> Generator` |
 | `word` | `(g: Generator) -> (Int, Generator)` |
 | `int` | `(g: Generator, below: Int) -> (Int, Generator) ^ RandomError` |
@@ -3011,6 +3167,17 @@ RandomError { InvalidBound(Int) InvalidPath(List(Int)) }
 | `split` | `(g: Generator) -> (Generator, Generator)` |
 | `at_path` | `(g: Generator, path: List(Int)) -> Generator ^ RandomError` |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| `from_seed` | `(Int) -> Generator` |
+| `word` | `(Generator) -> (Int, Generator)` |
+| `int` | `(Generator, Int) <- (Fail(RandomError)) -> (Int, Generator)` |
+| `float` | `(Generator) -> (Float, Generator)` |
+| `split` | `(Generator) -> (Generator, Generator)` |
+| `at_path` | `(Generator, List(Int)) <- (Fail(RandomError)) -> Generator` |
+
+<!-- /syn3-new -->
 A Generator contains a normalized seed, SplitMix state, tagged derivation
 history, and a nonnegative draw index. Equality is ordinary structural equality.
 Reusing the same immutable input repeats the same result; callers pass the next
@@ -3073,6 +3240,8 @@ like Boundary and Continuation. They have no public constructors. i/request
 exports the following ordinary status/service types, their constructors, and
 functions; it does not redeclare or re-export the primitive types.
 
+<!-- syn3-old -->
+
 ```i
 Await { Await(wait: (ticket: Ticket) -> Nil) }
 Root { Root(key: Key(Nil)) }
@@ -3080,8 +3249,26 @@ Owner { Owner(key: Key(Nil), root: Root) }
 RequestState(A) { Waiting Ready(A) Cancelled Taken }
 ```
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+```i future-SYN3
+Await = (wait = (Ticket) -> Nil)
+Root = (key = Key(Nil))
+Owner = (key = Key(Nil), root = Root)
+Waiting = ()
+Ready(A) = (A)
+Cancelled = ()
+Taken = ()
+RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
+```
+
+<!-- /syn3-new -->
+
 | Function | Type | Rule |
 |---|---|---|
+<!-- syn3-old -->
+
 | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
 | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
@@ -3105,6 +3292,35 @@ RequestState(A) { Waiting Ready(A) Cancelled Taken }
 | `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
 | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| `open_root` | `() <- (Root) -> Root` | Open an independent request run within the current entry context |
+| `close_root` | `(Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `open_owner` | `() <- (Root) -> Owner` | Register a group at the current root; changing Owner does not change that root |
+| `close_owner` | `(Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+| `count` | `(Owner) -> Int` | Number of outstanding requests in this group |
+| `count_root` | `(Root) -> Int` | Number of outstanding requests in all groups of this root |
+| `settled_owner` | `(Owner) -> Bool` | True exactly when count(owner) is zero |
+| `settled_root` | `(Root) -> Bool` | True exactly when count_root(root) is zero |
+| `cancel_all` | `(Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(Owner) <- (Await) -> Nil` | Await until this group's count is zero |
+| `wait_none_root` | `(Root) <- (Await) -> Nil` | Await until this root's count is zero |
+| `within` | `<A, N>(() <- (..N, Owner) -> A) <- (..N, Root) -> A` | Fresh Owner; ensure close_owner on exit |
+| `ready` | `<A>(A) -> Request(A)` | A fresh completed request; available in pure fakes |
+| `ticket` | `<A>(Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+| `state` | `<A>(Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+| `take` | `<A>(Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+| `settled` | `(Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+| `cancel` | `(Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+| `await` | `<A>(Request(A)) <- (Await) -> A` | Borrow the producer, wait, then take the Ready value |
+| `await_owned` | `<A>(Request(A)) <- (Await) -> A` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+| `wait_any` | `(List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+| `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+
+<!-- /syn3-new -->
 
 `cancel` makes every alias observe Cancelled, even for a previously Ready cell.
 A Taken request stays Taken on cancel. It invokes ABI cancel only for a still-outstanding host id. Cancelling a Ready
@@ -3231,6 +3447,8 @@ separate ownership transfers, not a promise that all raw results are resources.
 
 The ordinary helper for an owned operation that produces no resource is:
 
+<!-- syn3-old -->
+
 ```i
 await_owned(A) = (r: Request(A)) -> A ! Await {
   resource.ensure(
@@ -3240,6 +3458,16 @@ await_owned(A) = (r: Request(A)) -> A ! Await {
 }
 ```
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+```i future-SYN3
+await_owned = <A>(r: Request(A)) -> A {
+  resource.ensure(() { await(r) }, () { cancel(ticket(r)) })
+}
+```
+
+<!-- /syn3-new -->
 This definition lives in i/request and uses its local function names. The final
 runs on success, error and task cancellation; after take, cancel is a no-op.
 request.await itself remains a borrowed wait and never takes producer ownership.
@@ -3361,9 +3589,20 @@ These ordinary functions use the services described in §9.7; their definitions 
 name: (T1, …, Tn) -> R
 ```
 
+<!-- syn3-old -->
+
 This declares a function that the host gives. It is the Wasm import `function` in the import module `module`, encoded as in Appendix B. The full type must be written. Parameters and the value must be types that the host can take (§10.3), with no errors and no environment. Every call of an external function is done when it is reached, like all calls. An external function should have no side effects that i code may see; work with side effects on the host uses host services (§9.7).
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+This declares a function that the host gives. It is the Wasm import `function` in the import module `module`, encoded as in Appendix B. The full type must be written. The type has one shape, its parameter data has positions only, and its parameters and value must be types that the host can take (§10.3). It has no need, or exactly `<- (Fail(E))` with an `E` that the host can take; the host's error is then raised through the caller's `Fail`. Every call of an external function is done when it is reached, like all calls. An external function should have no side effects that i code may see; work with side effects on the host uses host services (§9.7).
+
+<!-- /syn3-new -->
+
 #### 10.1.1 JavaScript value declarations
+
+<!-- syn3-old -->
 
 The form is
 `@js("expression") name: T`, where T expands to one closed nominal type with
@@ -3373,7 +3612,21 @@ cast between nominal types. `i/js.Value {}` is one ordinary use; packages can
 define `Element {}` or other opaque types. JS is specific to this attribute;
 it is not a target-neutral foreign language feature.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The form is
+`@js("expression") name: T`, where T expands to one opaque type (§4.3). No holes, type variables, unions, functions or constructed
+resource types. The annotation is required. It creates no i constructor or
+cast between labelled types. `i/js.Value = Opaque` is one ordinary use; packages can
+define `Element = Opaque` or other opaque types. JS is specific to this attribute;
+it is not a target-neutral foreign language feature.
+
+<!-- /syn3-new -->
+
 For example, an opaque type defined by a package needs no library rule:
+
+<!-- syn3-old -->
 
 ```i
 Element {}
@@ -3381,6 +3634,16 @@ Element {}
 body: Element
 ```
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+```i future-SYN3
+Element = Opaque
+@js("globalThis.document.body")
+body: Element
+```
+
+<!-- /syn3-new -->
 Each retained declaration becomes a zero-argument value import returning
 `externref`, with a cache in the loader, rather than an imported mutable
 global. Its first and only initialization call is emitted in `ilang_start`,
@@ -3494,6 +3757,8 @@ An ordinary environment-bound Target may hold a substituted value. It is not cer
 
 The generated artifact and loader metadata are specified in §B.6.1. Host exports always use the fixed ABI conversions, never a dynamically replaced Js converter.
 
+<!-- syn3-old -->
+
 ### 10.2 Entry points
 
 These functions are **entry points**:
@@ -3514,6 +3779,29 @@ On targets using the v3 asynchronous entry protocol, an entry is **async** exact
 
 Open the dependency-free primitive entry context before chosen factories, enabling async admission exactly for an async entry. It constructs no replaceable service. Construct all services in §2.6.1's one topological order, enter the sole adapter at its place in that order, and invoke the unchanged source entry with the chosen body services. Finish structured cleanup before delivering the result or error; retire the primitive context on every exit. A stop runs no i finals. Synchronous fake-only contexts cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; pure scheduler switches alone do not yield to the host.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+### 10.2 Entry points
+
+These functions are **entry points**:
+
+- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter group is `()`, and its result is unused. A missing default means no program entry.
+- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has the parameter group `()` and gives `Nil` or `Never`. A test **passes** when it gives `Nil`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
+- **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. A host export has one shape, its parameter data has positions only, and its parameters and value must be types that the host can take (§10.3).
+
+**Platform services.** At an entry the platform of the target provides its services (§9.7): the host services of its table, `Assert`, `Scope`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and a top-level `Fail`. For the program entry and tests, that `Fail` takes any error, and an error that reaches it stops the program or fails the test. For a host export, it takes only an error type that the host can take, and the error is given to the host (Appendix B).
+
+The need of an entry, after what the entry's own code provides, may contain only services that the platform of the target provides. Otherwise it is the compile error "`T` is not provided by the target `t`", also when the program catches every error of the operations that need `T`. Checking with no target checks the entry's shape and types, but not its need.
+
+On targets using the asynchronous entry protocol, an entry is **async** exactly when its need has a host service whose declaration is `"async"`, or `Runner`. `Await`, `Owner` and `Root` alone do not make it async. A requested synchronous export that is async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7). When the need of an entry has `Scheduler`, `Runner`, `Await`, `Owner` or `Root`, the entry runs in a fresh task run (§9.9) that provides them.
+
+The entry context is opened before the entry runs, and closed on every exit, after structured cleanup and before the result or error is delivered. A stop runs no i finals. A synchronous context cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; scheduler switches alone do not yield to the host.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 ### 10.3 Types the host can take
 
 `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and custom types with no constructors (§4.3). Values of custom types with no constructors go to the host as opaque references. No other type may go to the host. An error type that the host can take is a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
@@ -3531,11 +3819,40 @@ The outer Request and optional Result in a request-mode host declaration describ
 
 Records may neither be given to the host nor received from it through this interface. A binding with label parameters (§4.9.4) cannot be an entry point even when its ordinary parameter types would fit the host interface.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+### 10.3 Types the host can take
+
+`Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and opaque types (§4.3). Values of opaque types go to the host as opaque references. No other type may go to the host: data, labelled types with data, and functions do not cross. An error type that the host can take is a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
+
+Where i code gives a value to the host, an `Int` or `String` member counts as `Int` or `String`, whatever its value set (§4.2): a literal type, a union of literal types of one type constructor (also through a name), or all the values but a finite set, such as `Int - 0`. Where the host gives the value (the value of an external function, the value and errors of a host-service function, and the parameters of a host export), an `Int` or `String` member must have all its values, because the host's values are checked only for their form (§B.2).
+
+```i future-SYN3
+@external("app", "mode")
+mode: () -> "on" | "off"            // compile error: the host gives the value
+@external("app", "log")
+log: ("info" | "warn") -> Nil       // correct: i code gives the value
+```
+
+The outer `Request` and optional `Result` in a request-mode host declaration describe how work is obtained; they are not additional boundary types. Requests, tickets, tasks, groups, channels and events cannot cross the interface. IO types over Int and constructed `Thrown` and `Mismatch` values are not boundary types; their libraries pass Int or an opaque outcome and decode in i. JavaScript value declarations do not change the value and error lists above. No library-specific exception is added.
+
+<!-- /syn3-new -->
+
 ## 11. Run-time behavior
 
 ### 11.1 Values
 
+<!-- syn3-old -->
+
 No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, tuples, lists, records, values of custom types, functions, boundaries, continuations, keys, keyed values, requests, tickets, and host references.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+No value may be changed. The values are integers, floats, strings, codepoints, bit arrays, data, lists, values of labelled types, functions, boundaries, continuations, keys, keyed values, requests, tickets, and host references.
+
+<!-- /syn3-new -->
 
 ### 11.2 Int
 
@@ -3557,11 +3874,42 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 
 - Ints are the same when their numbers are equal. Floats are the same when they are equal by IEEE 754, so `0.0 == -0.0`.
 - Strings are the same when their scalar values are equal. Codepoints are the same when their numbers are equal. Bit arrays are the same when their bits are equal.
+<!-- syn3-old -->
+
 - Tuples, lists, and values of custom types are the same when they have the same constructor and their parts are the same, in order. Values with different type constructors, and tuples of different sizes, are never the same.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- Data is the same when it has the same shape and its parts under each key are the same. Lists are the same when their parts are the same, in order. Values of labelled types are the same when they have the same constructor and their data is the same. Values with different type constructors, and data of different shapes, are never the same; data and a labelled value are never the same.
+
+<!-- /syn3-new -->
+<!-- syn3-old -->
+
 - Records are the same when they have the same labels and the values with the same label are the same. Field order has no effect. Additional fields count, also when static types hide them. A record is never the same as a value that is not a record.
+
+<!-- /syn3-old -->
+<!-- syn3-old -->
+
 - A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression or a clause block, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, a library function, and each `@external` declaration are each one value; two declarations of one import are two values. So two function expressions that are written the same way give values that are not the same.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- A function, a boundary, a continuation, and a host reference have no parts that may be looked at, so each is the same only as itself: the value made by one evaluation of a function expression or a chain, by one call of `control.boundary` or `control.suspend`, or one reference from the host (§B.4). A top-level function is worked out once (§2.5), so all its uses are the same value. In the same way, a constructor, a built-in function, a library function, and each `@external` declaration are each one value; two declarations of one import are two values. So two function expressions that are written the same way give values that are not the same.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 - Each call of `control.keep_env` (§9.4) makes a new function, the same only as itself. A key (§9.8) is the same only as itself. Two keyed values are equal when their keys are the same and their values are equal.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+- Each call of `keep` (§9.4) makes a new function, the same only as itself. A key (§9.8) is the same only as itself. Two keyed values are equal when their keys are the same and their values are equal.
+
+<!-- /syn3-new -->
 - A request or ticket compares by its underlying request identity, which does not change on answer, take or cancel. Ticket identity is not a fresh value on each call of ticket. Request and Ticket are different type constructors and are not equal to one another.
 - A value stays the same value when the program copies it from one worker to another (§11.9).
 
@@ -3571,13 +3919,33 @@ A Float is a finite IEEE 754 binary64 number. Results are rounded to the nearest
 
 ### 11.6 Tail calls
 
+<!-- syn3-old -->
+
 A call in tail position uses no more stack. Tail positions are: the last expression of the body of a function expression (§6.8); the expression of a clause of a clause block that is called as a function, and not in a match, because that expression is the last thing the function works out; the expression of a clause of a match in tail position; the last expression of a block in tail position; and the right side of `&&` or `||` in tail position. An environment statement does not change which calls are in tail position. The clause expressions of a clause block are in tail position only by the two items on clauses above.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+A call in tail position uses no more stack. Tail positions are: the last expression of the body of a function expression (§6.8); the body of a branch of a chain that is called; the body of a branch of a match in tail position; the last expression of a block in tail position; the right side of `&&` or `||` in tail position; and the left operand of a provide in tail position. A provide does not change which calls are in tail position.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 So in `loop = { 0 -> Done  n -> loop(n - 1) }`, the call `loop(n - 1)` uses no more stack. A match adds no call frame (§6.12).
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+So in `loop = (0) { Done } | (n) { loop(n - 1) }`, the call `loop(n - 1)` uses no more stack. A match adds no call frame (§6.12).
+
+<!-- /syn3-new -->
 
 ### 11.7 Stops
 
 The program stops in these cases:
+
+<!-- syn3-old -->
 
 | Case | Reason |
 |---|---|
@@ -3591,17 +3959,54 @@ The program stops in these cases:
 | A value from the host is not correct (Appendix B) | `host: value is not correct` |
 | There is no more memory or stack | none |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Case | Reason |
+|---|---|
+| `panic(m)` is called | `panic: ` and `m` |
+| The `Assert` of an entry point gets a failure (§9.6) | `assertion failed: ` and the message |
+| An error comes to the program entry or a test (§9.3) | `error: ` and the text form of the error |
+| `control.suspend` or `control.escape` with a boundary that is not active, also through a `Fail` used after its `catch` (§9.3, §9.4) | `control: boundary is not active` |
+| A continuation is used a second time (§9.4) | `control: continuation was already used` |
+| A float operation has a result that is not finite (§11.3) | `float: result is not finite` |
+| Making a bit array fails (§8.3) | `bit array: value is too short`, `bit array: length is negative`, `bit array: bytes are not whole`, or `bit array: float is not finite` |
+| A value from the host is not correct (Appendix B) | `host: value is not correct` |
+| There is no more memory or stack | none |
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 A JS bridge call that does not expose exceptions uses `panic("js: call threw")` for a thrown exception. Malformed raw outcomes, argument builders or typed host replies use `host: value is not correct`. These stops are not Mismatch errors; explicit checked conversions may return Mismatch. Provider adapter guards use the panic messages of §2.6.1. Memory and stack exhaustion remain stops.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+A JS bridge call that does not expose exceptions uses `panic("js: call threw")` for a thrown exception. Malformed raw outcomes, argument builders or typed host replies use `host: value is not correct`. These stops are not Mismatch errors; explicit checked conversions may return Mismatch. Memory and stack exhaustion remain stops.
+
+<!-- /syn3-new -->
 
 Before the program stops, the host gets a **stop message**, in one call of `panic` (Appendix B): the reason, then one line for each source position, with a line feed between lines. The first position is that of the innermost expression in the program source that was being worked out: a call, an operator, a `<<`, or a binding. Then come the positions of the calls in the program source that were running, the innermost first. Calls that were replaced by tail calls are gone, but the first position is always given, also when that expression is a call in tail position: in `f = (n) { assert(n > 0) }`, the stop shows the position of `assert(n > 0)`. A call of a library function, such as `fail.catch` or `resource.ensure`, counts as a tail call when it is in tail position. For an error at an entry point, there is only the position of the entry point's binding.
 
 A **source position** is written `module path:line:column`, for example `app/users:12:5`, with the module path as its own package names it. For a module of a package with a location, the location, `@`, the major version, and a space come first: `github.com/alice/json@1 json/decode:12:5`. Lines and columns count from 1; a column counts Unicode scalar values. The position of an expression is the position of its first token.
 
+<!-- syn3-old -->
+
 A function with no errors and no environment (`^ Never ! Never`) may still stop for these reasons, and it may never end.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+A function with no need may still stop for these reasons, and it may never end.
+
+<!-- /syn3-new -->
 
 ### 11.8 Text form of values
 
 The **text form** of a value is given by `core.inspect` (§13):
+
+<!-- syn3-old -->
 
 | Value | Text form |
 |---|---|
@@ -3620,6 +4025,27 @@ The **text form** of a value is given by `core.inspect` (§13):
 | Request, ticket | `//request`, `//ticket` |
 | Host reference | `//wasm(opaque)` |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Value | Text form |
+|---|---|
+| Int | Decimal digits, with `-` before a negative number: `-42` |
+| Float | See below |
+| String | `"`, then the characters, then `"`. `"` and `\` are written as `\"` and `\\`. Line feed, carriage return, tab, and form feed are `\n`, `\r`, `\t`, `\f`. Other characters from U+0000 to U+001F, U+007F, and U+0080 to U+009F are `\u{XXXX}`, with four upper-case hex digits. All other characters are written as they are. |
+| List | `[`, the text forms of the parts with `, ` between them, `]` |
+| Data | `(`, the text forms of the positional parts in order, then `label = ` and the text form of each labelled part, in the UTF-8 byte order of the labels, with `, ` between them, `)`. `()` when empty. |
+| Value of a labelled type | The constructor name; when its data is not `()`, then the text form of its data: `True`, `Ok(1)`, `User(age = 36, name = "ada")`. |
+| BitArray | `<<`, the whole bytes as decimal numbers with `, ` between them, `>>`. If the number of bits is not a multiple of 8, the last k bits come last, written as `value:uk`: `<<82, 2:u2>>` |
+| UtfCodepoint | `//utfcodepoint(`, the character, `)` |
+| Function | `//fn(`, one name for each key of its shape with `, ` between them, `) { ... }`. The names are `a`, `b`, … in order: position i, and then the i-th label (counting on after the positions), gets the letter `a` + (i mod 26), with the decimal number i div 26 after it when i is 26 or more; a label is written `label = ` before its name: `//fn(a, port = b) { ... }`. A function with several shapes writes the part of each shape group, in the written order of their first branches, joined by ` \| `: `//fn(a) { ... } \| (a, b) { ... }`. |
+| Boundary, continuation | `//boundary`, `//continuation` |
+| Key, keyed value | `//key`, `//keyed` |
+| Request, ticket | `//request`, `//ticket` |
+| Host reference | `//wasm(opaque)` |
+
+<!-- /syn3-new -->
+
 A **Float** is written in this way. Let d1 … dn be the shortest list of decimal digits, with dn not 0, such that 0.d1…dn × 10^k gives back the same float when read. When more than one list of that length does this, take the one nearest to the exact value of the float; when two are equally near, take the one whose last digit is even. `-` comes first for a negative float, including -0.0. Zero is `0.0`. Let p = k − n.
 
 - The **long form** is used when p is at least L and at most U, and not when p ≥ 0 and the size of the float is 2^53 or more. L is −4 when n = 1, and −2 − n when not. U is 2 when n = 1 or k ≥ 11, and 1 when not.
@@ -3632,15 +4058,35 @@ The text form of a function, a key or a keyed value never depends on which worke
 
 A program may run on one or more **workers** at the same time. Which worker does which part of the work cannot be seen. Tasks that run at the same time take their steps (sends and receives, joins, host calls, failures and stops) one after another, in an order that the program does not fix; this order may differ from run to run and with the number of workers. Every run gives a result that some order of the steps gives, and each step does what it would do if the steps were taken one at a time in that order. The number of workers only changes which order happens. So anything that depends on the order of steps may change, for example which sender a receive pairs with, which event of a `choose` commits, whether a step comes before or after the end of a scope, which tasks fail before a cancel reaches them, which of two stops is first, and the order of output. A program whose results do not depend on the order of its steps gives one result. Running out of memory or stack (§11.7) is not covered by this rule. The host chooses the number of workers.
 
+<!-- syn3-old -->
+
 The **captures** of a function made by a function expression are the local names that its body uses and that are bound outside it, after macro expansion; a name counts when it is written in the body, also in a part that never runs. Top-level names are not captures. A function made by `control.keep_env` (§9.4) has the captures of its argument and the services it keeps. Other functions have no captures.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The **captures** of a function made by a function expression are the local names that its body uses and that are bound outside it, after macro expansion; a name counts when it is written in the body, also in a part that never runs. Top-level names are not captures. A function made by `keep` (§9.4) has the captures of its argument and the services it keeps. Other functions have no captures.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 The values that a value **holds** are: the parts of a tuple, a list, a value of a custom type or a record (§11.4); the values of the captures of a function; and the value in a `Keyed` (§9.8). `==` does not look at what a function holds (§11.4). A value is **portable** when it is not a boundary, a continuation, a host reference, a request, a ticket or a `Syntax` value (§14.4), and every value it holds is portable. A value may hold itself, through a local function that calls itself; only the other values it holds then count.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The values that a value **holds** are: the parts of data, of a list, or of the data of a labelled value (§11.4); the values of the captures of a function; and the value in a `Keyed` (§9.8). `==` does not look at what a function holds (§11.4). A value is **portable** when it is not a boundary, a continuation, a host reference, a request, a ticket or a `Syntax` value (§14.4), and every value it holds is portable. A value may hold itself, through a local function that calls itself; only the other values it holds then count.
+
+<!-- /syn3-new -->
 
 A value that is not portable never goes to another worker. Values may be copied between workers; a copy is the same value (§11.4).
 
 ## 12. Built-in names
 
 These names may be used in every module. Other names may cover them.
+
+<!-- syn3-old -->
 
 | Name | What it is | See |
 |---|---|---|
@@ -3653,13 +4099,59 @@ These names may be used in every module. Other names may cover them.
 | `panic` | `(message: String) -> Never` | §11.7 |
 | `assert` | `(c: Bool) -> Nil ! Assert` | §9.6 |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Name | What it is | See |
+|---|---|---|
+| `Int` `Float` `String` `List` `BitArray` `UtfCodepoint` `Never` | Types | §4.2 |
+| `Bool` `Result` | Names | §4.2 |
+| `True` `False` `Nil` `Ok` `Error` | Labelled types and their constructors | §4.2 |
+| `Assert` `AssertionFailure` `Fail` | Labelled types and their constructors | §9.3, §9.6 |
+| `Boundary` `Continuation` | Built-in types made by `i/control` | §9.4 |
+| `Key` `Keyed` | Built-in types made by `i/key` | §9.8 |
+| `Request` `Ticket` | Built-in types operated on by `i/request` | §9.11 |
+| `panic` | `(String) -> Never` | §11.7 |
+| `assert` | `(Bool) <- (Assert) -> Nil` | §9.6 |
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/key` (§9.8), `i/task` (§9.9), `i/random` (§9.10), `i/request` (§9.11), `i/core` (§13), `i/syntax` (§14), and `i/record` (§15) give the other names. The IO module list is extended with its service definitions.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+These are normal functions and types. The modules `i/fail` (§9.3), `i/control` (§9.4), `i/resource` (§9.5), `i/assertion` (§9.6), `i/io` (§9.7), `i/key` (§9.8), `i/task` (§9.9), `i/random` (§9.10), `i/request` (§9.11), `i/core` (§13), and `i/syntax` (§14) give the other names. The IO module list is extended with its service definitions.
+
+<!-- /syn3-new -->
 
 ## 13. The module `i/core`
 
+<!-- syn3-old -->
+
 The module exports the built-in types `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`, `Record`, `Boundary`, `Continuation`, `Key`, `Keyed`, `Request`, and `Ticket`. These are the same types as the unqualified built-in names.
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+The module exports the built-in types `Int`, `Float`, `String`, `List`, `BitArray`, `UtfCodepoint`, `Never`, `Boundary`, `Continuation`, `Key`, `Keyed`, `Request`, and `Ticket`. These are the same types as the unqualified built-in names.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
+
 These are normal functions: they are called, given, and compared like any other function. Only their bodies are not written in i. Most of them do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). Some, such as `index_of` and `bit_array_concat`, could be written in i, but the runtime does them much faster. They have no errors and need no environment.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+These are normal functions: they are called, given, and compared like any other function. Only their bodies are not written in i. Most of them do things that the rest of the language cannot do, such as looking at how any value is made (`inspect`, `hash`). Some, such as `index_of` and `bit_array_concat`, could be written in i, but the runtime does them much faster. They have no need.
+
+<!-- /syn3-new -->
+
+<!-- syn3-old -->
 
 | Function | Type | What it gives |
 |---|---|---|
@@ -3691,6 +4183,43 @@ These are normal functions: they are called, given, and compared like any other 
 | `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
 | `inspect` | `(a) -> String` | The text form of the value (§11.8) |
 | `hash` | `(a) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed. |
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Function | Type | What it gives |
+|---|---|---|
+| `portable` | `<A>(A) -> Bool` | `True` when the value is portable (§11.9) |
+| `not` | `(Bool) -> Bool` | `True` for `False`, and `False` for `True` |
+| `to_float` | `(Int) -> Float` | The nearest Float, with ties to even. If it is not finite, the program stops. |
+| `truncate` | `(Float) -> Int` | The Float without its fraction, rounded toward zero |
+| `floor` | `(Float) -> Float` | The greatest whole number that is not greater |
+| `ceiling` | `(Float) -> Float` | The smallest whole number that is not smaller |
+| `sqrt` | `(Float) -> Float` | The square root. For a negative number the result is not finite, so the program stops (§11.3). |
+| `float_to_bits` | `(Float) -> Int` | The 64 bits of the IEEE 754 binary64 value, as a number from 0 to 2^64 − 1 |
+| `float_from_bits` | `(Int) -> Float` | The float with the lowest 64 bits of the number. If it is not finite, the program stops. |
+| `bit_and`, `bit_or`, `bit_xor` | `(Int, Int) -> Int` | The bitwise operation on the numbers as two's complement with no end |
+| `bit_not` | `(Int) -> Int` | `-x - 1` |
+| `shift_left` | `(Int, Int) -> Int` | `x` × 2^n. A negative n is `shift_right` by −n. |
+| `shift_right` | `(Int, Int) -> Int` | `x` ÷ 2^n, rounded down. A negative n is `shift_left` by −n. |
+| `concat` | `(List(String)) -> String` | The strings one after the other |
+| `byte_size` | `(String) -> Int` | The number of UTF-8 bytes |
+| `byte_slice` | `(String, Int, Int) -> Result(String, Nil)` | The bytes from `start` (counting from 0), `length` of them. `Error(Nil)` when they are not all in the string, or when the start or the end is inside a character. |
+| `codepoints` | `(String) -> List(UtfCodepoint)` | The characters in order |
+| `from_codepoints` | `(List(UtfCodepoint)) -> String` | The string of these characters |
+| `codepoint_to_int` | `(UtfCodepoint) -> Int` | The number of the character |
+| `int_to_codepoint` | `(Int) -> Result(UtfCodepoint, Nil)` | The character with this number, or `Error(Nil)` when it is not a Unicode scalar value |
+| `to_upper` | `(String) -> String` | The string with each character changed to its simple uppercase mapping in Unicode 18.0.0 (UnicodeData.txt). This is one character for one character, and no language changes it. A character with no simple uppercase mapping, such as `ß`, stays the same. |
+| `to_lower` | `(String) -> String` | The string with each character changed to its simple lowercase mapping in Unicode 18.0.0, in the same way |
+| `index_of` | `(String, String, Int) -> Result(Int, Nil)` | The byte offset (counting from 0) of the first `find` in `in` that starts at `from` or after it. An empty `find` is at `from`. `Error(Nil)` when there is no such `find`, when `from` is less than 0 or greater than the byte size of `in`, or when `from` is inside a character. |
+| `bit_size` | `(BitArray) -> Int` | The number of bits |
+| `bit_array_to_string` | `(BitArray) -> Result(String, Nil)` | The string, when the bits are whole bytes of correct UTF-8; `Error(Nil)` when not |
+| `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
+| `inspect` | `<A>(A) -> String` | The text form of the value (§11.8) |
+| `hash` | `<A>(A) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed. |
+| `never` | `<A>(Never) -> A` | The match on `Never` (§6.12); it is never called with a value |
+
+<!-- /syn3-new -->
 
 ## 14. Macros and the Lisp surface
 
@@ -3931,6 +4460,8 @@ A **compile-time binding** has `@macro`, or has a quote or a function of `i/synt
 
 An error in expanded code is reported at the span of the code; code from a template is reported at the macro call, with the template as a note. Warnings are given only for code whose span is in the module being compiled.
 
+<!-- syn3-old -->
+
 ## 15. The module `i/record`
 
 These are ordinary library functions, using the label parameters of §4.9.4. They have no errors and need no environment. Keys for `get`, `put`, and `remove` must be one known string, or an enclosing key parameter passed by its own name. There is no privilege for this module in inference.
@@ -3946,6 +4477,8 @@ These are ordinary library functions, using the label parameters of §4.9.4. The
 | `texts` | `(r: Record) -> List((String, String))` | Each label with its value's text form (§11.8), sorted by label bytes |
 
 There is no `empty` function: `()` is the empty record. `has` and `keys` do not change any type. There is no operation returning all fields as values of one type: fields may have different types. Code that knows their types reads them by label; code that shows them uses `texts`.
+
+<!-- /syn3-old -->
 
 ## Appendix A. Choices
 
@@ -3972,6 +4505,8 @@ This version runs one instance for each run of the program. Workers (§11.9) com
 
 A value of a type that the host can take (§10.3) is passed as zero or more Wasm values:
 
+<!-- syn3-old -->
+
 | Type | Wasm values |
 |---|---|
 | `Nil` | none |
@@ -3982,9 +4517,33 @@ A value of a type that the host can take (§10.3) is passed as zero or more Wasm
 | `BitArray` | `i32` address, `i32` number of bits. There are ⌈bits / 8⌉ bytes. In each byte the highest bit comes first. Bits after the end in the last byte are 0. |
 | A custom type with no constructors | `externref` |
 
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+| Type | Wasm values |
+|---|---|
+| `Nil` | none |
+| `Bool` | `i32`: 0 is `False`, 1 is `True` |
+| `Float` | `f64` |
+| `Int` | `i32` sign, `i32` address, `i32` count. The sign is −1, 0, or 1. The size of the number is `count` unsigned 32-bit parts at the address, lowest part first, each part little-endian. The last part is not 0. Zero is sign 0 and count 0. |
+| `String` | `i32` address, `i32` length: the UTF-8 bytes |
+| `BitArray` | `i32` address, `i32` number of bits. There are ⌈bits / 8⌉ bytes. In each byte the highest bit comes first. Bits after the end in the last byte are 0. |
+| An opaque type | `externref` |
+
+<!-- /syn3-new -->
+
 The size of the buffer of an `Int` is 4 × count bytes, of a `String` its length, and of a `BitArray` ⌈bits / 8⌉ bytes.
 
+<!-- syn3-old -->
+
 A function `(P1, …, Pn) -> A ^ E` is passed like this. Environment parameters are not passed.
+
+<!-- /syn3-old -->
+<!-- syn3-new -->
+
+A function `(P1, …, Pn) <- (Fail(E)) -> A`, or `(P1, …, Pn) -> A` with `E` = `Never`, is passed like this. Services are not passed.
+
+<!-- /syn3-new -->
 
 - **Parameters**: the values of `P1`, then `P2`, and so on.
 - **Results**, when `E` is `Never`: the values of `A`.
