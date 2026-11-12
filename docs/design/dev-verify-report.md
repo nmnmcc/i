@@ -129,7 +129,11 @@ No language or library surface was added, including state mechanisms.
   its original cap; the large literal key case also passes O0/O2 under ten
   seconds. Verified the std snapshot differs only by 1446 hygienic test names
   and six ordinary test helper bindings; its two existing censored runtime
-  observations and budgets are unchanged.
+  observations and budgets are unchanged. The std checker still exceeded
+  the cap in a three-job run until imported ASTs themselves were shared
+  between resolvers. Keep immutable per-module Arc views and replace a view
+  only after its module finishes expansion. The final nine-case reproduction
+  with `--jobs 3` passes all checks under the original saved budgets.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
@@ -239,7 +243,7 @@ One intermediate overlapping Cargo run failed at doctests with
 `error[E0460]: found possibly newer version of crate ilang_check which
 ilang_macro depends on`. Another Cargo build had replaced artifacts while
 workspace tests were running. Final acceptance waits for that workspace
-command to finish and runs without overlapping Cargo builds. No Cargo
+command to finish and does not replace its debug artifacts during testing. No Cargo
 command was interrupted. Earlier bounded std and literal failures were
 `review-k4s/std: unclassified checker timeout` and
 `review-t1/stress-keys-2000: full output changed`; the fixes above retain

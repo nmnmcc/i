@@ -69,6 +69,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
     let mut transactions = Vec::new();
     let mut session = Session::default();
     let next_answer = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let mut definition_modules: Vec<_> = parsed.iter().cloned().map(Arc::new).collect();
     for source in order {
         let index = parsed
             .iter()
@@ -84,8 +85,11 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         // Definition queries can name the caller and its transitive imports,
         // including the modules that supplied macro templates. Freeze that
         // existing import closure rather than copying unrelated project ASTs.
-        let definition_modules = match crate::prepare::import_closure(graph, &parsed, source) {
-            Ok(modules) => modules,
+        let definition_snapshot = match crate::prepare::import_indices(graph, &parsed, source) {
+            Ok(indices) => indices
+                .into_iter()
+                .map(|i| definition_modules[i].clone())
+                .collect(),
             Err(errors) => {
                 diagnostics.extend(errors);
                 return Err(diagnostics);
@@ -93,7 +97,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         };
         let definitions = Arc::new(DefinitionWorld::new_shared(
             graph,
-            definition_modules,
+            definition_snapshot,
             next_answer.clone(),
         ));
         let mut ast = parsed[index].ast.clone();
@@ -188,6 +192,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         graph.sources.set_text(source, scoped.text().to_owned());
         parsed[index].ast = ast;
         parsed[index].scoped = Some(scoped);
+        definition_modules[index] = Arc::new(parsed[index].clone());
         diagnostics.extend(notes(
             item_transactions.iter().chain(body_transactions.iter()),
         ));

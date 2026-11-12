@@ -57,7 +57,7 @@ struct Index {
 /// module's definition index once per item attempt.
 pub struct DefinitionWorld {
     graph: PackageGraph,
-    parsed: Vec<Parsed>,
+    parsed: Vec<Arc<Parsed>>,
     next_answer: Arc<AtomicU64>,
     lisp_documents: HashMap<u32, Vec<Datum>>,
     source_encoders: HashMap<u32, ilang_syntax::lisp::SourceEncoder>,
@@ -65,12 +65,16 @@ pub struct DefinitionWorld {
 }
 impl DefinitionWorld {
     pub fn new(graph: &PackageGraph, parsed: &[Parsed]) -> Self {
-        Self::new_shared(graph, parsed.to_vec(), Arc::new(AtomicU64::new(0)))
+        Self::new_shared(
+            graph,
+            parsed.iter().cloned().map(Arc::new).collect(),
+            Arc::new(AtomicU64::new(0)),
+        )
     }
     /// All modules in one project share the same answer identity allocator.
     pub fn new_shared(
         graph: &PackageGraph,
-        parsed: Vec<Parsed>,
+        parsed: Vec<Arc<Parsed>>,
         next_answer: Arc<AtomicU64>,
     ) -> Self {
         let lisp_documents = parsed
@@ -128,7 +132,10 @@ impl DefinitionWorld {
             .expect("definition answer identity space exhausted")
     }
     fn source_module(&self, source: u32) -> Option<&Parsed> {
-        self.parsed.iter().find(|p| p.source.0 == source)
+        self.parsed
+            .iter()
+            .find(|p| p.source.0 == source)
+            .map(AsRef::as_ref)
     }
     fn target(&self, p: &Parsed, import: &ilang_syntax::ast::ImportItem) -> Option<u32> {
         let package = &self.graph.packages[p.package];

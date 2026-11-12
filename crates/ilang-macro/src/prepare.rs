@@ -74,6 +74,19 @@ pub fn import_closure(
     parsed: &[Parsed],
     source: ilang_package::SourceId,
 ) -> Result<Vec<Parsed>, Vec<Diagnostic>> {
+    import_indices(graph, parsed, source).map(|indices| {
+        indices
+            .into_iter()
+            .map(|index| parsed[index].clone())
+            .collect()
+    })
+}
+
+pub(crate) fn import_indices(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    source: ilang_package::SourceId,
+) -> Result<Vec<usize>, Vec<Diagnostic>> {
     use std::collections::{BTreeSet, VecDeque};
     let start = parsed
         .iter()
@@ -166,10 +179,7 @@ pub fn import_closure(
         }
     }
     if errors.is_empty() {
-        Ok(selected
-            .into_iter()
-            .map(|index| parsed[index].clone())
-            .collect())
+        Ok(selected.into_iter().collect())
     } else {
         Err(errors)
     }
