@@ -133,3 +133,25 @@ fn lisp_surface_round_trip() {
     }
     assert_eq!(a.lines().count(), b.lines().count());
 }
+
+/// A literal's written `-> R` leaves needs and failures open (inferred).
+#[test]
+fn literal_result_is_open() {
+    let out = shown("f = () -> Int { 1 }\n");
+    assert!(out.contains("-> Int ^ _ ! _"), "{out}");
+}
+
+/// The written full type of a binding closes needs and failures.
+#[test]
+fn written_full_type_is_closed() {
+    let out = shown("f: () -> Int = () { 1 }\n");
+    assert!(!out.contains('^') && !out.contains('!'), "{out}");
+    assert!(out.contains("() -> Int"), "{out}");
+}
+
+/// A type parameter written twice is kept twice, for E0226.
+#[test]
+fn repeated_type_parameter_kept() {
+    let out = shown("pair = <A, A>(x: A) { (x, x) }\n");
+    assert!(out.contains("pair(A, A)"), "{out}");
+}
