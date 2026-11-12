@@ -1097,6 +1097,8 @@ impl<'a> Query<'a> {
                 }
             }
         }
+        w.split_written_puns();
+        self.walk_sum_members(m, &mut w.occ);
         self.walk_imports_exports(m, &mut w.occ);
         self.walk_type_params(m, &mut w.occ);
         Occurrences {
@@ -1143,6 +1145,42 @@ impl<'a> Query<'a> {
                     });
                 if let Some(v) = var {
                     occ.push((param.span, Target::TyVar(v)));
+                }
+            }
+        }
+    }
+
+    /// The members of a sum `T = C1 | C2` (syntax three §2.6): each names
+    /// the labelled type `C1`, which is the constructor `C1` of `T` in the
+    /// HIR. The HIR keeps only the definitions of the members, so their
+    /// names in the sum are found in the written item.
+    fn walk_sum_members(&self, m: ModuleId, occ: &mut Vec<(Span, Target)>) {
+        let ast = self.ast(m);
+        let p = self.program;
+        let text = self.written_text(m);
+        for &t in &p.module(m).types {
+            let def = p.ty(t);
+            let TypeBody::Custom(cs) = &def.body else {
+                continue;
+            };
+            let Some(item) = ast.items.iter().find(|i| {
+                matches!(&i.kind, ast::ItemKind::TypeDef(d) if d.name.span == def.span)
+            }) else {
+                continue;
+            };
+            let rhs = Span::new(def.span.end, item.span.end);
+            for (ci, c) in cs.iter().enumerate() {
+                if item.span.start <= c.span.start && c.span.end <= item.span.end {
+                    continue;
+                }
+                if let Some(s) = find_word(text, rhs, &c.name, false) {
+                    occ.push((
+                        s,
+                        Target::Ctor(CtorRef {
+                            ty: t,
+                            index: ci as u32,
+                        }),
+                    ));
                 }
             }
         }
@@ -1860,6 +1898,51 @@ impl Walk<'_> {
             if let Some(b) = label_binder(a) {
                 self.labels
                     .push((b.span, Target::Field(vec![(ctor, index as u32)])));
+            }
+        }
+    }
+
+    /// Syntax three writes the label and the local of a pattern part both,
+    /// `C(label = label)` (`(= label label)` in the Lisp surface), where
+    /// the tree has one binder at the label. The label stays a name of the
+    /// field; the local is the second word.
+    fn split_written_puns(&mut self) {
+        let text = self.text;
+        let bytes = text.as_bytes();
+        for (a, field) in self.labels.clone() {
+            let name = &text[a.start as usize..a.end as usize];
+            let rest = &text[a.end as usize..];
+            let lisp_form = text[..a.start as usize].trim_end().ends_with("(=");
+            let after = rest.trim_start();
+            let after = if lisp_form {
+                after
+            } else {
+                match after.strip_prefix('=') {
+                    Some(x) if !x.starts_with('=') => x.trim_start(),
+                    _ => continue,
+                }
+            };
+            let start = text.len() - after.len();
+            let end = start + name.len();
+            if !after.starts_with(name) || bytes.get(end).is_some_and(|b| is_word_byte(*b)) {
+                continue;
+            }
+            let b = Span::new(start as u32, end as u32);
+            let mut moved = false;
+            for (s, t) in self.occ.iter_mut() {
+                if *s == a && matches!(t, Target::Local(_)) {
+                    if let Target::Local(v) = t
+                        && self.binders.get(v) == Some(&a)
+                    {
+                        self.binders.insert(*v, b);
+                    }
+                    *s = b;
+                    moved = true;
+                }
+            }
+            if moved {
+                self.labels.retain(|(s, _)| *s != a);
+                self.occ.push((a, field));
             }
         }
     }
