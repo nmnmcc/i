@@ -510,7 +510,7 @@ fn round<'a>(d: &'a Datum, head: &str) -> Option<&'a [Datum]> {
     }
 }
 
-fn symbol<'a>(d: &'a Datum) -> Option<&'a str> {
+fn symbol(d: &Datum) -> Option<&str> {
     match &d.kind {
         K::Symbol(s) => Some(s),
         _ => None,
