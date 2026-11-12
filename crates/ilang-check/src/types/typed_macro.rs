@@ -100,9 +100,7 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
             }
         }
         Ty::Fn(f) => {
-            for p in [&f.param] {
-                occurrences(s, p, pol.flip(), out);
-            }
+            occurrences(s, &f.param, pol.flip(), out);
             for t in [&f.ret, &f.err] {
                 occurrences(s, t, pol, out);
             }
