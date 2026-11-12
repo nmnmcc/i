@@ -19,7 +19,9 @@ use std::time::Instant;
 
 fn enabled() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("I_TRACE_STAGES").is_some_and(|v| !v.is_empty() && v != "0"))
+    *ON.get_or_init(|| {
+        std::env::var_os("I_TRACE_STAGES").is_some_and(|v| !v.is_empty() && v != "0")
+    })
 }
 
 /// The peaks (kB) of the open stages, innermost last.
@@ -83,7 +85,12 @@ fn memory() -> Option<(u64, u64)> {
     let status = std::fs::read_to_string("/proc/self/status").ok()?;
     let field = |key: &str| -> Option<u64> {
         let line = status.lines().find(|l| l.starts_with(key))?;
-        line[key.len()..].trim().trim_end_matches("kB").trim().parse().ok()
+        line[key.len()..]
+            .trim()
+            .trim_end_matches("kB")
+            .trim()
+            .parse()
+            .ok()
     };
     Some((field("VmRSS:")?, field("VmHWM:")?))
 }
