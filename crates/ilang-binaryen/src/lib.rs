@@ -5,7 +5,7 @@
 //! Binaryen. Only the few C API calls that this needs are bound here.
 //!
 //! Custom sections whose names start with `ilang.` (the binary interface
-//! metadata of Appendix B of the spec) are taken out before Binaryen reads the
+//! metadata of a compiled module) are taken out before Binaryen reads the
 //! module and are put back, unchanged and in order, at the end of the result.
 //! So the optimizer can never change or lose them.
 
@@ -51,7 +51,7 @@ pub const ALWAYS_INLINE: u32 = 20;
 static BINARYEN: Mutex<()> = Mutex::new(());
 
 /// The Wasm features that i programs may use: GC with typed function
-/// references, tail calls, and exception handling (spec, Appendix B.1), and
+/// references, tail calls, and exception handling, and
 /// the small features that every engine with these also has.
 fn features() -> ffi::BinaryenFeatures {
     // SAFETY: these functions only return constants.
@@ -74,7 +74,7 @@ fn features() -> ffi::BinaryenFeatures {
 /// The optimizer is run in closed-world mode: only numbers, buffers in linear
 /// memory, and `externref` values cross the host boundary, so no GC type is
 /// seen from outside. Traps are never assumed away, because a trap is how a
-/// program stops (spec §11.7).
+/// program stops.
 pub fn optimize(wasm: &[u8], level: Level) -> Result<Vec<u8>, Error> {
     let (module, kept) = split_custom_sections(wasm)?;
     if level == Level::O0 {
