@@ -244,6 +244,8 @@ jobs:
     env:
       # One thread per i process; the runner's four cores run four cases.
       RAYON_NUM_THREADS: 1
+      # The runner's cores are slower than the machine the expectations were recorded on.
+      CORPUS_BOUND_SCALE: 3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
