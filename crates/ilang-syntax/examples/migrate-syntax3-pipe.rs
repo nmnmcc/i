@@ -317,10 +317,7 @@ fn escaped(text: &str, i: usize, quote: char, js: bool) -> (Literal, usize) {
         value.push(c);
         raw.extend(std::iter::repeat_n(at, c.len_utf8()));
     };
-    loop {
-        let Some(c) = text[j..].chars().next() else {
-            break;
-        };
+    while let Some(c) = text[j..].chars().next() {
         if c == quote {
             raw.push(j);
             j += 1;
