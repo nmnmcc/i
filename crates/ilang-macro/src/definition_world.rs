@@ -60,7 +60,15 @@ pub struct DefinitionWorld {
     parsed: Vec<Arc<Parsed>>,
     next_answer: Arc<AtomicU64>,
     lisp_documents: HashMap<u32, Vec<Datum>>,
-    source_encoders: HashMap<u32, ilang_syntax::lisp::SourceEncoder>,
+    /// The lexical index of each written source and the length it covers,
+    /// built on first use: most worlds never encode most sources.
+    source_encoders: HashMap<
+        u32,
+        (
+            usize,
+            std::sync::OnceLock<ilang_syntax::lisp::SourceEncoder>,
+        ),
+    >,
     current: Mutex<Option<(u32, u64, Arc<Index>)>>,
 }
 impl DefinitionWorld {
@@ -104,14 +112,7 @@ impl DefinitionWorld {
                         .scoped
                         .as_ref()
                         .map_or(file.text.len(), |scoped| scoped.original_len() as usize);
-                    let scope = Scope {
-                        module: p.source.0,
-                        marks: Default::default(),
-                    };
-                    (
-                        p.source.0,
-                        ilang_syntax::lisp::SourceEncoder::new(&scope, &file.text[..end]),
-                    )
+                    (p.source.0, (end, std::sync::OnceLock::new()))
                 })
             })
             .collect();
@@ -555,10 +556,19 @@ impl Definitions for DefinitionWorld {
                             .expect("written Lisp type remains valid")
                     })
                 } else {
-                    let encoder = self
+                    let (end, encoder) = self
                         .source_encoders
                         .get(&parsed.source.0)
                         .expect("written source has a lexical index");
+                    let encoder = encoder.get_or_init(|| {
+                        ilang_syntax::lisp::SourceEncoder::new(
+                            &Scope {
+                                module: parsed.source.0,
+                                marks: Default::default(),
+                            },
+                            &self.graph.sources.get(parsed.source).text[..*end],
+                        )
+                    });
                     encoder
                         .visit_item_charge(item, |event| {
                             charge_definition(budget, DefinitionCost::Event(event))

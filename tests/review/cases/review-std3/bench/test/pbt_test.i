@@ -41,7 +41,7 @@ test("greedy", () {
 
 test("zero_budget", () {
 	never = () { never() }
-	(v, path, checked) = pbt.shrink(pbt.Tree(1, () { never() }), 0, (_) {
+	(v, path, checked) = pbt.shrink(pbt.Tree(value: 1, children: () { never() }), 0, (_) {
 		True
 	})
 	assert(v == 1)
@@ -50,7 +50,7 @@ test("zero_budget", () {
 })
 
 test("cyclic_budget", () {
-	cyclic = () -> pbt.Tree(Int) { pbt.Tree(1, () { [cyclic()] }) }
+	cyclic = () -> pbt.Tree(Int) { pbt.Tree(value: 1, children: () { [cyclic()] }) }
 	(v, path, checked) = pbt.shrink(cyclic(), 10, (_) { True })
 	assert(v == 1)
 	assert(list.length(path) == 10)

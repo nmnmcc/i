@@ -12,6 +12,6 @@ pair = ("b", () {
 
 
 main = () {
-	! Assert = Assert((_) { panic("caught group local") })
+	! Assert = Assert(fail: (_) { panic("caught group local") })
 	pair.1()
 }

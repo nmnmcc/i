@@ -9,7 +9,7 @@ Clock {
 }
 
 Log {
-	Log(write: (line: String) -> Nil)
+	Log(write: (String) -> Nil)
 }
 
 elapsed = (start: Int, clock ! Clock) { clock.now() - start }
@@ -38,14 +38,14 @@ given = (c: Clock) {
 
 // §9.3: errors come together by union.
 Http {
-	Http(get: (url: String) -> String ^ Int)
+	Http(get: (String) -> String ^ Int)
 }
 
 fetch = (url, http ! Http) { http.get(url) }
 
 two = () {
 	a = fetch("a")
-	b = core.byte_slice(a, start: 0, length: 1) |> fail.from_result
+	b = core.byte_slice(a, 0, 1) |> fail.from_result
 	(a, b)
 }
 

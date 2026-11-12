@@ -387,7 +387,7 @@ loosely_compare = (a: Float, with: Float, tolerating: Float) -> Order {
 /// `True` when the two Floats are no more than `tolerating` apart.
 ///
 /// ```i
-/// float.loosely_equals(0.1 +. 0.2, with: 0.3, tolerating: 1.0e-9)  // True
+/// float.loosely_equals(0.1 +. 0.2, 0.3, 1.0e-9)  // True
 /// ```
 loosely_equals = (a: Float, with: Float, tolerating: Float) -> Bool {
 	// `a -. with` is not finite when they are far apart, so it is not used.
@@ -502,8 +502,8 @@ to_precision = (x: Float, precision: Int) -> Float {
 /// is a Float.
 ///
 /// ```i
-/// float.power(2.0, of: 10)  // Ok(1024.0)
-/// float.power(-.2.0, of: -1)  // Ok(-.0.5)
+/// float.power(2.0, 10)  // Ok(1024.0)
+/// float.power(-.2.0, -1)  // Ok(-.0.5)
 /// ```
 power = (base: Float, of: Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |> {
@@ -578,7 +578,7 @@ divide = (a: Float, by: Float) -> Result(Float, Nil) {
 /// `by`, or `Error(Nil)` when `by` is `0.0`.
 ///
 /// ```i
-/// float.modulo(13.3, by: 3.3)  // Ok(0.10000000000000053)
+/// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
 /// ```
 modulo = (a: Float, by: Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> {
@@ -635,8 +635,8 @@ logarithm = (x: Float) -> Result(Float, Nil) {
 /// one unit in the last place of the exact power.
 ///
 /// ```i
-/// float.real_power(16.0, of: 0.5)  // Ok(4.0)
-/// float.real_power(-.8.0, of: 1.0 /. 3.0)  // Error(Nil)
+/// float.real_power(16.0, 0.5)  // Ok(4.0)
+/// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
 /// ```
 real_power = (base: Float, of: Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
@@ -1070,7 +1070,7 @@ Fixed {
 
 fixed_ratio = (n: Int, d: Int, p: Int) -> Fixed {
 	scaled = core.shift_left(n, p)
-	Fixed(down(scaled, d), up(scaled, d))
+	Fixed(lo: down(scaled, d), hi: up(scaled, d))
 }
 
 fixed_float = (x: Float, p: Int) -> Fixed {
@@ -1078,30 +1078,30 @@ fixed_float = (x: Float, p: Int) -> Fixed {
 	{ p >= 1074 } |> {
 		True -> {
 			v = core.shift_left(n, p - 1074)
-			Fixed(v, v)
+			Fixed(lo: v, hi: v)
 		}
 		False -> {
 			d = core.shift_left(1, 1074 - p)
-			Fixed(down(n, d), up(n, d))
+			Fixed(lo: down(n, d), hi: up(n, d))
 		}
 	}
 }
 
-fixed_add = (a: Fixed, b: Fixed) -> Fixed { Fixed(a.lo + b.lo, a.hi + b.hi) }
+fixed_add = (a: Fixed, b: Fixed) -> Fixed { Fixed(lo: a.lo + b.lo, hi: a.hi + b.hi) }
 
-fixed_neg = (a: Fixed) -> Fixed { Fixed(-a.hi, -a.lo) }
+fixed_neg = (a: Fixed) -> Fixed { Fixed(lo: -a.hi, hi: -a.lo) }
 
 fixed_sub = (a: Fixed, b: Fixed) -> Fixed { fixed_add(a, fixed_neg(b)) }
 
 fixed_scale = (a: Fixed, k: Int) -> Fixed {
 	{ k >= 0 } |> {
-		True  -> Fixed(a.lo * k, a.hi * k)
-		False -> Fixed(a.hi * k, a.lo * k)
+		True  -> Fixed(lo: a.lo * k, hi: a.hi * k)
+		False -> Fixed(lo: a.hi * k, hi: a.lo * k)
 	}
 }
 
 fixed_div_int = (a: Fixed, d: Int) -> Fixed {
-	Fixed(down(a.lo, d), up(a.hi, d))
+	Fixed(lo: down(a.lo, d), hi: up(a.hi, d))
 }
 
 fixed_mul = (a: Fixed, b: Fixed, p: Int) -> Fixed {
@@ -1111,7 +1111,7 @@ fixed_mul = (a: Fixed, b: Fixed, p: Int) -> Fixed {
 	bb = a.hi * b.hi
 	low = int_min(int_min(aa, ab), int_min(ba, bb))
 	high = int_max(int_max(aa, ab), int_max(ba, bb))
-	Fixed(core.shift_right(low, p), -core.shift_right(-high, p))
+	Fixed(lo: core.shift_right(low, p), hi: -core.shift_right(-high, p))
 }
 
 fixed_div = (a: Fixed, b: Fixed, p: Int) -> Option(Fixed) {
@@ -1126,8 +1126,8 @@ fixed_div = (a: Fixed, b: Fixed, p: Int) -> Option(Fixed) {
 				bb = fixed_ratio(a.hi, b.hi, p)
 				Some(
 					Fixed(
-						int_min(int_min(aa.lo, ab.lo), int_min(ba.lo, bb.lo))
-						int_max(int_max(aa.hi, ab.hi), int_max(ba.hi, bb.hi))
+						lo: int_min(int_min(aa.lo, ab.lo), int_min(ba.lo, bb.lo))
+						hi: int_max(int_max(aa.hi, ab.hi), int_max(ba.hi, bb.hi))
 					)
 				)
 			}
@@ -1138,7 +1138,7 @@ fixed_div = (a: Fixed, b: Fixed, p: Int) -> Option(Fixed) {
 fixed_radius = (a: Fixed) -> Int { int_max(int_abs(a.lo), int_abs(a.hi)) }
 
 fixed_widen = (a: Fixed, radius: Int) -> Fixed {
-	Fixed(a.lo - radius, a.hi + radius)
+	Fixed(lo: a.lo - radius, hi: a.hi + radius)
 }
 
 // Machin terms are divided individually with directed rounding. The first
@@ -1150,7 +1150,7 @@ reciprocal_atan = (k: Int, p: Int) -> Fixed {
 		{ denominator > scale } |> {
 			True -> fixed_widen(sum, 1)
 			False -> {
-				term = Fixed(scale / denominator, up(scale, denominator))
+				term = Fixed(lo: scale / denominator, hi: up(scale, denominator))
 				next = positive |> {
 					True  -> fixed_add(sum, term)
 					False -> fixed_sub(sum, term)
@@ -1159,7 +1159,7 @@ reciprocal_atan = (k: Int, p: Int) -> Fixed {
 			}
 		}
 	}
-	go(k, 0, Fixed(0, 0), True)
+	go(k, 0, Fixed(lo: 0, hi: 0), True)
 }
 
 fixed_pi = (p: Int) -> Fixed {
@@ -1183,20 +1183,20 @@ small_atan = (z: Fixed, p: Int) -> Fixed {
 			False -> go(next, index + 1, next_sum)
 		}
 	}
-	go(z, 0, Fixed(0, 0))
+	go(z, 0, Fixed(lo: 0, hi: 0))
 }
 
 // z is nonnegative; interval extension of exact inverse/addition identities.
 positive_atan = (z: Fixed, pi_bounds: () -> Fixed, p: Int) -> Fixed {
 	scale = core.shift_left(1, p)
-	one = Fixed(scale, scale)
+	one = Fixed(lo: scale, hi: scale)
 	{ z.lo >= scale } |> {
 		True -> fixed_div(one, z, p) |> {
 			Some(inverse) -> fixed_sub(
 				fixed_div_int(pi_bounds(), 2)
 				positive_atan_small(inverse, p)
 			)
-			None -> Fixed(0, pi_bounds().hi)
+			None -> Fixed(lo: 0, hi: pi_bounds().hi)
 		}
 		False -> positive_atan_small(z, p)
 	}
@@ -1207,14 +1207,14 @@ positive_atan_small = (z: Fixed, p: Int) -> Fixed {
 	{ z.hi <= scale / 2 } |> {
 		True -> small_atan(z, p)
 		False -> {
-			half = Fixed(scale / 2, scale / 2)
-			denominator = fixed_add(Fixed(scale, scale), fixed_div_int(z, 2))
+			half = Fixed(lo: scale / 2, hi: scale / 2)
+			denominator = fixed_add(Fixed(lo: scale, hi: scale), fixed_div_int(z, 2))
 			fixed_div(fixed_sub(z, half), denominator, p) |> {
 				Some(reduced) -> fixed_add(
 					small_atan(half, p)
 					small_atan(reduced, p)
 				)
-				None -> Fixed(-scale, scale)
+				None -> Fixed(lo: -scale, hi: scale)
 			}
 		}
 	}
@@ -1243,8 +1243,8 @@ reduce_angle = (x: Float, p: Int, work: Int) -> (Int, Fixed) {
 					(
 						qlo
 						Fixed(
-							core.shift_right(r.lo, shift)
-							-core.shift_right(-r.hi, shift)
+							lo: core.shift_right(r.lo, shift)
+							hi: -core.shift_right(-r.hi, shift)
 						)
 					)
 				}
@@ -1259,7 +1259,7 @@ fixed_sincos = (r: Fixed, cosine: Bool, p: Int) -> Fixed {
 	square = fixed_mul(r, r, p)
 	scale = core.shift_left(1, p)
 	initial = cosine |> {
-		True  -> Fixed(scale, scale)
+		True  -> Fixed(lo: scale, hi: scale)
 		False -> r
 	}
 	go = (term: Fixed, k: Int, sum: Fixed) -> Fixed {
@@ -1274,7 +1274,7 @@ fixed_sincos = (r: Fixed, cosine: Bool, p: Int) -> Fixed {
 			False -> go(next, k + 1, next_sum)
 		}
 	}
-	go(initial, 0, Fixed(0, 0))
+	go(initial, 0, Fixed(lo: 0, hi: 0))
 }
 
 trig_bounds = (x: Float, p: Int) -> (Fixed, Fixed) {
@@ -1311,7 +1311,7 @@ integer_sqrt = (n: Int) -> Int {
 fixed_sqrt_ratio = (n: Int, d: Int, p: Int) -> Fixed {
 	scaled = core.shift_left(n, 2 * p)
 	k = integer_sqrt(scaled / d)
-	Fixed(k, { k * k * d == scaled } |> {
+	Fixed(lo: k, hi: { k * k * d == scaled } |> {
 		True  -> k
 		False -> k + 1
 	})
@@ -1351,7 +1351,7 @@ Double {
 two_sum = (a: Float, b: Float) -> Double {
 	s = a +. b
 	v = s -. a
-	Double(s, { a -. { s -. v } } +. { b -. v })
+	Double(hi: s, lo: { a -. { s -. v } } +. { b -. v })
 }
 
 two_product = (a: Float, b: Float) -> Double {
@@ -1365,7 +1365,7 @@ two_product = (a: Float, b: Float) -> Double {
 	error = { { { ah *. bh } -. product } +. { ah *. bl } +. { al *. bh } } +. {
 		al *. bl
 	}
-	Double(product, error)
+	Double(hi: product, lo: error)
 }
 
 double_add = (a: Double, b: Double) -> Double {
@@ -1373,7 +1373,7 @@ double_add = (a: Double, b: Double) -> Double {
 	two_sum(high.hi, high.lo +. a.lo +. b.lo)
 }
 
-double_neg = (a: Double) -> Double { Double(-.a.hi, -.a.lo) }
+double_neg = (a: Double) -> Double { Double(hi: -.a.hi, lo: -.a.lo) }
 
 double_mul = (a: Double, b: Double) -> Double {
 	high = two_product(a.hi, b.hi)
@@ -1428,7 +1428,7 @@ fast_unit_max = 2.5822498780869086e120
 
 quick_sum = (a: Float, b: Float) -> Double {
 	s = a +. b
-	Double(s, b -. { s -. a })
+	Double(hi: s, lo: b -. { s -. a })
 }
 
 double_mul_fast = (a: Double, b: Double) -> Double {
@@ -1463,7 +1463,7 @@ double_quotient = (a: Double, b: Double) -> Double {
 	q = a.hi /. b.hi
 	residual = double_add(
 		a
-		double_neg(double_mul_fast(Double(q, fast_zero), b))
+		double_neg(double_mul_fast(Double(hi: q, lo: fast_zero), b))
 	)
 	two_sum(q, { residual.hi +. residual.lo } /. b.hi)
 }
@@ -1497,16 +1497,16 @@ fast_reduce = (x: Float) -> Option(Reduced) {
 		False -> {
 			q = core.floor(x *. fast_inverse_half_pi +. fast_half)
 			argument = double_add(
-				Double(x, fast_zero)
-				double_neg(double_mul_fast(Double(q, fast_zero), half_pi_pair))
+				Double(hi: x, lo: fast_zero)
+				double_neg(double_mul_fast(Double(hi: q, lo: fast_zero), half_pi_pair))
 			)
 			{ abs(argument.hi) >. fast_reduced_limit } |> {
 				True -> None
 				False -> Some(
 					Reduced(
-						q
-						q -. fast_four *. core.floor(q /. fast_four)
-						argument
+						q: q
+						quadrant: q -. fast_four *. core.floor(q /. fast_four)
+						argument: argument
 					)
 				)
 			}
@@ -1590,10 +1590,10 @@ fast_atan_unit = (z: Double) -> Double {
 		15.0 -> atan_point_15
 		_    -> atan_point_16
 	}
-	numerator = double_add(z, Double(-.center, fast_zero))
+	numerator = double_add(z, Double(hi: -.center, lo: fast_zero))
 	denominator = double_add(
-		Double(fast_one, fast_zero)
-		double_mul_fast(Double(center, fast_zero), z)
+		Double(hi: fast_one, lo: fast_zero)
+		double_mul_fast(Double(hi: center, lo: fast_zero), z)
 	)
 	r = double_quotient(numerator, denominator)
 	correction = double_mul_fast(r, atan_polynomial(double_mul_fast(r, r)))
@@ -1611,7 +1611,7 @@ positive_angle = (y: Double, x: Double) -> Double {
 }
 
 fast_arctangent = (x: Float) -> Option(Float) {
-	a = positive_angle(Double(abs(x), fast_zero), Double(fast_one, fast_zero))
+	a = positive_angle(Double(hi: abs(x), lo: fast_zero), Double(hi: fast_one, lo: fast_zero))
 	signed = { x <. fast_zero } |> {
 		True  -> double_neg(a)
 		False -> a
@@ -1626,8 +1626,8 @@ fast_angle = (y: Float, x: Float) -> Option(Float) {
 		True -> None
 		False -> {
 			angle = positive_angle(
-				Double(abs(y), fast_zero)
-				Double(abs(x), fast_zero)
+				Double(hi: abs(y), lo: fast_zero)
+				Double(hi: abs(x), lo: fast_zero)
 			)
 			quadrant = { x <. fast_zero } |> {
 				True  -> double_add(pi_pair, double_neg(angle))
@@ -1646,7 +1646,7 @@ fast_inverse = (x: Float, cosine: Bool) -> Option(Float) {
 	lower = two_sum(fast_one, -.x)
 	upper = two_sum(fast_one, x)
 	root = double_root(double_mul_fast(lower, upper))
-	magnitude = Double(abs(x), fast_zero)
+	magnitude = Double(hi: abs(x), lo: fast_zero)
 	angle = cosine |> {
 		True  -> positive_angle(root, magnitude)
 		False -> positive_angle(magnitude, root)
@@ -1676,7 +1676,7 @@ fast_units = (x: Float, factor: Double) -> Option(Float) {
 	{ abs(x) <. fast_unit_min || abs(x) >. fast_unit_max } |> {
 		True -> None
 		False -> fast_round(
-			double_mul_fast(Double(x, fast_zero), factor)
+			double_mul_fast(Double(hi: x, lo: fast_zero), factor)
 			fast_zero
 		)
 	}
@@ -1808,7 +1808,7 @@ math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
 					pi_bounds()
 					p
 				)
-				_ -> Some(Fixed(-scale, scale))
+				_ -> Some(Fixed(lo: -scale, hi: scale))
 			}
 		}
 	}
@@ -2022,127 +2022,127 @@ degrees = (radians: Float) -> Result(Float, Nil) {
 
 // BEGIN GENERATED FAST COEFFICIENTS
 // Generated by std/test/float_coefficients.py; MPFR MPFR 4.2.2.
-half_pi_pair = Double(1.5707963267948966, 6.123233995736766e-17)
+half_pi_pair = Double(hi: 1.5707963267948966, lo: 6.123233995736766e-17)
 
-pi_pair = Double(3.141592653589793, 1.2246467991473532e-16)
+pi_pair = Double(hi: 3.141592653589793, lo: 1.2246467991473532e-16)
 
-radian_pair = Double(0.017453292519943295, 2.9486522708701687e-19)
+radian_pair = Double(hi: 0.017453292519943295, lo: 2.9486522708701687e-19)
 
-degree_pair = Double(57.29577951308232, -.1.9878495670576283e-15)
+degree_pair = Double(hi: 57.29577951308232, lo: -.1.9878495670576283e-15)
 
-atan_point_0 = Double(0.0, -.0.0)
+atan_point_0 = Double(hi: 0.0, lo: -.0.0)
 
-atan_point_1 = Double(0.06241880999595735, -.1.5490756308295046e-18)
+atan_point_1 = Double(hi: 0.06241880999595735, lo: -.1.5490756308295046e-18)
 
-atan_point_2 = Double(0.12435499454676144, -.3.1253241424539383e-18)
+atan_point_2 = Double(hi: 0.12435499454676144, lo: -.3.1253241424539383e-18)
 
-atan_point_3 = Double(0.18534794999569476, 4.180692268843079e-18)
+atan_point_3 = Double(hi: 0.18534794999569476, lo: 4.180692268843079e-18)
 
-atan_point_4 = Double(0.24497866312686414, 1.0698755618734451e-17)
+atan_point_4 = Double(hi: 0.24497866312686414, lo: 1.0698755618734451e-17)
 
-atan_point_5 = Double(0.3028848683749714, -.1.1010827903001369e-17)
+atan_point_5 = Double(hi: 0.3028848683749714, lo: -.1.1010827903001369e-17)
 
-atan_point_6 = Double(0.35877067027057225, -.2.4623815582638635e-17)
+atan_point_6 = Double(hi: 0.35877067027057225, lo: -.2.4623815582638635e-17)
 
-atan_point_7 = Double(0.4124104415973873, -.1.587652227770689e-17)
+atan_point_7 = Double(hi: 0.4124104415973873, lo: -.1.587652227770689e-17)
 
-atan_point_8 = Double(0.4636476090008061, 2.2698777452961687e-17)
+atan_point_8 = Double(hi: 0.4636476090008061, lo: 2.2698777452961687e-17)
 
-atan_point_9 = Double(0.5123894603107377, -.2.5462781472855804e-17)
+atan_point_9 = Double(hi: 0.5123894603107377, lo: -.2.5462781472855804e-17)
 
-atan_point_10 = Double(0.5585993153435624, -.5.4556305485916264e-18)
+atan_point_10 = Double(hi: 0.5585993153435624, lo: -.5.4556305485916264e-18)
 
-atan_point_11 = Double(0.6022873461349642, 2.950430737228402e-17)
+atan_point_11 = Double(hi: 0.6022873461349642, lo: 2.950430737228402e-17)
 
-atan_point_12 = Double(0.6435011087932844, 1.5834785051444286e-17)
+atan_point_12 = Double(hi: 0.6435011087932844, lo: 1.5834785051444286e-17)
 
-atan_point_13 = Double(0.6823165548747481, 6.943223671560008e-18)
+atan_point_13 = Double(hi: 0.6823165548747481, lo: 6.943223671560008e-18)
 
-atan_point_14 = Double(0.7188299996216245, -.2.1478388444456983e-17)
+atan_point_14 = Double(hi: 0.7188299996216245, lo: -.2.1478388444456983e-17)
 
-atan_point_15 = Double(0.7531512809621944, -.2.4256934659182068e-17)
+atan_point_15 = Double(hi: 0.7531512809621944, lo: -.2.4256934659182068e-17)
 
-atan_point_16 = Double(0.7853981633974483, 3.061616997868383e-17)
+atan_point_16 = Double(hi: 0.7853981633974483, lo: 3.061616997868383e-17)
 
-sine_coefficient_0 = Double(1.0, 0.0)
+sine_coefficient_0 = Double(hi: 1.0, lo: 0.0)
 
-sine_coefficient_1 = Double(-.0.16666666666666666, -.9.25185853854297e-18)
+sine_coefficient_1 = Double(hi: -.0.16666666666666666, lo: -.9.25185853854297e-18)
 
-sine_coefficient_2 = Double(0.008333333333333333, 1.1564823173178714e-19)
+sine_coefficient_2 = Double(hi: 0.008333333333333333, lo: 1.1564823173178714e-19)
 
-sine_coefficient_3 = Double(-.0.0001984126984126984, -.1.7209558293420705e-22)
+sine_coefficient_3 = Double(hi: -.0.0001984126984126984, lo: -.1.7209558293420705e-22)
 
-sine_coefficient_4 = Double(2.7557319223985893e-06, -.1.858393274046472e-22)
+sine_coefficient_4 = Double(hi: 2.7557319223985893e-06, lo: -.1.858393274046472e-22)
 
-sine_coefficient_5 = Double(-.2.505210838544172e-08, 1.448814070935912e-24)
+sine_coefficient_5 = Double(hi: -.2.505210838544172e-08, lo: 1.448814070935912e-24)
 
-sine_coefficient_6 = Double(1.6059043836821613e-10, 1.2585294588752098e-26)
+sine_coefficient_6 = Double(hi: 1.6059043836821613e-10, lo: 1.2585294588752098e-26)
 
-sine_coefficient_7 = Double(-.7.647163731819816e-13, -.7.03872877733453e-30)
+sine_coefficient_7 = Double(hi: -.7.647163731819816e-13, lo: -.7.03872877733453e-30)
 
-sine_coefficient_8 = Double(2.8114572543455206e-15, 1.6508842730861433e-31)
+sine_coefficient_8 = Double(hi: 2.8114572543455206e-15, lo: 1.6508842730861433e-31)
 
-sine_coefficient_9 = Double(-.8.22063524662433e-18, -.2.2141894119604265e-34)
+sine_coefficient_9 = Double(hi: -.8.22063524662433e-18, lo: -.2.2141894119604265e-34)
 
-sine_coefficient_10 = Double(1.9572941063391263e-20, -.1.3643503830087908e-36)
+sine_coefficient_10 = Double(hi: 1.9572941063391263e-20, lo: -.1.3643503830087908e-36)
 
-sine_coefficient_11 = Double(-.3.868170170630684e-23, 8.843177655482344e-40)
+sine_coefficient_11 = Double(hi: -.3.868170170630684e-23, lo: 8.843177655482344e-40)
 
-sine_coefficient_12 = Double(6.446950284384474e-26, -.1.9330404233703465e-42)
+sine_coefficient_12 = Double(hi: 6.446950284384474e-26, lo: -.1.9330404233703465e-42)
 
-sine_coefficient_13 = Double(-.9.183689863795546e-29, -.1.4303150396787322e-45)
+sine_coefficient_13 = Double(hi: -.9.183689863795546e-29, lo: -.1.4303150396787322e-45)
 
-cosine_coefficient_0 = Double(1.0, 0.0)
+cosine_coefficient_0 = Double(hi: 1.0, lo: 0.0)
 
-cosine_coefficient_1 = Double(-.0.5, 0.0)
+cosine_coefficient_1 = Double(hi: -.0.5, lo: 0.0)
 
-cosine_coefficient_2 = Double(0.041666666666666664, 2.3129646346357427e-18)
+cosine_coefficient_2 = Double(hi: 0.041666666666666664, lo: 2.3129646346357427e-18)
 
-cosine_coefficient_3 = Double(-.0.001388888888888889, 5.300543954373577e-20)
+cosine_coefficient_3 = Double(hi: -.0.001388888888888889, lo: 5.300543954373577e-20)
 
-cosine_coefficient_4 = Double(2.48015873015873e-05, 2.1511947866775882e-23)
+cosine_coefficient_4 = Double(hi: 2.48015873015873e-05, lo: 2.1511947866775882e-23)
 
-cosine_coefficient_5 = Double(-.2.755731922398589e-07, -.2.3767714622250297e-23)
+cosine_coefficient_5 = Double(hi: -.2.755731922398589e-07, lo: -.2.3767714622250297e-23)
 
-cosine_coefficient_6 = Double(2.08767569878681e-09, -.1.20734505911326e-25)
+cosine_coefficient_6 = Double(hi: 2.08767569878681e-09, lo: -.1.20734505911326e-25)
 
 cosine_coefficient_7 = Double(
-	-.1.1470745597729725e-11
-	-.2.0655512752830745e-28
+	hi: -.1.1470745597729725e-11
+	lo: -.2.0655512752830745e-28
 )
 
-cosine_coefficient_8 = Double(4.779477332387385e-14, 4.399205485834081e-31)
+cosine_coefficient_8 = Double(hi: 4.779477332387385e-14, lo: 4.399205485834081e-31)
 
 cosine_coefficient_9 = Double(
-	-.1.5619206968586225e-16
-	-.1.1910679660273754e-32
+	hi: -.1.5619206968586225e-16
+	lo: -.1.1910679660273754e-32
 )
 
-cosine_coefficient_10 = Double(4.110317623312165e-19, 1.4412973378659527e-36)
+cosine_coefficient_10 = Double(hi: 4.110317623312165e-19, lo: 1.4412973378659527e-36)
 
-cosine_coefficient_11 = Double(-.8.896791392450574e-22, 7.911402614872376e-38)
+cosine_coefficient_11 = Double(hi: -.8.896791392450574e-22, lo: 7.911402614872376e-38)
 
-cosine_coefficient_12 = Double(1.6117375710961184e-24, -.3.6846573564509766e-41)
+cosine_coefficient_12 = Double(hi: 1.6117375710961184e-24, lo: -.3.6846573564509766e-41)
 
-cosine_coefficient_13 = Double(-.2.4795962632247976e-27, 1.2953730964765229e-43)
+cosine_coefficient_13 = Double(hi: -.2.4795962632247976e-27, lo: 1.2953730964765229e-43)
 
-atan_coefficient_0 = Double(1.0, 0.0)
+atan_coefficient_0 = Double(hi: 1.0, lo: 0.0)
 
-atan_coefficient_1 = Double(-.0.3333333333333333, -.1.850371707708594e-17)
+atan_coefficient_1 = Double(hi: -.0.3333333333333333, lo: -.1.850371707708594e-17)
 
-atan_coefficient_2 = Double(0.2, -.1.1102230246251566e-17)
+atan_coefficient_2 = Double(hi: 0.2, lo: -.1.1102230246251566e-17)
 
-atan_coefficient_3 = Double(-.0.14285714285714285, -.7.93016446160826e-18)
+atan_coefficient_3 = Double(hi: -.0.14285714285714285, lo: -.7.93016446160826e-18)
 
-atan_coefficient_4 = Double(0.1111111111111111, 6.1679056923619804e-18)
+atan_coefficient_4 = Double(hi: 0.1111111111111111, lo: 6.1679056923619804e-18)
 
-atan_coefficient_5 = Double(-.0.09090909090909091, 2.523234146875356e-18)
+atan_coefficient_5 = Double(hi: -.0.09090909090909091, lo: 2.523234146875356e-18)
 
-atan_coefficient_6 = Double(0.07692307692307693, -.4.270088556250602e-18)
+atan_coefficient_6 = Double(hi: 0.07692307692307693, lo: -.4.270088556250602e-18)
 
-atan_coefficient_7 = Double(-.0.06666666666666667, -.9.251858538542971e-19)
+atan_coefficient_7 = Double(hi: -.0.06666666666666667, lo: -.9.251858538542971e-19)
 
-atan_coefficient_8 = Double(0.058823529411764705, 8.163404592832033e-19)
+atan_coefficient_8 = Double(hi: 0.058823529411764705, lo: 8.163404592832033e-19)
 
 sine_high_0 = sine_coefficient_0.hi
 
@@ -2308,7 +2308,7 @@ sine_polynomial = (square: Double) -> Double {
 	s0_sum_low = s0_residual +. sine_low_0 +. s0_mul_lo
 	p0_hi = s0_sum +. s0_sum_low
 	p0_lo = s0_sum_low -. { p0_hi -. s0_sum }
-	Double(p0_hi, p0_lo)
+	Double(hi: p0_hi, lo: p0_lo)
 }
 
 cosine_high_0 = cosine_coefficient_0.hi
@@ -2494,7 +2494,7 @@ cosine_polynomial = (square: Double) -> Double {
 	s0_sum_low = s0_residual +. cosine_low_0 +. s0_mul_lo
 	p0_hi = s0_sum +. s0_sum_low
 	p0_lo = s0_sum_low -. { p0_hi -. s0_sum }
-	Double(p0_hi, p0_lo)
+	Double(hi: p0_hi, lo: p0_lo)
 }
 
 atan_high_0 = atan_coefficient_0.hi
@@ -2608,7 +2608,7 @@ atan_polynomial = (square: Double) -> Double {
 	s0_sum_low = s0_residual +. atan_low_0 +. s0_mul_lo
 	p0_hi = s0_sum +. s0_sum_low
 	p0_lo = s0_sum_low -. { p0_hi -. s0_sum }
-	Double(p0_hi, p0_lo)
+	Double(hi: p0_hi, lo: p0_lo)
 }
 
 // END GENERATED FAST COEFFICIENTS

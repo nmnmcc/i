@@ -8,7 +8,7 @@ User {
 	User(name: String, age: Int)
 }
 
-users: List(User) = [User("ann", 30)]
+users: List(User) = [User(name: "ann", age: 30)]
 
 // An argument of a call whose function has a known function type: the type
 // variables of its parameter come from the other arguments.
@@ -25,7 +25,7 @@ first_name = () {
 // Also with `|>`, with labels, and with more than one type variable.
 piped = users |> list.map((u) { u.age })
 
-by_label = list.map(f: (u) { u.name }, xs: users)
+by_label = list.map(users, (u) { u.name })
 
 total = list.fold(users, 0, (sum, u) { sum + u.age })
 

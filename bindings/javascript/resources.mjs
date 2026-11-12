@@ -14,7 +14,7 @@ export class ResourceHost {
     if (limit !== undefined && typeof limit !== "bigint") throw new TypeError("Resource limit must be bigint");
     this.#limit = limit;
   }
-  /** Drain host cleanup diagnostics. Close/teardown themselves remain error-free. */
+  /** Drains host cleanup diagnostics. Close/teardown themselves remain error-free. */
   takeCleanupErrors() { return this.#cleanupErrors.splice(0); }
   context() { return new ResourceContext(contextKey, () => {
     if (this.#limit !== undefined && this.#next > this.#limit) throw new ResourceError("memory exhausted");
@@ -83,7 +83,7 @@ export class ResourceContext {
     this.#requests.add(request);
     return () => this.#requests.delete(request);
   }
-  /** Track independent creation/supervision before starting OS work. */
+  /** Tracks independent creation/supervision before starting OS work. */
   cleanupJob() {
     if (!this.#live) throw new ResourceError("closed");
     let finish;
@@ -122,7 +122,7 @@ export class ResourceContext {
       },
     });
   }
-  /** Transfer an idle resource to another owner without running cleanup. */
+  /** Transfers an idle resource to another owner without running cleanup. */
   takeIdle(id, kind) {
     const entry = this.#entries.get(id);
     if (!this.#live || !entry || entry.kind !== kind) throw new ResourceError("closed");
@@ -146,7 +146,7 @@ export class ResourceContext {
       complete();
     });
   }
-  /** Remove first, then revoke/wake and run cleanup. Reentrant closes join it. */
+  /** Removes first, then revokes or wakes and runs cleanup. Reentrant closes join it. */
   close(id, kind) {
     const pending = this.#closing.get(id);
     if (pending) return pending.kind === kind ? pending.receipt : Promise.resolve();
@@ -156,7 +156,7 @@ export class ResourceContext {
     this.#finishClose(work);
     return work.receipt;
   }
-  /** Make every entry inaccessible before any cancellation or wake callback. */
+  /** Makes every entry inaccessible before any cancellation or wake callback. */
   teardown() {
     if (this.#teardown) return this.#teardown;
     this.#live = false;
@@ -170,7 +170,7 @@ export class ResourceContext {
     for (const entry of work) this.#finishClose(entry);
     return this.#teardown;
   }
-  /** An explicit drop guard for a not-yet-published resource reply (N9.4). */
+  /** An explicit drop guard for a not-yet-published resource reply. */
   provisional(id, kind) {
     let delivered = false;
     return Object.freeze({

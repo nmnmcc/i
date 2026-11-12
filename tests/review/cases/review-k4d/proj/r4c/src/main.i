@@ -19,11 +19,11 @@ tell = (x: Int) { x |> {
 
 
 main = (io ! Io) {
-  ! S(Dep) = S(() { get() }, (_: Dep) { Nil })
-  ! Dep = Dep(2)
+  ! S(Dep) = S(f: () { get() }, m: (_: Dep) { Nil })
+  ! Dep = Dep(v: 2)
   h = () { run(fr) }
   k = () { run(h) + fw() }
   io.print(tell(k()))
-  ! S(Never) = S(() { 1 }, (_: Never) { Nil })
+  ! S(Never) = S(f: () { 1 }, m: (_: Never) { Nil })
   io.print(tell(k() + fr()))
 }

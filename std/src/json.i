@@ -74,7 +74,7 @@ parse = (text: String) -> Result(Json, JsonError) {
 		(tail, end) = whitespace(rest, at)
 		tail |> {
 			[] -> value
-			_  -> fail.raise(JsonError(end, "trailing data"))
+			_  -> fail.raise(JsonError(offset: end, reason: "trailing data"))
 		}
 	})
 }
@@ -102,7 +102,7 @@ value = (input: List(Int), offset: Int) -> (Json, List(Int), Int) ^ JsonError {
 		[91, ..rest]                   -> array_start(rest, at + 1)
 		[123, ..rest]                  -> object_start(rest, at + 1)
 		[x, .._] ? x == 45 || digit(x) -> number(xs, at)
-		_                              -> fail.raise(JsonError(at, "expected value"))
+		_                              -> fail.raise(JsonError(offset: at, reason: "expected value"))
 	}
 }
 
@@ -124,7 +124,9 @@ array_items = (
 	tail |> {
 		[93, ..after] -> (Array(list.reverse([v, ..acc])), after, end + 1)
 		[44, ..after] -> array_items(after, end + 1, [v, ..acc])
-		_             -> fail.raise(JsonError(end, "expected comma or closing bracket"))
+		_ -> fail.raise(
+			JsonError(offset: end, reason: "expected comma or closing bracket")
+		)
 	}
 }
 
@@ -165,14 +167,19 @@ object_items = (
 							[(key, v), ..acc]
 						)
 						_ -> fail.raise(
-							JsonError(end, "expected comma or closing brace")
+							JsonError(
+								offset: end
+								reason: "expected comma or closing brace"
+							)
 						)
 					}
 				}
-				_ -> fail.raise(JsonError(colon_at, "expected colon"))
+				_ -> fail.raise(
+					JsonError(offset: colon_at, reason: "expected colon")
+				)
 			}
 		}
-		_ -> fail.raise(JsonError(pos, "expected object key"))
+		_ -> fail.raise(JsonError(offset: pos, reason: "expected object key"))
 	}
 }
 
@@ -182,16 +189,18 @@ read_string = (
 	acc: List(BitArray)
 ) -> (String, List(Int), Int) ^ JsonError {
 	xs |> {
-		[] -> fail.raise(JsonError(at, "unterminated string"))
+		[] -> fail.raise(JsonError(offset: at, reason: "unterminated string"))
 		[34, ..tail] -> {
 			bit_array.to_string(bit_array.concat(list.reverse(acc))) |> {
-				Ok(s)    -> (s, tail, at + 1)
-				Error(_) -> fail.raise(JsonError(at, "invalid UTF-8"))
+				Ok(s) -> (s, tail, at + 1)
+				Error(_) -> fail.raise(
+					JsonError(offset: at, reason: "invalid UTF-8")
+				)
 			}
 		}
 		[92, ..tail] -> escape(tail, at + 1, acc)
 		[x, .._] ? x < 32 -> fail.raise(
-			JsonError(at, "control character in string")
+			JsonError(offset: at, reason: "control character in string")
 		)
 		[x, ..tail] -> read_string(tail, at + 1, [<<x>>, ..acc])
 	}
@@ -224,14 +233,21 @@ escape = (
 								]
 							)
 							False -> fail.raise(
-								JsonError(end, "invalid surrogate pair")
+								JsonError(
+									offset: end
+									reason: "invalid surrogate pair"
+								)
 							)
 						}
 					}
-					_ -> fail.raise(JsonError(end, "missing low surrogate"))
+					_ -> fail.raise(
+						JsonError(offset: end, reason: "missing low surrogate")
+					)
 				}
 				False -> { n >= 56320 && n <= 57343 } |> {
-					True  -> fail.raise(JsonError(at, "lone low surrogate"))
+					True -> fail.raise(
+						JsonError(offset: at, reason: "lone low surrogate")
+					)
 					False -> read_string(after, end, [scalar(n), ..acc])
 				}
 			}
@@ -249,11 +265,13 @@ escape = (
 				_   -> -1
 			}
 			{ code < 0 } |> {
-				True  -> fail.raise(JsonError(at, "invalid escape"))
+				True -> fail.raise(
+					JsonError(offset: at, reason: "invalid escape")
+				)
 				False -> read_string(tail, at + 1, [<<code>>, ..acc])
 			}
 		}
-		_ -> fail.raise(JsonError(at, "unterminated escape"))
+		_ -> fail.raise(JsonError(offset: at, reason: "unterminated escape"))
 	}
 }
 
@@ -267,10 +285,12 @@ hex4 = (xs: List(Int), at: Int) -> (Int, List(Int), Int) ^ JsonError {
 					tail
 					at + 4
 				)
-				False -> fail.raise(JsonError(at, "invalid Unicode escape"))
+				False -> fail.raise(
+					JsonError(offset: at, reason: "invalid Unicode escape")
+				)
 			}
 		}
-		_ -> fail.raise(JsonError(at, "short Unicode escape"))
+		_ -> fail.raise(JsonError(offset: at, reason: "short Unicode escape"))
 	}
 }
 
@@ -301,19 +321,21 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 		[48, ..tail] -> {
 			tail |> {
 				[x, .._] ? digit(x) -> fail.raise(
-					JsonError(pos + 1, "leading zero")
+					JsonError(offset: pos + 1, reason: "leading zero")
 				)
 				_ -> ([48], tail, pos + 1)
 			}
 		}
 		[x, ..tail] ? x >= 49 && x <= 57 -> digits(tail, pos + 1, [x])
-		_                                -> fail.raise(JsonError(pos, "expected digit"))
+		_                                -> fail.raise(JsonError(offset: pos, reason: "expected digit"))
 	}
 	(fraction, rest, finish, floating) = after |> {
 		[46, ..tail] -> {
 			(ds, rem, p) = digits(tail, end + 1, [])
 			{ ds == [] } |> {
-				True  -> fail.raise(JsonError(p, "expected fraction digit"))
+				True -> fail.raise(
+					JsonError(offset: p, reason: "expected fraction digit")
+				)
 				False -> ([46, ..ds], rem, p, True)
 			}
 		}
@@ -327,7 +349,9 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 			}
 			(ds, rem, p) = digits(start_exp, exp_at, [])
 			{ ds == [] } |> {
-				True  -> fail.raise(JsonError(p, "expected exponent digit"))
+				True -> fail.raise(
+					JsonError(offset: p, reason: "expected exponent digit")
+				)
 				False -> (list.append([e, ..sign], ds), rem, p, True)
 			}
 		}
@@ -340,8 +364,10 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 	num = text_bytes(list.append(list.append(prefix, fraction), exponent))
 	parsed = is_float |> {
 		False -> int.parse(num) |> {
-			Ok(n)    -> Integer(n)
-			Error(_) -> fail.raise(JsonError(at, "number out of range"))
+			Ok(n) -> Integer(n)
+			Error(_) -> fail.raise(
+				JsonError(offset: at, reason: "number out of range")
+			)
 		}
 		True -> {
 			float_text = { fraction == [] } |> {
@@ -351,8 +377,10 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) ^ JsonError {
 				False -> num
 			}
 			float.parse(float_text) |> {
-				Ok(n)    -> Number(n)
-				Error(_) -> fail.raise(JsonError(at, "number out of range"))
+				Ok(n) -> Number(n)
+				Error(_) -> fail.raise(
+					JsonError(offset: at, reason: "number out of range")
+				)
 			}
 		}
 	}

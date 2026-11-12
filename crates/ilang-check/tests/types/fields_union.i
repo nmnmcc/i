@@ -85,7 +85,7 @@ narrowed = (x: Cat | Rock) {
 }
 
 // A value with no written type, whose known type comes from a call.
-make = (n: Int) { Cat("tom", n) }
+make = (n: Int) { Cat(name: "tom", lives: n) }
 
 from_call = () { make(9).lives }
 

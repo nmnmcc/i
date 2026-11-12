@@ -26,7 +26,7 @@ make = () { control.keep_env((b) { walk(b, 0) }) }
 
 
 main = () {
-  ! Name = Name("kept")
+  ! Name = Name(text: "kept")
   kept = make()
   pure = (n: Int) { n + 1 }
   a = control.keep_env(pure)
@@ -34,10 +34,10 @@ main = () {
   assert(a != b)
   assert(a(37) == 38)
   inner = control.keep_env((boundary) {
-    ! Name = Name("inner")
+    ! Name = Name(text: "inner")
     identity(walk(boundary, 0))
   })
-  ! Name = Name("caller")
+  ! Name = Name(text: "caller")
   Paused(k1) = control.boundary((boundary) { kept(boundary) })
   Paused(k2) = control.resume(k1, Nil)
   Paused(k3) = control.resume(k2, Nil)
@@ -46,18 +46,18 @@ main = () {
   Paused(ki2) = control.resume(ki1, Nil)
   Paused(ki3) = control.resume(ki2, Nil)
   assert(control.resume(ki3, Nil) == Done("inner"))
-  ! Name = Name("final")
+  ! Name = Name(text: "final")
   with_final = control.keep_env((boundary) {
     resource.ensure(() {
       control.suspend(boundary, (k) { Paused(k) })
       Done("unreachable")
     }, () { assert(name() == "final") })
   })
-  ! Name = Name("canceller")
+  ! Name = Name(text: "canceller")
   Paused(k4) = control.boundary((boundary) { with_final(boundary) })
   control.cancel(k4)
   control.boundary((boundary) {
-    ! Name = Name("unused")
+    ! Name = Name(text: "unused")
     ! Extra(Nil, Never, Assert) = Extra(boundary)
     f = control.keep_env(pure)
     assert(core.not(core.portable(f)))

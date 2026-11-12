@@ -1,6 +1,7 @@
 (
 	testlib = (test, suite, skip, fails, each) = std/test
 	fail = i/fail
+	typed = macro_tests/typed
 )
 
 test("adds two numbers", () { assert(1 + 1 == 2) })
@@ -22,7 +23,7 @@ SuiteService {
 read = (service ! SuiteService) { service.value }
 
 suite("outer", () {
-	! SuiteService = SuiteService(42)
+	! SuiteService = SuiteService(value: 42)
 	suite("inner", () {
 		test("service", () { assert(read() == 42) })
 		each("cases", [("one", 1), ("two", 2)], (number) {
@@ -32,3 +33,9 @@ suite("outer", () {
 })
 
 each("numbers", [("one", 1), ("two", 2)], (number) { assert(number > 0) })
+
+test("typed macro converts checked Int and String expressions", () {
+	assert(typed.to_text(42) == "42")
+	assert(typed.to_text("hello") == "hello")
+	typed.assert_eq(6 * 7, 42)
+})

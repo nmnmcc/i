@@ -27,7 +27,7 @@ describe = (c: Color) {
 	c |> {
 		Red         -> "red"
 		Green       -> "green"
-		Blue(level) -> "blue " <> core_inspect(level)
+		Blue(level = level) -> "blue " <> core_inspect(level)
 	}
 }
 

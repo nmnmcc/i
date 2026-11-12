@@ -63,7 +63,7 @@ test("lists", () {
 })
 
 test("custom", () {
-	u = User("ann", 31)
+	u = User(name: "ann", age: 31)
 	check(show(u), "User(\"ann\", 31)")
 	check(u.name, "ann")
 	check(show(u.age), "31")
@@ -89,7 +89,7 @@ Thin {
 }
 
 test("fields_on_unions", () {
-	boxes = [Wide(2.0, 3.0), Thin(4.0)]
+	boxes = [Wide(width: 2.0, depth: 3.0), Thin(width: 4.0)]
 	boxes |> {
 		[r, s] -> {
 			// `width` is field 0 of both constructors.
@@ -119,16 +119,16 @@ sizes = (xs: List(Sized)) -> List(Int) {
 }
 
 test("fields_by_constructor", () {
-	check(show(sizes([Small(1), Big("b", 2), Small(3)])), "[1, 2, 3]")
+	check(show(sizes([Small(size: 1), Big(name: "b", size: 2), Small(size: 3)])), "[1, 2, 3]")
 })
 
 test("known_constructor", () {
-	s = Rect(1.0, 2.0)
+	s = Rect(width: 1.0, height: 2.0)
 	s |> {
 		Rect(..) -> check(show(Rect(..s, height: 9.0)), "Rect(1.0, 9.0)")
 		_        -> panic("no")
 	}
-	Circle(1.5) |> {
+	Circle(radius: 1.5) |> {
 		c = Circle(..) -> check(show(c.radius), "1.5")
 		_              -> panic("no")
 	}

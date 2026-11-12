@@ -6,7 +6,7 @@
 (i/control, i/fail, i/request)
 
 @host("test:async/v1", "async")
-Later { Later(double: (n: Int) -> Int ^ String) }
+Later { Later(double: (Int) -> Int ^ String) }
 
 Step = Paused | Done
 Paused { Paused(Continuation(Nil, Step, String, Later | request.Await | request.Owner)) }

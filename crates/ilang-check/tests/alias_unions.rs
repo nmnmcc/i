@@ -44,17 +44,23 @@ fn nominal_union(n: usize) -> String {
 
 #[test]
 fn nominal_union_recursive_match_scales() {
-    // Checking was exponential in the number of members: 9 members took
-    // over a minute with optimizations. The work is now polynomial; an
-    // unoptimized build needs some seconds at 22 members.
-    let bound = Duration::from_secs(if cfg!(debug_assertions) { 60 } else { 5 });
+    // Checking was exponential in the number of members: each added member multiplied the time by
+    // about ten, and 9 members took over a minute with optimizations. The work is now polynomial.
+    // The bound is relative to the smallest case, so that a busy machine does not fail the test:
+    // from 8 to 22 members a polynomial grows by far less than 2000 times, an exponential by more
+    // than 10^13 times.
+    let mut smallest = None;
     for n in [8, 12, 16, 22] {
         let source = nominal_union(n);
         let start = Instant::now();
         let lines = lines(&source);
         let took = start.elapsed();
         eprintln!("{n} members: {took:?}");
-        assert!(took < bound, "{n} members took {took:?}");
+        let base = *smallest.get_or_insert(took.max(Duration::from_millis(50)));
+        assert!(
+            took < base * 2000,
+            "{n} members took {took:?}, 8 members took {base:?}"
+        );
         assert!(
             lines.contains(&"app/main.f0 : (e: E(Int)) -> Int".to_string()),
             "{n} members: {lines:?}"

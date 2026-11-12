@@ -1,7 +1,7 @@
 Config { Config(label: String) }
 Await { Await(wait: () -> String) }
-make_config = () { Config("configured") }
-make_await = (c ! Config) { Await(() { c.label }) }
+make_config = () { Config(label: "configured") }
+make_await = (c ! Config) { Await(wait: () { c.label }) }
 body = (a ! Await) { a.wait() }
 fixed_order = () {
   ! Await = make_await()

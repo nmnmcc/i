@@ -291,7 +291,7 @@ attempt(A, E, N) = (stream: Stream(A, E, N)) -> Stream(Result(A, E), Never, N) {
 /// Runs each input pull through a fixed-result runner, rebuilding every tail.
 map_environment(A, E, N, M) = (
 	stream: Stream(A, E, N)
-	run: (body: () -> Step(A, E, N) ^ E ! N) -> Step(A, E, N) ^ E ! M
+	run: (() -> Step(A, E, N) ^ E ! N) -> Step(A, E, N) ^ E ! M
 ) -> Stream(A, E, M) {
 	make(() {
 		run(() { pull(stream) }) |> {

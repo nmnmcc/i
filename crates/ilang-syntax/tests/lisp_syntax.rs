@@ -362,6 +362,7 @@ fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
 fn macro_arguments_match_labels_and_attribute_items() {
     use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
     let m = MacroDefinition {
+        signature: None,
         item: 0,
         name: "m".into(),
         parameters: vec!["first".into(), "second".into(), "item".into()],
@@ -1548,4 +1549,47 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
         }
     }
     assert!(checked >= 50, "only {checked} source expressions parsed");
+}
+
+#[test]
+fn typed_macro_type_view_has_no_source_constructor_or_text_round_trip() {
+    use ilang_syntax::lisp::syntax::{Node, Position, Syntax, TypeHandle};
+    let like = root("Int");
+    let handle = TypeHandle {
+        snapshot: 19,
+        index: 3,
+    };
+    let view = Syntax::type_view(handle, &like);
+    assert!(Syntax::make(Node::TypeView(handle), &like).is_err());
+    assert_eq!(view.show(), "#<type-view>");
+    assert!(view.show_as(Position::Type).is_err());
+    let copied = view.flip_mark(7).flip_mark(7);
+    assert!(view.same_input(&copied));
+    let other = Syntax::type_view(
+        TypeHandle {
+            snapshot: 20,
+            index: 3,
+        },
+        &like,
+    );
+    assert!(!view.same_code(&other));
+    let nested = Syntax::make(Node::Round(vec![root("List"), view]), &like).unwrap();
+    assert!(nested.show_as(Position::Type).is_err());
+}
+
+#[test]
+fn typed_macro_type_answers_share_marked_variable_nodes_across_queries() {
+    use ilang_syntax::lisp::syntax::{MarkCache, Node, ScopeIdentity, Syntax};
+    let variable = root("A").with_scope_identity(ScopeIdentity::TypeVariable {
+        variable: 17,
+        name: "A".into(),
+    });
+    let mut cache = MarkCache::new(9);
+    let first = cache.flip(std::slice::from_ref(&variable));
+    let signature = Syntax::make(Node::Round(vec![root("List"), variable]), &root("List")).unwrap();
+    let next = cache.flip(&[signature]);
+    let Node::Round(xs) = next[0].node() else {
+        panic!("application")
+    };
+    assert!(first[0].identical(&xs[1]));
 }

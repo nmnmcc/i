@@ -34,6 +34,9 @@ pub struct ParseStats {
 /// far as the source allows; the diagnostics say what was wrong, sorted by
 /// position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
+    if crate::syn3::enabled() {
+        return crate::syn3::parse_lowered(source);
+    }
     let (module, diags, _) = run(source, true);
     (module, diags)
 }
@@ -50,7 +53,20 @@ pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
     (module, diags)
 }
 
+/// Parses with `|>` at the level it had before syntax three stage 5: above
+/// `<>` and below `+`. Only `examples/migrate-syntax3-pipe.rs` uses it, to find the
+/// groups of an old source that other lanes add after the change.
+#[doc(hidden)]
+pub fn parse_module_old_pipe(source: &str) -> (Module, Vec<Diagnostic>) {
+    let (module, diags, _) = run_with(source, true, true);
+    (module, diags)
+}
+
 fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
+    run_with(source, cache, false)
+}
+
+fn run_with(source: &str, cache: bool, old_pipe: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
     let lexed = lex(source);
     let mut parser = Parser {
         toks: &lexed.tokens,
@@ -64,6 +80,7 @@ fn run(source: &str, cache: bool) -> (Module, Vec<Diagnostic>, ParseStats) {
         decisions: 0,
         tuple_type: false,
         cache,
+        old_pipe,
     };
     let module = parser.module();
     let stats = ParseStats {
@@ -107,6 +124,8 @@ struct Parser<'a> {
     /// clause (§7.1).
     tuple_type: bool,
     cache: bool,
+    /// The level of `|>` before syntax three stage 5 (see `parse_module_old_pipe`).
+    old_pipe: bool,
 }
 
 fn binop(kind: &T) -> Option<BinOp> {
@@ -1002,16 +1021,35 @@ impl Parser<'_> {
         self.binary(0)
     }
 
+    /// The binding level of `op` (§6.9). `|>` is the weakest.
+    fn level(&self, op: BinOp) -> u8 {
+        use BinOp::*;
+        if !self.old_pipe {
+            return op.level();
+        }
+        match op {
+            Or => 1,
+            And => 2,
+            Eq | NotEq => 3,
+            Lt | LtEq | Gt | GtEq | LtFloat | LtEqFloat | GtFloat | GtEqFloat => 4,
+            Concat => 5,
+            Pipe => 6,
+            Add | Sub | AddFloat | SubFloat => 7,
+            Mul | Div | Rem | MulFloat | DivFloat => 8,
+        }
+    }
+
     fn binary(&mut self, min: u8) -> PResult<Expr> {
         let start = self.start();
         let mut lhs = self.unary()?;
         while !self.tok().brk {
             let Some(op) = binop(self.kind()) else { break };
-            if op.level() <= min {
+            let level = self.level(op);
+            if level <= min {
                 break;
             }
             self.bump();
-            let mut rhs = self.binary(op.level())?;
+            let mut rhs = self.binary(level)?;
             if op == BinOp::Pipe
                 && let ExprKind::Clauses(_) = rhs.kind
             {
@@ -1037,7 +1075,7 @@ impl Parser<'_> {
                     ExprKind::Binary { .. } | ExprKind::Field { .. } | ExprKind::TupleIndex { .. }
                 ) && starts_with_clauses(&rhs)
                 {
-                    "a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+                    "`|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
                 } else {
                     "the right side of `|>` must be a name, a call, a function, or a clause block"
                 };
@@ -1186,6 +1224,7 @@ impl Parser<'_> {
                         decisions: 0,
                         tuple_type: false,
                         cache: self.cache,
+                        old_pipe: self.old_pipe,
                     };
                     let expression = child.expr()?;
                     child.expect(&T::Eof)?;

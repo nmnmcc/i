@@ -88,7 +88,7 @@ append = (to: String, suffix: String) -> String { to <> suffix }
 /// The strings with `with` between every two of them.
 ///
 /// ```i
-/// string.join(["a", "b", "c"], with: ", ")  // "a, b, c"
+/// string.join(["a", "b", "c"], ", ")  // "a, b, c"
 /// ```
 join = (strings: List(String), with: String) -> String {
 	core.concat(list.intersperse(strings, with))
@@ -104,8 +104,8 @@ repeat = (string: String, times: Int) -> String {
 /// `on` as `""`, it cuts between every two codepoints.
 ///
 /// ```i
-/// string.split("a,b,,c", on: ",")  // ["a", "b", "", "c"]
-/// string.split("abc", on: "")      // ["a", "b", "c"]
+/// string.split("a,b,,c", ",")  // ["a", "b", "", "c"]
+/// string.split("abc", "")      // ["a", "b", "c"]
 /// ```
 split = (string: String, on: String) -> List(String) {
 	on |> {
@@ -143,7 +143,7 @@ byte_range = (string: String, start: Int, end: Int) -> String {
 /// `on`. `None` when `on` is not in the string, or is `""`.
 ///
 /// ```i
-/// string.split_once("key=value=x", on: "=")  // Some(("key", "value=x"))
+/// string.split_once("key=value=x", "=")  // Some(("key", "value=x"))
 /// ```
 split_once = (string: String, on: String) -> Option((String, String)) {
 	on |> {
@@ -221,7 +221,7 @@ ends_with = (string: String, suffix: String) -> Bool {
 /// `""`.
 ///
 /// ```i
-/// string.contains(does: "theory", contain: "ory")  // True
+/// string.contains("theory", "ory")  // True
 /// ```
 contains = (does: String, contain: String) -> Bool {
 	core.index_of(does, contain, 0) |> {
@@ -234,7 +234,7 @@ contains = (does: String, contain: String) -> Bool {
 /// `""`, the string is the same.
 ///
 /// ```i
-/// string.replace(in: "www.example.com", each: ".", with: "-")  // "www-example-com"
+/// string.replace("www.example.com", ".", "-")  // "www-example-com"
 /// ```
 replace = (in: String, each: String, with: String) -> String {
 	each |> {
@@ -248,8 +248,8 @@ replace = (in: String, each: String, with: String) -> String {
 /// slice stops at the end of the string. A negative length gives `""`.
 ///
 /// ```i
-/// string.slice("hello", at_index: 1, length: 2)   // "el"
-/// string.slice("hello", at_index: -3, length: 2)  // "ll"
+/// string.slice("hello", 1, 2)   // "el"
+/// string.slice("hello", -3, 2)  // "ll"
 /// ```
 slice = (string: String, at_index: Int, length: Int) -> String {
 	{ length <= 0 } |> {
@@ -312,7 +312,7 @@ pop_codepoint = (string: String) -> Option((String, String)) {
 /// there, the string is the same.
 ///
 /// ```i
-/// string.crop("The Lone Ranger", before: "Lone")  // "Lone Ranger"
+/// string.crop("The Lone Ranger", "Lone")  // "Lone Ranger"
 /// ```
 crop = (from: String, before: String) -> String {
 	core.index_of(from, before, 0) |> {
@@ -412,8 +412,8 @@ padding = (length: Int, with: String) -> String {
 /// The last copy of `with` may be cut. A string that is long enough stays.
 ///
 /// ```i
-/// string.pad_left("121", to: 5, with: ".")  // "..121"
-/// string.pad_left("121", to: 6, with: "XY")  // "XYX121"
+/// string.pad_left("121", 5, ".")  // "..121"
+/// string.pad_left("121", 6, "XY")  // "XYX121"
 /// ```
 pad_left = (string: String, to: Int, with: String) -> String {
 	padding(to - length(string), with) <> string

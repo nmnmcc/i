@@ -834,8 +834,8 @@
   "crates/ilang-syntax/tests/golden/err_pipe_group.i:b21ad312873fd189": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`",
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`",
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/golden/err_pipe_target.i:f211c96492c6d0ca": {
@@ -979,19 +979,19 @@
   "crates/ilang-syntax/tests/parse.rs:04e24b46baf5040e": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:3ce334bfd693e428": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-syntax/tests/parse.rs:b6a4ae21a4ba6902": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "crates/ilang-package/tests/manifest.rs:ad4393882ff472b2": {
@@ -1310,7 +1310,7 @@
   "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -1419,7 +1419,7 @@
   "tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i:695c23c607efd2ff": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"
+      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
     ]
   },
   "tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -2208,30 +2208,6 @@
     ],
     "reason": "Render Rust format string with a representative port."
   },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:d162de7b30d5d39d": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:04a3d99efcbda47b": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `?`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:eb648ea1f46a27c1": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected a type, found `..`"
-    ]
-  },
-  "crates/ilang-syntax/examples/migrate-syntax2.rs:d29dbdfffc876b3c": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
   "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
@@ -2753,13 +2729,6 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "editors/vscode/test/sample.i:1b4b9e4de98c425f": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
   "crates/ilang-cli/src/commands/package.rs:df747cb87930f0f2": {
     "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
   },
@@ -2976,5 +2945,311 @@
   },
   "crates/ilang-cli/tests/providers.rs:94ebdef83b17a3a3": {
     "not_source": "TOML provider manifest or manifest template; i source is checked separately"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:3ba0d395ea48a08e": {
+    "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:e47b61baf95042a0": {
+    "not_source": "Rust assertion label interpolating the optimization level (O{opt})"
+  },
+  "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
+    "not_source": "Rust format template with a clause placeholder, not a complete i source"
+  },
+  "crates/ilang-check/tests/query.rs:14b48e90364d1623": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/src/server/features.rs:d942f64886578d87": {
+    "not_source": "Code action fix tag, not i source"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d942f64886578d87": {
+    "not_source": "Code action fix tag, not i source"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d2ca964c413f21c8": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:40ccea3ebc617547": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:6108f6cf17bc9fe1": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:c9130ec0e015aa50": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:5d670fc264ba0466": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:274887ecbb44aa02": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:9fa8dccc56811613": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:1418cff66c7679a7": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:02f4d82a1d1b5450": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:2b1965c1b03ffba2": {
+    "reason": "Robustness test: broken input on purpose",
+    "diagnostics": [
+      "E0010: `{` is not closed",
+      "E0010: `(` is not closed",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0010: `{` is not closed",
+      "E0101: expected a closed `{`, found `{`",
+      "E0010: `(` is not closed",
+      "E0002: this string is not closed"
+    ]
+  },
+  "docs/spec.md:a12d9a52fd631114": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "docs/spec.md:f644ea0d31f307b2": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:2f5b05034fc1229f": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
+    ]
+  },
+  "docs/spec.md:e7d9c651ae0ffea8": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
+      "E0101: expected `,` or `)`, found `?`"
+    ]
+  },
+  "docs/spec.md:912892ff09b080d5": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:6e7bc6c384edd950": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:f30f07d66d50ef70": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:8cd36264ae24baa3": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected a name, found `..`",
+      "E0101: expected `:`, found `)`"
+    ]
+  },
+  "docs/spec.md:5aae9c9a5ac4e3f9": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:fa26cd87534cb894": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`",
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:d457fbb1e446a369": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `|`"
+    ]
+  },
+  "docs/spec.md:9dd6b392676320e8": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:5a03b853ff51115c": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:d6fdfeb8cc43c346": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:3f075e37e918dad7": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `|`"
+    ]
+  },
+  "docs/spec.md:31ad23aa280e3999": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:8826291ef2e8a1ab": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:bedb60a148643970": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "docs/spec.md:f1593542964fc4e8": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
+    ]
+  },
+  "docs/spec.md:e90707beeb178a90": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<`"
+    ]
+  },
+  "docs/spec.md:a3d2992aab5bde34": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:8793f6c04245c85f": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:5db078f812d3d664": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "docs/spec.md:9305a9d9ed7d77fe": {
+    "track": "SYN3",
+    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "diagnostics": [
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
+      "E0101: expected `,` or `)`, found `=`"
+    ]
+  },
+  "crates/ilang-check/tests/alias_unions.rs:1176f1053a24405c": {
+    "not_source": "Rust format template fragment of a generated i program"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:3bb2195cc9c09f06": {
+    "not_source": "Rust format template fragment of a generated i program"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:4ff96d8c9f03da76": {
+    "not_source": "Rust format template fragment of a generated i program"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:beaaa485d82b9360": {
+    "not_source": "Rust format template fragment of a generated i program"
+  },
+  "crates/ilang-check/tests/alias_unions.rs:c4a37f2a714decb3": {
+    "not_source": "Rust format template fragment of a generated i program"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1": {
+    "not_source": "JSON object key in a serde_json macro"
+  },
+  "editors/vscode/test/sample.i:c502997562f7493a": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+    ]
+  },
+  "crates/ilang-check/src/types/typed_macro.rs:fe904007a1a28013": {
+    "not_source": "Rust formatting template for a compiler-owned opaque type-variable name; it generates an identifier, not an i module."
+  },
+  "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-cli/tests/native.rs:0ec7fda8361d6c0d": {
+    "not_source": true,
+    "reason": "i.toml manifest text in a test, not an i module."
+  },
+  "crates/ilang-cli/build.rs:1c713f59c8bfc4d7": {
+    "not_source": true,
+    "reason": "Cargo build-script directive, not an i module."
+  },
+  "crates/ilang-cli/tests/native.rs:76df5d4e33397944": {
+    "not_source": true,
+    "reason": "i.toml manifest text in a test, not an i module."
+  },
+  "crates/ilang-cli/tests/native.rs:b7dd204f0b7730c0": {
+    "not_source": true,
+    "reason": "Cargo.toml dependency text in a test, not an i module."
+  },
+  "crates/ilang-cli/build.rs:18f1e7e7ee554c11": {
+    "not_source": true,
+    "reason": "Cargo build-script directive, not an i module."
   }
 }

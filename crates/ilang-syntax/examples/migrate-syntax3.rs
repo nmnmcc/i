@@ -14,9 +14,18 @@
 //!
 //! Each subcommand is a module in `migrate-syntax3/` with a `NAME` and a
 //! `run(&Source) -> Outcome`, and one row in `SUBCOMMANDS` at the bottom.
+//!
+//! The stage 8 conversion keeps its own arguments (`migrate-syntax3/convert.rs`):
+//!
+//! ```text
+//! migrate-syntax3 convert [--write] [--ctors DIR]... FILE...
+//! migrate-syntax3 --verify [DIR...]
+//! ```
 
 #[path = "migrate-syntax3/common.rs"]
 mod common;
+#[path = "migrate-syntax3/convert.rs"]
+mod convert;
 #[path = "migrate-syntax3/types.rs"]
 mod types;
 
@@ -24,6 +33,11 @@ use common::{Migrate, Outcome};
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("convert") => std::process::exit(convert::convert_command(&args[1..])),
+        Some("--verify") => std::process::exit(convert::verify(&args[1..])),
+        _ => {}
+    }
     let check = args.first().is_some_and(|a| a == "--check");
     if check {
         args.remove(0);
@@ -88,7 +102,10 @@ fn main() {
 
 fn usage() -> ! {
     let names: Vec<_> = SUBCOMMANDS.iter().map(|(n, _)| *n).collect();
-    eprintln!("usage: migrate-syntax3 [--check] <{}> [path …]", names.join("|"));
+    eprintln!(
+        "usage: migrate-syntax3 [--check] <{}> [path …]\n       migrate-syntax3 convert [--write] [--ctors DIR]... FILE...\n       migrate-syntax3 --verify [DIR...]",
+        names.join("|")
+    );
     std::process::exit(2)
 }
 

@@ -18,6 +18,6 @@ Square {
 area = (s: Shape) -> Float {
 	s |> {
 		Circle(r)    -> 3.14 *. r *. r
-		Square(side) -> side *. side
+		Square(side = side) -> side *. side
 	}
 }

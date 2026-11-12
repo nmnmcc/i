@@ -207,12 +207,15 @@ pure(A) = (value: A) -> Parser(A) {
 }
 
 flag = (names: Names, help: String) -> Parser(Bool) {
-	Parser([Field(names.long, names.short, help, Flag)], (buckets) {
-		buckets |> {
-			[values, ..tail] -> Ok((values != [], tail))
-			[]               -> panic("cli: missing flag bucket")
+	Parser(
+		[Field(name: names.long, short: names.short, help: help, kind: Flag)]
+		(buckets) {
+			buckets |> {
+				[values, ..tail] -> Ok((values != [], tail))
+				[]               -> panic("cli: missing flag bucket")
+			}
 		}
-	})
+	)
 }
 
 convert(A) = (
@@ -223,7 +226,12 @@ convert(A) = (
 	read(token.text) |> {
 		Ok(value) -> Ok(value)
 		Error(reason) -> Error(
-			InvalidArgument(token.index, name, token.text, reason)
+			InvalidArgument(
+				index:  token.index
+				name:   name
+				text:   token.text
+				reason: reason
+			)
 		)
 	}
 }
@@ -236,7 +244,7 @@ required(A) = (
 	Parser([field], (buckets) {
 		buckets |> {
 			[]        -> panic("cli: missing required bucket")
-			[[], .._] -> Error(MissingArgument(name))
+			[[], .._] -> Error(MissingArgument(name: name))
 			[[token, .._], ..tail] -> convert(token, name, read) |> {
 				Error(error) -> Error(error)
 				Ok(value)    -> Ok((value, tail))
@@ -251,7 +259,7 @@ option(A) = (
 	read: (String) -> Result(A, String)
 ) -> Parser(A) {
 	required(
-		Field(names.long, names.short, help, Required)
+		Field(name: names.long, short: names.short, help: help, kind: Required)
 		"--" <> names.long
 		read
 	)
@@ -261,27 +269,43 @@ argument(A) = (
 	name: String
 	help: String
 	read: (String) -> Result(A, String)
-) -> Parser(A) { required(Field(name, None, help, Positional), name, read) }
+) -> Parser(A) {
+	required(
+		Field(name: name, short: None, help: help, kind: Positional)
+		name
+		read
+	)
+}
 
 optional(A) = (
 	names: Names
 	help: String
 	read: (String) -> Result(A, String)
 ) -> Parser(Option(A)) {
-	Parser([Field(names.long, names.short, help, Optional)], (buckets) {
-		buckets |> {
-			[]           -> panic("cli: missing optional bucket")
-			[[], ..tail] -> Ok((None, tail))
-			[[token, .._], ..tail] -> convert(
-				token
-				"--" <> names.long
-				read
-			) |> {
-				Error(error) -> Error(error)
-				Ok(value)    -> Ok((Some(value), tail))
+	Parser(
+		[
+			Field(
+				name:  names.long
+				short: names.short
+				help:  help
+				kind:  Optional
+			)
+		]
+		(buckets) {
+			buckets |> {
+				[]           -> panic("cli: missing optional bucket")
+				[[], ..tail] -> Ok((None, tail))
+				[[token, .._], ..tail] -> convert(
+					token
+					"--" <> names.long
+					read
+				) |> {
+					Error(error) -> Error(error)
+					Ok(value)    -> Ok((Some(value), tail))
+				}
 			}
 		}
-	})
+	)
 }
 
 convert_all(A) = (
@@ -323,7 +347,7 @@ many(A) = (
 	read: (String) -> Result(A, String)
 ) -> Parser(List(A)) {
 	repeated(
-		Field(names.long, names.short, help, Repeated)
+		Field(name: names.long, short: names.short, help: help, kind: Repeated)
 		"--" <> names.long
 		read
 	)
@@ -334,7 +358,11 @@ rest(A) = (
 	help: String
 	read: (String) -> Result(A, String)
 ) -> Parser(List(A)) {
-	repeated(Field(name, None, help, Remaining), name, read)
+	repeated(
+		Field(name: name, short: None, help: help, kind: Remaining)
+		name
+		read
+	)
 }
 
 map(A, B) = (parser: Parser(A), with: (A) -> B) -> Parser(B) {
@@ -552,16 +580,20 @@ scan = (
 							index + 1
 							options
 							buckets
-							[Token(index, raw), ..positions]
+							[Token(index: index, text: raw), ..positions]
 						)
 						True -> option_token(raw) |> {
-							None -> Error(UnknownOption(index, raw))
+							None -> Error(
+								UnknownOption(index: index, token: raw)
+							)
 							Some((name, short, attached)) -> lookup(
 								fields
 								name
 								short
 							) |> {
-								None -> Error(UnknownOption(index, raw))
+								None -> Error(
+									UnknownOption(index: index, token: raw)
+								)
 								Some((slot, field)) -> {
 									canonical = "--" <> field.name
 									{
@@ -569,14 +601,17 @@ scan = (
 											bucket_at(buckets, slot) != []
 									} |> {
 										True -> Error(
-											RepeatedOption(index, canonical)
+											RepeatedOption(
+												index: index
+												name:  canonical
+											)
 										)
 										False -> field.kind |> {
 											Flag -> attached |> {
 												Some(_) -> Error(
 													UnexpectedValue(
-														index
-														canonical
+														index: index
+														name:  canonical
 													)
 												)
 												None -> go(
@@ -586,7 +621,10 @@ scan = (
 													put(
 														buckets
 														slot
-														Token(index, raw)
+														Token(
+															index: index
+															text:  raw
+														)
 													)
 													positions
 												)
@@ -599,21 +637,24 @@ scan = (
 													put(
 														buckets
 														slot
-														Token(index, value)
+														Token(
+															index: index
+															text:  value
+														)
 													)
 													positions
 												)
 												None -> tail |> {
 													[] -> Error(
 														MissingValue(
-															index
-															canonical
+															index: index
+															name:  canonical
 														)
 													)
 													["--", .._] -> Error(
 														MissingValue(
-															index
-															canonical
+															index: index
+															name:  canonical
 														)
 													)
 													[value, ..rest] -> go(
@@ -624,8 +665,8 @@ scan = (
 															buckets
 															slot
 															Token(
-																index + 1
-																value
+																index: index + 1
+																text:  value
 															)
 														)
 														positions
@@ -658,8 +699,10 @@ allocate = (
 	) -> Result(List(List(Token)), CliError) {
 		(remaining, stored) |> {
 			([], []) -> args |> {
-				[]           -> Ok(list.reverse(acc))
-				[token, .._] -> Error(ExtraArgument(token.index, token.text))
+				[] -> Ok(list.reverse(acc))
+				[token, .._] -> Error(
+					ExtraArgument(index: token.index, token: token.text)
+				)
 			}
 			([field, ..tail], [bucket, ..rest]) -> field.kind |> {
 				Positional -> args |> {

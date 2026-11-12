@@ -3,7 +3,7 @@ S(N) {
 }
 
 use(N) = (s ! S(N)) {
-	S(f, ..) = s
+	S(f = f, ..) = s
 	f()
 }
 
@@ -13,4 +13,4 @@ wrap(N) = (svc: S(N)) {
 }
 
 
-main = () { assert(wrap(S(() { 1 })) == 1) }
+main = () { assert(wrap(S(f: () { 1 })) == 1) }

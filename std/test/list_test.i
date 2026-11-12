@@ -40,8 +40,7 @@ test("length_three_test", () {
 
 test("length_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.length()
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.length()
 	Nil
 })
 
@@ -92,8 +91,7 @@ test("reverse_five_test", () {
 
 test("reverse_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.reverse
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.reverse
 	Nil
 })
 
@@ -159,18 +157,21 @@ test("group_test", () {
 			Ok(_)    -> "Successful"
 			Error(_) -> "Failed"
 		}
-	}) == dict.new() |> dict.insert("Failed", [Error("Wrong")]) |> dict.insert("Successful", [Ok(10), Ok(200), Ok(1)]))
+	}) == {
+		dict.new()
+			|> dict.insert("Failed", [Error("Wrong")])
+			|> dict.insert("Successful", [Ok(10), Ok(200), Ok(1)])
+	})
 	Nil
 })
 
 test("group_modulo_test", () {
-	assert(
-		list.group([1, 2, 3, 4, 5], (i) { i - i / 3 * 3 }) ==
-			dict.new()
-				|> dict.insert(0, [3])
-				|> dict.insert(1, [1, 4])
-				|> dict.insert(2, [2, 5])
-	)
+	assert(list.group([1, 2, 3, 4, 5], (i) { i - i / 3 * 3 }) == {
+		dict.new()
+			|> dict.insert(0, [3])
+			|> dict.insert(1, [1, 4])
+			|> dict.insert(2, [2, 5])
+	})
 	Nil
 })
 
@@ -196,8 +197,9 @@ test("filter_less_than_test", () {
 
 test("filter_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.filter((x) { x == -1 })
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.filter((x) {
+		x == -1
+	})
 	Nil
 })
 
@@ -274,9 +276,7 @@ test("map2_tco_test", () {
 
 test("map_fold_test", () {
 	assert(
-		list.map_fold([1, 2, 3, 4], from: 0, with: (acc, i) {
-			(acc + i, i * 2)
-		}) ==
+		list.map_fold([1, 2, 3, 4], 0, (acc, i) { (acc + i, i * 2) }) ==
 			(10, [2, 4, 6, 8])
 	)
 	Nil
@@ -284,8 +284,9 @@ test("map_fold_test", () {
 
 test("map_fold_tco_test", () {
 	// TCO test
-	list.repeat(0, recursion_test_cycles)
-		|> list.map_fold(from: 0, with: (acc, i) { (acc + i, i + 1) })
+	list.repeat(0, recursion_test_cycles) |> list.map_fold(0, (acc, i) {
+		(acc + i, i + 1)
+	})
 	Nil
 })
 
@@ -472,16 +473,13 @@ test("fold_test", () {
 
 test("fold_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
+	int.range(recursion_test_cycles, -1, [], list.prepend)
 		|> list.fold([], (acc, x) { [x, ..acc] })
 	Nil
 })
 
 test("fold_right_test", () {
-	assert(
-		list.fold_right([1, 2, 3], from: [], with: (acc, x) { [x, ..acc] }) ==
-			[1, 2, 3]
-	)
+	assert(list.fold_right([1, 2, 3], [], (acc, x) { [x, ..acc] }) == [1, 2, 3])
 	Nil
 })
 
@@ -494,13 +492,13 @@ test("index_fold_test", () {
 
 test("index_fold_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
+	int.range(recursion_test_cycles, -1, [], list.prepend)
 		|> list.index_fold([], (acc, i, ix) { [(ix, i), ..acc] })
 	Nil
 })
 
 test("fold_until_test", () {
-	assert(list.fold_until([1, 2, 3, 4], from: 0, with: (acc, n) {
+	assert(list.fold_until([1, 2, 3, 4], 0, (acc, n) {
 		{ n < 4 } |> {
 			True  -> list.Continue(acc + n)
 			False -> list.Stop(acc)
@@ -560,7 +558,7 @@ test("find_map_found_test", () {
 		}
 	}
 
-	assert(list.find_map([1, 2, 3], with: f) == Some(4))
+	assert(list.find_map([1, 2, 3], f) == Some(4))
 	Nil
 })
 
@@ -572,7 +570,7 @@ test("find_map_found_different_order_test", () {
 		}
 	}
 
-	assert(list.find_map([1, 3, 2], with: f) == Some(4))
+	assert(list.find_map([1, 3, 2], f) == Some(4))
 	Nil
 })
 
@@ -584,14 +582,14 @@ test("find_map_not_found_test", () {
 		}
 	}
 
-	assert(list.find_map([1, 3], with: f) == None)
+	assert(list.find_map([1, 3], f) == None)
 	Nil
 })
 
 test("find_map_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.find_map(with: (x) {
+	int.range(recursion_test_cycles, -1, [], list.prepend)
+		|> list.find_map((x) {
 			{ x == recursion_test_cycles } |> {
 				True  -> Some(recursion_test_cycles)
 				False -> None
@@ -603,28 +601,29 @@ test("find_map_tco_test", () {
 test("find_found_test", () {
 	is_two = (x) { x == 2 }
 
-	assert(list.find([1, 2, 3], one_that: is_two) == Some(2))
+	assert(list.find([1, 2, 3], is_two) == Some(2))
 	Nil
 })
 
 test("find_found_different_order_test", () {
 	is_two = (x) { x == 2 }
 
-	assert(list.find([1, 3, 2], one_that: is_two) == Some(2))
+	assert(list.find([1, 3, 2], is_two) == Some(2))
 	Nil
 })
 
 test("find_not_found_test", () {
 	is_two = (x) { x == 2 }
 
-	assert(list.find([1, 3], one_that: is_two) == None)
+	assert(list.find([1, 3], is_two) == None)
 	Nil
 })
 
 test("find_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.find(one_that: (x) { x == recursion_test_cycles })
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.find((x) {
+		x == recursion_test_cycles
+	})
 	Nil
 })
 
@@ -695,8 +694,9 @@ test("any_short_circuit_test", () {
 
 test("any_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.any((x) { x == recursion_test_cycles })
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.any((x) {
+		x == recursion_test_cycles
+	})
 	Nil
 })
 
@@ -728,10 +728,10 @@ test("zip_shorter_first_test", () {
 test("zip_tco_test", () {
 	// TCO test
 	recursion_test_cycles_list = int.range(
-		from: recursion_test_cycles
-		to:   -1
-		with: []
-		run:  list.prepend
+		recursion_test_cycles
+		-1
+		[]
+		list.prepend
 	)
 	list.zip(recursion_test_cycles_list, recursion_test_cycles_list)
 	Nil
@@ -777,10 +777,10 @@ test("unzip_empty_test", () {
 test("unzip_tco_test", () {
 	// TCO test
 	recursion_test_cycles_list = int.range(
-		from: recursion_test_cycles
-		to:   -1
-		with: []
-		run:  list.prepend
+		recursion_test_cycles
+		-1
+		[]
+		list.prepend
 	)
 	list.zip(recursion_test_cycles_list, recursion_test_cycles_list)
 		|> list.unzip()
@@ -910,16 +910,19 @@ test("sort_stability_test", () {
 		(2, 3)
 	]
 	assert(
-		shuffled_cards
-			|> list.sort((a, b) { int.compare(a.0, b.0) })
-			|> list.sort((a, b) { int.compare(a.1, b.1) }) == sorted_cards
+		{
+			shuffled_cards
+				|> list.sort((a, b) { int.compare(a.0, b.0) })
+				|> list.sort((a, b) { int.compare(a.1, b.1) })
+		} ==
+			sorted_cards
 	)
 	Nil
 })
 
 test("sort_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
+	int.range(recursion_test_cycles, -1, [], list.prepend)
 		|> list.reverse
 		|> list.sort(int.compare)
 	Nil
@@ -1002,12 +1005,7 @@ test("split_beyond_length_test", () {
 
 test("split_tco_test", () {
 	// TCO test
-	int.range(
-		from: recursion_test_cycles + 10
-		to:   -1
-		with: []
-		run:  list.prepend
-	)
+	int.range(recursion_test_cycles + 10, -1, [], list.prepend)
 		|> list.split(recursion_test_cycles + 1)
 	Nil
 })
@@ -1131,10 +1129,10 @@ test("key_set_new_test", () {
 test("key_set_tco_test", () {
 	// TCO test
 	recursion_test_cycles_list = int.range(
-		from: recursion_test_cycles
-		to:   -1
-		with: []
-		run:  list.prepend
+		recursion_test_cycles
+		-1
+		[]
+		list.prepend
 	)
 	list.zip(recursion_test_cycles_list, recursion_test_cycles_list)
 		|> list.key_set(0, 0)
@@ -1159,7 +1157,7 @@ test("each_tco_test", () {
 })
 
 test("try_each_ok_test", () {
-	Ok(Nil) = list.try_each(over: [1, 1, 1], with: (x) {
+	Ok(Nil) = list.try_each([1, 1, 1], (x) {
 		assert(x == 1)
 		Ok(Nil)
 	})
@@ -1168,7 +1166,7 @@ test("try_each_ok_test", () {
 
 test("try_each_stops_on_error_test", () {
 	// `try_each` actually stops when `fun` returns error
-	Error(1) = list.try_each(over: [1, 2, 3], with: (x) {
+	Error(1) = list.try_each([1, 2, 3], (x) {
 		assert(x == 1)
 		Error(x)
 	})
@@ -1177,7 +1175,7 @@ test("try_each_stops_on_error_test", () {
 
 test("try_each_tco_test", () {
 	// TCO test
-	Ok(Nil) = list.repeat(1, recursion_test_cycles) |> list.try_each(with: (_) {
+	Ok(Nil) = list.repeat(1, recursion_test_cycles) |> list.try_each((_) {
 		Ok(Nil)
 	})
 	Nil
@@ -1303,7 +1301,7 @@ test("permutations_all_same_four_test", () {
 })
 
 test("window_two_test", () {
-	assert(list.window([1, 2, 3], by: 2) == [[1, 2], [2, 3]])
+	assert(list.window([1, 2, 3], 2) == [[1, 2], [2, 3]])
 	Nil
 })
 
@@ -1334,8 +1332,7 @@ test("window_negative_test", () {
 
 test("window_tco_test", () {
 	// TCO test
-	int.range(from: recursion_test_cycles, to: -1, with: [], run: list.prepend)
-		|> list.window(2)
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.window(2)
 	Nil
 })
 
@@ -1356,12 +1353,7 @@ test("drop_while_test", () {
 
 test("drop_while_tco_test", () {
 	// TCO test
-	int.range(
-		from: recursion_test_cycles + 10
-		to:   -1
-		with: []
-		run:  list.prepend
-	)
+	int.range(recursion_test_cycles + 10, -1, [], list.prepend)
 		|> list.drop_while((x) { x < recursion_test_cycles + 1 })
 	Nil
 })
@@ -1379,13 +1371,13 @@ test("take_while_tco_test", () {
 })
 
 test("chunk_test", () {
-	assert(list.chunk([1, 2, 3], by: (n) { n % 2 }) == [[1], [2], [3]])
+	assert(list.chunk([1, 2, 3], (n) { n % 2 }) == [[1], [2], [3]])
 	Nil
 })
 
 test("chunk_adjacent_test", () {
 	assert(
-		list.chunk([1, 2, 2, 3, 4, 4, 6, 7, 7], by: (n) { n % 2 }) ==
+		list.chunk([1, 2, 2, 3, 4, 4, 6, 7, 7], (n) { n % 2 }) ==
 			[[1], [2, 2], [3], [4, 4, 6], [7, 7]]
 	)
 	Nil
@@ -1399,16 +1391,13 @@ test("chunk_tco_test", () {
 })
 
 test("sized_chunk_test", () {
-	assert(
-		list.sized_chunk([1, 2, 3, 4, 5, 6], into: 2) ==
-			[[1, 2], [3, 4], [5, 6]]
-	)
+	assert(list.sized_chunk([1, 2, 3, 4, 5, 6], 2) == [[1, 2], [3, 4], [5, 6]])
 	Nil
 })
 
 test("sized_chunk_remainder_test", () {
 	assert(
-		list.sized_chunk([1, 2, 3, 4, 5, 6, 7, 8], into: 3) ==
+		list.sized_chunk([1, 2, 3, 4, 5, 6, 7, 8], 3) ==
 			[[1, 2, 3], [4, 5, 6], [7, 8]]
 	)
 	Nil
@@ -1419,30 +1408,29 @@ test("sized_chunk_tco_test", () {
 })
 
 test("reduce_empty_test", () {
-	assert(list.reduce([], with: (x, y) { x + y }) == None)
+	assert(list.reduce([], (x, y) { x + y }) == None)
 	Nil
 })
 
 test("reduce_sum_test", () {
-	assert(list.reduce([1, 2, 3, 4, 5], with: (x, y) { x + y }) == Some(15))
+	assert(list.reduce([1, 2, 3, 4, 5], (x, y) { x + y }) == Some(15))
 	Nil
 })
 
 test("scan_empty_test", () {
-	assert(list.scan([], from: 0, with: (acc, i) { i + acc }) == [])
+	assert(list.scan([], 0, (acc, i) { i + acc }) == [])
 	Nil
 })
 
 test("scan_basic_test", () {
 	assert(
-		list.scan([1, 2, 3, 4], from: 0, with: (acc, i) { 2 * i + acc }) ==
-			[2, 6, 12, 20]
+		list.scan([1, 2, 3, 4], 0, (acc, i) { 2 * i + acc }) == [2, 6, 12, 20]
 	)
 	Nil
 })
 
 test("scan_list_test", () {
-	assert(list.scan([1, 2, 3, 4], from: [], with: (acc, i) {
+	assert(list.scan([1, 2, 3, 4], [], (acc, i) {
 		int.is_even(i) |> {
 			True  -> ["Even", ..acc]
 			False -> ["Odd", ..acc]
@@ -1466,27 +1454,27 @@ test("last_ok_test", () {
 })
 
 test("combinations_zero_test", () {
-	assert(list.combinations([1, 2, 3], by: 0) == [[]])
+	assert(list.combinations([1, 2, 3], 0) == [[]])
 	Nil
 })
 
 test("combinations_one_test", () {
-	assert(list.combinations([1, 2, 3], by: 1) == [[1], [2], [3]])
+	assert(list.combinations([1, 2, 3], 1) == [[1], [2], [3]])
 	Nil
 })
 
 test("combinations_two_test", () {
-	assert(list.combinations([1, 2, 3], by: 2) == [[1, 2], [1, 3], [2, 3]])
+	assert(list.combinations([1, 2, 3], 2) == [[1, 2], [1, 3], [2, 3]])
 	Nil
 })
 
 test("combinations_three_test", () {
-	assert(list.combinations([1, 2, 3], by: 3) == [[1, 2, 3]])
+	assert(list.combinations([1, 2, 3], 3) == [[1, 2, 3]])
 	Nil
 })
 
 test("combinations_four_test", () {
-	assert(list.combinations([1, 2, 3], by: 4) == [])
+	assert(list.combinations([1, 2, 3], 4) == [])
 	Nil
 })
 
@@ -1523,8 +1511,7 @@ test("combination_pairs_four_test", () {
 
 test("combination_pairs_tco_test", () {
 	// TCO test
-	int.range(from: 200, to: -1, with: [], run: list.prepend)
-		|> list.combination_pairs()
+	int.range(200, -1, [], list.prepend) |> list.combination_pairs()
 	Nil
 })
 
@@ -1744,8 +1731,8 @@ test("min_max_test", () {
 })
 
 test("contains_any_label_test", () {
-	assert(list.contains([1, 2, 3], any: 2))
-	assert(core.not(list.contains([1, 2, 3], any: 4)))
+	assert(list.contains([1, 2, 3], 2))
+	assert(core.not(list.contains([1, 2, 3], 4)))
 })
 
 test("window_test", () {
@@ -1807,11 +1794,11 @@ test("group_tco_test", () {
 })
 
 test("labels_test", () {
-	assert(list.fold(over: [1, 2, 3], from: 0, with: int.add) == 6)
-	assert(list.map(with: (x) { x + 1 }, list: [1]) == [2])
-	assert(list.filter([1, 2, 3, 4], keeping: int.is_odd) == [1, 3])
-	assert(list.find([1, 2, 3], one_that: (x) { x > 1 }) == Some(2))
-	assert(list.take(from: [1, 2, 3], up_to: 2) == [1, 2])
+	assert(list.fold([1, 2, 3], 0, int.add) == 6)
+	assert(list.map([1], (x) { x + 1 }) == [2])
+	assert(list.filter([1, 2, 3, 4], int.is_odd) == [1, 3])
+	assert(list.find([1, 2, 3], (x) { x > 1 }) == Some(2))
+	assert(list.take([1, 2, 3], 2) == [1, 2])
 })
 
 User {
@@ -1820,12 +1807,14 @@ User {
 
 test("known_types_test", () {
 	// The field of `u` is known from the type of `list.map`, with no annotation.
-	users = [User("ann", 30), User("bob", 25)]
+	users = [User(name: "ann", age: 30), User(name: "bob", age: 25)]
 	assert(list.map(users, (u) { u.name }) == ["ann", "bob"])
-	assert(list.filter(users, (u) { u.age > 26 }) == [User("ann", 30)])
+	assert(
+		list.filter(users, (u) { u.age > 26 }) == [User(name: "ann", age: 30)]
+	)
 	assert(
 		list.sort(users, (a, b) { int.compare(a.age, b.age) }) ==
-			[User("bob", 25), User("ann", 30)]
+			[User(name: "bob", age: 25), User(name: "ann", age: 30)]
 	)
 	assert(list.fold(users, 0, (acc, u) { acc + u.age }) == 55)
 })
@@ -1835,13 +1824,13 @@ Counter {
 }
 
 Yield(A) {
-	Yield(emit: (value: A) -> Nil)
+	Yield(emit: (A) -> Nil)
 }
 
 // A generator made with `i/control` (§9.4).
 collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 	control.boundary((b) {
-		! Yield(A) = Yield((x) {
+		! Yield(A) = Yield(emit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		body()
@@ -1851,7 +1840,7 @@ collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 
 test("environment_callbacks_test", () {
 	// A callback may need a service; `list.map` passes the environment on.
-	! Counter = Counter(7)
+	! Counter = Counter(step: 7)
 	assert(list.map([1, 2, 3], (x, c ! Counter) { x + c.step }) == [8, 9, 10])
 })
 

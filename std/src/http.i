@@ -22,32 +22,17 @@
 (
 	Client(..)
 	Transport(..)
-	ResponseStream(..)
-	ClientFunctions(..)
-	BodyReader(..)
+	ResponseStream
 	native_client
 	fetch_client
 	send_stream
 	Method(..)
 	Status(..)
-	Headers
-	HeadersCase(..)
-	RawHeaders(..)
+	Headers(..)
 	Request(..)
 	Response(..)
-	HttpError
-	NeedMore(..)
-	BadMessage(..)
-	Dns(..)
-	Connect(..)
-	Tls(..)
-	Protocol(..)
-	Timeout(..)
-	StatusError(..)
-	Progress
-	More(..)
-	Complete(..)
-	Invalid(..)
+	HttpError(..)
+	Progress(..)
 	request
 	response
 	feed_request
@@ -72,10 +57,7 @@
 	body_text
 	body_json
 	body_decode
-	BodyError
-	InvalidText(..)
-	InvalidJson(..)
-	InvalidSchema(..)
+	BodyError(..)
 	send_with
 	send_timeout
 	route
@@ -104,13 +86,8 @@ Status {
 	Status(Int)
 }
 
-Headers = HeadersCase | RawHeaders
-
-HeadersCase {
+Headers {
 	Headers(List((String, String)))
-}
-
-RawHeaders {
 	RawHeaders(List((String, BitArray)))
 }
 
@@ -134,61 +111,42 @@ Response {
 	)
 }
 
-HttpError = NeedMore | BadMessage | Dns | Connect | Tls | Protocol | Timeout | StatusError
-
-NeedMore {
+HttpError {
 	NeedMore
-}
-
-BadMessage {
 	BadMessage(String)
-}
-
-Dns {
 	Dns(String)
-}
-
-Connect {
 	Connect(String)
-}
-
-Tls {
 	Tls(String)
-}
-
-Protocol {
 	Protocol(String)
-}
-
-Timeout {
 	Timeout
-}
-
-StatusError {
 	StatusError(Int)
 }
 
-Progress(A) = More | Complete(A) | Invalid
-
-More {
+Progress(A) {
 	More(BitArray)
-}
-
-Complete(A) {
 	Complete(A, BitArray)
-}
-
-Invalid {
 	Invalid(String)
 }
 
 request = (method: Method, target: String) -> Request {
-	Request(method, target, Headers([]), <<>>, Headers([]))
+	Request(
+		method:   method
+		target:   target
+		headers:  Headers([])
+		body:     <<>>
+		trailers: Headers([])
+	)
 }
 
 response = (status: Status) -> Response {
 	Status(n) = status
-	Response(status, reason(n), Headers([]), <<>>, Headers([]))
+	Response(
+		status:   status
+		reason:   reason(n)
+		headers:  Headers([])
+		body:     <<>>
+		trailers: Headers([])
+	)
 }
 
 header = (hs: Headers, name: String) -> Option(String) {
@@ -363,7 +321,16 @@ parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ^ HttpError {
 			)
 			(hs, after) = read_headers(rest, [])
 			validate_framing(hs)
-			(Request(Method(method), target, hs, <<>>, Headers([])), after)
+			(
+				Request(
+					method:   Method(method)
+					target:   target
+					headers:  hs
+					body:     <<>>
+					trailers: Headers([])
+				)
+				after
+			)
 		}
 		_ -> fail.raise(BadMessage("invalid request line"))
 	}
@@ -412,7 +379,16 @@ parse_response_for = (
 			False -> read_body(hs, after)
 		}
 	}
-	(Response(Status(code), text(phrase), hs, body, trailers), tail)
+	(
+		Response(
+			status:   Status(code)
+			reason:   text(phrase)
+			headers:  hs
+			body:     body
+			trailers: trailers
+		)
+		tail
+	)
 }
 
 read_headers = (
@@ -951,7 +927,7 @@ lowercase = (s: String) -> String {
 /// Buffered request handler, built on the incremental body reader.
 serve = (listener, handler) {
 	serve_stream(listener, (req: Request, reader) {
-		body = collect_body((read: reader.read), [])
+		body = collect_body(reader, [])
 		handler(Request(..req, body: body, trailers: reader.trailers()))
 	})
 }
@@ -1000,12 +976,12 @@ connection_loop = (stream, handler, buffer) {
 				task.scope((_) {
 					cursor = task.ref(
 						BodyCursor(
-							rest
-							request_framing(req.headers)
-							Headers([])
+							buffer:   rest
+							framing:  request_framing(req.headers)
+							trailers: Headers([])
 						)
 					)
-					reader = BodyReader(
+					reader = (
 						read: (max: Int) {
 							read_request_piece(stream, cursor, max)
 						}
@@ -1027,7 +1003,7 @@ connection_loop = (stream, handler, buffer) {
 						Error(BadMessage(why)) -> fail.raise(BadMessage(why))
 						Error(_)               -> response(Status(500))
 					}
-					drain_body((read: reader.read))
+					drain_body(reader)
 					tail = task.update(cursor, (state) {
 						(state, state.buffer)
 					})
@@ -1074,34 +1050,23 @@ write_server_reply = (stream, res: Response, closing: Bool) {
 	net.write(
 		stream
 		serialize_response(
-			Response(res.status, res.reason, hs, res.body, res.trailers)
+			Response(
+				status:   res.status
+				reason:   res.reason
+				headers:  hs
+				body:     res.body
+				trailers: res.trailers
+			)
 		)
 	)
 }
 
-BodyFraming = Remaining | ChunkSize | ChunkData | ChunkEnd | ChunkTrailers | BodyDone
-
-Remaining {
+BodyFraming {
 	Remaining(Int)
-}
-
-ChunkSize {
 	ChunkSize
-}
-
-ChunkData {
 	ChunkData(Int)
-}
-
-ChunkEnd {
 	ChunkEnd
-}
-
-ChunkTrailers {
 	ChunkTrailers
-}
-
-BodyDone {
 	BodyDone
 }
 
@@ -1211,7 +1176,14 @@ body_piece = (stream, state: BodyCursor, max: Int) {
 			Error(error) -> fail.raise(error)
 			Ok((trailers, rest)) -> {
 				valid_trailers(trailers)
-				(<<>>, BodyCursor(bits(rest), BodyDone, trailers))
+				(
+					<<>>
+					BodyCursor(
+						buffer:   bits(rest)
+						framing:  BodyDone
+						trailers: trailers
+					)
+				)
 			}
 		}
 	}
@@ -1240,42 +1212,31 @@ drain_body = (reader) {
 }
 
 // Target providers capture transport services; callers retain one principal type.
-ResponseStream {
-	ResponseStream(
-		head: Response
-		read: (
-			max: Int
-		) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	)
-}
+ResponseStream = (
+	head: Response
+	read: (
+		Int
+	) -> BitArray ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+)
 
-/// The body of a request that a handler reads (a custom type: records whose
-/// function fields give a large error union do not check, see
-/// docs/design/syn3-stage3-report.md).
-BodyReader(E, N, M) {
-	BodyReader(read: (max: Int) -> BitArray ^ E ! N, trailers: () -> Headers ! M)
-}
-
-ClientFunctions {
-	ClientFunctions(
-		stream: (
-			req: Request
-		) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-		send: (
-			req: Request
-		) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
-	)
-}
+ClientFunctions = (
+	stream: (
+		Request
+	) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	send: (
+		Request
+	) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+	close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
+)
 
 Transport {
 	Transport(
 		stream: (
-			req: Request
+			Request
 		) -> ResponseStream ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
 		send: (
-			req: Request
+			Request
 		) -> Response ^ HttpError ! requests.Await | requests.Owner | task.Scheduler | task.Runner
 		close: () -> Nil ! requests.Await | requests.Owner | task.Scheduler | task.Runner
 	)
@@ -1295,7 +1256,7 @@ native_client = (n ! net.Net, t ! tls.Tls) {
 			! tls.Tls = t
 			res = provider.send(req)
 			cursor = task.ref(res.body)
-			ResponseStream(head: res, read: (max) {
+			(head: res, read: (max) {
 				{ max <= 0 } |> {
 					True  -> fail.raise(Protocol("invalid read size"))
 					False -> Nil
@@ -1331,7 +1292,7 @@ client = (
 	c ! Client
 ) -> ClientFunctions ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
 	t = c.make()
-	ClientFunctions(stream: t.stream, send: t.send, close: t.close)
+	(stream: t.stream, send: t.send, close: t.close)
 }
 
 send = (
@@ -1389,8 +1350,14 @@ fetch_stream = (req: Request, f ! fetch.Fetch) {
 	status = fetch_reply(() { fetch.status(id) })
 	encoded = fetch_reply(() { fetch.headers(id) })
 	hs = Headers(fetch_headers(string.split(encoded, "\u{0}")))
-	ResponseStream(
-		head: Response(Status(status), reason(status), hs, <<>>, Headers([]))
+	(
+		head: Response(
+			status:   Status(status)
+			reason:   reason(status)
+			headers:  hs
+			body:     <<>>
+			trailers: Headers([])
+		)
 		read: (max) {
 			! fetch.Fetch = f
 			fetch_reply(() { fetch.read(id, max) })
@@ -1415,11 +1382,11 @@ fetch_client = (f ! fetch.Fetch) {
 			resource.ensure(() {
 				h = reader.head
 				Response(
-					h.status
-					h.reason
-					h.headers
-					collect_body((read: reader.read), [])
-					h.trailers
+					status:   h.status
+					reason:   h.reason
+					headers:  h.headers
+					body:     collect_body(reader, [])
+					trailers: h.trailers
 				)
 			}, reader.close)
 		}, close: () { Nil })
@@ -1435,17 +1402,12 @@ send_stream = (
 
 /// A provider is a record containing a send function, so callers can replace it.
 network_client = () {
-	pool = task.ref(Pool([], []))
+	pool = task.ref(Pool(idle: [], released: []))
 	(send: (req) { follow(pool, req, 0) }, close: () { close_client(pool) })
 }
 
-Connection = Plain | Secure
-
-Plain {
+Connection {
 	Plain(net.Stream)
-}
-
-Secure {
 	Secure(tls.Stream)
 }
 
@@ -1475,7 +1437,9 @@ close_connection = (connection: Connection) {
 }
 
 close_client = (pool: task.Ref(Pool)) {
-	idle = task.update(pool, (state) { (Pool([], state.released), state.idle) })
+	idle = task.update(pool, (state) {
+		(Pool(idle: [], released: state.released), state.idle)
+	})
 	list.each(idle, (entry) { close_connection(entry.connection) })
 }
 
@@ -1509,7 +1473,15 @@ post = (
 	url: String
 	body: BitArray
 ) -> Response ^ HttpError ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
-	send(Request(Method("POST"), url, Headers([]), body, Headers([])))
+	send(
+		Request(
+			method:   Method("POST")
+			target:   url
+			headers:  Headers([])
+			body:     body
+			trailers: Headers([])
+		)
+	)
 }
 
 body_text = (res: Response) { bit_array.to_string(res.body) }
@@ -1545,30 +1517,35 @@ follow = (pool: task.Ref(Pool), req: Request, count: Int) {
 						True -> follow(
 							pool
 							Request(
-								Method("GET")
-								url
-								redirect_headers(req.headers, base, next, True)
-								<<>>
-								Headers([])
+								method: Method("GET")
+								target: url
+								headers: redirect_headers(
+									req.headers
+									base
+									next
+									True
+								)
+								body:     <<>>
+								trailers: Headers([])
 							)
 							count + 1
 						)
 						False -> follow(
 							pool
 							Request(
-								req.method
-								url
-								redirect_headers(
+								method: req.method
+								target: url
+								headers: redirect_headers(
 									req.headers
 									base
 									next
 									drop_body
 								)
-								{ drop_body } |> {
+								body: { drop_body } |> {
 									True  -> <<>>
 									False -> req.body
 								}
-								{ drop_body } |> {
+								trailers: { drop_body } |> {
 									True  -> Headers([])
 									False -> req.trailers
 								}
@@ -1658,22 +1635,28 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 		None    -> add_header(req.headers, "Host", host_header)
 	}
 	wire = serialize_request(
-		Request(req.method, target, hs, req.body, req.trailers)
+		Request(
+			method:   req.method
+			target:   target
+			headers:  hs
+			body:     req.body
+			trailers: req.trailers
+		)
 	)
 	cached = task.update(pool, (state) {
 		(rest, found) = pool_take(state.idle, secure, lowercase(hostname), port)
-		(Pool(rest, state.released), found)
+		(Pool(idle: rest, released: state.released), found)
 	})
 	result = cached |> {
 		None -> fail.catch(() {
 			exchange(
 				pool
 				Idle(
-					secure
-					lowercase(hostname)
-					port
-					dial(secure, hostname, port)
-					<<>>
+					secure:     secure
+					host:       lowercase(hostname)
+					port:       port
+					connection: dial(secure, hostname, port)
+					buffer:     <<>>
 				)
 				req
 				wire
@@ -1685,11 +1668,11 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 					exchange(
 						pool
 						Idle(
-							secure
-							lowercase(hostname)
-							port
-							dial(secure, hostname, port)
-							<<>>
+							secure:     secure
+							host:       lowercase(hostname)
+							port:       port
+							connection: dial(secure, hostname, port)
+							buffer:     <<>>
 						)
 						req
 						wire
@@ -1708,12 +1691,14 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 
 dial = (secure: Bool, hostname: String, port: Int) {
 	fail.catch(() { net.resolve(hostname) }) |> {
-		Ok(_)                                          -> Nil
-		Error(net.NetError(operation, endpoint, code)) -> fail.raise(Dns(code))
+		Ok(_) -> Nil
+		Error(net.NetError(operation = operation, endpoint = endpoint, code = code)) -> fail.raise(
+			Dns(code)
+		)
 	}
 	stream = fail.catch(() { net.connect(hostname, port) }) |> {
 		Ok(value) -> value
-		Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+		Error(net.NetError(operation = operation, endpoint = endpoint, code = code)) -> fail.raise(
 			Connect(code)
 		)
 	}
@@ -1723,7 +1708,7 @@ dial = (secure: Bool, hostname: String, port: Int) {
 			tls.connect(stream, hostname, (..tls.options(), alpn: ["http/1.1"]))
 		}) |> {
 			Ok(value) -> Secure(value)
-			Error(tls.TlsError(stage, reason)) -> {
+			Error(tls.TlsError(stage = stage, reason = reason)) -> {
 				net.close_stream(stream)
 				fail.raise(Tls(reason))
 			}
@@ -1751,8 +1736,8 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 			True -> task.update(pool, (state) {
 				(
 					Pool(
-						[Idle(..entry, buffer: rest), ..state.idle]
-						[lease, ..state.released]
+						idle:     [Idle(..entry, buffer: rest), ..state.idle]
+						released: [lease, ..state.released]
 					)
 					Nil
 				)
@@ -1763,9 +1748,12 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 	}, () {
 		released = task.update(pool, (state) {
 			(
-				Pool(state.idle, list.filter(state.released, (key) {
-					key != lease
-				}))
+				Pool(
+					idle: state.idle
+					released: list.filter(state.released, (key) {
+						key != lease
+					})
+				)
 				list.contains(state.released, lease)
 			)
 		})
@@ -1808,17 +1796,9 @@ read_progress = (transport, method, buffer, eof) {
 	}
 }
 
-BodyError = InvalidText | InvalidJson | InvalidSchema
-
-InvalidText {
+BodyError {
 	InvalidText
-}
-
-InvalidJson {
 	InvalidJson(json.JsonError)
-}
-
-InvalidSchema {
 	InvalidSchema(schema.SchemaError)
 }
 
@@ -1898,14 +1878,14 @@ net_transport = (stream) {
 	(read: (max) {
 		fail.catch(() { net.read(stream, max) }) |> {
 			Ok(value) -> value
-			Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+			Error(net.NetError(operation = operation, endpoint = endpoint, code = code)) -> fail.raise(
 				Connect(code)
 			)
 		}
 	}, write: (bytes) {
 		fail.catch(() { net.write(stream, bytes) }) |> {
 			Ok(value) -> value
-			Error(net.NetError(operation, endpoint, code)) -> fail.raise(
+			Error(net.NetError(operation = operation, endpoint = endpoint, code = code)) -> fail.raise(
 				Connect(code)
 			)
 		}
@@ -1915,13 +1895,17 @@ net_transport = (stream) {
 tls_transport = (stream) {
 	(read: (max) {
 		fail.catch(() { tls.read(stream, max) }) |> {
-			Ok(value)                          -> value
-			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+			Ok(value) -> value
+			Error(tls.TlsError(stage = stage, reason = reason)) -> fail.raise(
+				Tls(reason)
+			)
 		}
 	}, write: (bytes) {
 		fail.catch(() { tls.write(stream, bytes) }) |> {
-			Ok(value)                          -> value
-			Error(tls.TlsError(stage, reason)) -> fail.raise(Tls(reason))
+			Ok(value) -> value
+			Error(tls.TlsError(stage = stage, reason = reason)) -> fail.raise(
+				Tls(reason)
+			)
 		}
 	})
 }

@@ -13,6 +13,8 @@ pub mod order;
 pub mod providers;
 pub mod query;
 pub mod resolve;
+pub mod syn3_facts;
+pub mod typed_macro;
 pub mod types;
 mod unused;
 
@@ -139,6 +141,7 @@ pub struct Parsed {
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
     pub compiler_generated: bool,
+    pub typed_macros: Option<std::sync::Arc<dyn typed_macro::Expander>>,
 }
 
 /// Parses every module of the graph. Syntax errors keep their codes.
@@ -166,6 +169,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 ast,
                 scoped: None,
                 compiler_generated: false,
+                typed_macros: None,
             });
         }
     }
@@ -324,7 +328,7 @@ fn check_resolved(
 
 pub fn check_resolved_selected(
     graph: &PackageGraph,
-    program: Option<hir::Program>,
+    mut program: Option<hir::Program>,
     mut diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
 ) -> Checked {
@@ -340,6 +344,9 @@ pub fn check_resolved_selected(
         }
         _ => None,
     };
+    if let (Some(p), Some(typed)) = (&mut program, &types) {
+        typed_macro::apply(p, typed);
+    }
     if let Some(p) = &program {
         map_expansion_diagnostics(p, &graph.sources, &mut diags);
     }
@@ -367,6 +374,8 @@ pub fn check_selected_many(
     selected: &[(hir::DefId, bool)],
 ) -> (types::Typed, Vec<Diagnostic>) {
     let (typed, mut diags) = types::check_selected(program, &graph.sources, selected);
+    typed_macro::restore(program);
+    typed_macro::apply(program, &typed);
     let targets: Vec<_> = selected.iter().map(|(target, _)| *target).collect();
     capabilities::check_selected(program, graph, &targets, &mut diags);
     map_expansion_diagnostics(program, &graph.sources, &mut diags);

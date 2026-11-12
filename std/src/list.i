@@ -152,7 +152,7 @@ is_empty(A) = (list: List(A)) -> Bool { list == [] }
 /// `True` when an element is `==` to `any`.
 ///
 /// ```i
-/// list.contains([1, 2], any: 2)  // True
+/// list.contains([1, 2], 2)  // True
 /// ```
 contains(A) = (list: List(A), any: A) -> Bool {
 	list |> {
@@ -224,7 +224,7 @@ index_of(A) = (list: List(A), item: A) -> Option(Int) {
 /// keeps the elements in the order of the list.
 ///
 /// ```i
-/// list.group([1, 2, 3, 4], by: (x) { x % 2 })  // {1 -> [1, 3], 0 -> [2, 4]}
+/// list.group([1, 2, 3, 4], (x) { x % 2 })  // {1 -> [1, 3], 0 -> [2, 4]}
 /// ```
 group(V, K, E, N) = (
 	list: List(V)
@@ -234,7 +234,7 @@ group(V, K, E, N) = (
 /// Keeps the elements for which the function gives `True`, in order.
 ///
 /// ```i
-/// list.filter([1, 2, 3, 4], keeping: int.is_even)  // [2, 4]
+/// list.filter([1, 2, 3, 4], int.is_even)  // [2, 4]
 /// ```
 filter(A, E, N) = (
 	list: List(A)
@@ -313,7 +313,7 @@ map2(A, B, C, E, N) = (
 /// next. Gives the last accumulator and the new list.
 ///
 /// ```i
-/// list.map_fold([1, 2, 3], from: 100, with: (acc, x) { (acc + x, x * 2) })
+/// list.map_fold([1, 2, 3], 100, (acc, x) { (acc + x, x * 2) })
 /// // (106, [2, 4, 6])
 /// ```
 map_fold(A, Acc, B, E, N) = (
@@ -375,7 +375,7 @@ try_map(A, B, F, E, N) = (
 /// the empty list.
 ///
 /// ```i
-/// list.drop([1, 2, 3, 4], up_to: 2)  // [3, 4]
+/// list.drop([1, 2, 3, 4], 2)  // [3, 4]
 /// ```
 drop(A) = (from: List(A), up_to: Int) -> List(A) {
 	{ up_to <= 0 } |> {
@@ -390,7 +390,7 @@ drop(A) = (from: List(A), up_to: Int) -> List(A) {
 /// The first `up_to` elements. When the list is shorter, the whole list.
 ///
 /// ```i
-/// list.take([1, 2, 3, 4], up_to: 2)  // [1, 2]
+/// list.take([1, 2, 3, 4], 2)  // [1, 2]
 /// ```
 take(A) = (from: List(A), up_to: Int) -> List(A) {
 	go = (rest, n, acc) {
@@ -459,7 +459,7 @@ flat_map(A, B, E, N) = (
 /// Combines the elements with an accumulator, from the first to the last.
 ///
 /// ```i
-/// list.fold([1, 2, 3], from: 0, with: (acc, x) { acc + x })  // 6
+/// list.fold([1, 2, 3], 0, (acc, x) { acc + x })  // 6
 /// ```
 fold(A, Acc, E, N) = (
 	over: List(A)
@@ -475,7 +475,7 @@ fold(A, Acc, E, N) = (
 /// Combines the elements with an accumulator, from the last to the first.
 ///
 /// ```i
-/// list.fold_right([1, 2, 3], from: [], with: (acc, x) { [x, ..acc] })  // [1, 2, 3]
+/// list.fold_right([1, 2, 3], [], (acc, x) { [x, ..acc] })  // [1, 2, 3]
 /// ```
 fold_right(A, Acc, E, N) = (
 	over: List(A)
@@ -502,7 +502,7 @@ index_fold(A, Acc, E, N) = (
 /// first `Error`.
 ///
 /// ```i
-/// list.try_fold([1, 2, 3], from: 0, with: (acc, x) { Ok(acc + x) })  // Ok(6)
+/// list.try_fold([1, 2, 3], 0, (acc, x) { Ok(acc + x) })  // Ok(6)
 /// ```
 try_fold(A, Acc, F, E, N) = (
 	over: List(A)
@@ -522,7 +522,7 @@ try_fold(A, Acc, F, E, N) = (
 /// stop (`Stop`).
 ///
 /// ```i
-/// list.fold_until([1, 2, 3, 4], from: 0, with: (acc, x) {
+/// list.fold_until([1, 2, 3, 4], 0, (acc, x) {
 ///   { x < 3 } |> { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
 /// })  // 3
 /// ```
@@ -543,7 +543,7 @@ fold_until(A, Acc, E, N) = (
 /// The first element for which the function gives `True`, or `None`.
 ///
 /// ```i
-/// list.find([1, 2, 3], one_that: (x) { x > 1 })  // Some(2)
+/// list.find([1, 2, 3], (x) { x > 1 })  // Some(2)
 /// ```
 find(A, E, N) = (
 	in: List(A)
@@ -636,7 +636,7 @@ unzip(A, B) = (input: List((A, B))) -> (List(A), List(B)) {
 /// Puts `with` between every two elements.
 ///
 /// ```i
-/// list.intersperse([1, 2, 3], with: 0)  // [1, 0, 2, 0, 3]
+/// list.intersperse([1, 2, 3], 0)  // [1, 0, 2, 0, 3]
 /// ```
 intersperse(A) = (list: List(A), with: A) -> List(A) {
 	list |> {
@@ -677,7 +677,7 @@ unique(A) = (list: List(A)) -> List(A) {
 /// steps, and which starts from the runs that are already in order.
 ///
 /// ```i
-/// list.sort([3, 1, 2], by: int.compare)  // [1, 2, 3]
+/// list.sort([3, 1, 2], int.compare)  // [1, 2, 3]
 /// ```
 sort(A, E, N) = (
 	list: List(A)
@@ -807,7 +807,7 @@ range = (from: Int, to: Int) -> List(Int) {
 /// A list of `times` copies of `item`.
 ///
 /// ```i
-/// list.repeat("a", times: 3)  // ["a", "a", "a"]
+/// list.repeat("a", 3)  // ["a", "a", "a"]
 /// ```
 repeat(A) = (item: A, times: Int) -> List(A) {
 	go = (n, acc) {
@@ -822,7 +822,7 @@ repeat(A) = (item: A, times: Int) -> List(A) {
 /// The first `at` elements, and the rest.
 ///
 /// ```i
-/// list.split([1, 2, 3, 4], at: 1)  // ([1], [2, 3, 4])
+/// list.split([1, 2, 3, 4], 1)  // ([1], [2, 3, 4])
 /// ```
 split(A) = (list: List(A), at: Int) -> (List(A), List(A)) {
 	go = (rest, n, acc) {
@@ -1000,7 +1000,7 @@ permutations(A) = (list: List(A)) -> List(List(A)) {
 /// Every run of `by` elements that come one after the other, in order.
 ///
 /// ```i
-/// list.window([1, 2, 3, 4], by: 2)  // [[1, 2], [2, 3], [3, 4]]
+/// list.window([1, 2, 3, 4], 2)  // [[1, 2], [2, 3], [3, 4]]
 /// ```
 window(A) = (list: List(A), by: Int) -> List(List(A)) {
 	{ by <= 0 } |> {
@@ -1069,7 +1069,7 @@ take_while(A, E, N) = (
 /// function gives the same key.
 ///
 /// ```i
-/// list.chunk([1, 2, 2, 3, 4, 4, 6], by: (x) { x % 2 })
+/// list.chunk([1, 2, 2, 3, 4, 4, 6], (x) { x % 2 })
 /// // [[1], [2, 2], [3], [4, 4, 6]]
 /// ```
 chunk(A, K, E, N) = (
@@ -1100,7 +1100,7 @@ chunk(A, K, E, N) = (
 /// shorter. When `into` is 0 or less, the empty list.
 ///
 /// ```i
-/// list.sized_chunk([1, 2, 3, 4, 5], into: 2)  // [[1, 2], [3, 4], [5]]
+/// list.sized_chunk([1, 2, 3, 4, 5], 2)  // [[1, 2], [3, 4], [5]]
 /// ```
 sized_chunk(A) = (in: List(A), into: Int) -> List(List(A)) {
 	{ into <= 0 } |> {
@@ -1132,7 +1132,7 @@ sized_chunk(A) = (in: List(A), into: Int) -> List(List(A)) {
 /// the first element as the start. `None` for the empty list.
 ///
 /// ```i
-/// list.reduce([1, 2, 3], with: (a, b) { a + b })  // Some(6)
+/// list.reduce([1, 2, 3], (a, b) { a + b })  // Some(6)
 /// ```
 reduce(A, E, N) = (
 	over: List(A)
@@ -1147,7 +1147,7 @@ reduce(A, E, N) = (
 /// Like `fold`, but gives every accumulator after each element.
 ///
 /// ```i
-/// list.scan([1, 2, 3], from: 0, with: (acc, x) { acc + x })  // [1, 3, 6]
+/// list.scan([1, 2, 3], 0, (acc, x) { acc + x })  // [1, 3, 6]
 /// ```
 scan(A, Acc, E, N) = (
 	over: List(A)
@@ -1169,7 +1169,7 @@ scan(A, Acc, E, N) = (
 /// Every way to choose `by` elements, keeping their order.
 ///
 /// ```i
-/// list.combinations([1, 2, 3], by: 2)  // [[1, 2], [1, 3], [2, 3]]
+/// list.combinations([1, 2, 3], 2)  // [[1, 2], [1, 3], [2, 3]]
 /// ```
 combinations(A) = (items: List(A), by: Int) -> List(List(A)) {
 	{ by <= 0 } |> {

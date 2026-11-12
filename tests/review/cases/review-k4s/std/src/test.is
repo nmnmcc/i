@@ -1,14 +1,100 @@
 (, (= syntax (/ i syntax)) (= int (/ std int)))
 (, tests test skip only fails suite each)
 (= tests Nil)
-(= text (-> (x) _ {(| ((. syntax node) x) {(-> ((. syntax Node) ((. syntax Text) s)) s) (-> _ (panic "test name must be a string literal"))})}))
-(= _entry (-> (name body mode (! items (. syntax Items))) _ {(= target `generated_test) ((. items add) `tests target [(, "name" (text name)) (, "mode" mode)] name) `(= ~target (-> () _ {(~body)}))}))
-(@ macro (= test (-> (name body (! items (. syntax Items))) _ {(_entry name body "test")})))
-(@ macro (= skip (-> (name body (! items (. syntax Items))) _ {(_entry name body "skip")})))
-(@ macro (= only (-> (name body (! items (. syntax Items))) _ {(_entry name body "only")})))
-(@ macro (= fails (-> (name body (! items (. syntax Items))) _ {(_entry name body "fails")})))
-(= append (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))
-(= suite_items (-> (prefix statements env) _ {(| statements {(-> [] []) (-> [statement .. rest] (| statement {(-> `(! ~service ~value) (suite_items prefix rest (append env [statement]))) (-> `(suite ~name (-> () _ {~..children})) (append (suite_items (<> (<> prefix (text name)) " / ") children env) (suite_items prefix rest env))) (-> `((. ~module suite) ~name (-> () _ {~..children})) (append (suite_items (<> (<> prefix (text name)) " / ") children env) (suite_items prefix rest env))) (-> `(~callee ~name ~cases ~body) {(= full ((. syntax make) ((. syntax Node) ((. syntax Text) (<> prefix (text name)))) name)) (= wrapped `(-> (case_value) _ {~..env (~body case_value)})) [`(~callee ~full ~cases ~wrapped) .. (suite_items prefix rest env)]}) (-> `(~callee ~name ~body) {(= full ((. syntax make) ((. syntax Node) ((. syntax Text) (<> prefix (text name)))) name)) (= wrapped `(-> () _ {~..env (~body)})) [`(~callee ~full ~wrapped) .. (suite_items prefix rest env)]}) (-> _ (panic "suite body expects tests, suites, and environment statements"))}))})}))
-(@ macro (= suite (-> (name body) _ {(| body {(-> `(-> () _ {~..statements}) `{~..(suite_items (<> (text name) " / ") statements [])}) (-> _ (panic "suite body must be a zero-argument function"))})})))
-(= case_items (-> (prefix cases body index (! items (. syntax Items))) _ {(| cases {(-> [] []) (-> [case .. rest] (| case {(-> `(, ~name ~value) {(= full ((. syntax make) ((. syntax Node) ((. syntax Text) (<> (<> prefix " / ") (text name)))) name)) (= target ((. syntax make) ((. syntax Node) ((. syntax Name) (<> "generated_test_" ((. int to_string) index)))) `generated_test)) ((. items add) `tests target [(, "name" (text full)) (, "mode" "test")] name) [`(= ~target (-> () _ {(~body ~value)})) .. (case_items prefix rest body (+ index 1))]}) (-> _ (panic "each case must be a (name, value) tuple"))}))})}))
-(@ macro (= each (-> (name cases body (! items (. syntax Items))) _ {(| cases {(-> `[~..values] `{~..(case_items (text name) values body 0)}) (-> _ (panic "each expects a list of cases"))})})))
+(= text
+  (-> (x) _
+    {(| ((. syntax node) x)
+       {(-> ((. syntax Node) ((. syntax Text) s)) s)
+        (-> _ (panic "test name must be a string literal"))})}))
+(= _entry
+  (-> (name body mode (! items (. syntax Items))) _
+    {(= target `generated_test)
+     ((. items add) `tests target [(, "name" (text name)) (, "mode" mode)] name)
+     `(= ~target (-> () _ {(~body)}))}))
+(@ macro
+  (= test
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "test")})))
+(@ macro
+  (= skip
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "skip")})))
+(@ macro
+  (= only
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "only")})))
+(@ macro
+  (= fails
+    (-> (name body (! items (. syntax Items))) _ {(_entry name body "fails")})))
+(= append
+  (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))
+(= suite_items
+  (-> (prefix statements env) _
+    {(| statements
+       {(-> [] [])
+        (-> [statement .. rest]
+          (| statement
+            {(-> `(! ~service ~value)
+               (suite_items prefix rest (append env [statement])))
+             (-> `(suite ~name (-> () _ {~..children}))
+               (append
+                (suite_items (<> (<> prefix (text name)) " / ") children env)
+                (suite_items prefix rest env)))
+             (-> `((. ~module suite) ~name (-> () _ {~..children}))
+               (append
+                (suite_items (<> (<> prefix (text name)) " / ") children env)
+                (suite_items prefix rest env)))
+             (-> `(~callee ~name ~cases ~body)
+               {(= full
+                  ((. syntax make)
+                   ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
+                   name))
+                (= wrapped `(-> (case_value) _ {~..env (~body case_value)}))
+                [`(~callee ~full ~cases ~wrapped)
+                 ..
+                 (suite_items prefix rest env)]})
+             (-> `(~callee ~name ~body)
+               {(= full
+                  ((. syntax make)
+                   ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
+                   name))
+                (= wrapped `(-> () _ {~..env (~body)}))
+                [`(~callee ~full ~wrapped) .. (suite_items prefix rest env)]})
+             (-> _
+               (panic
+                "suite body expects tests, suites, and environment statements"))}))})}))
+(@ macro
+  (= suite
+    (-> (name body) _
+      {(| body
+         {(-> `(-> () _ {~..statements})
+            `{~..(suite_items (<> (text name) " / ") statements [])})
+          (-> _ (panic "suite body must be a zero-argument function"))})})))
+(= case_items
+  (-> (prefix cases body index (! items (. syntax Items))) _
+    {(| cases
+       {(-> [] [])
+        (-> [case .. rest]
+          (| case
+            {(-> `(, ~name ~value)
+               {(= full
+                  ((. syntax make)
+                   ((. syntax Node) ((. syntax Text) (<> (<> prefix " / ") (text name))))
+                   name))
+                (= target
+                  ((. syntax make)
+                   ((. syntax Name)
+                    (<> "generated_test_" ((. int to_string) index)))
+                   `generated_test))
+                ((. items add)
+                 `tests
+                 target
+                 [(, "name" (text full)) (, "mode" "test")]
+                 name)
+                [`(= ~target (-> () _ {(~body ~value)}))
+                 ..
+                 (case_items prefix rest body (+ index 1))]})
+             (-> _ (panic "each case must be a (name, value) tuple"))}))})}))
+(@ macro
+  (= each
+    (-> (name cases body (! items (. syntax Items))) _
+      {(| cases
+         {(-> `[~..values] `{~..(case_items (text name) values body 0)})
+          (-> _ (panic "each expects a list of cases"))})})))

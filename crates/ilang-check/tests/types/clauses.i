@@ -23,7 +23,7 @@ map = (opts: List(Option(User))) {
 list_map(A, B) = (xs: List(A), f: (A) -> B) {
   xs |> { [] -> []  [x, ..rest] -> [f(x), ..list_map(rest, f)] }
 }
-expected = () { (u) { u.name } |> { f: (User) -> String -> f(User("bob")) } }
+expected = () { (u) { u.name } |> { f: (User) -> String -> f(User(name: "bob")) } }
 f = (x) { x + 1 }
 subject_scope = () { (x) { f(x) * 2 } |> { f -> f(1) } }
 empty = (x: Never) { x |> {} }

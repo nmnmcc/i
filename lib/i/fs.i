@@ -65,17 +65,17 @@ Metadata {
 @host("i:fs/v1", "request")
 Fs {
 	Fs(
-		open:     (path: String, mode: String) -> Request(Result(Int, String))
-		read:     (file: Int, max_bytes: Int) -> Request(Result(BitArray, String))
-		write:    (file: Int, bytes: BitArray) -> Request(Result(Nil, String))
-		flush:    (file: Int) -> Request(Result(Nil, String))
-		close:    (file: Int) -> Request(Nil)
-		remove:   (path: String) -> Request(Result(Nil, String))
-		rename:   (from: String, to: String) -> Request(Result(Nil, String))
-		mkdir:    (path: String) -> Request(Result(Nil, String))
-		list:     (path: String) -> Request(Result(String, String))
-		size:     (path: String) -> Request(Result(Int, String))
-		kind:     (path: String) -> Request(Result(String, String))
+		open:     (String, String) -> Request(Result(Int, String))
+		read:     (Int, Int) -> Request(Result(BitArray, String))
+		write:    (Int, BitArray) -> Request(Result(Nil, String))
+		flush:    (Int) -> Request(Result(Nil, String))
+		close:    (Int) -> Request(Nil)
+		remove:   (String) -> Request(Result(Nil, String))
+		rename:   (String, String) -> Request(Result(Nil, String))
+		mkdir:    (String) -> Request(Result(Nil, String))
+		list:     (String) -> Request(Result(String, String))
+		size:     (String) -> Request(Result(Int, String))
+		kind:     (String) -> Request(Result(String, String))
 		temp_dir: () -> Request(Result(String, String))
 	)
 }
@@ -91,8 +91,10 @@ open = (path, mode, raw ! Fs) {
 	r = raw.open(path, mode_string(mode))
 	number = resource.ensure(() {
 		request.await(r) |> {
-			Ok(value)   -> value
-			Error(code) -> fail.raise(FsError("open", path, code))
+			Ok(value) -> value
+			Error(code) -> fail.raise(
+				FsError(operation: "open", path: path, code: code)
+			)
 		}
 	}, () {
 		request.state(r) |> {
@@ -106,22 +108,28 @@ open = (path, mode, raw ! Fs) {
 
 read = (File(number), max_bytes, raw ! Fs) {
 	request.await_owned(raw.read(number, max_bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("read", "", code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "read", path: "", code: code)
+		)
 	}
 }
 
 write = (File(number), bytes, raw ! Fs) {
 	request.await_owned(raw.write(number, bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("write", "", code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "write", path: "", code: code)
+		)
 	}
 }
 
 flush = (File(number), raw ! Fs) {
 	request.await_owned(raw.flush(number)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("flush", "", code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "flush", path: "", code: code)
+		)
 	}
 }
 
@@ -129,22 +137,28 @@ close = (File(number), raw ! Fs) { request.await_owned(raw.close(number)) }
 
 remove = (path, raw ! Fs) {
 	request.await_owned(raw.remove(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("remove", path, code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "remove", path: path, code: code)
+		)
 	}
 }
 
 rename = (from, to, raw ! Fs) {
 	request.await_owned(raw.rename(from, to)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("rename", from, code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "rename", path: from, code: code)
+		)
 	}
 }
 
 mkdir = (path, raw ! Fs) {
 	request.await_owned(raw.mkdir(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("mkdir", path, code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "mkdir", path: path, code: code)
+		)
 	}
 }
 
@@ -167,27 +181,35 @@ list_parts = (text: String, start: Int) -> List(String) {
 
 list = (path, raw ! Fs) {
 	request.await_owned(raw.list(path)) |> {
-		Ok(value)   -> list_parts(value, 0)
-		Error(code) -> fail.raise(FsError("list", path, code))
+		Ok(value) -> list_parts(value, 0)
+		Error(code) -> fail.raise(
+			FsError(operation: "list", path: path, code: code)
+		)
 	}
 }
 
 metadata = (path, raw ! Fs) {
 	size = request.await_owned(raw.size(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("metadata", path, code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "metadata", path: path, code: code)
+		)
 	}
 	kind = request.await_owned(raw.kind(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("metadata", path, code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "metadata", path: path, code: code)
+		)
 	}
-	Metadata(size, kind)
+	Metadata(size: size, kind: kind)
 }
 
 temp_dir = (raw ! Fs) {
 	request.await_owned(raw.temp_dir()) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError("temp_dir", "", code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "temp_dir", path: "", code: code)
+		)
 	}
 }
 
@@ -230,6 +252,8 @@ line_parts = (text: String, start: Int) -> List(String) {
 read_lines = (path) {
 	core.bit_array_to_string(read_file(path)) |> {
 		Ok(text) -> line_parts(text, 0)
-		Error(_) -> fail.raise(FsError("read_lines", path, "invalid"))
+		Error(_) -> fail.raise(
+			FsError(operation: "read_lines", path: path, code: "invalid")
+		)
 	}
 }

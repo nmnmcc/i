@@ -10,4 +10,4 @@ wrap(N) = (body: () -> Int ! N | Svc(Int), svc: Svc(Int)) {
 }
 
 
-main = () { assert(wrap(use, Svc(() { 6 })) == 6) }
+main = () { assert(wrap(use, Svc(f: () { 6 })) == 6) }

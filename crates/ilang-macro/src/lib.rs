@@ -14,3 +14,5 @@ pub mod module_order;
 pub mod project;
 pub mod registry;
 pub mod validate;
+
+pub mod typed;

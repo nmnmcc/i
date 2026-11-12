@@ -1,4 +1,4 @@
-//! The modules of a package: the `.i` files under `src/` and `test/` (§2.1).
+//! The modules of a package: the `.i` files under `src/` and `test/`.
 
 use crate::{Diagnostic, Loader, ModuleKind, ModuleSource, code, is_name};
 use ilang_syntax::span::Span;
@@ -57,9 +57,7 @@ pub(crate) fn collect(
                     code::MODULE_PATH_NAME,
                     Some(source),
                     Span::default(),
-                    format!(
-                        "every part of a module path must be a name (§2.1), but `{bad}` is not"
-                    ),
+                    format!("every part of a module path must be a name, but `{bad}` is not"),
                 ));
                 continue;
             }

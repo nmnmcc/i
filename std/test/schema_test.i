@@ -45,29 +45,29 @@ user_schema = () {
 		}
 	)
 	address = schema.field(
-		schema.object(Address(""))
+		schema.object(Address(city: ""))
 		"city"
 		schema.string
 		(a) { a.city }
-		(_, city) { Address(city) }
+		(_, city) { Address(city: city) }
 	)
-	start = schema.object(User("", [], Member))
+	start = schema.object(User(name: "", addresses: [], role: Member))
 	names = schema.field(
 		start
 		"name"
 		schema.string
 		(u) { u.name }
-		(u, name) { User(name, u.addresses, u.role) }
+		(u, name) { User(name: name, addresses: u.addresses, role: u.role) }
 	)
 	addresses = schema.field(
 		names
 		"addresses"
 		schema.list(address)
 		(u) { u.addresses }
-		(u, a) { User(u.name, a, u.role) }
+		(u, a) { User(name: u.name, addresses: a, role: u.role) }
 	)
 	schema.field(addresses, "role", role, (u) { u.role }, (u, r) {
-		User(u.name, u.addresses, r)
+		User(name: u.name, addresses: u.addresses, role: r)
 	})
 }
 
@@ -78,7 +78,7 @@ test("int_negative", () { assert(round(schema.int, -7)) })
 test("int_wrong", () {
 	assert(
 		schema.decode(schema.int, json.Text("x")) ==
-			Error(schema.SchemaError([], "int"))
+			Error(schema.SchemaError(path: [], expected: "int"))
 	)
 })
 
@@ -87,7 +87,7 @@ test("float_round", () { assert(round(schema.float, 1.5)) })
 test("float_wrong", () {
 	assert(
 		schema.decode(schema.float, json.Integer(1)) ==
-			Error(schema.SchemaError([], "float"))
+			Error(schema.SchemaError(path: [], expected: "float"))
 	)
 })
 
@@ -98,7 +98,7 @@ test("string_empty", () { assert(round(schema.string, "")) })
 test("string_wrong", () {
 	assert(
 		schema.decode(schema.string, json.Null) ==
-			Error(schema.SchemaError([], "string"))
+			Error(schema.SchemaError(path: [], expected: "string"))
 	)
 })
 
@@ -109,7 +109,7 @@ test("bool_false", () { assert(round(schema.bool, False)) })
 test("bool_wrong", () {
 	assert(
 		schema.decode(schema.bool, json.Integer(1)) ==
-			Error(schema.SchemaError([], "bool"))
+			Error(schema.SchemaError(path: [], expected: "bool"))
 	)
 })
 
@@ -118,7 +118,7 @@ test("null_round", () { assert(round(schema.null, ())) })
 test("null_wrong", () {
 	assert(
 		schema.decode(schema.null, json.Boolean(False)) ==
-			Error(schema.SchemaError([], "null"))
+			Error(schema.SchemaError(path: [], expected: "null"))
 	)
 })
 
@@ -129,7 +129,7 @@ test("literal_string_round", () {
 test("literal_string_wrong", () {
 	assert(
 		schema.decode(schema.literal_string("yes"), json.Text("no")) ==
-			Error(schema.SchemaError([], "yes"))
+			Error(schema.SchemaError(path: [], expected: "yes"))
 	)
 })
 
@@ -138,7 +138,7 @@ test("literal_int_round", () { assert(round(schema.literal_int(3), 3)) })
 test("literal_int_wrong", () {
 	assert(
 		schema.decode(schema.literal_int(3), json.Integer(4)) ==
-			Error(schema.SchemaError([], "literal int"))
+			Error(schema.SchemaError(path: [], expected: "literal int"))
 	)
 })
 
@@ -166,7 +166,7 @@ test("list_path", () {
 			schema.list(schema.int)
 			json.Array([json.Integer(1), json.Text("x")])
 		) ==
-			Error(schema.SchemaError([schema.Index(1)], "int"))
+			Error(schema.SchemaError(path: [schema.Index(1)], expected: "int"))
 	)
 })
 
@@ -182,7 +182,9 @@ test("dict_path", () {
 			schema.dict(schema.bool)
 			json.Object([("x", json.Null)])
 		) ==
-			Error(schema.SchemaError([schema.Field("x")], "bool"))
+			Error(
+				schema.SchemaError(path: [schema.Field("x")], expected: "bool")
+			)
 	)
 })
 
@@ -196,7 +198,9 @@ test("tuple_path", () {
 			schema.tuple(schema.int, schema.string)
 			json.Array([json.Integer(1), json.Null])
 		) ==
-			Error(schema.SchemaError([schema.Index(1)], "string"))
+			Error(
+				schema.SchemaError(path: [schema.Index(1)], expected: "string")
+			)
 	)
 })
 
@@ -218,7 +222,7 @@ test("refine_error", () {
 			schema.refine(schema.int, (x) { x > 0 }, "positive")
 			json.Integer(-1)
 		) ==
-			Error(schema.SchemaError([], "positive"))
+			Error(schema.SchemaError(path: [], expected: "positive"))
 	)
 })
 
@@ -255,7 +259,7 @@ test("union_order", () {
 test("union_failure", () {
 	assert(
 		schema.decode(schema.union([schema.int], (_) { 0 }), json.Null) ==
-			Error(schema.SchemaError([], "union"))
+			Error(schema.SchemaError(path: [], expected: "union"))
 	)
 })
 
@@ -271,7 +275,7 @@ test("parse_bad_syntax", () {
 test("parse_bad_value", () {
 	assert(
 		schema.parse(schema.int, "true") ==
-			Error(schema.Decode(schema.SchemaError([], "int")))
+			Error(schema.Decode(schema.SchemaError(path: [], expected: "int")))
 	)
 })
 
@@ -285,7 +289,11 @@ test("nested_round", () {
 	assert(
 		round(
 			user_schema()
-			User("Ada", [Address("HK"), Address("Paris")], Admin)
+			User(
+				name:      "Ada"
+				addresses: [Address(city: "HK"), Address(city: "Paris")]
+				role:      Admin
+			)
 		)
 	)
 })
@@ -302,12 +310,12 @@ test("nested_path", () {
 		) ==
 			Error(
 				schema.SchemaError(
-					[
+					path: [
 						schema.Field("addresses")
 						schema.Index(0)
 						schema.Field("city")
 					]
-					"string"
+					expected: "string"
 				)
 			)
 	)
@@ -325,8 +333,8 @@ test("tag_error", () {
 		) ==
 			Error(
 				schema.SchemaError(
-					[schema.Field("role"), schema.Field("kind")]
-					"tag"
+					path:     [schema.Field("role"), schema.Field("kind")]
+					expected: "tag"
 				)
 			)
 	)
@@ -337,7 +345,7 @@ user = user_schema()
 Schema(DecodedUser, _) = user
 
 test("alias_type", () {
-	x: DecodedUser = User("A", [], Admin)
+	x: DecodedUser = User(name: "A", addresses: [], role: Admin)
 	assert(round(user, x))
 })
 
@@ -346,25 +354,30 @@ Tree {
 }
 
 tree_schema = () {
-	base = schema.object(Tree(0, []))
+	base = schema.object(Tree(value: 0, children: []))
 	with_value = schema.field(
 		base
 		"value"
 		schema.int
 		(t) { t.value }
-		(t, v) { Tree(v, t.children) }
+		(t, v) { Tree(value: v, children: t.children) }
 	)
 	schema.field(
 		with_value
 		"children"
 		schema.list(schema.lazy(() { tree_schema() }))
 		(t) { t.children }
-		(t, c) { Tree(t.value, c) }
+		(t, c) { Tree(value: t.value, children: c) }
 	)
 }
 
 test("recursive_round", () {
-	assert(round(tree_schema(), Tree(1, [Tree(2, [])])))
+	assert(
+		round(
+			tree_schema()
+			Tree(value: 1, children: [Tree(value: 2, children: [])])
+		)
+	)
 })
 
 optional_schema = () {
@@ -384,7 +397,12 @@ test("optional_field_none", () { assert(round(optional_schema(), None)) })
 test("optional_field_path", () {
 	assert(
 		schema.decode(optional_schema(), json.Object([("value", json.Null)])) ==
-			Error(schema.SchemaError([schema.Field("value")], "int"))
+			Error(
+				schema.SchemaError(
+					path:     [schema.Field("value")]
+					expected: "int"
+				)
+			)
 	)
 })
 

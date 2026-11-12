@@ -1183,7 +1183,7 @@ read = (File(number), max_bytes, raw ! Fs) {
 close = (File(number), raw ! Fs) { request.await_owned(raw.close(number)) }
 ```
 
-### 7.3 TCP networking
+### 7.3 TCP and UDP networking
 
 | Raw Net field | Type |
 |---|---|
@@ -1239,9 +1239,52 @@ whole stream/listener, is idempotent, and settles other pending operations on
 that object with closed unless their answer already committed. A concurrent
 read and write are allowed. A second concurrent read, write, or accept on the
 same direction/object gives busy, not an unspecified interleaving. DNS is part
-of i/net; TLS is i/tls (a later task); UDP is not in v1. Missing, closed, foreign-context or wrong-kind
+of i/net; TLS is i/tls; UDP datagrams are specified below. Missing, closed, foreign-context or wrong-kind
 numbers give closed; close gives Nil. Stream values can cross workers, while
 their pending Request values cannot.
+
+UDP uses the same private raw Net service and the private nominal
+`Datagram(Int)` value. No state surface is added in i.
+
+| Raw Net field | Type |
+|---|---|
+| `bind` | `(address: String, port: Int) -> Request(Result(Int,String))` |
+| `send_to` | `(socket: Int, address: String, port: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
+| `receive_from` | `(socket: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
+| `local_address` | `(socket: Int) -> Request(Result(String,String))` |
+| `datagram_port` | `(socket: Int) -> Request(Result(Int,String))` |
+| `close_datagram` | `(socket: Int) -> Request(Nil)` |
+
+Public `bind` returns Datagram. `send_to` takes Datagram, address, port and bytes;
+`receive_from` returns the ordinary i record `(data, address, port)` with labels.
+`local_address` returns a numeric String; `local_port` accepts either Listener or
+Datagram, dispatching to the corresponding raw field. `close_datagram` has no
+errors. Other wrappers translate String codes into NetError, naming their public
+operation (and the address for bind/send_to). The raw receive reply contains a
+little-endian u16 sender port, a u8 byte length, that many UTF-8 bytes of the numeric
+sender IP address, then the payload. Ordinary i decodes this BitArray into the
+record; records do not cross the ABI (§10.3). A malformed internal reply panics.
+
+Bind accepts numeric IPv4/IPv6 or a host name and ports 0..65535. Port zero picks
+an OS port. Send accepts ports 1..65535. Both use the system resolver and try
+addresses in order, as TCP connect does. Empty names, bad ports, partial-byte
+sends and nonpositive receive bounds give invalid. Receive caps its buffer at
+65536 bytes and returns one datagram, discarding bytes beyond the requested bound.
+Empty datagrams succeed with empty data, never EOF. Sends are atomic, including
+empty sends; OS size limits surface as NetError. Delivery/order are not guaranteed.
+
+Datagrams use native N9's context, non-reuse, ownership and teardown. One read
+lease and one write lease can coexist; a second receive or send gives busy.
+Close revokes both leases, wakes pending receives with closed, and is idempotent.
+Creators have the same Ready/Taken guard as listen/connect. Other wrappers use
+request.await_owned; scope cancellation drops a pending receive, releases its
+lease and leaves the socket usable. The Rust provider holds tokio::net::UdpSocket
+in the resource table, using cancel-safe recv_from. Node uses node:dgram and a
+whole-datagram receive queue; cancellation removes the waiter without consuming a
+queued datagram. Both providers check completion against their resource lease.
+Entry teardown closes forgotten sockets independently of i finals. Node cleanup
+waits for the dgram close callback. Browser and WASI lack Net providers: a required
+Net service is a compile error naming i/net.Net, as for TCP.
 
 ### 7.4 Processes and entropy
 

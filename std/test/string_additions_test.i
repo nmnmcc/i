@@ -134,7 +134,7 @@ Calls {
 
 observe = (body: () -> Nil ! Calls | Assert) -> List(Int) ! Assert {
 	control.boundary((b) {
-		! Calls = Calls((n) {
+		! Calls = Calls(call: (n) {
 			control.suspend(b, (k) { [n, ..control.resume(k, Nil)] })
 		})
 		body()

@@ -1053,7 +1053,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("added host \"i:io/v1\": (print: (text: String) -> Nil)"),
+        out.contains("added host \"i:io/v1\": (print: (String) -> Nil)"),
         "{out}"
     );
     assert!(out.contains("a new minor version"), "{out}");

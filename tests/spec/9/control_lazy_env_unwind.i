@@ -46,10 +46,10 @@ final = (outer) {
 // The call of `resource.ensure` is under `! Name = Name("in")`, and is not
 // a tail call, so the frame of `f` waits outside the ensure.
 f = (b, outer) {
-	! Name = Name("in")
+	! Name = Name(text: "in")
 	x = resource.ensure(() {
 		control.suspend(b, (k) {
-			! Name = Name("out")
+			! Name = Name(text: "out")
 			control.cancel(k)
 			"cancelled"
 		})
@@ -61,13 +61,13 @@ f = (b, outer) {
 // of its frame, not the one of the place of `cancel`.
 
 test("cancel_keeps_inner_environment", () {
-	! Name = Name("outside")
+	! Name = Name(text: "outside")
 	r = control.boundary((outer) { control.boundary((b) { f(b, outer) }) })
 	check(r, "in, cancelled")
 })
 
 failing = (b, outer) {
-	! Name = Name("in")
+	! Name = Name(text: "in")
 	x = resource.ensure(() {
 		control.suspend(b, (k) { Paused(k) })
 		fail.raise(Bad(1))
@@ -78,14 +78,14 @@ failing = (b, outer) {
 // The same for an error after a resume from a place where `Name` is "out".
 
 test("error_keeps_inner_environment", () {
-	! Name = Name("outside")
+	! Name = Name(text: "outside")
 	r = control.boundary((outer) {
 		p = control.boundary((b) {
 			Done(show(fail.catch(() { failing(b, outer) })))
 		})
 		p |> {
 			Paused(k) -> {
-				! Name = Name("out")
+				! Name = Name(text: "out")
 				{ control.resume(k, Nil) } |> {
 					Done(s)   -> s
 					Paused(_) -> "paused again"
@@ -100,21 +100,21 @@ test("error_keeps_inner_environment", () {
 // Two more frames with environment statements, inside the ensure: they are
 // passed over, and the final function sees the environment of `nested`.
 nested = (b, outer) {
-	! Name = Name("in")
+	! Name = Name(text: "in")
 	x = resource.ensure(() { mid1(b) }, () { final(outer) })
 	x <> ""
 }
 
 mid1 = (b) {
-	! Name = Name("mid1")
+	! Name = Name(text: "mid1")
 	x = mid2(b)
 	x <> ""
 }
 
 mid2 = (b) {
-	! Name = Name("mid2")
+	! Name = Name(text: "mid2")
 	x = control.suspend(b, (k) {
-		! Name = Name("out")
+		! Name = Name(text: "out")
 		control.cancel(k)
 		"cancelled"
 	})
@@ -122,7 +122,7 @@ mid2 = (b) {
 }
 
 test("frames_inside_the_ensure", () {
-	! Name = Name("outside")
+	! Name = Name(text: "outside")
 	r = control.boundary((outer) { control.boundary((b) { nested(b, outer) }) })
 	check(r, "in, cancelled")
 })
@@ -130,22 +130,22 @@ test("frames_inside_the_ensure", () {
 // The two frames outside the ensure: the final function sees the
 // environment of the innermost of them.
 around = (b, outer) {
-	! Name = Name("in")
+	! Name = Name(text: "in")
 	x = around1(b, outer)
 	x <> ""
 }
 
 around1 = (b, outer) {
-	! Name = Name("around1")
+	! Name = Name(text: "around1")
 	x = around2(b, outer)
 	x <> ""
 }
 
 around2 = (b, outer) {
-	! Name = Name("around2")
+	! Name = Name(text: "around2")
 	x = resource.ensure(() {
 		control.suspend(b, (k) {
-			! Name = Name("out")
+			! Name = Name(text: "out")
 			control.cancel(k)
 			"cancelled"
 		})
@@ -154,7 +154,7 @@ around2 = (b, outer) {
 }
 
 test("frames_outside_the_ensure", () {
-	! Name = Name("outside")
+	! Name = Name(text: "outside")
 	r = control.boundary((outer) { control.boundary((b) { around(b, outer) }) })
 	check(r, "around2, cancelled")
 })

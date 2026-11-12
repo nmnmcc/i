@@ -41,7 +41,7 @@ test("list_build", () {
 })
 
 test("list_map", () {
-	xs = list.map(list.range(1, size), with: (x) { x + 1 })
+	xs = list.map(list.range(1, size), (x) { x + 1 })
 	check(list.first(xs) == Some(2), "first")
 })
 
@@ -54,7 +54,7 @@ test("list_reverse", () {
 })
 
 test("list_sort", () {
-	xs = list.sort(randoms(size), by: int.compare)
+	xs = list.sort(randoms(size), int.compare)
 	check(list.length(xs) == size, "length")
 })
 
@@ -73,16 +73,16 @@ merge = (xs: List(Int), ys: List(Int), acc: List(Int)) -> List(Int) {
 }
 
 test("list_merge", () {
-	evens = list.map(list.range(0, size - 1), with: (x) { x * 2 })
-	odds = list.map(list.range(0, size - 1), with: (x) { x * 2 + 1 })
+	evens = list.map(list.range(0, size - 1), (x) { x * 2 })
+	odds = list.map(list.range(0, size - 1), (x) { x * 2 + 1 })
 	xs = merge(evens, odds, [])
 	check(list.length(xs) == 2 * size, "length")
 })
 
 test("closures", () {
-	adders = list.map(list.range(1, 100), with: (k) { (x) { x + k } })
-	total = list.fold(list.range(1, 10_000), from: 0, with: (acc, x) {
-		list.fold(adders, from: acc, with: (a, f) {
+	adders = list.map(list.range(1, 100), (k) { (x) { x + k } })
+	total = list.fold(list.range(1, 10_000), 0, (acc, x) {
+		list.fold(adders, acc, (a, f) {
 			y = f(x) + a
 			y % 1_000_000
 		})
@@ -91,7 +91,7 @@ test("closures", () {
 })
 
 inspect = () {
-	text = core.inspect(list.map(list.range(1, 200_000), with: (x) {
+	text = core.inspect(list.map(list.range(1, 200_000), (x) {
 		(x, [x, x + 1])
 	}))
 	check(core.byte_size(text) > 0, "text")
@@ -100,16 +100,16 @@ inspect = () {
 test("inspect", () { inspect() })
 
 test("dict_insert", () {
-	d = list.fold(randoms(200_000), from: dict.new(), with: (d, x) {
+	d = list.fold(randoms(200_000), dict.new(), (d, x) {
 		dict.insert(d, x, x + 1)
 	})
 	check(dict.size(d) > 0, "size")
 })
 
 test("equality", () {
-	xs = list.map(list.range(1, 100_000), with: (x) { (x, "a") })
-	ys = list.map(list.range(1, 100_000), with: (x) { (x, "a") })
-	n = list.fold(list.range(1, 20), from: 0, with: (acc, _) {
+	xs = list.map(list.range(1, 100_000), (x) { (x, "a") })
+	ys = list.map(list.range(1, 100_000), (x) { (x, "a") })
+	n = list.fold(list.range(1, 20), 0, (acc, _) {
 		{ xs == ys } |> {
 			True  -> acc + 1
 			False -> acc

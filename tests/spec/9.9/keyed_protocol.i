@@ -33,7 +33,7 @@ Done {
 }
 
 Scheduler {
-	Scheduler(step: (command: Command) -> StepAnswer)
+	Scheduler(step: (Command) -> StepAnswer)
 }
 
 Channel(A) {
@@ -41,7 +41,7 @@ Channel(A) {
 }
 
 Start {
-	Start(run: (own: Scheduler) -> Turn)
+	Start(run: (Scheduler) -> Turn)
 }
 
 read = (k, value) {
@@ -68,17 +68,17 @@ receive = (c, scheduler ! Scheduler) {
 }
 
 start = (body, result_key) {
-	! Scheduler = Scheduler((_) { panic("prototype: detached") })
+	! Scheduler = Scheduler(step: (_) { panic("prototype: detached") })
 	kept = control.keep_env((own: Scheduler) {
 		! Scheduler = own
 		identity(Done(key.wrap(result_key, fail.catch(body))))
 	})
-	Start(kept)
+	Start(run: kept)
 }
 
 begin = (start: Start) {
 	control.boundary((b) {
-		start.run(Scheduler((command) {
+		start.run(Scheduler(step: (command) {
 			control.suspend(b, (k) { Step(command, k) })
 		}))
 	})

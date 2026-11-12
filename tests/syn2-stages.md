@@ -198,15 +198,6 @@ runs (1,836 tests each) passed. The first review regeneration reported the
 three deep R2 failures above; their focused retry and the six named-entry
 review cases passed.
 
-The repository-wide `scripts/syntax-2-migrate --repo --check` audit reported
-zero changes and zero unresolved empty tuples, but exited 1 on 269 unparseable
-extracted candidates. Five documentation examples from that report were then
-corrected and their targeted migration check passed. The remaining reported
-candidates are in Rust/editor/JavaScript test strings or deliberate invalid
-fixtures; the separate old-syntax inventory verifies their registered context
-and expected diagnostics. Minimal reproduction:
-`scripts/syntax-2-migrate --repo --check --use-built-tool`.
-
 After the comparison, `redesign` advanced to `4ed95a05` and was merged into
 this lane. The counts above describe the original `7e240a4e` baseline, not
 WAT comparisons for the newly merged HTTP and editor work. The new Rust HTTP
@@ -214,4 +205,3 @@ fixtures were migrated, and the editor retains both error-type spellings for
 legacy parser coverage. The post-merge syntax inventory passes for 4,117
 snippets; all seven VS Code editor tests pass.
 
-The migration tool carries a frozen legacy parser in `crates/ilang-syntax/src/parser_legacy.rs`. After bringing the migration tool and its frozen reader into another branch, run `scripts/syntax-2-migrate --repo --write` from that branch.

@@ -10,7 +10,7 @@
 )
 
 test("from_list_size_test", () {
-	assert([(4, 0), (1, 0)] |> dict.from_list |> dict.size == 2)
+	assert({ [(4, 0), (1, 0)] |> dict.from_list |> dict.size } == 2)
 	Nil
 })
 
@@ -147,64 +147,75 @@ test("get_bit_array_key_missing_test", () {
 
 test("insert_test", () {
 	assert(
-		dict.new()
-			|> dict.insert("a", 0)
-			|> dict.insert("b", 1)
-			|> dict.insert("c", 2) == dict.from_list([
-				("a", 0)
-				("b", 1)
-				("c", 2)
-			])
+		{
+			dict.new()
+				|> dict.insert("a", 0)
+				|> dict.insert("b", 1)
+				|> dict.insert("c", 2)
+		} ==
+			dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 	)
 	Nil
 })
 
 test("map_values_test", () {
 	assert(
-		[(1, 0), (2, 1), (3, 2)] |> dict.from_list |> dict.map_values((k, v) {
-			k + v
-		}) == dict.from_list([(1, 1), (2, 3), (3, 5)])
+		{
+			[(1, 0), (2, 1), (3, 2)]
+				|> dict.from_list
+				|> dict.map_values((k, v) { k + v })
+		} ==
+			dict.from_list([(1, 1), (2, 3), (3, 5)])
 	)
 	Nil
 })
 
 test("keys_test", () {
 	assert(
-		[("a", 0), ("b", 1), ("c", 2)]
-			|> dict.from_list
-			|> dict.keys
-			|> list.sort(string.compare) == ["a", "b", "c"]
+		{
+			[("a", 0), ("b", 1), ("c", 2)]
+				|> dict.from_list
+				|> dict.keys
+				|> list.sort(string.compare)
+		} ==
+			["a", "b", "c"]
 	)
 	Nil
 })
 
 test("values_test", () {
 	assert(
-		[("a", 0), ("b", 1), ("c", 2)]
-			|> dict.from_list
-			|> dict.values
-			|> list.sort(int.compare) == [0, 1, 2]
+		{
+			[("a", 0), ("b", 1), ("c", 2)]
+				|> dict.from_list
+				|> dict.values
+				|> list.sort(int.compare)
+		} ==
+			[0, 1, 2]
 	)
 	Nil
 })
 
 test("take_test", () {
 	assert(
-		[("a", 0), ("b", 1), ("c", 2)]
-			|> dict.from_list
-			|> dict.take(["a", "b", "d"]) == dict.from_list([
-				("a", 0)
-				("b", 1)
-			])
+		{
+			[("a", 0), ("b", 1), ("c", 2)]
+				|> dict.from_list
+				|> dict.take(["a", "b", "d"])
+		} ==
+			dict.from_list([("a", 0), ("b", 1)])
 	)
 	Nil
 })
 
 test("drop_test", () {
 	assert(
-		[("a", 0), ("b", 1), ("c", 2)]
-			|> dict.from_list
-			|> dict.drop(["a", "b", "d"]) == dict.from_list([("c", 2)])
+		{
+			[("a", 0), ("b", 1), ("c", 2)]
+				|> dict.from_list
+				|> dict.drop(["a", "b", "d"])
+		} ==
+			dict.from_list([("c", 2)])
 	)
 	Nil
 })
@@ -249,10 +260,13 @@ test("merge_second_test", () {
 
 test("delete_test", () {
 	assert(
-		[("a", 0), ("b", 1), ("c", 2)]
-			|> dict.from_list
-			|> dict.delete("a")
-			|> dict.delete("d") == dict.from_list([("b", 1), ("c", 2)])
+		{
+			[("a", 0), ("b", 1), ("c", 2)]
+				|> dict.from_list
+				|> dict.delete("a")
+				|> dict.delete("d")
+		} ==
+			dict.from_list([("b", 1), ("c", 2)])
 	)
 	Nil
 })
@@ -323,12 +337,8 @@ test("fold_keys_test", () {
 	prepend = (acc, k, _) { list.prepend(acc, k) }
 
 	assert(
-		d |> dict.fold([], prepend) |> list.sort(string.compare) == [
-				"a"
-				"b"
-				"c"
-				"d"
-			]
+		{ d |> dict.fold([], prepend) |> list.sort(string.compare) } ==
+			["a", "b", "c", "d"]
 	)
 	Nil
 })
@@ -500,26 +510,29 @@ test("is_empty_after_delete_test", () {
 
 test("peters_bug_test", () {
 	assert(
-		dict.new()
-			|> dict.insert(22, Nil)
-			|> dict.insert(21, Nil)
-			|> dict.insert(23, Nil)
-			|> dict.insert(18, Nil)
-			|> dict.insert(17, Nil)
-			|> dict.insert(19, Nil)
-			|> dict.insert(14, Nil)
-			|> dict.insert(13, Nil)
-			|> dict.insert(15, Nil)
-			|> dict.insert(10, Nil)
-			|> dict.insert(9, Nil)
-			|> dict.insert(11, Nil)
-			|> dict.insert(6, Nil)
-			|> dict.insert(5, Nil)
-			|> dict.insert(7, Nil)
-			|> dict.insert(2, Nil)
-			|> dict.insert(1, Nil)
-			|> dict.insert(3, Nil)
-			|> dict.get(0) == None
+		{
+			dict.new()
+				|> dict.insert(22, Nil)
+				|> dict.insert(21, Nil)
+				|> dict.insert(23, Nil)
+				|> dict.insert(18, Nil)
+				|> dict.insert(17, Nil)
+				|> dict.insert(19, Nil)
+				|> dict.insert(14, Nil)
+				|> dict.insert(13, Nil)
+				|> dict.insert(15, Nil)
+				|> dict.insert(10, Nil)
+				|> dict.insert(9, Nil)
+				|> dict.insert(11, Nil)
+				|> dict.insert(6, Nil)
+				|> dict.insert(5, Nil)
+				|> dict.insert(7, Nil)
+				|> dict.insert(2, Nil)
+				|> dict.insert(1, Nil)
+				|> dict.insert(3, Nil)
+				|> dict.get(0)
+		} ==
+			None
 	)
 	Nil
 })
@@ -793,9 +806,12 @@ test("hash_collision_keys_test", () {
 	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
 
 	assert(
-		dict.keys(colours)
-			|> list.filter_map((k) { dict.get(colours, k) })
-			|> list.sort(string.compare) == ["blue", "green", "red"]
+		{
+			dict.keys(colours)
+				|> list.filter_map((k) { dict.get(colours, k) })
+				|> list.sort(string.compare)
+		} ==
+			["blue", "green", "red"]
 	)
 	Nil
 })
@@ -882,34 +898,19 @@ run_many_random_tests = (
 }
 
 test("random_operations_small_test", () {
-	run_many_random_tests(
-		count:        100
-		ops_per_test: 50
-		key_space:    32
-		initial:      dict.new()
-	)
+	run_many_random_tests(100, 50, 32, dict.new())
 })
 
 test("random_operations_medium_test", () {
-	run_many_random_tests(
-		count:        100
-		ops_per_test: 50
-		key_space:    200
-		initial:      range_dict(50)
-	)
+	run_many_random_tests(100, 50, 200, range_dict(50))
 })
 
 test("random_operations_large_test", () {
-	run_many_random_tests(
-		count:        3
-		ops_per_test: 300
-		key_space:    600
-		initial:      range_dict(300)
-	)
+	run_many_random_tests(3, 300, 600, range_dict(300))
 })
 
 range_dict = (size) {
-	int.range(from: size, to: 0, with: [], run: list.prepend)
+	int.range(size, 0, [], list.prepend)
 		|> list.map((x) { (x, x) })
 		|> dict.from_list
 }
@@ -1031,16 +1032,16 @@ Point {
 
 test("any_key_type_test", () {
 	d = dict.new()
-		|> dict.insert(Point(1, 2), "a")
+		|> dict.insert(Point(x: 1, y: 2), "a")
 		|> dict.insert((1, [2, 3]), "b")
 		|> dict.insert(<<1, 2>>, "c")
 		|> dict.insert(1.5, "d")
 	assert(dict.size(d) == 4)
-	assert(dict.get(d, Point(1, 2)) == Some("a"))
+	assert(dict.get(d, Point(x: 1, y: 2)) == Some("a"))
 	assert(dict.get(d, (1, [2, 3])) == Some("b"))
 	assert(dict.get(d, <<1, 2>>) == Some("c"))
 	assert(dict.get(d, 1.5) == Some("d"))
-	assert(dict.get(d, Point(2, 1)) == None)
+	assert(dict.get(d, Point(x: 2, y: 1)) == None)
 })
 
 test("zero_keys_test", () {
@@ -1064,7 +1065,7 @@ test("upsert_update_test", () {
 	d = count(["a", "b", "a", "c", "a"])
 	assert(dict.get(d, "a") == Some(3))
 	assert(dict.get(d, "c") == Some(1))
-	assert(dict.update(d, "a", (n) { n * 10 }) |> dict.get("a") == Some(30))
+	assert({ dict.update(d, "a", (n) { n * 10 }) |> dict.get("a") } == Some(30))
 	assert(dict.update(d, "z", (n) { n * 10 }) == d)
 })
 

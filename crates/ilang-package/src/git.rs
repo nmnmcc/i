@@ -1,4 +1,4 @@
-//! Getting the versions of packages with a location from git (§2.6–§2.8).
+//! Gets the versions of packages with a location from git.
 //!
 //! The `git` program is run as a subprocess; there is no git library.
 //!
@@ -20,7 +20,7 @@
 //!   left out. The directory is written next to it and then renamed, so it
 //!   is either all there or not there.
 //! - `pkg/<escaped location>/<commit>.hash` is the hash of those files
-//!   (§2.8), worked out from the git objects.
+//!   (see [`crate::lock::hash`]), worked out from the git objects.
 //!
 //! An escaped name keeps the bytes `a-z`, `0-9`, `.`, `_` and `-`, and writes
 //! every other byte as `%` and two lowercase hex digits, so
@@ -29,13 +29,14 @@
 //! # Where a repository is got from
 //!
 //! A location has no scheme; its repository is got from `https://` and the
-//! repository (§2.6). [`Git::new`] takes a list of rewrites, from a prefix of
+//! repository. [`Git::new`] takes a list of rewrites, from a prefix of
 //! the repository to a prefix of a URL: the longest prefix that matches is
 //! replaced. `ILANG_GIT_URLS` gives the list from the environment, as
 //! entries `prefix=url` separated by white space, for example
 //! `ILANG_GIT_URLS="example.com/=file:///srv/git/"` gets
 //! `example.com/alice/json` from `file:///srv/git/alice/json`. Tests use it
-//! with local bare repositories; it may also point at a mirror (§2.8).
+//! with local bare repositories; it may also point at a mirror, because the
+//! hash in `i.lock` makes certain the files are the same.
 //!
 //! # The network
 //!
@@ -345,7 +346,7 @@ impl Git {
         Ok((out.status.success() && !commit.is_empty()).then_some(commit))
     }
 
-    /// The commit of the tag `v<version>` of `repository` (§2.7).
+    /// Returns the commit of the tag `v<version>` of `repository`.
     ///
     /// The cache is used when it has the tag, and, when `expected` is given,
     /// when the tag is at that commit there. Otherwise the repository is
@@ -438,7 +439,7 @@ impl Git {
     }
 
     /// The files of the package in `dir` of the tree of `commit`, or in the
-    /// whole tree (§2.8): read with `git ls-tree` and `git cat-file`, with
+    /// whole tree: read with `git ls-tree` and `git cat-file`, with
     /// their bytes as git keeps them, symbolic links with their target as
     /// bytes, and without submodules. In the order of their paths.
     pub fn files(
@@ -474,7 +475,7 @@ impl Git {
                 ));
             };
             let kind = match (mode, kind) {
-                // A submodule is not part of the package (§2.8).
+                // A submodule is not part of the package.
                 (_, "commit") => continue,
                 ("120000", "blob") => FileKind::Symlink,
                 ("100755", "blob") => FileKind::Executable,
@@ -508,7 +509,7 @@ impl Git {
     }
 
     /// The directory in the cache with the files of the package at `place`
-    /// (the location with its `//dir`) at `commit`, and their hash (§2.8).
+    /// (the location with its `//dir`) at `commit`, and their hash.
     /// They are written when they are not in the cache yet.
     pub fn package(
         &self,

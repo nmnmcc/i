@@ -106,9 +106,9 @@ test("lists", () {
 })
 
 test("constructors", () {
-	u = User("ann", 30)
+	u = User(name: "ann", age: 30)
 	u |> {
-		User(age, name) -> check(name <> show(age), "ann30")
+		User(age = age, name = name) -> check(name <> show(age), "ann30")
 	}
 	u |> {
 		User(n = name, ..) -> check(n <> name, "annann")
@@ -117,12 +117,12 @@ test("constructors", () {
 		User(..) -> check("any", "any")
 	}
 	u |> {
-		User(age: Int, name: String) -> check(name, "ann")
+		User(age = age: Int, name = name: String) -> check(name, "ann")
 	}
-	Point(1, 2, "p") |> {
-		Point(x, y, label) -> check(show((x, y, label)), "(1, 2, \"p\")")
+	Point(1, 2, label: "p") |> {
+		Point(x, y, label = label) -> check(show((x, y, label)), "(1, 2, \"p\")")
 	}
-	Point(1, 2, "p") |> {
+	Point(1, 2, label: "p") |> {
 		Point(1, _, ..) -> Nil
 		_               -> panic("no")
 	}

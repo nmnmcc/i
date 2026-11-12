@@ -1,12 +1,8 @@
 (
 	Secret
 	Choice
-	Left
-	Right
 	Raw
-	Open
-	OpenCase(..)
-	Other(..)
+	Open(..)
 	make
 	read
 	local_update
@@ -21,13 +17,8 @@ Secret(A) {
 	Pack(value: A, parts: (A, Int), read: () -> A)
 }
 
-Choice = Left | Right
-
-Left {
+Choice {
 	Left(value: Int)
-}
-
-Right {
 	Right(value: Int)
 }
 
@@ -35,17 +26,12 @@ Raw {
 	Raw(read: () -> Int)
 }
 
-Open = OpenCase | Other
-
-OpenCase {
+Open {
 	Open(value: Int)
-}
-
-Other {
 	Other(value: Int)
 }
 
-make = (value) { Pack(value, (value, 7), () { value }) }
+make = (value) { Pack(value: value, parts: (value, 7), read: () { value }) }
 
 read(A) = (value: Secret(A)) { value.value }
 
@@ -53,10 +39,10 @@ local_update(A) = (value: Secret(A), next: A) { Pack(..value, value: next) }
 
 local_choice = (value: Choice) { value.value }
 
-local_known = Pack(42, (42, 7), () { 42 }).value
+local_known = Pack(value: 42, parts: (42, 7), read: () { 42 }).value
 
 callback(A) = (value: Secret(A)) { value.read }
 
-raw = Raw(() { 42 })
+raw = Raw(read: () { 42 })
 
-open: Open = Open(11)
+open = Open(value: 11)

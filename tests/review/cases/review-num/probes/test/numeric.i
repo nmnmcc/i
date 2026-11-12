@@ -94,9 +94,9 @@ Holder {
 test("identity_and_capture", () {
 	f = make(-.0.0)
 	g = make(-.0.0)
-	p = Holder(f, 1.0)
-	q = Holder(f, 1.0)
-	r = Holder(g, 1.0)
+	p = Holder(f: f, x: 1.0)
+	q = Holder(f: f, x: 1.0)
+	r = Holder(f: g, x: 1.0)
 	check(id(p) == id(q))
 	check(id(p) != id(r))
 	check_bits(p.f(), 9223372036854775808)

@@ -174,6 +174,9 @@ pub(crate) struct Solver {
     /// Allocation ownership observed during a demanded source group.
     pub observation: Option<(usize, HashSet<V>, std::cell::RefCell<HashSet<V>>)>,
     pub vars: Vec<VarState>,
+    pub(super) rigid_boundary: usize,
+    rigid_active: HashSet<(Ty, Ty, Mode)>,
+    rigid_proved: HashSet<(Ty, Ty, Mode)>,
     /// Peak concrete bounds of one head, on either side of one variable.
     #[cfg(test)]
     peak_bound_count: usize,
@@ -249,6 +252,129 @@ impl Solver {
         snapshot.alias_folds = self.alias_folds.clone();
         snapshot
     }
+    /// Discard inference caches: a cached solved goal is not a rigid proof.
+    pub(super) fn freeze(&mut self) {
+        self.rigid_boundary = self.vars.len();
+        self.cache.clear();
+        self.compared.clear();
+        self.rigid_active.clear();
+        self.rigid_proved.clear();
+    }
+    fn frozen(&self, t: &Ty) -> bool {
+        matches!(t, Ty::Var(v) if (v.0 as usize) < self.rigid_boundary)
+    }
+    fn rigid_bounds(&self, root: V, lower: bool) -> (HashSet<V>, Vec<Ty>) {
+        let mut seen = HashSet::default();
+        let mut work = vec![root];
+        let mut bounds = Vec::new();
+        while let Some(v) = work.pop() {
+            if !seen.insert(v) {
+                continue;
+            }
+            let st = self.var(v);
+            for t in if lower { &st.lower } else { &st.upper } {
+                if let Ty::Var(w) = t {
+                    if (w.0 as usize) < self.rigid_boundary {
+                        work.push(*w);
+                    }
+                } else {
+                    bounds.push(t.clone());
+                }
+            }
+            work.extend(
+                if lower { &st.from } else { &st.into }
+                    .iter()
+                    .copied()
+                    .filter(|v| (v.0 as usize) < self.rigid_boundary),
+            );
+        }
+        (seen, bounds)
+    }
+    fn rigid_constraint(&mut self, l: &Ty, r: &Ty, mode: Mode) -> bool {
+        let mode = mode.max(self.mode(l)).max(self.mode(r));
+        if !self.frozen(l) && !self.frozen(r) {
+            return false;
+        }
+        if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
+            return true;
+        }
+        // A direct fresh edge records a bound only on the fresh endpoint.
+        if let Ty::Var(v) = r
+            && !self.frozen(r)
+        {
+            self.mark_mode(r, mode);
+            if self.var(*v).lower.contains(l) {
+                return true;
+            }
+            if self.add_bound(*v, l.clone(), true, mode) {
+                for ub in self.var(*v).upper.clone() {
+                    self.constrain_in(l, &ub, mode);
+                }
+            }
+            return true;
+        }
+        if let Ty::Var(v) = l
+            && !self.frozen(l)
+        {
+            self.mark_mode(l, mode);
+            if self.var(*v).upper.contains(r) {
+                return true;
+            }
+            if self.add_bound(*v, r.clone(), false, mode) {
+                for lb in self.var(*v).lower.clone() {
+                    self.constrain_in(&lb, r, mode);
+                }
+            }
+            return true;
+        }
+        let goal = (l.clone(), r.clone(), mode);
+        if self.rigid_proved.contains(&goal) {
+            return true;
+        }
+        if !self.rigid_active.insert(goal.clone()) {
+            self.fail(FailKind::Mismatch, l, r);
+            return true;
+        }
+        let mut trial = self.clone();
+        let before = trial.failures.len();
+        let proved = if let Ty::Var(v) = l {
+            let (edges, bounds) = self.rigid_bounds(*v, false);
+            if matches!(r, Ty::Var(w) if edges.contains(w)) {
+                true
+            } else if bounds.is_empty() {
+                false
+            } else {
+                let upper = trial.inter(bounds);
+                trial.constrain_in(&upper, r, mode);
+                trial.failures.len() == before
+            }
+        } else if let Ty::Var(v) = r {
+            let (_, bounds) = self.rigid_bounds(*v, true);
+            let lower = trial.union(bounds);
+            trial.constrain_in(l, &lower, mode);
+            trial.failures.len() == before
+        } else {
+            unreachable!("rigid endpoint")
+        };
+        if proved {
+            trial.rigid_active.remove(&goal);
+            trial.rigid_proved.insert(goal);
+            *self = trial;
+        } else {
+            self.rigid_active.remove(&goal);
+            if let Some(failure) = trial
+                .failures
+                .into_iter()
+                .skip(before)
+                .find(|f| f.kind == FailKind::ResourceLimit)
+            {
+                self.failures.push(failure);
+            } else {
+                self.fail(FailKind::Mismatch, l, r);
+            }
+        }
+        true
+    }
     pub fn record(&mut self, mut fields: Vec<(super::records::Label, Ty)>) -> Ty {
         fields.sort_by(|(a, _), (b, _)| a.cmp(b));
         let mut merged: Vec<(super::records::Label, Ty)> = Vec::with_capacity(fields.len());
@@ -274,6 +400,9 @@ impl Solver {
             observed_shape: false,
             observation: None,
             vars: Vec::new(),
+            rigid_boundary: 0,
+            rigid_active: HashSet::default(),
+            rigid_proved: HashSet::default(),
             #[cfg(test)]
             peak_bound_count: 0,
             level: 0,
@@ -379,7 +508,9 @@ impl Solver {
     /// Sets the upper bounds of a new variable.
     fn set_upper(&mut self, v: V, upper: Vec<Ty>) {
         for u in &upper {
-            if let Ty::Var(w) = u {
+            if let Ty::Var(w) = u
+                && (w.0 as usize) >= self.rigid_boundary
+            {
                 self.var_mut(*w).from.push(v);
             }
         }
@@ -391,7 +522,9 @@ impl Solver {
     /// Sets the lower bounds of a new variable.
     fn set_lower(&mut self, v: V, lower: Vec<Ty>) {
         for l in &lower {
-            if let Ty::Var(w) = l {
+            if let Ty::Var(w) = l
+                && (w.0 as usize) >= self.rigid_boundary
+            {
                 self.var_mut(*w).into.push(v);
             }
         }
@@ -400,11 +533,15 @@ impl Solver {
         self.observe_bounds(v, true);
     }
 
-    fn var(&self, v: V) -> &VarState {
+    pub(super) fn var(&self, v: V) -> &VarState {
         &self.vars[v.0 as usize]
     }
 
     fn var_mut(&mut self, v: V) -> &mut VarState {
+        assert!(
+            (v.0 as usize) >= self.rigid_boundary,
+            "typed expansion mutated frozen solver state"
+        );
         &mut self.vars[v.0 as usize]
     }
 
@@ -536,6 +673,9 @@ impl Solver {
     }
 
     pub fn mark_mode(&mut self, t: &Ty, mode: Mode) {
+        if matches!(t, Ty::Var(v) if (v.0 as usize) < self.rigid_boundary) {
+            return;
+        }
         if mode == Mode::Value
             || matches!(t, Ty::Var(v) if self.var(*v).row >= mode)
             || matches!(t, Ty::Con(..) | Ty::Fn(_) | Ty::Never | Ty::Top)
@@ -558,7 +698,7 @@ impl Solver {
         let mut added = Vec::new();
         while let Some(t) = todo.pop() {
             match t {
-                Ty::Var(v) if self.var(v).row < mode => {
+                Ty::Var(v) if (v.0 as usize) >= self.rigid_boundary && self.var(v).row < mode => {
                     self.observe(v);
                     self.var_mut(v).row = mode;
                     added.push(v);
@@ -650,9 +790,13 @@ impl Solver {
         {
             return;
         }
+        if (v.0 as usize) < self.rigid_boundary && !self.var(v).handled.contains(h) {
+            self.fail(FailKind::Mismatch, &Ty::Var(v), h);
+            return;
+        }
         self.has_handlers = true;
         for w in self.reach(vec![v], true).0 {
-            if self.var(w).handled.contains(h) {
+            if (w.0 as usize) < self.rigid_boundary || self.var(w).handled.contains(h) {
                 continue;
             }
             self.observe(w);
@@ -844,6 +988,9 @@ impl Solver {
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: Mode) {
+        if self.rigid_boundary > 0 && self.rigid_constraint(l, r, env) {
+            return;
+        }
         let env = env.max(self.mode(l)).max(self.mode(r));
         if env != Mode::Value {
             self.mark_mode(l, env);
@@ -1245,6 +1392,10 @@ impl Solver {
     /// calls, would make a number of constraints that grows with the
     /// square of their number.
     fn add_bound(&mut self, v: V, t: Ty, lower: bool, env: Mode) -> bool {
+        assert!(
+            (v.0 as usize) >= self.rigid_boundary,
+            "typed expansion mutated a frozen variable"
+        );
         self.observe(v);
         // Only argumentless Con bounds can fuse without touching variables,
         // variance, or service argument comparisons.
@@ -1350,7 +1501,9 @@ impl Solver {
             if t.head().is_some() {
                 self.observe_bounds(v, lower);
             }
-            if let Ty::Var(w) = &t {
+            if let Ty::Var(w) = &t
+                && (w.0 as usize) >= self.rigid_boundary
+            {
                 if lower {
                     self.var_mut(*w).into.push(v);
                 } else {
@@ -1637,6 +1790,9 @@ impl Solver {
         cache: &mut HashMap<(V, Pol, Mode), V>,
     ) -> Ty {
         let env = env.max(self.mode(t));
+        if self.frozen(t) {
+            return t.clone();
+        }
         self.observe_type(t);
         if matches!(t, Ty::Graph(g) if g.label_level() > level) {
             self.fail(FailKind::LabelEscapes, t, &Ty::Top);
@@ -2127,6 +2283,24 @@ impl Solver {
         self.diff_mode(a, h, Mode::Value)
     }
 
+    /// The member of the environment `env` whose type constructor is
+    /// `head`, read also through the lower bounds of row variables. Used by
+    /// a provide of syntax three, whose service type is not written.
+    pub fn env_need(&self, env: &Ty, head: Head) -> Option<Ty> {
+        let mut seen = HashSet::default();
+        let mut todo = vec![env.clone()];
+        while let Some(t) = todo.pop() {
+            match &t {
+                Ty::Con(h, ..) if *h == head => return Some(t),
+                Ty::Union(ms) => todo.extend(ms.iter().cloned()),
+                Ty::Diff(a, _) => todo.push((**a).clone()),
+                Ty::Var(v) if seen.insert(*v) => todo.extend(self.var(*v).lower.iter().cloned()),
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// `M - T` for an environment `M` (§4.8 rule 9): the member of `M` that
     /// is taken out must be equal to its member of `T` (§9.2).
     pub fn env_diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
@@ -2335,7 +2509,7 @@ impl Solver {
         let mut changed = false;
         let mut done = HashSet::default();
         for &v in roots {
-            if !done.insert(v) {
+            if (v.0 as usize) < self.rigid_boundary || !done.insert(v) {
                 continue;
             }
             let (below, lower) = self.reach(vec![v], true);
@@ -2359,12 +2533,16 @@ impl Solver {
                 let old_lower = std::mem::take(&mut self.var_mut(v).lower);
                 let old_upper = std::mem::take(&mut self.var_mut(v).upper);
                 for b in old_lower {
-                    if let Ty::Var(u) = b {
+                    if let Ty::Var(u) = b
+                        && (u.0 as usize) >= self.rigid_boundary
+                    {
                         self.var_mut(u).into.retain(|w| *w != v);
                     }
                 }
                 for b in old_upper {
-                    if let Ty::Var(u) = b {
+                    if let Ty::Var(u) = b
+                        && (u.0 as usize) >= self.rigid_boundary
+                    {
                         self.var_mut(u).from.retain(|w| *w != v);
                     }
                 }

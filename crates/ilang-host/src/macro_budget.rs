@@ -97,7 +97,7 @@ impl MacroBudget {
         self.0.lock().expect("macro budget lock poisoned").exceeded
     }
 
-    /// Charge before doing the corresponding operation or allocating memory.
+    /// Charges before doing the corresponding operation or allocating memory.
     pub fn charge(&self, work: u64, allocation: u64) -> Result<(), Exceeded> {
         let mut s = self.0.lock().expect("macro budget lock poisoned");
         if let Some(limit) = s.exceeded {
