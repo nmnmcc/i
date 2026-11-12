@@ -9,7 +9,9 @@
 //! migrate-syntax3 --verify [DIR...]
 //!     For every `.i` and `.is` file under the DIRs (default: lib std
 //!     examples tests) that the current parser reads without an error:
-//!     parse3(print3(convert(parse_old(f)))) == convert(parse_old(f)).
+//!     parse3(print3(convert(parse_old(f)))) == convert(parse_old(f)),
+//!     the same for the text with the comments of the source, every comment
+//!     is in that text, and the formatter leaves that text as it is.
 //!     Prints the counts and the files that failed; exits 1 when one failed.
 //! ```
 
@@ -58,6 +60,8 @@ struct Converted {
     notes: Vec<convert::Note>,
     /// The text for the file, with the comments of the source.
     text: String,
+    /// The number of comments in the source.
+    comments: usize,
 }
 
 fn convert_file(
@@ -76,6 +80,7 @@ fn convert_file(
             module,
             notes,
             text,
+            comments: 0,
         })
     } else {
         let lexed = lex(source);
@@ -85,6 +90,7 @@ fn convert_file(
             module,
             notes,
             text,
+            comments: lexed.comments.len(),
         })
     }
 }
@@ -113,6 +119,24 @@ fn check(path: &Path, c: &Converted) -> Option<String> {
     }
     reparse(&syn3::print_module(&c.module), "print")
         .or_else(|| reparse(&c.text, "print with comments"))
+        .or_else(|| {
+            let kept = ilang_syntax::lexer::lex3(&c.text).comments.len();
+            (kept != c.comments).then(|| {
+                format!("the source has {} comments, the new text {kept}", c.comments)
+            })
+        })
+        .or_else(|| match syn3::format(&c.text) {
+            Ok(again) if again == c.text => None,
+            Ok(again) => {
+                let (a, b) = again
+                    .lines()
+                    .zip(c.text.lines())
+                    .find(|(a, b)| a != b)
+                    .unwrap_or(("", ""));
+                Some(format!("the formatter changes its own text:\n      {b}\n      {a}"))
+            }
+            Err(_) => Some("the formatter rejects the new text".into()),
+        })
 }
 
 fn ctor_table(files: &[PathBuf]) -> convert::CtorTable {
