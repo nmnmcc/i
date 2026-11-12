@@ -272,8 +272,16 @@ impl Emitter<'_> {
         let repr = *self.numeric_plan.locals.get(&local)?;
         Some(match repr {
             Repr::Float => {
+                let mut reference = "(ref.null eq)".to_string();
                 let raw = match value {
-                    Value::Atom(atom) => self.float_atom(atom),
+                    Value::Atom(atom) => {
+                        if let Atom::Local(source) = atom
+                            && self.numeric_plan.locals.get(source) == Some(&Repr::Float)
+                        {
+                            reference = format!("(local.get $l{source})");
+                        }
+                        self.float_atom(atom)
+                    }
                     Value::Op(op, args)
                         if matches!(
                             op,
@@ -287,9 +295,18 @@ impl Emitter<'_> {
                         let args = args.iter().map(|a| self.float_atom(a)).collect::<Vec<_>>();
                         float_op(*op, &args).expect("Float definition has a scalar operation")
                     }
-                    _ => unbox_float(&self.value(value)),
+                    _ => {
+                        // A call/projection already produced a canonical Float.
+                        // Keep that reference rather than throwing it away and
+                        // allocating a second box when the value escapes.
+                        let boxed = self.value(value);
+                        return Some(format!(
+                            "(local.set $l{local} {boxed})\n(local.set $numeric_f{local} {})\n",
+                            unbox_float(&format!("(local.get $l{local})"))
+                        ));
+                    }
                 };
-                format!("(local.set $numeric_f{local} {raw})\n")
+                format!("(local.set $numeric_f{local} {raw})\n(local.set $l{local} {reference})\n")
             }
             Repr::Int => match value {
                 Value::Atom(atom) => {

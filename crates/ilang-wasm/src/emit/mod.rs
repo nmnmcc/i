@@ -589,7 +589,12 @@ impl<'p> Emitter<'p> {
         match a {
             Atom::Local(l) => match self.numeric_plan.locals.get(l) {
                 Some(numeric::Repr::Float) => {
-                    numeric::box_float(&format!("(local.get $numeric_f{l})"))
+                    // Reuse incoming/canonical boxes. A purely scalar definition
+                    // materializes once, at its first reference escape.
+                    let boxed = numeric::box_float(&format!("(local.get $numeric_f{l})"));
+                    format!(
+                        "(block (result eqref) (if (ref.is_null (local.get $l{l})) (then (local.set $l{l} {boxed}))) (local.get $l{l}))"
+                    )
                 }
                 Some(numeric::Repr::Int) => format!(
                     "(if (result eqref) (ref.is_null (local.get $l{l})) (then (ref.i31 (i32.wrap_i64 (local.get $numeric_i{l})))) (else (local.get $l{l})))"

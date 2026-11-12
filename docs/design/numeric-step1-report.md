@@ -28,7 +28,12 @@ Float operations use f64 locals; each potentially overflowing operation retains
 its finite check and eager source-site action, even when unused. Constants use
 all 64 bits. Division evaluates both operands, handles either zero with positive
 zero, and otherwise divides and checks. There is no reassociation, fused
-arithmetic, finite-check removal, or fast-math option.
+arithmetic, finite-check removal, or fast-math option. Canonical Float inputs and
+results seed a local reference cache. Scalar definitions materialize once at the
+first reference escape; aliases copy an existing reference without forcing a box.
+The first paired N1 measurement exposed 19 extra sine boxes (and one extra dot/
+tuple box) when incoming boxes were discarded; this measured regression prompted
+the cache, rather than a new optimizer pass.
 
 An Int region has an exact signed-i31 scalar in an i64 local and a nullable
 canonical fallback reference. Null marks the scalar successor, not source Nil.

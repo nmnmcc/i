@@ -383,22 +383,54 @@ resumed_h = (x: Float) -> Float {
 fn nonnumeric_emission_and_optimization_are_byte_equal() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"plain\"\n[wasm]\nexports = [\"plain/pass.pass\"]\n").unwrap();
-    std::fs::write(dir.path().join("src/pass.i"), "(pass)\npass = (x: String) -> String { x }\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        "name = \"plain\"\n[wasm]\nexports = [\"plain/pass.pass\"]\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/pass.i"),
+        "(pass)\npass = (x: String) -> String { x }\n",
+    )
+    .unwrap();
     let (graph, diagnostics) = ilang_package::load(dir.path());
     assert!(diagnostics.is_empty());
     let checked = ilang_check::check(&graph);
-    assert!(!checked.diags.iter().any(ilang_package::Diagnostic::is_error));
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error)
+    );
     let program = checked.program.as_ref().unwrap();
     let typed = checked.types.as_ref().unwrap();
     let reference = ilang_wasm::compile_wat(&graph, program, typed, Options::default()).unwrap();
-    let (bytes, _) = ilang_wasm::compile_with_bindings(&graph, program, typed, Options::default()).unwrap();
+    let (bytes, _) =
+        ilang_wasm::compile_with_bindings(&graph, program, typed, Options::default()).unwrap();
     for mode in [Numeric::Visible, Numeric::Scalars] {
-        let text = ilang_wasm::compile_wat_numeric(&graph, program, typed, Options::default().numeric(mode)).unwrap();
-        assert_eq!(text, reference, "no numeric region must leave WAT unchanged");
-        let (candidate, _) = ilang_wasm::compile_with_bindings_numeric(&graph, program, typed, Options::default().numeric(mode)).unwrap();
+        let text = ilang_wasm::compile_wat_numeric(
+            &graph,
+            program,
+            typed,
+            Options::default().numeric(mode),
+        )
+        .unwrap();
+        assert_eq!(
+            text, reference,
+            "no numeric region must leave WAT unchanged"
+        );
+        let (candidate, _) = ilang_wasm::compile_with_bindings_numeric(
+            &graph,
+            program,
+            typed,
+            Options::default().numeric(mode),
+        )
+        .unwrap();
         for level in [ilang_cli::Level::O2, ilang_cli::Level::O3] {
-            assert_eq!(ilang_cli::optimize(&bytes, level).unwrap(), ilang_cli::optimize(&candidate, level).unwrap());
+            assert_eq!(
+                ilang_cli::optimize(&bytes, level).unwrap(),
+                ilang_cli::optimize(&candidate, level).unwrap()
+            );
         }
     }
 }
