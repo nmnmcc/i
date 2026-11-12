@@ -33,7 +33,7 @@ main = () {{
  listener = net.listen("127.0.0.1", 0)
  port = net.local_port(listener)
  ident = tls.identity(<<{server:?}:utf8>>, <<{key:?}:utf8>>)
- opts = (..tls.options(), alpn: ["test"], roots: <<{ca:?}:utf8>>)
+ opts = (..tls.options(), alpn = ["test"], roots = <<{ca:?}:utf8>>)
  task.run(() {{
   task.scope((scope) {{
    task.go(scope, () {{
@@ -56,7 +56,7 @@ main = () {{
   task.scope((scope) {{
    server = task.go(scope, () {{ fail.catch(() {{ tls.accept(net.accept(listener), ident, opts) }}) }})
    result = fail.catch(() {{ tls.dial("localhost", port, tls.options()) }})
-   result |> {{ Error(tls.TlsError(stage, reason)) -> assert(stage == "certificate") _ -> panic("expected certificate error") }}
+   result |> (Error(tls.TlsError(stage = stage, reason = _))) {{ assert(stage == "certificate") }} | (_) {{ panic("expected certificate error") }}
    task.join(server)
    Nil
   }})
@@ -65,7 +65,7 @@ main = () {{
   task.scope((scope) {{
    server = task.go(scope, () {{ fail.catch(() {{ tls.accept(net.accept(listener), ident, opts) }}) }})
    result = fail.catch(() {{ tls.connect(net.connect("localhost", port), "wrong.example", opts) }})
-   result |> {{ Error(tls.TlsError(stage, reason)) -> assert(stage == "certificate") _ -> panic("expected name error") }}
+   result |> (Error(tls.TlsError(stage = stage, reason = _))) {{ assert(stage == "certificate") }} | (_) {{ panic("expected name error") }}
    task.join(server)
    Nil
   }})

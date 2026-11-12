@@ -175,7 +175,7 @@ const LEVELS: [Level; 2] = [Level::O0, Level::O2];
 #[test]
 fn hello_needs_only_wasi() {
     let dir = package(&format!(
-        "{IO}\nmain = (io ! Io) {{ io.print(\"Hello from i!\") }}\n"
+        "{IO}\nmain = () <- (io: Io) {{ io.print(\"Hello from i!\") }}\n"
     ));
     for opt in LEVELS {
         let wasm = wasi(dir.path(), opt);
@@ -211,7 +211,7 @@ fn stops_write_the_message_and_exit_with_1() {
         // An error at the entry (§9.3).
         (
             " (i/fail)\n",
-            "Bad = { (Int) }\n\nmain = () { fail.raise(Bad(7)) }\n",
+            "Bad = (Int)\n\nmain = () { fail.raise(Bad(7)) }\n",
         ),
         // A stop while the top-level values are worked out (§2.5).
         ("", "early = panic(\"too early\")\n\nmain = () { early }\n"),
@@ -239,24 +239,22 @@ fn long_output_survives_short_writes() {
     let dir = package(&format!(
         "{IO}
 double = (s: String, n: Int) {{
-  n |> {{
-    0 -> s
-    _ -> double(s <> s, n - 1)
+  n
+  |> (0) {{ s }}
+  | (_) {{ double(s <> s, n - 1) }}
+}}
+
+lines = (n: Int) <- (io: Io) {{
+  n
+  |> (0) {{ Nil }}
+  | (_) {{
+    io.print(\"ünïcödé ✓\")
+    lines(n - 1)
   }}
 }}
 
-lines = (io ! Io, n: Int) {{
-  n |> {{
-    0 -> Nil
-    _ -> {{
-      io.print(\"ünïcödé ✓\")
-      lines(n - 1)
-    }}
-  }}
-}}
 
-
-main = (io ! Io) {{
+main = () <- (io: Io) {{
   io.print(double(\"héllo ✓ \", 14))
   lines(1000)
 }}
@@ -302,8 +300,8 @@ fn greeter(linker: &mut Linker<State>) {
 
 fn greet_program(attribute: &str) -> tempfile::TempDir {
     package(&format!(
-        "{IO}{attribute}\nGreet {{ Greet(greet: (name: String) -> String) }}\n\
-         \nmain = (io ! Io, g ! Greet) {{ io.print(g.greet(\"i\")) }}\n"
+        "{IO}{attribute}\nGreet = (greet = (String) -> String)\n\
+         \nmain = () <- (io: Io, g: Greet) {{ io.print(g.greet(\"i\")) }}\n"
     ))
 }
 
@@ -408,7 +406,7 @@ fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
             Err(e) => panic!("{e}"),
             Ok(_) => panic!("built"),
         };
-        assert!(e.contains("src/main.i:2:31: error[E0701]"), "{e}");
+        assert!(e.contains("src/main.i:5:1: error[E0701]"), "{e}");
     }
 }
 
@@ -420,14 +418,14 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     let wasi_module = "wasi_snapshot_preview1";
     for name in ["fd_write", "proc_exit"] {
         let external = format!(
-            "@external(\"{wasi_module}\", \"{name}\")\nf: (code: String) -> Nil\n\
+            "@external(\"{wasi_module}\", \"{name}\")\nf: (String) -> Nil\n\
              \nmain = () {{ f(\"x\") }}\n"
         );
         let e = build_error(&external);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
         let service = format!(
-            "@host(\"{wasi_module}\")\nW {{ W({name}: (code: Bool) -> Nil) }}\n\
-             \nmain = (w ! W) {{ w.{name}(True) }}\n"
+            "@host(\"{wasi_module}\")\nW = ({name} = (Bool) -> Nil)\n\
+             \nmain = () <- (w: W) {{ w.{name}(True) }}\n"
         );
         let e = build_error(&service);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
@@ -441,7 +439,7 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     assert!(imports(&wasm).contains(&(wasi_module.into(), "sched_yield".into())));
     // On the target of the binary interface they are normal imports.
     let dir = package(&format!(
-        "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (code: Int) -> Nil\n\
+        "@external(\"{wasi_module}\", \"proc_exit\")\nexit: (Int) -> Nil\n\
          \nmain = () {{ exit(0) }}\n"
     ));
     assert!(build(dir.path(), options(Level::O0, Target::Native)).is_ok());
@@ -486,7 +484,7 @@ Done = ()
 Outer = Paused | Done
 Handed = (Inner)
 Lost = ()
-Handed = Handed | Lost
+Hand = Handed | Lost
 
 put = (k2) <- (o: Out) { o.put(k2) }
 "#;
@@ -549,7 +547,7 @@ paused = () {
 		{
 			control.cancel(k)
 			Lost
-		} <- (Out(print = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
+		} <- (Out(put = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
 	})
 	handed |>
 		(Handed(Inner(k2))) { k2 }
@@ -566,7 +564,7 @@ main = () {
 	{
 		control.resume(paused(), Nil)
 		Nil
-	} <- (Out(print = (k2) { Nil }))
+	} <- (Out(put = (k2) { Nil }))
 }
 "#;
 
@@ -612,7 +610,7 @@ main = () {
 			| (Over) { panic("not paused") }
 		control.resume(k3, Nil)
 		Nil
-	} <- (Out(print = (k2) { Nil }))
+	} <- (Out(put = (k2) { Nil }))
 }
 "#;
 
@@ -815,37 +813,37 @@ fn eager(name: &str) -> (String, &'static str, &'static str, i32) {
         "cancel_out_trace" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:13:7\napp/main:55:3\n",
+            "control: boundary is not active\napp/main:20:7\napp/main:61:3\n",
             1,
         ),
         "cancel_out_trace_catch" => (
             [CANCEL_OUT, G_CATCH, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:14:5\napp/main:13:7\napp/main:59:3\n",
+            "control: boundary is not active\napp/main:21:3\napp/main:20:6\napp/main:62:3\n",
             1,
         ),
         "cancel_out_two_trampolines" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_PLAIN, MAIN_THIRD].concat(),
             "",
-            "control: boundary is not active\napp/main:13:7\napp/main:60:16\napp/main:64:3\napp/main:69:22\napp/main:82:3\n",
+            "control: boundary is not active\napp/main:20:7\napp/main:64:16\napp/main:68:2\napp/main:72:22\napp/main:83:3\n",
             1,
         ),
         "cancel_out_restores_before_mode2" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_ENSURE, MAIN_THIRD].concat(),
             "",
-            "panic: final\napp/main:69:61\napp/main:69:22\napp/main:82:3\n",
+            "panic: final\napp/main:72:61\napp/main:72:22\napp/main:83:3\n",
             1,
         ),
         "env_tail_call_resume" => (
             ENV_TAIL_RESUME.to_string(),
             "",
-            "panic: resumer\napp/main:10:3\napp/main:24:5\napp/main:31:3\n",
+            "panic: resumer\napp/main:14:2\napp/main:25:5\napp/main:32:4\n",
             1,
         ),
         "env_tail_call_cancel" => (
             ENV_TAIL_CANCEL.to_string(),
             "",
-            "panic: resumer\napp/main:11:10\napp/main:26:5\napp/main:33:3\n",
+            "panic: resumer\napp/main:19:8\napp/main:31:5\napp/main:38:4\n",
             1,
         ),
         "cancel_suspends_to_inner_boundary" => (

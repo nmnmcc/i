@@ -488,46 +488,12 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/package_commands.rs:8d36c5f7f3bb9c2a": {
-    "substitutions": [
-      [
-        "{ty}",
-        "Int"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:324fd4156599e8eb": {
-    "substitutions": [
-      [
-        "{ty}",
-        "Int"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-cli/tests/wasi.rs:6d488eb17aafdb21": {
-    "suffix": "\nGreet { Greet(greet: (String) -> String) }\n",
+    "suffix": "\nGreet = (greet = (String) -> String)\n\nmain = () <- (io: Io, g: Greet) { io.print(g.greet(\"i\")) }\n",
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-cli/tests/wasi.rs:11e79c35bb505860": {
-    "suffix": "\nGreet { Greet(greet: (String) -> String) }\n",
+    "suffix": "\nGreet = (greet = (String) -> String)\n\nmain = () <- (io: Io, g: Greet) { io.print(g.greet(\"i\")) }\n",
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-lsp/tests/protocol.rs:0e39ade54c6a0756": {
@@ -686,6 +652,15 @@
       "E0101: expected an expression, found `->`"
     ]
   },
+  "crates/ilang-cli/tests/package_commands.rs:5888b0d352a6a1b0": {
+    "not_source": "search text in a test: the head of the template main"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:baccf998e7fb47a5": {
+    "not_source": "search text in a test: a label of a host service"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:e62e28decc0ee04d": {
+    "not_source": "search text in a test: a label of a host service"
+  },
   "crates/ilang-lsp/src/change.rs:4cdfb1ce888445e2": {
     "reason": "Existing deliberately invalid syntax fixture",
     "diagnostics": [
@@ -736,7 +711,7 @@
     ],
     "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
   },
-  "crates/ilang-wasm/tests/codegen.rs:ce1f7bfbe647f15b": {
+  "crates/ilang-wasm/tests/codegen.rs:b08e50fe7ba33d85": {
     "prefix": "f = (b, x) {\n  a0 = x\n",
     "suffix": "  a1\n}\n",
     "substitutions": [
@@ -1307,7 +1282,7 @@
     "not_source": true,
     "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
   },
-  "crates/ilang-cli/tests/wasi.rs:853ccab837669e73": {
+  "crates/ilang-cli/tests/wasi.rs:fe5a45081165354f": {
     "substitutions": [
       [
         "{IO}",
@@ -1328,7 +1303,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:2c63fcbf8e502a36": {
+  "crates/ilang-cli/tests/wasi.rs:a54563504b5d686a": {
     "substitutions": [
       [
         "{IO}",
@@ -1349,7 +1324,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:1d250e2cb1aa2c23": {
+  "crates/ilang-cli/tests/wasi.rs:69730641c8a3038e": {
     "substitutions": [
       [
         "{IO}",
@@ -1370,7 +1345,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:a2d39b7f18996a7f": {
+  "crates/ilang-cli/tests/wasi.rs:2f2f9eeda8da582e": {
     "substitutions": [
       [
         "{wasi_module}",
@@ -1391,49 +1366,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:882f2779164e0247": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
   "crates/ilang-cli/tests/wasi.rs:99e1343aed5932cb": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-cli/tests/wasi.rs:b6f06d4f92a45093": {
     "reason": "Materialize the source template rather than parse doubled Rust format braces",
     "substitutions": [
       [
@@ -1488,10 +1421,6 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-cli/tests/package_commands.rs:63b8eb2dbb020e7c": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
   "crates/ilang-cli/tests/r2_runtime.rs:e545c6b927783df9": {
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
@@ -1500,7 +1429,7 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-cli/tests/tls.rs:020da3c5bde29e24": {
+  "crates/ilang-cli/tests/tls.rs:783069f71ba1cc71": {
     "substitutions": [
       [
         "{server:?}",
@@ -1905,6 +1834,9 @@
     "not_source": true,
     "reason": "Delimiter used to split a generated program, not an i module."
   },
+  "crates/ilang-wasm/tests/control_lazy.rs:49ab064948281b07": {
+    "not_source": "Rust diagnostic format string"
+  },
   "crates/ilang-cli/tests/http.rs:3597d8fd08de24af": {
     "not_source": true,
     "reason": "Rust format string generates a TOML manifest."
@@ -1913,7 +1845,7 @@
     "not_source": true,
     "reason": "Rust format string generates a TOML manifest."
   },
-  "crates/ilang-cli/tests/http.rs:81cdcb5c5b4e27d6": {
+  "crates/ilang-cli/tests/http.rs:97e31cf541bb26e9": {
     "substitutions": [
       [
         "{{",
@@ -1930,7 +1862,7 @@
     ],
     "reason": "Render Rust format string with a representative port."
   },
-  "crates/ilang-cli/tests/http.rs:53c514ae54f0dcfe": {
+  "crates/ilang-cli/tests/http.rs:146cf9901a2b99ba": {
     "substitutions": [
       [
         "{{",
@@ -1947,7 +1879,7 @@
     ],
     "reason": "Render Rust format string with a representative port."
   },
-  "crates/ilang-cli/tests/http.rs:86571961a0f21442": {
+  "crates/ilang-cli/tests/http.rs:5475c0aa0e2f0c43": {
     "substitutions": [
       [
         "{{",
@@ -2032,7 +1964,7 @@
   "crates/ilang-cli/tests/macro_budget.rs:080eb357b7982bd5": {
     "not_source": "TOML manifest"
   },
-  "crates/ilang-cli/tests/macro_budget.rs:0e972437a34e4ebb": {
+  "crates/ilang-cli/tests/macro_budget.rs:1b94955c0a0c81fc": {
     "substitutions": [
       [
         "{{",
@@ -2657,6 +2589,9 @@
   },
   "crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1": {
     "not_source": "JSON object key in a serde_json macro"
+  },
+  "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
+    "not_source": "Rust format string for a type name"
   },
   "crates/ilang-macro/src/prepare.rs:2bdef896cb528363": {
     "substitutions": [

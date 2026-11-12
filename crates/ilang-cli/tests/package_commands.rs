@@ -214,7 +214,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     assert_eq!(read(&dir.join("i.toml")), test_project::manifest("demo"));
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
-    assert!(read(&dir.join("src/main.i")).contains("main = (io ! Io)"));
+    assert!(read(&dir.join("src/main.i")).contains("main = () <- (io: Io)"));
     assert!(read(&dir.join("test/main_test.i")).contains("test(\"greets\""));
 
     let project = dir.display().to_string();
@@ -656,7 +656,7 @@ fn publish_compares_the_interface() {
 
     // An addition needs a minor version.
     let added = API_1
-        .replace("(one,", "(one, two,")
+        .replace("\tone\n", "\tone\n\ttwo\n")
         .replace("one = 1\n", "one = 1\n\ntwo = 2\n");
     write(&dir, &[("src/api.i", &added)]);
     commit(&dir, "two");
@@ -674,7 +674,7 @@ fn publish_compares_the_interface() {
             "add = (a: Int, b: Int) { a + b }",
             "add = (a: Int, b: Int, c: Int) { a + b + c }",
         )
-        .replace("Square(side: Float) }", "Square(side: Float) Dot }");
+        .replace("Shape = Circle | Square\n", "Dot = ()\nShape = Circle | Square | Dot\n");
     write(&dir, &[("src/api.i", &changed)]);
     commit(&dir, "change");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
@@ -696,7 +696,7 @@ fn publish_compares_the_interface() {
     // Removing a name, or hiding constructors, is incompatible too.
     let hidden = changed
         .replace("Shape(..)", "Shape")
-        .replace("one, two,", "one,");
+        .replace("\ttwo\n", "");
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
@@ -884,8 +884,8 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
         "1.0.1",
     );
     assert!(!ok, "{out}");
-    assert!(out.contains("changed constructors api.W: W(a.T)"), "{out}");
-    assert!(out.contains("to constructors api.W: W(b.T)"), "{out}");
+    assert!(out.contains("changed type api.W: W = (a.T)"), "{out}");
+    assert!(out.contains("to type api.W: W = (b.T)"), "{out}");
     assert!(out.contains("a new major version"), "{out}");
 
     // An alias of another type of the same name.
@@ -944,7 +944,7 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
 #[test]
 fn publish_sees_a_new_major_version_of_a_dependency() {
     let w = World::new();
-    let v = |ty: &str| format!(" (V(..))\n\nV {{ V({ty}) }}\n");
+    let v = |ty: &str| format!(" (V(..))\n\nV = ({ty})\n");
     let (v1, v2) = (v("Int"), v("String"));
     w.repo(
         "dep",
@@ -979,7 +979,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
         "{out}"
     );
     assert!(
-        out.contains("changed constructors api.W: W(example.com/dep@1:v.V)"),
+        out.contains("changed type api.W: W = (example.com/dep@1:v.V)"),
         "{out}"
     );
     assert!(out.contains("a new major version"), "{out}");
@@ -1021,12 +1021,12 @@ fn publish_sees_what_the_host_must_give() {
     let (ok, out) = try_publish(
         &w,
         &dir,
-        &[("src/api.i", &api.replace("print:", "show:"))],
+        &[("src/api.i", &api.replace("print =", "show ="))],
         "1.0.2",
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed constructors api.Io: Io(print: (text: String) -> Nil)"),
+        out.contains("changed constructors api.Io: Io(print: (String) -> Nil)"),
         "{out}"
     );
 }
@@ -1056,7 +1056,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("added host \"i:io/v1\": (print: (text: String) -> Nil)"),
+        out.contains("added host \"i:io/v1\": (print: (String) -> Nil)"),
         "{out}"
     );
     assert!(out.contains("a new minor version"), "{out}");
@@ -1067,7 +1067,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
     let w = World::new();
     // Two packages, both named `util`, each with a module `u` and a type
     // `T`; `pa` and `pb` each use one of them as `util`.
-    let util = |ty: &str| format!(" (T(..))\n\nT {{ T({ty}) }}\n");
+    let util = |ty: &str| format!(" (T(..))\n\nT = ({ty})\n");
     let (u1, u2) = (util("Int"), util("String"));
     w.repo(
         "u1",
@@ -1180,7 +1180,7 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
         &dir,
         &[(
             "src/api.i",
-            &api.replace("now: () -> Int", "now: (n: Int) -> Int")
+            &api.replace("now: () -> Int", "now: (Int) -> Int")
                 .replace("now()", "now(1)"),
         )],
         "1.0.2",
@@ -1195,16 +1195,16 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
     let (ok, out) = try_publish(
         &w,
         &dir,
-        &[("src/api.i", &api.replace("print:", "show:"))],
+        &[("src/api.i", &api.replace("print =", "show ="))],
         "1.0.2",
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed host \"pub:io/v1\": (print: (text: String) -> Nil)"),
+        out.contains("changed host \"pub:io/v1\": (print: (String) -> Nil)"),
         "{out}"
     );
     assert!(
-        out.contains("to host \"pub:io/v1\": (show: (text: String) -> Nil)"),
+        out.contains("to host \"pub:io/v1\": (show: (String) -> Nil)"),
         "{out}"
     );
 }

@@ -130,7 +130,7 @@ fn http_timeout() {
 main = () {{
  task.run(() {{
   result = fail.catch(() {{ http.send_timeout(http.client(), http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
-  result |> {{ Error(http.Timeout) -> Nil _ -> panic("expected timeout") }}
+  result |> (Error(http.Timeout)) {{ Nil }} | (_) {{ panic("expected timeout") }}
  }})
 }}
 "#
@@ -164,7 +164,7 @@ fn http_dns_distinct_from_connection_refused() {
 (i/fail, std/http)
 main = () {{
  result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/") }})
- result |> {{ Error(http.Connect(_)) -> Nil _ -> panic("expected connection error") }}
+ result |> (Error(http.Connect(_))) {{ Nil }} | (_) {{ panic("expected connection error") }}
 }}
 "#
     ));
@@ -248,7 +248,7 @@ fn http_redirect_limit() {
 (i/fail, std/http)
 main = () {{
  result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/start") }})
- result |> {{ Error(http.Protocol("too many redirects")) -> Nil _ -> panic("expected redirect limit") }}
+ result |> (Error(http.Protocol("too many redirects"))) {{ Nil }} | (_) {{ panic("expected redirect limit") }}
 }}
 "#
     ));
