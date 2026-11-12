@@ -286,10 +286,13 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         m.push_str(runtime::LIBRARY_ABSENT);
     }
     for (wat, f) in &p.runtime_calls {
+        let arity = p.funcs[f.0 as usize].arity();
+        let params: String = (0..arity).map(|i| format!(" (param $p{i} eqref)")).collect();
+        let args: String = (0..arity).map(|i| format!(" (local.get $p{i})")).collect();
         let _ = writeln!(
             m,
-            "(func {wat} (param $value eqref) (result eqref) \
-             (call $f{} (global.get $c{}) (ref.null $env) (local.get $value)))",
+            "(func {wat}{params} (result eqref) \
+             (call $f{} (global.get $c{}) (ref.null $env){args}))",
             f.0, f.0
         );
     }

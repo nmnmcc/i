@@ -1,0 +1,258 @@
+//! Large Int arithmetic is i code, `lib/i/big.i`, which the runtime calls
+//! when an operand is not small. These tests compile one program at O0 and
+//! at O2 with scalar lowering and compare `+ - * / %`, the comparisons and
+//! the text form with `num-bigint`, on the edges of the small range, of 32
+//! and 64 bits, and on pseudo-random values of up to 40 limbs. The bitwise
+//! operations, shifts and Float conversions stay in the runtime, but they
+//! use the arithmetic, so they are compared here too.
+use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
+use ilang_wasm::{Numeric, Options};
+use num_bigint::BigInt;
+
+const SOURCE: &str = "(i/core)\n(apply, bits, float_of, whole)\n\
+apply = (a: Int, b: Int) -> String {\n\
+ core.inspect((a + b, a - b, a * b, a / b, a % b, a < b, a == b, a > b, a <= b))\n\
+}\n\
+bits = (a: Int, b: Int, n: Int) -> String {\n\
+ core.inspect((core.bit_and(a, b), core.bit_or(a, b), core.bit_xor(a, b), core.bit_not(a), \
+ core.shift_left(a, n), core.shift_right(a, n)))\n\
+}\n\
+float_of = (a: Int) -> Float { core.to_float(a) }\n\
+whole = (x: Float) -> String { core.inspect(core.truncate(x)) }\n";
+
+fn programs() -> Vec<(u8, Program)> {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        "name = \"big\"\n[wasm]\nexports = [\"big/main.apply\", \"big/main.bits\", \"big/main.float_of\", \"big/main.whole\"]\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("src/main.i"), SOURCE).unwrap();
+    let (graph, diagnostics) = ilang_package::load(dir.path());
+    assert!(
+        !diagnostics.iter().any(ilang_package::Diagnostic::is_error),
+        "{diagnostics:?}"
+    );
+    let checked = ilang_check::check(&graph);
+    assert!(
+        !checked.diags.iter().any(ilang_package::Diagnostic::is_error),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let program = checked.program.as_ref().unwrap();
+    let typed = checked.types.as_ref().unwrap();
+    [(0, Numeric::Reference), (2, Numeric::Scalars)]
+        .into_iter()
+        .map(|(opt, numeric)| {
+            let (wasm, _) = ilang_wasm::compile_with_bindings_numeric(
+                &graph,
+                program,
+                typed,
+                Options::default().numeric(numeric),
+            )
+            .unwrap();
+            let wasm = ilang_cli::optimize(&wasm, ilang_cli::level(opt).unwrap()).unwrap();
+            (opt, Program::from_bytes(&wasm).unwrap())
+        })
+        .collect()
+}
+
+/// The text of §11.8 for the tuple of `apply`, worked out with `num-bigint`.
+fn expected(a: &BigInt, b: &BigInt) -> String {
+    let zero = BigInt::from(0);
+    let (q, r) = if *b == zero {
+        (zero.clone(), zero.clone())
+    } else {
+        // Truncating division; the remainder has the sign of `a`.
+        let q = a / b;
+        let r = a - &q * b;
+        (q, r)
+    };
+    let bool_text = |b: bool| if b { "True" } else { "False" };
+    format!(
+        "({}, {}, {}, {q}, {r}, {}, {}, {}, {})",
+        a + b,
+        a - b,
+        a * b,
+        bool_text(a < b),
+        bool_text(a == b),
+        bool_text(a > b),
+        bool_text(a <= b),
+    )
+}
+
+fn values() -> Vec<BigInt> {
+    let mut values: Vec<BigInt> = [
+        "0",
+        "1",
+        "-1",
+        "1073741823",
+        "1073741824",
+        "-1073741824",
+        "-1073741825",
+        "4294967295",
+        "4294967296",
+        "16383",
+        "16384",
+        "268435456",
+        "9223372036854775807",
+        "9223372036854775808",
+        "-9223372036854775808",
+        "18446744073709551616",
+        "340282366920938463463374607431768211455",
+        "-340282366920938463463374607431768211456",
+        "100000000000000000000",
+        "99999999999999999999999999999999999999",
+    ]
+    .iter()
+    .map(|t| t.parse().unwrap())
+    .collect();
+    let mut state = 0x2545_f491_4f6c_dd1d_u64;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    for _ in 0..60 {
+        let limbs = (next() % 40 + 1) as usize;
+        let mut v = BigInt::from(0);
+        for _ in 0..limbs {
+            // Runs of all-ones and zero limbs stress carries and estimates.
+            let limb = match next() % 4 {
+                0 => u32::MAX,
+                1 => 0,
+                _ => next() as u32,
+            };
+            v = (v << 32) + BigInt::from(limb);
+        }
+        if next() % 2 == 0 {
+            v = -v;
+        }
+        values.push(v);
+    }
+    values
+}
+
+#[test]
+fn large_int_arithmetic_matches_num_bigint() {
+    let values = values();
+    let mut pairs = Vec::new();
+    for (i, a) in values.iter().enumerate() {
+        for (j, b) in values.iter().enumerate() {
+            // Every fixed pair, and a sample of the random ones.
+            if i < 20 || j < 20 || (i * 7 + j) % 5 == 0 {
+                pairs.push((a.clone(), b.clone()));
+            }
+        }
+        // Exact multiples and near multiples divide with no remainder or
+        // with a small one.
+        if let Some(b) = values.get(i + 1) {
+            if *b != BigInt::from(0) {
+                let product = a * b;
+                let step = BigInt::from(if *b > BigInt::from(0) { 1 } else { -1 });
+                pairs.push((product.clone(), b.clone()));
+                pairs.push((&product - step, b.clone()));
+            }
+        }
+    }
+    for (opt, program) in programs() {
+        let mut instance = program
+            .instantiate(HostOptions::new(HostImports::default()))
+            .unwrap();
+        for (a, b) in &pairs {
+            let got = match instance
+                .call("big/main.apply", &[Value::Int(a.clone()), Value::Int(b.clone())])
+                .unwrap()
+            {
+                Outcome::Ok(Value::String(text)) => text,
+                other => panic!("O{opt} {a} {b}: {other:?}"),
+            };
+            assert_eq!(got, expected(a, b), "O{opt}: a = {a}, b = {b}");
+        }
+    }
+}
+
+fn text(instance: &mut ilang_host::Instance, export: &str, args: &[Value]) -> String {
+    match instance.call(export, args).unwrap() {
+        Outcome::Ok(Value::String(text)) => text,
+        other => panic!("{export} {args:?}: {other:?}"),
+    }
+}
+
+#[test]
+fn bitwise_operations_shifts_and_floats_match_num_bigint() {
+    let values = values();
+    for (opt, program) in programs() {
+        let mut instance = program
+            .instantiate(HostOptions::new(HostImports::default()))
+            .unwrap();
+        for (i, a) in values.iter().enumerate() {
+            for (j, b) in values.iter().enumerate() {
+                if !(i < 20 || j < 20 || (i * 3 + j) % 7 == 0) {
+                    continue;
+                }
+                let n = ((i * 31 + j * 17) % 300) as u32;
+                let expected = format!(
+                    "({}, {}, {}, {}, {}, {})",
+                    a & b,
+                    a | b,
+                    a ^ b,
+                    !a.clone(),
+                    a << n,
+                    a >> n
+                );
+                let got = text(
+                    &mut instance,
+                    "big/main.bits",
+                    &[
+                        Value::Int(a.clone()),
+                        Value::Int(b.clone()),
+                        Value::Int(BigInt::from(n)),
+                    ],
+                );
+                assert_eq!(got, expected, "O{opt}: bits of {a}, {b}, {n}");
+            }
+            // The nearest Float, read from the exact decimal text.
+            if a.bits() < 1024 {
+                let expected: f64 = a.to_string().parse().unwrap();
+                match instance
+                    .call("big/main.float_of", &[Value::Int(a.clone())])
+                    .unwrap()
+                {
+                    Outcome::Ok(Value::Float(got)) => {
+                        assert_eq!(got.to_bits(), expected.to_bits(), "O{opt}: to_float {a}")
+                    }
+                    other => panic!("O{opt}: to_float {a}: {other:?}"),
+                }
+            }
+        }
+        for x in [
+            0.0,
+            1.999,
+            -1.999,
+            2f64.powi(30),
+            -(2f64.powi(30)),
+            2f64.powi(53) + 2.0,
+            2f64.powi(63),
+            -(2f64.powi(63)),
+            1e100,
+            -1e100,
+            f64::MIN_POSITIVE,
+            f64::MAX,
+            -f64::MAX,
+        ] {
+            let expected = if x.trunc() == 0.0 {
+                "0".to_string()
+            } else {
+                format!("{:.0}", x.trunc())
+            };
+            assert_eq!(
+                text(&mut instance, "big/main.whole", &[Value::Float(x)]),
+                expected,
+                "O{opt}: truncate {x}"
+            );
+        }
+    }
+}

@@ -13,6 +13,7 @@ pub const MODULES: &[(&str, &str)] = &[
     ("i/key", include_str!("../../../lib/i/key.i")),
     ("i/core", include_str!("../../../lib/i/core.i")),
     ("i/float_text", include_str!("../../../lib/i/float_text.i")),
+    ("i/big", include_str!("../../../lib/i/big.i")),
     ("i/record", include_str!("../../../lib/i/record.i")),
     ("i/io", include_str!("../../../lib/i/io.i")),
     ("i/task", include_str!("../../../lib/i/task.i")),
@@ -30,7 +31,7 @@ pub const MODULES: &[(&str, &str)] = &[
 /// The library modules whose functions the runtime calls
 /// (`ilang_wasm::ir::RUNTIME_CALLS`). Every program has them, also a
 /// compiler program that selects only an import closure.
-pub const RUNTIME: &[&str] = &["i/float_text"];
+pub const RUNTIME: &[&str] = &["i/float_text", "i/big"];
 
 pub const PRELUDE: (&str, &str) = ("i/prelude", include_str!("../../../lib/prelude.i"));
 

@@ -3,6 +3,11 @@
 //! Small values are signed i31 references. Larger values have a sign and a
 //! normalized, little-endian array of unsigned 32-bit limbs. Every arithmetic
 //! operation returns the canonical representation and never mutates an input.
+//!
+//! The operators work out small operands here. When an operand is large they
+//! call the i code of `lib/i/big.i` (`$big_add`, … of `ir::RUNTIME_CALLS`),
+//! which reads and makes large values with the primitives `$big_sign`,
+//! `$big_digits` and `$big_from_digits`.
 
 #[path = "bigint_bits.rs"]
 mod bits;
@@ -131,23 +136,6 @@ const BASE_WAT: &str = r#"
       (if (i64.gt_u (local.get $mag) (i64.const 9223372036854775807)) (then unreachable))
       (local.get $mag))))
 
-(func $mag_compare (param $a (ref $limbs)) (param $b (ref $limbs)) (result i32)
-  (local $an i32) (local $bn i32) (local $x i32) (local $y i32)
-  (local.set $an (call $mag_len (local.get $a)))
-  (local.set $bn (call $mag_len (local.get $b)))
-  (if (i32.lt_u (local.get $an) (local.get $bn)) (then (return (i32.const -1))))
-  (if (i32.gt_u (local.get $an) (local.get $bn)) (then (return (i32.const 1))))
-  (block $done
-    (loop $scan
-      (br_if $done (i32.eqz (local.get $an)))
-      (local.set $an (i32.sub (local.get $an) (i32.const 1)))
-      (local.set $x (array.get $limbs (local.get $a) (local.get $an)))
-      (local.set $y (array.get $limbs (local.get $b) (local.get $an)))
-      (if (i32.lt_u (local.get $x) (local.get $y)) (then (return (i32.const -1))))
-      (if (i32.gt_u (local.get $x) (local.get $y)) (then (return (i32.const 1))))
-      (br $scan)))
-  (i32.const 0))
-
 (func $int_compare (param $a eqref) (param $b eqref) (result i32)
   (local $as i32) (local $bs i32)
   (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
@@ -157,95 +145,25 @@ const BASE_WAT: &str = r#"
       (return
         (i32.sub (i32.gt_s (local.get $as) (local.get $bs))
                  (i32.lt_s (local.get $as) (local.get $bs))))))
+  ;; A large Int is outside the small range, so its sign decides against a
+  ;; small one, and different signs decide between two large ones.
   (local.set $as (call $int_sign (local.get $a)))
   (local.set $bs (call $int_sign (local.get $b)))
-  (if (i32.lt_s (local.get $as) (local.get $bs)) (then (return (i32.const -1))))
-  (if (i32.gt_s (local.get $as) (local.get $bs)) (then (return (i32.const 1))))
-  (if (i32.eqz (local.get $as)) (then (return (i32.const 0))))
-  (i32.mul (local.get $as)
-    (call $mag_compare (call $int_limbs (local.get $a)) (call $int_limbs (local.get $b)))))
-
-(func $mag_add (param $a (ref $limbs)) (param $b (ref $limbs)) (result (ref $limbs))
-  (local $out (ref null $limbs))
-  (local $an i32) (local $bn i32) (local $n i32) (local $i i32)
-  (local $carry i64) (local $sum i64)
-  (local.set $an (array.len (local.get $a)))
-  (local.set $bn (array.len (local.get $b)))
-  (local.set $n
-    (if (result i32) (i32.gt_u (local.get $an) (local.get $bn))
-      (then (local.get $an)) (else (local.get $bn))))
-  (local.set $out (array.new_default $limbs (i32.add (local.get $n) (i32.const 1))))
-  (block $done
-    (loop $add
-      (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
-      (local.set $sum (local.get $carry))
-      (if (i32.lt_u (local.get $i) (local.get $an))
-        (then
-          (local.set $sum (i64.add (local.get $sum)
-            (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $i)))))))
-      (if (i32.lt_u (local.get $i) (local.get $bn))
-        (then
-          (local.set $sum (i64.add (local.get $sum)
-            (i64.extend_i32_u (array.get $limbs (local.get $b) (local.get $i)))))))
-      (array.set $limbs (local.get $out) (local.get $i) (i32.wrap_i64 (local.get $sum)))
-      (local.set $carry (i64.shr_u (local.get $sum) (i64.const 32)))
-      (local.set $i (i32.add (local.get $i) (i32.const 1)))
-      (br $add)))
-  (array.set $limbs (local.get $out) (local.get $n) (i32.wrap_i64 (local.get $carry)))
-  (ref.as_non_null (local.get $out)))
-
-;; Magnitude subtraction; the caller proves a >= b.
-(func $mag_sub (param $a (ref $limbs)) (param $b (ref $limbs)) (result (ref $limbs))
-  (local $out (ref null $limbs)) (local $an i32) (local $bn i32) (local $i i32)
-  (local $borrow i64) (local $x i64) (local $y i64)
-  (local.set $an (array.len (local.get $a)))
-  (local.set $bn (array.len (local.get $b)))
-  (local.set $out (array.new_default $limbs (local.get $an)))
-  (block $done
-    (loop $sub
-      (br_if $done (i32.ge_u (local.get $i) (local.get $an)))
-      (local.set $x (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $i))))
-      (local.set $y (local.get $borrow))
-      (if (i32.lt_u (local.get $i) (local.get $bn))
-        (then
-          (local.set $y (i64.add (local.get $y)
-            (i64.extend_i32_u (array.get $limbs (local.get $b) (local.get $i)))))))
-      (array.set $limbs (local.get $out) (local.get $i)
-        (i32.wrap_i64 (i64.sub (local.get $x) (local.get $y))))
-      (local.set $borrow (i64.extend_i32_u (i64.lt_u (local.get $x) (local.get $y))))
-      (local.set $i (i32.add (local.get $i) (i32.const 1)))
-      (br $sub)))
-  (ref.as_non_null (local.get $out)))
+  (if (ref.test (ref i31) (local.get $a)) (then (return (i32.sub (i32.const 0) (local.get $bs)))))
+  (if (ref.test (ref i31) (local.get $b)) (then (return (local.get $as))))
+  (if (i32.ne (local.get $as) (local.get $bs))
+    (then (return (i32.sub (i32.gt_s (local.get $as) (local.get $bs)) (i32.lt_s (local.get $as) (local.get $bs))))))
+  (i31.get_s (ref.cast (ref i31) (call $big_compare (local.get $a) (local.get $b)))))
 
 (func $int_add (param $a eqref) (param $b eqref) (result eqref)
-  (local $as i32) (local $bs i32) (local $cmp i32)
-  (local $al (ref null $limbs)) (local $bl (ref null $limbs))
-  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (if (result eqref)
+    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
     (then
-      (return (call $int_from_i64
+      (call $int_from_i64
         (i64.add
           (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
-  (local.set $as (call $int_sign (local.get $a)))
-  (local.set $bs (call $int_sign (local.get $b)))
-  (if (i32.eqz (local.get $as)) (then (return (local.get $b))))
-  (if (i32.eqz (local.get $bs)) (then (return (local.get $a))))
-  (local.set $al (call $int_limbs (local.get $a)))
-  (local.set $bl (call $int_limbs (local.get $b)))
-  (if (i32.eq (local.get $as) (local.get $bs))
-    (then
-      (return (call $int_pack (local.get $as)
-        (call $mag_add (ref.as_non_null (local.get $al)) (ref.as_non_null (local.get $bl)))))))
-  (local.set $cmp
-    (call $mag_compare (ref.as_non_null (local.get $al)) (ref.as_non_null (local.get $bl))))
-  (if (i32.eqz (local.get $cmp)) (then (return (ref.i31 (i32.const 0)))))
-  (if (result eqref) (i32.gt_s (local.get $cmp) (i32.const 0))
-    (then
-      (call $int_pack (local.get $as)
-        (call $mag_sub (ref.as_non_null (local.get $al)) (ref.as_non_null (local.get $bl)))))
-    (else
-      (call $int_pack (local.get $bs)
-        (call $mag_sub (ref.as_non_null (local.get $bl)) (ref.as_non_null (local.get $al)))))))
+          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))
+    (else (call $big_add (local.get $a) (local.get $b)))))
 
 (func $int_neg (param $v eqref) (result eqref)
   (if (result eqref) (ref.test (ref i31) (local.get $v))
@@ -265,172 +183,116 @@ const BASE_WAT: &str = r#"
         (i64.sub
           (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
           (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))
-    (else (call $int_add (local.get $a) (call $int_neg (local.get $b))))))
-
-(func $mag_mul (param $a (ref $limbs)) (param $b (ref $limbs)) (result (ref $limbs))
-  (local $out (ref null $limbs)) (local $an i32) (local $bn i32)
-  (local $i i32) (local $j i32) (local $k i32)
-  (local $carry i64) (local $product i64) (local $x i64)
-  (local.set $an (array.len (local.get $a)))
-  (local.set $bn (array.len (local.get $b)))
-  (local.set $out (array.new_default $limbs (i32.add (local.get $an) (local.get $bn))))
-  (block $done
-    (loop $rows
-      (br_if $done (i32.ge_u (local.get $i) (local.get $an)))
-      (local.set $x (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $i))))
-      (local.set $carry (i64.const 0))
-      (local.set $j (i32.const 0))
-      (block $row_done
-        (loop $columns
-          (br_if $row_done (i32.ge_u (local.get $j) (local.get $bn)))
-          (local.set $k (i32.add (local.get $i) (local.get $j)))
-          (local.set $product
-            (i64.add
-              (i64.add
-                (i64.mul (local.get $x)
-                  (i64.extend_i32_u (array.get $limbs (local.get $b) (local.get $j))))
-                (i64.extend_i32_u (array.get $limbs (local.get $out) (local.get $k))))
-              (local.get $carry)))
-          (array.set $limbs (local.get $out) (local.get $k) (i32.wrap_i64 (local.get $product)))
-          (local.set $carry (i64.shr_u (local.get $product) (i64.const 32)))
-          (local.set $j (i32.add (local.get $j) (i32.const 1)))
-          (br $columns)))
-      (array.set $limbs (local.get $out) (i32.add (local.get $i) (local.get $bn))
-        (i32.wrap_i64 (local.get $carry)))
-      (local.set $i (i32.add (local.get $i) (i32.const 1)))
-      (br $rows)))
-  (ref.as_non_null (local.get $out)))
+    (else (call $big_subtract (local.get $a) (local.get $b)))))
 
 (func $int_mul (param $a eqref) (param $b eqref) (result eqref)
-  (local $sign i32)
-  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (if (result eqref)
+    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
     (then
-      (return (call $int_from_i64
+      (call $int_from_i64
         (i64.mul
           (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
-  (local.set $sign (i32.mul (call $int_sign (local.get $a)) (call $int_sign (local.get $b))))
-  (if (i32.eqz (local.get $sign)) (then (return (ref.i31 (i32.const 0)))))
-  (call $int_pack (local.get $sign)
-    (call $mag_mul (call $int_limbs (local.get $a)) (call $int_limbs (local.get $b)))))
-
-;; Binary long division. All writes target newly allocated q and r arrays.
-;; The remainder carries one extra limb while it is shifted, so no leading
-;; carry is lost even when the divisor's highest bit is set.
-(func $mag_divrem (param $a (ref $limbs)) (param $b (ref $limbs))
-  (result (ref $limbs) (ref $limbs))
-  (local $q (ref null $limbs)) (local $r (ref null $limbs))
-  (local $an i32) (local $bn i32) (local $rn i32)
-  (local $bit i64) (local $i i32) (local $word i32) (local $shift i32)
-  (local $carry i64) (local $sum i64) (local $x i64) (local $y i64) (local $borrow i64)
-  (local.set $an (call $mag_len (local.get $a)))
-  (local.set $bn (call $mag_len (local.get $b)))
-  (if (i32.eqz (local.get $bn)) (then unreachable))
-  (if (i32.lt_s (call $mag_compare (local.get $a) (local.get $b)) (i32.const 0))
-    (then (return (array.new_default $limbs (i32.const 0)) (local.get $a))))
-  ;; Common divisors such as 10 and 36 need a single pass over the limbs.
-  ;; carry < divisor <= u32::MAX keeps the combined dividend within u64.
-  (if (i32.eq (local.get $bn) (i32.const 1))
-    (then
-      (local.set $q (array.new_default $limbs (local.get $an)))
-      (local.set $x (i64.extend_i32_u (array.get $limbs (local.get $b) (i32.const 0))))
-      (local.set $i (local.get $an))
-      (local.set $carry (i64.const 0))
-      (block $small_done
-        (loop $small_divide
-          (br_if $small_done (i32.eqz (local.get $i)))
-          (local.set $i (i32.sub (local.get $i) (i32.const 1)))
-          (local.set $sum
-            (i64.or (i64.shl (local.get $carry) (i64.const 32))
-              (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $i)))))
-          (array.set $limbs (local.get $q) (local.get $i)
-            (i32.wrap_i64 (i64.div_u (local.get $sum) (local.get $x))))
-          (local.set $carry (i64.rem_u (local.get $sum) (local.get $x)))
-          (br $small_divide)))
-      (return (ref.as_non_null (local.get $q))
-        (array.new_fixed $limbs 1 (i32.wrap_i64 (local.get $carry))))))
-  (local.set $rn (i32.add (local.get $bn) (i32.const 1)))
-  (local.set $q (array.new_default $limbs (local.get $an)))
-  (local.set $r (array.new_default $limbs (local.get $rn)))
-  (local.set $bit (i64.mul (i64.extend_i32_u (local.get $an)) (i64.const 32)))
-  (block $done
-    (loop $bits
-      (br_if $done (i64.eqz (local.get $bit)))
-      (local.set $bit (i64.sub (local.get $bit) (i64.const 1)))
-      (local.set $word (i32.wrap_i64 (i64.shr_u (local.get $bit) (i64.const 5))))
-      (local.set $shift (i32.and (i32.wrap_i64 (local.get $bit)) (i32.const 31)))
-      (local.set $carry (i64.extend_i32_u
-        (i32.and
-          (i32.shr_u (array.get $limbs (local.get $a) (local.get $word)) (local.get $shift))
-          (i32.const 1))))
-      (local.set $i (i32.const 0))
-      (block $shift_done
-        (loop $shift_r
-          (br_if $shift_done (i32.ge_u (local.get $i) (local.get $rn)))
-          (local.set $sum
-            (i64.or
-              (i64.shl (i64.extend_i32_u (array.get $limbs (local.get $r) (local.get $i)))
-                (i64.const 1))
-              (local.get $carry)))
-          (array.set $limbs (local.get $r) (local.get $i) (i32.wrap_i64 (local.get $sum)))
-          (local.set $carry (i64.shr_u (local.get $sum) (i64.const 32)))
-          (local.set $i (i32.add (local.get $i) (i32.const 1)))
-          (br $shift_r)))
-      (if
-        (i32.ge_s
-          (call $mag_compare (ref.as_non_null (local.get $r)) (local.get $b))
-          (i32.const 0))
-        (then
-          (local.set $i (i32.const 0))
-          (local.set $borrow (i64.const 0))
-          (block $sub_done
-            (loop $sub_r
-              (br_if $sub_done (i32.ge_u (local.get $i) (local.get $rn)))
-              (local.set $x (i64.extend_i32_u (array.get $limbs (local.get $r) (local.get $i))))
-              (local.set $y (local.get $borrow))
-              (if (i32.lt_u (local.get $i) (local.get $bn))
-                (then
-                  (local.set $y
-                    (i64.add (local.get $y)
-                      (i64.extend_i32_u (array.get $limbs (local.get $b) (local.get $i)))))))
-              (array.set $limbs (local.get $r) (local.get $i)
-                (i32.wrap_i64 (i64.sub (local.get $x) (local.get $y))))
-              (local.set $borrow (i64.extend_i32_u (i64.lt_u (local.get $x) (local.get $y))))
-              (local.set $i (i32.add (local.get $i) (i32.const 1)))
-              (br $sub_r)))
-          (array.set $limbs (local.get $q) (local.get $word)
-            (i32.or (array.get $limbs (local.get $q) (local.get $word))
-              (i32.shl (i32.const 1) (local.get $shift))))))
-      (br $bits)))
-  (ref.as_non_null (local.get $q))
-  (ref.as_non_null (local.get $r)))
+          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))
+    (else (call $big_multiply (local.get $a) (local.get $b)))))
 
 (func $int_div (param $a eqref) (param $b eqref) (result eqref)
-  (local $q (ref null $limbs)) (local $r (ref null $limbs))
-  (if (i32.eqz (call $int_sign (local.get $b)))
-    (then (return (ref.i31 (i32.const 0)))))
-  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (if (result eqref)
+    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
     (then
-      (return (call $int_from_i64
-        (i64.div_s
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
-  (call $mag_divrem (call $int_limbs (local.get $a)) (call $int_limbs (local.get $b)))
-  (local.set $r) (local.set $q)
-  (call $int_pack (i32.mul (call $int_sign (local.get $a)) (call $int_sign (local.get $b)))
-    (ref.as_non_null (local.get $q))))
+      (if (result eqref) (i32.eqz (i31.get_s (ref.cast (ref i31) (local.get $b))))
+        (then (ref.i31 (i32.const 0)))
+        (else
+          (call $int_from_i64
+            (i64.div_s
+              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
+              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+    (else (call $big_divide (local.get $a) (local.get $b)))))
 
 (func $int_rem (param $a eqref) (param $b eqref) (result eqref)
-  (local $q (ref null $limbs)) (local $r (ref null $limbs))
-  (if (i32.eqz (call $int_sign (local.get $b)))
-    (then (return (ref.i31 (i32.const 0)))))
-  (if (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
+  (if (result eqref)
+    (i32.and (ref.test (ref i31) (local.get $a)) (ref.test (ref i31) (local.get $b)))
     (then
-      (return (call $int_from_i64
-        (i64.rem_s
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
-          (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
-  (call $mag_divrem (call $int_limbs (local.get $a)) (call $int_limbs (local.get $b)))
-  (local.set $r) (local.set $q)
-  (call $int_pack (call $int_sign (local.get $a)) (ref.as_non_null (local.get $r))))
+      (if (result eqref) (i32.eqz (i31.get_s (ref.cast (ref i31) (local.get $b))))
+        (then (ref.i31 (i32.const 0)))
+        (else
+          (call $int_from_i64
+            (i64.rem_s
+              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $a))))
+              (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $b)))))))))
+    (else (call $big_remainder (local.get $a) (local.get $b)))))
+
+;; The private primitives of `lib/i/big.i` ("ilang:big"): the sign, and the
+;; magnitude as base 2^14 digits, least significant first, as a List(Int).
+(func $big_sign (param $v eqref) (result eqref)
+  (ref.i31 (call $int_sign (local.get $v))))
+
+(func $big_digits (param $v eqref) (result eqref)
+  (local $a (ref $limbs)) (local $n i32) (local $bits i64) (local $k i64)
+  (local $position i64) (local $word i32) (local $window i64) (local $out eqref)
+  (local.set $out (call $list_nil))
+  (local.set $a (call $int_limbs (local.get $v)))
+  (local.set $n (call $mag_len (local.get $a)))
+  (if (i32.eqz (local.get $n)) (then (return (local.get $out))))
+  (local.set $bits
+    (i64.sub (i64.mul (i64.extend_i32_u (local.get $n)) (i64.const 32))
+      (i64.extend_i32_u
+        (i32.clz (array.get $limbs (local.get $a) (i32.sub (local.get $n) (i32.const 1)))))))
+  (local.set $k (i64.div_u (i64.add (local.get $bits) (i64.const 13)) (i64.const 14)))
+  (block $done
+    (loop $digit
+      (br_if $done (i64.eqz (local.get $k)))
+      (local.set $k (i64.sub (local.get $k) (i64.const 1)))
+      (local.set $position (i64.mul (local.get $k) (i64.const 14)))
+      (local.set $word (i32.wrap_i64 (i64.shr_u (local.get $position) (i64.const 5))))
+      (local.set $window
+        (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $word))))
+      (if (i32.lt_u (i32.add (local.get $word) (i32.const 1)) (local.get $n))
+        (then
+          (local.set $window
+            (i64.or (local.get $window)
+              (i64.shl
+                (i64.extend_i32_u
+                  (array.get $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1))))
+                (i64.const 32))))))
+      (local.set $out
+        (call $list_cons
+          (ref.i31 (i32.wrap_i64
+            (i64.and
+              (i64.shr_u (local.get $window) (i64.and (local.get $position) (i64.const 31)))
+              (i64.const 16383))))
+          (local.get $out)))
+      (br $digit)))
+  (local.get $out))
+
+(func $big_from_digits (param $sign eqref) (param $digits eqref) (result eqref)
+  (local $count i32) (local $cursor eqref) (local $a (ref $limbs))
+  (local $position i32) (local $word i32) (local $value i64)
+  (local.set $cursor (local.get $digits))
+  (block $counted
+    (loop $count_digits
+      (br_if $counted (call $list_is_empty (local.get $cursor)))
+      (local.set $count (i32.add (local.get $count) (i32.const 1)))
+      (local.set $cursor (call $list_tail (local.get $cursor)))
+      (br $count_digits)))
+  (local.set $a
+    (array.new_default $limbs
+      (i32.add (i32.div_u (i32.mul (local.get $count) (i32.const 14)) (i32.const 32)) (i32.const 2))))
+  (local.set $cursor (local.get $digits))
+  (block $done
+    (loop $digit
+      (br_if $done (call $list_is_empty (local.get $cursor)))
+      (local.set $word (i32.shr_u (local.get $position) (i32.const 5)))
+      (local.set $value
+        (i64.shl
+          (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (call $list_head (local.get $cursor)))))
+          (i64.extend_i32_u (i32.and (local.get $position) (i32.const 31)))))
+      (array.set $limbs (local.get $a) (local.get $word)
+        (i32.or (array.get $limbs (local.get $a) (local.get $word)) (i32.wrap_i64 (local.get $value))))
+      (array.set $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1))
+        (i32.or (array.get $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1)))
+          (i32.wrap_i64 (i64.shr_u (local.get $value) (i64.const 32)))))
+      (local.set $position (i32.add (local.get $position) (i32.const 14)))
+      (local.set $cursor (call $list_tail (local.get $cursor)))
+      (br $digit)))
+  (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign))) (local.get $a)))
 "#;
