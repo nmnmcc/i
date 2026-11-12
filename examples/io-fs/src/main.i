@@ -21,13 +21,13 @@ main = () {
 	assert(fs.read_file(file) == <<"hello\nworld\n":utf8>>)
 	assert(fs.read_lines(file) == ["hello", "world"])
 	assert(fs.list(dir) == ["first"])
-	assert(fs.metadata(file) == fs.Metadata(12, "file"))
+	assert(fs.metadata(file) == fs.Metadata(size: 12, kind: "file"))
 	fs.rename(file, moved)
 	fs.remove(moved)
 	fs.remove(dir)
 	assert(
 		fail.catch(() { fs.open(moved, fs.ReadOnly) }) ==
-			Error(fs.FsError("open", moved, "not_found"))
+			Error(fs.FsError(operation: "open", path: moved, code: "not_found"))
 	)
 	stdio.print("fs ok")
 }

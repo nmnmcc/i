@@ -7,7 +7,7 @@ T(N) {
 }
 
 merge(N, M) = (a: T(N), b: T(M)) {
-	T(() {
+	T(f: () {
 		a.f()
 		b.f()
 	})
@@ -19,6 +19,6 @@ two = (s ! S(String)) { Nil }
 
 
 main = () {
-	unused = merge(T(one), T(two))
+	unused = merge(T(f: one), T(f: two))
 	Nil
 }

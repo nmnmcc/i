@@ -16,7 +16,7 @@ total_pair = ((1, 2), () {
 
 f = (s: String) -> Int {
 	(a, b) = (1, 2)
-	! Assert = Assert((_) { panic("own") })
+	! Assert = Assert(fail: (_) { panic("own") })
 	"a" = s
 	a
 }

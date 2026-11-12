@@ -11,7 +11,7 @@ main = () {
   x = key.wrap(a, 37)
   assert(a == a)
   assert(a != b)
-  assert(key.unwrap(k: a, x: x) == key.Found(37))
+  assert(key.unwrap(a, x) == key.Found(37))
   assert(key.unwrap(b, x) == key.Missing)
   assert(x == key.wrap(a, 37))
   assert(x != key.wrap(a, 38))

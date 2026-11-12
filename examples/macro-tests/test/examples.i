@@ -22,7 +22,7 @@ SuiteService {
 read = (service ! SuiteService) { service.value }
 
 suite("outer", () {
-	! SuiteService = SuiteService(42)
+	! SuiteService = SuiteService(value: 42)
 	suite("inner", () {
 		test("service", () { assert(read() == 42) })
 		each("cases", [("one", 1), ("two", 2)], (number) {

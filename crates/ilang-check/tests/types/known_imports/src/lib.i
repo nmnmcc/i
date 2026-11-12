@@ -12,11 +12,11 @@ User {
 
 // Not a direct value, so not generalized: its value has no known type, but
 // its type scheme is `User`.
-x = { (a) { a } }(User("bob", 3))
+x = { (a) { a } }(User(name: "bob", age: 3))
 
-xs = { (a) { a } }([User("ann", 4)])
+xs = { (a) { a } }([User(name: "ann", age: 4)])
 
 // A direct value: generalized.
-y = User("ann", 4)
+y = User(name: "ann", age: 4)
 
 mk = (a) { a }

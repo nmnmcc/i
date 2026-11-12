@@ -9,10 +9,10 @@ tell = (x: Int) { x |> {
 } }
 
 main = (io ! Io) {
-  ! Svc(Int) = Svc(() { 1 }, (_: Int) { Nil })
+  ! Svc(Int) = Svc(f: () { 1 }, m: (_: Int) { Nil })
   body = () { ask() + 1 }
   inner(N) = (b: () -> Int ! N) -> Int ! N {
-    ! Svc(String) = Svc(() { "s" }, (_: String) { Nil })
+    ! Svc(String) = Svc(f: () { "s" }, m: (_: String) { Nil })
     b()
   }
   io.print(tell(inner(body)))

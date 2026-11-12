@@ -8,7 +8,7 @@
 // it, after the program waited for the host.
 @host("test:async/v1", "async")
 Later {
-	Later(double: (n: Int) -> Int ^ String)
+	Later(double: (Int) -> Int ^ String)
 }
 
 

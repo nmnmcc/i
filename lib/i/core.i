@@ -99,7 +99,7 @@ byte_size: (String) -> Int
 
 /// The bytes from `start`, `length` of them.
 @external("ilang:core", "byte_slice")
-byte_slice: (String, start: Int, length: Int) -> Result(String, Nil)
+byte_slice: (String, Int, Int) -> Result(String, Nil)
 
 /// The characters in order.
 @external("ilang:core", "codepoints")
@@ -127,7 +127,7 @@ to_lower: (String) -> String
 
 /// The byte offset of the first `find` at or after byte `from`.
 @external("ilang:core", "index_of")
-index_of: (in: String, find: String, from: Int) -> Result(Int, Nil)
+index_of: (String, String, Int) -> Result(Int, Nil)
 
 /// The number of bits.
 @external("ilang:core", "bit_size")
@@ -151,4 +151,4 @@ hash(A): (A) -> Int
 
 /// Whether this value and every capture or held value can cross workers.
 @external("ilang:core", "portable")
-portable(A): (value: A) -> Bool
+portable(A): (A) -> Bool

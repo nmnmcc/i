@@ -2083,7 +2083,10 @@ impl<'a> Resolver<'a> {
                             && crate::syn3_facts::on()
                         {
                             crate::syn3_facts::record(crate::syn3_facts::Fact::FnTypeLabel {
-                                module: self.cur,
+                                file: crate::syn3_facts::File::of(
+                                    &self.graph.sources,
+                                    self.p.module(self.cur).source,
+                                ),
                                 label: label.span,
                                 ty: p.ty.span,
                             });

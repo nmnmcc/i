@@ -24,7 +24,7 @@
 
 @host("app:storage/v1")
 Storage {
-	Storage(read: (key: String) -> String)
+	Storage(read: (String) -> String)
 }
 
 Clock {

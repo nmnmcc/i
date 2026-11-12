@@ -19,21 +19,21 @@
 
 @host("app:console/v1")
 Console {
-	Console(print: (text: String) -> Nil)
+	Console(print: (String) -> Nil)
 }
 
 @host("app:storage/v1")
 Storage {
-	Storage(read: (key: String) -> String ^ String)
+	Storage(read: (String) -> String ^ String)
 }
 
 @host("app:clock/v1", "async")
 Clock {
-	Clock(later: (x: Float) -> Float ^ String, tick: (n: Int) -> Int)
+	Clock(later: (Float) -> Float ^ String, tick: (Int) -> Int)
 }
 
 @external("app:math/v1", "hypot")
-hypot: (a: Float, b: Float) -> Float
+hypot: (Float, Float) -> Float
 
 /// A sync host export with a sync service: prints, and gives the size.
 greet = (name: String, console ! Console) {

@@ -30,7 +30,7 @@ main = () {
 	p: Both(Size) = Pair(left: 1, right: 2)
 	q = Pair(..p, left: 3)
 	c = Circle(radius: 1.0)
-	s = shapes.Square(2.0)
+	s = shapes.Square(side: 2.0)
 	total = area(c) +. shapes.area(s)
 	n = double(u.double(p.left))
 	pt: Point = (1, 2)
@@ -39,12 +39,12 @@ main = () {
 
 check = (q, total, n, pt) {
 	q |> {
-		Pair(left = 1, right) | Pair(right = 1, left) -> core.inspect((
+		Pair(left = 1, right = right) | Pair(right = 1, left = left) -> core.inspect((
 			left
 			right
 			total
 		))
-		Pair(left, right) ? left > right -> core.inspect(n)
+		Pair(left = left, right = right) ? left > right -> core.inspect(n)
 		_                                -> core.inspect(pt)
 	}
 }

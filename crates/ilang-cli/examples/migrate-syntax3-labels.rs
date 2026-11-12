@@ -18,12 +18,16 @@
 //! `src/main.i` of a package `spec` (as the spec suite does). Only files of
 //! the project's own package are edited; with `--lib`, the modules of the
 //! library `i` (`lib/`) too, read from disk. `--check` edits nothing and
-//! exits 1 when an edit is due. Running it again changes nothing.
+//! exits 1 when an edit is due. Running it again changes nothing. A file
+//! that contains `syn3-labels: keep` is not edited.
 
 use ilang_check::syn3_facts::{self, ArgFact, Fact};
 use ilang_syntax::span::Span;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
+
+/// A file with this text is left as it is (a case that tests the error).
+const KEEP: &str = "syn3-labels: keep";
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Edit {
@@ -93,7 +97,12 @@ fn migrate(repo: &Path, project: &Path, check: bool, lib: bool) -> usize {
 }
 
 fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
-    let single = project.extension().is_some_and(|e| e == "i");
+    let single = project.is_file() && project.extension().is_some_and(|e| e == "i");
+    if single
+        && std::fs::read_to_string(project).is_ok_and(|t| t.contains(KEEP))
+    {
+        return Vec::new();
+    }
     let temp;
     let (dir, single_file) = if single {
         temp = tempfile::tempdir().expect("temporary directory");
@@ -132,7 +141,7 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                 let text = std::fs::read_to_string(&path).expect("library module");
                 graph.sources.set_text(m.source, text);
                 path
-            } else if id == root {
+            } else if id == root && !graph.sources.get(m.source).text.contains(KEEP) {
                 match &single_file {
                     Some(f) => f.clone(),
                     None => {
@@ -162,14 +171,23 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
     let mut groups = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for fact in facts {
-        let module = match &fact {
-            Fact::Call { module, .. } | Fact::PatternPart { module, .. } | Fact::FnTypeLabel { module, .. } => *module,
+        let file = match &fact {
+            Fact::Call { file, .. } | Fact::PatternPart { file, .. } | Fact::FnTypeLabel { file, .. } => file,
         };
-        let m = program.module(module);
+        let Some(m) = program
+            .modules
+            .iter()
+            .find(|m| graph.sources.get(m.source).display == file.shown)
+        else {
+            continue;
+        };
         let Some(path) = paths.get(&m.source.0) else {
             continue;
         };
         let text = graph.sources.get(m.source).text.clone();
+        if text.len() != file.len as usize {
+            continue;
+        }
         // A span of expanded code is mapped to the written code it was
         // spliced from, when it was spliced unchanged.
         let map = |s: Span| -> Option<Span> {
@@ -178,10 +196,7 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                     let origin = scoped.origin(s)?;
                     let scope = origin.syntax.scope();
                     let o = origin.syntax.span();
-                    (scope.module == m.source.0
-                        && scope.marks.is_empty()
-                        && o.end as usize <= text.len()
-                        && o.end - o.start == s.end - s.start)
+                    (scope.module == m.source.0 && scope.marks.is_empty() && o.end as usize <= text.len())
                         .then_some(o)
                 }
                 _ => Some(s),
@@ -199,7 +214,32 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                 to,
                 ..
             } => {
+                let generated = m.scoped.as_ref().is_some_and(|sc| sc.is_generated(span));
                 let mapped = (|| {
+                    if generated {
+                        // Read the arguments again from the written call.
+                        let span = map(span)?;
+                        let callee = map(callee)?;
+                        let first = match first {
+                            Some((s, d)) => Some((map(s)?, d)),
+                            None => None,
+                        };
+                        if first.is_none() && callee.start != span.start {
+                            return None;
+                        }
+                        let found = written_args(&text, callee.end as usize, span.end as usize)?;
+                        if found.len() != args.len()
+                            || found.iter().zip(&args).any(|(f, a)| f.label.is_some() != a.label.is_some())
+                        {
+                            return None;
+                        }
+                        let args = found
+                            .into_iter()
+                            .zip(&args)
+                            .map(|(f, a)| ArgFact { direct: a.direct, ..f })
+                            .collect();
+                        return Some((span, callee, first, args));
+                    }
                     let span = map(span)?;
                     let callee = map(callee)?;
                     let first = match first {
@@ -221,6 +261,16 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
                         .collect::<Option<Vec<_>>>()?;
                     Some((span, callee, first, args))
                 })();
+                let mapped = mapped.filter(|(_, _, _, args)| {
+                    args.iter().all(|a| {
+                        a.label.is_none_or(|l| {
+                            text[l.start as usize..l.end as usize]
+                                .bytes()
+                                .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+                                && text[l.end as usize..a.value.start as usize].trim() == ":"
+                        })
+                    })
+                });
                 let Some((span, callee, first, args)) = mapped else {
                     eprintln!("{}: a call in expanded code is not migrated", path.display());
                     continue;
@@ -246,6 +296,12 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
             Fact::PatternPart { span, label, .. } => {
                 let Some(span) = map(span) else { continue };
                 let part = &text[span.start as usize..span.end as usize];
+                if !part.starts_with(label.as_str())
+                    || part[label.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_')
+                {
+                    eprintln!("{}: a pattern in expanded code is not migrated", path.display());
+                    continue;
+                }
                 let rest = part.strip_prefix(label.as_str()).map(str::trim_start);
                 let written = rest.is_some_and(|r| r.starts_with('=') && !r.starts_with("=="));
                 (!written).then(|| Group {
@@ -261,7 +317,11 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
             Fact::FnTypeLabel { label, ty, .. } => {
                 let (Some(label), Some(ty)) = (map(label), map(ty)) else { continue };
                 let between = &text[label.end as usize..ty.start as usize];
-                (between.trim() == ":").then(|| Group {
+                let name = &text[label.start as usize..label.end as usize];
+                (between.trim() == ":"
+                    && !name.is_empty()
+                    && name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_'))
+                .then(|| Group {
                     file: path.clone(),
                     edits: vec![Edit {
                         start: label.start as usize,
@@ -279,6 +339,97 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
         }
     }
     select(groups)
+}
+
+/// The arguments of the call whose callee ends at `from` and which ends at
+/// `end`, read from the text: commas and breaks separate them (spec §6.1).
+fn written_args(text: &str, from: usize, end: usize) -> Option<Vec<ArgFact>> {
+    let b = text.as_bytes();
+    let mut i = from;
+    while i < end && b[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if b.get(i) != Some(&b'(') || b.get(end - 1) != Some(&b')') {
+        return None;
+    }
+    let (open, close) = (i + 1, end - 1);
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = open;
+    let mut j = open;
+    while j < close {
+        match b[j] {
+            b'"' => {
+                j += 1;
+                while j < close && b[j] != b'"' {
+                    j += if b[j] == b'\\' { 2 } else { 1 };
+                }
+            }
+            b'/' if b.get(j + 1) == Some(&b'/') => {
+                while j < close && b[j] != b'\n' {
+                    j += 1;
+                }
+                continue;
+            }
+            b'<' if b.get(j + 1) == Some(&b'<') => {
+                depth += 1;
+                j += 1;
+            }
+            b'>' if b.get(j + 1) == Some(&b'>') && depth > 0 => {
+                depth -= 1;
+                j += 1;
+            }
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth -= 1,
+            b',' | b'\n' if depth == 0 => {
+                if !text[start..j].trim().is_empty() {
+                    parts.push((start, j));
+                }
+                start = j + 1;
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    if depth != 0 {
+        return None;
+    }
+    if !text[start..close].trim().is_empty() {
+        parts.push((start, close));
+    }
+    Some(
+        parts
+            .into_iter()
+            .map(|(s, e)| {
+                let seg = &text[s..e];
+                let s = s + (seg.len() - seg.trim_start().len());
+                let e = e - (seg.len() - seg.trim_end().len());
+                let seg = &text[s..e];
+                let name = seg
+                    .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                    .unwrap_or(seg.len());
+                let after = seg[name..].trim_start();
+                let label = (name > 0
+                    && seg.as_bytes()[0].is_ascii_lowercase() | (seg.as_bytes()[0] == b'_')
+                    && after.starts_with(':')
+                    && !after.starts_with("::")
+                    && !after.starts_with(":="))
+                .then_some(Span { start: s as u32, end: (s + name) as u32 });
+                let value_start = match label {
+                    Some(_) => {
+                        let colon = s + seg.find(':').expect("label colon");
+                        colon + 1 + (text[colon + 1..e].len() - text[colon + 1..e].trim_start().len())
+                    }
+                    None => s,
+                };
+                ArgFact {
+                    label,
+                    value: Span { start: value_start as u32, end: e as u32 },
+                    direct: false,
+                }
+            })
+            .collect(),
+    )
 }
 
 fn line(text: &str, at: usize) -> usize {

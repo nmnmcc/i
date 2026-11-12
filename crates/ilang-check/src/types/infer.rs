@@ -183,7 +183,7 @@ struct PendingUnion {
 
 pub(crate) struct Checker<'a> {
     pub p: &'a Program,
-    sources: &'a Sources,
+    pub(super) sources: &'a Sources,
     pub s: Solver,
     pub diags: Vec<Diagnostic>,
     /// The module whose code is being typed, for the place of problems.
@@ -2131,8 +2131,17 @@ impl<'a> Checker<'a> {
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
+        let ctor = matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)));
+        if !ctor && let Some(a) = args.iter().find_map(|a| a.label.as_ref()) {
+            self.error(
+                code::CALL_LABELS,
+                a.span,
+                "an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)",
+            );
+        }
         let to: Option<Vec<usize>> = if args.iter().any(|a| a.label.is_some()) {
             match &kfn {
+                None if !ctor => None,
                 None => {
                     self.error(
                         code::NEEDS_KNOWN_TYPE,
@@ -2225,14 +2234,6 @@ impl<'a> Checker<'a> {
         let Some(to) = to else {
             return (self.s.fresh(), Ty::Top);
         };
-        let ctor = matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)));
-        if !ctor && let Some(a) = args.iter().find_map(|a| a.label.as_ref()) {
-            self.error(
-                code::CALL_LABELS,
-                a.span,
-                "an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)",
-            );
-        }
         if crate::syn3_facts::on()
             && let Some(k) = &kfn
         {
@@ -2327,7 +2328,7 @@ impl<'a> Checker<'a> {
             return;
         }
         record(Fact::Call {
-            module: self.module,
+            file: crate::syn3_facts::File::of(self.sources, self.p.module(self.module).source),
             span,
             callee: callee.span,
             callee_direct: direct(callee) || matches!(callee.kind, ExprKind::Field { .. }),

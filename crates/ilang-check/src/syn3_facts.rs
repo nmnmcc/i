@@ -3,7 +3,7 @@
 //! the written places that `migrate-syntax3-labels` rewrites. Recording is
 //! off unless a tool turns it on; the facts never change what is checked.
 
-use crate::hir::{Expr, ExprKind, ModuleId, Stmt, ValueRef};
+use crate::hir::{Expr, ExprKind, Stmt, ValueRef};
 use ilang_syntax::span::Span;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,6 +17,25 @@ pub struct ArgFact {
     pub direct: bool,
 }
 
+/// The written file the spans of a fact are in: its shown path and its
+/// length. A fact from a checker run on other text (such as a macro
+/// sandbox) is recognised by the length.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct File {
+    pub shown: String,
+    pub len: u32,
+}
+
+impl File {
+    pub fn of(sources: &ilang_package::Sources, source: ilang_package::SourceId) -> File {
+        let f = sources.get(source);
+        File {
+            shown: f.display.clone(),
+            len: f.text.len() as u32,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Fact {
     /// A call of a function that is not a constructor with an argument by
@@ -25,7 +44,7 @@ pub enum Fact {
     /// parameter of the argument `i`, counting the left side of `|>`
     /// (`first`) as argument 0.
     Call {
-        module: ModuleId,
+        file: File,
         span: Span,
         callee: Span,
         callee_direct: bool,
@@ -38,14 +57,14 @@ pub enum Fact {
     /// A part of a constructor pattern matched to the field `label` by
     /// label, whose top is a name or `name: T` (§7.1).
     PatternPart {
-        module: ModuleId,
+        file: File,
         span: Span,
         label: String,
     },
     /// A label of a parameter of a function type: from the start of the
     /// label to the start of the type.
     FnTypeLabel {
-        module: ModuleId,
+        file: File,
         label: Span,
         ty: Span,
     },

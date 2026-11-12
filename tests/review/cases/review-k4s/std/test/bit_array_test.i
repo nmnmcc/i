@@ -875,6 +875,6 @@ test("concat_many_test", () {
 })
 
 test("slice_negative_take_test", () {
-	assert(bit_array.slice(<<1, 2, 3, 4>>, at: 3, take: -2) == Ok(<<2, 3>>))
-	assert(bit_array.slice(<<1, 2, 3, 4>>, at: 1, take: -2) == Error(Nil))
+	assert(bit_array.slice(<<1, 2, 3, 4>>, 3, -2) == Ok(<<2, 3>>))
+	assert(bit_array.slice(<<1, 2, 3, 4>>, 1, -2) == Error(Nil))
 })

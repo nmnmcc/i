@@ -149,7 +149,7 @@ test("json_conformance_cases", () {
 
 test("json_generated_strings", () {
 	Ok(gen) = property.string(30)
-	property.test(gen, property.Config(13, 100, 30, 0, 100), (s) {
+	property.test(gen, property.Config(seed: 13, cases: 100, max_size: 30, max_discards: 0, max_shrinks: 100), (s) {
 		value = json.Object([("value", json.Text(s))])
 		assert(json.parse(json.print(value)) == Ok(value))
 		assert(json.parse(json.pretty(value, 2)) == Ok(value))
@@ -607,7 +607,7 @@ test("json_invalid_41_a_n", () {
 
 test("json_float_overflow", () {
 	assert(
-		json.parse("1e400") == Error(json.JsonError(0, "number out of range"))
+		json.parse("1e400") == Error(json.JsonError(offset: 0, reason: "number out of range"))
 	)
 })
 
