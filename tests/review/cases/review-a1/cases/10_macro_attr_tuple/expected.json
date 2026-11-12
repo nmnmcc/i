@@ -1,8 +1,8 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "747dc43aa3b52b162ff5dad4fe74e5b843eb1196",
+  "binary_sha256": "1b0c22ae6cdbd633bef043c180222fa76e8018fa4cff783c773fd34d2060a67f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:1:1: error[E0301]: the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`\n1 error\n"
+      "stderr": "src/main.i:1:1: error[E0301]: the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`\n1 error\n"
     }
   }
 }

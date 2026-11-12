@@ -41,6 +41,11 @@ No language or library surface was added, including state mechanisms.
   accepted models. Generate ordinary `main` bindings in `src/main.i`, and
   update the clause minimizer to replace that binding by name. All model,
   runtime, permutation and annotation-removal checks remain enabled.
+- i review corpus: the two `10_macro_attr_tuple` observations still listed
+  removed built-in `@main`/`@test` attributes in the E0301 message. Compared
+  actual output with each saved observation: rejection, code and source
+  position are unchanged. Regenerated only these two diagnostic observations
+  against the current CLI; their independent requirements remain unchanged.
 - JS: the tests execute `target/debug/i`, but the JS verification part did
   not build it. Added Binaryen initialization and a locked debug CLI build
   before npm installation and tests, so this part runs independently.
@@ -97,6 +102,8 @@ Commands use `/home/agent/Programming/i/.rd/cache/heavy direnv exec
 - `scripts/test-generation --mode short --binary target/debug/i`: passed,
   32 cases (20 accepted, 12 rejected by the model), 64 declaration
   permutations, 32 annotation removals, zero failures.
+- `UPDATE=1 scripts/review-corpus run --filter 10_macro_attr_tuple --binary
+  target/debug/i`: passed, both rejected inputs retain their rejection.
 - `scripts/dev-verify js`: passed, 104 Node tests and 60 browser tests across
   Chromium, Firefox and WebKit.
 - `scripts/dev-verify editors`: passed, including query compilation,
