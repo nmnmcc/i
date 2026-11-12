@@ -107,7 +107,10 @@ and LSP formatting/idempotence/syntax-error behavior.
   from `std/test:5:73` to `std/test:21:15`. Updated the expected location.
 - Heavy-wrapped `cargo check -p ilang-cli --all-targets` and
   `cargo test -p ilang-cli --test commands an_error_stops_a_test`: passed.
-- Full acceptance verification is being rerun after that correction.
+- Acceptance rerun: release build, formatter checks and `dev-verify rust` passed.
+  `dev-verify i` passed its format, standard library, benchmark and WASI checks,
+  but its review corpus reported three timeouts and changed outputs in wide/stress
+  cases under concurrent load. The verification is being retried.
 
 ## std/src/test.is before and after
 
