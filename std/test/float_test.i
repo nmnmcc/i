@@ -196,9 +196,7 @@ test("loosely_compare_lt_no_tolerance_test", () {
 })
 
 test("loosely_compare_eq_with_tolerance_test", () {
-	assert(
-		float.loosely_compare(10.2, 10.5, 0.31) == order.Equal
-	)
+	assert(float.loosely_compare(10.2, 10.5, 0.31) == order.Equal)
 	Nil
 })
 
@@ -744,10 +742,7 @@ test("logarithm_half_test", () {
 	assert(
 		float.logarithm(0.5)
 			|> result.unwrap(0.0)
-			|> float.loosely_equals(
-				-.0.6931471805599453
-				0.001
-			)
+			|> float.loosely_equals(-.0.6931471805599453, 0.001)
 	)
 	Nil
 })
@@ -756,10 +751,7 @@ test("logarithm_tenth_test", () {
 	assert(
 		float.logarithm(0.1)
 			|> result.unwrap(0.0)
-			|> float.loosely_equals(
-				-.2.3025850929940455
-				0.001
-			)
+			|> float.loosely_equals(-.2.3025850929940455, 0.001)
 	)
 	Nil
 })
@@ -1037,19 +1029,11 @@ test("loosely_huge_test", () {
 	// Far apart numbers must not stop the program by overflow.
 	assert(
 		core.not(
-			float.loosely_equals(
-				float.max_finite
-				-.float.max_finite
-				1.0
-			)
+			float.loosely_equals(float.max_finite, -.float.max_finite, 1.0)
 		)
 	)
 	assert(
-		float.loosely_compare(
-			float.max_finite
-			-.float.max_finite
-			1.0
-		) ==
+		float.loosely_compare(float.max_finite, -.float.max_finite, 1.0) ==
 			Greater
 	)
 })
@@ -1855,7 +1839,13 @@ test("hypot_symmetry_property", () {
 	Ok(gen) = property.int(-100000, 100000)
 	property.test(
 		property.pair(gen, gen)
-		property.Config(seed: 123, cases: 100, max_size: 30, max_discards: 0, max_shrinks: 100)
+		property.Config(
+			seed:         123
+			cases:        100
+			max_size:     30
+			max_discards: 0
+			max_shrinks:  100
+		)
 		(pair) {
 			(x, y) = pair
 			a = core.to_float(x) /. 100.0
@@ -1870,7 +1860,13 @@ test("atan2_quadrants_property", () {
 	Ok(gen) = property.int(1, 100000)
 	property.test(
 		property.pair(gen, gen)
-		property.Config(seed: 456, cases: 100, max_size: 30, max_discards: 0, max_shrinks: 100)
+		property.Config(
+			seed:         456
+			cases:        100
+			max_size:     30
+			max_discards: 0
+			max_shrinks:  100
+		)
 		(pair) {
 			(x, y) = pair
 			a = core.to_float(x)
@@ -2445,13 +2441,24 @@ test("trig_special_values_test", () {
 
 test("sin_odd_property", () {
 	Ok(gen) = property.int(1, 100000)
-	property.test(gen, property.Config(seed: 789, cases: 100, max_size: 30, max_discards: 0, max_shrinks: 100), (value) {
-		x = core.to_float(value) /. 100.0
-		assert(
-			core.float_to_bits(float.sin(-.x)) ==
-				core.float_to_bits(-.float.sin(x))
+	property.test(
+		gen
+		property.Config(
+			seed:         789
+			cases:        100
+			max_size:     30
+			max_discards: 0
+			max_shrinks:  100
 		)
-	}, core.inspect)
+		(value) {
+			x = core.to_float(value) /. 100.0
+			assert(
+				core.float_to_bits(float.sin(-.x)) ==
+					core.float_to_bits(-.float.sin(x))
+			)
+		}
+		core.inspect
+	)
 })
 
 test("trig_large_and_near_pole_test", () {

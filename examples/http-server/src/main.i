@@ -29,10 +29,10 @@ user_schema = () {
 reply = (status, text) {
 	r = http.response(http.Status(status))
 	http.Response(
-		status: r.status
-		reason: r.reason
-		headers: http.Headers([("Content-Type", "application/json")])
-		body: <<text:utf8>>
+		status:   r.status
+		reason:   r.reason
+		headers:  http.Headers([("Content-Type", "application/json")])
+		body:     <<text:utf8>>
 		trailers: http.Headers([])
 	)
 }
@@ -42,10 +42,10 @@ handle = (req: http.Request) {
 		(http.Method("GET"), "/health") -> {
 			r = http.response(http.Status(200))
 			http.Response(
-				status: r.status
-				reason: r.reason
-				headers: r.headers
-				body: <<"ok":utf8>>
+				status:   r.status
+				reason:   r.reason
+				headers:  r.headers
+				body:     <<"ok":utf8>>
 				trailers: r.trailers
 			)
 		}

@@ -165,7 +165,13 @@ test("filter_prunes_whole_subtrees", () {
 	assert(
 		property.check(
 			property.filter(property.constant(0), (x) { x > 0 })
-			property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 0)
+			property.Config(
+				seed:         0
+				cases:        1
+				max_size:     0
+				max_discards: 0
+				max_shrinks:  0
+			)
 			(_) { property.Pass }
 		) ==
 			property.GaveUp(successes: 0, discards: 1)
@@ -184,7 +190,13 @@ test("greedy_path_budget_and_replay", () {
 	}
 	property.Falsified(f) = property.check(
 		gen
-		property.Config(seed: -1, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 100)
+		property.Config(
+			seed:         -1
+			cases:        1
+			max_size:     0
+			max_discards: 0
+			max_shrinks:  100
+		)
 		predicate
 	)
 	assert(f.original == 10 && f.smallest == 6)
@@ -194,7 +206,13 @@ test("greedy_path_budget_and_replay", () {
 	assert(property.replay(gen, f.seed, f.attempt, f.size, f.path) == Some(6))
 	property.Falsified(short) = property.check(
 		gen
-		property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 2)
+		property.Config(
+			seed:         0
+			cases:        1
+			max_size:     0
+			max_discards: 0
+			max_shrinks:  2
+		)
 		predicate
 	)
 	assert(
@@ -207,7 +225,13 @@ test("greedy_path_budget_and_replay", () {
 	lazy = property.make((_, _) { Some(property.tree(10, () { never() })) })
 	property.Falsified(zero) = property.check(
 		lazy
-		property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 0)
+		property.Config(
+			seed:         0
+			cases:        1
+			max_size:     0
+			max_discards: 0
+			max_shrinks:  0
+		)
 		predicate
 	)
 	assert(
@@ -220,7 +244,13 @@ test("greedy_path_budget_and_replay", () {
 	cycle = property.make((_, _) { Some(cyclic()) })
 	property.Falsified(c) = property.check(
 		cycle
-		property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 7)
+		property.Config(
+			seed:         0
+			cases:        1
+			max_size:     0
+			max_discards: 0
+			max_shrinks:  7
+		)
 		predicate
 	)
 	assert(c.checked == 7 && c.limited && list.length(c.path) == 7)
@@ -237,7 +267,13 @@ test("structural_shrinking", () {
 	gen = property.map(property.make((_, _) { Some(ten) }), (x) { 100 - x })
 	property.Falsified(f) = property.check(
 		gen
-		property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 10)
+		property.Config(
+			seed:         0
+			cases:        1
+			max_size:     0
+			max_discards: 0
+			max_shrinks:  10
+		)
 		(_) { property.Fail("all") }
 	)
 	assert(f.original == 90 && f.smallest == 100)
@@ -246,21 +282,70 @@ test("structural_shrinking", () {
 test("config_and_protocol", () {
 	invalid = property.make((_, _) { panic("invalid config called generator") })
 	predicate = (_) { panic("invalid config called predicate") }
-	assert(property.defaults() == property.Config(seed: 0, cases: 100, max_size: 100, max_discards: 1000, max_shrinks: 1000))
 	assert(
-		property.check(invalid, property.Config(seed: 0, cases: 0, max_size: -1, max_discards: -1, max_shrinks: -1), predicate) ==
+		property.defaults() ==
+			property.Config(
+				seed:         0
+				cases:        100
+				max_size:     100
+				max_discards: 1000
+				max_shrinks:  1000
+			)
+	)
+	assert(
+		property.check(
+			invalid
+			property.Config(
+				seed:         0
+				cases:        0
+				max_size:     -1
+				max_discards: -1
+				max_shrinks:  -1
+			)
+			predicate
+		) ==
 			property.InvalidConfig("cases must be positive")
 	)
 	assert(
-		property.check(invalid, property.Config(seed: 0, cases: 1, max_size: -1, max_discards: -1, max_shrinks: -1), predicate) ==
+		property.check(
+			invalid
+			property.Config(
+				seed:         0
+				cases:        1
+				max_size:     -1
+				max_discards: -1
+				max_shrinks:  -1
+			)
+			predicate
+		) ==
 			property.InvalidConfig("max_size must be nonnegative")
 	)
 	assert(
-		property.check(invalid, property.Config(seed: 0, cases: 1, max_size: 0, max_discards: -1, max_shrinks: -1), predicate) ==
+		property.check(
+			invalid
+			property.Config(
+				seed:         0
+				cases:        1
+				max_size:     0
+				max_discards: -1
+				max_shrinks:  -1
+			)
+			predicate
+		) ==
 			property.InvalidConfig("max_discards must be nonnegative")
 	)
 	assert(
-		property.check(invalid, property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: -1), predicate) ==
+		property.check(
+			invalid
+			property.Config(
+				seed:         0
+				cases:        1
+				max_size:     0
+				max_discards: 0
+				max_shrinks:  -1
+			)
+			predicate
+		) ==
 			property.InvalidConfig("max_shrinks must be nonnegative")
 	)
 	no_show = (_) { panic("nonfailure called show") }
@@ -277,7 +362,17 @@ test("config_and_protocol", () {
 			"std/property v1: invalid config; bad"
 	)
 	report = property.Falsified(
-		property.Failure(seed: 0, attempt: 1, size: 2, original: 10, smallest: 6, reason: "why\nnext", path: [2, 1], checked: 8, limited: False)
+		property.Failure(
+			seed:     0
+			attempt:  1
+			size:     2
+			original: 10
+			smallest: 6
+			reason:   "why\nnext"
+			path:     [2, 1]
+			checked:  8
+			limited:  False
+		)
 	)
 	assert(
 		property.format(report, core.inspect) ==
@@ -300,20 +395,49 @@ test("attempt_streams_seed_and_prefixes", () {
 	})
 	Ok(ints) = property.int(-100, 100)
 	predicate = (x: Int) -> property.Verdict { property.Fail(core.inspect(x)) }
-	a = property.check(ints, property.Config(seed: 0, cases: 1, max_size: 2, max_discards: 0, max_shrinks: 20), predicate)
+	a = property.check(
+		ints
+		property.Config(
+			seed:         0
+			cases:        1
+			max_size:     2
+			max_discards: 0
+			max_shrinks:  20
+		)
+		predicate
+	)
 	b = property.check(
 		ints
-		property.Config(seed: 0x10000000000000000, cases: 5, max_size: 2, max_discards: 100, max_shrinks: 20)
+		property.Config(
+			seed:         0x10000000000000000
+			cases:        5
+			max_size:     2
+			max_discards: 100
+			max_shrinks:  20
+		)
 		predicate
 	)
 	assert(a == b)
 	sizes = property.sized((s) { property.constant(s) })
-	assert(property.check(sizes, property.Config(seed: 0, cases: 3, max_size: 2, max_discards: 6, max_shrinks: 0), (s) {
-		{ s == 2 } |> {
-			True  -> property.Pass
-			False -> property.Discard
-		}
-	}) == property.Passed(successes: 3, discards: 6))
+	assert(
+		property.check(
+			sizes
+			property.Config(
+				seed:         0
+				cases:        3
+				max_size:     2
+				max_discards: 6
+				max_shrinks:  0
+			)
+			(s) {
+				{ s == 2 } |> {
+					True  -> property.Pass
+					False -> property.Discard
+				}
+			}
+		) ==
+			property.Passed(successes: 3, discards: 6)
+	)
 })
 
 test("list_order_and_generated_bounds", () {
@@ -375,7 +499,13 @@ test("assertion_adapter_and_clients", () {
 	report = assertion.catch(() {
 		property.test(
 			property.constant(1)
-			property.Config(seed: 42, cases: 1, max_size: 0, max_discards: 0, max_shrinks: 0)
+			property.Config(
+				seed:         42
+				cases:        1
+				max_size:     0
+				max_discards: 0
+				max_shrinks:  0
+			)
 			(x) { assert(x == 0) }
 			core.inspect
 		)
@@ -391,14 +521,31 @@ test("assertion_adapter_and_clients", () {
 	)
 	Ok(items) = property.int(-10, 10)
 	Ok(lists) = property.list(items, 0, 10)
-	property.test(lists, property.Config(seed: 0, cases: 30, max_size: 10, max_discards: 0, max_shrinks: 100), (xs) {
-		assert(list.reverse(list.reverse(xs)) == xs)
-		assert(sequence.to_list(sequence.from_list(xs)) == xs)
-	}, core.inspect)
+	property.test(
+		lists
+		property.Config(
+			seed:         0
+			cases:        30
+			max_size:     10
+			max_discards: 0
+			max_shrinks:  100
+		)
+		(xs) {
+			assert(list.reverse(list.reverse(xs)) == xs)
+			assert(sequence.to_list(sequence.from_list(xs)) == xs)
+		}
+		core.inspect
+	)
 	Ok(strings) = property.string(20)
 	property.test(
 		strings
-		property.Config(seed: 0, cases: 30, max_size: 20, max_discards: 0, max_shrinks: 100)
+		property.Config(
+			seed:         0
+			cases:        30
+			max_size:     20
+			max_discards: 0
+			max_shrinks:  100
+		)
 		(s) { assert(core.from_codepoints(core.codepoints(s)) == s) }
 		core.inspect
 	)
@@ -477,7 +624,13 @@ test("budget_prefixes_and_discarded_children", () {
 	list.index_map(expected, (pair, index) {
 		property.Falsified(f) = property.check(
 			gen
-			property.Config(seed: 0, cases: 1, max_size: 0, max_discards: 0, max_shrinks: index + 1)
+			property.Config(
+				seed:         0
+				cases:        1
+				max_size:     0
+				max_discards: 0
+				max_shrinks:  index + 1
+			)
 			predicate
 		)
 		assert(f.checked == index + 1 && f.limited)

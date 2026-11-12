@@ -93,12 +93,7 @@ test("from_list_test", () {
 
 test("fold_test", () {
 	assert(
-		{
-			[1, 3, 9] |> set.from_list |> set.fold(0, (m, a) {
-				m + a
-			})
-		} ==
-			13
+		{ [1, 3, 9] |> set.from_list |> set.fold(0, (m, a) { m + a }) } == 13
 	)
 	Nil
 })

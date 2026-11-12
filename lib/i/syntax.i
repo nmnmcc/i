@@ -159,7 +159,10 @@ item_result = (result: ItemResult) -> Nil ^ SyntaxError {
 	raw_items_ok(result) |> {
 		True -> Nil
 		False -> fail.raise(
-			SyntaxError(message: raw_items_message(result), at: raw_items_at(result))
+			SyntaxError(
+				message: raw_items_message(result)
+				at:      raw_items_at(result)
+			)
 		)
 	}
 }
@@ -177,7 +180,9 @@ _items = () -> Items {
 				)
 			)
 		}
-		expose: (name) -> Nil ^ SyntaxError { item_result(raw_items_expose(name)) }
+		expose: (name) -> Nil ^ SyntaxError {
+			item_result(raw_items_expose(name))
+		}
 	)
 }
 
@@ -208,7 +213,7 @@ _definitions = () -> Definitions {
 			False -> fail.raise(
 				SyntaxError(
 					message: raw_definition_message(result)
-					at: raw_definition_at(result)
+					at:      raw_definition_at(result)
 				)
 			)
 		}
@@ -444,8 +449,10 @@ make = (node: Node, like: Syntax) -> Syntax ^ SyntaxError {
 		TypeView(_)   -> panic("TypeView make invariant")
 	}
 	raw_syntax_ok(result) |> {
-		True  -> raw_syntax_value(result)
-		False -> fail.raise(SyntaxError(message: raw_syntax_error(result), at: like))
+		True -> raw_syntax_value(result)
+		False -> fail.raise(
+			SyntaxError(message: raw_syntax_error(result), at: like)
+		)
 	}
 }
 
@@ -483,7 +490,10 @@ show_as = (syntax: Syntax, position: Position) -> String ^ SyntaxError {
 	raw_text_ok(result) |> {
 		True -> raw_text_value(result)
 		False -> fail.raise(
-			SyntaxError(message: raw_text_error(result), at: raw_text_error_at(result))
+			SyntaxError(
+				message: raw_text_error(result)
+				at:      raw_text_error_at(result)
+			)
 		)
 	}
 }
@@ -541,8 +551,10 @@ raw_type_at: (TypeResult) -> Syntax
 
 type_result = (r: TypeResult) -> Syntax ^ SyntaxError {
 	raw_type_ok(r) |> {
-		True  -> raw_type_value(r)
-		False -> fail.raise(SyntaxError(message: raw_type_message(r), at: raw_type_at(r)))
+		True -> raw_type_value(r)
+		False -> fail.raise(
+			SyntaxError(message: raw_type_message(r), at: raw_type_at(r))
+		)
 	}
 }
 
@@ -555,13 +567,16 @@ type_members = (r: TypeResult, index: Int, count: Int) -> List(Syntax) {
 
 _types = () -> Types {
 	Types(
-		type_of: (s) -> Syntax ^ SyntaxError { type_result(raw_type_of(s)) }
+		type_of:   (s) -> Syntax ^ SyntaxError { type_result(raw_type_of(s)) }
 		signature: () -> Syntax { raw_type_value(raw_signature()) }
 		subtype: (a, b) -> Truth ^ SyntaxError {
 			r = raw_subtype(a, b)
 			raw_type_ok(r) |> {
 				False -> fail.raise(
-					SyntaxError(message: raw_type_message(r), at: raw_type_at(r))
+					SyntaxError(
+						message: raw_type_message(r)
+						at:      raw_type_at(r)
+					)
 				)
 				True -> raw_type_truth(r) |> {
 					0 -> Yes
@@ -574,7 +589,10 @@ _types = () -> Types {
 			r = raw_members(s)
 			raw_type_ok(r) |> {
 				False -> fail.raise(
-					SyntaxError(message: raw_type_message(r), at: raw_type_at(r))
+					SyntaxError(
+						message: raw_type_message(r)
+						at:      raw_type_at(r)
+					)
 				)
 				True -> type_members(r, 0, raw_type_len(r))
 			}

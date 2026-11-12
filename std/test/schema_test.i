@@ -177,7 +177,9 @@ test("dict_path", () {
 			schema.dict(schema.bool)
 			json.Object([("x", json.Null)])
 		) ==
-			Error(schema.SchemaError(path: [schema.Field("x")], expected: "bool"))
+			Error(
+				schema.SchemaError(path: [schema.Field("x")], expected: "bool")
+			)
 	)
 })
 
@@ -191,7 +193,9 @@ test("tuple_path", () {
 			schema.tuple(schema.int, schema.string)
 			json.Array([json.Integer(1), json.Null])
 		) ==
-			Error(schema.SchemaError(path: [schema.Index(1)], expected: "string"))
+			Error(
+				schema.SchemaError(path: [schema.Index(1)], expected: "string")
+			)
 	)
 })
 
@@ -280,7 +284,11 @@ test("nested_round", () {
 	assert(
 		round(
 			user_schema()
-			User(name: "Ada", addresses: [Address(city: "HK"), Address(city: "Paris")], role: Admin)
+			User(
+				name:      "Ada"
+				addresses: [Address(city: "HK"), Address(city: "Paris")]
+				role:      Admin
+			)
 		)
 	)
 })
@@ -320,7 +328,7 @@ test("tag_error", () {
 		) ==
 			Error(
 				schema.SchemaError(
-					path: [schema.Field("role"), schema.Field("kind")]
+					path:     [schema.Field("role"), schema.Field("kind")]
 					expected: "tag"
 				)
 			)
@@ -359,7 +367,12 @@ tree_schema = () {
 }
 
 test("recursive_round", () {
-	assert(round(tree_schema(), Tree(value: 1, children: [Tree(value: 2, children: [])])))
+	assert(
+		round(
+			tree_schema()
+			Tree(value: 1, children: [Tree(value: 2, children: [])])
+		)
+	)
 })
 
 optional_schema = () {
@@ -379,7 +392,12 @@ test("optional_field_none", () { assert(round(optional_schema(), None)) })
 test("optional_field_path", () {
 	assert(
 		schema.decode(optional_schema(), json.Object([("value", json.Null)])) ==
-			Error(schema.SchemaError(path: [schema.Field("value")], expected: "int"))
+			Error(
+				schema.SchemaError(
+					path:     [schema.Field("value")]
+					expected: "int"
+				)
+			)
 	)
 })
 

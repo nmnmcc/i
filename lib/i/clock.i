@@ -27,8 +27,10 @@ Clock {
 
 monotonic_ns = (clock ! Clock) {
 	request.await_owned(clock.monotonic_ns()) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ClockError(operation: "monotonic_ns", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ClockError(operation: "monotonic_ns", code: code)
+		)
 	}
 }
 

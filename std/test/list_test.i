@@ -40,8 +40,7 @@ test("length_three_test", () {
 
 test("length_tco_test", () {
 	// TCO test
-	int.range(recursion_test_cycles, -1, [], list.prepend)
-		|> list.length()
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.length()
 	Nil
 })
 
@@ -92,8 +91,7 @@ test("reverse_five_test", () {
 
 test("reverse_tco_test", () {
 	// TCO test
-	int.range(recursion_test_cycles, -1, [], list.prepend)
-		|> list.reverse
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.reverse
 	Nil
 })
 
@@ -199,8 +197,9 @@ test("filter_less_than_test", () {
 
 test("filter_tco_test", () {
 	// TCO test
-	int.range(recursion_test_cycles, -1, [], list.prepend)
-		|> list.filter((x) { x == -1 })
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.filter((x) {
+		x == -1
+	})
 	Nil
 })
 
@@ -277,9 +276,7 @@ test("map2_tco_test", () {
 
 test("map_fold_test", () {
 	assert(
-		list.map_fold([1, 2, 3, 4], 0, (acc, i) {
-			(acc + i, i * 2)
-		}) ==
+		list.map_fold([1, 2, 3, 4], 0, (acc, i) { (acc + i, i * 2) }) ==
 			(10, [2, 4, 6, 8])
 	)
 	Nil
@@ -287,8 +284,9 @@ test("map_fold_test", () {
 
 test("map_fold_tco_test", () {
 	// TCO test
-	list.repeat(0, recursion_test_cycles)
-		|> list.map_fold(0, (acc, i) { (acc + i, i + 1) })
+	list.repeat(0, recursion_test_cycles) |> list.map_fold(0, (acc, i) {
+		(acc + i, i + 1)
+	})
 	Nil
 })
 
@@ -481,10 +479,7 @@ test("fold_tco_test", () {
 })
 
 test("fold_right_test", () {
-	assert(
-		list.fold_right([1, 2, 3], [], (acc, x) { [x, ..acc] }) ==
-			[1, 2, 3]
-	)
+	assert(list.fold_right([1, 2, 3], [], (acc, x) { [x, ..acc] }) == [1, 2, 3])
 	Nil
 })
 
@@ -626,8 +621,9 @@ test("find_not_found_test", () {
 
 test("find_tco_test", () {
 	// TCO test
-	int.range(recursion_test_cycles, -1, [], list.prepend)
-		|> list.find((x) { x == recursion_test_cycles })
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.find((x) {
+		x == recursion_test_cycles
+	})
 	Nil
 })
 
@@ -698,8 +694,9 @@ test("any_short_circuit_test", () {
 
 test("any_tco_test", () {
 	// TCO test
-	int.range(recursion_test_cycles, -1, [], list.prepend)
-		|> list.any((x) { x == recursion_test_cycles })
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.any((x) {
+		x == recursion_test_cycles
+	})
 	Nil
 })
 
@@ -1008,12 +1005,7 @@ test("split_beyond_length_test", () {
 
 test("split_tco_test", () {
 	// TCO test
-	int.range(
-		recursion_test_cycles + 10
-		-1
-		[]
-		list.prepend
-	)
+	int.range(recursion_test_cycles + 10, -1, [], list.prepend)
 		|> list.split(recursion_test_cycles + 1)
 	Nil
 })
@@ -1340,8 +1332,7 @@ test("window_negative_test", () {
 
 test("window_tco_test", () {
 	// TCO test
-	int.range(recursion_test_cycles, -1, [], list.prepend)
-		|> list.window(2)
+	int.range(recursion_test_cycles, -1, [], list.prepend) |> list.window(2)
 	Nil
 })
 
@@ -1362,12 +1353,7 @@ test("drop_while_test", () {
 
 test("drop_while_tco_test", () {
 	// TCO test
-	int.range(
-		recursion_test_cycles + 10
-		-1
-		[]
-		list.prepend
-	)
+	int.range(recursion_test_cycles + 10, -1, [], list.prepend)
 		|> list.drop_while((x) { x < recursion_test_cycles + 1 })
 	Nil
 })
@@ -1405,10 +1391,7 @@ test("chunk_tco_test", () {
 })
 
 test("sized_chunk_test", () {
-	assert(
-		list.sized_chunk([1, 2, 3, 4, 5, 6], 2) ==
-			[[1, 2], [3, 4], [5, 6]]
-	)
+	assert(list.sized_chunk([1, 2, 3, 4, 5, 6], 2) == [[1, 2], [3, 4], [5, 6]])
 	Nil
 })
 
@@ -1441,8 +1424,7 @@ test("scan_empty_test", () {
 
 test("scan_basic_test", () {
 	assert(
-		list.scan([1, 2, 3, 4], 0, (acc, i) { 2 * i + acc }) ==
-			[2, 6, 12, 20]
+		list.scan([1, 2, 3, 4], 0, (acc, i) { 2 * i + acc }) == [2, 6, 12, 20]
 	)
 	Nil
 })
@@ -1529,8 +1511,7 @@ test("combination_pairs_four_test", () {
 
 test("combination_pairs_tco_test", () {
 	// TCO test
-	int.range(200, -1, [], list.prepend)
-		|> list.combination_pairs()
+	int.range(200, -1, [], list.prepend) |> list.combination_pairs()
 	Nil
 })
 
@@ -1828,7 +1809,9 @@ test("known_types_test", () {
 	// The field of `u` is known from the type of `list.map`, with no annotation.
 	users = [User(name: "ann", age: 30), User(name: "bob", age: 25)]
 	assert(list.map(users, (u) { u.name }) == ["ann", "bob"])
-	assert(list.filter(users, (u) { u.age > 26 }) == [User(name: "ann", age: 30)])
+	assert(
+		list.filter(users, (u) { u.age > 26 }) == [User(name: "ann", age: 30)]
+	)
 	assert(
 		list.sort(users, (a, b) { int.compare(a.age, b.age) }) ==
 			[User(name: "bob", age: 25), User(name: "ann", age: 30)]

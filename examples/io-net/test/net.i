@@ -8,11 +8,23 @@
 test("network", () {
 	assert(
 		fail.catch(() { net.listen("localhost", 0) }) ==
-			Error(net.NetError(operation: "listen", endpoint: "localhost", code: "invalid"))
+			Error(
+				net.NetError(
+					operation: "listen"
+					endpoint:  "localhost"
+					code:      "invalid"
+				)
+			)
 	)
 	assert(
 		fail.catch(() { net.connect("localhost", 0) }) ==
-			Error(net.NetError(operation: "connect", endpoint: "localhost", code: "invalid"))
+			Error(
+				net.NetError(
+					operation: "connect"
+					endpoint:  "localhost"
+					code:      "invalid"
+				)
+			)
 	)
 	listener = net.listen("127.0.0.1", 0)
 	port = net.local_port(listener)
@@ -28,21 +40,39 @@ test("network", () {
 			stream = net.connect("localhost", port)
 			assert(
 				fail.catch(() { net.read(stream, 0) }) ==
-					Error(net.NetError(operation: "read", endpoint: "", code: "invalid"))
+					Error(
+						net.NetError(
+							operation: "read"
+							endpoint:  ""
+							code:      "invalid"
+						)
+					)
 			)
 			net.write(stream, <<"ping":utf8>>)
 			net.shutdown_write(stream)
 			net.shutdown_write(stream)
 			assert(
 				fail.catch(() { net.write(stream, <<"x":utf8>>) }) ==
-					Error(net.NetError(operation: "write", endpoint: "", code: "closed"))
+					Error(
+						net.NetError(
+							operation: "write"
+							endpoint:  ""
+							code:      "closed"
+						)
+					)
 			)
 			assert(net.read(stream, 4) == <<"pong":utf8>>)
 			net.close_stream(stream)
 			net.close_stream(stream)
 			assert(
 				fail.catch(() { net.read(stream, 1) }) ==
-					Error(net.NetError(operation: "read", endpoint: "", code: "closed"))
+					Error(
+						net.NetError(
+							operation: "read"
+							endpoint:  ""
+							code:      "closed"
+						)
+					)
 			)
 			Nil
 		})
@@ -52,7 +82,13 @@ test("network", () {
 	net.close_listener(listener)
 	assert(
 		fail.catch(() { net.local_port(listener) }) ==
-			Error(net.NetError(operation: "local_port", endpoint: "", code: "closed"))
+			Error(
+				net.NetError(
+					operation: "local_port"
+					endpoint:  ""
+					code:      "closed"
+				)
+			)
 	)
 	Nil
 })
@@ -67,12 +103,24 @@ test("pending_accept_is_exclusive_and_closed", () {
 			task.yield()
 			assert(
 				fail.catch(() { net.accept(listener) }) ==
-					Error(net.NetError(operation: "accept", endpoint: "", code: "busy"))
+					Error(
+						net.NetError(
+							operation: "accept"
+							endpoint:  ""
+							code:      "busy"
+						)
+					)
 			)
 			net.close_listener(listener)
 			assert(
 				task.join(pending) ==
-					Error(net.NetError(operation: "accept", endpoint: "", code: "closed"))
+					Error(
+						net.NetError(
+							operation: "accept"
+							endpoint:  ""
+							code:      "closed"
+						)
+					)
 			)
 			Nil
 		})
@@ -92,13 +140,26 @@ test("pending_read_allows_write_and_close_wakes_it", () {
 			task.yield()
 			assert(
 				fail.catch(() { net.read(client, 10) }) ==
-					Error(net.NetError(operation: "read", endpoint: "", code: "busy"))
+					Error(
+						net.NetError(
+							operation: "read"
+							endpoint:  ""
+							code:      "busy"
+						)
+					)
 			)
 			net.write(client, <<"ok":utf8>>)
 			assert(net.read(peer, 10) == <<"ok":utf8>>)
 			net.close_stream(client)
 			assert(
-				task.join(pending) == Error(net.NetError(operation: "read", endpoint: "", code: "closed"))
+				task.join(pending) ==
+					Error(
+						net.NetError(
+							operation: "read"
+							endpoint:  ""
+							code:      "closed"
+						)
+					)
 			)
 			Nil
 		})

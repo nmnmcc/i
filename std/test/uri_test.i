@@ -46,9 +46,15 @@ test("uri_raw_parts", () {
 		uri.parts(u) ==
 			uri.Parts(
 				scheme: Some("HTTP")
-				authority: Some(uri.Authority(userinfo: Some("u%3A"), host: uri.RegName("Host"), port: Some("")))
-				path: "/p%2F"
-				query: Some("q=")
+				authority: Some(
+					uri.Authority(
+						userinfo: Some("u%3A")
+						host:     uri.RegName("Host")
+						port:     Some("")
+					)
+				)
+				path:     "/p%2F"
+				query:    Some("q=")
 				fragment: Some("")
 			)
 	)
@@ -56,11 +62,23 @@ test("uri_raw_parts", () {
 	assert(uri.has_scheme(parse_good("a/b")) == False)
 	assert(
 		uri.parts(parse_good("//h")).authority ==
-			Some(uri.Authority(userinfo: None, host: uri.RegName("h"), port: None))
+			Some(
+				uri.Authority(
+					userinfo: None
+					host:     uri.RegName("h")
+					port:     None
+				)
+			)
 	)
 	assert(
 		uri.parts(parse_good("//@h:")).authority ==
-			Some(uri.Authority(userinfo: Some(""), host: uri.RegName("h"), port: Some("")))
+			Some(
+				uri.Authority(
+					userinfo: Some("")
+					host:     uri.RegName("h")
+					port:     Some("")
+				)
+			)
 	)
 	assert(
 		uri.decode_component(uri.parts(parse_good("/%FF")).path) ==
@@ -73,30 +91,146 @@ test("uri_raw_parts", () {
 
 test("uri_parse_errors", () {
 	cases = [
-		("a b", uri.UriError(part: uri.WholePart, offset: 1, problem: uri.BadCharacter))
-		("a%2", uri.UriError(part: uri.WholePart, offset: 1, problem: uri.BadPercent))
-		("%GG ", uri.UriError(part: uri.WholePart, offset: 0, problem: uri.BadPercent))
-		("é%GG", uri.UriError(part: uri.WholePart, offset: 0, problem: uri.BadCharacter))
-		("/a\u{0}", uri.UriError(part: uri.WholePart, offset: 2, problem: uri.BadCharacter))
-		("1:x", uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath))
-		("1:x?[", uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath))
-		("1:x[", uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath))
-		("[1:x", uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath))
-		(":x", uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath))
-		("http://[::1", uri.UriError(part: uri.HostPart, offset: 11, problem: uri.BadHost))
-		("http://h:abc/", uri.UriError(part: uri.PortPart, offset: 9, problem: uri.BadPort))
-		("http://h:1:2/", uri.UriError(part: uri.HostPart, offset: 10, problem: uri.BadHost))
-		("//u@v@h", uri.UriError(part: uri.AuthorityPart, offset: 5, problem: uri.BadAuthority))
-		("//[::1]x", uri.UriError(part: uri.HostPart, offset: 7, problem: uri.BadHost))
-		("//[no]", uri.UriError(part: uri.HostPart, offset: 3, problem: uri.BadHost))
-		("//a]", uri.UriError(part: uri.HostPart, offset: 3, problem: uri.BadHost))
-		("a?b[c", uri.UriError(part: uri.QueryPart, offset: 3, problem: uri.BadCharacter))
-		("a#b#c", uri.UriError(part: uri.FragmentPart, offset: 3, problem: uri.BadCharacter))
-		("a[b", uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath))
-		("//u[ser@h", uri.UriError(part: uri.UserInfoPart, offset: 3, problem: uri.BadAuthority))
-		("//u[ser@h:1:2", uri.UriError(part: uri.UserInfoPart, offset: 3, problem: uri.BadAuthority))
-		("//u[ser@[::", uri.UriError(part: uri.UserInfoPart, offset: 3, problem: uri.BadAuthority))
-		("//h]:1:2", uri.UriError(part: uri.HostPart, offset: 3, problem: uri.BadHost))
+		(
+			"a b"
+			uri.UriError(
+				part:    uri.WholePart
+				offset:  1
+				problem: uri.BadCharacter
+			)
+		)
+		(
+			"a%2"
+			uri.UriError(
+				part:    uri.WholePart
+				offset:  1
+				problem: uri.BadPercent
+			)
+		)
+		(
+			"%GG "
+			uri.UriError(
+				part:    uri.WholePart
+				offset:  0
+				problem: uri.BadPercent
+			)
+		)
+		(
+			"é%GG"
+			uri.UriError(
+				part:    uri.WholePart
+				offset:  0
+				problem: uri.BadCharacter
+			)
+		)
+		(
+			"/a\u{0}"
+			uri.UriError(
+				part:    uri.WholePart
+				offset:  2
+				problem: uri.BadCharacter
+			)
+		)
+		(
+			"1:x"
+			uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath)
+		)
+		(
+			"1:x?["
+			uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath)
+		)
+		(
+			"1:x["
+			uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath)
+		)
+		(
+			"[1:x"
+			uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath)
+		)
+		(
+			":x"
+			uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath)
+		)
+		(
+			"http://[::1"
+			uri.UriError(part: uri.HostPart, offset: 11, problem: uri.BadHost)
+		)
+		(
+			"http://h:abc/"
+			uri.UriError(part: uri.PortPart, offset: 9, problem: uri.BadPort)
+		)
+		(
+			"http://h:1:2/"
+			uri.UriError(part: uri.HostPart, offset: 10, problem: uri.BadHost)
+		)
+		(
+			"//u@v@h"
+			uri.UriError(
+				part:    uri.AuthorityPart
+				offset:  5
+				problem: uri.BadAuthority
+			)
+		)
+		(
+			"//[::1]x"
+			uri.UriError(part: uri.HostPart, offset: 7, problem: uri.BadHost)
+		)
+		(
+			"//[no]"
+			uri.UriError(part: uri.HostPart, offset: 3, problem: uri.BadHost)
+		)
+		(
+			"//a]"
+			uri.UriError(part: uri.HostPart, offset: 3, problem: uri.BadHost)
+		)
+		(
+			"a?b[c"
+			uri.UriError(
+				part:    uri.QueryPart
+				offset:  3
+				problem: uri.BadCharacter
+			)
+		)
+		(
+			"a#b#c"
+			uri.UriError(
+				part:    uri.FragmentPart
+				offset:  3
+				problem: uri.BadCharacter
+			)
+		)
+		(
+			"a[b"
+			uri.UriError(part: uri.PathPart, offset: 1, problem: uri.BadPath)
+		)
+		(
+			"//u[ser@h"
+			uri.UriError(
+				part:    uri.UserInfoPart
+				offset:  3
+				problem: uri.BadAuthority
+			)
+		)
+		(
+			"//u[ser@h:1:2"
+			uri.UriError(
+				part:    uri.UserInfoPart
+				offset:  3
+				problem: uri.BadAuthority
+			)
+		)
+		(
+			"//u[ser@[::"
+			uri.UriError(
+				part:    uri.UserInfoPart
+				offset:  3
+				problem: uri.BadAuthority
+			)
+		)
+		(
+			"//h]:1:2"
+			uri.UriError(part: uri.HostPart, offset: 3, problem: uri.BadHost)
+		)
 	]
 	list.each(cases, (pair) {
 		(text, expected) = pair
@@ -106,7 +240,13 @@ test("uri_parse_errors", () {
 })
 
 test("uri_build_errors", () {
-	blank = uri.Parts(scheme: None, authority: None, path: "", query: None, fragment: None)
+	blank = uri.Parts(
+		scheme:    None
+		authority: None
+		path:      ""
+		query:     None
+		fragment:  None
+	)
 	cases = [
 		(
 			uri.Parts(..blank, path: "a:b")
@@ -119,30 +259,56 @@ test("uri_build_errors", () {
 		(
 			uri.Parts(
 				..blank
-				authority: Some(uri.Authority(userinfo: None, host: uri.RegName("h"), port: None))
-				path:      "x"
+				authority: Some(
+					uri.Authority(
+						userinfo: None
+						host:     uri.RegName("h")
+						port:     None
+					)
+				)
+				path: "x"
 			)
 			uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath)
 		)
 		(
 			uri.Parts(..blank, scheme: Some(""))
-			uri.UriError(part: uri.SchemePart, offset: 0, problem: uri.BadScheme)
+			uri.UriError(
+				part:    uri.SchemePart
+				offset:  0
+				problem: uri.BadScheme
+			)
 		)
 		(
 			uri.Parts(..blank, scheme: Some("1x"))
-			uri.UriError(part: uri.SchemePart, offset: 0, problem: uri.BadScheme)
+			uri.UriError(
+				part:    uri.SchemePart
+				offset:  0
+				problem: uri.BadScheme
+			)
 		)
 		(
 			uri.Parts(..blank, scheme: Some("a:"))
-			uri.UriError(part: uri.SchemePart, offset: 1, problem: uri.BadScheme)
+			uri.UriError(
+				part:    uri.SchemePart
+				offset:  1
+				problem: uri.BadScheme
+			)
 		)
 		(
 			uri.Parts(..blank, scheme: Some("a%20"))
-			uri.UriError(part: uri.SchemePart, offset: 1, problem: uri.BadScheme)
+			uri.UriError(
+				part:    uri.SchemePart
+				offset:  1
+				problem: uri.BadScheme
+			)
 		)
 		(
 			uri.Parts(..blank, scheme: Some("é"))
-			uri.UriError(part: uri.SchemePart, offset: 0, problem: uri.BadCharacter)
+			uri.UriError(
+				part:    uri.SchemePart
+				offset:  0
+				problem: uri.BadCharacter
+			)
 		)
 		(
 			uri.Parts(..blank, path: "x%")
@@ -150,32 +316,60 @@ test("uri_build_errors", () {
 		)
 		(
 			uri.Parts(..blank, query: Some("#"))
-			uri.UriError(part: uri.QueryPart, offset: 0, problem: uri.BadCharacter)
+			uri.UriError(
+				part:    uri.QueryPart
+				offset:  0
+				problem: uri.BadCharacter
+			)
 		)
 		(
 			uri.Parts(..blank, fragment: Some("["))
-			uri.UriError(part: uri.FragmentPart, offset: 0, problem: uri.BadCharacter)
+			uri.UriError(
+				part:    uri.FragmentPart
+				offset:  0
+				problem: uri.BadCharacter
+			)
 		)
 		(
 			uri.Parts(
 				..blank
 				authority: Some(
-					uri.Authority(userinfo: Some("a@"), host: uri.RegName("h"), port: None)
+					uri.Authority(
+						userinfo: Some("a@")
+						host:     uri.RegName("h")
+						port:     None
+					)
 				)
 			)
-			uri.UriError(part: uri.UserInfoPart, offset: 1, problem: uri.BadAuthority)
+			uri.UriError(
+				part:    uri.UserInfoPart
+				offset:  1
+				problem: uri.BadAuthority
+			)
 		)
 		(
 			uri.Parts(
 				..blank
-				authority: Some(uri.Authority(userinfo: None, host: uri.RegName("a:b"), port: None))
+				authority: Some(
+					uri.Authority(
+						userinfo: None
+						host:     uri.RegName("a:b")
+						port:     None
+					)
+				)
 			)
 			uri.UriError(part: uri.HostPart, offset: 1, problem: uri.BadHost)
 		)
 		(
 			uri.Parts(
 				..blank
-				authority: Some(uri.Authority(userinfo: None, host: uri.IpLiteral("::g"), port: None))
+				authority: Some(
+					uri.Authority(
+						userinfo: None
+						host:     uri.IpLiteral("::g")
+						port:     None
+					)
+				)
 			)
 			uri.UriError(part: uri.HostPart, offset: 0, problem: uri.BadHost)
 		)
@@ -183,7 +377,11 @@ test("uri_build_errors", () {
 			uri.Parts(
 				..blank
 				authority: Some(
-					uri.Authority(userinfo: None, host: uri.RegName("h"), port: Some("1x"))
+					uri.Authority(
+						userinfo: None
+						host:     uri.RegName("h")
+						port:     Some("1x")
+					)
 				)
 			)
 			uri.UriError(part: uri.PortPart, offset: 1, problem: uri.BadPort)
@@ -195,13 +393,31 @@ test("uri_build_errors", () {
 		)
 		(
 			uri.Parts(..blank, path: "//h", query: Some(" "))
-			uri.UriError(part: uri.QueryPart, offset: 0, problem: uri.BadCharacter)
+			uri.UriError(
+				part:    uri.QueryPart
+				offset:  0
+				problem: uri.BadCharacter
+			)
 		)
 	]
 	// U8 build checks query grammar before the path's cross-field constraints.
 	assert(
-		uri.build(uri.Parts(scheme: None, authority: None, path: "a:b", query: Some("["), fragment: None)) ==
-			Error(uri.UriError(part: uri.QueryPart, offset: 0, problem: uri.BadCharacter))
+		uri.build(
+			uri.Parts(
+				scheme:    None
+				authority: None
+				path:      "a:b"
+				query:     Some("[")
+				fragment:  None
+			)
+		) ==
+			Error(
+				uri.UriError(
+					part:    uri.QueryPart
+					offset:  0
+					problem: uri.BadCharacter
+				)
+			)
 	)
 	list.each(cases, (pair) {
 		(p, expected) = pair
@@ -280,17 +496,31 @@ test("uri_rfc_resolution", () {
 
 test("uri_resolution_validation", () {
 	base = parse_good("x:a")
-	bad = Error(uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath))
+	bad = Error(
+		uri.UriError(part: uri.PathPart, offset: 0, problem: uri.BadPath)
+	)
 	list.each(["/.//h", "/a/..//h", "/.//a:b", "x:/.//h"], (s) {
 		assert(uri.resolve(base, parse_good(s)) == bad)
 	})
 	assert(
 		uri.resolve(parse_good("a"), parse_good("/.//h")) ==
-			Error(uri.UriError(part: uri.WholePart, offset: 0, problem: uri.RelativeBase))
+			Error(
+				uri.UriError(
+					part:    uri.WholePart
+					offset:  0
+					problem: uri.RelativeBase
+				)
+			)
 	)
 	assert(
 		uri.resolve(parse_good("a"), parse_good("x:b")) ==
-			Error(uri.UriError(part: uri.WholePart, offset: 0, problem: uri.RelativeBase))
+			Error(
+				uri.UriError(
+					part:    uri.WholePart
+					offset:  0
+					problem: uri.RelativeBase
+				)
+			)
 	)
 	Ok(u) = uri.resolve(parse_good("x://host/a"), parse_good("/.//h"))
 	assert(uri.to_string(u) == "x://host//h")
@@ -340,7 +570,13 @@ test("uri_ip_literals", () {
 	list.each(invalid, (host) {
 		assert(
 			uri.parse(string.concat(["x://[", host, "]"])) ==
-				Error(uri.UriError(part: uri.HostPart, offset: 5, problem: uri.BadHost))
+				Error(
+					uri.UriError(
+						part:    uri.HostPart
+						offset:  5
+						problem: uri.BadHost
+					)
+				)
 		)
 	})
 	Nil
@@ -417,15 +653,33 @@ test("uri_generated_round_trips", () {
 	authorities = [
 		None
 		Some(uri.Authority(userinfo: None, host: uri.RegName(""), port: None))
-		Some(uri.Authority(userinfo: Some("a%3A"), host: uri.RegName("h"), port: Some("")))
-		Some(uri.Authority(userinfo: None, host: uri.IpLiteral("::1"), port: Some("99999")))
+		Some(
+			uri.Authority(
+				userinfo: Some("a%3A")
+				host:     uri.RegName("h")
+				port:     Some("")
+			)
+		)
+		Some(
+			uri.Authority(
+				userinfo: None
+				host:     uri.IpLiteral("::1")
+				port:     Some("99999")
+			)
+		)
 	]
 	list.each(schemes, (scheme) {
 		list.each(authorities, (authority) {
 			list.each(["", "/", "/a//b/../", "/%FF", "/a%2fb"], (path) {
 				list.each([None, Some(""), Some("x=+&x=%FF")], (query) {
 					list.each([None, Some(""), Some("a/?")], (fragment) {
-						p = uri.Parts(scheme: scheme, authority: authority, path: path, query: query, fragment: fragment)
+						p = uri.Parts(
+							scheme:    scheme
+							authority: authority
+							path:      path
+							query:     query
+							fragment:  fragment
+						)
 						Ok(u) = uri.build(p)
 						assert(uri.parts(u) == p)
 						round_trip(u)

@@ -21,7 +21,9 @@ test("stdio_fake", () {
 			True  -> Ok(Nil)
 			False -> Error("wrong_bytes")
 		})
-	}, flush: () { request.ready(Ok(Nil)) }, flush_error: () { request.ready(Ok(Nil)) })
+	}, flush: () { request.ready(Ok(Nil)) }, flush_error: () {
+		request.ready(Ok(Nil))
+	})
 	assert(stdio.read(1) == <<>>)
 	assert(
 		fail.catch(() { stdio.read(0) }) ==

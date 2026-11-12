@@ -35,20 +35,12 @@ TlsError {
 @host("i:tls/v1", "request")
 Tls {
 	Tls(
-		connect: (
-			Int
-			String
-			String
-			BitArray
-			BitArray
-			BitArray
-		) -> Request(Result(Int, String))
-		accept: (
-			Int
-			BitArray
-			BitArray
-			String
-		) -> Request(Result(Int, String))
+		connect: (Int, String, String, BitArray, BitArray, BitArray) -> Request(
+			Result(Int, String)
+		)
+		accept: (Int, BitArray, BitArray, String) -> Request(
+			Result(Int, String)
+		)
 		alpn:           (Int) -> Request(Result(String, String))
 		read:           (Int, Int) -> Request(Result(BitArray, String))
 		write:          (Int, BitArray) -> Request(Result(Nil, String))
@@ -80,7 +72,7 @@ raise = (message) {
 	core.index_of(message, ":", 0) |> {
 		Ok(n) -> fail.raise(
 			TlsError(
-				stage: slice(message, 0, n)
+				stage:  slice(message, 0, n)
 				reason: slice(message, n + 1, core.byte_size(message) - n - 1)
 			)
 		)

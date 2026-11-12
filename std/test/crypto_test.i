@@ -511,9 +511,7 @@ test("hmac_sha256_rfc4231_2", () {
 	assert(
 		crypto.hmac_sha256(
 			unhex("4a656665")
-			unhex(
-				"7768617420646f2079612077616e7420666f72206e6f7468696e673f"
-			)
+			unhex("7768617420646f2079612077616e7420666f72206e6f7468696e673f")
 		) ==
 			Ok(
 				unhex(
@@ -630,9 +628,7 @@ test("hmac_sha512_rfc4231_2", () {
 	assert(
 		crypto.hmac_sha512(
 			unhex("4a656665")
-			unhex(
-				"7768617420646f2079612077616e7420666f72206e6f7468696e673f"
-			)
+			unhex("7768617420646f2079612077616e7420666f72206e6f7468696e673f")
 		) ==
 			Ok(
 				unhex(
@@ -1003,12 +999,7 @@ test("pbkdf2_rfc6070_sha256_5", () {
 
 test("pbkdf2_rfc6070_sha256_6", () {
 	assert(
-		crypto.pbkdf2_sha256(
-			unhex("")
-			unhex("")
-			1
-			64
-		) ==
+		crypto.pbkdf2_sha256(unhex(""), unhex(""), 1, 64) ==
 			Ok(
 				unhex(
 					"f7ce0b653d2d72a4108cf5abe912ffdd777616dbbb27a70e8204f3ae2d0f6fad89f68f4811d1e87bcc3bd7400a9ffd29094f0184639574f39ae5a1315217bcd7"
@@ -1020,13 +1011,7 @@ test("pbkdf2_rfc6070_sha256_6", () {
 
 test("pbkdf2_rfc6070_sha256_7", () {
 	assert(
-		crypto.pbkdf2_sha256(
-			unhex("70")
-			unhex("73")
-			3
-			0
-		) ==
-			Ok(unhex(""))
+		crypto.pbkdf2_sha256(unhex("70"), unhex("73"), 3, 0) == Ok(unhex(""))
 	)
 	Nil
 })
@@ -1192,7 +1177,12 @@ test("random_bytes_service_error", () {
 	})
 	assert(
 		fail.catch(() { crypto.random_bytes(1) }) ==
-			Error(process.ProcessError(operation: "entropy", code: "entropy failed"))
+			Error(
+				process.ProcessError(
+					operation: "entropy"
+					code:      "entropy failed"
+				)
+			)
 	)
 	Nil
 })

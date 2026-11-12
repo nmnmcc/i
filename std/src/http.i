@@ -129,12 +129,24 @@ Progress(A) {
 }
 
 request = (method: Method, target: String) -> Request {
-	Request(method: method, target: target, headers: Headers([]), body: <<>>, trailers: Headers([]))
+	Request(
+		method:   method
+		target:   target
+		headers:  Headers([])
+		body:     <<>>
+		trailers: Headers([])
+	)
 }
 
 response = (status: Status) -> Response {
 	Status(n) = status
-	Response(status: status, reason: reason(n), headers: Headers([]), body: <<>>, trailers: Headers([]))
+	Response(
+		status:   status
+		reason:   reason(n)
+		headers:  Headers([])
+		body:     <<>>
+		trailers: Headers([])
+	)
 }
 
 header = (hs: Headers, name: String) -> Option(String) {
@@ -309,7 +321,16 @@ parse_request_head = (xs: List(Int)) -> (Request, List(Int)) ^ HttpError {
 			)
 			(hs, after) = read_headers(rest, [])
 			validate_framing(hs)
-			(Request(method: Method(method), target: target, headers: hs, body: <<>>, trailers: Headers([])), after)
+			(
+				Request(
+					method:   Method(method)
+					target:   target
+					headers:  hs
+					body:     <<>>
+					trailers: Headers([])
+				)
+				after
+			)
 		}
 		_ -> fail.raise(BadMessage("invalid request line"))
 	}
@@ -358,7 +379,16 @@ parse_response_for = (
 			False -> read_body(hs, after)
 		}
 	}
-	(Response(status: Status(code), reason: text(phrase), headers: hs, body: body, trailers: trailers), tail)
+	(
+		Response(
+			status:   Status(code)
+			reason:   text(phrase)
+			headers:  hs
+			body:     body
+			trailers: trailers
+		)
+		tail
+	)
 }
 
 read_headers = (
@@ -946,8 +976,8 @@ connection_loop = (stream, handler, buffer) {
 				task.scope((_) {
 					cursor = task.ref(
 						BodyCursor(
-							buffer: rest
-							framing: request_framing(req.headers)
+							buffer:   rest
+							framing:  request_framing(req.headers)
 							trailers: Headers([])
 						)
 					)
@@ -1020,7 +1050,13 @@ write_server_reply = (stream, res: Response, closing: Bool) {
 	net.write(
 		stream
 		serialize_response(
-			Response(status: res.status, reason: res.reason, headers: hs, body: res.body, trailers: res.trailers)
+			Response(
+				status:   res.status
+				reason:   res.reason
+				headers:  hs
+				body:     res.body
+				trailers: res.trailers
+			)
 		)
 	)
 }
@@ -1140,7 +1176,14 @@ body_piece = (stream, state: BodyCursor, max: Int) {
 			Error(error) -> fail.raise(error)
 			Ok((trailers, rest)) -> {
 				valid_trailers(trailers)
-				(<<>>, BodyCursor(buffer: bits(rest), framing: BodyDone, trailers: trailers))
+				(
+					<<>>
+					BodyCursor(
+						buffer:   bits(rest)
+						framing:  BodyDone
+						trailers: trailers
+					)
+				)
 			}
 		}
 	}
@@ -1308,7 +1351,13 @@ fetch_stream = (req: Request, f ! fetch.Fetch) {
 	encoded = fetch_reply(() { fetch.headers(id) })
 	hs = Headers(fetch_headers(string.split(encoded, "\u{0}")))
 	(
-		head: Response(status: Status(status), reason: reason(status), headers: hs, body: <<>>, trailers: Headers([]))
+		head: Response(
+			status:   Status(status)
+			reason:   reason(status)
+			headers:  hs
+			body:     <<>>
+			trailers: Headers([])
+		)
 		read: (max) {
 			! fetch.Fetch = f
 			fetch_reply(() { fetch.read(id, max) })
@@ -1333,10 +1382,10 @@ fetch_client = (f ! fetch.Fetch) {
 			resource.ensure(() {
 				h = reader.head
 				Response(
-					status: h.status
-					reason: h.reason
-					headers: h.headers
-					body: collect_body(reader, [])
+					status:   h.status
+					reason:   h.reason
+					headers:  h.headers
+					body:     collect_body(reader, [])
 					trailers: h.trailers
 				)
 			}, reader.close)
@@ -1388,7 +1437,9 @@ close_connection = (connection: Connection) {
 }
 
 close_client = (pool: task.Ref(Pool)) {
-	idle = task.update(pool, (state) { (Pool(idle: [], released: state.released), state.idle) })
+	idle = task.update(pool, (state) {
+		(Pool(idle: [], released: state.released), state.idle)
+	})
 	list.each(idle, (entry) { close_connection(entry.connection) })
 }
 
@@ -1422,7 +1473,15 @@ post = (
 	url: String
 	body: BitArray
 ) -> Response ^ HttpError ! Client | requests.Await | requests.Owner | task.Scheduler | task.Runner {
-	send(Request(method: Method("POST"), target: url, headers: Headers([]), body: body, trailers: Headers([])))
+	send(
+		Request(
+			method:   Method("POST")
+			target:   url
+			headers:  Headers([])
+			body:     body
+			trailers: Headers([])
+		)
+	)
 }
 
 body_text = (res: Response) { bit_array.to_string(res.body) }
@@ -1460,8 +1519,13 @@ follow = (pool: task.Ref(Pool), req: Request, count: Int) {
 							Request(
 								method: Method("GET")
 								target: url
-								headers: redirect_headers(req.headers, base, next, True)
-								body: <<>>
+								headers: redirect_headers(
+									req.headers
+									base
+									next
+									True
+								)
+								body:     <<>>
 								trailers: Headers([])
 							)
 							count + 1
@@ -1571,7 +1635,13 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 		None    -> add_header(req.headers, "Host", host_header)
 	}
 	wire = serialize_request(
-		Request(method: req.method, target: target, headers: hs, body: req.body, trailers: req.trailers)
+		Request(
+			method:   req.method
+			target:   target
+			headers:  hs
+			body:     req.body
+			trailers: req.trailers
+		)
 	)
 	cached = task.update(pool, (state) {
 		(rest, found) = pool_take(state.idle, secure, lowercase(hostname), port)
@@ -1582,11 +1652,11 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 			exchange(
 				pool
 				Idle(
-					secure: secure
-					host: lowercase(hostname)
-					port: port
+					secure:     secure
+					host:       lowercase(hostname)
+					port:       port
 					connection: dial(secure, hostname, port)
-					buffer: <<>>
+					buffer:     <<>>
 				)
 				req
 				wire
@@ -1598,11 +1668,11 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 					exchange(
 						pool
 						Idle(
-							secure: secure
-							host: lowercase(hostname)
-							port: port
+							secure:     secure
+							host:       lowercase(hostname)
+							port:       port
 							connection: dial(secure, hostname, port)
-							buffer: <<>>
+							buffer:     <<>>
 						)
 						req
 						wire
@@ -1621,8 +1691,10 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 
 dial = (secure: Bool, hostname: String, port: Int) {
 	fail.catch(() { net.resolve(hostname) }) |> {
-		Ok(_)                                          -> Nil
-		Error(net.NetError(operation = operation, endpoint = endpoint, code = code)) -> fail.raise(Dns(code))
+		Ok(_) -> Nil
+		Error(net.NetError(operation = operation, endpoint = endpoint, code = code)) -> fail.raise(
+			Dns(code)
+		)
 	}
 	stream = fail.catch(() { net.connect(hostname, port) }) |> {
 		Ok(value) -> value
@@ -1664,7 +1736,7 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 			True -> task.update(pool, (state) {
 				(
 					Pool(
-						idle: [Idle(..entry, buffer: rest), ..state.idle]
+						idle:     [Idle(..entry, buffer: rest), ..state.idle]
 						released: [lease, ..state.released]
 					)
 					Nil
@@ -1676,9 +1748,12 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 	}, () {
 		released = task.update(pool, (state) {
 			(
-				Pool(idle: state.idle, released: list.filter(state.released, (key) {
-					key != lease
-				}))
+				Pool(
+					idle: state.idle
+					released: list.filter(state.released, (key) {
+						key != lease
+					})
+				)
 				list.contains(state.released, lease)
 			)
 		})
@@ -1820,13 +1895,17 @@ net_transport = (stream) {
 tls_transport = (stream) {
 	(read: (max) {
 		fail.catch(() { tls.read(stream, max) }) |> {
-			Ok(value)                          -> value
-			Error(tls.TlsError(stage = stage, reason = reason)) -> fail.raise(Tls(reason))
+			Ok(value) -> value
+			Error(tls.TlsError(stage = stage, reason = reason)) -> fail.raise(
+				Tls(reason)
+			)
 		}
 	}, write: (bytes) {
 		fail.catch(() { tls.write(stream, bytes) }) |> {
-			Ok(value)                          -> value
-			Error(tls.TlsError(stage = stage, reason = reason)) -> fail.raise(Tls(reason))
+			Ok(value) -> value
+			Error(tls.TlsError(stage = stage, reason = reason)) -> fail.raise(
+				Tls(reason)
+			)
 		}
 	})
 }

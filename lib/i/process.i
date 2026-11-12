@@ -80,13 +80,9 @@ Entropy {
 @host("i:process/v1", "request")
 Process {
 	Process(
-		spawn_piped: (
-			String
-			BitArray
-			String
-			String
-			String
-		) -> Request(Result(Int, String))
+		spawn_piped: (String, BitArray, String, String, String) -> Request(
+			Result(Int, String)
+		)
 		spawn_config: (
 			String
 			BitArray
@@ -101,9 +97,7 @@ Process {
 		own:         (Int) -> Request(Nil)
 		read_stdout: (Int, Int) -> Request(Result(BitArray, String))
 		read_stderr: (Int, Int) -> Request(Result(BitArray, String))
-		write_stdin: (Int, BitArray) -> Request(
-			Result(Nil, String)
-		)
+		write_stdin: (Int, BitArray) -> Request(Result(Nil, String))
 		close_stdin: (Int) -> Request(Result(Nil, String))
 		spawn:       (String, BitArray) -> Request(Result(Int, String))
 		wait:        (Int) -> Request(Result(Int, String))
@@ -125,8 +119,10 @@ encode_items = {
 		bytes = <<s:utf8>>
 		n = core.bit_size(bytes) / 8
 		{ n <= 4294967295 } |> {
-			True  -> Nil
-			False -> fail.raise(ProcessError(operation: "spawn", code: "invalid"))
+			True -> Nil
+			False -> fail.raise(
+				ProcessError(operation: "spawn", code: "invalid")
+			)
 		}
 		core.bit_array_concat([u32(n), bytes, encode_items(rest)])
 	}
@@ -192,8 +188,10 @@ cwd = (raw ! WorkingDirectory) {
 
 entropy = (bytes, raw ! Entropy) {
 	request.await_owned(raw.entropy(bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ProcessError(operation: "entropy", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ProcessError(operation: "entropy", code: code)
+		)
 	}
 }
 
@@ -201,8 +199,10 @@ spawn = (program, values, raw ! Process) {
 	r = raw.spawn(program, encode_args(values))
 	number = resource.ensure(() {
 		request.await(r) |> {
-			Ok(value)   -> value
-			Error(code) -> fail.raise(ProcessError(operation: "spawn", code: code))
+			Ok(value) -> value
+			Error(code) -> fail.raise(
+				ProcessError(operation: "spawn", code: code)
+			)
 		}
 	}, () {
 		request.state(r) |> {
@@ -224,8 +224,10 @@ wait = (Child(number), raw ! Process) {
 
 terminate = (Child(number), raw ! Process) {
 	request.await_owned(raw.terminate(number)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ProcessError(operation: "terminate", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ProcessError(operation: "terminate", code: code)
+		)
 	}
 }
 
@@ -249,8 +251,10 @@ spawn_piped = (program, values, input, output, errors, raw ! Process) {
 	)
 	number = resource.ensure(() {
 		request.await(r) |> {
-			Ok(value)   -> value
-			Error(code) -> fail.raise(ProcessError(operation: "spawn", code: code))
+			Ok(value) -> value
+			Error(code) -> fail.raise(
+				ProcessError(operation: "spawn", code: code)
+			)
 		}
 	}, () {
 		request.state(r) |> {
@@ -296,8 +300,10 @@ spawn_config = (
 	)
 	number = resource.ensure(() {
 		request.await(r) |> {
-			Ok(value)   -> value
-			Error(code) -> fail.raise(ProcessError(operation: "spawn", code: code))
+			Ok(value) -> value
+			Error(code) -> fail.raise(
+				ProcessError(operation: "spawn", code: code)
+			)
 		}
 	}, () {
 		request.state(r) |> {
@@ -312,28 +318,36 @@ spawn_config = (
 
 read_stdout = (Child(number), max, raw ! Process) {
 	request.await_owned(raw.read_stdout(number, max)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ProcessError(operation: "read_stdout", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ProcessError(operation: "read_stdout", code: code)
+		)
 	}
 }
 
 read_stderr = (Child(number), max, raw ! Process) {
 	request.await_owned(raw.read_stderr(number, max)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ProcessError(operation: "read_stderr", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ProcessError(operation: "read_stderr", code: code)
+		)
 	}
 }
 
 write_stdin = (Child(number), bytes, raw ! Process) {
 	request.await_owned(raw.write_stdin(number, bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ProcessError(operation: "write_stdin", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ProcessError(operation: "write_stdin", code: code)
+		)
 	}
 }
 
 close_stdin = (Child(number), raw ! Process) {
 	request.await_owned(raw.close_stdin(number)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(ProcessError(operation: "close_stdin", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			ProcessError(operation: "close_stdin", code: code)
+		)
 	}
 }

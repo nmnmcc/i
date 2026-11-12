@@ -81,7 +81,9 @@ print(A, E) = (schema: Schema(A, E), value: A) -> String {
 	json.print(encode(schema, value))
 }
 
-error = (expected: String) -> SchemaError { SchemaError(path: [], expected: expected) }
+error = (expected: String) -> SchemaError {
+	SchemaError(path: [], expected: expected)
+}
 
 at = (part: Path, e: SchemaError) -> SchemaError {
 	SchemaError(path: [part, ..e.path], expected: e.expected)

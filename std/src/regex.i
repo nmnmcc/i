@@ -620,11 +620,11 @@ lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
 compile = (pattern: String) -> Result(Regex, RegexError) {
 	fail.catch(() {
 		p = Parser(
-			rest: list.map(core.codepoints(pattern), core.codepoint_to_int)
+			rest:     list.map(core.codepoints(pattern), core.codepoint_to_int)
 			position: 0
-			flags: Flags(insensitive: False, multiline: False, dotall: False)
-			count: 0
-			names: dict.new()
+			flags:    Flags(insensitive: False, multiline: False, dotall: False)
+			count:    0
+			names:    dict.new()
 		)
 		(a, end) = parse_alternation(p)
 		{ peek(end) != -1 } |> {
@@ -726,10 +726,10 @@ Captures {
 
 input = (text: String) -> Input {
 	Input(
-		text: text
-		rest: list.map(core.codepoints(text), core.codepoint_to_int)
+		text:     text
+		rest:     list.map(core.codepoints(text), core.codepoint_to_int)
 		previous: -1
-		at: Offset(scalar: 0, byte: 0)
+		at:       Offset(scalar: 0, byte: 0)
 	)
 }
 
@@ -754,10 +754,10 @@ advance = (i: Input) -> Input {
 	i.rest |> {
 		[] -> panic("regex: advance after end")
 		[c, ..tail] -> Input(
-			text: i.text
-			rest: tail
+			text:     i.text
+			rest:     tail
 			previous: c
-			at: Offset(scalar: i.at.scalar + 1, byte: i.at.byte + byte_width(c))
+			at:       Offset(scalar: i.at.scalar + 1, byte: i.at.byte + byte_width(c))
 		)
 	}
 }
@@ -911,8 +911,8 @@ group = (captures: Captures, index: Int) -> Option(Match) {
 			(Some(start), Some(end)) -> Some(
 				Match(
 					start: start.scalar
-					end: end.scalar
-					text: bytes(captures.text, start.byte, end.byte)
+					end:   end.scalar
+					text:  bytes(captures.text, start.byte, end.byte)
 				)
 			)
 			_ -> None

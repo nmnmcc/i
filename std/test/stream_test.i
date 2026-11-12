@@ -538,7 +538,10 @@ Count {
 }
 
 test("stream_nominal_callbacks", () {
-	s: stream.Stream(Item, Never, Never) = stream.from_list([Item(value: 2), Item(value: 3)])
+	s: stream.Stream(Item, Never, Never) = stream.from_list([
+		Item(value: 2)
+		Item(value: 3)
+	])
 	assert(stream.to_list(stream.map(s, (x) { x.value })) == [2, 3])
 	assert(
 		stream.fold(s, Count(total: 0), (acc, x) {
@@ -548,7 +551,10 @@ test("stream_nominal_callbacks", () {
 	)
 	assert(stream.to_list(stream.unfold(Count(total: 0), (state) {
 		{ state.total < 3 } |> {
-			True  -> Some((Item(value: state.total), Count(total: state.total + 1)))
+			True -> Some((
+				Item(value: state.total)
+				Count(total: state.total + 1)
+			))
 			False -> None
 		}
 	})) == [Item(value: 0), Item(value: 1), Item(value: 2)])

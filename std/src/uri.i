@@ -125,11 +125,11 @@ parse = (text: String) -> Result(Uri, UriError) {
 			_ -> (None, rest, start, [])
 		}
 		p = Parts(
-			scheme: scheme
+			scheme:    scheme
 			authority: authority
-			path: text_bytes(path_bytes)
-			query: optional_text(query_bytes, query_present)
-			fragment: optional_text(fragment_bytes, fragment_present)
+			path:      text_bytes(path_bytes)
+			query:     optional_text(query_bytes, query_present)
+			fragment:  optional_text(fragment_bytes, fragment_present)
 		)
 		offsets = list.append(
 			locations
@@ -150,7 +150,13 @@ parse = (text: String) -> Result(Uri, UriError) {
 						False -> acc
 					}
 				})
-				fail.raise(UriError(part: part, offset: origin + offset, problem: problem))
+				fail.raise(
+					UriError(
+						part:    part
+						offset:  origin + offset
+						problem: problem
+					)
+				)
 			}
 		}
 	})
@@ -199,7 +205,9 @@ resolve = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
 	b = parts(base)
 	r = parts(reference)
 	b.scheme |> {
-		None -> Error(UriError(part: WholePart, offset: 0, problem: RelativeBase))
+		None -> Error(
+			UriError(part: WholePart, offset: 0, problem: RelativeBase)
+		)
 		Some(_) -> {
 			candidate = r.scheme |> {
 				Some(_) -> Parts(..r, path: remove_dots(r.path))
@@ -218,7 +226,13 @@ resolve = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
 							"/" <> _ -> (remove_dots(r.path), r.query)
 							_        -> (remove_dots(merge_path(b, r.path)), r.query)
 						}
-						Parts(scheme: b.scheme, authority: b.authority, path: path, query: query, fragment: r.fragment)
+						Parts(
+							scheme:    b.scheme
+							authority: b.authority
+							path:      path
+							query:     query
+							fragment:  r.fragment
+						)
 					}
 				}
 			}
@@ -502,7 +516,9 @@ read_authority = (
 	// Structure selects the components; userinfo grammar precedes host grammar.
 	fail.map_error(
 		() { grammar_option(userinfo, UserInfoPart, BadAuthority, user_char) }
-		(e: UriError) { UriError(part: e.part, offset: start + e.offset, problem: e.problem) }
+		(e: UriError) {
+			UriError(part: e.part, offset: start + e.offset, problem: e.problem)
+		}
 	)
 	(host, port, host_start, port_start) = hostport |> {
 		[91, ..inside] -> {
@@ -520,7 +536,13 @@ read_authority = (
 			(h, p, colon) = cut(hostport, 58)
 			fail.map_error(
 				() { grammar(h, HostPart, BadHost, reg_char, 0) }
-				(e: UriError) { UriError(part: e.part, offset: hstart + e.offset, problem: e.problem) }
+				(e: UriError) {
+					UriError(
+						part:    e.part
+						offset:  hstart + e.offset
+						problem: e.problem
+					)
+				}
 			)
 			(extra, _, again) = cut(p, 58)
 			require(

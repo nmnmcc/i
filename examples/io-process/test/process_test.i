@@ -18,7 +18,9 @@ test("fake_capabilities", () {
 		fail.catch(() { process.env("missing") }) ==
 			Error(process.ProcessError(operation: "env", code: "missing"))
 	)
-	! process.Entropy = process.Entropy(entropy: (n) { request.ready(Ok(<<n>>)) })
+	! process.Entropy = process.Entropy(entropy: (n) {
+		request.ready(Ok(<<n>>))
+	})
 	assert(process.entropy(7) == <<7>>)
 	! process.WorkingDirectory = process.WorkingDirectory(cwd: () {
 		request.ready(Ok("/fake"))

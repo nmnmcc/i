@@ -248,8 +248,7 @@ test("join_3_test", () {
 
 test("join_3_dash_test", () {
 	assert(
-		string.join(["Hello", "there", "world!"], "-") ==
-			"Hello-there-world!"
+		string.join(["Hello", "there", "world!"], "-") == "Hello-there-world!"
 	)
 	Nil
 })
@@ -1786,9 +1785,7 @@ test("split_unicode_needle_test", () {
 })
 
 test("split_once_more_test", () {
-	assert(
-		string.split_once("key=value=x", "=") == Some(("key", "value=x"))
-	)
+	assert(string.split_once("key=value=x", "=") == Some(("key", "value=x")))
 	assert(string.split_once("novalue", "=") == None)
 	assert(string.split_once("abc", "") == None)
 	assert(string.split_once("=", "=") == Some(("", "")))
@@ -1802,10 +1799,7 @@ test("lines_test", () {
 })
 
 test("replace_more_test", () {
-	assert(
-		string.replace("www.example.com", ".", "-") ==
-			"www-example-com"
-	)
+	assert(string.replace("www.example.com", ".", "-") == "www-example-com")
 	assert(string.replace("aaa", "a", "bb") == "bbbbbb")
 	assert(string.replace("abc", "", "x") == "abc")
 	assert(string.replace("héllo", "é", "e") == "hello")

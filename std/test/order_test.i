@@ -129,17 +129,13 @@ test("lazy_break_tie_eq_eq_test", () {
 
 test("lazy_break_tie_gt_lazy_test", () {
 	assert(
-		order.lazy_break_tie(Greater, () { panic("unreachable") }) ==
-			Greater
+		order.lazy_break_tie(Greater, () { panic("unreachable") }) == Greater
 	)
 	Nil
 })
 
 test("lazy_break_tie_lt_lazy_test", () {
-	assert(
-		order.lazy_break_tie(Less, () { panic("unreachable") }) ==
-			Less
-	)
+	assert(order.lazy_break_tie(Less, () { panic("unreachable") }) == Less)
 	Nil
 })
 
@@ -165,10 +161,7 @@ test("reverse_sort_test", () {
 test("break_tie_sort_test", () {
 	people = [("b", 2), ("a", 2), ("c", 1)]
 	by_age_then_name = (x: (String, Int), y: (String, Int)) {
-		order.break_tie(
-			int.compare(x.1, y.1)
-			string.compare(x.0, y.0)
-		)
+		order.break_tie(int.compare(x.1, y.1), string.compare(x.0, y.0))
 	}
 	assert(
 		list.sort(people, by_age_then_name) == [("c", 1), ("a", 2), ("b", 2)]

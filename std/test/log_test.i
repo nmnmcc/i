@@ -43,16 +43,18 @@ capture_sink = () -> log.Sink(String, Capture) {
 // A pure divergent predicate detects an unwanted call without adding effects.
 unreachable = (level: log.Level) -> Bool { unreachable(level) }
 
-entry = (level: log.Level) -> log.Entry { log.Entry(level: level, message: "hello", fields: [], at: None) }
+entry = (level: log.Level) -> log.Entry {
+	log.Entry(level: level, message: "hello", fields: [], at: None)
+}
 
 // L1/L2 and the sequential service law: entry fields and timestamps are data.
 
 test("log_delivery", () {
 	original = log.Entry(
-		level: log.Info
+		level:   log.Info
 		message: "hello"
-		fields: [("", ""), ("k", "1"), ("k", "2")]
-		at: Some(time.from_unix_nanoseconds(-1))
+		fields:  [("", ""), ("k", "1"), ("k", "2")]
+		at:      Some(time.from_unix_nanoseconds(-1))
 	)
 	producer = () { deliver(original) }
 	trace = control.boundary((b) {
@@ -108,7 +110,14 @@ test("log_lazy", () {
 			[
 				Message
 				Message
-				Sent(log.Entry(level: log.Info, message: "built", fields: [], at: None))
+				Sent(
+					log.Entry(
+						level:   log.Info
+						message: "built"
+						fields:  []
+						at:      None
+					)
+				)
 				Message
 			]
 	)
@@ -222,17 +231,22 @@ test("log_errors", () {
 test("log_format", () {
 	assert(
 		log.format(
-			log.Entry(level: log.Info, message: "a\nb", fields: [("k", "v"), ("k", "")], at: None)
+			log.Entry(
+				level:   log.Info
+				message: "a\nb"
+				fields:  [("k", "v"), ("k", "")]
+				at:      None
+			)
 		) ==
 			"info \"a\\nb\" \"k\"=\"v\" \"k\"=\"\""
 	)
 	assert(
 		log.format(
 			log.Entry(
-				level: log.Debug
+				level:   log.Debug
 				message: "\"\\\r\t"
-				fields: [("\n", "\u{0}\u{1b}\u{2028}\u{2029}")]
-				at: Some(time.from_unix_nanoseconds(-1))
+				fields:  [("\n", "\u{0}\u{1b}\u{2028}\u{2029}")]
+				at:      Some(time.from_unix_nanoseconds(-1))
 			)
 		) ==
 			"debug \"\\\"\\\\\\r\\t\" @-1 \"\\n\"=\"\\u{0}\\u{1b}\\u{2028}\\u{2029}\""
@@ -240,16 +254,21 @@ test("log_format", () {
 	assert(
 		log.format(
 			log.Entry(
-				level: log.Warning
+				level:   log.Warning
 				message: "é漢🙂"
-				fields: [("", "\u{7f}\u{80}\u{9f}\u{a0}")]
-				at: Some(time.from_unix_nanoseconds(0))
+				fields:  [("", "\u{7f}\u{80}\u{9f}\u{a0}")]
+				at:      Some(time.from_unix_nanoseconds(0))
 			)
 		) ==
 			"warning \"é漢🙂\" @0 \"\"=\"\\u{7f}\\u{80}\\u{9f}\u{a0}\""
 	)
 	assert(log.format(entry(log.Failure)) == "failure \"hello\"")
-	assert(log.format(log.Entry(level: log.Info, message: "", fields: [], at: None)) == "info \"\"")
+	assert(
+		log.format(
+			log.Entry(level: log.Info, message: "", fields: [], at: None)
+		) ==
+			"info \"\""
+	)
 	Nil
 })
 
@@ -320,10 +339,10 @@ test("gate_invariant_client", () {
 
 test("stderr_sink_reports_failures", () {
 	! stdio.Stdio = stdio.Stdio(
-		read: (_) { request.ready(Ok(<<>>)) }
-		write: (_) { request.ready(Ok(Nil)) }
+		read:        (_) { request.ready(Ok(<<>>)) }
+		write:       (_) { request.ready(Ok(Nil)) }
 		write_error: (_) { request.ready(Error("failed")) }
-		flush: () { request.ready(Ok(Nil)) }
+		flush:       () { request.ready(Ok(Nil)) }
 		flush_error: () { request.ready(Ok(Nil)) }
 	)
 	! log.Sink(

@@ -87,7 +87,9 @@ open_root = (parent ! Root) -> Root ! Root { Root(key: new_root(parent.key)) }
 
 close_root = (root: Root) { end_root(root.key) }
 
-open_owner = (root ! Root) -> Owner ! Root { Owner(key: new_owner(root.key), root: root) }
+open_owner = (root ! Root) -> Owner ! Root {
+	Owner(key: new_owner(root.key), root: root)
+}
 
 close_owner = (owner: Owner) { end_owner(owner.key) }
 

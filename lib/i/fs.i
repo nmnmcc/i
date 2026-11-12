@@ -76,8 +76,10 @@ open = (path, mode, raw ! Fs) {
 	r = raw.open(path, mode_string(mode))
 	number = resource.ensure(() {
 		request.await(r) |> {
-			Ok(value)   -> value
-			Error(code) -> fail.raise(FsError(operation: "open", path: path, code: code))
+			Ok(value) -> value
+			Error(code) -> fail.raise(
+				FsError(operation: "open", path: path, code: code)
+			)
 		}
 	}, () {
 		request.state(r) |> {
@@ -91,22 +93,28 @@ open = (path, mode, raw ! Fs) {
 
 read = (File(number), max_bytes, raw ! Fs) {
 	request.await_owned(raw.read(number, max_bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "read", path: "", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "read", path: "", code: code)
+		)
 	}
 }
 
 write = (File(number), bytes, raw ! Fs) {
 	request.await_owned(raw.write(number, bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "write", path: "", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "write", path: "", code: code)
+		)
 	}
 }
 
 flush = (File(number), raw ! Fs) {
 	request.await_owned(raw.flush(number)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "flush", path: "", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "flush", path: "", code: code)
+		)
 	}
 }
 
@@ -114,22 +122,28 @@ close = (File(number), raw ! Fs) { request.await_owned(raw.close(number)) }
 
 remove = (path, raw ! Fs) {
 	request.await_owned(raw.remove(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "remove", path: path, code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "remove", path: path, code: code)
+		)
 	}
 }
 
 rename = (from, to, raw ! Fs) {
 	request.await_owned(raw.rename(from, to)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "rename", path: from, code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "rename", path: from, code: code)
+		)
 	}
 }
 
 mkdir = (path, raw ! Fs) {
 	request.await_owned(raw.mkdir(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "mkdir", path: path, code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "mkdir", path: path, code: code)
+		)
 	}
 }
 
@@ -152,27 +166,35 @@ list_parts = (text: String, start: Int) -> List(String) {
 
 list = (path, raw ! Fs) {
 	request.await_owned(raw.list(path)) |> {
-		Ok(value)   -> list_parts(value, 0)
-		Error(code) -> fail.raise(FsError(operation: "list", path: path, code: code))
+		Ok(value) -> list_parts(value, 0)
+		Error(code) -> fail.raise(
+			FsError(operation: "list", path: path, code: code)
+		)
 	}
 }
 
 metadata = (path, raw ! Fs) {
 	size = request.await_owned(raw.size(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "metadata", path: path, code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "metadata", path: path, code: code)
+		)
 	}
 	kind = request.await_owned(raw.kind(path)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "metadata", path: path, code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "metadata", path: path, code: code)
+		)
 	}
 	Metadata(size: size, kind: kind)
 }
 
 temp_dir = (raw ! Fs) {
 	request.await_owned(raw.temp_dir()) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(FsError(operation: "temp_dir", path: "", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			FsError(operation: "temp_dir", path: "", code: code)
+		)
 	}
 }
 
@@ -215,6 +237,8 @@ line_parts = (text: String, start: Int) -> List(String) {
 read_lines = (path) {
 	core.bit_array_to_string(read_file(path)) |> {
 		Ok(text) -> line_parts(text, 0)
-		Error(_) -> fail.raise(FsError(operation: "read_lines", path: path, code: "invalid"))
+		Error(_) -> fail.raise(
+			FsError(operation: "read_lines", path: path, code: "invalid")
+		)
 	}
 }

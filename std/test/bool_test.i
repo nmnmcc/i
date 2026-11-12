@@ -145,9 +145,7 @@ test("to_string_false_test", () {
 	Nil
 })
 
-test("guard_when_true_test", () {
-	assert(bool.guard(True, 2, () { 1 }) == 2)
-})
+test("guard_when_true_test", () { assert(bool.guard(True, 2, () { 1 }) == 2) })
 
 test("guard_when_false_test", () {
 	assert(bool.guard(False, 2, () { 1 }) == 1)

@@ -19,7 +19,11 @@ Triple {
 }
 
 jobs = () -> cli.Parser(Int) {
-	cli.option(cli.Names(long: "jobs", short: Some("j")), "Workers", cli.integer)
+	cli.option(
+		cli.Names(long: "jobs", short: Some("j"))
+		"Workers"
+		cli.integer
+	)
 }
 
 verbose = () -> cli.Parser(Bool) {
@@ -36,34 +40,59 @@ options = () -> cli.Parser(Options) { cli.map2(jobs(), verbose(), Options) }
 
 test("cli_options", () {
 	assert(
-		cli.parse(options(), ["--verbose", "--jobs=4"]) == Ok(Options(jobs: 4, verbose: True))
+		cli.parse(options(), ["--verbose", "--jobs=4"]) ==
+			Ok(Options(jobs: 4, verbose: True))
 	)
-	assert(cli.parse(options(), ["-j", "4"]) == Ok(Options(jobs: 4, verbose: False)))
+	assert(
+		cli.parse(options(), ["-j", "4"]) ==
+			Ok(Options(jobs: 4, verbose: False))
+	)
 	list.each([["--jobs=-2"], ["--jobs", "-2"], ["-j", "-2"]], (args) {
 		assert(cli.parse(jobs(), args) == Ok(-2))
 	})
 	assert(
 		cli.parse(jobs(), ["--jobs="]) ==
-			Error(cli.InvalidArgument(index: 0, name: "--jobs", text: "", reason: "expected integer"))
+			Error(
+				cli.InvalidArgument(
+					index:  0
+					name:   "--jobs"
+					text:   ""
+					reason: "expected integer"
+				)
+			)
 	)
 	assert(
 		cli.parse(jobs(), ["--jobs", "--verbose"]) ==
 			Error(
 				cli.InvalidArgument(
-					index: 1
-					name: "--jobs"
-					text: "--verbose"
+					index:  1
+					name:   "--jobs"
+					text:   "--verbose"
 					reason: "expected integer"
 				)
 			)
 	)
 	assert(
 		cli.parse(jobs(), ["-j", "bad"]) ==
-			Error(cli.InvalidArgument(index: 1, name: "--jobs", text: "bad", reason: "expected integer"))
+			Error(
+				cli.InvalidArgument(
+					index:  1
+					name:   "--jobs"
+					text:   "bad"
+					reason: "expected integer"
+				)
+			)
 	)
 	assert(
 		cli.parse(jobs(), ["--jobs=bad"]) ==
-			Error(cli.InvalidArgument(index: 0, name: "--jobs", text: "bad", reason: "expected integer"))
+			Error(
+				cli.InvalidArgument(
+					index:  0
+					name:   "--jobs"
+					text:   "bad"
+					reason: "expected integer"
+				)
+			)
 	)
 	assert(cli.parse(jobs(), []) == Error(cli.MissingArgument(name: "--jobs")))
 	assert(cli.parse(verbose(), []) == Ok(False))
@@ -99,7 +128,10 @@ test("cli_definition_errors", () {
 			Error(cli.BadDefinition(cli.DuplicateName("--jobs")))
 	)
 	assert(
-		cli.help(cli.flag(cli.Names(long: "other", short: Some("ab")), ""), "app") ==
+		cli.help(
+			cli.flag(cli.Names(long: "other", short: Some("ab")), "")
+			"app"
+		) ==
 			Error(cli.InvalidName("ab"))
 	)
 	assert(
@@ -128,7 +160,10 @@ test("cli_definition_errors", () {
 		["", "Jobs", "1jobs", "-jobs", "jo_bs", "jé", "a\u{0}", "a b"]
 		(bad) {
 			assert(
-				cli.help(cli.flag(cli.Names(long: bad, short: Some("ab")), ""), "app") ==
+				cli.help(
+					cli.flag(cli.Names(long: bad, short: Some("ab")), "")
+					"app"
+				) ==
 					Error(cli.InvalidName(bad))
 			)
 			assert(
@@ -139,13 +174,19 @@ test("cli_definition_errors", () {
 	)
 	list.each(["", "1", "-", "é", "aa"], (bad) {
 		assert(
-			cli.help(cli.flag(cli.Names(long: "valid", short: Some(bad)), ""), "app") ==
+			cli.help(
+				cli.flag(cli.Names(long: "valid", short: Some(bad)), "")
+				"app"
+			) ==
 				Error(cli.InvalidName(bad))
 		)
 	})
 	list.each(["a", "a0", "a-b", "a-", "a--b"], (good) {
 		assert(
-			cli.parse(cli.flag(cli.Names(long: good, short: Some("Z")), ""), ["-Z"]) ==
+			cli.parse(
+				cli.flag(cli.Names(long: good, short: Some("Z")), "")
+				["-Z"]
+			) ==
 				Ok(True)
 		)
 	})
@@ -176,7 +217,11 @@ test("cli_definition_errors", () {
 	assert(
 		cli.parse(
 			cli.map2(
-				cli.option(cli.Names(long: "j", short: Some("j")), "", cli.integer)
+				cli.option(
+					cli.Names(long: "j", short: Some("j"))
+					""
+					cli.integer
+				)
 				cli.argument("j", "", cli.text)
 				Pair
 			)
@@ -191,7 +236,10 @@ test("cli_definition_errors", () {
 
 test("cli_token_ownership", () {
 	list.each([["--jobs"], ["--jobs", "--"], ["-j"], ["-j", "--"]], (args) {
-		assert(cli.parse(jobs(), args) == Error(cli.MissingValue(index: 0, name: "--jobs")))
+		assert(
+			cli.parse(jobs(), args) ==
+				Error(cli.MissingValue(index: 0, name: "--jobs"))
+		)
 	})
 	assert(
 		cli.parse(jobs(), ["--jobs=1", "-j", "--"]) ==
@@ -233,7 +281,8 @@ test("cli_token_ownership", () {
 		]
 		(raw) {
 			assert(
-				cli.parse(options(), [raw]) == Error(cli.UnknownOption(index: 0, token: raw))
+				cli.parse(options(), [raw]) ==
+					Error(cli.UnknownOption(index: 0, token: raw))
 			)
 		}
 	)
@@ -323,7 +372,10 @@ test("cli_error_order", () {
 		cli.parse(jobs(), ["--jobs=bad", "extra"]) ==
 			Error(cli.ExtraArgument(index: 1, token: "extra"))
 	)
-	assert(cli.parse(jobs(), ["extra"]) == Error(cli.ExtraArgument(index: 0, token: "extra")))
+	assert(
+		cli.parse(jobs(), ["extra"]) ==
+			Error(cli.ExtraArgument(index: 0, token: "extra"))
+	)
 	stop = (_: String) -> Result(Int, String) {
 		panic("conversion before allocation")
 	}
@@ -355,14 +407,29 @@ test("cli_error_order", () {
 			cli.map2(first, second_error, (a, b) { a + b })
 			["--second=bad", "--first=bad"]
 		) ==
-			Error(cli.InvalidArgument(index: 1, name: "--first", text: "bad", reason: "first"))
+			Error(
+				cli.InvalidArgument(
+					index:  1
+					name:   "--first"
+					text:   "bad"
+					reason: "first"
+				)
+			)
 	)
 	assert(
 		cli.parse(p, ["--second=bad", "--first=bad"]) ==
-			Error(cli.InvalidArgument(index: 1, name: "--first", text: "bad", reason: "first"))
+			Error(
+				cli.InvalidArgument(
+					index:  1
+					name:   "--first"
+					text:   "bad"
+					reason: "first"
+				)
+			)
 	)
 	assert(
-		cli.parse(p, ["--second=bad"]) == Error(cli.MissingArgument(name: "--first"))
+		cli.parse(p, ["--second=bad"]) ==
+			Error(cli.MissingArgument(name: "--first"))
 	)
 	assert(
 		cli.parse(p, ["--first=bad", "--unknown"]) ==
@@ -381,14 +448,28 @@ test("cli_error_order", () {
 	)
 	assert(
 		cli.parse(failing_many, ["--num=1", "--num=bad", "--num=never"]) ==
-			Error(cli.InvalidArgument(index: 1, name: "--num", text: "bad", reason: "stop"))
+			Error(
+				cli.InvalidArgument(
+					index:  1
+					name:   "--num"
+					text:   "bad"
+					reason: "stop"
+				)
+			)
 	)
 	assert(
 		cli.parse(
 			cli.map(first, (_) -> Int { panic("mapped failed parser") })
 			["--first=x"]
 		) ==
-			Error(cli.InvalidArgument(index: 0, name: "--first", text: "x", reason: "first"))
+			Error(
+				cli.InvalidArgument(
+					index:  0
+					name:   "--first"
+					text:   "x"
+					reason: "first"
+				)
+			)
 	)
 	Nil
 })
@@ -511,7 +592,11 @@ test("cli_composition_laws", () {
 test("cli_help", () {
 	assert(
 		cli.help(
-			cli.optional(cli.Names(long: "jobs", short: Some("j")), "Workers", cli.integer)
+			cli.optional(
+				cli.Names(long: "jobs", short: Some("j"))
+				"Workers"
+				cli.integer
+			)
 			"app"
 		) ==
 			Ok("Usage: app\n  [--jobs, -j VALUE]\tWorkers\n")
@@ -526,7 +611,10 @@ test("cli_help", () {
 			Ok("Usage: app\n  --jobs, -j VALUE\tWorkers\n")
 	)
 	assert(
-		cli.help(cli.many(cli.Names(long: "name", short: None), "Names", cli.text), "app") ==
+		cli.help(
+			cli.many(cli.Names(long: "name", short: None), "Names", cli.text)
+			"app"
+		) ==
 			Ok("Usage: app\n  [--name VALUE...]\tNames\n")
 	)
 	assert(
@@ -539,7 +627,11 @@ test("cli_help", () {
 	)
 	stop = (_: String) -> Result(Int, String) { panic("help called reader") }
 	stopping = cli.map(
-		cli.option(cli.Names(long: "jobs", short: None), "Workers\n\tverbatim", stop)
+		cli.option(
+			cli.Names(long: "jobs", short: None)
+			"Workers\n\tverbatim"
+			stop
+		)
 		(_) -> String { panic("help called mapper") }
 	)
 	assert(
@@ -561,17 +653,25 @@ test("cli_help", () {
 	)
 	// Help and version have no built-in parsing behavior, alone or mixed.
 	assert(
-		cli.parse(jobs(), ["--help"]) == Error(cli.UnknownOption(index: 0, token: "--help"))
+		cli.parse(jobs(), ["--help"]) ==
+			Error(cli.UnknownOption(index: 0, token: "--help"))
 	)
 	assert(
 		cli.parse(jobs(), ["--jobs=1", "--help"]) ==
 			Error(cli.UnknownOption(index: 1, token: "--help"))
 	)
 	assert(
-		cli.parse(cli.flag(cli.Names(long: "help", short: None), ""), ["--help"]) == Ok(True)
+		cli.parse(
+			cli.flag(cli.Names(long: "help", short: None), "")
+			["--help"]
+		) ==
+			Ok(True)
 	)
 	assert(
-		cli.parse(cli.flag(cli.Names(long: "version", short: None), ""), ["--version"]) ==
+		cli.parse(
+			cli.flag(cli.Names(long: "version", short: None), "")
+			["--version"]
+		) ==
 			Ok(True)
 	)
 	Nil
@@ -591,7 +691,10 @@ test("cli_long_inputs", () {
 		}
 	})
 	assert(
-		cli.parse(cli.many(cli.Names(long: "name", short: None), "", cli.text), values) ==
+		cli.parse(
+			cli.many(cli.Names(long: "name", short: None), "", cli.text)
+			values
+		) ==
 			Ok(list.map(list.range(0, 1000), (n) {
 				n % 2 |> {
 					0 -> "a"

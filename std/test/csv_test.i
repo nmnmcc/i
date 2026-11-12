@@ -176,14 +176,23 @@ test("parse_bom", () {
 })
 
 test("error_bare_quote", () {
-	assert(csv.parse("a\"b") == Error(csv.CsvError(line: 1, column: 2, reason: "bare quote")))
+	assert(
+		csv.parse("a\"b") ==
+			Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))
+	)
 	Nil
 })
 
 test("error_after_quote", () {
 	assert(
 		csv.parse("\"a\"b") ==
-			Error(csv.CsvError(line: 1, column: 4, reason: "data after closing quote"))
+			Error(
+				csv.CsvError(
+					line:   1
+					column: 4
+					reason: "data after closing quote"
+				)
+			)
 	)
 	Nil
 })
@@ -191,7 +200,13 @@ test("error_after_quote", () {
 test("error_space_after_quote", () {
 	assert(
 		csv.parse("\"a\" ") ==
-			Error(csv.CsvError(line: 1, column: 4, reason: "data after closing quote"))
+			Error(
+				csv.CsvError(
+					line:   1
+					column: 4
+					reason: "data after closing quote"
+				)
+			)
 	)
 	Nil
 })
@@ -199,7 +214,13 @@ test("error_space_after_quote", () {
 test("error_missing_quote", () {
 	assert(
 		csv.parse("\"a") ==
-			Error(csv.CsvError(line: 1, column: 3, reason: "unterminated quoted field"))
+			Error(
+				csv.CsvError(
+					line:   1
+					column: 3
+					reason: "unterminated quoted field"
+				)
+			)
 	)
 	Nil
 })
@@ -207,13 +228,22 @@ test("error_missing_quote", () {
 test("error_multiline_quote", () {
 	assert(
 		csv.parse("\"a\nb") ==
-			Error(csv.CsvError(line: 2, column: 2, reason: "unterminated quoted field"))
+			Error(
+				csv.CsvError(
+					line:   2
+					column: 2
+					reason: "unterminated quoted field"
+				)
+			)
 	)
 	Nil
 })
 
 test("error_unicode_position", () {
-	assert(csv.parse("é\"") == Error(csv.CsvError(line: 1, column: 2, reason: "bare quote")))
+	assert(
+		csv.parse("é\"") ==
+			Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))
+	)
 	Nil
 })
 
@@ -968,7 +998,13 @@ test("large_roundtrip", () {
 test("width_error_record_line", () {
 	assert(
 		csv.parse("a,b\n\nc\n") ==
-			Error(csv.CsvError(line: 3, column: 1, reason: "wrong number of fields"))
+			Error(
+				csv.CsvError(
+					line:   3
+					column: 1
+					reason: "wrong number of fields"
+				)
+			)
 	)
 	Nil
 })
@@ -976,7 +1012,13 @@ test("width_error_record_line", () {
 test("header_width_error_line", () {
 	assert(
 		csv.parse_header("a,b\n\n1\n", config(",", -1, False)) ==
-			Error(csv.CsvError(line: 3, column: 1, reason: "header width differs from row"))
+			Error(
+				csv.CsvError(
+					line:   3
+					column: 1
+					reason: "header width differs from row"
+				)
+			)
 	)
 	Nil
 })

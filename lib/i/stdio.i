@@ -47,8 +47,10 @@ write = (bytes: BitArray, io ! Stdio) {
 
 write_error = (bytes: BitArray, io ! Stdio) {
 	request.await_owned(io.write_error(bytes)) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError(operation: "write_error", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			StdioError(operation: "write_error", code: code)
+		)
 	}
 }
 
@@ -61,8 +63,10 @@ flush = (io ! Stdio) {
 
 flush_error = (io ! Stdio) {
 	request.await_owned(io.flush_error()) |> {
-		Ok(value)   -> value
-		Error(code) -> fail.raise(StdioError(operation: "flush_error", code: code))
+		Ok(value) -> value
+		Error(code) -> fail.raise(
+			StdioError(operation: "flush_error", code: code)
+		)
 	}
 }
 

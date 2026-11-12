@@ -820,47 +820,27 @@ test("bitwise_shift_edge_cases_test", () {
 })
 
 test("range_ascending_test", () {
-	assert(
-		int.range(0, 3, "", (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			"012"
-	)
+	assert(int.range(0, 3, "", (acc, i) { acc <> int.to_string(i) }) == "012")
 	Nil
 })
 
 test("range_descending_test", () {
-	assert(
-		int.range(3, 0, "", (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			"321"
-	)
+	assert(int.range(3, 0, "", (acc, i) { acc <> int.to_string(i) }) == "321")
 	Nil
 })
 
 test("range_empty_test", () {
-	assert(
-		int.range(5, 5, "", (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			""
-	)
+	assert(int.range(5, 5, "", (acc, i) { acc <> int.to_string(i) }) == "")
 	Nil
 })
 
 test("range_with_list_prepend_test", () {
-	assert(
-		int.range(1, -2, [], list.prepend) == [-1, 0, 1]
-	)
+	assert(int.range(1, -2, [], list.prepend) == [-1, 0, 1])
 	Nil
 })
 
 test("range_negative_to_positive_test", () {
-	assert(
-		int.range(-2, 2, [], (acc, i) { [i, ..acc] }) ==
-			[1, 0, -1, -2]
-	)
+	assert(int.range(-2, 2, [], (acc, i) { [i, ..acc] }) == [1, 0, -1, -2])
 	Nil
 })
 
@@ -885,9 +865,7 @@ test("power_zero_exponent_test", () {
 
 test("power_big_test", () {
 	assert(int.power(2, 100) == Ok(1267650600228229401496703205376))
-	assert(
-		int.power(10, 30) == Ok(1_000_000_000_000_000_000_000_000_000_000)
-	)
+	assert(int.power(10, 30) == Ok(1_000_000_000_000_000_000_000_000_000_000))
 })
 
 test("power_negative_exponent_test", () {
@@ -980,8 +958,5 @@ test("sum_product_long_test", () {
 })
 
 test("range_long_test", () {
-	assert(
-		int.range(0, 1_000_000, 0, int.add) ==
-			499_999_500_000
-	)
+	assert(int.range(0, 1_000_000, 0, int.add) == 499_999_500_000)
 })

@@ -623,7 +623,12 @@ test("error_large_scalar", () {
 test("error_position", () {
 	assert(
 		regex.compile("a[") ==
-			Error(regex.RegexError(position: 2, reason: "unclosed character class"))
+			Error(
+				regex.RegexError(
+					position: 2
+					reason:   "unclosed character class"
+				)
+			)
 	)
 	Nil
 })
@@ -663,14 +668,20 @@ test("capture_alternation", () {
 })
 
 test("unicode_scalar_offsets", () {
-	assert(regex.find(compile("🦀é"), "中🦀é!") == Some(regex.Match(start: 1, end: 3, text: "🦀é")))
+	assert(
+		regex.find(compile("🦀é"), "中🦀é!") ==
+			Some(regex.Match(start: 1, end: 3, text: "🦀é"))
+	)
 	Nil
 })
 
 test("find_all", () {
 	assert(
 		regex.find_all(compile("a+"), "aa ba") ==
-			[regex.Match(start: 0, end: 2, text: "aa"), regex.Match(start: 4, end: 5, text: "a")]
+			[
+				regex.Match(start: 0, end: 2, text: "aa")
+				regex.Match(start: 4, end: 5, text: "a")
+			]
 	)
 	Nil
 })
@@ -690,7 +701,10 @@ test("find_all_empty", () {
 test("find_all_suppress_adjacent_empty", () {
 	assert(
 		regex.find_all(compile("a*"), "ab") ==
-			[regex.Match(start: 0, end: 1, text: "a"), regex.Match(start: 2, end: 2, text: "")]
+			[
+				regex.Match(start: 0, end: 1, text: "a")
+				regex.Match(start: 2, end: 2, text: "")
+			]
 	)
 	Nil
 })
@@ -952,14 +966,20 @@ test("rust_empty_330", () {
 test("rust_empty_400", () {
 	assert(
 		regex.find_all(compile("a(?:)|b"), "abc") ==
-			[regex.Match(start: 0, end: 1, text: "a"), regex.Match(start: 1, end: 2, text: "b")]
+			[
+				regex.Match(start: 0, end: 1, text: "a")
+				regex.Match(start: 1, end: 2, text: "b")
+			]
 	)
 	Nil
 })
 
 // Rust regex testdata/empty.toml, 500.
 test("rust_empty_500", () {
-	assert(regex.find_all(compile(""), "") == [regex.Match(start: 0, end: 0, text: "")])
+	assert(
+		regex.find_all(compile(""), "") ==
+			[regex.Match(start: 0, end: 0, text: "")]
+	)
 	Nil
 })
 
@@ -967,7 +987,10 @@ test("rust_empty_500", () {
 test("rust_empty_510", () {
 	assert(
 		regex.find_all(compile(""), "a") ==
-			[regex.Match(start: 0, end: 0, text: ""), regex.Match(start: 1, end: 1, text: "")]
+			[
+				regex.Match(start: 0, end: 0, text: "")
+				regex.Match(start: 1, end: 1, text: "")
+			]
 	)
 	Nil
 })

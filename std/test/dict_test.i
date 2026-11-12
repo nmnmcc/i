@@ -877,30 +877,15 @@ run_many_random_tests = (
 }
 
 test("random_operations_small_test", () {
-	run_many_random_tests(
-		100
-		50
-		32
-		dict.new()
-	)
+	run_many_random_tests(100, 50, 32, dict.new())
 })
 
 test("random_operations_medium_test", () {
-	run_many_random_tests(
-		100
-		50
-		200
-		range_dict(50)
-	)
+	run_many_random_tests(100, 50, 200, range_dict(50))
 })
 
 test("random_operations_large_test", () {
-	run_many_random_tests(
-		3
-		300
-		600
-		range_dict(300)
-	)
+	run_many_random_tests(3, 300, 600, range_dict(300))
 })
 
 range_dict = (size) {

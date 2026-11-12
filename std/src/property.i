@@ -105,7 +105,15 @@ Report(A) {
 }
 
 /// The default seed, success count, size, discard budget, and shrink budget.
-defaults = () -> Config { Config(seed: 0, cases: 100, max_size: 100, max_discards: 1000, max_shrinks: 1000) }
+defaults = () -> Config {
+	Config(
+		seed:         0
+		cases:        100
+		max_size:     100
+		max_discards: 1000
+		max_shrinks:  1000
+	)
+}
 
 /// Stores a pure draw. None discards one attempt; there are no hidden retries.
 make(A) = (draw: (Int, random.Generator) -> Option(Tree(A))) -> Gen(A) {
@@ -576,15 +584,15 @@ attempts(A) = (
 							)
 							Falsified(
 								Failure(
-									seed: seed
-									attempt: attempt
-									size: size
+									seed:     seed
+									attempt:  attempt
+									size:     size
 									original: t.value
 									smallest: small.value
-									reason: why
-									path: path
-									checked: checked
-									limited: limited
+									reason:   why
+									path:     path
+									checked:  checked
+									limited:  limited
 								)
 							)
 						}

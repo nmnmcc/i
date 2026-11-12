@@ -703,21 +703,32 @@ test("http_obs_text_round_trip", () {
 
 test("http_generated_body_round_trip", () {
 	Ok(gen) = property.string(30)
-	property.test(gen, property.Config(seed: 17, cases: 100, max_size: 30, max_discards: 0, max_shrinks: 100), (s) {
-		body = <<s:utf8>>
-		req = http.Request(
-			method: http.Method("POST")
-			target: "/"
-			headers: http.Headers([])
-			body: body
-			trailers: http.Headers([])
+	property.test(
+		gen
+		property.Config(
+			seed:         17
+			cases:        100
+			max_size:     30
+			max_discards: 0
+			max_shrinks:  100
 		)
-		http.Complete(parsed, <<>>) = http.feed_request(
-			<<>>
-			http.serialize_request(req)
-		)
-		assert(parsed.body == body)
-	}, core.inspect)
+		(s) {
+			body = <<s:utf8>>
+			req = http.Request(
+				method:   http.Method("POST")
+				target:   "/"
+				headers:  http.Headers([])
+				body:     body
+				trailers: http.Headers([])
+			)
+			http.Complete(parsed, <<>>) = http.feed_request(
+				<<>>
+				http.serialize_request(req)
+			)
+			assert(parsed.body == body)
+		}
+		core.inspect
+	)
 })
 
 test("http_quoted_chunk_extension", () {
