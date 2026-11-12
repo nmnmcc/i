@@ -3231,9 +3231,12 @@ impl<'a> Checker<'a> {
                     // The service type is the need of the rest for this
                     // key, when the rest writes one; else its arguments are
                     // left open, and the value and the rest fix them.
-                    let t = self.s.env_need(&env, super::Head::Named(r)).unwrap_or_else(|| {
-                        Ty::named(r, (0..args).map(|_| self.s.fresh()).collect())
-                    });
+                    let t = self
+                        .s
+                        .env_need(&env, super::Head::Named(r))
+                        .unwrap_or_else(|| {
+                            Ty::named(r, (0..args).map(|_| self.s.fresh()).collect())
+                        });
                     self.sub2(&v, &t, value.span, value.span);
                     let rest = self.s.env_diff(env, vec![t]);
                     self.flush(*span, None);

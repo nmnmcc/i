@@ -2294,9 +2294,7 @@ impl Solver {
                 Ty::Con(h, ..) if *h == head => return Some(t),
                 Ty::Union(ms) => todo.extend(ms.iter().cloned()),
                 Ty::Diff(a, _) => todo.push((**a).clone()),
-                Ty::Var(v) if seen.insert(*v) => {
-                    todo.extend(self.var(*v).lower.iter().cloned())
-                }
+                Ty::Var(v) if seen.insert(*v) => todo.extend(self.var(*v).lower.iter().cloned()),
                 _ => {}
             }
         }

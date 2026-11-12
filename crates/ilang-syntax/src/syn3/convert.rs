@@ -314,7 +314,10 @@ impl Cx<'_> {
         self.note(
             l.span,
             "string-label",
-            format!("the label `{}` is not a name; syntax three has no string labels", l.name),
+            format!(
+                "the label `{}` is not a name; syntax three has no string labels",
+                l.name
+            ),
         );
         let mut s: String = l
             .name
@@ -545,7 +548,9 @@ impl Cx<'_> {
                 constructors: e.constructors,
                 span: n::Sp(e.span),
             });
-            if !e.constructors && let Some(others) = members.get(e.name.name.as_str()) {
+            if !e.constructors
+                && let Some(others) = members.get(e.name.name.as_str())
+            {
                 // §7.3: `T` alone becomes `T, C1, C2` (types only).
                 for c in others {
                     if !exported.contains(c.name.as_str()) {
@@ -1026,7 +1031,10 @@ impl Cx<'_> {
         let typed = |p: &n::Pattern| match &p.kind {
             n::PatternKind::Typed { .. } => true,
             n::PatternKind::And(parts) => {
-                matches!(parts.last().map(|p| &p.kind), Some(n::PatternKind::Typed { .. }))
+                matches!(
+                    parts.last().map(|p| &p.kind),
+                    Some(n::PatternKind::Typed { .. })
+                )
             }
             _ => false,
         };
@@ -1084,7 +1092,11 @@ impl Cx<'_> {
     fn call(&mut self, callee: &o::Expr, args: &[o::Arg], piped: bool, span: Span) -> n::ExprKind {
         let ctor = match &callee.kind {
             o::ExprKind::Name { module, name }
-                if name.name.as_bytes().first().is_some_and(u8::is_ascii_uppercase) =>
+                if name
+                    .name
+                    .as_bytes()
+                    .first()
+                    .is_some_and(u8::is_ascii_uppercase) =>
             {
                 Some((module.as_ref(), name))
             }
@@ -1159,7 +1171,10 @@ impl Cx<'_> {
                 }
                 (None, Some(Some(l))) => {
                     keyed = true;
-                    out.push(n::DItem::Label(n::Ident::new(l.clone(), a.value.span), value));
+                    out.push(n::DItem::Label(
+                        n::Ident::new(l.clone(), a.value.span),
+                        value,
+                    ));
                 }
                 (None, _) => {
                     if keyed {
@@ -1177,13 +1192,20 @@ impl Cx<'_> {
     }
 
     fn expr(&mut self, e: &o::Expr) -> n::Expr {
-        if matches!(e.kind, o::ExprKind::Binary { op: o::BinOp::Concat, .. })
-            && let Some(kind) = self.interp(e)
+        if matches!(
+            e.kind,
+            o::ExprKind::Binary {
+                op: o::BinOp::Concat,
+                ..
+            }
+        ) && let Some(kind) = self.interp(e)
         {
             return n::Expr::new(kind, e.span);
         }
         let kind = match &e.kind {
-            o::ExprKind::Quote(d) => n::ExprKind::Quote(n::Quoted(Box::new(super::lisp::convert_quote(d)))),
+            o::ExprKind::Quote(d) => {
+                n::ExprKind::Quote(n::Quoted(Box::new(super::lisp::convert_quote(d))))
+            }
             o::ExprKind::Int(v) => n::ExprKind::Int(v.clone()),
             o::ExprKind::Float(v) => n::ExprKind::Float(*v),
             o::ExprKind::String(s) => n::ExprKind::String(s.clone()),
@@ -1442,10 +1464,14 @@ impl Cx<'_> {
         let count = args.len();
         let lookup = self.lookup(module, &name.name, |c| {
             let free = c.iter().filter(|f| f.is_none()).count();
-            (if spread { c.len() >= count } else { c.len() == count })
-                && args.iter().skip(free).all(|a| {
-                    label_of(a).is_some_and(|l| c.iter().any(|f| f.as_deref() == Some(l)))
-                })
+            (if spread {
+                c.len() >= count
+            } else {
+                c.len() == count
+            }) && args
+                .iter()
+                .skip(free)
+                .all(|a| label_of(a).is_some_and(|l| c.iter().any(|f| f.as_deref() == Some(l))))
         });
         let fields = match lookup {
             Lookup::Fields(fields) => fields,
@@ -1473,12 +1499,16 @@ impl Cx<'_> {
                 items.push(n::DPItem::Pos(self.pattern(a, true)));
                 continue;
             }
-            let Some(label) = label_of(a).filter(|l| fields.iter().any(|f| f.as_deref() == Some(*l)))
+            let Some(label) =
+                label_of(a).filter(|l| fields.iter().any(|f| f.as_deref() == Some(*l)))
             else {
                 self.note(
                     a.span,
                     "constructor-pattern-label",
-                    format!("this part of the pattern of `{}` names no label of it", name.name),
+                    format!(
+                        "this part of the pattern of `{}` names no label of it",
+                        name.name
+                    ),
                 );
                 items.push(n::DPItem::Pos(self.pattern(a, true)));
                 continue;
@@ -1674,9 +1704,15 @@ impl Cx<'_> {
                     ret: self.ty(ret),
                 }))
             }
-            o::TypeKind::Union(parts) => n::TypeKind::Union(parts.iter().map(|p| self.ty(p)).collect()),
-            o::TypeKind::Inter(parts) => n::TypeKind::Inter(parts.iter().map(|p| self.ty(p)).collect()),
-            o::TypeKind::Diff(parts) => n::TypeKind::Diff(parts.iter().map(|p| self.ty(p)).collect()),
+            o::TypeKind::Union(parts) => {
+                n::TypeKind::Union(parts.iter().map(|p| self.ty(p)).collect())
+            }
+            o::TypeKind::Inter(parts) => {
+                n::TypeKind::Inter(parts.iter().map(|p| self.ty(p)).collect())
+            }
+            o::TypeKind::Diff(parts) => {
+                n::TypeKind::Diff(parts.iter().map(|p| self.ty(p)).collect())
+            }
         };
         n::Type::new(kind, t.span)
     }
@@ -1946,7 +1982,11 @@ fn signature_uses<'a>(
 /// row variable and no `^` part.
 fn bare_row(b: &o::Binding, vars: &[String]) -> bool {
     fn ty(t: &o::TypeExpr, vars: &[String], found: &mut bool) {
-        if let o::TypeKind::Fn { err: None, env: Some(env), .. } = &t.kind
+        if let o::TypeKind::Fn {
+            err: None,
+            env: Some(env),
+            ..
+        } = &t.kind
             && match &env.kind {
                 o::TypeKind::Union(ms) => ms.iter().any(|m| is_var(vars, m)),
                 _ => is_var(vars, env),

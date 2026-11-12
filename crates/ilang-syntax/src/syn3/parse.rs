@@ -593,13 +593,17 @@ impl Parser<'_> {
         let first = self.kind().clone();
         let ty = self.ty()?;
         let rhs = match (first, ty.kind) {
-            (T::UpName(n), TypeKind::Named { module: None, args, .. })
-                if n == "Opaque" && args.is_empty() =>
-            {
-                TypeRhs::Opaque
-            }
+            (
+                T::UpName(n),
+                TypeKind::Named {
+                    module: None, args, ..
+                },
+            ) if n == "Opaque" && args.is_empty() => TypeRhs::Opaque,
             (T::LParen, TypeKind::Data(items)) => TypeRhs::Data(items),
-            (_, kind) => TypeRhs::Type(Type { kind, span: ty.span }),
+            (_, kind) => TypeRhs::Type(Type {
+                kind,
+                span: ty.span,
+            }),
         };
         Ok(TypeDef { name, head, rhs })
     }
@@ -786,7 +790,8 @@ impl Parser<'_> {
             );
         }
         if self.at(&T::Pipe) {
-            let msg = "`|` joins only function literals: it may follow only the `}` of a function body";
+            let msg =
+                "`|` joins only function literals: it may follow only the `}` of a function body";
             return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
         }
         Ok(lhs)
@@ -1026,7 +1031,8 @@ impl Parser<'_> {
                 // P9.
                 guard = Some(self.expr()?);
                 if !self.at(&T::RParen) {
-                    return self.error("`)` after the guard, which is the last part of a parameter group");
+                    return self
+                        .error("`)` after the guard, which is the last part of a parameter group");
                 }
                 break;
             }
@@ -1079,8 +1085,10 @@ impl Parser<'_> {
                 Ok(SItem { rest, name, ty })
             })?;
             if items.is_empty() {
-                let msg = "an empty service pattern `<- ()` is not written: leave the `<-` part out";
-                self.diags.push(Diagnostic::new(Code::BadPattern, open, msg));
+                let msg =
+                    "an empty service pattern `<- ()` is not written: leave the `<-` part out";
+                self.diags
+                    .push(Diagnostic::new(Code::BadPattern, open, msg));
             }
             if let Some(i) = items.iter().position(|i| i.rest)
                 && i + 1 != items.len()
@@ -1197,7 +1205,8 @@ impl Parser<'_> {
         let kind = match self.kind().clone() {
             T::Name(_) if self.at_qualified() => self.constructor_pattern()?,
             T::Name(_) | T::Discard(_) => {
-                if matches!(self.kind(), T::Name(_)) && self.toks[self.pos + 1].kind == T::LParen
+                if matches!(self.kind(), T::Name(_))
+                    && self.toks[self.pos + 1].kind == T::LParen
                     && !self.toks[self.pos + 1].brk
                 {
                     let msg = "a lowercase name followed by `(` is not a pattern; a constructor pattern begins with an UpName";
@@ -1504,7 +1513,9 @@ impl Parser<'_> {
         let from = self.start();
         if !self.at(&T::LParen) {
             if !matches!(self.kind(), T::UpName(_)) {
-                return self.error("the needs of a function type: `(Db, Log)`, `(..N, Db)` or a row variable `N`");
+                return self.error(
+                    "the needs of a function type: `(Db, Log)`, `(..N, Db)` or a row variable `N`",
+                );
             }
             let name = self.up_name()?;
             return Ok(Type::new(
@@ -1538,9 +1549,15 @@ impl Parser<'_> {
         })?;
         if items.is_empty() {
             let msg = "an empty need `<- ()` is not written: leave the `<-` part out";
-            self.diags.push(Diagnostic::new(Code::Unexpected, open, msg));
+            self.diags
+                .push(Diagnostic::new(Code::Unexpected, open, msg));
         }
-        if items.iter().filter(|i| matches!(i, TItem::Spread(_))).count() > 1 {
+        if items
+            .iter()
+            .filter(|i| matches!(i, TItem::Spread(_)))
+            .count()
+            > 1
+        {
             let msg = "a need has at most one row variable `..N`";
             self.diags.push(Diagnostic::new(Code::BadSpread, open, msg));
         }

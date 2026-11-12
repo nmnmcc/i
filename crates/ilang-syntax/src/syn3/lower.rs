@@ -97,14 +97,17 @@ struct Row {
 
 /// The row variables that a type writes beside a `Fail` entry.
 fn fail_rows(t: &n::Type, out: &mut HashSet<String>) {
-    let each = |ts: &[n::Type], out: &mut HashSet<String>| ts.iter().for_each(|t| fail_rows(t, out));
+    let each =
+        |ts: &[n::Type], out: &mut HashSet<String>| ts.iter().for_each(|t| fail_rows(t, out));
     match &t.kind {
         n::TypeKind::Named { args, .. } | n::TypeKind::Call { args, .. } => each(args, out),
         n::TypeKind::Union(ts) | n::TypeKind::Inter(ts) | n::TypeKind::Diff(ts) => each(ts, out),
         n::TypeKind::Data(items) => {
             for i in items {
                 match i {
-                    n::TItem::Pos(t) | n::TItem::Label(_, t) | n::TItem::Spread(t) => fail_rows(t, out),
+                    n::TItem::Pos(t) | n::TItem::Label(_, t) | n::TItem::Spread(t) => {
+                        fail_rows(t, out)
+                    }
                 }
             }
         }
@@ -137,7 +140,10 @@ fn fail_rows(t: &n::Type, out: &mut HashSet<String>) {
 fn pattern_fail_rows(p: &n::Pattern, out: &mut HashSet<String>) {
     match &p.kind {
         n::PatternKind::Typed { ty, .. } => fail_rows(ty, out),
-        n::PatternKind::Ctor { args: Some(items), .. } | n::PatternKind::Data(items) => {
+        n::PatternKind::Ctor {
+            args: Some(items), ..
+        }
+        | n::PatternKind::Data(items) => {
             for i in items {
                 match i {
                     n::DPItem::Pos(p) | n::DPItem::Key(_, p) => pattern_fail_rows(p, out),
@@ -536,7 +542,9 @@ impl Cx {
         if let n::ExprKind::Chain(fs) = &b.value.kind {
             for f in fs {
                 for p in &f.params {
-                    p.choices.iter().for_each(|c| pattern_fail_rows(c, &mut with_fail));
+                    p.choices
+                        .iter()
+                        .for_each(|c| pattern_fail_rows(c, &mut with_fail));
                 }
                 for s in f.services.iter().flatten() {
                     fail_rows(&s.ty, &mut with_fail);
@@ -709,7 +717,8 @@ impl Cx {
                 "a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
             );
         }
-        let plain = |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
+        let plain =
+            |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
         if let [f] = fs
             && plain(f)
         {
@@ -766,7 +775,10 @@ impl Cx {
                 }
             }
         }
-        let ret = fs.iter().find(|f| f.ret.is_some()).and_then(|f| self.ret(f));
+        let ret = fs
+            .iter()
+            .find(|f| f.ret.is_some())
+            .and_then(|f| self.ret(f));
         let subject = if count == 1 {
             name_expr(&names[0].0, names[0].1)
         } else {
@@ -799,7 +811,11 @@ impl Cx {
     fn clause(&mut self, f: &n::Function, count: usize) -> o::Clause {
         let span = f.span.0;
         let patterns = if count == 1 && f.params.len() == 1 {
-            f.params[0].choices.iter().map(|p| self.pattern(p)).collect()
+            f.params[0]
+                .choices
+                .iter()
+                .map(|p| self.pattern(p))
+                .collect()
         } else {
             // Every way to take one alternative of each position.
             let mut rows: Vec<Vec<o::Pattern>> = vec![Vec::new()];
@@ -877,7 +893,9 @@ impl Cx {
     fn expr(&mut self, e: &n::Expr) -> o::Expr {
         let span = e.span.0;
         let kind = match &e.kind {
-            n::ExprKind::Quote(q) => o::ExprKind::Quote(Box::new(super::lisp::unconvert_quote(&q.0))),
+            n::ExprKind::Quote(q) => {
+                o::ExprKind::Quote(Box::new(super::lisp::unconvert_quote(&q.0)))
+            }
             n::ExprKind::Int(v) => o::ExprKind::Int(v.clone()),
             n::ExprKind::Float(v) => o::ExprKind::Float(*v),
             n::ExprKind::String(s) => o::ExprKind::String(s.clone()),
@@ -996,12 +1014,12 @@ impl Cx {
                 n::ExprKind::Chain(fs)
                     if !self.lisp
                         && fs.iter().all(|f| {
-                        f.params.len() == 1
-                            && f.services.is_none()
-                            && f.ret.is_none()
-                            && f.generics.is_empty()
-                            && f.params[0].key.is_none()
-                    }) =>
+                            f.params.len() == 1
+                                && f.services.is_none()
+                                && f.ret.is_none()
+                                && f.generics.is_empty()
+                                && f.params[0].key.is_none()
+                        }) =>
                 {
                     o::ExprKind::Case {
                         subject: Box::new(self.expr(lhs)),
@@ -1030,13 +1048,15 @@ impl Cx {
     fn pattern(&mut self, p: &n::Pattern) -> o::Pattern {
         let span = p.span.0;
         let kind = match &p.kind {
-            n::PatternKind::Quote(q) => match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.0)) {
-                Ok(p) => p.kind.clone(),
-                Err(d) => {
-                    self.errors.push(d);
-                    o::PatternKind::Discard("_".into())
+            n::PatternKind::Quote(q) => {
+                match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.0)) {
+                    Ok(p) => p.kind.clone(),
+                    Err(d) => {
+                        self.errors.push(d);
+                        o::PatternKind::Discard("_".into())
+                    }
                 }
-            },
+            }
             n::PatternKind::Var(s) => o::PatternKind::Var(s.clone()),
             n::PatternKind::Discard(s) => o::PatternKind::Discard(s.clone()),
             n::PatternKind::Typed { binder: b, ty: t } => o::PatternKind::Typed {
@@ -1363,9 +1383,15 @@ impl Cx {
                 }
             }
             n::TypeKind::Fn(f) => return self.fn_type(f, span, false),
-            n::TypeKind::Union(parts) => o::TypeKind::Union(parts.iter().map(|p| self.ty(p)).collect()),
-            n::TypeKind::Inter(parts) => o::TypeKind::Inter(parts.iter().map(|p| self.ty(p)).collect()),
-            n::TypeKind::Diff(parts) => o::TypeKind::Diff(parts.iter().map(|p| self.ty(p)).collect()),
+            n::TypeKind::Union(parts) => {
+                o::TypeKind::Union(parts.iter().map(|p| self.ty(p)).collect())
+            }
+            n::TypeKind::Inter(parts) => {
+                o::TypeKind::Inter(parts.iter().map(|p| self.ty(p)).collect())
+            }
+            n::TypeKind::Diff(parts) => {
+                o::TypeKind::Diff(parts.iter().map(|p| self.ty(p)).collect())
+            }
         };
         ty(kind, span)
     }
