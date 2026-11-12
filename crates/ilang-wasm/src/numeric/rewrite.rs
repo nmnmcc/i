@@ -51,6 +51,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
         Value::HostCall { args, .. }
         | Value::HostStart { args, .. }
         | Value::Op(_, args)
+        | Value::Finite(_, args)
         | Value::Tuple(args) => args.iter_mut().for_each(map),
         Value::OpEnv(_, args, e) => {
             args.iter_mut().for_each(&mut *map);

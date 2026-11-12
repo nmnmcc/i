@@ -217,6 +217,40 @@ fn corpus() -> Vec<Case> {
         events: vec!["before".into()],
     });
     cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    // N5: exact rounded chains under dominating bounds, and chains whose
+    // middle result overflows even though the final expression would be finite.
+    for n in 0..24 {
+        let x = n as f64 * 0.125 - 1.5;
+        let expected = if (-1.0..=1.0).contains(&x) {
+            let a = x * 0.5 + 0.25;
+            a * 0.5 - 0.125
+        } else {
+            x
+        };
+        cases.push(float_case("bounded_float(x)", x, expected));
+        cases.push(Case {
+            body: format!("core.inspect({{ a = x *. 2.0 b = a /. 0.0 b +. {n}.0 }})"),
+            input: Value::Float(1.0e308),
+            expected: "float: result is not finite".into(),
+            stop: true,
+            events: vec![],
+        });
+    }
+    for x in [
+        f64::from_bits(1),
+        -f64::from_bits(1),
+        f64::MAX,
+        -f64::MAX,
+        -0.0,
+    ] {
+        let expected = if (-1.0..=1.0).contains(&x) {
+            let a = x * 0.5 + 0.25;
+            a * 0.5 - 0.125
+        } else {
+            x
+        };
+        cases.push(float_case("bounded_float(x)", x, expected));
+    }
     // N4: carry the current accumulator through promotion and demotion. The
     // effect trace checks that leaving a guarded worker never replays a step.
     for n in 0..24 {
@@ -298,6 +332,11 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
 (i/core, i/control, i/resource)
 @external("numeric:events", "record")
 record: (String) -> Nil
+bounded_float = (x: Float) -> Float {
+ { x >=. -.1.0 } |> { False -> x True -> {
+  { x <=. 1.0 } |> { False -> x True -> { a = x *. 0.5 +. 0.25 a *. 0.5 -. 0.125 } }
+ } }
+}
 Pair { Left(x: Float, y: Float) Right(y: Float, x: Float) }
 relay = (f: (Float) -> Float, n: Int, x: Float) -> Float { n |> { 0 -> f(x) _ -> relay(f, n - 1, x) } }
 numeric_pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }

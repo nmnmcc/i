@@ -19,6 +19,9 @@ pub(super) fn checked(raw: &str) -> String {
 }
 
 pub(super) fn float_op(op: Op, args: &[String]) -> Option<String> {
+    float_operation(op, args, true)
+}
+pub(super) fn float_operation(op: Op, args: &[String], check: bool) -> Option<String> {
     let instruction = match op {
         Op::FloatAdd => "f64.add",
         Op::FloatSub => "f64.sub",
@@ -40,7 +43,7 @@ pub(super) fn float_op(op: Op, args: &[String]) -> Option<String> {
     } else {
         format!("({instruction} {a} {})", args[1])
     };
-    Some(if op == Op::FloatNeg {
+    Some(if op == Op::FloatNeg || !check {
         raw
     } else {
         checked(&raw)
@@ -53,11 +56,11 @@ pub(crate) fn has_float(stmts: &[Stmt]) -> bool {
         for stmt in stmts {
             match stmt {
                 Stmt::Let {
-                    value: Value::Op(op, _),
+                    value: Value::Op(op, _) | Value::Finite(op, _),
                     ..
                 }
                 | Stmt::Suspendable {
-                    value: Value::Op(op, _),
+                    value: Value::Op(op, _) | Value::Finite(op, _),
                     ..
                 } if matches!(
                     op,
@@ -173,6 +176,7 @@ impl Plan {
                         Op::FloatAdd | Op::FloatSub | Op::FloatMul | Op::FloatDiv | Op::FloatNeg,
                         _,
                     )
+                    | Value::Finite(_, _)
                     | Value::Atom(Atom::Float(_)) => Some(Repr::Float),
                     Value::Op(
                         Op::IntAdd | Op::IntSub | Op::IntMul | Op::IntDiv | Op::IntRem | Op::IntNeg,
@@ -408,6 +412,10 @@ impl Emitter<'_> {
             Repr::Float => {
                 let mut reference = "(ref.null eq)".to_string();
                 let raw = match value {
+                    Value::Finite(op, args) => {
+                        let args = args.iter().map(|a| self.float_atom(a)).collect::<Vec<_>>();
+                        float_operation(*op, &args, false).expect("proved Float operation")
+                    }
                     Value::Call { callee, args, env } if self.float_call(callee) => {
                         self.call(callee, args, false, &env_text(*env))
                     }

@@ -97,3 +97,31 @@ N4 paired batch medians (ns), compared with N3:
 
 N4 differential corpus and changed-crate Clippy pass. These batch spreads
 require a quiet confirmation before a performance pass/fail claim.
+
+N5 uses exact BigInt endpoints in units of 2^-1074. Add/subtract/multiply
+and division bounds use exact integer/rational transfers, then round endpoints
+outward to binary64. Signed-zero possibilities are retained separately. Every
+removed check has an exact magnitude bound at most max_finite; zero division
+still returns positive zero. Unknown/recursive inputs widen to all finite values.
+Dominating comparisons refine branch successors, including failure blocks;
+per-definition versions prevent stale comparison facts after a join or rewrite.
+There are no range-specialized clones or caller-dependent callee summaries.
+The instruction itself and eager source-site actions remain. Proof exhaustion
+retains checks. CORE-MATH sin.c u128_tod and its explicit rounding-bound argument
+were also read before implementing the exact dyadic enclosure.
+
+N5 first paired batch medians (ns), compared with N4:
+
+| Kernel | N4 baseline | N5 | N5 allocations including wrapper |
+|---|---|---|---:|
+| fast | [4707, 4597, 4537, 4777, 4446] | [4808, 4886, 4397, 4618, 4376] | 50 |
+| horner | [40, 49, 40, 60, 40] | [30, 59, 41, 61, 42] | 13 |
+| dot | [1853, 1842, 1842, 1882, 1913] | [1841, 1862, 1813, 1842, 1823] | 13 |
+| integer | [1291, 1262, 1244, 1232, 1293] | [1292, 1261, 1231, 1242, 1291] | 14 |
+| tuples | [52, 60, 50, 50, 60] | [40, 49, 30, 60, 31] | 13 |
+| closures | [1702, 1683, 1682, 1743, 1752] | [1793, 1732, 1783, 1912, 1693] | 16 |
+
+N5 differential corpus and the ilang-wasm tests pass, including the exact
+subnormal/overflow enclosure tests. A final budget audit counts argument binds,
+logical actions and aggregate expansion in actual extra worker statements,
+and narrows expansion if it would exceed the bound.

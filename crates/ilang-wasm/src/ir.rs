@@ -300,6 +300,8 @@ pub enum Value {
         env: Env,
     },
     Op(Op, Vec<Atom>),
+    /// This exact Float operation has an outward finite-result proof.
+    Finite(Op, Vec<Atom>),
     /// An operation that calls i code with this environment.
     OpEnv(Op, Vec<Atom>, Env),
     /// The service with this id in the environment (§9.2).

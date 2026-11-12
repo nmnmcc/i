@@ -663,7 +663,9 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
             args.iter().for_each(|a| atom_uses(a, f))
         }
         Value::Call { callee, args, env } => call_uses(callee, args, *env, f),
-        Value::Op(_, args) | Value::Tuple(args) => args.iter().for_each(|a| atom_uses(a, f)),
+        Value::Op(_, args) | Value::Finite(_, args) | Value::Tuple(args) => {
+            args.iter().for_each(|a| atom_uses(a, f))
+        }
         Value::OpEnv(_, args, env) => {
             args.iter().for_each(|a| atom_uses(a, f));
             env_uses(*env, f);

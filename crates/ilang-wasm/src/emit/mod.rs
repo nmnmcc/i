@@ -885,6 +885,12 @@ impl<'p> Emitter<'p> {
                     raw
                 }
             }
+            Value::Finite(op, args) => {
+                let args = args.iter().map(|a| self.float_atom(a)).collect::<Vec<_>>();
+                numeric::box_float(
+                    &numeric::float_operation(*op, &args, false).expect("proved Float operation"),
+                )
+            }
             Value::Op(op, args) => {
                 if self.numeric_enabled
                     && matches!(

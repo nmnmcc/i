@@ -4,6 +4,7 @@ use crate::ir::*;
 use ilang_check::types::NumericFact;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 mod aggregate;
+mod float_range;
 mod integer;
 pub(crate) mod rewrite;
 
@@ -518,6 +519,8 @@ pub fn run(p: &mut Program) {
             break;
         }
     }
+    // Include every appended scalar worker in the frozen pre-inlining set.
+    let inline_may = crate::control::may_suspend(p);
     // Inline only original, nonrecursive, transitively non-suspending bodies.
     // Calls already evaluate actual arguments in written order in ANF.
     for i in 0..p.funcs.len() {
@@ -547,7 +550,7 @@ pub fn run(p: &mut Program) {
             &mut f,
             &mut facts,
             &originals,
-            &may,
+            &inline_may,
             &recursive,
             &mut labels,
             &mut used,
@@ -568,7 +571,19 @@ pub fn run(p: &mut Program) {
                     .get(&FuncId(i as u32))
                     .is_some_and(|facts| !facts.is_empty()))
         {
-            aggregate::run(f);
+            let mut candidate = f.clone();
+            aggregate::run(&mut candidate);
+            let before = rewrite::size(&f.body);
+            let after = rewrite::size(&candidate.body);
+            if i < source_count || growth + after <= 2 * source_size + before {
+                if i >= source_count {
+                    growth = growth + after - before;
+                }
+                *f = candidate;
+            } else {
+                p.numeric_log
+                    .push(format!("code {i}: aggregate worker growth budget"));
+            }
         }
     }
     // Select workers after inlining; tail conventions must agree exactly.
@@ -667,6 +682,33 @@ pub fn run(p: &mut Program) {
         });
         p.numeric_locals.remove(&origin);
     }
+    for (i, function) in p.funcs.iter_mut().enumerate() {
+        if let FuncKind::Code(f) = function
+            && has_numeric(f)
+        {
+            let removed = float_range::run(f);
+            if removed != 0 {
+                p.numeric_log
+                    .push(format!("finite proofs code={i} removed={removed}"));
+            }
+        }
+    }
+    let actual_extra: usize = p
+        .funcs
+        .iter()
+        .skip(source_count)
+        .filter_map(|f| {
+            if let FuncKind::Code(f) = f {
+                Some(rewrite::size(&f.body))
+            } else {
+                None
+            }
+        })
+        .sum();
+    assert!(
+        actual_extra <= 2 * source_size,
+        "numeric actual extra-statement budget"
+    );
     assert!(growth <= 2 * source_size, "numeric extra-statement budget");
     assert!(
         worker_counts.values().all(|count| *count <= 4),
@@ -755,7 +797,6 @@ fn inline(
         if needs_closure && closure.is_none() {
             continue;
         }
-        *used += size;
         let offset = caller.locals.len() as u32;
         caller.locals.extend(&f.locals);
         let label_offset = *labels;
@@ -873,13 +914,19 @@ fn inline(
                 _ => {}
             }
         });
+        expansion.extend(clone);
+        let added = rewrite::size(&expansion);
+        if *used + added > limit {
+            caller.locals.truncate(offset as usize);
+            continue;
+        }
+        *used += added;
         // Fresh definition facts are renamed with the exact cloned code.
         if let Some(source) = all_facts.get(&id) {
             for (&l, &fact) in source {
                 facts.insert(offset + l, fact);
             }
         }
-        expansion.extend(clone);
         *stmt = Stmt::Block {
             label: done,
             body: expansion,
