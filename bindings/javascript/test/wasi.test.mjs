@@ -7,8 +7,9 @@ import { resolve, join } from 'node:path';
 const root = resolve(import.meta.dirname, '../../..'), cli = join(root, 'target/debug/i');
 const runner = join(root, 'bindings/javascript/wasi-run.mjs');
 function build(project, name, opt) {
-  execFileSync(cli, ['build', '--project', project, '--target', 'wasi', '--opt', String(opt)], { stdio: 'pipe' });
-  return join(project, 'build', name + '.wasm');
+  const output = join(project, 'build', name + '.wasi-o' + opt + '.wasm');
+  execFileSync(cli, ['build', '--project', project, '--target', 'wasi', '--opt', String(opt), '--out', output], { stdio: 'pipe' });
+  return output;
 }
 function run(wasm, options) {
   return execFileSync(process.execPath, [runner, wasm, JSON.stringify(options)], { encoding: 'utf8', timeout: 60000 });
