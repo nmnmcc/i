@@ -1831,12 +1831,6 @@
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
     ]
   },
-  "crates/ilang-syntax/tests/syn2.rs:9ae72ee3455756b6": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
   "crates/ilang-syntax/tests/syn2.rs:8acdab015f1921c9": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -2116,12 +2110,6 @@
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "tests/spec/6/syn2_empty_tuple_type.i:4dfd264ad80b24c8": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
     ]
   },
   "tests/spec/6/syn2_mixed_tuple.i:4434f59aa351dc4c": {
