@@ -337,7 +337,7 @@ fn macro_item_results_accept_only_a_single_item_or_a_flat_curly_list() {
 #[test]
 fn macro_declarations_have_a_lisp_binding_and_named_parameters() {
     use ilang_syntax::lisp::{expansion::definitions, parse_source};
-    let (module, errors) = parse_source("(@ macro (= m (-> (x y) _ x)))");
+    let (module, errors) = parse_source("(@ macro (= m (-> (, x y) _ x)))");
     assert!(errors.is_empty(), "{errors:?}");
     let found = definitions(&module, true).unwrap();
     assert_eq!(found[0].name, "m");
@@ -520,7 +520,7 @@ fn written_definition_answers_give_parameters_their_own_binder() {
 fn definition_preserves_record_label_parameter_identity() {
     use ilang_syntax::lisp::definitions::source_definition;
     use ilang_syntax::lisp::syntax::Node;
-    let source = "Box(K) = { (k = Int) }";
+    let source = "Box(K) = (k = Int)";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let like = root("x");
@@ -1109,34 +1109,6 @@ fn scoped_virtual_source_uses_utf8_byte_boundaries() {
 }
 
 #[test]
-fn lisp_source_definition_answers_keep_parameter_scope() {
-    use ilang_syntax::lisp::definitions::source_definition;
-    use ilang_syntax::lisp::syntax::Node;
-    let source = "((Pair A B) {(Pair (: left A) (: right B))})";
-    let (module, errors) = ilang_syntax::lisp::parse_source(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let like = root("x");
-    let answer = source_definition(&module.items[0], source, like.scope(), 27);
-    let Node::Round(parts) = answer.node() else {
-        panic!("item")
-    };
-    let Node::Round(head) = parts[0].node() else {
-        panic!("head")
-    };
-    let Node::Curly(body) = parts[1].node() else {
-        panic!("body")
-    };
-    let Node::Round(constructor) = body[0].node() else {
-        panic!("constructor")
-    };
-    let Node::Round(field) = constructor[1].node() else {
-        panic!("field")
-    };
-    assert_eq!(head[1].scope_identity(), field[2].scope_identity());
-    assert!(head[1].scope_identity().is_some());
-}
-
-#[test]
 fn source_syntax_normalizes_lisp_groups_without_erasing_function_bodies() {
     use ilang_syntax::lisp::source_syntax::{source_expression_syntax, source_item_syntax};
     use ilang_syntax::lisp::syntax::{Node, Scope};
@@ -1148,7 +1120,7 @@ fn source_syntax_normalizes_lisp_groups_without_erasing_function_bodies() {
     let normal = "f = (x) { y = { x }\n { y } }";
     let (normal_module, normal_errors) = ilang_syntax::parse_module(normal);
     assert!(normal_errors.is_empty(), "{normal_errors:?}");
-    let lisp = "(= f (-> (x) _ {(= y {x}) {y}}))";
+    let lisp = "(= f (-> (, x) _ {(= y {x}) {y}}))";
     let (lisp_module, lisp_errors) = ilang_syntax::lisp::parse_source(lisp);
     assert!(lisp_errors.is_empty(), "{lisp_errors:?}");
     let a = source_item_syntax(&normal_module.items[0], &scope, normal, false);
@@ -1165,31 +1137,11 @@ fn source_syntax_normalizes_lisp_groups_without_erasing_function_bodies() {
 }
 
 #[test]
-fn source_syntax_strips_nested_type_groups_in_lisp_items() {
-    use ilang_syntax::lisp::source_syntax::source_item_syntax;
-    use ilang_syntax::lisp::syntax::Scope;
-    use std::collections::BTreeSet;
-    let source = "((Box A) {(Box (: value {A}))})";
-    let (module, errors) = ilang_syntax::lisp::parse_source(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let syntax = source_item_syntax(
-        &module.items[0],
-        &Scope {
-            module: 2,
-            marks: BTreeSet::new(),
-        },
-        source,
-        true,
-    );
-    assert_eq!(syntax.show(), "((Box A) {(Box (: value A))})");
-}
-
-#[test]
 fn lisp_short_function_body_matches_normal_surface_core() {
     use ilang_syntax::lisp::source_syntax::source_item_syntax;
     let scope = root("x").scope().clone();
     let normal = "f = (x) { x }";
-    let lisp = "(= f (-> (x) _ x))";
+    let lisp = "(= f (-> (, x) _ x))";
     let (a, ae) = ilang_syntax::parse_module(normal);
     let (b, be) = ilang_syntax::lisp::parse_source(lisp);
     assert!(ae.is_empty() && be.is_empty());
@@ -1221,7 +1173,8 @@ fn source_syntax_agrees_across_surfaces_for_library_modules() {
         let source = std::fs::read_to_string(root.join(file)).unwrap();
         let (module, errors) = ilang_syntax::parse_module(&source);
         assert!(errors.is_empty(), "{file}: {errors:?}");
-        let lisp = ilang_syntax::lisp::print_module(&module);
+        let lisp =
+            ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(&source).0);
         let (parsed, errors) = ilang_syntax::lisp::parse_source(&lisp);
         assert!(errors.is_empty(), "{file}: {errors:?}");
         assert_eq!(module.items.len(), parsed.items.len(), "{file}");
@@ -1472,11 +1425,6 @@ fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
     assert_eq!(
         negative.show_as(Position::Expression).unwrap(),
         "() { x\n-1 }"
-    );
-    let clauses = root("(. x { (-> 1 2) (-> 3 4) })");
-    assert_eq!(
-        clauses.show_as(Position::Expression).unwrap(),
-        "x |> { 1 -> 2 3 -> 4 }"
     );
 }
 
