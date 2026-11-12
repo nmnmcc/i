@@ -2439,6 +2439,39 @@ impl<'a> Checker<'a> {
                         );
                     }
                 }
+                Stmt::Env { ty, value, span } if matches!(ty.kind, TypeKind::Hole) => {
+                    // Syntax three, `r <- (e1)` (§2.10.2): the key is the
+                    // type constructor of the known type of `e1`.
+                    let (v, k) = self.infer_k(value, &Ty::Top);
+                    let head = [&v, &k].into_iter().find_map(|t| match t {
+                        Ty::Con(super::Head::Named(r), _, args) => Some((*r, args.len())),
+                        _ => None,
+                    });
+                    let Some((r, args)) = head else {
+                        self.error(
+                            code::ENV_TYPE,
+                            value.span,
+                            "a provided service is keyed by its type, and the type of this value is not known to be one service type: give it a written type (syntax-3 §2.10.2)",
+                        );
+                        return self.block(&stmts[i + 1..], *span, expected);
+                    };
+                    self.out.services.insert((self.module, *span), r);
+                    self.effects.push(Effects::default());
+                    let a = self.block(&stmts[i + 1..], *span, expected);
+                    let (err, env) = self.pop_effects(*span);
+                    self.add_err(err);
+                    // The service type is the need of the rest for this
+                    // key, when the rest writes one; else its arguments are
+                    // left open, and the value and the rest fix them.
+                    let t = self.s.env_need(&env, super::Head::Named(r)).unwrap_or_else(|| {
+                        Ty::named(r, (0..args).map(|_| self.s.fresh()).collect())
+                    });
+                    self.sub2(&v, &t, value.span, value.span);
+                    let rest = self.s.env_diff(env, vec![t]);
+                    self.flush(*span, None);
+                    self.add_env(rest);
+                    return a;
+                }
                 Stmt::Env { ty, value, span } => {
                     // `! T = e1` and the rest `r`: `A ^ E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
@@ -2527,8 +2560,15 @@ impl<'a> Checker<'a> {
                 self.check_places(t, Pol::Pos, 0);
             }
         }
+        // Syntax three (transition front): `-> R ^ _ ! _` is a written
+        // result whose needs are left to inference.
+        let hole = |t: &Option<Type>| matches!(t, Some(t) if matches!(t.kind, TypeKind::Hole));
+        let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.err) && hole(&r.env));
         let ret = f.ret.as_ref().map(|r| {
             let value = self.conv(&r.value, &HashMap::new());
+            if inferred_needs {
+                return (value, Ty::Never, Ty::Never);
+            }
             let err = r
                 .err
                 .as_ref()
@@ -2553,6 +2593,25 @@ impl<'a> Checker<'a> {
         let (err, env) = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
         let t = match (ret, &f.ret) {
+            (Some((value, _, _)), Some(written)) if inferred_needs => {
+                let body_span = match f.body.stmts.last() {
+                    Some(Stmt::Expr(e)) => e.span,
+                    _ => f.body.span,
+                };
+                self.sub2(&a, &value, body_span, written.value.span);
+                let mut envs = vec![env];
+                envs.extend(env_tys);
+                if fails {
+                    envs.push(assert);
+                }
+                let env = self.env_union(envs, f.span);
+                Ty::Fn(Box::new(FnTy {
+                    params,
+                    ret: value,
+                    err,
+                    env,
+                }))
+            }
             (Some((value, rerr, renv)), Some(written)) => {
                 // §6.8: the written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and

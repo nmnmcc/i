@@ -3326,7 +3326,10 @@ impl<'a> Resolver<'a> {
                 }
                 ast::Stmt::Env { ty, value, span } => {
                     let ty = self.ty(ty);
-                    self.env_type(&ty);
+                    // `_`: the key is read from the value (syntax three).
+                    if !matches!(ty.kind, TypeKind::Hole) {
+                        self.env_type(&ty);
+                    }
                     let value = self.expr(value);
                     Stmt::Env {
                         ty,
