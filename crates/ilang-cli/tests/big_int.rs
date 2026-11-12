@@ -43,7 +43,10 @@ fn programs() -> Vec<(u8, Program)> {
     );
     let checked = ilang_check::check(&graph);
     assert!(
-        !checked.diags.iter().any(ilang_package::Diagnostic::is_error),
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );
@@ -170,7 +173,10 @@ fn large_int_arithmetic_matches_num_bigint() {
             .unwrap();
         for (a, b) in &pairs {
             let got = match instance
-                .call("big/main.apply", &[Value::Int(a.clone()), Value::Int(b.clone())])
+                .call(
+                    "big/main.apply",
+                    &[Value::Int(a.clone()), Value::Int(b.clone())],
+                )
                 .unwrap()
             {
                 Outcome::Ok(Value::String(text)) => text,
@@ -325,17 +331,23 @@ fn wide_integer_segments_match_their_encoding() {
         let mut instance = program
             .instantiate(HostOptions::new(HostImports::default()))
             .unwrap();
-        let mut run = |export: &str, args: Vec<Value>| match instance.call(export, &args).unwrap()
-        {
+        let mut run = |export: &str, args: Vec<Value>| match instance.call(export, &args).unwrap() {
             Outcome::Ok(value) => value,
             other => panic!("O{opt} {export} {args:?}: {other:?}"),
         };
         for (value, width) in &cases {
             let n = Value::Int(BigInt::from(*width));
             let bytes = encoding(value, *width, false);
-            match run("big/main.segment", vec![Value::Int(value.clone()), n.clone()]) {
+            match run(
+                "big/main.segment",
+                vec![Value::Int(value.clone()), n.clone()],
+            ) {
                 Value::BitArray(b) => {
-                    assert_eq!((b.bytes, b.bit_length as usize), (bytes.clone(), *width), "O{opt}: u({width}) of {value}")
+                    assert_eq!(
+                        (b.bytes, b.bit_length as usize),
+                        (bytes.clone(), *width),
+                        "O{opt}: u({width}) of {value}"
+                    )
                 }
                 other => panic!("{other:?}"),
             }
@@ -347,7 +359,11 @@ fn wide_integer_segments_match_their_encoding() {
             );
             let half = BigInt::from(1) << (width - 1);
             let u = unsigned(value, *width);
-            let signed = if u >= half { u - (BigInt::from(1) << *width) } else { u };
+            let signed = if u >= half {
+                u - (BigInt::from(1) << *width)
+            } else {
+                u
+            };
             assert_eq!(
                 int_of(run("big/main.read_i", vec![bits, n])),
                 signed,
@@ -361,7 +377,9 @@ fn wide_integer_segments_match_their_encoding() {
             ] {
                 let bytes = encoding(&value, width, true);
                 match run(write, vec![Value::Int(value.clone())]) {
-                    Value::BitArray(b) => assert_eq!(b.bytes, bytes, "O{opt}: le{width} of {value}"),
+                    Value::BitArray(b) => {
+                        assert_eq!(b.bytes, bytes, "O{opt}: le{width} of {value}")
+                    }
                     other => panic!("{other:?}"),
                 }
                 let bits = Value::BitArray(ilang_host::BitArray::new(bytes, width as u32).unwrap());
@@ -371,7 +389,11 @@ fn wide_integer_segments_match_their_encoding() {
                 } else {
                     u
                 };
-                assert_eq!(int_of(run(read, vec![bits])), expected, "O{opt}: read le{width} of {value}");
+                assert_eq!(
+                    int_of(run(read, vec![bits])),
+                    expected,
+                    "O{opt}: read le{width} of {value}"
+                );
             }
         }
     }

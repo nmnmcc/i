@@ -124,8 +124,7 @@ fn shortest(value: f64) -> (String, i32) {
         let better = match &best {
             None => true,
             Some((_, best_far)) => {
-                far < *best_far
-                    || (far == *best_far && text.ends_with(['0', '2', '4', '6', '8']))
+                far < *best_far || (far == *best_far && text.ends_with(['0', '2', '4', '6', '8']))
             }
         };
         if better {
@@ -199,7 +198,10 @@ fn programs() -> Vec<(u8, Program)> {
     );
     let checked = ilang_check::check(&graph);
     assert!(
-        !checked.diags.iter().any(ilang_package::Diagnostic::is_error),
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );

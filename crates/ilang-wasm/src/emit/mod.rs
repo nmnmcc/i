@@ -287,7 +287,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     }
     for (wat, f) in &p.runtime_calls {
         let arity = p.funcs[f.0 as usize].arity();
-        let params: String = (0..arity).map(|i| format!(" (param $p{i} eqref)")).collect();
+        let params: String = (0..arity)
+            .map(|i| format!(" (param $p{i} eqref)"))
+            .collect();
         let args: String = (0..arity).map(|i| format!(" (local.get $p{i})")).collect();
         let _ = writeln!(
             m,

@@ -171,9 +171,16 @@ fn big_hex(text: &str) -> String {
             if value < num_bigint::BigInt::from(-(1_i64 << 30))
                 || value >= num_bigint::BigInt::from(1_i64 << 30)
             {
-                let sign = if value < num_bigint::BigInt::from(0) { "-" } else { "" };
+                let sign = if value < num_bigint::BigInt::from(0) {
+                    "-"
+                } else {
+                    ""
+                };
                 let magnitude = if sign.is_empty() { value } else { -value };
-                out.push_str(&format!("{sign}0x{}", magnitude.to_str_radix(16).to_uppercase()));
+                out.push_str(&format!(
+                    "{sign}0x{}",
+                    magnitude.to_str_radix(16).to_uppercase()
+                ));
             } else {
                 out.push_str(&text[i..end]);
             }
@@ -326,7 +333,10 @@ fn big(text: &str) -> String {
         num_bigint::Sign::NoSign => 0,
         num_bigint::Sign::Plus => 1,
     };
-    let limbs: String = limbs.iter().map(|l| format!(" (i32.const {})", *l as i32)).collect();
+    let limbs: String = limbs
+        .iter()
+        .map(|l| format!(" (i32.const {})", *l as i32))
+        .collect();
     format!(
         "(call $int_pack (i32.const {sign}) (array.new_fixed $limbs {}{limbs}))",
         value.to_u32_digits().1.len()
