@@ -6,7 +6,7 @@
 //! The lexer (§1): tokens, the line rule (§1.7), and bracket pairs.
 
 use crate::span::Span;
-use crate::token::{Token, TokenKind as T};
+use crate::token::{StringPart, Token, TokenKind as T};
 use crate::{Code, Diagnostic};
 use num_bigint::BigUint;
 
@@ -64,7 +64,7 @@ fn lex_surface(source: &str, lisp: bool) -> Lexed {
     if source.starts_with('\u{feff}') {
         lexer.pos = 3;
     }
-    lexer.run();
+    lexer.run(false);
     let Lexer {
         mut tokens,
         docs,
@@ -102,7 +102,7 @@ fn opener(kind: &T) -> Option<T> {
     })
 }
 
-fn pair_brackets(tokens: &[Token], diags: &mut Vec<Diagnostic>) -> Vec<Option<u32>> {
+pub(crate) fn pair_brackets(tokens: &[Token], diags: &mut Vec<Diagnostic>) -> Vec<Option<u32>> {
     // Each kind has a link to its nearest open bracket. When a mismatched
     // closer searches below the top, every discarded opener is popped once;
     // an absent opener is found without rescanning the whole stack.
@@ -252,7 +252,8 @@ impl Lexer<'_> {
         }
     }
 
-    fn run(&mut self) {
+    fn run(&mut self, interpolation: bool) {
+        let mut parens = 0usize;
         loop {
             let nl = self.skip_trivia();
             let start = self.pos;
@@ -260,12 +261,17 @@ impl Lexer<'_> {
                 self.push(T::Eof, start, true);
                 return;
             };
+            if interpolation && c == b')' && parens == 0 {
+                self.push(T::Eof, start, true);
+                self.pos += 1;
+                return;
+            }
             let after_dot = !self.lisp && self.tokens.last().is_some_and(|t| t.kind == T::Dot);
             let kind = match c {
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.word(),
                 b'0'..=b'9' if after_dot => self.tuple_index(),
                 b'0'..=b'9' => self.number(),
-                b'"' => self.string(),
+                b'"' | b'#' => self.string(),
                 _ => match self.symbol(c) {
                     Some(kind) => kind,
                     None => {
@@ -281,6 +287,11 @@ impl Lexer<'_> {
                     }
                 },
             };
+            match kind {
+                T::LParen => parens += 1,
+                T::RParen => parens = parens.saturating_sub(1),
+                _ => {}
+            }
             self.push(kind, start, nl);
         }
     }
@@ -473,33 +484,269 @@ impl Lexer<'_> {
         T::Float(value)
     }
 
-    /// §1.6: string literals and escapes.
+    /// Swift-style delimiter matching: a raw escape needs exactly the opening
+    /// number of hashes. A closing quote consumes that many hashes.
     fn string(&mut self) -> T {
+        enum Piece {
+            Text(usize, usize),
+            Expr {
+                tokens: Vec<Token>,
+                span: Span,
+                comments: Vec<Comment>,
+            },
+        }
         let start = self.pos;
-        self.pos += 1;
-        let mut value = String::new();
+        while self.at(0) == b'#' {
+            self.pos += 1;
+        }
+        let hashes = self.pos - start;
+        if self.at(0) != b'"' {
+            self.error(
+                Code::UnexpectedChar,
+                self.span(start),
+                "a raw string delimiter needs a quote after `#`",
+            );
+            return T::Str(String::new());
+        }
+        let triple = self.src[self.pos..].starts_with(b"\"\"\"");
+        // Swift distinguishes raw quote-only strings such as #"""# from
+        // multi-line openers by a matching raw close on the same line.
+        let same_line_close = hashes > 0 && triple && {
+            let line_end = self.source[self.pos..]
+                .find(['\r', '\n'])
+                .map_or(self.src.len(), |n| self.pos + n);
+            (self.pos + 2..line_end).any(|at| {
+                self.src[at] == b'"'
+                    && self
+                        .src
+                        .get(at + 1..at + 1 + hashes)
+                        .is_some_and(|s| s.iter().all(|b| *b == b'#'))
+            })
+        };
+        let multiline = triple && !same_line_close;
+        let quotes = if multiline { 3 } else { 1 };
+        self.pos += quotes;
+        if multiline {
+            if !matches!(self.at(0), b'\r' | b'\n') {
+                self.error(
+                    Code::BadEscape,
+                    self.span(start),
+                    "a multi-line string opening delimiter must be followed by a line break",
+                );
+            } else {
+                self.newline();
+            }
+        }
+        let body = self.pos;
+        let mut text_start = body;
+        let mut pieces = Vec::new();
+        let end;
         loop {
-            let Some(c) = self.source[self.pos..].chars().next() else {
-                let msg = "this string is not closed";
+            if self.pos == self.src.len() {
                 self.error(
                     Code::UnterminatedString,
                     Span::new(start as u32, start as u32 + 1),
-                    msg,
+                    "this string is not closed",
                 );
-                return T::Str(value);
-            };
-            self.pos += c.len_utf8();
-            match c {
-                '"' => return T::Str(value),
-                '\r' => {
-                    if self.at(0) == b'\n' {
-                        self.pos += 1;
-                    }
-                    value.push('\n');
-                }
-                '\\' => self.escape(&mut value),
-                c => value.push(c),
+                end = self.pos;
+                pieces.push(Piece::Text(text_start, end));
+                break;
             }
+            if self.src[self.pos..].starts_with(&vec![b'"'; quotes])
+                && self
+                    .src
+                    .get(self.pos + quotes..self.pos + quotes + hashes)
+                    .is_some_and(|s| s.iter().all(|b| *b == b'#'))
+            {
+                end = self.pos;
+                pieces.push(Piece::Text(text_start, end));
+                self.pos += quotes + hashes;
+                break;
+            }
+            if self.at(0) == b'\\' && self.escape_hashes(hashes) {
+                let slash = self.pos;
+                self.pos += 1 + hashes;
+                if self.at(0) == b'(' {
+                    pieces.push(Piece::Text(text_start, slash));
+                    self.pos += 1;
+                    let expression_start = self.pos;
+                    let mut child = Lexer {
+                        src: self.src,
+                        source: self.source,
+                        pos: self.pos,
+                        tokens: Vec::new(),
+                        docs: Vec::new(),
+                        comments: Vec::new(),
+                        diags: Vec::new(),
+                        lisp: self.lisp,
+                    };
+                    child.run(true);
+                    if child.pos == child.src.len() && child.src.last() != Some(&b')') {
+                        child.error(
+                            Code::UnterminatedString,
+                            child.span(slash),
+                            "this string interpolation is missing its closing `)`",
+                        );
+                    }
+                    self.pos = child.pos;
+                    self.diags.extend(child.diags);
+                    mark_breaks(&mut child.tokens);
+                    let span = Span::new(
+                        expression_start as u32,
+                        child
+                            .tokens
+                            .last()
+                            .expect("expression ends in EOF")
+                            .span
+                            .start,
+                    );
+                    pieces.push(Piece::Expr {
+                        tokens: child.tokens,
+                        span,
+                        comments: child.comments,
+                    });
+                    text_start = self.pos;
+                } else if self.pos < self.src.len() {
+                    // Keep escapes in the text range; decode after indentation
+                    // is known. Skip the escaped character while finding quotes.
+                    self.pos += self.source[self.pos..].chars().next().unwrap().len_utf8();
+                }
+            } else {
+                self.pos += self.source[self.pos..].chars().next().unwrap().len_utf8();
+            }
+        }
+        let after = self.pos;
+        let mut remove = Vec::new();
+        if multiline {
+            let line = self.source[..end]
+                .rfind(['\r', '\n'])
+                .map_or(body, |p| p + 1);
+            let indent = &self.source[line..end];
+            if !indent.bytes().all(|b| matches!(b, b' ' | b'\t')) {
+                self.error(
+                    Code::BadEscape,
+                    Span::new(line as u32, end as u32),
+                    "a multi-line string closing delimiter must be on its own line",
+                );
+            } else {
+                let mut at = body;
+                while at < line {
+                    let stop = self.source[at..line]
+                        .find(['\r', '\n'])
+                        .map_or(line, |n| at + n);
+                    let content = &self.source[at..stop];
+                    let blank = content.bytes().all(|b| matches!(b, b' ' | b'\t'));
+                    if content.starts_with(indent) {
+                        remove.push((at, at + indent.len()));
+                    } else if blank {
+                        remove.push((at, stop));
+                    } else {
+                        self.error(Code::BadEscape, Span::new(at as u32, stop as u32), "a multi-line string line has less or different indentation than its closing delimiter");
+                    }
+                    at = stop;
+                    if self.src.get(at) == Some(&b'\r') {
+                        at += 1;
+                    }
+                    if self.src.get(at) == Some(&b'\n') {
+                        at += 1;
+                    }
+                }
+                let mut last = line;
+                if last > body && self.src[last - 1] == b'\n' {
+                    last -= 1;
+                }
+                if last > body && self.src[last - 1] == b'\r' {
+                    last -= 1;
+                }
+                remove.push((last, end));
+            }
+        }
+        let mut parts = Vec::new();
+        let mut interpolated = false;
+        for piece in pieces {
+            match piece {
+                Piece::Expr {
+                    tokens,
+                    span,
+                    comments,
+                } => {
+                    interpolated = true;
+                    parts.push(StringPart::Expr {
+                        tokens,
+                        span,
+                        comments,
+                    });
+                }
+                Piece::Text(a, z) => {
+                    self.pos = a;
+                    let mut value = String::new();
+                    while self.pos < z {
+                        if let Some((_, stop)) =
+                            remove.iter().find(|(a, z)| *a <= self.pos && self.pos < *z)
+                        {
+                            self.pos = (*stop).min(z);
+                            continue;
+                        }
+                        let c = self.source[self.pos..].chars().next().unwrap();
+                        self.pos += c.len_utf8();
+                        if c == '\\' && self.escape_hashes_after_slash(hashes) {
+                            self.pos += hashes;
+                            if multiline && matches!(self.at(0), b'\r' | b'\n') {
+                                self.newline();
+                            } else {
+                                self.escape(&mut value);
+                            }
+                        } else if c == '\r' {
+                            if self.at(0) == b'\n' {
+                                self.pos += 1;
+                            }
+                            value.push('\n');
+                        } else {
+                            value.push(c);
+                        }
+                    }
+                    parts.push(StringPart::Text(value, Span::new(a as u32, z as u32)));
+                }
+            }
+        }
+        self.pos = after;
+        if interpolated {
+            if self.lisp {
+                self.error(
+                    Code::BadEscape,
+                    self.span(start),
+                    "the Lisp surface has no string interpolation; use `<>`",
+                );
+            }
+            T::Interpolated(parts)
+        } else {
+            let [StringPart::Text(value, _)] = parts.as_slice() else {
+                unreachable!("a literal has one text part")
+            };
+            T::Str(value.clone())
+        }
+    }
+
+    fn escape_hashes(&self, hashes: usize) -> bool {
+        self.src
+            .get(self.pos + 1..self.pos + 1 + hashes)
+            .is_some_and(|s| s.iter().all(|b| *b == b'#'))
+            && (hashes == 0 || self.src.get(self.pos + 1 + hashes) != Some(&b'#'))
+    }
+
+    fn escape_hashes_after_slash(&self, hashes: usize) -> bool {
+        self.src
+            .get(self.pos..self.pos + hashes)
+            .is_some_and(|s| s.iter().all(|b| *b == b'#'))
+            && (hashes == 0 || self.src.get(self.pos + hashes) != Some(&b'#'))
+    }
+
+    fn newline(&mut self) {
+        if self.at(0) == b'\r' {
+            self.pos += 1;
+        }
+        if self.at(0) == b'\n' {
+            self.pos += 1;
         }
     }
 

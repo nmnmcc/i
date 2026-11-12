@@ -746,8 +746,11 @@ impl<'p> Emitter<'p> {
             Value::Field(a, i) => format!("(call $field {} (i32.const {i}))", self.atom(a)),
             Value::ListHead(a) => format!("(call $list_head {})", self.atom(a)),
             Value::ListTail(a) => format!("(call $list_tail {})", self.atom(a)),
-            Value::StringSuffix(a, n) => {
-                format!("(call $string_suffix {} (i32.const {n}))", self.atom(a))
+            Value::StringSuffix(a, n, z) => {
+                format!(
+                    "(call $string_trim_affixes {} (i32.const {n}) (i32.const {z}))",
+                    self.atom(a)
+                )
             }
             Value::BitsEmpty => "(call $bits_empty)".into(),
             Value::BitsConcat(a, b) => {
@@ -931,11 +934,12 @@ impl<'p> Emitter<'p> {
                 let s = self.string(s);
                 format!("(call $is_string {} {s})", self.atom(a))
             }
-            Cond::StartsWith(a, b) => {
+            Cond::StartsWith(a, b, c) => {
                 format!(
-                    "(call $string_starts_with {} {})",
+                    "(call $string_matches_affixes {} {} {})",
                     self.atom(a),
-                    self.atom(b)
+                    self.atom(b),
+                    self.atom(c)
                 )
             }
             Cond::I32(l) => format!("(local.get $l{l})"),

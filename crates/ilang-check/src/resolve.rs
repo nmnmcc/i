@@ -3726,8 +3726,13 @@ impl<'a> Resolver<'a> {
                 value: *value,
             },
             P::String(s) => PatternKind::String(s.clone()),
-            P::Prefix { prefix, rest } => PatternKind::Prefix {
+            P::Prefix {
+                prefix,
+                suffix,
+                rest,
+            } => PatternKind::Prefix {
                 prefix: prefix.clone(),
+                suffix: suffix.clone(),
                 rest: (!rest.discard).then(|| self.bind(&rest.name, rest.span, binders, shared)),
             },
             P::Constructor {

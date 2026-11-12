@@ -1,0 +1,3 @@
+(, (= syntax (/ i syntax)))
+(, pass)
+(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))

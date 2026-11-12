@@ -653,7 +653,7 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         | Value::RecGet(a, _)
         | Value::ListHead(a)
         | Value::ListTail(a)
-        | Value::StringSuffix(a, _)
+        | Value::StringSuffix(a, _, _)
         | Value::BitsWhole(a)
         | Value::BitsFromFloat { value: a, .. }
         | Value::BitsFromUtf { value: a, .. } => atom_uses(a, f),
@@ -742,7 +742,12 @@ fn cond_uses(c: &Cond, f: &mut dyn FnMut(Local)) {
             cond_uses(a, f);
             cond_uses(b, f);
         }
-        Cond::Equal(a, b) | Cond::StartsWith(a, b) | Cond::BitsEqual(a, b) => {
+        Cond::StartsWith(a, b, c) => {
+            atom_uses(a, f);
+            atom_uses(b, f);
+            atom_uses(c, f);
+        }
+        Cond::Equal(a, b) | Cond::BitsEqual(a, b) => {
             atom_uses(a, f);
             atom_uses(b, f);
         }

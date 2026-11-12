@@ -1366,11 +1366,11 @@ send_once = (pool: task.Ref(Pool), req: Request) {
 		False -> parts.path
 	}
 	target = parts.query |> {
-		Some(q) -> path <> "?" <> q
+		Some(q) -> "\(path)?\(q)"
 		None    -> path
 	}
 	host_header = authority.port |> {
-		Some(p) -> hostname <> ":" <> p
+		Some(p) -> "\(hostname):\(p)"
 		None    -> hostname
 	}
 	hs = header(req.headers, "host") |> {

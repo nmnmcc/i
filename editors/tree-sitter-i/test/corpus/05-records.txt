@@ -18,7 +18,9 @@ Forget = (..New, -count, name: "i")
       (record_field
         (identifier)
         (string
-          (string_content)))
+          (string_start)
+          (string_content)
+          (string_end)))
       (record_field
         (identifier)
         (integer))))
@@ -63,4 +65,6 @@ Forget = (..New, -count, name: "i")
       (type_field
         (identifier)
         (string
-          (string_content))))))
+          (string_start)
+          (string_content)
+          (string_end))))))

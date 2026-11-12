@@ -853,3 +853,32 @@ fn macro_expansion_preserves_hover_on_user_argument() {
         "{hover:?}"
     );
 }
+
+#[test]
+fn semantic_tokens_and_hover_inside_raw_interpolation() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "main = () { name = \"i\"  #\"raw \\(name) \\#(name)\"# }\n";
+    package(dir.path(), &[("src/main.i", source)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut client = Client::start();
+    client.open(&main, source);
+    let result = client.request::<lsp::request::SemanticTokensFullRequest>(json!({
+        "textDocument": { "uri": main }
+    }));
+    let data: lsp::SemanticTokens = serde_json::from_value(result).unwrap();
+    let (_, character) = find(source, "\\#(name)", 0);
+    let mut column = 0;
+    assert!(data.data.iter().any(|token| {
+        assert_eq!(token.delta_line, 0);
+        column += token.delta_start;
+        column == character + 3 && token.length == 4 && token.token_type == 3
+    }));
+    let hover =
+        client.request::<lsp::request::HoverRequest>(position_params(&main, 0, character + 3));
+    assert!(
+        hover["contents"]["value"]
+            .as_str()
+            .is_some_and(|s| s.contains("name:")),
+        "{hover:?}"
+    );
+}

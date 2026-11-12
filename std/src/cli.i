@@ -646,12 +646,12 @@ show_field = (field: Field) -> String {
 		}
 	}
 	field.kind |> {
-		Flag       -> "[" <> base <> "]"
+		Flag       -> "[\(base)]"
 		Required   -> base <> " VALUE"
-		Optional   -> "[" <> base <> " VALUE]"
-		Repeated   -> "[" <> base <> " VALUE...]"
-		Positional -> "<" <> field.name <> ">"
-		Remaining  -> "[<" <> field.name <> ">...]"
+		Optional   -> "[\(base) VALUE]"
+		Repeated   -> "[\(base) VALUE...]"
+		Positional -> "<\(field.name)>"
+		Remaining  -> "[<\(field.name)>...]"
 	}
 }
 

@@ -652,3 +652,18 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
         }
     }
 }
+
+#[test]
+fn charge_events_for_interpolation_and_two_sided_string_patterns() {
+    use ilang_syntax::lisp::SourceEncoder;
+    let source = r##"value = (s: String) { s |> { "a" <> r <> "b" -> #"x\#(r)"#  r <> "b" -> r  _ -> "" } }"##;
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let scope = scope();
+    let encoder = SourceEncoder::new(&scope, source);
+    let item = &module.items[0];
+    assert_eq!(
+        planned(&encoder, item),
+        direct_charge_events(&encoder.item(item))
+    );
+}

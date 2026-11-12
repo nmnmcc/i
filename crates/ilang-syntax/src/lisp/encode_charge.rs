@@ -49,6 +49,7 @@ enum Task<'a> {
     RecordTypeField(&'a RecordLabel, &'a TypeExpr),
     RecordRemoved(&'a RecordLabel),
     Qualified(Option<&'a Ident>, &'a Ident),
+    StringPrefix(&'a str, &'a Binder),
     BracketParams(&'a [Param]),
     BracketTypeParams(&'a [FnParamType]),
     Constructors(&'a [Constructor]),
@@ -114,6 +115,12 @@ pub(super) fn item<E>(
     while let Some(task) = work.pop() {
         match task {
             Leave => f(SyntaxCharge::LeaveFrame)?,
+            StringPrefix(prefix, rest) => {
+                bracket(&mut f, &mut work, 3)?;
+                work.push(Atom(&rest.name));
+                work.push(Atom(prefix));
+                work.push(Atom("<>"));
+            }
             Atom(text) => atom(&mut f, text.len() as u64, false)?,
             Int(value) => atom(&mut f, value.bits().div_ceil(8), true)?,
             SignedInt(value) => atom(&mut f, value.magnitude().bits().div_ceil(8), true)?,
@@ -493,11 +500,23 @@ pub(super) fn item<E>(
                         work.push(Float);
                     }
                 }
-                PatternKind::Prefix { prefix, rest } => {
-                    bracket(&mut f, &mut work, 3)?;
-                    work.push(Atom(&rest.name));
-                    work.push(Atom(prefix));
-                    work.push(Atom("<>"));
+                PatternKind::Prefix {
+                    prefix,
+                    suffix,
+                    rest,
+                } => {
+                    if suffix.is_empty() {
+                        work.push(StringPrefix(prefix, rest));
+                    } else {
+                        bracket(&mut f, &mut work, 3)?;
+                        work.push(Atom(suffix));
+                        if prefix.is_empty() {
+                            work.push(Atom(&rest.name));
+                        } else {
+                            work.push(StringPrefix(prefix, rest));
+                        }
+                        work.push(Atom("<>"));
+                    }
                 }
                 PatternKind::Constructor {
                     module,

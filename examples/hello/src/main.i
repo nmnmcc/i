@@ -25,7 +25,7 @@ repeat = (text: String, times: Int, sep: String) -> String {
 	}
 }
 
-greet = (g: Greeting) { repeat("hello " <> g.name <> "!", g.times, " ") }
+greet = (g: Greeting) { repeat("hello \(g.name)!", g.times, " ") }
 
 // Program entry.
 main = (io ! Io) { io.print("Hello from i!") }

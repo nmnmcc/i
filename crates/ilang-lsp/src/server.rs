@@ -63,6 +63,15 @@ pub fn capabilities() -> lsp::ServerCapabilities {
                 ..Default::default()
             },
         )),
+        semantic_tokens_provider: Some(
+            lsp::SemanticTokensServerCapabilities::SemanticTokensOptions(
+                lsp::SemanticTokensOptions {
+                    legend: crate::semantic::legend(),
+                    full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
+                    ..Default::default()
+                },
+            ),
+        ),
         hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
         definition_provider: Some(lsp::OneOf::Left(true)),
         document_symbol_provider: Some(lsp::OneOf::Left(true)),
@@ -677,7 +686,16 @@ impl<'c> Server<'c> {
     // ---- Requests ----
 
     fn request(&mut self, req: Request) {
-        use lsp::request::{Formatting, Request as _};
+        use lsp::request::{Formatting, Request as _, SemanticTokensFullRequest};
+        if req.method == SemanticTokensFullRequest::METHOD {
+            let id = req.id.clone();
+            let response =
+                match req.extract::<lsp::SemanticTokensParams>(SemanticTokensFullRequest::METHOD) {
+                    Ok((id, p)) => self.semantic_tokens(id, p),
+                    Err(e) => error(id, ErrorCode::InvalidParams, e.to_string()),
+                };
+            return self.send(Message::Response(response));
+        }
         if req.method == Formatting::METHOD {
             let id = req.id.clone();
             let response = match req.extract::<lsp::DocumentFormattingParams>(Formatting::METHOD) {
@@ -918,6 +936,23 @@ impl<'c> Server<'c> {
         Ok(Some(completion_response(
             q.completions_at(place.module, offset),
         )))
+    }
+
+    fn semantic_tokens(&self, id: RequestId, p: lsp::SemanticTokensParams) -> Response {
+        let Some(path) = uri::to_path(&p.text_document.uri).map(|p| normalize(&p)) else {
+            return Response::new_ok(id, None::<lsp::SemanticTokens>);
+        };
+        let text = match self.docs.get(&path) {
+            Some(d) => d.text.clone(),
+            None => match std::fs::read_to_string(&path) {
+                Ok(text) => text,
+                Err(e) => return error(id, ErrorCode::RequestFailed, e.to_string()),
+            },
+        };
+        Response::new_ok(
+            id,
+            crate::semantic::tokens(&text, path.extension().is_some_and(|e| e == "is")),
+        )
     }
 
     fn formatting(&mut self, id: RequestId, p: lsp::DocumentFormattingParams) -> Response {

@@ -23,10 +23,14 @@ import = () { // ordinary comment
     (arguments
       (argument
         (string
-          (string_content)))
+          (string_start)
+          (string_content)
+          (string_end)))
       (argument
         (string
-          (string_content)))))
+          (string_start)
+          (string_content)
+          (string_end)))))
   (declaration
     (identifier)
     (function_type
@@ -40,7 +44,9 @@ import = () { // ordinary comment
     (arguments
       (argument
         (string
-          (string_content)))))
+          (string_start)
+          (string_content)
+          (string_end)))))
   (attribute
     (identifier))
   (binding

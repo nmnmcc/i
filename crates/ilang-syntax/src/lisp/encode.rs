@@ -29,9 +29,75 @@ pub struct SourceEncoder {
     close: Vec<Option<u32>>,
     positions: Vec<usize>,
 }
+// Source positions of interpolation's generated concatenations. Macro syntax
+// contains only ordinary operators and expression names, just like the AST.
+fn core_tokens(tokens: Vec<Token>) -> Vec<Token> {
+    use crate::token::{StringPart, TokenKind as T};
+    let mut out = Vec::new();
+    for token in tokens {
+        let T::Interpolated(parts) = token.kind else {
+            out.push(token);
+            continue;
+        };
+        let mut groups = Vec::new();
+        for part in parts {
+            match part {
+                StringPart::Text(value, span) if !value.is_empty() => groups.push((
+                    span,
+                    vec![Token {
+                        kind: T::Str(value),
+                        span,
+                        nl: false,
+                        brk: false,
+                    }],
+                )),
+                StringPart::Text(_, _) => {}
+                StringPart::Expr {
+                    mut tokens, span, ..
+                } => {
+                    let eof = tokens.pop().expect("interpolation tokens end in EOF");
+                    assert_eq!(eof.kind, T::Eof, "interpolation tokens end in EOF");
+                    groups.push((span, core_tokens(tokens)));
+                }
+            }
+        }
+        if groups.len() == 1 {
+            let span = Span::new(token.span.start, token.span.start);
+            groups.insert(
+                0,
+                (
+                    span,
+                    vec![Token {
+                        kind: T::Str(String::new()),
+                        span,
+                        nl: false,
+                        brk: false,
+                    }],
+                ),
+            );
+        }
+        let mut end = None;
+        for (span, group) in groups {
+            if let Some(end) = end {
+                out.push(Token {
+                    kind: T::LtGt,
+                    span: Span::new(end, span.start),
+                    nl: false,
+                    brk: false,
+                });
+            }
+            end = Some(span.end);
+            out.extend(group);
+        }
+    }
+    out
+}
+
 impl SourceEncoder {
     pub fn new(scope: &Scope, source: &str) -> Self {
-        let lexed = crate::lex(source);
+        let mut lexed = crate::lex(source);
+        lexed.tokens = core_tokens(lexed.tokens);
+        lexed.close = crate::lexer::pair_brackets(&lexed.tokens, &mut lexed.diagnostics);
         // The first token beginning at or after each byte boundary. The
         // source is indexed once, so separate items do not re-lex it.
         let mut positions = vec![lexed.tokens.len(); source.len() + 1];
@@ -378,7 +444,9 @@ impl Encoder<'_> {
     }
     fn record_label(&self, n: &Ident) -> Syntax {
         let token = &self.tokens[self.positions[n.span.start as usize]];
-        if matches!(token.kind, TokenKind::Str(_)) && crate::print::record_label(&n.name, false).starts_with('"') {
+        if matches!(token.kind, TokenKind::Str(_))
+            && crate::print::record_label(&n.name, false).starts_with('"')
+        {
             self.node(Node::Text(n.name.clone()), n.span)
         } else {
             self.name(n)
@@ -958,16 +1026,41 @@ impl Encoder<'_> {
                 }
             }
             PatternKind::String(s) => self.node(Node::Text(s.clone()), p.span),
-            PatternKind::Prefix { prefix, rest } => {
+            PatternKind::Prefix {
+                prefix,
+                suffix,
+                rest,
+            } => {
                 let span = self.token_span(p.span, |k| matches!(k, TokenKind::Str(_)));
-                self.form(
-                    "<>",
-                    [
-                        self.node(Node::Text(prefix.clone()), span),
-                        self.binder(rest),
-                    ],
-                    p.span,
-                )
+                let start = if !prefix.is_empty() || suffix.is_empty() {
+                    self.form(
+                        "<>",
+                        [
+                            self.node(Node::Text(prefix.clone()), span),
+                            self.binder(rest),
+                        ],
+                        p.span,
+                    )
+                } else {
+                    self.binder(rest)
+                };
+                if suffix.is_empty() {
+                    start
+                } else {
+                    self.form(
+                        "<>",
+                        [
+                            start,
+                            self.node(
+                                Node::Text(suffix.clone()),
+                                self.token_span(Span::new(rest.span.end, p.span.end), |k| {
+                                    matches!(k, TokenKind::Str(_))
+                                }),
+                            ),
+                        ],
+                        p.span,
+                    )
+                }
             }
             PatternKind::Constructor {
                 module,

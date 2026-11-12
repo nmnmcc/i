@@ -3,7 +3,7 @@
 const list = (item, sep) => optional(seq(item, repeat(seq(sep, item)), optional(sep)));
 module.exports = grammar({
   name: 'i',
-  externals: $ => [$._break, $.string_content],
+  externals: $ => [$._break, $.string_start, $.string_content, $.string_end, $.escape_sequence, $.interpolation_start, $.interpolation_end],
   extras: $ => [/\s/, $.module_comment, $.doc_comment, $.comment],
   word: $ => $.identifier,
   conflicts: $ => [
@@ -119,7 +119,9 @@ module.exports = grammar({
     segment_alias_pattern: $ => prec.right(seq($.identifier, '=', $._segment_pattern)),
     typed_pattern: $ => prec.right(2, seq(field('pattern', $._pattern), ':', $._type)),
     alias_pattern: $ => prec.right(0, seq($.identifier, '=', $._pattern)),
-    prefix_pattern: $ => seq($.string, '<>', choice($.identifier, $.discard)),
+    prefix_pattern: $ => choice(
+      seq($.string, '<>', choice($.identifier, $.discard), optional(seq('<>', $.string))),
+      seq(choice($.identifier, $.discard), '<>', $.string)),
     _type: $ => choice($.named_type, $.value_type, $.type_call, $.integer, $.string, $.discard, $.negative_type, $.type_tuple, $.type_record, $.type_group, $.function_type, $.binary_type),
     named_type: $ => prec(11, seq(optional(seq($.identifier, '.')), $.type_identifier, optional($.type_arguments))),
     value_type: $ => seq(optional(seq($.identifier, '.')), $.identifier),
@@ -141,8 +143,8 @@ module.exports = grammar({
     discard: _ => /_|__[a-z0-9_]*/,
     integer: _ => /0x[0-9a-fA-F][0-9a-fA-F_]*|0o[0-7][0-7_]*|0b[01][01_]*|[0-9][0-9_]*/,
     float: _ => /[0-9][0-9_]*\.[0-9_]*(e-?[0-9][0-9_]*)?/,
-    string: $ => seq('"', repeat(choice($.string_content, $.escape_sequence)), '"'),
-    escape_sequence: _ => token.immediate(/\\(u\{[0-9a-fA-F]{1,6}\}|[nrtf"\\])/),
+    string: $ => seq($.string_start, repeat(choice($.string_content, $.escape_sequence, $.interpolation)), $.string_end),
+    interpolation: $ => seq($.interpolation_start, $._expression, $.interpolation_end),
     module_comment: _ => token(prec(3, /\/\/\/\/[^\r\n]*/)),
     doc_comment: _ => token(prec(2, /\/\/\/[^\r\n]*/)),
     comment: _ => token(prec(1, /\/\/[^\r\n]*/)),

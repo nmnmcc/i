@@ -36,10 +36,16 @@ pub(crate) enum Lit {
     Float(u64),
     Str(String),
     /// `"lit" <> r`: the strings that start with `lit`.
-    Prefix(String),
+    Prefix(String, String),
     /// A bit array pattern (§8.4). It is never known to match all the
     /// values of another pattern.
     Bits,
+}
+
+fn affix_matches(value: &str, prefix: &str, suffix: &str) -> bool {
+    value.len() >= prefix.len() + suffix.len()
+        && value.starts_with(prefix)
+        && value.ends_with(suffix)
 }
 
 /// A constructor in the sense of Maranget: a part of a signature.
@@ -377,7 +383,7 @@ impl Ctor {
             Ctor::Lit(l) => Head::Named(TypeRef::Builtin(match l {
                 Lit::Int(_) => BuiltinType::Int,
                 Lit::Float(_) => BuiltinType::Float,
-                Lit::Str(_) | Lit::Prefix(_) => BuiltinType::String,
+                Lit::Str(_) | Lit::Prefix(_, _) => BuiltinType::String,
                 Lit::Bits => BuiltinType::BitArray,
                 Lit::Opaque(_) => unreachable!(),
             })),
@@ -400,8 +406,9 @@ impl Ctor {
     fn covers(&self, c: &Ctor) -> bool {
         match (self, c) {
             (Ctor::Lit(Lit::Bits | Lit::Opaque(_)), _) => false,
-            (Ctor::Lit(Lit::Prefix(p)), Ctor::Lit(Lit::Str(s) | Lit::Prefix(s))) => {
-                s.starts_with(p.as_str())
+            (Ctor::Lit(Lit::Prefix(p, z)), Ctor::Lit(Lit::Str(s))) => affix_matches(s, p, z),
+            (Ctor::Lit(Lit::Prefix(p, z)), Ctor::Lit(Lit::Prefix(q, w))) => {
+                q.starts_with(p.as_str()) && w.ends_with(z.as_str())
             }
             (a, b) => a == b,
         }
@@ -570,7 +577,9 @@ impl Checker<'_> {
                     if *x == h
                         && match c {
                             Ctor::Lit(Lit::Int(v) | Lit::Str(v)) => set.contains(v),
-                            Ctor::Lit(Lit::Prefix(p)) => !set.items().any(|v| v.starts_with(p)),
+                            Ctor::Lit(Lit::Prefix(p, z)) => {
+                                !set.items().any(|v| affix_matches(v, p, z))
+                            }
                             _ => false,
                         } =>
                 {
@@ -617,7 +626,9 @@ impl Checker<'_> {
                 .filter(|r| match &r[0] {
                     Pat::Wild(_) | Pat::Head(..) => true,
                     // `"" <> r` matches every string.
-                    Pat::Ctor(Ctor::Lit(Lit::Prefix(p)), _) => all_strings && p.is_empty(),
+                    Pat::Ctor(Ctor::Lit(Lit::Prefix(p, z)), _) => {
+                        all_strings && p.is_empty() && z.is_empty()
+                    }
                     _ => false,
                 })
                 .map(|r| r[1..].to_vec())
@@ -709,7 +720,7 @@ impl Checker<'_> {
             .iter()
             .filter(|r| match &r[0] {
                 Pat::Wild(_) | Pat::Head(..) | Pat::Except(..) => true,
-                Pat::Ctor(Ctor::Lit(Lit::Prefix(p)), _) => p.is_empty(),
+                Pat::Ctor(Ctor::Lit(Lit::Prefix(p, z)), _) => p.is_empty() && z.is_empty(),
                 _ => false,
             })
             .map(|r| r[1..].to_vec())
@@ -730,14 +741,26 @@ impl Checker<'_> {
             let prefixes: Vec<_> = rows
                 .iter()
                 .filter_map(|r| match &r[0] {
-                    Pat::Ctor(Ctor::Lit(Lit::Prefix(p)), _) if !p.is_empty() => Some(p),
+                    Pat::Ctor(Ctor::Lit(Lit::Prefix(p, z)), _)
+                        if !p.is_empty() || !z.is_empty() =>
+                    {
+                        Some((p, z))
+                    }
                     _ => None,
                 })
                 .collect();
             let c = ('a'..='z')
                 .chain('0'..='9')
                 .chain((123..=0x10ffff).filter_map(char::from_u32))
-                .find(|c| !prefixes.iter().any(|p| p.starts_with(*c)))
+                .find(|c| {
+                    !prefixes.iter().any(|(p, z)| {
+                        if p.is_empty() {
+                            z.ends_with(*c)
+                        } else {
+                            p.starts_with(*c)
+                        }
+                    })
+                })
                 .unwrap();
             let mut v = c.to_string();
             while !set.contains(&v) || listed.contains(&v) {
@@ -778,7 +801,9 @@ impl Checker<'_> {
         {
             let possible = match lit {
                 Lit::Int(v) | Lit::Str(v) => set.contains(v),
-                Lit::Prefix(p) => !set.is_finite() || set.items().any(|v| v.starts_with(p)),
+                Lit::Prefix(p, z) => {
+                    !set.is_finite() || set.items().any(|v| affix_matches(v, p, z))
+                }
                 _ => true,
             };
             if !possible {
@@ -1018,7 +1043,18 @@ impl Checker<'_> {
                 Lit::Int(s) => s.clone(),
                 Lit::Float(b) => format!("{:?}", f64::from_bits(*b)),
                 Lit::Str(s) => ilang_syntax::print::string_literal(s),
-                Lit::Prefix(s) => format!("{} <> _", ilang_syntax::print::string_literal(s)),
+                Lit::Prefix(p, z) => {
+                    let start = if p.is_empty() && !z.is_empty() {
+                        "_".into()
+                    } else {
+                        format!("{} <> _", ilang_syntax::print::string_literal(p))
+                    };
+                    if z.is_empty() {
+                        start
+                    } else {
+                        format!("{start} <> {}", ilang_syntax::print::string_literal(z))
+                    }
+                }
                 Lit::Bits => "<<..>>".into(),
                 Lit::Opaque(_) => "a syntax pattern".into(),
             },
@@ -1114,7 +1150,7 @@ pub(crate) fn literal(q: &Pattern) -> Option<Lit> {
             Lit::Float(if v == 0.0 { 0 } else { v.to_bits() })
         }
         PatternKind::String(s) => Lit::Str(s.clone()),
-        PatternKind::Prefix { prefix, .. } => Lit::Prefix(prefix.clone()),
+        PatternKind::Prefix { prefix, suffix, .. } => Lit::Prefix(prefix.clone(), suffix.clone()),
         PatternKind::BitArray(_) => Lit::Bits,
         _ => return None,
     })
@@ -1215,7 +1251,10 @@ mod literal_coverage_tests {
         let h = Head::Named(TypeRef::Builtin(BuiltinType::String));
         let except = ValueSet::except([std::sync::Arc::from("ab")]);
         let row = vec![Pat::Except(h, except.clone()), Pat::Wild(None)];
-        let prefix = Pat::Ctor(Ctor::Lit(Lit::Prefix("a".into())), Vec::new());
+        let prefix = Pat::Ctor(
+            Ctor::Lit(Lit::Prefix("a".into(), String::new())),
+            Vec::new(),
+        );
         assert!(
             ch.useful(
                 std::slice::from_ref(&row),
@@ -1274,7 +1313,7 @@ mod literal_coverage_tests {
         let mut queries = prefix.to_vec();
         queries.extend([
             lit(Lit::Str("".into())),
-            lit(Lit::Prefix("a".into())),
+            lit(Lit::Prefix("a".into(), String::new())),
             Pat::Head(int, 0),
             Pat::Head(string, 0),
             Pat::Except(string, ValueSet::except([std::sync::Arc::from("a")])),

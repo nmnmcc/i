@@ -1818,6 +1818,89 @@
     }
   },
   {
+    "type": "interpolation",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "binary_expression",
+          "named": true
+        },
+        {
+          "type": "bit_array",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "clause_block",
+          "named": true
+        },
+        {
+          "type": "field_access",
+          "named": true
+        },
+        {
+          "type": "float",
+          "named": true
+        },
+        {
+          "type": "function",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "integer",
+          "named": true
+        },
+        {
+          "type": "interpolation_end",
+          "named": true
+        },
+        {
+          "type": "interpolation_start",
+          "named": true
+        },
+        {
+          "type": "list",
+          "named": true
+        },
+        {
+          "type": "record",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "tuple",
+          "named": true
+        },
+        {
+          "type": "type_identifier",
+          "named": true
+        },
+        {
+          "type": "unary_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "list",
     "named": true,
     "fields": {},
@@ -2642,14 +2725,26 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": false,
+      "required": true,
       "types": [
         {
           "type": "escape_sequence",
           "named": true
         },
         {
+          "type": "interpolation",
+          "named": true
+        },
+        {
           "type": "string_content",
+          "named": true
+        },
+        {
+          "type": "string_end",
+          "named": true
+        },
+        {
+          "type": "string_start",
           "named": true
         }
       ]
@@ -3530,10 +3625,6 @@
     "named": false
   },
   {
-    "type": "\"",
-    "named": false
-  },
-  {
     "type": "%",
     "named": false
   },
@@ -3708,12 +3799,28 @@
     "named": true
   },
   {
+    "type": "interpolation_end",
+    "named": true
+  },
+  {
+    "type": "interpolation_start",
+    "named": true
+  },
+  {
     "type": "module_comment",
     "named": true,
     "extra": true
   },
   {
     "type": "string_content",
+    "named": true
+  },
+  {
+    "type": "string_end",
+    "named": true
+  },
+  {
+    "type": "string_start",
     "named": true
   },
   {

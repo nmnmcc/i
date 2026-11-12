@@ -43,7 +43,9 @@ impl Clone for Cond {
                     Cond::IsInt(a, n) => done.push(Cond::IsInt(a.clone(), n.clone())),
                     Cond::IsFloat(a, n) => done.push(Cond::IsFloat(a.clone(), *n)),
                     Cond::IsString(a, n) => done.push(Cond::IsString(a.clone(), n.clone())),
-                    Cond::StartsWith(a, b) => done.push(Cond::StartsWith(a.clone(), b.clone())),
+                    Cond::StartsWith(a, b, c) => {
+                        done.push(Cond::StartsWith(a.clone(), b.clone(), c.clone()))
+                    }
                     Cond::I32(n) => done.push(Cond::I32(*n)),
                     Cond::NumLt(a, b) => done.push(Cond::NumLt(a.clone(), b.clone())),
                     Cond::NumEq(a, b) => done.push(Cond::NumEq(a.clone(), b.clone())),
@@ -89,6 +91,11 @@ impl PartialEq for Cond {
         let mut todo = vec![(self, other)];
         while let Some((a, b)) = todo.pop() {
             match (a, b) {
+                (Cond::StartsWith(a, b, c), Cond::StartsWith(x, y, z)) => {
+                    if a != x || b != y || c != z {
+                        return false;
+                    }
+                }
                 (Cond::Not(a), Cond::Not(b)) => todo.push((a, b)),
                 (Cond::And(a, b), Cond::And(c, d)) | (Cond::Or(a, b), Cond::Or(c, d)) => {
                     todo.push((b, d));
@@ -113,7 +120,6 @@ impl PartialEq for Cond {
                     }
                 }
                 (Cond::Equal(a, b), Cond::Equal(c, d))
-                | (Cond::StartsWith(a, b), Cond::StartsWith(c, d))
                 | (Cond::BitsEqual(a, b), Cond::BitsEqual(c, d)) => {
                     if a != c || b != d {
                         return false;

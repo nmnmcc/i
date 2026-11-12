@@ -85,7 +85,8 @@ test("the grammar is valid JSON, and its regexes compile", () => {
     } else if (v && typeof v === "object") {
       for (const [k, x] of Object.entries(v)) {
         if ((k === "match" || k === "begin" || k === "end") && typeof x === "string") {
-          regexes.push(x);
+          // TextMate resolves end-pattern backreferences from the begin captures.
+          regexes.push(k === "end" ? x.replace(/\\[1-9]/g, "") : x);
         } else {
           visit(x);
         }
@@ -199,4 +200,17 @@ run: () -> Record ^ String ! Console
   has("name", "variable.parameter.i");
   has("rule", "storage.type.annotation.i");
   assert.ok(tokens.every((t) => !t.includes("invalid.illegal.annotation.i")));
+});
+
+test("interpolation nesting and arbitrary raw delimiters", async () => {
+  const grammar = await loadGrammar();
+  const source = `a = "hello \\(f("nested \\(name)"))!"
+b = ##"raw \\(name) "# stays inside"##
+c = """
+  line \\(name)
+  """`;
+  const tokens = tokenize(grammar, source);
+  assert.ok(scopesOf(tokens, "name").some((s) => s.includes("variable.other.i")));
+  assert.ok(scopesOf(tokens, String.raw`raw \(name) "# stays inside`).some((s) => s.includes("string.quoted.double.raw.i")));
+  assert.ok(tokens.some((t) => t.includes("punctuation.section.interpolation.begin.i")));
 });

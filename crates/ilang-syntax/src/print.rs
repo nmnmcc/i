@@ -772,8 +772,18 @@ impl Printer {
                 self.w(&float(*value));
             }
             PatternKind::String(s) => self.w(&string_literal(s)),
-            PatternKind::Prefix { prefix, rest } => {
-                self.w(&format!("{} <> {}", string_literal(prefix), rest.name));
+            PatternKind::Prefix {
+                prefix,
+                suffix,
+                rest,
+            } => {
+                if !prefix.is_empty() || suffix.is_empty() {
+                    self.w(&format!("{} <> ", string_literal(prefix)));
+                }
+                self.w(&rest.name);
+                if !suffix.is_empty() {
+                    self.w(&format!(" <> {}", string_literal(suffix)));
+                }
             }
             PatternKind::Constructor {
                 module,

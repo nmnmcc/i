@@ -4,7 +4,11 @@
 (discard) @variable.special
 (integer) @number
 (float) @number
-(string) @string
+(string_content) @string
+(string_start) @string
+(string_end) @string
+(interpolation_start) @punctuation.special
+(interpolation_end) @punctuation.special
 (escape_sequence) @string.escape
 (comment) @comment
 (doc_comment) @comment.doc

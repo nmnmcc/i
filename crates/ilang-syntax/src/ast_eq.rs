@@ -361,13 +361,15 @@ fn eq(mut q: Vec<Pair<'_>>) -> bool {
                     (
                         K::Prefix {
                             prefix: a,
+                            suffix: az,
                             rest: ar,
                         },
                         K::Prefix {
                             prefix: b,
+                            suffix: bz,
                             rest: br,
                         },
-                    ) => a == b && ar == br,
+                    ) => a == b && az == bz && ar == br,
                     (
                         K::Constructor {
                             module: a,

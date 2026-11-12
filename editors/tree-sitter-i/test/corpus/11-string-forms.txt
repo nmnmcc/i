@@ -1,0 +1,101 @@
+==================
+Interpolated nested raw and multiline strings
+==================
+quote = #"""#
+value = "hello \(f("nested \(name)"))!"
+raw = ##"raw \(name) \#n \##(name) \##n "# inside"##
+multiline = #"""
+  one
+    two \#(name)
+  """#
+tail = (s) { s |> { "a" <> r <> ".txt" -> r  r <> ".txt" -> r  _ -> "" } }
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (string
+      (string_start)
+      (string_content)
+      (string_end)))
+  (binding
+    (identifier)
+    (string
+      (string_start)
+      (string_content)
+      (interpolation
+        (interpolation_start)
+        (call
+          (identifier)
+          (arguments
+            (argument
+              (string
+                (string_start)
+                (string_content)
+                (interpolation
+                  (interpolation_start)
+                  (identifier)
+                  (interpolation_end))
+                (string_end)))))
+        (interpolation_end))
+      (string_content)
+      (string_end)))
+  (binding
+    (identifier)
+    (string
+      (string_start)
+      (string_content)
+      (interpolation
+        (interpolation_start)
+        (identifier)
+        (interpolation_end))
+      (string_content)
+      (escape_sequence)
+      (string_content)
+      (string_end)))
+  (binding
+    (identifier)
+    (string
+      (string_start)
+      (string_content)
+      (interpolation
+        (interpolation_start)
+        (identifier)
+        (interpolation_end))
+      (string_content)
+      (string_end)))
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (identifier))
+      (block
+        (binary_expression
+          (identifier)
+          (clause_block
+            (clause
+              (prefix_pattern
+                (string
+                  (string_start)
+                  (string_content)
+                  (string_end))
+                (identifier)
+                (string
+                  (string_start)
+                  (string_content)
+                  (string_end)))
+              (identifier))
+            (clause
+              (prefix_pattern
+                (identifier)
+                (string
+                  (string_start)
+                  (string_content)
+                  (string_end)))
+              (identifier))
+            (clause
+              (discard)
+              (string
+                (string_start)
+                (string_end)))))))))

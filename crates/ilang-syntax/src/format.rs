@@ -1129,6 +1129,10 @@ impl<'a> Formatter<'a> {
     /// `e` where an expression of at least level `min` is needed (§6.9).
     fn expr(&mut self, e: &Expr, min: u8) -> Doc {
         self.continued(e.span.start, |f| {
+            let token = &f.toks[f.tok_index(e.span.start)];
+            if token.span == e.span && matches!(token.kind, T::Interpolated(_)) {
+                return text(f.slice(e.span));
+            }
             // A match is an operation at level 6 (§6.9).
             if level(e) < min || is_match(e) && min > 6 {
                 let before = f.hard;
@@ -1316,6 +1320,7 @@ impl<'a> Formatter<'a> {
         let mut first = e;
         while let ExprKind::Binary { op, lhs, rhs } = &first.kind
             && op.level() == lvl
+            && !matches!(&self.toks[self.tok_index(first.span.start)], Token { span, kind: T::Interpolated(_), .. } if *span == first.span)
         {
             rest.push((*op, &**rhs));
             first = lhs;
@@ -1517,8 +1522,21 @@ impl<'a> Formatter<'a> {
             )),
             PatternKind::String(_) => text(self.slice(span)),
             PatternKind::Prefix { rest, .. } => {
-                let prefix = self.slice(self.toks[self.tok_index(span.start)].span);
-                text(format!("{prefix} <> {}", rest.name))
+                let first = &self.toks[self.tok_index(span.start)];
+                let prefix = matches!(first.kind, T::Str(_)).then_some(first.span);
+                let last = &self.toks[self.tok_index(span.end) - 1];
+                let suffix = matches!(last.kind, T::Str(_)).then_some(last.span);
+                let mut parts = Vec::new();
+                if let Some(prefix) = prefix {
+                    parts.push(text(self.slice(prefix)));
+                    parts.push(text(" <> "));
+                }
+                parts.push(self.continued(rest.span.start, |_| text(&rest.name)));
+                if let Some(suffix) = suffix {
+                    parts.push(text(" <> "));
+                    parts.push(self.continued(suffix.start, |f| text(f.slice(suffix))));
+                }
+                group(cat(parts))
             }
             PatternKind::Constructor {
                 module,

@@ -88,7 +88,11 @@ fn raw_string_lines(src: &str) -> Vec<usize> {
     let lines = ilang_syntax::span::LineIndex::new(src);
     let mut out = Vec::new();
     for t in &lexed.tokens {
-        if let ilang_syntax::token::TokenKind::Str(_) = t.kind {
+        if matches!(
+            t.kind,
+            ilang_syntax::token::TokenKind::Str(_)
+                | ilang_syntax::token::TokenKind::Interpolated(_)
+        ) {
             let (a, _) = lines.line_col(t.span.start);
             let (b, _) = lines.line_col(t.span.end);
             out.extend(a as usize..b as usize);

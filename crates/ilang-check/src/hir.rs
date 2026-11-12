@@ -602,9 +602,10 @@ pub enum PatternKind {
         value: f64,
     },
     String(String),
-    /// `"lit" <> rest`.
+    /// A string with a fixed prefix and suffix around one binder.
     Prefix {
         prefix: String,
+        suffix: String,
         rest: Option<Binder>,
     },
     /// `C(p, …)`, `C(p, ..)`. The parts are as written; matching them to
