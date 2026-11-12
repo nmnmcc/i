@@ -324,10 +324,10 @@ pub(super) const EFFECTS: &str = r#"
         (else (local.set $given (local.get $cur))))
       (if (local.get $mode)
         (then
-          ;; Kinds 2, 3 and 4 take an error; kinds 2 and 3 take a cancel.
+          ;; Kinds 2 and 3 take an error or a cancel.
           (br_if $step (i32.eqz (i32.and (i32.const 1)
             (i32.shr_u
-              (select (i32.const 0x1C) (i32.const 0x0C) (i32.eq (local.get $mode) (i32.const 1)))
+              (i32.const 0x0C)
               (struct.get $frame 3 (local.get $fr))))))
           (call $shadow_restore (local.get $d))))
       (local.set $v
@@ -353,39 +353,6 @@ pub(super) const EFFECTS: &str = r#"
   (call $capture_splice (local.get $c) (local.get $node) (local.get $nm) (local.get $last) (local.get $mlast))
   (global.set $pend (struct.get $tramp 2 (local.get $t)))
   (throw_ref (local.get $x)))
-
-;; `fail.catch(body)` (§9.3).
-(func $fail_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
-  (return_call $catch_run (local.get $env) (local.get $body)))
-
-;; Calls `body`, and takes `$error`.
-(func $catch_run (param $env (ref null $env)) (param $body eqref) (result eqref)
-  (local $depth i32) (local $e eqref) (local $r eqref)
-  (local.set $depth (call $shadow_depth))
-  (block $captured (result (ref $cap) exnref)
-    (local.set $e
-      (block $caught (result eqref)
-        (local.set $r
-          (try_table (result eqref) (catch $error $caught) (catch_ref $capture $captured)
-            (call $call0 (local.get $body) (local.get $env))))
-        (return (call $result_ok (local.get $r)))))
-    ;; An escape goes on to its boundary.
-    (if (ref.test (ref $escaped) (local.get $e)) (then (throw $error (local.get $e))))
-    (call $shadow_restore (local.get $depth))
-    (return (call $result_error (local.get $e))))
-  (call $capture_rethrow
-    (struct.new $frame (ref.func $catch_reenter) (ref.null $values) (i32.const -1) (i32.const 4)
-      (ref.null $values)))
-  (unreachable))
-
-;; The body ended with the value or the error `v`.
-(func $catch_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
-    (param $mode i32) (result eqref)
-  (if (i32.eq (local.get $mode) (i32.const 1))
-    (then
-      (if (ref.test (ref $escaped) (local.get $v)) (then (throw $error (local.get $v))))
-      (return_call $result_error (local.get $v))))
-  (return_call $result_ok (local.get $v)))
 
 ;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
 ;; an error or an unwinding goes through, which then goes on. A capture
@@ -718,6 +685,9 @@ pub(super) const EFFECTS: &str = r#"
       (array.get $values (local.get $slots) (local.get $i)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
+  ;; `Fail` comes from the place of the call (§2.10.7: the kept function
+  ;; raises to the caller's `catch`).
+  (array.set $env (local.get $kept) (i32.const 1) (array.get $env (local.get $env) (i32.const 1)))
   (return_call $keep_run (array.get $values (local.get $caps) (i32.const 0))
     (local.get $arg) (local.get $kept)))
 

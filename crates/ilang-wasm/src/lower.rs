@@ -878,6 +878,12 @@ impl<'a> Lowerer<'a> {
             .iter()
             .position(|t| Some(t.module) == prelude && t.name == "Assert")
             .map(|i| TypeRef::Custom(TypeId(i as u32)));
+        let fail = self
+            .program
+            .types
+            .iter()
+            .position(|t| Some(t.module) == prelude && t.name == "Fail")
+            .map(|i| TypeRef::Custom(TypeId(i as u32)));
         let mut all: Vec<TypeRef> = self.typed.services.values().copied().collect();
         let key = |t: &TypeRef| match t {
             TypeRef::Custom(id) => (
@@ -891,7 +897,10 @@ impl<'a> Lowerer<'a> {
         if let Some(a) = assert {
             self.services.insert(a, ASSERT_SERVICE);
         }
-        let mut next = ASSERT_SERVICE + 1;
+        if let Some(f) = fail {
+            self.services.insert(f, FAIL_SERVICE);
+        }
+        let mut next = FAIL_SERVICE + 1;
         for t in all {
             if let std::collections::hash_map::Entry::Vacant(e) = self.services.entry(t) {
                 e.insert(next);
@@ -967,6 +976,7 @@ impl<'a> Lowerer<'a> {
                     "Result" => Some(TypeRepr::Record(0)),
                     "AssertionFailure" => Some(TypeRepr::Record(1)),
                     "Assert" => Some(TypeRepr::Record(2)),
+                    "Fail" => Some(TypeRepr::Record(3)),
                     _ => None,
                 }
             } else {
@@ -992,7 +1002,8 @@ impl<'a> Lowerer<'a> {
                             "Ok" => 0,
                             "Error" => 1,
                             "AssertionFailure" => 2,
-                            _ => 3,
+                            "Assert" => 3,
+                            _ => 4,
                         },
                         ty,
                     },
@@ -1653,7 +1664,17 @@ impl<'a> Lowerer<'a> {
         operation: &'static str,
         args: Vec<Atom>,
     ) -> Atom {
-        let result = let_value(fx, out, Value::OpEnv(Op::Catch, vec![body], env), None);
+        let catch = self.library_callee("i/fail", "catch");
+        let result = let_value(
+            fx,
+            out,
+            Value::Call {
+                callee: catch,
+                args: vec![body],
+                env,
+            },
+            None,
+        );
         let arity = args.len() as u32;
         let_value(
             fx,
@@ -2555,8 +2576,6 @@ impl<'a> Lowerer<'a> {
                 };
                 Ok((Op::Runtime { name, arity }, arity))
             }
-            "ilang:fail" if function == "raise" => Ok((Op::Raise, arity)),
-            "ilang:fail" if function == "catch" => Ok((Op::Catch, arity)),
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
             "ilang:control" => match function.as_str() {
                 "boundary" => Ok((Op::Boundary, arity)),

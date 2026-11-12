@@ -720,11 +720,15 @@ impl<'p> Emitter<'p> {
             k += abi_in(t).0.len();
         }
         let n = x.abi.errors.len();
-        let mut chain = format!("(throw $error {})", take(offsets[n].0, offsets[n].1));
+        // An error of the host goes to the `Fail` of the environment (§9.3).
+        let mut chain = format!(
+            "(call $fail_env {} (local.get $env))",
+            take(offsets[n].0, offsets[n].1)
+        );
         for m in (1..n).rev() {
             chain = format!(
                 "(if (result eqref) (i32.eq (global.get $hr{i}_0) (i32.const {m}))\n\
-                 (then (throw $error {})) (else {chain}))",
+                 (then (call $fail_env {} (local.get $env))) (else {chain}))",
                 take(offsets[m].0, offsets[m].1)
             );
         }

@@ -85,7 +85,10 @@ pub(super) fn call(x: &Import, args: &[String]) -> String {
             "(block $wa_done (result eqref) (block $wa_error (result eqref) (br $wa_done (call $result_ok (try_table (result eqref) (catch $error $wa_error) {call})))) (call $result_error))"
         )
     } else {
-        call
+        // An error of the adapter goes to the `Fail` of the environment.
+        format!(
+            "(block $wa_done (result eqref) (call $fail_env (block $wa_error (result eqref) (br $wa_done (try_table (result eqref) (catch $error $wa_error) {call}))) (local.get $env)))"
+        )
     }
 }
 pub(super) fn runtime(p: &Program) -> String {

@@ -272,7 +272,6 @@ fn record_kinds() {
     assert_ne!(two[0], two[2], "two services: {two:?}");
     // The runtime records: no slot (-1), and their kinds.
     for (reenter, kind) in [
-        ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
         // Bit 5 marks finalizer re-entry for cancellation shielding; Wasm's
         // i32 shift uses the low five bits, so it dispatches like kind 5.

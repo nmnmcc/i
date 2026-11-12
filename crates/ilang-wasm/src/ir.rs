@@ -77,6 +77,10 @@
 /// The service id of `Assert` (§9.6).
 pub const ASSERT_SERVICE: u32 = 0;
 
+/// The service id of `Fail` (§9.3). The entry gives the platform's `Fail`,
+/// whose `raise` throws `$error` to the entry.
+pub const FAIL_SERVICE: u32 = 1;
+
 use num_bigint::BigInt;
 
 /// A local of the function. The first `arity` locals are its parameters.
@@ -203,10 +207,6 @@ pub enum Op {
         name: &'static str,
         arity: u32,
     },
-    /// `fail.raise(e)`: throws `$error`. It never gives a value.
-    Raise,
-    /// `fail.catch(body)`: `Ok` of the value, or `Error` of the error.
-    Catch,
     /// `resource.ensure(body, with)`.
     Ensure,
     /// `control.boundary(body)` (§9.4).
@@ -238,7 +238,6 @@ impl Op {
                 | Op::FloatDiv
                 | Op::Panic
                 | Op::Runtime { .. }
-                | Op::Catch
                 | Op::Ensure
                 | Op::Boundary
                 | Op::Suspend
@@ -254,8 +253,7 @@ impl Op {
     pub fn needs_env(self) -> bool {
         matches!(
             self,
-            Op::Catch
-                | Op::Ensure
+            Op::Ensure
                 | Op::Boundary
                 | Op::Resume
                 | Op::Cancel
@@ -270,8 +268,7 @@ impl Op {
     pub fn suspends(self) -> bool {
         matches!(
             self,
-            Op::Catch
-                | Op::Ensure
+            Op::Ensure
                 | Op::Boundary
                 | Op::Suspend
                 | Op::Resume
