@@ -30,7 +30,7 @@ The spec suite in `tests/spec` runs every case unoptimized and optimized, and re
 | --- | --- |
 | `i new NAME` | Make a new package, with a program and a test |
 | `i check` | Check a package for errors |
-| `i build [--target ilang\|wasi]` | Build a package into a Wasm module (see [Run on a stock Wasmtime](#run-on-a-stock-wasmtime)) |
+| `i build [NAME] [--target host\|ilang\|wasi]` | Build a package into one native executable, `build/<name>` (see [Native executables](#native-executables)); with `--target`, into a Wasm module (see [Run on a stock Wasmtime](#run-on-a-stock-wasmtime)) |
 | `i run` | Build and run the program entry of a package |
 | `i test [--time]` | Build and run the tests of a package |
 | `i fmt [--check]` | Format the `.i` files of `src/` and `test/`, or the paths given |
@@ -70,10 +70,33 @@ services of `ilang_host::services::testing`, under `test:` namespaces.
 services and external functions that it declares, and `i:io/v1` when one of
 its modules imports `i/io`.
 
+## Native executables
+
+`i build` makes one executable file, `build/<name>` (the package name, or
+the entry `NAME` of `i build NAME`), that runs without `i` installed:
+
+```sh
+i build --project examples/hello
+examples/hello/build/hello            # prints Hello from i!
+```
+
+It is a copy of the native runner, which has Wasmtime's runtime (without a
+compiler) and the standard host services of `i run` (standard streams, files,
+network, TLS, clocks, randomness, processes), followed by the program,
+compiled ahead of time. The executable passes its arguments, environment and
+standard streams to the program, and exits as `i run` does: 0 when the entry
+returns, 1 with the message when it stops. It is built for the target triple
+of the machine that builds it, for a baseline of CPU features (x86-64-v2 on
+x86-64); building for other targets and signing are not supported yet. The
+program needs a program entry, and may only import host services the runner
+gives; a package that needs others is built with `--target host` and run by
+an embedding host. See `docs/design/native.md` and
+`docs/design/native-packaging-report.md`.
+
 ## Run on a stock Wasmtime
 
-`i build` makes a module for hosts of the i binary interface: `i run`, the
-Rust host `ilang_host`, and the JavaScript SDK. To make a WASI preview 1
+`i build --target host` (or `ilang`) makes a module for hosts of the i binary
+interface: `i run`, the Rust host `ilang_host`, and the JavaScript SDK. To make a WASI preview 1
 command instead, which any WASI host runs with no other step, build with
 `--target wasi` (§B.7 of the spec):
 

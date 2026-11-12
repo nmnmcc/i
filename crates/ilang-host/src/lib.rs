@@ -74,6 +74,7 @@
 
 pub mod bindings;
 pub mod macro_budget;
+pub mod native;
 mod requests;
 pub mod resources;
 mod run;
@@ -797,8 +798,21 @@ pub struct Program {
     macro_static_cost: Option<(u64, u64)>,
 }
 
-impl Program {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+/// What a [`Program`] reads from the custom sections of its module, apart
+/// from the code: the same for a module compiled here and for a native
+/// package, which keeps these sections beside its precompiled code.
+pub(crate) struct Metadata {
+    pub(crate) abi: Abi,
+    embedded_abi: bool,
+    pub(crate) artifact_digest: String,
+    provider_registrations: Vec<ProviderRegistration>,
+    macro_static_cost: Option<(u64, u64)>,
+}
+
+impl Metadata {
+    /// Read the custom sections of `bytes`; `artifact_digest` identifies the
+    /// complete module that they came from.
+    pub(crate) fn read(bytes: &[u8], artifact_digest: String) -> Result<Self> {
         let embedded = Abi::from_wasm(bytes)?;
         let mut macro_static_cost = None;
         for payload in wasmparser::Parser::new(0).parse_all(bytes) {
@@ -851,42 +865,134 @@ impl Program {
                 "the module was built for the {target} target (B.7); run it with a WASI host such as `wasmtime run`"
             );
         }
-        let mut config = Config::new();
-        config.wasm_gc(true);
-        config.wasm_function_references(true);
-        config.wasm_tail_call(true);
-        config.wasm_exceptions(true);
-        config.max_wasm_stack(WASM_STACK);
-        // Only checked against `max_wasm_stack`: the host does not use
-        // Wasmtime's async support.
-        config.async_stack_size(THREAD_STACK);
+        Ok(Self {
+            abi,
+            embedded_abi,
+            artifact_digest,
+            provider_registrations,
+            macro_static_cost,
+        })
+    }
+}
+
+/// Check that `imports` give every function the module imports, with the
+/// authority of `plan`, before anything is linked.
+fn check_imports(
+    abi: &Abi,
+    provider_registrations: &[ProviderRegistration],
+    artifact_digest: &str,
+    plan: Option<&bindings::BindingPlan>,
+    imports: &HostImports,
+) -> Result<()> {
+    {
+        for table in [&abi.services, &abi.externals] {
+            for (namespace, fields) in table {
+                for name in fields.keys() {
+                    ensure!(
+                        imports
+                            .functions
+                            .contains_key(&(namespace.clone(), name.clone())),
+                        "missing host function {namespace} {name}{}",
+                        {
+                            let services: Vec<_> = provider_registrations
+                                .iter()
+                                .filter(|d| d.namespace == *namespace && d.name == *name)
+                                .map(|d| d.service.as_str())
+                                .collect();
+                            if services.is_empty() {
+                                String::new()
+                            } else {
+                                format!(" for service {}", services.join(", "))
+                            }
+                        }
+                    );
+                }
+            }
+        }
+        // Check every declaration before linking the coalesced import names.
+        if let Some(plan) = plan {
+            plan.validate(artifact_digest, &abi)?;
+            for declaration in &plan.declarations {
+                let key = (declaration.namespace.clone(), declaration.name.clone());
+                ensure!(
+                    imports.unrestricted.contains(&key) || imports.grants.allows(plan, declaration),
+                    "ungranted host import {} {} declared by {} {}",
+                    declaration.namespace,
+                    declaration.name,
+                    declaration.module,
+                    declaration.declaration
+                );
+            }
+        } else {
+            for table in [&abi.services, &abi.externals] {
+                for (namespace, fields) in table {
+                    for name in fields.keys() {
+                        ensure!(
+                            imports
+                                .unrestricted
+                                .contains(&(namespace.clone(), name.clone())),
+                            "ungranted host import {namespace} {name}: a trusted binding plan or explicit declaration grant is required"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The engine settings that do not depend on the compiler, shared by
+/// [`Program::from_bytes`] and native packages ([`native`]).
+fn runtime_config(collector: wasmtime::Collector, heap: u64) -> Config {
+    let mut config = Config::new();
+    config.wasm_gc(true);
+    config.wasm_function_references(true);
+    config.wasm_tail_call(true);
+    config.wasm_exceptions(true);
+    config.max_wasm_stack(WASM_STACK);
+    // Only checked against `max_wasm_stack`: the host does not use
+    // Wasmtime's async support.
+    config.async_stack_size(THREAD_STACK);
+    config.collector(collector);
+    config.gc_heap_initial_size(heap);
+    config
+}
+
+impl Program {
+    /// Compile a module in this process, for the CPU it runs on.
+    #[cfg(feature = "compiler")]
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let metadata = Metadata::read(bytes, bindings::artifact_digest(bytes))?;
+        let (collector, heap) = gc_settings()?;
+        let mut config = runtime_config(collector, heap);
         // Compile independent functions concurrently while preserving the
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-        let (collector, heap) = gc_settings()?;
-        config.collector(collector);
-        config.gc_heap_initial_size(heap);
         let engine = Engine::new(&config)?;
         let module = Module::new(&engine, bytes)
             .map_err(anyhow::Error::from)
             .context("compiling the i WebAssembly module")?;
+        Self::from_parts(engine, module, metadata)
+    }
+
+    fn from_parts(engine: Engine, module: Module, metadata: Metadata) -> Result<Self> {
         let has_macro_hooks = module
             .imports()
             .any(|import| import.module() == "ilang:macro/budget/v1");
         ensure!(
-            has_macro_hooks == macro_static_cost.is_some(),
+            has_macro_hooks == metadata.macro_static_cost.is_some(),
             "macro accounting hooks and static budget section must occur together"
         );
         Ok(Self {
             engine,
             module,
-            abi,
-            embedded_abi,
-            artifact_digest: bindings::artifact_digest(bytes),
+            abi: metadata.abi,
+            embedded_abi: metadata.embedded_abi,
+            artifact_digest: metadata.artifact_digest,
             binding_plan: None,
-            provider_registrations,
-            macro_static_cost,
+            provider_registrations: metadata.provider_registrations,
+            macro_static_cost: metadata.macro_static_cost,
         })
     }
 
@@ -928,62 +1034,13 @@ impl Program {
                 .context("macro program needs a compiler budget")?;
             budget.charge(work, allocation)?;
         }
-        for table in [&self.abi.services, &self.abi.externals] {
-            for (namespace, fields) in table {
-                for name in fields.keys() {
-                    ensure!(
-                        options
-                            .imports
-                            .functions
-                            .contains_key(&(namespace.clone(), name.clone())),
-                        "missing host function {namespace} {name}{}",
-                        {
-                            let services: Vec<_> = self
-                                .provider_registrations
-                                .iter()
-                                .filter(|d| d.namespace == *namespace && d.name == *name)
-                                .map(|d| d.service.as_str())
-                                .collect();
-                            if services.is_empty() {
-                                String::new()
-                            } else {
-                                format!(" for service {}", services.join(", "))
-                            }
-                        }
-                    );
-                }
-            }
-        }
-        // Check every declaration before linking the coalesced import names.
-        if let Some(plan) = &self.binding_plan {
-            plan.validate(&self.artifact_digest, &self.abi)?;
-            for declaration in &plan.declarations {
-                let key = (declaration.namespace.clone(), declaration.name.clone());
-                ensure!(
-                    options.imports.unrestricted.contains(&key)
-                        || options.imports.grants.allows(plan, declaration),
-                    "ungranted host import {} {} declared by {} {}",
-                    declaration.namespace,
-                    declaration.name,
-                    declaration.module,
-                    declaration.declaration
-                );
-            }
-        } else {
-            for table in [&self.abi.services, &self.abi.externals] {
-                for (namespace, fields) in table {
-                    for name in fields.keys() {
-                        ensure!(
-                            options
-                                .imports
-                                .unrestricted
-                                .contains(&(namespace.clone(), name.clone())),
-                            "ungranted host import {namespace} {name}: a trusted binding plan or explicit declaration grant is required"
-                        );
-                    }
-                }
-            }
-        }
+        check_imports(
+            &self.abi,
+            &self.provider_registrations,
+            &self.artifact_digest,
+            self.binding_plan.as_ref(),
+            &options.imports,
+        )?;
         let mut linker = Linker::new(&self.engine);
         define_builtins(&mut linker)?;
         for (kind, modules) in [(true, &self.abi.services), (false, &self.abi.externals)] {
@@ -1645,6 +1702,7 @@ pub const GC_HEAP: u64 = 256 << 20;
 /// `drc` or `null`) and `ILANG_GC_HEAP` (MiB) say otherwise, to measure them.
 ///
 /// [`Collector::Copying`]: wasmtime::Collector::Copying
+#[cfg_attr(not(feature = "compiler"), allow(dead_code))]
 fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
     use wasmtime::Collector;
     let collector = match std::env::var("ILANG_GC").as_deref() {

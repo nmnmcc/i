@@ -17,10 +17,18 @@ serde_json.workspace = true
 sha2.workspace = true
 tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "io-util", "io-std", "sync", "fs", "net", "process"] }
 wasmparser.workspace = true
-wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-copying", "gc-drc", "gc-null", "runtime", "std", "backtrace", "parallel-compilation"] }
+# The runtime alone: the native runner (crates/ilang-runner) loads
+# precompiled code and has no compiler. `compiler` adds Cranelift.
+wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "gc", "gc-copying", "gc-drc", "gc-null", "runtime", "std", "backtrace"] }
+target-lexicon = "0.13.5"
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 rustls-native-certs = "0.8.5"
 rustls-pemfile = "2.2.0"
+
+[features]
+default = ["compiler"]
+# Compile Wasm with Cranelift: `Program::from_bytes` and native packaging.
+compiler = ["wasmtime/cranelift", "wasmtime/parallel-compilation"]
 
 [dev-dependencies]
 tokio = { version = "1.53.3", default-features = false, features = ["rt", "time", "test-util", "net"] }

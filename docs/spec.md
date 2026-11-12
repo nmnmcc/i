@@ -531,7 +531,7 @@ The target columns are `js`, `nodejs`, `native`, `wasi` and `host`. `--target il
 |---|---|---|
 | `i run` | native / Native | Validate the selected entry plan; execute in process |
 | `i test` | native / Native | Validate test entry plans; execute in process with the normal fresh test instances |
-| `i build` | selected target; default native | Validate that target's entry plans; emit its artifacts |
+| `i build` | selected target; default native | Validate that target's entry plans; emit its artifacts: for native, one executable `build/<name>` (below); for the other targets, the module `build/<name>.wasm` |
 | `i check` | none | Parse, resolve and infer all source, including test bodies; no target plan selection |
 | `i check --target t` | t, with ilang normalized to host | Check source and the plans for that target's main, configured exports and eligible tests; emit and execute nothing |
 
@@ -543,6 +543,8 @@ promise that any target can build or run the program. Neither check form
 promises actual host grants, engine features, successful initializers, or
 runtime results. Malformed manifest syntax is still a package-load error.
 The target-independent source checker retains entry arity and ABI checks, but does not reject an entry merely for requiring an ordinary service. These command rules concern provider selection; native packaging remains a runner plus an embedded compiled program, requires main, and rejects only required imports that runner cannot supply. A package with only host exports uses host (or its ilang alias).
+
+**Native packages.** `i build` with the native target writes one executable file, `build/<name>`, where `<name>` is the package name or the entry `NAME` of `i build NAME` (`--out` chooses another path). It is the native runner — Wasmtime's runtime without a compiler, the standard host services and the reactor of `i run` — followed by a payload: a manifest, the program's `ilang.*` metadata and its code compiled ahead of time, sealed by a SHA-256 digest. The manifest records the contract the code was compiled for (Wasmtime version, target triple, CPU feature baseline, collector and engine settings), the digest of the module and its trusted binding plan; the runner loads nothing else, and refuses a missing, truncated or damaged payload and a payload whose contract is not its own. The executable runs the program entry with its arguments, environment and standard streams, and exits as `i run` does. It is built for the target triple of the building machine only; cross-target builds and signing are not specified. Building fails, with the namespace and label, for each required import the runner cannot supply, including a declaration it does not grant (§9.7); a service replaced by ordinary i code needs no import.
 
 ### 2.7 Versions
 

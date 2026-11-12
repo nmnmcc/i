@@ -10,7 +10,7 @@ const cli = resolve(root, 'target/debug/i');
 const runner = resolve(root, 'bindings/javascript/run.mjs');
 function build(name) {
   const project = resolve(root, 'examples', name);
-  execFileSync(cli, ['build', '--project', project], { cwd: root, stdio: 'pipe' });
+  execFileSync(cli, ['build', '--target', 'host', '--project', project], { cwd: root, stdio: 'pipe' });
   return resolve(project, 'build', name.replaceAll('-', '_') + '.wasm');
 }
 for (const name of ['io-clock', 'io-fs', 'io-net', 'io-process', 'io-tls']) {
