@@ -13,7 +13,8 @@ source statement count bound additional worker code, including inline growth.
 Inlining binds each actual once, renames locals/labels/facts, and retains eager
 logical enter/site/leave/tail actions. It excludes the frozen transitive
 may-suspend set, recursive helpers and bodies over 32 statements, with twice the
-caller size as the growth limit. The exact review fixture checks both its
+caller size as the growth limit (three times for a caller that projects fields,
+see the final pass below). The exact review fixture checks both its
 eligibility dump and complete O0/O2/O3 resumed-stop output. Suspension is
 recomputed afterward. Scalar captures box only in the capture handler; segments
 and joins restore the original scalar representations from canonical values.
@@ -139,3 +140,84 @@ per-binding limit. Additional keys use the ordinary entry.
 
 The task's “at redesign” is interpreted as the starting revision: work stays on
 the existing lane/jp branch, as the shared rule forbids edits on redesign.
+
+## Final pass and targets
+
+A second worker reviewed the four stages and the unfinished last change. Kept:
+callers that project tuple/record fields may expand to three times their size
+(still inside the global 2x worker-statement bound; §9.3 makes budgets
+heuristics). Without it the final growth audit had narrowed the tuple kernel
+back to 16 raw allocations; with it the tuple kernel is again 13. Copy
+forwarding inside one inline expansion was tightened: the copy and its source
+must each have at most one definition there, so a join can never change the
+forwarded value. The measurement driver now records per-site allocation
+counts (target/numeric-step2/*/allocation-sites.json), and
+tests/perf/numeric/compare-js.mjs replays the exported corpus on Node.
+
+The corpus gained 56 programs: inlined helpers whose multiplication stops (one
+and three nested inlined frames), an inlined call that tail-calls a recursive
+loop, mixed Int/Float workers that leave the i31 region in the middle of a loop
+and stop later, Int loops that cross both i31 ends, closure factories passed to
+a known higher-order helper, an unused record field whose arithmetic must still
+stop, the binary64 overflow tie (2^970 + max_finite) under a dominating bound,
+and bounded division by both zeros and by subnormal divisors. Total: 455
+programs, at least 200 distinct bodies, values, final effects and complete stop
+traces equal for reference O0, visible O2, scalar O2 and scalar O3. A separate
+19-project probe (main programs run with `i run` at O0/O2/O3, comparing exit
+status, stdout and complete stderr traces, including an Int worker and an
+inlined stopping helper after a suspend/resume) also agreed at all levels.
+
+Final paired measurement against the N5-stage Wasm
+(NUMERIC_BASELINE=target/numeric-step2/n5/n1.wasm),
+five batch medians (ns), one heavy slot, other workers' builds running (not a
+quiet window):
+
+| Kernel | N5 baseline | Final | Final allocations including wrapper |
+|---|---|---|---:|
+| fast | [4406, 4317, 4317, 4326, 6259] | [4477, 4295, 4237, 4266, 4245] | 50 |
+| horner | [40, 41, 31, 40, 41] | [60, 62, 50, 60, 52] | 13 |
+| dot | [1811, 1793, 1795, 2885, 1914] | [1814, 1844, 1853, 2484, 1934] | 13 |
+| integer | [1301, 1280, 1290, 1254, 1304] | [1332, 1302, 1312, 1262, 1312] | 14 |
+| tuples | [49, 50, 60, 50, 50] | [40, 49, 51, 50, 40] | 13 |
+| closures | [1623, 1683, 1632, 1643, 1631] | [1612, 1623, 1624, 1682, 1653] | 16 |
+
+Targets of numeric-lowering §7 (gate 4 and the combined table) against the
+median of the five batch medians of each stage's own paired run. Allocation
+counts subtract the 11 nonnumeric entry/root allocations; the input and result
+Float boxes of the f64 ABI wrapper remain in them (identity is 2 on this scale).
+
+| Kernel | Early-N2 gate | Combined target ns / allocs | N2 | N3 | N4 | N5 | Final | Met |
+|---|---:|---|---:|---:|---:|---:|---:|---|
+| fast sine | <=3,000 | <=500 / <=8 | 4207 / 41 | 4266 / 40 | 4477 / 39 | 4618 / 39 | 4266 / 39 | no |
+| Horner | <=70 | <=40 / <=2 | 50 / 2 | 60 / 2 | 51 / 2 | 42 / 2 | 60 / 2 | early gate and allocations yes; 40 ns no in the final run (N5 run: 42) |
+| dot | <=700 | <=300 / <=2 | 3226 / 2 | 2063 / 2 | 1823 / 2 | 1841 / 2 | 1853 / 2 | allocations yes; time no |
+| integer | <=1.05x baseline until N4, then <=2,500 | <=500 / <=2, no Int objects | 1152 / 3 | 1111 / 3 | 1362 / 3 | 1261 / 3 | 1312 / 3 | 1.05x (N2 1.046x, N3 1.00x) and 2,500 yes; no Int objects yes; 500 ns and 2 allocations no |
+| tuples | <=70 | <=40 / <=2, no tuple/array objects | 60 / 2 | 49 / 2 | 40 / 2 | 40 / 2 | 49 / 2 | early gate, allocations and no tuple objects yes; 40 ns met at N4/N5, not in the final run (49) |
+| closures (fold) | <=800 | <=400 / <=4 | 1603 / 5 | 1744 / 5 | 1653 / 5 | 1783 / 5 | 1624 / 5 | no |
+
+Reasons for the misses, from the optimized WAT and per-site counts:
+
+- Every source call and every self tail iteration keeps the eager logical
+  frame actions (`shadow_enter_call`, a site store and `shadow_leave_tail`),
+  because cold stop-stack reconstruction is deferred (§9.5). In dot, fold and
+  integer these are two calls and two bounds-checked array stores per element
+  or step, plus the list pattern's tag test chain (`ref.test`/`ref.cast`
+  twice per list). That, not boxing, is the remaining per-iteration cost:
+  dot is about 57 ns per element with no Float box in the loop.
+- fast sine keeps 39 allocations: the certified path crosses record- and
+  pair-returning helpers above the 32-statement inline bound, and out-of-line
+  multivalue returns are deferred by R5 (sites in allocation-sites.json).
+- fold: the closure object, its capture array and the canonical box of the
+  captured `x` are allocated per call (R7: stored closures keep ordinary
+  captures), plus the wrapper boxes; 5 against <=4.
+- integer: `core.to_float` is a runtime helper that returns a boxed Float, the
+  third Float box. The N4 i64 worker is not faster than the N3 loop, which
+  re-encoded i31 values in eqref parameters: about +15% in the N4 paired run
+  (1154 -> 1362 ns), repeated in later runs (~1260-1310 against N3's
+  ~1110-1150). Both loops are dominated by the same shadow-stack calls; the
+  cost gate "no unexplained >5% regression" is therefore not met for this
+  kernel, and the cause is not established.
+- Horner and tuples are within one or two steps of the 10 ns timer
+  resolution of the 40 ns target; the runs were not quiet, so these are not
+  pass/fail claims (gate 4 requires another quiet paired comparison when the
+  spread exceeds 20%, which it does for both).
