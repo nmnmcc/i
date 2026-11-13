@@ -436,6 +436,107 @@ every rebuild after an edit takes up to 2.7 times longer. For work on the
 type checker with large inputs, `CARGO_PROFILE_DEV_OPT_LEVEL=1` (or a
 release build) gives the fast checker without changing the default.
 
+## Standard-library test memory (2026-11-13)
+
+The `lane/o2mem` baseline is `d17def11` with the stage trace from
+`073255fb` and `df32d679`, built in release mode through the shared heavy
+wrapper (four Cargo jobs, no LTO, 16 codegen units). The wrapper sets
+`RAYON_NUM_THREADS=1`. No compile cache was used. The measurement was:
+
+```sh
+H=/home/agent/Programming/i/.rd/cache/heavy
+I_TRACE_STAGES=1 ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project std --opt 2
+```
+
+All **2170 tests passed**, with no failures. On the shared machine the run
+took 10:11.41 wall time (379.32 s user, 56.17 s system). The trace's `MB`
+columns are actually MiB (1024 squared bytes):
+
+| Stage | Wall seconds | CPU seconds | RSS at end, MiB | Stage peak, MiB |
+|---|---:|---:|---:|---:|
+| Load | 0.029 | 0.000 | 12 | 12 |
+| Expand | 12.541 | 11.280 | 250 | 250 |
+| Resolve | 5.698 | 5.550 | 250 | 250 |
+| Check | 0.835 | 0.820 | 306 | 356 |
+| Lower | 2.400 | 2.360 | 307 | 318 |
+| Emit WAT | 0.402 | 0.390 | 362 | 399 |
+| Parse WAT | 1.562 | 1.530 | 505 | 557 |
+| Binaryen | 142.801 | 70.110 | 652 | 652 |
+| Wasmtime compile | 243.282 | 159.900 | 19414 | 19766 |
+| Run tests | 198.610 | 180.370 | 19414 | 19844 |
+
+The large increase is in **Wasmtime compilation**, from roughly 0.6 GiB
+to 19.3 GiB. The test run inherits that resident memory and adds only
+about 0.1 GiB to the compilation peak. Binaryen's module is already
+optimized in place and disposed before Wasmtime starts. Reclaiming all
+of its measured resident memory would still leave the peak well above
+the 12 GB target.
+
+The external `time -v` reports 19,881,856 kB maximum RSS. Do not treat that
+as an independent process-wide high-water measurement when tracing:
+the trace resets Linux `VmHWM` at stage boundaries through
+`/proc/self/clear_refs`. The maximum of the stage peaks is 19,844 MiB;
+an untraced `time -v` run is needed for an independent process-wide peak.
+
+Wasmtime 50 already enables `memory_init_cow` by default. Binaryen uses
+its own thread pool, independent of Rayon's thread count. Smaller Wasm
+byte buffers cannot account for the observed increase. If allocator and
+Wasmtime configuration changes do not suffice, the next investigation
+needs to identify which Wasmtime compilation data stays live across
+functions, or reduce the size of the single compilation unit. Any split
+must preserve all tests, their provider plans and fresh instances: spec
+§10.2 requires that the runner compile the collection once and run each
+selected test in a fresh started instance. Filtering out tests is not a
+memory fix.
+
+### Buffer-lifetime experiment
+
+A separately built variant transferred ownership of the original Wasm bytes
+into optimization, released those bytes after removing names and before
+Binaryen, and released Binaryen's input buffer immediately after its reader
+returned. The WAT text was explicitly dropped after parsing; the baseline
+already transferred that string to the parser, so this made its existing
+lifetime explicit. The same full traced command was run, without a filter:
+
+| Variant | Binaryen peak, MiB | Wasmtime compile peak, MiB | Run peak, MiB | Wall time | Result |
+|---|---:|---:|---:|---|---|
+| Baseline | 652 | 19766 | 19844 | 10:11.41 | 2170 passed, 0 failed |
+| Early buffer drops | 664 | 19730 | 19851 | 7:26.56 | 2170 passed, 0 failed |
+
+Every test-result line and the final summary were identical. `i build
+--target host` of `examples/hello` and `examples/echo`, at both `--opt 0`
+and `--opt 2`, produced byte-identical Wasm before and after (`cmp` checked
+all four files). The buffer drops did not lower the peak; the timing
+variation on this shared machine is not evidence of a speed improvement.
+The experiment is not retained as a compiler change.
+
+The baseline and this experiment both exceed the 12 GB target. These
+measurements do not establish whether allocator trimming or other Wasmtime
+settings can meet it. A source inspection of Wasmtime 50 shows that it
+calls `compiler.release_caches()` after assembling the compilation artifact;
+trimming only after that point could reduce memory retained during tests,
+but cannot recover a peak that has already occurred during compilation.
+
+### Remaining measurements
+
+At the end of the first investigation, no 12 GB fix had been validated. A Linux/glibc variant with
+`malloc_trim(0)` after Binaryen and after Wasmtime compilation built
+successfully, but its timed std run waited 8 minutes 37 seconds for the
+shared wrapper's memory slot and was cancelled before the executable
+started, to leave time for verification before the lane deadline.
+There is no RSS or test result for that variant.
+
+A further test-module-only variant was prepared with
+`parallel_compilation(false)`, `generate_address_map(false)` and
+`native_unwind_info(false)` (the last outside Windows). It was not built
+or measured. The host's stop messages are assembled by the guest under
+spec §11.7, but the requested native and spec stop-message checks still
+have to validate any retained configuration change. Both variants,
+including a temporary module-dump diagnostic, were discarded by reversing
+the reviewed experiment patch. Only the optional stage trace and these
+measurements are retained. Allocator trimming and the Wasmtime settings
+remain open experiments, rather than demonstrated failures or fixes.
+
 ## Macro expansion and compiled-code cache
 
 Building the macro registry once per expansion and reusing it for typed
@@ -551,3 +652,149 @@ BIG_INT_ARTIFACTS="$PWD/target/big-int-perf" \
 The fixture is `tests/performance/big-int`; the ignored Rust integration test
 builds it with both compilers, retains both Wasm artifacts when
 `BIG_INT_ARTIFACTS` is set, and prints the measurements as CSV.
+
+### Metadata initialization diagnosis
+
+The second investigation first measured the preserved `b2/std-O0.wasm`
+probe artifact (6,475,874 bytes), independently of the i frontend. The
+`ilang-host` examples `module_stats` and `compile_probe` retain the
+measurement tools. The function names below are those in the Wasm name
+section; `fNNN` names identify generated functions, not source bindings.
+
+```text
+types: 206, GC array/struct types: 37, tables: 0, element segments: 1
+code bytes: 3490626
+  123145 bytes      0 locals f39983: ilang_start
+   16608 bytes   1120 locals f14437: f14008
+    4652 bytes    174 locals f12134: f11705
+    4474 bytes    158 locals f15713: f15284
+    4426 bytes    229 locals f39982: start
+    4352 bytes    146 locals f15718: f15289
+    3925 bytes    131 locals f12407: f11978
+    3813 bytes    192 locals f14387: f13958
+    3789 bytes    147 locals f13058: f12629
+    3715 bytes    127 locals f12374: f11945
+    3629 bytes    267 locals f14398: f13969
+    3350 bytes    112 locals f15703: f15274
+    3166 bytes    128 locals f11509: f11080
+    3165 bytes    129 locals f15846: f15417
+    3082 bytes     92 locals f15660: f15231
+    2982 bytes     82 locals f12150: f11721
+    2954 bytes    172 locals f11511: f11082
+    2896 bytes    104 locals f15777: f15348
+    2783 bytes    103 locals f14328: f13899
+    2678 bytes    109 locals f14621: f14192
+    2621 bytes     86 locals f13104: f12675
+    2604 bytes    117 locals f11459: f11030
+    2531 bytes    160 locals f12486: f12057
+    2512 bytes    142 locals f14517: f14088
+    2465 bytes     56 locals f11969: f11540
+    2462 bytes     91 locals f13097: f12668
+    2441 bytes     56 locals f13145: f12716
+    2411 bytes     78 locals f11495: f11066
+    2407 bytes     55 locals f13117: f12688
+    2407 bytes    111 locals f14649: f14220
+functions: 29 imported, 42154 defined
+declared in element segments: 26897
+exported: 2202
+named by ref.func: 19196
+escaping defined functions (trampolines now): 29099
+escaping if only ref.func targets were declared: 21398
+```
+
+The 42,154 defined functions contain 3,490,626 bytes of code (83 bytes
+on average). Only two bodies exceed 10,000 bytes. The largest is the
+exported `ilang_start`, which installs runtime metadata; it is distinct
+from `start`, which executes source initializers. In particular, expanded
+programs have a source-note string for every site. One giant
+`array.new_fixed` evaluates all allocating string expressions before
+constructing its array. Every earlier GC reference stays live across the
+later allocations, making the compilation disproportionately expensive.
+
+Both compile-only measurements used `RAYON_NUM_THREADS=1`, no compile
+cache, and the shared heavy wrapper with `/run/current-system/sw/bin/time
+-v`. For the second measurement only the body of function 39983
+(`ilang_start`) was replaced with an empty body; the module was compiled,
+never executed. All remaining functions, types and element declarations
+were retained.
+
+| Compile-only input | Peak RSS, KiB | User CPU, s | System CPU, s | Wall, s |
+|---|---:|---:|---:|---:|
+| Original O0 module | 11,037,164 | 80.75 | 9.02 | 91.02 |
+| Only `ilang_start` stubbed | 600,112 | 18.18 | 0.66 | 19.11 |
+
+This identifies generated metadata initialization as the dominant cost;
+partitioning the test collection is unnecessary. Build large metadata
+arrays by storing each value immediately, in the original order, with
+64 stores per generated helper. User initializers still run in their
+original order after metadata installation. The collection, provider
+plans and fresh started instance per test stay the same (§10.2), and the
+source positions and expansion notes stay at the same indices (§11.7).
+Metered compiler-macro modules retain the original emission so their
+instruction and allocation accounting does not change.
+
+### Full std measurements with bounded metadata
+
+On merged main `95b1b500`, with the same wrapper and release profile as
+above, the full test runs give:
+
+| Version | Optimization | Peak RSS, KiB | User CPU, s | System CPU, s | Wall | Result |
+|---|---:|---:|---:|---:|---|---|
+| Main emitter | 0 | 11,435,724 | 277.30 | 43.48 | 6:04.88 | 2170 passed |
+| Bounded metadata | 0 | 1,418,108 | 228.18 | 37.16 | 4:58.75 | 2170 passed |
+| Main emitter | 2 | 20,365,148 | 381.52 | 55.06 | 7:07.08 | 2170 passed |
+| Bounded metadata | 2 | 2,149,808 | 270.52 | 37.02 | 4:19.99 | 2170 passed |
+
+Each command was:
+
+```sh
+ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project std --opt N
+```
+
+The main-emitter baseline uses the emitter from `95b1b500`; both variants
+use the merged source tree. The Wasmtime compilation cache is disabled.
+Stdout and stderr were captured separately, without stage tracing (which
+would reset the high-water mark). All four complete stdout files are byte
+for byte identical: 2170 result lines, in the same order, and the summary.
+All exit statuses are zero; none produces diagnostics on stderr.
+
+Peak RSS falls from 10.91 to 1.35 GiB at O0 and from 19.42 to 2.05 GiB
+at O2, below the 6 GB target at both levels. Total process CPU (user plus
+system) falls from 320.78 to 265.34 seconds at O0 and from 436.58 to
+307.54 seconds at O2. These are measurements on the shared machine, not a
+promise of the same timing on other machines. The bounded emission was
+first committed at `3bb591db` after the O2 run passed.
+
+The 4097-note metadata regression passes. Final compatibility verification
+also passes. Every heavy command below ran through `$H`; Cargo commands
+used `direnv exec /home/agent/Programming/i`, and standard Rust test
+harnesses used `RUST_TEST_THREADS=2`.
+
+| Verification | Result |
+|---|---|
+| `cargo test --release -p ilang-host -p ilang-wasm --locked` | 165 passed |
+| `cargo test --release -p ilang-cli --test many_tests --test compile_time_tests --test native --test compile_cache --test determinism --test commands --test macro_budget --locked` | 48 passed |
+| `cargo test --release -p ilang-cli --test spec --locked -- FILTER` for `9/`, `10/`, `11/`, `9.7/`, `9.8/`, `10.` | 127, 6, 51, 17, 4, 14 cases passed respectively; 219 distinct cases, each at O0 and O2 |
+| `i test --project examples/hello` | 2 passed |
+| `i test --project bench` | 15 passed |
+| `i test --project examples/macro-tests` | 9 passed, 1 skipped, as configured |
+| `i test --project std http` | 66 passed; complete output matches the baseline result lines selected by the same name substring, in the same order, plus the summary |
+| `cargo clippy --release -p ilang-host -p ilang-wasm --all-targets --locked -- -D warnings` | passed |
+| `cargo fmt --all -- --check` and `git diff --check` | passed |
+
+The slash spec filters also match dotted sections ending with the same
+number: for example, `11/` includes `9.11/`. The extra filters cover the
+remaining subsections, including the test-entry cases in `10.2/`.
+
+The first host/Wasm command exposed one pre-existing fixture mismatch:
+main `95b1b500` changed the shared browser fixture to ABI 4, while the
+legacy metadata unit test still explicitly asserted ABI 3. Commit
+`399a7c3e` constructs that test's intended ABI 3 fixture from its WAT and
+retains every assertion; other tests keep using the shared current
+fixture. The complete host/Wasm rerun passes. No production ABI code or
+language rules changed.
+
+The full workspace run, unfiltered spec/corpus and CI execution remain
+with the coordinator. No partitioning or per-module linking was needed;
+the collection is still compiled once and every selected test still gets
+its own started instance.

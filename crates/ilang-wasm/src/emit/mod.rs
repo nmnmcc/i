@@ -1675,6 +1675,52 @@ impl<'p> Emitter<'p> {
         }
     }
 
+    /// Build runtime metadata in bounded pieces. A single array.new_fixed
+    /// keeps every earlier GC reference live across every later allocation;
+    /// large site-note tables then make native compilation need quadratic
+    /// amounts of GC liveness information. Store each value immediately and
+    /// keep the generated initialization functions small as well.
+    fn metadata_array(&mut self, name: &str, values: &[String]) -> String {
+        const CHUNK: usize = 64;
+        // Macro execution accounts for emitted instructions and allocations;
+        // preserve that accounting sequence in metered compiler modules.
+        if self.metered || values.len() <= CHUNK {
+            return format!(
+                "(array.new_fixed $values {} {})",
+                values.len(),
+                values.join(" ")
+            );
+        }
+        for (chunk, items) in values.chunks(CHUNK).enumerate() {
+            let _ = writeln!(
+                self.out,
+                "(func $metadata_{name}_{chunk} (param $items (ref $values))"
+            );
+            for (offset, value) in items.iter().enumerate() {
+                let _ = writeln!(
+                    self.out,
+                    "(array.set $values (local.get $items) (i32.const {}) {value})",
+                    chunk * CHUNK + offset
+                );
+            }
+            self.out.push_str(")\n");
+        }
+        let _ = writeln!(
+            self.out,
+            "(func $metadata_{name} (result (ref $values)) (local $items (ref $values))\n\
+             (local.set $items (array.new_default $values (i32.const {})))",
+            values.len()
+        );
+        for chunk in 0..values.len().div_ceil(CHUNK) {
+            let _ = writeln!(
+                self.out,
+                "(call $metadata_{name}_{chunk} (local.get $items))"
+            );
+        }
+        self.out.push_str("(local.get $items))\n");
+        format!("(call $metadata_{name})")
+    }
+
     /// `ilang_start` (B.1): the site table, the constructor names, and the
     /// top-level values.
     fn start(&mut self) {
@@ -1689,7 +1735,6 @@ impl<'p> Emitter<'p> {
         let _ = writeln!(self.data, "(data $site_data \"{sites}\")");
         let modules: Vec<String> = self.p.site_modules.iter().map(|m| self.string(m)).collect();
         let names: Vec<String> = self.p.constructors.iter().map(|m| self.string(m)).collect();
-        let _ = writeln!(self.out, "(func $ilang_start (export \"ilang_start\")");
         let shapes: Vec<String> = self
             .p
             .shapes
@@ -1704,24 +1749,10 @@ impl<'p> Emitter<'p> {
                 )
             })
             .collect();
-        let _ = writeln!(
-            self.out,
-            "(call $shapes_install (array.new_fixed $values {} {}))",
-            shapes.len(),
-            shapes.join(" ")
-        );
-        let _ = writeln!(
-            self.out,
-            "(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {}))\n\
-             (array.new_fixed $values {} {}))\n\
-             (call $constructors_install (array.new_fixed $values {} {}))",
-            self.p.sites.len() * 3,
-            modules.len(),
-            modules.join(" "),
-            names.len(),
-            names.join(" ")
-        );
-        if self.p.site_notes.iter().any(Option::is_some) {
+        let shapes = self.metadata_array("shapes", &shapes);
+        let modules = self.metadata_array("modules", &modules);
+        let names = self.metadata_array("constructors", &names);
+        let notes = if self.p.site_notes.iter().any(Option::is_some) {
             assert_eq!(self.p.site_notes.len(), self.p.sites.len());
             let notes: Vec<String> = self
                 .p
@@ -1729,12 +1760,21 @@ impl<'p> Emitter<'p> {
                 .iter()
                 .map(|note| self.string(note.as_deref().unwrap_or("")))
                 .collect();
-            let _ = writeln!(
-                self.out,
-                "(call $site_notes_install (array.new_fixed $values {} {}))",
-                notes.len(),
-                notes.join(" ")
-            );
+            Some(self.metadata_array("notes", &notes))
+        } else {
+            None
+        };
+        let _ = writeln!(self.out, "(func $ilang_start (export \"ilang_start\")");
+        let _ = writeln!(self.out, "(call $shapes_install {shapes})");
+        let _ = writeln!(
+            self.out,
+            "(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {}))\n\
+             {modules})\n\
+             (call $constructors_install {names})",
+            self.p.sites.len() * 3,
+        );
+        if let Some(notes) = notes {
+            let _ = writeln!(self.out, "(call $site_notes_install {notes})");
         }
         // The root environment: the `Assert` of the runtime (§9.6), and
         // no other service yet.

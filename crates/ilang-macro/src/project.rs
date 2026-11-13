@@ -291,9 +291,14 @@ pub fn check_for_tools(graph: &mut PackageGraph) -> ProjectChecked {
 
 /// Expands and checks a package with all targets of one test collection as roots.
 pub fn check_tests(graph: &mut PackageGraph, collection: Option<&str>) -> ProjectChecked {
-    match expand(graph) {
+    let expanded = {
+        let _stage = ilang_syntax::trace::stage("expand");
+        expand(graph)
+    };
+    match expanded {
         Ok(mut expanded) => {
             expanded.lower_quotes();
+            let resolve = ilang_syntax::trace::stage("resolve");
             let (program, mut diags) = ilang_check::resolve_parsed(graph, &expanded.parsed);
             let mut entries = Vec::new();
             if let Some(program) = &program
@@ -322,7 +327,10 @@ pub fn check_tests(graph: &mut PackageGraph, collection: Option<&str>) -> Projec
                 })
                 .map(|e| (e.target, true))
                 .collect();
+            drop(resolve);
+            let check = ilang_syntax::trace::stage("check");
             let mut checked = ilang_check::check_resolved_selected(graph, program, diags, &roots);
+            drop(check);
             if let Some(typed) = &checked.types
                 && !checked.diags.iter().any(Diagnostic::is_error)
             {
