@@ -685,6 +685,35 @@ impl Coalescer<'_> {
                     }
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
+                if self.s.has_need_meets
+                    && self
+                        .members(v)
+                        .into_iter()
+                        .any(|m| self.s.vars[m.0 as usize].need_meet.is_some())
+                {
+                    // A marked variable denotes its derived meet, not a
+                    // further free parameter: §4.4 keeps `a & T` itself.
+                    if let Some(t) = self.memo.get(&(v, pos, env)) {
+                        return t.clone();
+                    }
+                    let generation = self.cycle_generation;
+                    self.stack.insert(v, depth);
+                    let upper: Vec<_> = self
+                        .members(v)
+                        .into_iter()
+                        .flat_map(|m| self.s.vars[m.0 as usize].upper.clone())
+                        .collect();
+                    let parts = upper
+                        .iter()
+                        .map(|b| self.go(b, false, depth, env))
+                        .collect();
+                    self.stack.remove(&v);
+                    let t = Ty::Inter(parts);
+                    if self.cycle_generation == generation {
+                        self.memo.insert((v, pos, env), t.clone());
+                    }
+                    return t;
+                }
                 let empty = |m: V| {
                     let st = &self.s.vars[m.0 as usize];
                     if mono {

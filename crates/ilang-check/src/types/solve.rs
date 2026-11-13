@@ -2808,6 +2808,7 @@ impl Solver {
     pub fn normalized(&self, t: &Ty) -> Option<Solver> {
         let mut view = Solver::new(self.variance.clone(), self.type_names.clone());
         view.vars = self.vars.clone();
+        view.has_need_meets = self.has_need_meets;
         view.row_params = self.row_params.clone();
         view.normalize_type(t).then_some(view)
     }

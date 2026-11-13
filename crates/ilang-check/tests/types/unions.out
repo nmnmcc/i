@@ -1,6 +1,6 @@
 use_int : () -> 1 ! State(Int)
 use_string : () -> 1 ! State(String)
-both : () -> 1 ! State(Int) | State(String)
+both : () -> 1 ! State(Int)
 ok : () -> 1 ! State(Int)
 fns : List((Never) -> Int)
 tuples : List((1 | "b", "a" | 2))
