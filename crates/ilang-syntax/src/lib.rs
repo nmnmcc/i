@@ -90,7 +90,7 @@ pub fn old_syntax_hint(source: &str) -> Option<&'static str> {
     };
     if old_syntax_marks(source) || has("import") || has("export") || has("case") {
         Some(
-            "if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
+            "if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`",
         )
     } else if has("if") {
         Some("if this is an old clause guard, replace `if condition` with `? condition`")

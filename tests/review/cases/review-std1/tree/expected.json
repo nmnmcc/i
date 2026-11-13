@@ -1,6 +1,6 @@
 {
-  "compiler": "045dd7dc8590cba93ec27bd6f7f03d49a995deaa",
-  "binary_sha256": "c1ef55233cb94ac719e5a0eec5514ed86d3fa9a27e7a9243802c618099483270",
+  "compiler": "9c7301c199c0e43864b623cb183acd9366c03730",
+  "binary_sha256": "873304491ab670801dc233ea02f631c7e49cf7f1f686d67e1068c73eeee33556",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:1:1: error[E0101]: the head of a data type or an opaque type has only type parameters\n1 error\n"
+      "stderr": "src/main.i:1:1: error[E0101]: the head of a data type or an opaque type has only type parameters\nnote: src/main.i: if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`\n1 error\n"
     }
   }
 }

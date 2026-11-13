@@ -214,3 +214,44 @@ expectation regeneration was used. Checker clippy also passed with
 Of the inventory's six tracked-error records, three are the explicitly
 staged spec examples and three are preserved historical invalid T3 inputs;
 all six are always parsed and compared to their exact diagnostic lists.
+
+### CLI migration guidance and conversion between surfaces
+
+- `macro_run` passed 57 tests, `typed_macros` 35, and `commands` 14.
+- `check` found one lost migration-guidance path: syntax-three parse errors
+  bypassed the old reader's hints. CLI diagnostic rendering now gives a
+  conditional note for a module with E01 parse errors, using the existing
+  lexical hint helper. The hint writes a syntax-three chain, not the removed
+  brace match. Diagnostic codes, locations and counts are unchanged. The
+  valid ordinary-name case now also asserts that it has no migration hint.
+  The full `check` retry passed all 10 tests (the documented stage-7
+  `check_types` case remains parked).
+- `fmt --to` still wrote/read the legacy tree. Ported the standalone
+  `syn3/surface.rs`, `walk.rs`, `group.rs` helpers and CLI bridge from
+  `d3ee3696` of the pending core lane; that revision's syntax-three AST is
+  identical to this lane's. Conversions compare syntax-three trees with only
+  expression groups removed, preserve comments at item/statement boundaries,
+  and report comments with no such place. All 6 formatter tests passed.
+- A macro definition has no normal spelling even without a quote (§14.1),
+  so the bridge rejects that case before writing a file. The former
+  unrepresentable-block fixture is now valid because every expression brace
+  is a block (syntax-3 §2.2); it remains covered as a successful conversion,
+  alongside the negative macro-definition case. All 6 Lisp tests passed,
+  including boundary comments, unplaced comments and destination protection.
+- Workspace all-target checking passed again, and the syntax inventory still
+  matches all 4,713 texts with six tracked-error records.
+
+The fresh release build and std/lib/examples formatting passed after this
+bridge change. The five-case corpus comparison found exactly three new
+conditional note lines, in `echo-types` (two modules) and `tree` (one).
+Removing those note lines reproduced the prior stderr byte for byte; codes,
+locations, counts, exit results, stdout and bounds stayed unchanged. The
+reviewed observation update and filtered retry passed all five.
+
+A final bridge review found that interpolation must also be lowered before
+core-tree comparison (§1.6). The comparison now lowers its clone to left-folded
+concatenation, including the empty text prefix for a sole expression. The
+new end-to-end test converts a program to Lisp and back and executes an
+assertion of its string result after each conversion. All **7** Lisp tests
+passed. This last normalization was tested in the debug CLI; the next final
+release rebuild will include it.
