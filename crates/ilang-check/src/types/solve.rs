@@ -1307,7 +1307,13 @@ impl Solver {
                     let before = self.failures.len();
                     let vs = self.variances(*h1, a1.len());
                     for (((x, y), v), row) in a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len())) {
-                        self.constrain_by(y, x, v, row);
+                        if row == Mode::Env {
+                            // A row inside a service is one row: equal.
+                            self.constrain_in(x, y, row);
+                            self.constrain_in(y, x, row);
+                        } else {
+                            self.constrain_by(y, x, v, row);
+                        }
                     }
                     if self.failures.len() > before {
                         self.failures.truncate(before);
@@ -1653,20 +1659,21 @@ impl Solver {
                         // ones (rule A). Only invariant arguments can
                         // disagree; the rest is checked through the
                         // bounds that the entries reach.
-                        if var == Variance::Inv {
+                        // A row inside a service is one row, so equal.
+                        // A covariant meet with no values is an error;
+                        // when an argument is not known yet, the two must
+                        // be equal (as before rule A), so that a meet
+                        // found empty later is still reported.
+                        if var == Variance::Inv || row == Mode::Env {
                             self.equal(x, y, FailKind::EnvForms);
-                        } else if var == Variance::Co
-                            && is_lower_bound
-                            && x.is_headed()
-                            && y.is_headed()
-                            && x.head() != y.head()
-                        {
-                            // Rule A: a covariant meet with no values.
-                            self.fail(FailKind::EnvForms, a, b);
-                        } else if (var == Variance::Contra && lower)
-                            || (var == Variance::Co && !is_lower_bound && first)
-                        {
-                            self.join(x, y, level, row);
+                        } else if var == Variance::Co && is_lower_bound {
+                            if x.is_headed() && y.is_headed() {
+                                if x.head() != y.head() {
+                                    self.fail(FailKind::EnvForms, a, b);
+                                }
+                            } else {
+                                self.equal(x, y, FailKind::EnvForms);
+                            }
                         }
                     } else if env != Mode::Value {
                         self.equal(x, y, FailKind::EnvForms);
