@@ -1,3 +1,6 @@
+#[path = "../src/commands/standard.rs"]
+mod standard;
+
 use std::process::{Command, Output};
 
 fn i(args: &[&str]) -> Output {
@@ -9,7 +12,8 @@ fn i(args: &[&str]) -> Output {
 
 #[test]
 fn raw_and_piped_output_match_the_standard() {
-    let expected = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/spec.md"));
+    let expected = std::fs::read(standard::PATH).unwrap();
+    assert_eq!(standard::TEXT.as_bytes(), expected);
     for args in [&["spec"][..], &["spec", "--raw"][..]] {
         let out = i(args);
         assert!(out.status.success());

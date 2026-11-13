@@ -2,8 +2,9 @@
 use std::io::{IsTerminal, Write};
 use std::process::{Command, ExitCode, Stdio};
 
-// The coordinator will move this file to /SPEC.md; change this one path then.
-const STANDARD: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/spec.md"));
+#[path = "standard.rs"]
+mod standard;
+use standard::TEXT as STANDARD;
 
 #[derive(clap::Args)]
 #[command(group(clap::ArgGroup::new("selection").args(["section", "section_option", "search", "toc", "version"]).multiple(false)))]
