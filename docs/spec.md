@@ -2858,7 +2858,7 @@ A type is a set of values that may be written in several ways, so a macro asks `
 
 ### 14.9 Running macros
 
-The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` gives fixed numbers there. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
+The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` in a macro gives the unsigned 32-bit integer defined below, on every machine. It does not use addresses, allocation order, compiler type numbers or randomized seeds. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
 
 A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full dependencies (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
 
@@ -2867,6 +2867,27 @@ An error in expanded code is reported at the span of the code; code from a templ
 `i fmt` formats a file in its own surface without expanding macros. `i expand` writes a module after expansion, in the surface that is asked for; a module with quotes can only be written in the Lisp surface, and `i expand --trace` also writes each run with its macro, arguments and result. The language server shows the expansion of a macro call, gives types and completion in the arguments of a typed macro call from its signature, and goes from a name in expanded code to its definition by its span.
 
 
+
+
+**Portable macro hash.** Begin with `h = 2166136261`. For each word `w` of the stream below, set `h = ((h xor w) * 16777619) mod 2^32`. Words are unsigned 32-bit integers; negative words use their value modulo 2^32. Concatenation is in the written order, and nested values contribute their complete streams, without restarting `h`.
+
+| Value | Word stream |
+|---|---|
+| `Nil` | `0` |
+| `False`, `True` | `1, b, 0, 0`, with `b = 0` or `1` |
+| `Int` | `8, sign, n`, then the `n` base-2^32 digits of the absolute value, least significant first; `sign` is -1, 0 or 1; zero has no digits |
+| `Float` | `2, low, high` of its IEEE 754 binary64 bits; either zero uses all-zero bits |
+| `String` | `3`, then one word per UTF-8 byte |
+| `Codepoint` | `13, scalar, 0, 0` |
+| `Bits` | `9, low, high` of its bit length, then one word (0 or 1) per bit, first bit first |
+| Data | `4, 0, 0, 0, n`, then its `n` parts in the canonical shape order (§6.4); labels themselves do not contribute |
+| A constructed value | `5, 0, 0, 0, n`, then its `n` fields in declaration order; constructor and type identities do not contribute |
+| `[]` | `6, 0, 0, 0` |
+| `[head .. tail]` | `6, 0, 0, 0, 2`, then `head` and `tail` |
+| A keyed value (§9.8) | `16, 0, 0, 0, 2`, then its key and enclosed value |
+| An opaque identity | `7` |
+
+Opaque identities include functions, keys, boundaries, continuations, lazy values, references and compiler-owned handles (including `Syntax` and type handles). Their contents and creation numbers are not hashed. Collisions between unequal values, including different labels, types or identities, are permitted (§13). Sharing does not change the stream: each occurrence contributes independently.
 
 ## Appendix A. Choices
 

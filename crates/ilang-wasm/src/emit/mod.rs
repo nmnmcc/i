@@ -82,7 +82,7 @@ pub fn wat(p: &Program) -> String {
 
 /// WAT for an isolated compiler macro run, including logical accounting.
 pub fn wat_metered(p: &Program) -> (String, crate::budget::StaticCharge) {
-    let raw = wat_inner(p, true);
+    let raw = crate::runtime::portable_macro_hash(&wat_inner(p, true));
     let cost = crate::budget::static_charge(&raw);
     (crate::budget::instrument(&raw), cost)
 }

@@ -2672,3 +2672,23 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         "{stderr}"
     );
 }
+
+#[test]
+fn portable_macro_hash_matches_the_specification_vectors() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.9/mp09_portable_hash");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
+    );
+}
