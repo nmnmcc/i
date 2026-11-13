@@ -821,3 +821,11 @@ verified repository std helper. At O0 and O2 the complete test bundle builds
 before CLI runtime filtering, then generator_callbacks_test passes. This is
 not a full runtime run of the copied std suite. No bound or expectation was
 changed, and there is no longer an E0523 compilation failure.
+
+Coordinator b15 item 3: measured stdout differs only at failure source
+positions: 12:21 became 13:4, and 24:2/29:2/34:2 became 25:2/30:2/35:2.
+The converted fixture now retains the original call-token coordinates.
+Both O0 and O2 stdout are byte-for-byte equal to main again: the same four
+intentional failures and two passing tests, including the corpus startup
+probe. No failure was suppressed and no expectation was changed. The
+before/after execution diff is in target/conv-b15/failure-output-results.json.
