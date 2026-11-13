@@ -352,10 +352,9 @@ names and adds an optional trailing comma to the HTTP result tuple. The
 diff changes no body or string. Repository formatter property tests had
 already checked canonical-tree preservation and idempotence.
 
-The first snippet run found `"\nwith_int"`, the READY alias regression's
-replacement search needle. Its new inventory entry supplies the exact
-`Reader` prefix and `with_int` tail from `types/soundness.i`; the assembled
-snippet is verified to be that file's prefix. It is parsed normally, with
+The first snippet run found the READY alias regression's replacement text
+ending in `with_int`. Its inventory entry supplies the `Reader` prefix
+and `with_int` tail from `types/soundness.i`. It is parsed normally, with
 no exemption or diagnostic recording. The checker regression still pins
 all four Reader E0515 errors. The retry uses the snippet script's own
 wrapped cargo build, avoiding a redundant outer build wrapper.
@@ -423,3 +422,22 @@ error message, location, total, and E0515 count. No stage-3 error deficit or
 different diagnostic remains among those projects. No additional checker
 implementation change is needed after importing main's revalidation fix.
 The remaining package/runtime/spec/corpus gates are still in progress.
+
+Reviewing the renamed snippet gate also identifies the exact registered
+fragment as `"\nIntReader = Reader(Int)\nwith_int"`, rather than its search
+needle. Its completion now applies the test's following annotation
+replacement too. The assembled fragment is verified byte-for-byte to be
+the actual constructed alias program's prefix. This changes no parser
+diagnostic expectation, exemption, or checker assertion.
+
+The Rust matrix passes: checker 362 (four existing ignores and the requested
+recovery skip), syntax 190, LSP 106, macro 9, Wasm 65; CLI check 10,
+commands 14, macro_run 57, providers 19, typed_macros 36. Spec filters
+`4.3/`, `6/`, `7/`, `9/`, `15.7/` pass 17/80/104/139/28 cases at O0 and O2,
+with the existing pending entries unchanged. Short generation passes 32
+cases, 64 permutations and 32 annotation removals. Fresh release, Rust/i
+formatting, all-feature workspace clippy and the final workspace check pass.
+The renamed `scripts/check-snippets` passes 4,817 sources plus 34 Lisp
+files and 89 macro fragments; all eight helper tests pass. The corrected
+alias-fragment context is included in that result. Std O0/O2 and the full
+365-case `review-k4d` filter remain in progress; this is not yet READY.
