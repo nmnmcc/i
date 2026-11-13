@@ -292,6 +292,7 @@ impl Solver {
         snapshot.vars = self.vars.clone();
         snapshot.row_params = self.row_params.clone();
         snapshot.has_handlers = self.has_handlers;
+        snapshot.has_need_meets = self.has_need_meets;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
         snapshot.alias_folds = self.alias_folds.clone();
         snapshot
