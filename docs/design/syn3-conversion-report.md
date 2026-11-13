@@ -711,3 +711,11 @@ by the inserted alias lines; positions were derived from the same f.raise,
 fail.raise and control.resume call anchors (§11.7), and the exact stop checks
 pass. The fixture format check also passes. Required 11/, release/std and
 full corpus verification remain.
+
+Merged main 46a6d43b6; its benchmark grouping/format correction was already
+present in this lane, so the merge has no tree delta or new old-syntax text.
+Spec 11/ passes all 51 cases at O0/O2, and the fresh release build passes.
+The first std O0 run found the same erased generator callback/provider A
+in std/test/list_test.i. Kept those annotations directly on the literals,
+using the already-verified spec helper pattern. Entry compilation now
+passes and the std O0 suite is executing; O2 and corpus remain pending.
