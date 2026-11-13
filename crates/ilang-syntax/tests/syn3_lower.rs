@@ -113,16 +113,34 @@ fn shape_groups() {
     let text = shown(
         "area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n\nopen = (host: String, port = p: Int, addr = a: String) { p }\n",
     );
-    let bindings: Vec<&str> = text.lines().filter(|l| !l.starts_with(['\t', '}']) && l.contains(" = ")).collect();
+    let bindings: Vec<&str> = text
+        .lines()
+        .filter(|l| !l.starts_with(['\t', '}']) && l.contains(" = "))
+        .collect();
     assert_eq!(bindings.len(), 5, "{text}");
     assert!(bindings[0].starts_with("area%g0 = (r: Float)"), "{text}");
-    assert!(bindings[1].starts_with("area%g1 = (w: Float, h: Float)"), "{text}");
-    assert!(bindings[2].starts_with("area = %multi(1: area%g0, 2: area%g1)"), "{text}");
-    assert!(bindings[3].starts_with("open%g0 = (host: String, a: String, p: Int)"), "{text}");
-    assert!(bindings[4].starts_with("open = %multi(1,addr,port: open%g0)"), "{text}");
+    assert!(
+        bindings[1].starts_with("area%g1 = (w: Float, h: Float)"),
+        "{text}"
+    );
+    assert!(
+        bindings[2].starts_with("area = %multi(1: area%g0, 2: area%g1)"),
+        "{text}"
+    );
+    assert!(
+        bindings[3].starts_with("open%g0 = (host: String, a: String, p: Int)"),
+        "{text}"
+    );
+    assert!(
+        bindings[4].starts_with("open = %multi(1,addr,port: open%g0)"),
+        "{text}"
+    );
     // A chain that is not bound to a name has its group functions in place.
     let text = shown("fs = [(a) { a } | (a, b) { b }]\n");
-    assert!(text.contains("%multi(1: (a) {") && text.contains("2: (a, b) {"), "{text}");
+    assert!(
+        text.contains("%multi(1: (a) {") && text.contains("2: (a, b) {"),
+        "{text}"
+    );
 }
 
 #[test]

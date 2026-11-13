@@ -180,7 +180,12 @@ struct Cx {
 
 /// The shape of a branch: its number of positions and its sorted labels.
 fn shape_of(f: &n::Function) -> (usize, Vec<&str>) {
-    let mut labels: Vec<&str> = f.params.iter().filter_map(|p| p.key.as_ref()).map(|k| k.name.as_str()).collect();
+    let mut labels: Vec<&str> = f
+        .params
+        .iter()
+        .filter_map(|p| p.key.as_ref())
+        .map(|k| k.name.as_str())
+        .collect();
     labels.sort();
     (f.params.len() - labels.len(), labels)
 }
@@ -200,7 +205,8 @@ fn shape_groups(fs: &[n::Function]) -> Vec<Vec<n::Function>> {
 
 /// A chain with several shape groups, or with a label in its one shape.
 fn is_multi(fs: &[n::Function]) -> bool {
-    fs.iter().any(|f| f.params.iter().any(|p| p.key.is_some()) || shape_of(f) != shape_of(&fs[0]))
+    fs.iter()
+        .any(|f| f.params.iter().any(|p| p.key.is_some()) || shape_of(f) != shape_of(&fs[0]))
 }
 
 /// The parameter items of a branch in canonical order: the positions, then
@@ -208,7 +214,13 @@ fn is_multi(fs: &[n::Function]) -> bool {
 fn canonical(f: &n::Function) -> Vec<&n::PItem> {
     let mut items: Vec<&n::PItem> = f.params.iter().filter(|p| p.key.is_none()).collect();
     let mut keyed: Vec<&n::PItem> = f.params.iter().filter(|p| p.key.is_some()).collect();
-    keyed.sort_by(|a, b| a.key.as_ref().unwrap().name.cmp(&b.key.as_ref().unwrap().name));
+    keyed.sort_by(|a, b| {
+        a.key
+            .as_ref()
+            .unwrap()
+            .name
+            .cmp(&b.key.as_ref().unwrap().name)
+    });
     items.extend(keyed);
     items
 }
@@ -387,7 +399,10 @@ impl Cx {
                 .filter(|e| e.constructors || !absorbed.contains(&e.name.name))
                 .flat_map(|e| {
                     // The group bindings of an exported chain go with it.
-                    let hidden = self.hidden.iter().filter(|(name, _)| !e.constructors && *name == e.name.name);
+                    let hidden = self
+                        .hidden
+                        .iter()
+                        .filter(|(name, _)| !e.constructors && *name == e.name.name);
                     let mut items: Vec<o::ExportItem> = hidden
                         .map(|(_, h)| o::ExportItem {
                             name: ident(h.clone(), e.span.0),
@@ -712,7 +727,9 @@ impl Cx {
                     kind: n::ExprKind::Provide { target, services },
                     ..
                 }) if i + 1 == b.stmts.len() => stmts.extend(self.provide(target, services)),
-                n::Stmt::Bind(b) => stmts.extend(self.bindings(b, false).into_iter().map(o::Stmt::Bind)),
+                n::Stmt::Bind(b) => {
+                    stmts.extend(self.bindings(b, false).into_iter().map(o::Stmt::Bind))
+                }
                 _ => stmts.push(self.stmt(s)),
             }
         }
@@ -734,7 +751,8 @@ impl Cx {
     /// binding per shape group and then the name itself, bound to the
     /// multi-shape value of those groups.
     fn bindings(&mut self, b: &n::Binding, top: bool) -> Vec<o::Binding> {
-        let (n::PatternKind::Var(name), n::ExprKind::Chain(fs)) = (&b.pattern.kind, &b.value.kind) else {
+        let (n::PatternKind::Var(name), n::ExprKind::Chain(fs)) = (&b.pattern.kind, &b.value.kind)
+        else {
             return vec![self.binding(b)];
         };
         if !is_multi(fs) {
@@ -897,7 +915,8 @@ impl Cx {
             }
         }
         let count = fs[0].params.len();
-        let plain = |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
+        let plain =
+            |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
         if let [f] = fs
             && plain(f)
         {
@@ -965,7 +984,10 @@ impl Cx {
         }
         let ret = match written.as_slice() {
             [] => None,
-            [_] => fs.iter().find(|f| f.ret.is_some()).and_then(|f| self.ret(f)),
+            [_] => fs
+                .iter()
+                .find(|f| f.ret.is_some())
+                .and_then(|f| self.ret(f)),
             _ if fs.iter().any(|f| f.ret.is_none()) => None,
             many => {
                 let at = many[0].span.0;
