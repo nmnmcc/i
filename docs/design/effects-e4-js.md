@@ -117,4 +117,45 @@ preserved environment and completion path.
   fixture manifests are now identical; their TOML-only snippet registrations
   coalesce under that literal's new identity. Every registered diagnostic
   expectation is unchanged, and all changed JS files' registrations resolve.
-- Strict Clippy is queued behind other workers.
+- Strict workspace Clippy, including every target, passes with `-D warnings`.
+  All requested gates are green; no reported JavaScript runtime issue remains.
+
+
+## Final verification commands
+
+All heavy commands use `/home/agent/Programming/i/.rd/cache/heavy`, one at a
+time. Cargo commands additionally use `direnv exec /home/agent/Programming/i`,
+with `CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0` for development builds.
+Logs are `/tmp/e4-jsfix-*.log`; investigation modules and WAT are in the ignored
+`target/e4-js-debug/` directory.
+
+| Command | Result |
+|---|---|
+| `cargo build --release -p ilang-cli --locked` | Both release builds pass: after E6 merge and after lowering fix |
+| `i build --target js --opt 0 --wat` for compiled, fetch, and pre-E4-std fetch reproductions | All builds pass; baseline probes reproduce both traps |
+| `i build --project tests/browser/fixtures/compiled --target host legacy --out tests/browser/fixtures/compiled.wasm` | Pass |
+| `node --test bindings/javascript/test/compiled.test.mjs` | 8/8 pass, including reuse after ordinary failure |
+| `i build --target js --opt 0 --wat` and `--opt 2 --wat` for corrected fetch reproduction; `node target/e4-js-debug/probe.mjs fetch <artifact>` | Both stream probes pass |
+| `wasm-tools print <artifact> -o <wat>` on pre-port, baseline and corrected artifacts | Pass; signatures unchanged, retained Client delta visible |
+| `I=$PWD/target/release/i bash scripts/build-abi-fixture.sh` | Pass, including conformance generation and Wasm validation |
+| `DEV_VERIFY_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4184 scripts/dev-verify js` | Final run: 117/117 Node, 60/60 browser checks; earlier runs exposed the diagnosed platform fixtures (108/117, then 114/117) |
+| `node --test bindings/javascript/test/providers.test.mjs bindings/javascript/test/io.test.mjs` | 9/9 pass after those fixture fixes |
+| `scripts/test-generation --mode short --binary ./target/release/i --output target/e4-js-debug/generation-short.json` | 32 cases, 64 permutations, 32 annotation removals; no failures |
+| `i check --project std` | Pass |
+| `i test --project std --opt 0` | 2171/2171 pass |
+| `i test --project std --opt 2` | 2171/2171 pass |
+| `taskset -c 0,1 cargo test --release -p ilang-cli --test spec --locked -- 9/` | 149/149 pass at both i optimization levels |
+| `taskset -c 0,1 cargo test --release -p ilang-cli --test spec --locked -- 11/` | 48/48 pass at both i optimization levels |
+| `cargo test --release -p ilang-cli --test http --locked -- --test-threads=1` | 11/11 pass |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Pass |
+| `i fmt --check bench std lib examples` and the changed browser fixture sources | Pass; the process example's long shell argument was formatted before the final check |
+| `cargo fmt --all -- --check`; `rustfmt --check --edition 2024 crates/ilang-wasm/src/lower.rs` | Pass |
+| `node --check` on changed JavaScript tests; `python3 -m py_compile scripts/qa/generate.py`; `git diff --check` | Pass |
+| Python audits of 75 std contracts/test retention, 720 old/new generation models, five normalized binding plans, and changed snippet registrations | Pass; no diagnostic expectation changed |
+| `i fmt` on generated source samples; `i fmt` and `i fmt --check` on extracted note examples | Pass |
+
+The coordinator-owned full workspace test suite and unfiltered review corpus
+were not run by this lane. The full snippet gate was also not run; the focused
+snippet audit covers all sources and registrations changed here. The general D16
+compiler gap is unchanged; this fetch adapter uses the retained-frame pattern
+required by runtime §6.3. No test is skipped, removed, or weakened.

@@ -218,6 +218,7 @@ Fixture decisions:
 
 
 The 2026-11-14 follow-up merges main-integrated E3/E5/E6 and resolves both
-reported JavaScript traps in focused checks. See
+reported JavaScript traps. The full JS gate passes 117 Node and 60 browser
+checks; all final requested gates are green. See
 [the WAT investigation and validation record](effects-e4-js.md). The preceding
 verification section is the 2026-11-13 checkpoint, not the final JS outcome.
