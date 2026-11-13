@@ -364,7 +364,7 @@ bits = (b: Bool) -> Nil {
         match instance.call("app/math.positive", &[int(0)]).unwrap() {
             Outcome::Stop(stop) => assert_eq!(
                 stop.message.as_deref(),
-                Some("assertion failed: assert\napp/math:26:3")
+                Some("assertion failed: assert\napp/math:28:2")
             ),
             other => panic!("{other:?}"),
         }
@@ -777,7 +777,7 @@ fn incorrect_host_answers_stop_in_the_module() {
     let imports = || ilang_host::services::testing(Default::default());
     assert_eq!(
         run(HostOptions::new(imports())).as_deref(),
-        Some("host: value is not correct\napp/main:5:7\napp/main:11:3")
+        Some("host: value is not correct\napp/main:5:6\napp/main:10:2")
     );
     assert_eq!(
         run(HostOptions {
