@@ -171,3 +171,20 @@ becomes a running fixture (`f(2.0)` prints `12.0`).
 - Which branch inside a group runs: that is the group function's own `Case`.
 - Tables in package interfaces: an imported chain is called through the same
   hidden bindings, which are ordinary exported functions.
+
+## 7. Stage 10 (lane/s10): what the run time does
+
+- A run-time shape id is `n` for `n` positions and `set << 32 | n` for a
+  shape with labels, where `set` (from 1) is the label set of data in
+  `ir::Program::shapes` (`ir::shape_id`). Closure field 2 is that id.
+- `Value::Multi(Vec<(ShapeId, Atom)>)` makes a `$multi`; a closure call site
+  tests `$clo{n}` once (`br_on_cast_fail`) and otherwise calls
+  `$dispatch{n}` with its shape id; the dispatcher ends in
+  `return_call_ref`, so tail calls and captures see no extra frame.
+  `$call0`, `$call1` and the handler call of `$boundary_core` dispatch too.
+- `FailKind::MultiCall` / `E0551` are deleted; two upper bounds of one
+  variable that are function types of different shapes are no longer an
+  arity failure.
+- Not yet: a labelled call through a value (`c("b.com", port = 8080)` with
+  `c` a parameter) is still E0506 in the checker; the back end lowers it
+  (`Callee::Shaped`) once the checker lets it through.

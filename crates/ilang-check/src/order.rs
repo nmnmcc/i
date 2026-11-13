@@ -31,123 +31,32 @@ fn uses(program: &Program, m: ModuleId, b: &Binding) -> Vec<(u32, bool)> {
 
 /// All resolved value references in a binding, including across modules.
 pub fn references(pattern: &Pattern, value: &Expr) -> Vec<(DefId, bool)> {
-    enum Node<'a> {
-        Expr(&'a Expr, bool),
-        Pattern(&'a Pattern, bool),
-        Block(&'a Block, bool),
-    }
     let mut out = Vec::new();
-    let mut work = vec![Node::Expr(value, false), Node::Pattern(pattern, false)];
-    while let Some(node) = work.pop() {
+    // `inside`: the node is in a function body (or its parameters).
+    let mut work = vec![(Node::Expr(value), false), (Node::Pattern(pattern), false)];
+    while let Some((node, inside)) = work.pop() {
         match node {
-            Node::Expr(e, inside) => match &e.kind {
-                ExprKind::Name(ValueRef::Def(d)) => out.push((*d, inside)),
-                ExprKind::Int(_)
-                | ExprKind::Float(_)
-                | ExprKind::String(_)
-                | ExprKind::Name(_)
-                | ExprKind::Error => {}
-                ExprKind::Tuple(xs) => work.extend(xs.iter().rev().map(|e| Node::Expr(e, inside))),
-                ExprKind::Record { base, fields } => {
-                    if let Some(base) = base {
-                        work.push(Node::Expr(base, inside));
-                    }
-                    work.extend(fields.iter().rev().map(|(_, e)| Node::Expr(e, inside)));
-                }
-                ExprKind::List { items, rest } => {
-                    if let Some(e) = rest {
-                        work.push(Node::Expr(e, inside));
-                    }
-                    work.extend(items.iter().rev().map(|e| Node::Expr(e, inside)));
-                }
-                ExprKind::BitArray(xs) => {
-                    for x in xs.iter().rev() {
-                        if let Some(arg) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                            work.push(Node::Expr(arg, inside));
-                        }
-                        work.push(Node::Expr(&x.value, inside));
-                    }
-                }
-                ExprKind::Block(b) => work.push(Node::Block(b, inside)),
-                ExprKind::Fn(f) => {
-                    work.push(Node::Block(&f.body, true));
-                    for p in f.params.iter().rev() {
-                        if let Param::Pattern { pattern, .. } = p {
-                            work.push(Node::Pattern(pattern, true));
-                        }
-                    }
-                }
-                ExprKind::Case { subject, clauses } => {
-                    for c in clauses.iter().rev() {
-                        work.push(Node::Expr(&c.body, inside));
-                        if let Some(g) = &c.guard {
-                            work.push(Node::Expr(g, inside));
-                        }
-                        work.extend(c.patterns.iter().rev().map(|p| Node::Pattern(p, inside)));
-                    }
-                    work.push(Node::Expr(subject, inside));
-                }
-                ExprKind::Call { callee, args } => {
-                    work.extend(args.iter().rev().map(|a| Node::Expr(&a.value, inside)));
-                    work.push(Node::Expr(callee, inside));
-                }
-                ExprKind::Field { target, .. }
-                | ExprKind::TupleIndex { target, .. }
-                | ExprKind::Unary { expr: target, .. } => work.push(Node::Expr(target, inside)),
-                ExprKind::Multi(groups) => {
-                    work.extend(groups.iter().rev().map(|g| Node::Expr(&g.value, inside)));
-                }
-                ExprKind::RecordUpdate { base, fields, .. } => {
-                    work.extend(fields.iter().rev().map(|(_, e)| Node::Expr(e, inside)));
-                    work.push(Node::Expr(base, inside));
-                }
-                ExprKind::Binary { lhs, rhs, .. } => {
-                    work.push(Node::Expr(rhs, inside));
-                    work.push(Node::Expr(lhs, inside));
-                }
-            },
-            Node::Pattern(p, inside) => match &p.kind {
-                PatternKind::Quote {
-                    functions,
-                    captures,
-                    ..
-                } => {
-                    out.extend(functions.iter().map(|f| (*f, inside)));
-                    work.extend(captures.iter().rev().map(|(_, p)| Node::Pattern(p, inside)));
-                }
-                PatternKind::Named { pattern, .. } => work.push(Node::Pattern(pattern, inside)),
-                PatternKind::Constructor { args, .. }
-                | PatternKind::Tuple(args)
-                | PatternKind::Error(args) => {
-                    work.extend(args.iter().rev().map(|p| Node::Pattern(p, inside)))
-                }
-                PatternKind::List { items, .. } => {
-                    work.extend(items.iter().rev().map(|p| Node::Pattern(p, inside)))
-                }
-                PatternKind::BitArray(xs) => {
-                    for x in xs.iter().rev() {
-                        if let Some(arg) = x.format.as_ref().and_then(|f| f.arg.as_deref()) {
-                            work.push(Node::Expr(arg, inside));
-                        }
-                        work.push(Node::Pattern(&x.value, inside));
-                    }
-                }
-                _ => {}
-            },
-            Node::Block(b, inside) => {
-                for st in b.stmts.iter().rev() {
-                    match st {
-                        Stmt::Bind(b) => {
-                            work.push(Node::Expr(&b.value, inside));
-                            work.push(Node::Pattern(&b.pattern, inside));
-                        }
-                        Stmt::Env { value, .. } | Stmt::Expr(value) => {
-                            work.push(Node::Expr(value, inside))
-                        }
-                    }
-                }
-            }
+            Node::Expr(Expr {
+                kind: ExprKind::Name(ValueRef::Def(d)),
+                ..
+            }) => out.push((*d, inside)),
+            Node::Pattern(Pattern {
+                kind: PatternKind::Quote { functions, .. },
+                ..
+            }) => out.extend(functions.iter().map(|f| (*f, inside))),
+            _ => {}
         }
+        let inside = inside
+            || matches!(
+                node,
+                Node::Expr(Expr {
+                    kind: ExprKind::Fn(_),
+                    ..
+                })
+            );
+        let first = work.len();
+        children(node, |c| work.push((c, inside)));
+        work[first..].reverse();
     }
     out
 }

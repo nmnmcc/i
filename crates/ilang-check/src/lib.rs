@@ -123,8 +123,6 @@ pub mod code {
     pub const ENTRY_TYPE: &str = "E0521";
     // Shape groups (syntax three §2.6).
     pub const NO_SHAPE_GROUP: &str = "E0550";
-    /// Temporary, until the run time has multi-shape values.
-    pub const MULTI_VALUE_CALL: &str = "E0551";
     pub const NO_BRANCH_SELECTED: &str = "E0552";
     pub const NEVER_USED: &str = "W0501";
     pub const VALUE_NOT_USED: &str = "W0502";

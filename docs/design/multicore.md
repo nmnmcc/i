@@ -674,3 +674,25 @@ MC-I. These are fixed semantics, not choices left to that prototype.
   `==` its original); D7's top-level portability walk; worker-local Root/Owner
   counts are not shared with worker 0; worker token tables are never freed;
   browser workers (N11); the packaged runner runs one worker.
+
+### Open: reclaiming worker-local token entries
+
+The message encoder currently roots each nonportable value in the owning
+worker's `$mc_locals` table and sends its worker and slot as a token. Forwarding
+a foreign token copies that identity, so the end of the task that first sent it
+does not prove the slot is dead. For example, a local-channel witness or a
+value held in a local channel buffer can survive that task. A token may also
+be held in scheduler state, a task record, an encoded message in transit, or a
+value on another worker's heap, including inside a closure or a cycle.
+
+Reclamation needs a protocol that accounts for every live copy and every
+in-flight transfer, including cancellation, dropped records and messages, scope
+teardown, and stop. It must coordinate transfers and releases with the owner so
+an entry is never cleared while a token can still be decoded or forwarded;
+local heap reachability and cycles need a solution as well as transport
+ownership. Slot reuse must not let a delayed token refer to a different value
+(for example, use generations or never reuse identities). Only after the last
+possible reference is gone may the owner clear its GC root; teardown of the
+whole run can release all remaining entries. The tracking mechanism and its
+cost, including how it interacts with Wasm GC, remain to be designed and tested.
+Do not free entries merely on task completion or scope exit.

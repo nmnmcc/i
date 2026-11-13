@@ -3040,5 +3040,36 @@
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-wasm/tests/codegen.rs:fc3b7cf6d9e48c43": {
+    "not_source": "module path of a generated metadata test, not an i source"
+  },
+  "crates/ilang-cli/tests/big_int.rs:16b691ee8beb299b": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-cli/tests/float_text.rs:cca1ac99a7986d4f": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-wasm/tests/multi_shape.rs:4414029af964b61f": {
+    "not_source": "Wasmtime preload argument, not i source."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b8adf43384a85784": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |> {\n\t\tTrue  -> x\n\t\tFalse -> spin(n - 1, { x * 75 + 74 } % 65537)\n\t}\n}\n"
+      ]
+    ],
+    "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
   }
 }

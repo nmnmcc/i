@@ -336,10 +336,11 @@ fn host_seam_kept() {
 #[test]
 fn runtime_alone_validates() {
     let source = format!(
-        "(module {} {} {})",
+        "(module {} {} {} {})",
         ilang_wasm::runtime::TYPES,
         ilang_wasm::runtime::HOST,
-        ilang_wasm::runtime::wat()
+        ilang_wasm::runtime::wat(),
+        ilang_wasm::runtime::LIBRARY_ABSENT
     );
     let module = wat::parse_str(&source).unwrap();
     ilang_wasm::validate(&module).unwrap();

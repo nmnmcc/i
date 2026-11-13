@@ -23,7 +23,7 @@ pub fn env(e: &mut Env, map: &mut impl FnMut(&mut Atom)) {
 }
 pub fn callee(c: &mut Callee, map: &mut impl FnMut(&mut Atom)) {
     match c {
-        Callee::Value(a) | Callee::Known { closure: a, .. } => map(a),
+        Callee::Value(a) | Callee::Shaped(a, _) | Callee::Known { closure: a, .. } => map(a),
         Callee::Direct(_) => {}
     }
 }
@@ -58,6 +58,9 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
         }
         Value::Service(e, _) => env(e, map),
         Value::Closure { captures, .. } => captures.iter_mut().for_each(map),
+        // A multi-shape value is opaque to numeric lowering: its groups are
+        // reached only through their reference entries (syntax-3.md §6.4).
+        Value::Multi(groups) => groups.iter_mut().for_each(|(_, a)| map(a)),
         Value::Record { fields, .. } => fields.iter_mut().for_each(map),
         Value::Data(_, fields) => fields.iter_mut().for_each(map),
         Value::Cons(a, b) | Value::BitsConcat(a, b) => {
@@ -198,32 +201,12 @@ pub fn operands(s: &mut Stmt, map: &mut impl FnMut(&mut Atom)) {
 }
 pub fn walk(stmts: &mut [Stmt], visit: &mut impl FnMut(&mut Stmt)) {
     for s in stmts {
-        match s {
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                walk(then, visit);
-                walk(otherwise, visit);
-            }
-            Stmt::Block { body, .. } => walk(body, visit),
-            _ => {}
-        }
+        s.bodies_mut().for_each(|b| walk(b, visit));
         visit(s);
     }
 }
 pub fn size(stmts: &[Stmt]) -> usize {
-    stmts
-        .iter()
-        .map(|s| {
-            1 + match s {
-                Stmt::If {
-                    then, otherwise, ..
-                } => size(then) + size(otherwise),
-                Stmt::Block { body, .. } => size(body),
-                _ => 0,
-            }
-        })
-        .sum()
+    each_stmt(stmts).count()
 }
 
 /// ANF arguments are already evaluated. Forward fresh, single-definition copies
@@ -280,16 +263,7 @@ pub fn copies(body: &mut Vec<Stmt>, first: Local) {
     });
     fn prune(body: &mut Vec<Stmt>, aliases: &std::collections::BTreeMap<Local, Atom>) {
         for s in body.iter_mut() {
-            match s {
-                Stmt::Block { body, .. } => prune(body, aliases),
-                Stmt::If {
-                    then, otherwise, ..
-                } => {
-                    prune(then, aliases);
-                    prune(otherwise, aliases);
-                }
-                _ => {}
-            }
+            s.bodies_mut().for_each(|b| prune(b, aliases));
         }
         body.retain(|s| !matches!(s, Stmt::Let { dst, .. } if aliases.contains_key(dst)));
     }

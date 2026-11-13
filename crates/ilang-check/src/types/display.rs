@@ -127,6 +127,13 @@ fn scheme_names(s: &Solver, t: &Ty) -> Result<SchemeNames, ()> {
     })
 }
 
+/// [`shown`] and [`scheme`] of the same type, simplified once.
+pub(crate) fn shown_and_scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<(Ty, ShownType), ()> {
+    let t = simplify_with(s, t, None, opts)?;
+    let scheme = Namer::new(s).show(s, &t);
+    Ok((t, scheme))
+}
+
 /// The shown type, as a type, for checks of what it uses.
 pub(crate) fn shown(s: &Solver, t: &Ty, opts: Opts) -> Result<Ty, ()> {
     simplify_with(s, t, None, opts)
@@ -172,6 +179,9 @@ fn simplify_steps(
         mono: opts.mono,
         stack: HashMap::default(),
         memo: HashMap::default(),
+        cyclic: HashMap::default(),
+        pushed: Vec::new(),
+        hits: Vec::new(),
         cycle_generation: 0,
         occurs: false,
         rep,
@@ -202,10 +212,25 @@ fn simplify_steps(
         r.members = std::mem::take(&mut c.members);
     }
     // Each step takes a variable out of the type, so the steps end.
+    let mut budget = StepBudget::default();
     loop {
         let steps = n.steps(&t);
         if steps.is_empty() {
             break;
+        }
+        if !budget.allows(&steps) {
+            // A variable taken out came back: the steps would not end.
+            // Show the coalesced type without the steps instead.
+            return Ok(match record {
+                Some(r) => {
+                    r.steps.clear();
+                    r.start.clone()
+                }
+                None => budget.start.unwrap_or(t),
+            });
+        }
+        if budget.start.is_none() && record.is_none() {
+            budget.start = Some(t.clone());
         }
         t = n.norm(replace_all(&t, &steps));
         if let Some(r) = record.as_deref_mut() {
@@ -213,6 +238,25 @@ fn simplify_steps(
         }
     }
     Ok(t)
+}
+
+/// The bound on the steps of a simplification. Each step takes its variable
+/// out of the type, and no step brings in a variable that the type did not
+/// have, so the steps end after at most one per variable. A variable taken
+/// out twice means that the steps would not end: the simplification stops
+/// there, and the type is shown as it was before the steps.
+#[derive(Default)]
+struct StepBudget {
+    /// The variables taken out so far.
+    taken: HashSet<V>,
+    /// The type before the steps.
+    start: Option<Ty>,
+}
+
+impl StepBudget {
+    fn allows(&mut self, steps: &[(V, Ty)]) -> bool {
+        steps.iter().all(|(v, _)| self.taken.insert(*v))
+    }
 }
 
 /// A variable that is a mark: the first is `MARK`. A variable on one side
@@ -524,6 +568,14 @@ struct Coalescer<'s> {
     /// Completed acyclic expansions only. A cycle-dependent result belongs
     /// to its active path and cannot be reused by another branch.
     memo: HashMap<(V, bool, bool), Ty>,
+    /// Completed expansions that met a variable being expanded, each with
+    /// what it depends on (see [`Cyclic`]).
+    cyclic: HashMap<(V, bool, bool), Cyclic>,
+    /// Each variable put on `stack`, in order, also by a reused expansion.
+    pushed: Vec<V>,
+    /// Each time a variable on `stack` was met: the variable and the
+    /// number of type constructors above the place where it was met.
+    hits: Vec<(V, u32)>,
     cycle_generation: u64,
 
     occurs: bool,
@@ -533,7 +585,90 @@ struct Coalescer<'s> {
     members: HashMap<V, Vec<V>>,
 }
 
+/// An expansion of a variable that met variables being expanded around it.
+/// Expanding the variable again gives the same type when the same variables
+/// are being expanded: each of `outer`, and none of `inner`. Then it meets
+/// the variables of `outer` again, at the same depths below it.
+struct Cyclic {
+    ty: Ty,
+    /// The variables met that were being expanded around it, each with the
+    /// greatest number of type constructors from it to a place where it
+    /// was met.
+    outer: Vec<(V, u32)>,
+    /// The variables expanded inside it, and the variable itself.
+    inner: Vec<V>,
+}
+
 impl Coalescer<'_> {
+    /// The expansion of `v` done again from `cyclic`, when it is the same:
+    /// it meets the same variables, with the same effects.
+    fn reuse(&mut self, key: (V, bool, bool), depth: u32) -> Option<Ty> {
+        let c = self.cyclic.get(&key)?;
+        if !c.outer.iter().all(|(w, _)| self.stack.contains_key(w))
+            || c.inner.iter().any(|w| self.stack.contains_key(w))
+        {
+            return None;
+        }
+        self.cycle_generation += 1;
+        for &(w, rel) in &c.outer {
+            if depth + rel > self.stack[&w] {
+                self.occurs = true;
+            }
+            self.hits.push((w, depth + rel));
+        }
+        self.pushed.extend(c.inner.iter().copied());
+        Some(c.ty.clone())
+    }
+
+    /// Keeps the expansion of `key.0` at `depth`, which met variables
+    /// being expanded: `pushed` and `hits` from `start` are its own.
+    fn keep_cyclic(&mut self, key: (V, bool, bool), depth: u32, start: (usize, usize), ty: &Ty) {
+        if self.occurs {
+            return;
+        }
+        let mut inner = self.pushed[start.0..].to_vec();
+        inner.sort_unstable();
+        inner.dedup();
+        let mut outer: HashMap<V, u32> = HashMap::default();
+        for &(w, at) in &self.hits[start.1..] {
+            // Still being expanded: around `key.0` (or `key.0` itself,
+            // which is met inside its own expansion).
+            if w != key.0 && self.stack.contains_key(&w) {
+                let rel = at - depth;
+                let e = outer.entry(w).or_insert(rel);
+                *e = (*e).max(rel);
+            }
+        }
+        let mut outer: Vec<(V, u32)> = outer.into_iter().collect();
+        outer.sort_unstable();
+        self.cyclic.insert(
+            key,
+            Cyclic {
+                ty: ty.clone(),
+                outer,
+                inner,
+            },
+        );
+    }
+
+    /// Outside every expansion, nothing reads what was met before.
+    fn clear_logs(&mut self) {
+        if self.stack.is_empty() {
+            self.pushed.clear();
+            self.hits.clear();
+        }
+    }
+
+    /// [`Self::bound_key`], borrowed when there is no cycle of variables:
+    /// then the key of a bound is the bound itself.
+    fn bound_key_of<'b>(&self, t: &'b Ty) -> std::borrow::Cow<'b, Ty> {
+        if self.rep.is_empty() {
+            std::borrow::Cow::Borrowed(t)
+        } else {
+            std::borrow::Cow::Owned(self.bound_key(t))
+        }
+    }
+
     /// Alias-class variables expand identically when their row roles agree.
     /// Graph aliases also keep their row and constructor-path roles.
     fn bound_key(&self, t: &Ty) -> Ty {
@@ -594,6 +729,7 @@ impl Coalescer<'_> {
                     if depth > d {
                         self.occurs = true;
                     }
+                    self.hits.push((v, depth));
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
                 let empty = |m: V| {
@@ -616,9 +752,14 @@ impl Coalescer<'_> {
                 if let Some(t) = self.memo.get(&(v, pos, env)) {
                     return t.clone();
                 }
+                if let Some(t) = self.reuse((v, pos, env), depth) {
+                    return t;
+                }
                 let generation = self.cycle_generation;
+                let start = (self.pushed.len(), self.hits.len());
 
                 self.stack.insert(v, depth);
+                self.pushed.push(v);
                 let mut parts = Vec::new();
                 let solver = self.s;
                 // Alias-class members can share stored bounds. Expand each
@@ -632,7 +773,7 @@ impl Coalescer<'_> {
                     for m in self.members(v) {
                         let st = &solver.vars[m.0 as usize];
                         for b in &st.lower {
-                            if expanded_bounds.insert(self.bound_key(b)) {
+                            if expanded_bounds.insert(self.bound_key_of(b)) {
                                 parts.push(self.go(b, true, depth, env));
                             }
                         }
@@ -646,7 +787,7 @@ impl Coalescer<'_> {
                         let st = &solver.vars[m.0 as usize];
                         let bounds = if pos { &st.lower } else { &st.upper };
                         for b in bounds {
-                            if expanded_bounds.insert(self.bound_key(b)) {
+                            if expanded_bounds.insert(self.bound_key_of(b)) {
                                 parts.push(self.go(b, pos, depth, env));
                             }
                         }
@@ -672,7 +813,10 @@ impl Coalescer<'_> {
                     };
                     if self.cycle_generation == generation {
                         self.memo.insert((v, pos, env), t.clone());
+                    } else {
+                        self.keep_cyclic((v, pos, env), depth, start, &t);
                     }
+                    self.clear_logs();
                     return t;
                 }
                 let mut flat = Vec::new();
@@ -695,7 +839,10 @@ impl Coalescer<'_> {
                 };
                 if self.cycle_generation == generation {
                     self.memo.insert((v, pos, env), t.clone());
+                } else {
+                    self.keep_cyclic((v, pos, env), depth, start, &t);
                 }
+                self.clear_logs();
                 t
             }
             Ty::Con(h, values, args) => {
@@ -919,36 +1066,41 @@ impl Norm<'_> {
         // Equal members have the same head. Keep the original order within
         // each head, including distinct invariant service instantiations.
         let mut by_head: HashMap<Option<Head>, Vec<usize>> = HashMap::default();
+        // Only the first member of a head is ever merged into; the members
+        // after it stay as they are, so they are found again by hash.
+        #[allow(clippy::mutable_key_type)]
+        let mut later: HashSet<Ty> = HashSet::default();
         for m in flat {
             let head = m.head();
             let positions = by_head.entry(head).or_default();
-            if m == Ty::Never || positions.iter().any(|&i| out[i] == m) {
+            if m == Ty::Never
+                || positions.first().is_some_and(|&i| out[i] == m)
+                || (positions.len() > 1 && later.contains(&m))
+            {
                 continue;
             }
             if is_top(&m) {
                 return Ty::Top;
             }
             match head.and_then(|_| positions.first().copied()) {
-                Some(_) if env => {
-                    positions.push(out.len());
-                    out.push(m);
-                }
-                Some(i) => {
+                Some(i) if !env => {
                     let old = std::mem::replace(&mut out[i], Ty::Never);
                     out[i] = self.merge(old, m, true);
                 }
-                None => {
+                _ => {
+                    if !positions.is_empty() {
+                        later.insert(m.clone());
+                    }
                     positions.push(out.len());
                     out.push(m);
                 }
             }
         }
         // `a | a - H` is `a`, and `a | a & T` is `a`.
-        let snapshot = out.clone();
-        out.retain(|m| match m {
-            Ty::Diff(a, _) => !snapshot.contains(a),
-            Ty::Inter(xs) => !xs.iter().any(|x| snapshot.contains(x)),
-            _ => true,
+        drop_absorbed(&mut out, |m, member| match m {
+            Ty::Diff(a, _) => member(a),
+            Ty::Inter(xs) => xs.iter().any(member),
+            _ => false,
         });
         // `T | r - T`, where `r` has no effect and `T` has every value of
         // its type constructor, is every value.
@@ -979,18 +1131,18 @@ impl Norm<'_> {
                 Some(_) => (2, String::new()),
                 None => (0, String::new()),
             });
-            let mut ranks = Vec::new();
+            // Each variable with the place where it is first found.
+            let mut ranks: HashMap<V, usize> = HashMap::default();
             for member in out.iter().filter(|m| m.head().is_some()) {
                 visit(member, &mut |t| {
-                    if let Ty::Var(v) = t
-                        && !ranks.contains(v)
-                    {
-                        ranks.push(*v);
+                    if let Ty::Var(v) = t {
+                        let next = ranks.len();
+                        ranks.entry(*v).or_insert(next);
                     }
                 });
             }
             out.sort_by_key(|t| match t {
-                Ty::Var(v) => (0, ranks.iter().position(|w| w == v).unwrap_or(usize::MAX)),
+                Ty::Var(v) => (0, ranks.get(v).copied().unwrap_or(usize::MAX)),
                 t if t.head().is_none() => (0, usize::MAX),
                 _ => (1, 0),
             });
@@ -1114,10 +1266,9 @@ impl Norm<'_> {
             }
         }
         // `a & { a | T }` is `a`.
-        let snapshot = out.clone();
-        out.retain(|m| match m {
-            Ty::Union(xs) => !xs.iter().any(|x| snapshot.contains(x)),
-            _ => true,
+        drop_absorbed(&mut out, |m, member| match m {
+            Ty::Union(xs) => xs.iter().any(member),
+            _ => false,
         });
         match out.len() {
             0 => Ty::Top,
@@ -1336,7 +1487,14 @@ impl Norm<'_> {
             kept(&o.pos_with, dropped).unwrap_or_default(),
             kept(&o.neg_with, dropped).unwrap_or_default(),
         );
-        for w in pw.iter().filter(|w| nw.contains(w)) {
+        // Graph keys hash their immutable pool identity and node ID.
+        #[allow(clippy::mutable_key_type)]
+        let in_nw: Option<HashSet<&Ty>> = (nw.len() > 8).then(|| nw.iter().copied().collect());
+        let both_sides = |w: &&Ty| match &in_nw {
+            Some(set) => set.contains(*w),
+            None => nw.contains(w),
+        };
+        for w in pw.iter().filter(|w| both_sides(w)) {
             match w {
                 Ty::Var(x) if *x == v => {}
                 Ty::Var(x) if named && !self.named(*x) => return Some((*x, Ty::Var(v))),
@@ -1440,6 +1598,19 @@ fn record<'a>(
         Some(g) => with.groups.push(g),
         None => with.alone = true,
     }
+}
+
+/// Takes out of `out` each member that `absorbed` finds absorbed by a member
+/// of `out` as it was before any was taken out. The members are looked up
+/// by hash, and only when some member could be absorbed at all.
+fn drop_absorbed(out: &mut Vec<Ty>, absorbed: impl Fn(&Ty, &dyn Fn(&Ty) -> bool) -> bool) {
+    if !out.iter().any(|m| absorbed(m, &|_| true)) {
+        return;
+    }
+    // Graph keys hash their immutable pool identity and node ID.
+    #[allow(clippy::mutable_key_type)]
+    let before: HashSet<Ty> = out.iter().cloned().collect();
+    out.retain(|m| !absorbed(m, &|x| before.contains(x)));
 }
 
 fn mentions(t: &Ty, v: V) -> bool {
@@ -2146,5 +2317,72 @@ mod literal_display_tests {
         assert_eq!(tree.text(&[]).matches('|').count(), 39);
         assert!(tree.text_limited(&[], 12).ends_with("… (30 more)"));
         assert!(!tree.text(&[]).contains('…'));
+    }
+}
+
+#[cfg(test)]
+mod lazy_display_tests {
+    use super::*;
+    use crate::hir::{BuiltinType, TypeRef};
+
+    fn vars(s: &mut Solver, n: usize) -> Vec<V> {
+        (0..n).map(|_| s.fresh_at(1)).collect()
+    }
+
+    #[test]
+    fn shown_and_scheme_is_shown_and_scheme() {
+        // The checker simplifies the scheme of a definition once for its
+        // text and for the check of the types it uses (§2.4): both must be
+        // what `shown` and `scheme` give on their own.
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let vs = vars(&mut s, 3);
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let t = Ty::Fn(Box::new(FnTy {
+            param: Ty::tuple(vec![Ty::Var(vs[0]), int.clone()]),
+            labels: vec![None, None],
+            ret: Ty::Union(vec![Ty::Var(vs[0]), Ty::Var(vs[1]), int]),
+            err: Ty::Never,
+            env: Ty::Var(vs[2]),
+        }));
+        for opts in [
+            Opts::default(),
+            Opts {
+                mono: true,
+                written: false,
+            },
+        ] {
+            let (ty, shown_scheme) = shown_and_scheme(&s, &t, opts).unwrap();
+            assert_eq!(ty, shown(&s, &t, opts).unwrap());
+            assert_eq!(shown_scheme, scheme(&s, &t, opts).unwrap());
+        }
+    }
+
+    #[test]
+    fn wide_unions_keep_their_order_and_drop_repeats() {
+        // Members are found again by hash; the first of each is kept, in
+        // the order written.
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let vs = vars(&mut s, 300);
+        let mut ms: Vec<Ty> = vs.iter().map(|v| Ty::Var(*v)).collect();
+        ms.extend(vs.iter().rev().map(|v| Ty::Var(*v)));
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        // `a | a - H` is `a`, and `a | a & T` is `a`.
+        ms.push(Ty::Diff(Box::new(Ty::Var(vs[7])), vec![string.clone()]));
+        ms.push(Ty::Inter(vec![Ty::Var(vs[9]), string.clone()]));
+        let u = known_union(&s, ms);
+        assert_eq!(u, Ty::Union(vs.iter().map(|v| Ty::Var(*v)).collect()));
+        // A difference whose base is not a member stays.
+        let other = s.fresh_at(1);
+        let d = Ty::Diff(Box::new(Ty::Var(other)), vec![string]);
+        let u = known_union(&s, vec![Ty::Var(vs[0]), d.clone(), Ty::Var(vs[0])]);
+        assert_eq!(u, Ty::Union(vec![Ty::Var(vs[0]), d]));
+    }
+
+    #[test]
+    fn a_variable_taken_out_twice_stops_the_steps() {
+        let mut budget = StepBudget::default();
+        assert!(budget.allows(&[(V(1), Ty::Top), (V(2), Ty::Never)]));
+        assert!(budget.allows(&[(V(3), Ty::Var(V(4)))]));
+        assert!(!budget.allows(&[(V(2), Ty::Top)]));
     }
 }

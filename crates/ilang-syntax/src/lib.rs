@@ -17,6 +17,7 @@ pub mod shape;
 pub mod span;
 pub mod syn3;
 pub mod token;
+pub mod trace;
 
 use span::Span;
 

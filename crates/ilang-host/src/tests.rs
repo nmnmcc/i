@@ -116,8 +116,15 @@ fn stop(outcome: Outcome) -> Stop {
 
 #[test]
 fn metadata_is_read_from_the_custom_section() {
-    let abi = program().abi().clone();
-    assert_eq!(abi.version, ABI_VERSION);
+    // Keep legacy metadata coverage when the shared browser fixture is updated.
+    let text = include_str!("../../../tests/browser/fixtures/host-abi.wat").replacen(
+        r#"{\"version\":4,"#,
+        r#"{\"version\":3,"#,
+        1,
+    );
+    let legacy = wat::parse_str(text).unwrap();
+    let abi = Program::from_bytes(&legacy).unwrap().abi().clone();
+    assert_eq!(abi.version, ABI_OLDEST);
     assert_eq!(abi.entry, Some(EntryPoint::new("app/main.main")));
     assert_eq!(abi.tests.len(), 6);
     assert!(abi.tests[5].is_async);
@@ -1481,7 +1488,7 @@ fn old_and_new_versions_are_refused() {
             r#"{{"version":{version},"entry":null,"tests":[],"exports":{{}},"services":{{}},"externals":{{}}}}"#
         )
     };
-    for version in [1, ABI_VERSION - 1] {
+    for version in [1, ABI_OLDEST - 1] {
         let error = Abi::from_json(json(version).as_bytes()).unwrap_err();
         assert_eq!(
             format!("{error:#}"),

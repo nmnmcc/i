@@ -402,3 +402,16 @@ stop and both frames. Mapping the same calls from main's source gives
 `panic("base")` 7:33 -> 9:35 and `base()` 10:6 -> 12:5; only those source
 coordinates were changed. This was derived from the original and converted
 source, not from a recorded runtime expectation. Spec chapters have not run.
+
+
+### Evening continuation: main fd99f9e3
+
+Merged main's stage-10 runtime, global cache, checker speedups, U1 numeric
+modules and reduced test-build memory. Converted 15 imported files including
+`big.i`, `bits.i`, `float_text.i`, and a new big-int test snippet. Three new
+helpers in an otherwise already-converted numeric-lowering program still
+used old clause syntax; translated those heads and branches directly while
+keeping every body. The embedded retry reads all imported snippets without
+errors. Stage 10 replaces multi_value_call's former rejected call with main's
+runtime expected-output fixture, preserving its intent. The workspace
+all-target check passes.

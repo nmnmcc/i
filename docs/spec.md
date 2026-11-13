@@ -10,6 +10,7 @@ This document is complete in itself. It defines:
 - the library module `i/core`, which has the operations that are not written in i (§13);
 
 - macros, the Lisp surface, and the library module `i/syntax` (§14);
+- the library module `i/float_text`, the text form of a Float written in i (§11.8);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
@@ -1345,7 +1346,7 @@ example = () {
 
 **Layers.** There is no layer concept. A function that returns several services returns ordinary data, which may be provided whole or spread:
 
-```i future-SYN3
+```i
 base = () <- (io: Io) -> (Config, Log) {
   (Config(url = "https://example.com"), Log(write = (s) { io.print(s) }))
 }
@@ -1434,7 +1435,7 @@ A structured task cancel resumes its scheduling continuation with a cancel answe
 
 **Keeping services.** In a service pattern, `..env: N` binds the whole set of services that the function receives as one value of the row type `N` (§6.8). A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` makes a function that, wherever it is called, calls `f` with the services of the place where `keep` was called, but with the caller's `Fail`:
 
-```i future-SYN3
+```i
 keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
   (x) { f(x) <- env }
 }
@@ -2523,6 +2524,8 @@ A **Float** is written in this way. Let d1 … dn be the shortest list of decima
 - The **long form** is used when p is at least L and at most U, and not when p ≥ 0 and the size of the float is 2^53 or more. L is −4 when n = 1, and −2 − n when not. U is 2 when n = 1 or k ≥ 11, and 1 when not.
 - In the long form, the digits are written as a decimal number, with `.` and at least one digit after it: `123.0`, `12.67`, `0.0123`.
 - In the short form, d1 is written, then `.`, then d2 … dn, or `0` when n = 1, then `e`, then k − 1 as a decimal number with `-` when it is negative: `3.0e26`, `1.0e-7`, `1.0e3`.
+
+The library module `i/float_text` writes this text in i: `float_text.to_string(x)` is the text form of the Float `x`, the same as `core.inspect(x)`.
 
 The text form of a function, a key or a keyed value never depends on which worker made it or holds it. Task handles keep bookkeeping ids under keyed fields, whose text is `//keyed`; only task.path exposes the semantic task path. Requests and tickets show no ids, state or answers.
 

@@ -1,2 +1,0 @@
-src/main.i:17:13: error[E0551]
-src/main.i:22:16: error[E0551]

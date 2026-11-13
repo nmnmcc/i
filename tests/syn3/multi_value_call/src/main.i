@@ -1,7 +1,7 @@
-//// Syntax three, stage 9 (docs/design/syntax-3.md §2.6.5): the temporary
-//// error of stage 9 for a multi-shape value that is called through a value.
-//// Stage 10 removes that error; this fixture then becomes a running one.
-//// Read with `I_SYNTAX=3`; `i check` gives the errors of `errors.txt`.
+//// Syntax three, stages 9 and 10 (docs/design/syntax-3.md §2.6.5, §6.4): a
+//// multi-shape value called through a value, and a call with labels through
+//// a value. Read with `I_SYNTAX=3`; `i run` prints the lines of
+//// `expected.txt`.
 (
 	(Io) = i/io
 	core = i/core

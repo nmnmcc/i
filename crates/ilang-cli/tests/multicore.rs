@@ -618,3 +618,34 @@ fn echo_example_serves_three_connections_with_auto_workers() {
     let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/echo");
     serve_clients(&project, None, 3);
 }
+
+/// Multicore D6: a function copied to another worker and back is `==` to
+/// its original, and different functions stay different.
+#[test]
+fn copied_functions_keep_their_identity() {
+    let source = format!(
+        "(
+	i/task
+	i/stdio
+	i/core
+)
+
+{SPIN}
+main = () {{
+	f = (x: Int) {{ x + spin(10, x) }}
+	g = (x: Int) {{ x + 2 }}
+	back = task.scope((s) {{
+		task.join(task.go(s, () {{
+			spin(200000, 1)
+			(f, g)
+		}}))
+	}})
+	(f2, g2) = back
+	stdio.print(core.inspect([f2 == f, g2 == g, f2 == g, f2(1) == f(1)]))
+}}
+"
+    );
+    let (_, eight, trace) = agree("identity", &source);
+    assert_eq!(eight.stdout.trim(), "[True, True, False, True]");
+    assert_eq!(trace.published, 1);
+}

@@ -11,7 +11,15 @@ fn deep_values_and_memory_boundaries_match_the_runtime_oracle() {
     let types = directory.path().join("types.wat");
     let runtime = directory.path().join("runtime.wat");
     std::fs::write(&types, ilang_wasm::runtime::TYPES).expect("write the runtime types");
-    std::fs::write(&runtime, ilang_wasm::runtime::wat()).expect("write the runtime");
+    std::fs::write(
+        &runtime,
+        [
+            ilang_wasm::runtime::wat(),
+            ilang_wasm::runtime::LIBRARY_ABSENT,
+        ]
+        .concat(),
+    )
+    .expect("write the runtime");
     let output = Command::new("python3")
         .arg(script)
         .arg("--types")

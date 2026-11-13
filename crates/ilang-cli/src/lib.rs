@@ -261,7 +261,9 @@ pub fn build_tests(
     options: BuildOptions,
     collection: Option<&str>,
 ) -> Result<(Built, Vec<CollectionEntry>), BuildError> {
+    let stage = ilang_syntax::trace::stage("load");
     let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    drop(stage);
     graph.test_run = options.tests;
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
@@ -699,6 +701,7 @@ pub fn optimize(wasm: &[u8], level: Level) -> Result<Vec<u8>, BuildError> {
     if level == Level::O0 {
         return Ok(wasm.to_vec());
     }
+    let _stage = ilang_syntax::trace::stage("Binaryen");
     let out = ilang_binaryen::optimize(&ilang_wasm::strip_names(wasm), level)
         .map_err(|e| BuildError::Internal(format!("Binaryen: {e}")))?;
     ilang_wasm::validate(&out)
