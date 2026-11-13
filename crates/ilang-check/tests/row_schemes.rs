@@ -491,3 +491,48 @@ fn a_closed_callback_can_instantiate_an_unused_fail_entry_as_never() {
         graph.sources.render_all(&checked.diags)
     );
 }
+
+#[test]
+fn a_sink_with_a_stored_callback_row_has_a_finite_instantiation() {
+    // E3 stores Fail in the callback row. The factory is pure and its
+    // callback raises String; neither row contains the sink itself.
+    types(
+        r#"(i/fail)
+Entry = (message = String)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, () <- N -> Nil)
+make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
+    Sink(send, () { Nil })
+}
+write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
+    Sink(send, _) = sink
+    send(entry)
+}
+example = () {
+    fail.catch(() { write(Entry(message = "seen")) }) <- (
+        make((entry) { fail.raise(entry.message) }),
+    )
+}
+"#,
+    );
+}
+
+#[test]
+fn a_stored_service_row_retains_the_callers_dependency() {
+    let source = r#"Dep = (read = () -> String)
+Other = (read = () -> String)
+S(N) = (run = () <- N -> String)
+need = () <- (s: S(Dep)) { Nil }
+wrong = () <- (o: Other) { "value" }
+main = () { need() <- (S(run = wrong)) }
+"#;
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("(o: Other)", "(o: Dep)"));
+}
