@@ -447,3 +447,27 @@ gate is the complete requested `review-k4d` selection: 365 projects, two
 jobs, with zero failures required. All verification commands remain serial
 and use the shared wrapper; the snippet gate uses its internal wrapped
 cargo build. No source or observation is changed during this final run.
+
+### Required equality warnings on the landed-tip integration
+
+The first complete `review-k4d` run checks 365 projects (213 accepted,
+152 rejected); 364 observations match and one differs only in warning
+messages. `review-k4d/_loose/spec/tests_spec_11_equality` gains W0503 at
+`test/equality.i:57:5`, `59:5`, and `62:5`, in check, O0 and O2. The pairs
+are `Some(1)` / `None`, `Ok(1)` / `Error(1)`, and `True` / `False`.
+Syntax-three §2.8 makes each data definition its own nominal type and its
+constructor return that type. These pairs are now known disjoint types;
+spec §6.9 requires W0503 when both known types are disjoint (§4.5 rule 3).
+Suppressing these warnings would violate that paragraph.
+
+Only those nine warning lines are added to the saved observation; all
+exits, stdout, commands, bounds, source programs and existing warnings are
+unchanged. Each runtime phase still passes all five equality tests. The
+record's compiler/hash provenance is refreshed for this observed binary.
+The focused case passes after the update. This preserves and strengthens
+the equality test's intent; no error is removed or weakened. All fourteen
+named-provider records remain byte-identical to fetched main. The complete
+first-run snapshot is `s3-r4-corpus-first-outcomes.json` in the shared
+coordinator cache; its raw log is `s3-r4-corpus.log`, and the focused retry
+is `s3-r4-equality.log`. A second complete filter run is required before
+READY.
