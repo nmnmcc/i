@@ -668,3 +668,28 @@ fn converted_p1_keeps_the_uniform_provider_error() {
         assert!(errors[0].message.contains("S("));
     }
 }
+
+#[test]
+fn provider_conflicts_keep_call_and_binding_diagnostics() {
+    // Spec §9.2: a provided P satisfies a need S only when P <: S.
+    // Both the call obligation and the enclosing binding must retain the
+    // Reader(String)/Reader(Int) conflict; keeping only the call loses reports.
+    let source = include_str!("types/soundness.i");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let mut sites: Vec<_> = diags
+        .iter()
+        .filter(|d| {
+            d.code == "E0515"
+                && d.message.contains("Reader(String)")
+                && d.message.contains("Reader(Int)")
+        })
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect();
+    sites.sort();
+    assert_eq!(
+        sites,
+        [(14, 5), (14, 19), (16, 5), (16, 29)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
