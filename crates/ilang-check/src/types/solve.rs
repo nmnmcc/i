@@ -913,8 +913,10 @@ impl Solver {
 
     /// A shown scheme must express every handler restriction. A visible
     /// difference or a row containing both the variable and the supplied
-    /// form expresses it. A form tied to that variable, as S(N) in a
-    /// parameter S(N), also keeps the obligation on that same row.
+    /// constructor expresses it (§2.10.4 rule B). Its arguments may have
+    /// been coalesced; the original directed constraints stay in the scheme
+    /// and are checked at instantiation. A form tied to that variable, as
+    /// S(N) in a parameter S(N), also keeps the obligation on that same row.
     pub fn hidden_handlers(&self, t: &Ty, level: u32) -> Vec<Ty> {
         if !self.has_handlers {
             return Vec::new();
@@ -945,6 +947,17 @@ impl Solver {
                 _ => {}
             }
         }
+        // Needs use Union internally, and coalescing may leave an Inter
+        // around a row alias. Only traverse the row algebra here: a row
+        // inside a service argument is not beside that service.
+        fn row_has(t: &Ty, test: &impl Fn(&Ty) -> bool) -> bool {
+            test(t)
+                || match t {
+                    Ty::Union(ms) | Ty::Inter(ms) => ms.iter().any(|m| row_has(m, test)),
+                    Ty::Diff(base, _) => row_has(base, test),
+                    _ => false,
+                }
+        }
         let mut all = Vec::new();
         parts(t, &mut all);
         let mut hidden = Vec::new();
@@ -972,10 +985,16 @@ impl Solver {
                     {
                         continue;
                     }
+                    let stated = |m: &Ty| {
+                        self.same_form(m, h)
+                            || (self.var(v).row == Mode::Env
+                                && h.head().is_some()
+                                && m.head() == h.head())
+                    };
                     let witnessed = all.iter().any(|part| match part {
-                        Ty::Diff(a, hs) => is_var(a) && hs.iter().any(|m| self.same_form(m, h)),
-                        Ty::Union(ms) => {
-                            ms.iter().any(&is_var) && ms.iter().any(|m| self.same_form(m, h))
+                        Ty::Diff(a, hs) => row_has(a, &is_var) && hs.iter().any(stated),
+                        Ty::Union(_) | Ty::Inter(_) => {
+                            row_has(part, &is_var) && row_has(part, &stated)
                         }
                         part if self.same_form(part, h) => {
                             let mut edges = Vec::new();
@@ -1176,6 +1195,10 @@ impl Solver {
                     self.constrain_in(l, a, env);
                 }
             }
+            (Ty::Con(..), _)
+                if env == Mode::Env
+                    && !matches!(r, Ty::Con(..) if r.head() == l.head())
+                    && self.vacate(l) => {}
             (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
                 if (env == Mode::Env && s1 != s2) || (env != Mode::Env && !s1.subset(s2)) {
                     self.fail(
@@ -1714,6 +1737,7 @@ impl Solver {
                 let m = vars[0].clone();
                 self.constrain_in(rest.as_ref().unwrap_or(l), &m, env);
             }
+            0 if env == Mode::Env && self.vacate(l) => {}
             0 => self.fail(
                 if rest.is_some() {
                     FailKind::Values
@@ -2088,6 +2112,31 @@ impl Solver {
     /// (§4.4). `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
         self.normalize_mode(Ty::Inter(ms), Mode::Value)
+    }
+
+    /// A closed need without this constructor can fit it only if the
+    /// entry is vacuous (§9.2). Constrain fresh arguments to that form;
+    /// known or rigid incompatible arguments still report an error.
+    fn vacate(&mut self, t: &Ty) -> bool {
+        let Ty::Con(h, values, args) = t else {
+            return false;
+        };
+        if args.is_empty() || !values.is_all() {
+            return false;
+        }
+        let variances: Vec<_> = self.variances(*h, args.len()).collect();
+        if variances.contains(&Variance::Inv) {
+            return false;
+        }
+        let rows: Vec<_> = self.rows(*h, args.len()).collect();
+        for ((arg, variance), row) in args.iter().zip(variances).zip(rows) {
+            match variance {
+                Variance::Contra => self.constrain_in(arg, &Ty::Never, row),
+                Variance::Co => self.constrain_in(&Ty::Top, arg, row),
+                _ => {}
+            }
+        }
+        true
     }
 
     pub(crate) fn vacuous(&self, t: &Ty) -> bool {

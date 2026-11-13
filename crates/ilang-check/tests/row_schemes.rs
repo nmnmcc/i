@@ -6,7 +6,7 @@ fn types(source: &str) -> std::collections::BTreeMap<String, String> {
     let checked = ilang_check::check(&graph);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),
-        "{:?}",
+        "{source}\n{:?}",
         graph.sources.render_all(&checked.diags)
     );
     let p = checked.program.unwrap();
@@ -197,7 +197,14 @@ Alias(N) = T(N)
             );
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
             let checked = ilang_check::check(&graph);
-            let expected = if op == "-" || written.contains("Fail(") {
+            // Fail's argument is an ordinary value type after E3. Its
+            // invariant union/intersection error is E0503, as elsewhere;
+            // the former separate error-row diagnostic no longer applies.
+            let expected = if op == "-" && written.contains("Fail(") {
+                // A difference in an ordinary error value requires value
+                // subtyping (§4.4); this is no longer an error-row check.
+                "E0501"
+            } else if op == "-" {
                 "E0515"
             } else {
                 "E0503"
@@ -284,7 +291,12 @@ fn a_directed_row_handler_keeps_the_callback_row_open() {
 use = <N>() <- (s: S(N)) { s.f() }
 wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
     );
-    assert_eq!(shown["app/main.wrap"], "(svc = S(A)) <- A -> Int");
+    // The retained key restriction is shown explicitly; A stays open to
+    // every other service. Difference heads carry only the key (§4.4).
+    assert_eq!(shown["app/main.wrap"], "(S(A)) <- (A - S(Never)) -> Int");
+    types(
+        "Dep = (value = Int)\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nwrap = <N>(svc: S(N)) -> Int { use() <- (svc) }\nneed = () <- (d: Dep) { d.value }\nexample = () { wrap(S(f = () { need() })) <- (Dep(value = 1)) }\n",
+    );
 }
 
 #[test]
@@ -324,7 +336,7 @@ fn an_undetermined_need_argument_keeps_its_intersection() {
 need_int = () <- (r: Read(Int)) { Nil }
 both = <A>(x: A) <- (r: Read(A)) { need_int() x }",
     );
-    assert_eq!(shown["app/main.both"], "(x = A) <- (Read(Int & A)) -> A");
+    assert_eq!(shown["app/main.both"], "(A) <- (Read(Int & A)) -> A");
 }
 
 #[test]
@@ -350,7 +362,11 @@ fn inferred_handlers_keep_future_provider_constraints() {
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
-        checked.diags.iter().any(|d| d.code == "E0515"),
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("S(")
+            && !d.message.contains("hides")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );
@@ -409,5 +425,69 @@ fn a_value_argument_cannot_erase_a_shared_row_constraint() {
                 "one = () <- (s: S(Int | String)) { 1 }\n",
             )
             .replace("\"hi\"", "2"),
+    );
+}
+
+#[test]
+fn catch_generalizes_its_stated_fail_entry_and_residual_row() {
+    // Rule B: the callback's (..N, Fail(E)) states the restriction on N.
+    // The scheme retains it; it is not an unexpressed provider obligation.
+    let shown = types(
+        "(i/fail)\nforward = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) { fail.catch(body) }\n",
+    );
+    assert!(shown["app/main.forward"].contains("Fail("), "{shown:?}");
+    assert!(shown["app/main.forward"].contains("Result("), "{shown:?}");
+}
+
+#[test]
+fn catch_cannot_split_a_fail_entry_into_the_residual_row() {
+    // §2.10.4 Q1-B: choosing E = Int and N = Fail(String) would allow
+    // an Error(String) to escape with the claimed Result(Nil, Int) type.
+    let source = "(i/fail)\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("Result(Nil, Int)", "Result(Nil, Int | String)"));
+}
+
+#[test]
+fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
+    let source = "Svc(A) = (value = A)\nhide: <N>(() <- N -> Nil) <- N -> Nil = (body) { body() <- (Svc(value = 1)) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("hides")
+            && d.message.contains("Svc")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_closed_callback_can_instantiate_an_unused_fail_entry_as_never() {
+    // Written callback types are closed. A fresh E may be Never, but an
+    // actual raised value must not disappear when fitting the callback.
+    types(
+        "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n",
+    );
+    let source =
+        "(i/fail)\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { fail.raise(1) }) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
     );
 }
