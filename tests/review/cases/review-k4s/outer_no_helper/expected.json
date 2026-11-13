@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N - D | S(N)\n",
-      "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `test` is not used\n"
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.test : () <- (N - D, S(N)) -> Nil\n",
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `test` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `test` is not used\n"
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `test` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:5:1: warning[W0504]: top-level binding `test` is not used\n"
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `test` is not used\n"
     }
   }
 }

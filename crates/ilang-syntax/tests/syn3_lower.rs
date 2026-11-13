@@ -377,3 +377,30 @@ fn a_single_use_provider_keeps_its_contract_before_generalization() {
         ilang_syntax::ast::Stmt::Bind(_)
     ));
 }
+
+#[test]
+fn a_closed_function_provider_keeps_its_generalization_boundary() {
+    use ilang_syntax::ast::{ExprKind, ItemKind, Stmt, TypeKind};
+
+    // §4.7/§4.8: preserve the closed function value's scheme and the
+    // actual-provider checks deferred through it. Open contracts are
+    // independently pinned by a_single_use_provider_keeps_its_contract_before_generalization.
+    let source = "Reader(A) = (get = () -> A)\nwith_int = (body) { provided: Reader(Int) = Reader(get = () -> Int { 1 }) body() <- (provided) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Binding(binding) = &module.items[1].kind else {
+        panic!()
+    };
+    let ExprKind::Fn(function) = &binding.value.kind else {
+        panic!()
+    };
+    assert_eq!(function.body.stmts.len(), 3);
+    assert!(matches!(&function.body.stmts[0], Stmt::Bind(_)));
+    let Stmt::Env { ty, value, .. } = &function.body.stmts[1] else {
+        panic!()
+    };
+    assert!(matches!(ty.kind, TypeKind::Hole));
+    assert!(
+        matches!(&value.kind, ExprKind::Name { module: None, name } if name.name == "provided")
+    );
+}

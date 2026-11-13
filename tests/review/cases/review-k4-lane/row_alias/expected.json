@@ -1,6 +1,6 @@
 {
-  "compiler": "32b10aba775aa3d675d49c37f1cb07220e7452b0",
-  "binary_sha256": "8e1d33b0608793d56a36457c6a6130c250239af3d598944dc0fb4e44c14bc6d9",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : (x: T(S(Never))) -> T(S(Never))\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:15:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stdout": "app/main.use : (T(S(Never))) -> T(S(Never))\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:9:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:15:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stderr": "src/main.i:9:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:15:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stderr": "src/main.i:9:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:15:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stderr": "src/main.i:9:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:15:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stderr": "src/main.i:9:1: warning[W0504]: top-level binding `use` is not used\n"
     }
   }
 }

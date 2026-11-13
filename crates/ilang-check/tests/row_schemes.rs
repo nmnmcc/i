@@ -693,3 +693,22 @@ fn provider_conflicts_keep_call_and_binding_diagnostics() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
+    // Keep every original Reader obligation, including the two checked
+    // when generalizing g and k, without changing the soundness golden.
+    let source = include_str!("types/soundness.i");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let actual = diags
+        .iter()
+        .filter(|d| d.code == "E0515" && d.message.contains("`Reader(String)` and `Reader(Int)`"))
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [(14, 19), (14, 5), (16, 29), (16, 5)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
