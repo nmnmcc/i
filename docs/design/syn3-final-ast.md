@@ -438,3 +438,8 @@ inventory no longer lists those future fences.
 The rows flip is complete as one commit. Steps 2d, 3 and 4 still require
 separate green gates. A native-engine draft is prepared under `target/`,
 outside the sources used by this completed gate.
+
+Conversion final commit `9365b311f` is integrated after the green rows flip.
+Its four Rust-file changes are formatting only; its other changes document
+conversion verification and fix inventory extraction. Workspace/all-targets
+check passed again (`conv-final-check.log`).

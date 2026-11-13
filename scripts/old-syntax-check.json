@@ -3064,9 +3064,12 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |> {\n\t\tTrue  -> x\n\t\tFalse -> spin(n - 1, { x * 75 + 74 } % 65537)\n\t}\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
+  },
+  "crates/ilang-wasm/tests/multi_shape.rs:6c0e82244f1f33bc": {
+    "not_source": "Wasmtime --preload command argument guest={} rendered with a Wasm file path; not i source."
   }
 }
