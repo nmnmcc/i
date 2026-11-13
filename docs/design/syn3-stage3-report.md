@@ -194,3 +194,26 @@ zero failures. Shard 1/10 (198 cases, two jobs) is now queued. The conversion
 fix candidate `d67bcf7e` restores the original written provider annotation
 in the failed CLI fixture; it changes no compiler rule and is still awaiting
 its own final validation before integration.
+
+## Completed shard audit
+
+The requested shard run completed on the same compiler tree: 198 selected,
+140 accepted checks and 58 rejected checks, exit 1. All 170 output
+differences are classified in [the per-case audit](syn3-stage3-corpus-audit.md):
+11 message only, 144 shown type, 15 outcome/diagnostic differences. Two
+additional requirement failures are recorded there. No expectation,
+requirement, bound, or corpus source was rewritten.
+
+Two diagnostic changes are explained by removed grammar. Eleven other
+diagnostic/acceptance changes are classified as bugs; two O2 test timeouts
+after passing stdout are under unchanged-bound retry. `proj/q35` also fails
+its principal-type assertion (`S(N & A)` instead of `S(N)`). Several failures
+are lost complete written needs in the conversion, including six permutation
+cases. This branch is not landable while these remain unresolved.
+
+The separately reviewed convfix `d67bcf7e` is merged at `62bc17079`: it
+restores the captured-row fixture's original provider annotation and adds a
+lowering comparison, changing no compiler code or expected result. Its
+own CLI/lowering verification on this branch is pending. The newer
+conversion head remains unlandable because of its reported `p1` correctness
+blocker and has not been merged.
