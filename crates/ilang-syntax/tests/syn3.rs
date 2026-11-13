@@ -41,7 +41,7 @@ fn bad(source: &str, needle: &str) {
 
 fn value(source: &str) -> Expr {
     let module = ok(source);
-    match &module.items.last().unwrap().kind {
+    match &module.items.last().unwrap().kind.clone() {
         ItemKind::Bind(b) => b.value.clone(),
         other => panic!("not a binding: {other:?}"),
     }
@@ -238,7 +238,7 @@ fn data_values() {
     }
     // P3: `==` is one token, so the item is positional.
     assert!(matches!(
-        syn3::parse_expr("(a == b)").unwrap().kind,
+        syn3::parse_expr("(a == b)").unwrap().kind.clone(),
         ExprKind::Data(items) if matches!(items[0], DItem::Pos(_))
     ));
     bad(
@@ -267,7 +267,7 @@ fn operators_and_groups() {
     }
     // A block with only an expression is a group, and stays one.
     assert!(matches!(
-        syn3::parse_expr("{ a }").unwrap().kind,
+        syn3::parse_expr("{ a }").unwrap().kind.clone(),
         ExprKind::Block(b) if b.stmts.len() == 1
     ));
 }
@@ -289,7 +289,7 @@ fn p1_function_or_data() {
     ));
     assert!(matches!(value("f = (x = 1)").kind, ExprKind::Data(_)));
     // G32: the outer `(` is data, the inner item a function.
-    match value("p = ((a) { a }, 1)").kind {
+    match value("p = ((a) { a }, 1)").kind.clone() {
         ExprKind::Data(items) => {
             assert!(matches!(&items[0], DItem::Pos(e) if matches!(e.kind, ExprKind::Chain(_))))
         }
@@ -335,14 +335,14 @@ fn p4_branch_join() {
     assert_eq!(fs.len(), 1);
     assert!(matches!(&fs[0].ret, Some(t) if matches!(t.kind, TypeKind::Union(_))));
     // G33: the labelled item's value is a chain.
-    match value("x = (f = (a) { a } | (b) { b })").kind {
+    match value("x = (f = (a) { a } | (b) { b })").kind.clone() {
         ExprKind::Data(items) => {
             assert!(matches!(&items[0], DItem::Label(_, e) if chain(e).len() == 2))
         }
         other => panic!("{other:?}"),
     }
     // G35: the call applies to the whole chain.
-    match value("x = (a) { 1 } | (b) { 2 }(y)").kind {
+    match value("x = (a) { 1 } | (b) { 2 }(y)").kind.clone() {
         ExprKind::Call { callee, .. } => assert_eq!(chain(&callee).len(), 2),
         other => panic!("{other:?}"),
     }
@@ -402,11 +402,11 @@ fn p6_statements() {
 #[test]
 fn p11_pipe() {
     // Lowest of the operators, left associative.
-    match syn3::parse_expr("a == b |> f").unwrap().kind {
+    match syn3::parse_expr("a == b |> f").unwrap().kind.clone() {
         ExprKind::Pipe { lhs, .. } => assert!(matches!(lhs.kind, ExprKind::Binary { .. })),
         other => panic!("{other:?}"),
     }
-    match syn3::parse_expr("a |> f |> g").unwrap().kind {
+    match syn3::parse_expr("a |> f |> g").unwrap().kind.clone() {
         ExprKind::Pipe { lhs, .. } => assert!(matches!(lhs.kind, ExprKind::Pipe { .. })),
         other => panic!("{other:?}"),
     }
@@ -429,7 +429,11 @@ fn p11_pipe() {
         "the right side of `|>` must be a name, a call",
     );
     // G4: the whole chain is the right operand.
-    match syn3::parse_expr("x |> (p) { e } | (q) { f }").unwrap().kind {
+    match syn3::parse_expr("x |> (p) { e } | (q) { f }")
+        .unwrap()
+        .kind
+        .clone()
+    {
         ExprKind::Pipe { rhs, .. } => assert_eq!(chain(&rhs).len(), 2),
         other => panic!("{other:?}"),
     }
@@ -496,7 +500,11 @@ fn patterns() {
         assert_eq!(pat(p), p);
     }
     // P7: inside a data pattern a leading `name =` is a key.
-    match syn3::parse_pattern("(size = whole = (w, h))").unwrap().kind {
+    match syn3::parse_pattern("(size = whole = (w, h))")
+        .unwrap()
+        .kind
+        .clone()
+    {
         PatternKind::Data(items) => match &items[0] {
             DPItem::Key(k, p) => {
                 assert_eq!(k.name, "size");
@@ -657,18 +665,18 @@ fn provide() {
     }
     // The weakest level, below `|>`; the left operand is the whole
     // expression to its left; left associative.
-    match syn3::parse_expr("x |> f <- (s)").unwrap().kind {
+    match syn3::parse_expr("x |> f <- (s)").unwrap().kind.clone() {
         ExprKind::Provide { target, .. } => assert!(matches!(target.kind, ExprKind::Pipe { .. })),
         other => panic!("{other:?}"),
     }
-    match syn3::parse_expr("f() <- (a) <- (b)").unwrap().kind {
+    match syn3::parse_expr("f() <- (a) <- (b)").unwrap().kind.clone() {
         ExprKind::Provide { target, .. } => {
             assert!(matches!(target.kind, ExprKind::Provide { .. }))
         }
         other => panic!("{other:?}"),
     }
     // The right operand is one postfix expression.
-    match syn3::parse_expr("f() <- s.x(1)").unwrap().kind {
+    match syn3::parse_expr("f() <- s.x(1)").unwrap().kind.clone() {
         ExprKind::Provide { services, .. } => {
             assert!(matches!(services.kind, ExprKind::Call { .. }))
         }
