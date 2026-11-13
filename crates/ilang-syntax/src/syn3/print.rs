@@ -1090,7 +1090,7 @@ impl Printer<'_> {
 
     fn pattern(&mut self, p: &Pattern) -> Doc {
         match &p.kind {
-            PatternKind::Quote(d) => t(crate::lisp::show(&d.0)),
+            PatternKind::Quote(q) => t(crate::lisp::show(&q.datum.0)),
             PatternKind::Var(s) | PatternKind::Discard(s) => t(s.clone()),
             PatternKind::Typed { binder, ty } => {
                 cat(vec![t(format!("{}: ", binder.name)), self.ty(ty, 0)])

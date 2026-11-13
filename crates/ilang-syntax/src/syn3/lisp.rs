@@ -483,7 +483,7 @@ fn pattern(p: &Pattern) -> Datum {
         }
     };
     match &p.kind {
-        PatternKind::Quote(d) => (*d.0).clone(),
+        PatternKind::Quote(q) => (*q.datum.0).clone(),
         PatternKind::Var(s) | PatternKind::Discard(s) => atom(s, span),
         PatternKind::Typed { binder: b, ty } => form(":", span, [binder(b), typ(ty)]),
         PatternKind::Int { negative, value } => {
@@ -620,6 +620,14 @@ pub fn from_lisp(source: &str) -> (Module, Vec<Diagnostic>) {
 /// Reads one expression datum.
 pub fn expr_from_datum(d: &Datum) -> Result<Expr, Diagnostic> {
     expr_of(d)
+}
+
+/// Reads a macro's item result: one item, or a curly list of items.
+pub fn items_from_datum(d: &Datum) -> Result<Vec<Item>, Diagnostic> {
+    match &d.kind {
+        K::Curly(items) => items.iter().map(item).collect(),
+        _ => Ok(vec![item(d)?]),
+    }
 }
 
 /// Reads one type datum.
@@ -1367,7 +1375,9 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
             name: upper(d)?,
             args: None,
         },
-        K::Quote(_) => PatternKind::Quote(Quoted(Box::new(d.clone()))),
+        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the
+        // quote in the rows before syntax three.
+        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),
         K::Square(parts) => {
             let mut items = Vec::new();
             let mut rest = None;

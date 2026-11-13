@@ -1370,7 +1370,9 @@ impl Cx<'_> {
     fn pattern(&mut self, p: &o::Pattern, item: bool) -> n::Pattern {
         let kind = match &p.kind {
             o::PatternKind::Quote { datum, .. } => {
-                n::PatternKind::Quote(n::Quoted(Box::new(super::lisp::convert_quote(datum))))
+                n::PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(
+                    &super::lisp::convert_quote(datum),
+                ))
             }
             o::PatternKind::Var(s) => n::PatternKind::Var(s.clone()),
             o::PatternKind::Discard(s) => n::PatternKind::Discard(s.clone()),

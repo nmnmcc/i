@@ -440,6 +440,87 @@ impl ScopedSource {
             .map_err(MeteredError::Resource)?;
         self.items(syntax, call_site).map_err(MeteredError::Syntax)
     }
+    // ---- The same conversions to the tree of syntax three ----
+    //
+    // The datum is read in the rows of syntax three (§6.8) by plain
+    // recursive readers: the caller is on a deep stack (`syn3::deep`).
+
+    pub fn expression3_metered(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+        mut charge: impl FnMut(u64, u64) -> ChargeResult,
+    ) -> Result<crate::syn3::ast::Expr, MeteredError> {
+        self.preflight(syntax, &mut charge)
+            .map_err(MeteredError::Resource)?;
+        self.expression3(syntax, call_site)
+            .map_err(MeteredError::Syntax)
+    }
+    pub fn pattern3_metered(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+        mut charge: impl FnMut(u64, u64) -> ChargeResult,
+    ) -> Result<crate::syn3::ast::Pattern, MeteredError> {
+        self.preflight(syntax, &mut charge)
+            .map_err(MeteredError::Resource)?;
+        self.pattern3(syntax, call_site)
+            .map_err(MeteredError::Syntax)
+    }
+    pub fn ty3_metered(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+        mut charge: impl FnMut(u64, u64) -> ChargeResult,
+    ) -> Result<crate::syn3::ast::Type, MeteredError> {
+        self.preflight(syntax, &mut charge)
+            .map_err(MeteredError::Resource)?;
+        self.ty3(syntax, call_site).map_err(MeteredError::Syntax)
+    }
+    pub fn items3_metered(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+        mut charge: impl FnMut(u64, u64) -> ChargeResult,
+    ) -> Result<Vec<crate::syn3::ast::Item>, MeteredError> {
+        self.preflight(syntax, &mut charge)
+            .map_err(MeteredError::Resource)?;
+        self.items3(syntax, call_site).map_err(MeteredError::Syntax)
+    }
+    pub fn expression3(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<crate::syn3::ast::Expr, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        crate::syn3::lisp::expr_from_datum(&datum).map_err(|error| self.error(error))
+    }
+    pub fn pattern3(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<crate::syn3::ast::Pattern, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        crate::syn3::lisp::pattern_from_datum(&datum).map_err(|error| self.error(error))
+    }
+    pub fn ty3(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<crate::syn3::ast::Type, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        crate::syn3::lisp::type_from_datum(&datum).map_err(|error| self.error(error))
+    }
+    /// A macro's item result: one item or a top-level curly list of items.
+    pub fn items3(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<Vec<crate::syn3::ast::Item>, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        crate::syn3::lisp::items_from_datum(&datum).map_err(|error| self.error(error))
+    }
+
     pub fn expression(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Expr, ScopedError> {
         let datum = self.append(syntax, call_site);
         super::parse_expression(&datum).map_err(|error| self.error(error))
