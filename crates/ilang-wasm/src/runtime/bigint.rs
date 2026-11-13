@@ -6,8 +6,10 @@
 //!
 //! The operators work out small operands here. When an operand is large they
 //! call the i code of `lib/i/big.i` (`$big_add`, … of `ir::RUNTIME_CALLS`),
-//! which reads and makes large values with the primitives `$big_sign`,
-//! `$big_digits` and `$big_from_digits`.
+//! which reads magnitudes through `$big_size` and `$big_limb` and writes
+//! private construction storage through `$big_builder`, `$big_put` and
+//! `$big_finish`. Only single-digit multiply-add and division live here;
+//! their surrounding algorithms remain in i.
 
 #[path = "bigint_bits.rs"]
 mod bits;
@@ -325,7 +327,14 @@ const BASE_WAT: &str = r#"
   (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign))) (local.get $a)))
 ;; The number of base 2^30 digits of the magnitude.
 (func $big_size (param $v eqref) (result eqref)
-  (local $a (ref $limbs)) (local $n i32)
+  (local $a (ref $limbs)) (local $n i32) (local $small i32)
+  (if (ref.test (ref i31) (local.get $v))
+    (then
+      (local.set $small (i31.get_s (ref.cast (ref i31) (local.get $v))))
+      (if (i32.eqz (local.get $small)) (then (return (ref.i31 (i32.const 0)))))
+      (return (ref.i31
+        (if (result i32) (i32.eq (local.get $small) (i32.const -1073741824))
+          (then (i32.const 2)) (else (i32.const 1)))))))
   (local.set $a (call $int_limbs (local.get $v)))
   (local.set $n (call $mag_len (local.get $a)))
   (if (i32.eqz (local.get $n)) (then (return (ref.i31 (i32.const 0)))))
@@ -399,4 +408,59 @@ const BASE_WAT: &str = r#"
       (local.set $cursor (call $list_tail (local.get $cursor)))
       (br $digit)))
   (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign))) (local.get $a)))
+
+;; Private construction storage, packed directly in the native limb layout.
+;; Each base-2^30 digit is written once. No writes follow big_finish, so an
+;; existing Int can never be mutated through these private primitives.
+(func $big_builder (param $n eqref) (result eqref)
+  (array.new_default $limbs
+    (i32.div_u
+      (i32.add (i32.mul (i31.get_s (ref.cast (ref i31) (local.get $n))) (i32.const 30))
+        (i32.const 31))
+      (i32.const 32))))
+
+(func $big_put (param $out eqref) (param $index eqref) (param $digit eqref) (result eqref)
+  (local $a (ref $limbs)) (local $position i32) (local $word i32) (local $value i64)
+  (local.set $a (ref.cast (ref $limbs) (local.get $out)))
+  (local.set $position (i32.mul (i31.get_s (ref.cast (ref i31) (local.get $index))) (i32.const 30)))
+  (local.set $word (i32.shr_u (local.get $position) (i32.const 5)))
+  (local.set $value
+    (i64.shl (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (local.get $digit))))
+      (i64.extend_i32_u (i32.and (local.get $position) (i32.const 31)))))
+  (array.set $limbs (local.get $a) (local.get $word)
+    (i32.or (array.get $limbs (local.get $a) (local.get $word)) (i32.wrap_i64 (local.get $value))))
+  (if (i32.lt_u (i32.add (local.get $word) (i32.const 1)) (array.len (local.get $a)))
+    (then
+      (array.set $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1))
+        (i32.or (array.get $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1)))
+          (i32.wrap_i64 (i64.shr_u (local.get $value) (i64.const 32)))))))
+  (local.get $out))
+
+(func $big_finish (param $sign eqref) (param $out eqref) (result eqref)
+  (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign)))
+    (ref.cast (ref $limbs) (local.get $out))))
+
+;; Only single-digit arithmetic lives here; the algorithms and loops are i.
+(func $big_multiply_add (param $a eqref) (param $b eqref) (param $carry eqref) (result eqref)
+  (local $p i64)
+  (local.set $p
+    (i64.add
+      (i64.mul (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (local.get $a))))
+        (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (local.get $b)))))
+      (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (local.get $carry))))))
+  (call $tuple (array.new_fixed $values 2
+    (ref.i31 (i32.wrap_i64 (i64.and (local.get $p) (i64.const 1073741823))))
+    (ref.i31 (i32.wrap_i64 (i64.shr_u (local.get $p) (i64.const 30)))))))
+
+(func $big_divide_digit (param $high eqref) (param $low eqref) (param $d eqref) (result eqref)
+  (local $v i64) (local $divisor i64) (local $q i64)
+  (local.set $v
+    (i64.or
+      (i64.shl (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (local.get $high)))) (i64.const 30))
+      (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (local.get $low))))))
+  (local.set $divisor (call $int_to_i64 (local.get $d)))
+  (local.set $q (i64.div_u (local.get $v) (local.get $divisor)))
+  (call $tuple (array.new_fixed $values 2
+    (ref.i31 (i32.wrap_i64 (local.get $q)))
+    (ref.i31 (i32.wrap_i64 (i64.sub (local.get $v) (i64.mul (local.get $q) (local.get $divisor))))))))
 "#;

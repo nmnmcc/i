@@ -116,30 +116,34 @@ i/big.from_digits : (sign: Int, digits: List(Int)) -> Int
 i/big.size : (Int) -> Int
 i/big.limb : (x: Int, index: Int) -> Int
 i/big.from_top : (sign: Int, digits: List(Int)) -> Int
+i/big.builder : (Int) -> Digits
+i/big.put : (Digits, Int, Int) -> Digits
+i/big.finish : (Int, Digits) -> Int
+i/big.multiply_add : (Int, Int, Int) -> (Int, Int)
+i/big.divide_digit : (Int, Int, Int) -> (Int, Int)
 i/big.compare : (a: Int, b: Int) -> Int
 i/big.magnitude_order : (a: Int, b: Int) -> Int
 i/big.order_from : (a: Int, b: Int, i: Int) -> Int
 i/big.add : (a: Int, b: Int) -> Int
 i/big.subtract : (a: Int, b: Int) -> Int
 i/big.signed_add : (a: Int, sa: Int, b: Int, sb: Int) -> Int
-i/big.add_up : (a: Int, b: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(Int)
-i/big.subtract_up : (a: Int, b: Int, i: Int, n: Int, borrow: Int, acc: List(Int)) -> List(Int)
+i/big.add_up : (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
+i/big.subtract_up : (a: Int, b: Int, i: Int, n: Int, borrow: Int, out: Digits) -> Digits
 i/big.multiply : (a: Int, b: Int) -> Int
-i/big.scale_up : (x: Int, d: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(Int)
-i/big.columns : (a: Int, b: Int, na: Int, nb: Int, k: Int, carry: Int, acc: List(Int)) -> List(Int)
+i/big.scale_up : (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
+i/big.columns : (a: Int, b: Int, na: Int, nb: Int, k: Int, carry: Int, out: Digits) -> Digits
 i/big.column : (a: Int, b: Int, i: Int, last: Int, k: Int, low: Int, high: Int) -> (Int, Int)
-i/big.spill : (carry: Int, acc: List(Int)) -> List(Int)
 i/big.max : (a: Int, b: Int) -> Int
 i/big.min : (a: Int, b: Int) -> Int
 i/big.divide : (a: Int, b: Int) -> Int
 i/big.remainder : (a: Int, b: Int) -> Int
 i/big.to_text : (value: Int, radix: Int) -> String
-i/big.magnitude_divide : (a: Int, b: Int) -> (List(Int), Int)
+i/big.magnitude_divide : (a: Int, b: Int) -> (Int, Int)
 i/big.normalized : (x: Int, factor: Int) -> Int
-i/big.initial_remainder : (x: Int, i: Int, stop: Int, acc: List(Int)) -> List(Int)
-i/big.short_divide_number : (x: Int, d: Int, i: Int, r: Int, acc: List(Int)) -> (List(Int), Int)
-i/big.long_divide : (x: Int, y: Int, i: Int, m: Int, top: Int, r: Int, q: List(Int)) -> (List(Int), Int)
-i/big.reduce_digit : (r: Int, a: Int, y: Int, d: Int, i: Int, n: Int, carry: Int, borrow: Int, acc: List(Int)) -> List(Int)
+i/big.initial_remainder : (x: Int, offset: Int, i: Int, n: Int, out: Digits) -> Digits
+i/big.short_divide_number : (x: Int, d: Int, i: Int, r: Int, out: Digits) -> (Int, Int)
+i/big.long_divide : (x: Int, y: Int, i: Int, m: Int, top: Int, r: Int, q: Digits) -> (Int, Int)
+i/big.reduce_digit : (r: Int, a: Int, y: Int, d: Int, i: Int, n: Int, carry: Int, borrow: Int, out: Digits) -> Digits
 i/big.correct : (r: Int, y: Int, digit: Int) -> (Int, Int)
 i/big.normal_shift : (top: Int, s: Int) -> Int
 i/big.power_of_two : (s: Int, acc: Int) -> Int

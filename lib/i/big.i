@@ -4,8 +4,8 @@
 ////
 //// The runtime keeps a large Int as its sign and an array of 32-bit limbs.
 //// This code reads its digits in base 2^30 in place, by index (`size`,
-//// `limb`), and builds each result once from its digits (`from_top`,
-//// `from_digits`). Only the text form works on lists of operand digits
+//// `limb`), and writes each result once into private construction storage.
+//// Only the text form works on lists of operand digits
 //// (`digits`). Every single-digit calculation is below 2^62, where
 //// the runtime does the arithmetic in 64 bits itself, so this code never
 //// calls itself through the runtime: a digit product is below 2^60.
@@ -51,6 +51,27 @@ limb: (x: Int, index: Int) -> Int
 /// first; zero digits in front are allowed.
 @external("ilang:big", "from_top")
 from_top: (sign: Int, digits: List(Int)) -> Int
+
+// Private construction storage. Each digit is written once, and the storage
+// is never used again after finish; no published Int is changed.
+Digits {}
+
+@external("ilang:big", "builder")
+builder: (Int) -> Digits
+
+@external("ilang:big", "put")
+put: (Digits, Int, Int) -> Digits
+
+@external("ilang:big", "finish")
+finish: (Int, Digits) -> Int
+
+// One base-2^30 multiply-add, split into low digit and carry.
+@external("ilang:big", "multiply_add")
+multiply_add: (Int, Int, Int) -> (Int, Int)
+
+// Divide high * base + low by d; high < d. Quotient and remainder.
+@external("ilang:big", "divide_digit")
+divide_digit: (Int, Int, Int) -> (Int, Int)
 
 /// -1, 0 or 1, as `a` is less than, equal to or greater than `b`.
 compare = (a: Int, b: Int) -> Int {
@@ -114,53 +135,51 @@ signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
 				False -> -b
 			}
 			False -> { sa == sb } |> {
-				True -> from_top(
-					sa
-					add_up(a, b, 0, max(size(a), size(b)), 0, [])
-				)
+				True -> {
+					n = max(size(a), size(b))
+					finish(sa, add_up(a, b, 0, n, 0, builder(n + 1)))
+				}
 				False -> magnitude_order(a, b) |> {
 					0 -> 0
-					1 -> from_top(sa, subtract_up(a, b, 0, size(a), 0, []))
-					_ -> from_top(sb, subtract_up(b, a, 0, size(b), 0, []))
+					1 -> finish(
+						sa
+						subtract_up(a, b, 0, size(a), 0, builder(size(a)))
+					)
+					_ -> finish(
+						sb
+						subtract_up(b, a, 0, size(b), 0, builder(size(b)))
+					)
 				}
 			}
 		}
 	}
 }
 
-// The digits of |a| + |b| from digit `i` up, most significant first in
-// front of `acc`.
-add_up = (
-	a: Int
-	b: Int
-	i: Int
-	n: Int
-	carry: Int
-	acc: List(Int)
-) -> List(Int) {
+// Write |a| + |b| from digit i up.
+add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
 	{ i == n } |> {
-		True -> [carry, ..acc]
+		True -> put(out, i, carry)
 		False -> {
 			sum = limb(a, i) + limb(b, i) + carry
 			{ sum >= 1073741824 } |> {
-				True  -> add_up(a, b, i + 1, n, 1, [sum - 1073741824, ..acc])
-				False -> add_up(a, b, i + 1, n, 0, [sum, ..acc])
+				True  -> add_up(a, b, i + 1, n, 1, put(out, i, sum - 1073741824))
+				False -> add_up(a, b, i + 1, n, 0, put(out, i, sum))
 			}
 		}
 	}
 }
 
-// The digits of |a| - |b|, where |a| is at least |b|.
+// Write |a| - |b|, where |a| is at least |b|.
 subtract_up = (
 	a: Int
 	b: Int
 	i: Int
 	n: Int
 	borrow: Int
-	acc: List(Int)
-) -> List(Int) {
+	out: Digits
+) -> Digits {
 	{ i == n } |> {
-		True -> acc
+		True -> out
 		False -> {
 			difference = limb(a, i) - limb(b, i) - borrow
 			{ difference < 0 } |> {
@@ -170,9 +189,9 @@ subtract_up = (
 					i + 1
 					n
 					1
-					[difference + 1073741824, ..acc]
+					put(out, i, difference + 1073741824)
 				)
-				False -> subtract_up(a, b, i + 1, n, 0, [difference, ..acc])
+				False -> subtract_up(a, b, i + 1, n, 0, put(out, i, difference))
 			}
 		}
 	}
@@ -192,35 +211,30 @@ multiply = (a: Int, b: Int) -> Int {
 						True  -> (b, limb(a, 0), nb)
 						False -> (a, limb(b, 0), na)
 					}
-					from_top(s, scale_up(x, d, 0, n, 0, []))
+					finish(s, scale_up(x, d, 0, n, 0, builder(n + 1)))
 				}
-				False -> from_top(s, columns(a, b, na, nb, 0, 0, []))
+				False -> finish(
+					s
+					columns(a, b, na, nb, 0, 0, builder(na + nb))
+				)
 			}
 		}
 	}
 }
 
 // |x| × d for one digit d.
-scale_up = (
-	x: Int
-	d: Int
-	i: Int
-	n: Int
-	carry: Int
-	acc: List(Int)
-) -> List(Int) {
+scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
 	{ i == n } |> {
-		True -> [carry, ..acc]
+		True -> put(out, i, carry)
 		False -> {
-			p = limb(x, i) * d + carry
-			scale_up(x, d, i + 1, n, p / 1073741824, [p % 1073741824, ..acc])
+			(low, high) = multiply_add(limb(x, i), d, carry)
+			scale_up(x, d, i + 1, n, high, put(out, i, low))
 		}
 	}
 }
 
-// Product scanning: digit k of |a| × |b| is the sum of the products of the
-// digits i and k - i, with the carry of the digits below. Each product is
-// split at 2^30, so the two sums stay below 2^62 for any size.
+// Product scanning: accumulate one column at a time. The low accumulator
+// stays one digit; each multiply-add contributes its carry to the high sum.
 columns = (
 	a: Int
 	b: Int
@@ -228,16 +242,16 @@ columns = (
 	nb: Int
 	k: Int
 	carry: Int
-	acc: List(Int)
-) -> List(Int) {
+	out: Digits
+) -> Digits {
 	{ k == na + nb - 1 } |> {
-		True -> spill(carry, acc)
+		True -> put(out, k, carry)
 		False -> {
 			first = max(0, k - nb + 1)
 			(low, high) = column(a, b, first, min(k, na - 1), k, 0, 0)
 			total = low + carry
 			next = total / 1073741824 + high
-			columns(a, b, na, nb, k + 1, next, [total % 1073741824, ..acc])
+			columns(a, b, na, nb, k + 1, next, put(out, k, total % 1073741824))
 		}
 	}
 }
@@ -254,25 +268,9 @@ column = (
 	{ i > last } |> {
 		True -> (low, high)
 		False -> {
-			p = limb(a, i) * limb(b, k - i)
-			column(
-				a
-				b
-				i + 1
-				last
-				k
-				low + p % 1073741824
-				high + p / 1073741824
-			)
+			(next, carry) = multiply_add(limb(a, i), limb(b, k - i), low)
+			column(a, b, i + 1, last, k, next, high + carry)
 		}
-	}
-}
-
-// The digits of the last carry in front of `acc`.
-spill = (carry: Int, acc: List(Int)) -> List(Int) {
-	{ carry == 0 } |> {
-		True  -> acc
-		False -> spill(carry / 1073741824, [carry % 1073741824, ..acc])
 	}
 }
 
@@ -297,7 +295,10 @@ divide = (a: Int, b: Int) -> Int {
 		True -> 0
 		False -> {
 			(q, _) = magnitude_divide(a, b)
-			from_digits(s, q)
+			{ s < 0 } |> {
+				True  -> -q
+				False -> q
+			}
 		}
 	}
 }
@@ -336,26 +337,38 @@ to_text = (value: Int, radix: Int) -> String {
 
 // ---- Division ----
 
-// Quotient digits, least significant first, and the positive remainder.
-// Normalize each operand once, then read both numbers directly by offset.
-magnitude_divide = (a: Int, b: Int) -> (List(Int), Int) {
+// Positive quotient and remainder. Normalize each operand once, then read
+// both numbers directly by offset, with no operand lists.
+magnitude_divide = (a: Int, b: Int) -> (Int, Int) {
 	{ magnitude_order(a, b) < 0 } |> {
-		True -> ([], { sign(a) < 0 } |> {
+		True -> (0, { sign(a) < 0 } |> {
 			True  -> -a
 			False -> a
 		})
 		False -> {
 			m = size(b)
 			{ m == 1 } |> {
-				True -> short_divide_number(a, limb(b, 0), size(a) - 1, 0, [])
+				True -> short_divide_number(
+					a
+					limb(b, 0)
+					size(a) - 1
+					0
+					builder(size(a))
+				)
 				False -> {
 					factor = power_of_two(normal_shift(limb(b, m - 1), 0), 1)
 					x = normalized(a, factor)
 					y = normalized(b, factor)
 					n = size(x)
-					start = from_digits(
+					start = finish(
 						1
-						initial_remainder(x, n - 1, n - m, [])
+						initial_remainder(
+							x
+							n - m + 1
+							0
+							m - 1
+							builder(m - 1)
+						)
 					)
 					(q, r) = long_divide(
 						x
@@ -364,7 +377,7 @@ magnitude_divide = (a: Int, b: Int) -> (List(Int), Int) {
 						m
 						limb(y, m - 1) + 1
 						start
-						[]
+						builder(n - m + 1)
 					)
 					{ factor == 1 } |> {
 						True -> (q, r)
@@ -374,9 +387,9 @@ magnitude_divide = (a: Int, b: Int) -> (List(Int), Int) {
 								factor
 								size(r) - 1
 								0
-								[]
+								builder(size(r))
 							)
-							(q, from_digits(1, rest))
+							(q, rest)
 						}
 					}
 				}
@@ -387,16 +400,31 @@ magnitude_divide = (a: Int, b: Int) -> (List(Int), Int) {
 
 normalized = (x: Int, factor: Int) -> Int {
 	{ factor == 1 } |> {
-		True  -> x
-		False -> from_top(1, scale_up(x, factor, 0, size(x), 0, []))
+		True -> x
+		False -> finish(
+			1
+			scale_up(x, factor, 0, size(x), 0, builder(size(x) + 1))
+		)
 	}
 }
 
 // The top m - 1 dividend digits are below the normalized divisor.
-initial_remainder = (x: Int, i: Int, stop: Int, acc: List(Int)) -> List(Int) {
-	{ i == stop } |> {
-		True  -> acc
-		False -> initial_remainder(x, i - 1, stop, [limb(x, i), ..acc])
+initial_remainder = (
+	x: Int
+	offset: Int
+	i: Int
+	n: Int
+	out: Digits
+) -> Digits {
+	{ i == n } |> {
+		True -> out
+		False -> initial_remainder(
+			x
+			offset
+			i + 1
+			n
+			put(out, i, limb(x, offset + i))
+		)
 	}
 }
 
@@ -405,13 +433,13 @@ short_divide_number = (
 	d: Int
 	i: Int
 	r: Int
-	acc: List(Int)
-) -> (List(Int), Int) {
+	out: Digits
+) -> (Int, Int) {
 	{ i < 0 } |> {
-		True -> (acc, r)
+		True -> (finish(1, out), r)
 		False -> {
-			v = r * 1073741824 + limb(x, i)
-			short_divide_number(x, d, i - 1, v % d, [v / d, ..acc])
+			(q, next) = divide_digit(r, limb(x, i), d)
+			short_divide_number(x, d, i - 1, next, put(out, i, q))
 		}
 	}
 }
@@ -425,19 +453,19 @@ long_divide = (
 	m: Int
 	top: Int
 	r: Int
-	q: List(Int)
-) -> (List(Int), Int) {
+	q: Digits
+) -> (Int, Int) {
 	{ i < 0 } |> {
-		True -> (q, r)
+		True -> (finish(1, q), r)
 		False -> {
 			a = limb(x, i)
-			estimate = { limb(r, m - 1) * 1073741824 + limb(r, m - 2) } / top
-			reduced = from_top(
+			(estimate, _) = divide_digit(limb(r, m - 1), limb(r, m - 2), top)
+			reduced = finish(
 				1
-				reduce_digit(r, a, y, estimate, 0, m + 1, 0, 0, [])
+				reduce_digit(r, a, y, estimate, 0, m + 1, 0, 0, builder(m + 1))
 			)
 			(digit, left) = correct(reduced, y, estimate)
-			long_divide(x, y, i - 1, m, top, left, [digit, ..q])
+			long_divide(x, y, i - 1, m, top, left, put(q, i, digit))
 		}
 	}
 }
@@ -453,17 +481,17 @@ reduce_digit = (
 	n: Int
 	carry: Int
 	borrow: Int
-	acc: List(Int)
-) -> List(Int) {
+	out: Digits
+) -> Digits {
 	{ i == n } |> {
-		True -> acc
+		True -> out
 		False -> {
-			p = limb(y, i) * d + carry
+			(low, high) = multiply_add(limb(y, i), d, carry)
 			x = { i == 0 } |> {
 				True  -> a
 				False -> limb(r, i - 1)
 			}
-			difference = x - p % 1073741824 - borrow
+			difference = x - low - borrow
 			{ difference < 0 } |> {
 				True -> reduce_digit(
 					r
@@ -472,9 +500,9 @@ reduce_digit = (
 					d
 					i + 1
 					n
-					p / 1073741824
+					high
 					1
-					[difference + 1073741824, ..acc]
+					put(out, i, difference + 1073741824)
 				)
 				False -> reduce_digit(
 					r
@@ -483,9 +511,9 @@ reduce_digit = (
 					d
 					i + 1
 					n
-					p / 1073741824
+					high
 					0
-					[difference, ..acc]
+					put(out, i, difference)
 				)
 			}
 		}
@@ -495,7 +523,7 @@ reduce_digit = (
 correct = (r: Int, y: Int, digit: Int) -> (Int, Int) {
 	{ magnitude_order(r, y) >= 0 } |> {
 		True -> correct(
-			from_top(1, subtract_up(r, y, 0, size(r), 0, []))
+			finish(1, subtract_up(r, y, 0, size(r), 0, builder(size(r))))
 			y
 			digit + 1
 		)
@@ -528,8 +556,8 @@ short_divide = (
 	top |> {
 		[] -> (trim(acc), r)
 		[a, ..rest] -> {
-			v = r * 1073741824 + a
-			short_divide(rest, d, v % d, [v / d, ..acc])
+			(q, next) = divide_digit(r, a, d)
+			short_divide(rest, d, next, [q, ..acc])
 		}
 	}
 }
