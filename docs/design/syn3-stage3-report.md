@@ -441,3 +441,9 @@ The renamed `scripts/check-snippets` passes 4,817 sources plus 34 Lisp
 files and 89 macro fragments; all eight helper tests pass. The corrected
 alias-fragment context is included in that result. Std O0/O2 and the full
 365-case `review-k4d` filter remain in progress; this is not yet READY.
+
+Both fresh std runs now pass 2,170 tests each at O0 and O2. The remaining
+gate is the complete requested `review-k4d` selection: 365 projects, two
+jobs, with zero failures required. All verification commands remain serial
+and use the shared wrapper; the snippet gate uses its internal wrapped
+cargo build. No source or observation is changed during this final run.
