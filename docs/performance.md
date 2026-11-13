@@ -371,3 +371,56 @@ times faster at 1, but takes under a second on `std` either way, while
 every rebuild after an edit takes up to 2.7 times longer. For work on the
 type checker with large inputs, `CARGO_PROFILE_DEV_OPT_LEVEL=1` (or a
 release build) gives the fast checker without changing the default.
+
+## Standard-library test memory (2026-11-13)
+
+The `lane/o2mem` baseline is `d17def11` with the stage trace from
+`073255fb` and `df32d679`, built in release mode through the shared heavy
+wrapper (four Cargo jobs, no LTO, 16 codegen units). The wrapper sets
+`RAYON_NUM_THREADS=1`. No compile cache was used. The measurement was:
+
+```sh
+H=/home/agent/Programming/i/.rd/cache/heavy
+I_TRACE_STAGES=1 ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project std --opt 2
+```
+
+All **2170 tests passed**, with no failures. On the shared machine the run
+took 10:11.41 wall time (379.32 s user, 56.17 s system). The trace's `MB`
+columns are actually MiB (1024 squared bytes):
+
+| Stage | Wall seconds | CPU seconds | RSS at end, MiB | Stage peak, MiB |
+|---|---:|---:|---:|---:|
+| Load | 0.029 | 0.000 | 12 | 12 |
+| Expand | 12.541 | 11.280 | 250 | 250 |
+| Resolve | 5.698 | 5.550 | 250 | 250 |
+| Check | 0.835 | 0.820 | 306 | 356 |
+| Lower | 2.400 | 2.360 | 307 | 318 |
+| Emit WAT | 0.402 | 0.390 | 362 | 399 |
+| Parse WAT | 1.562 | 1.530 | 505 | 557 |
+| Binaryen | 142.801 | 70.110 | 652 | 652 |
+| Wasmtime compile | 243.282 | 159.900 | 19414 | 19766 |
+| Run tests | 198.610 | 180.370 | 19414 | 19844 |
+
+The large increase is in **Wasmtime compilation**, from roughly 0.6 GiB
+to 19.3 GiB. The test run inherits that resident memory and adds only
+about 0.1 GiB to the compilation peak. Binaryen's module is already
+optimized in place and disposed before Wasmtime starts. Reclaiming all
+of its measured resident memory would still leave the peak well above
+the 12 GB target.
+
+The external `time -v` reports 19,881,856 kB maximum RSS. Do not treat that
+as an independent process-wide high-water measurement when tracing:
+the trace resets Linux `VmHWM` at stage boundaries through
+`/proc/self/clear_refs`. The maximum of the stage peaks is 19,844 MiB;
+an untraced `time -v` run is needed for an independent process-wide peak.
+
+Wasmtime 50 already enables `memory_init_cow` by default. Binaryen uses
+its own thread pool, independent of Rayon's thread count. Smaller Wasm
+byte buffers cannot account for the observed increase. If allocator and
+Wasmtime configuration changes do not suffice, the next investigation
+needs to identify which Wasmtime compilation data stays live across
+functions, or reduce the size of the single compilation unit. Any split
+must preserve all tests, their provider plans and fresh instances: spec
+§10.2 requires that the runner compile the collection once and run each
+selected test in a fresh started instance. Filtering out tests is not a
+memory fix.
