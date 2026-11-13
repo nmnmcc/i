@@ -233,24 +233,26 @@ pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use migration_syntax::lisp::expansion3::*;
+    use migration_syntax::lisp::syntax::SyntaxError;
+    use migration_syntax::lisp::expansion::MacroDefinition;
 
     /// The answer on the tree of syntax three and the answer on its
     /// lowering are the same.
     fn both(source: &str, lisp: bool) -> Result<Vec<MacroDefinition>, Vec<SyntaxError>> {
         let (module, errors) = if lisp {
-            crate::syn3::lisp::from_lisp(source)
+            migration_syntax::syn3::lisp::from_lisp(source)
         } else {
-            crate::syn3::parse_module(source)
+            migration_syntax::syn3::parse_module(source)
         };
         assert!(errors.is_empty(), "{errors:?}");
         let (lowered, _) = if lisp {
-            crate::syn3::lower::lower_lisp(&module)
+            migration_syntax::syn3::lower::lower_lisp(&module)
         } else {
-            crate::syn3::lower::lower(&module)
+            migration_syntax::syn3::lower::lower(&module)
         };
         let new = definitions(&module, lisp);
-        let old = super::super::expansion::definitions(&lowered, lisp);
+        let old = migration_syntax::lisp::expansion::definitions(&lowered, lisp);
         match (&new, &old) {
             (Ok(a), Ok(b)) => {
                 assert_eq!(a.len(), b.len(), "{source}");
@@ -305,9 +307,9 @@ mod tests {
             for lisp in [false, true] {
                 if lisp {
                     // The same module in the Lisp surface.
-                    let (module, errors) = crate::syn3::parse_module(case);
+                    let (module, errors) = migration_syntax::syn3::parse_module(case);
                     assert!(errors.is_empty(), "{case}: {errors:?}");
-                    let text = crate::syn3::lisp::to_lisp(&module);
+                    let text = migration_syntax::syn3::lisp::to_lisp(&module);
                     both(&text, true).ok();
                 } else {
                     assert!(both(case, false).is_err(), "{case}");

@@ -3,6 +3,8 @@
 //! `(= T (| C1 C2))` and each member is its own item `(= C (, …))`. The
 //! `_rows` functions are tested with the rows given, so these tests do not
 //! depend on `NEW_ROWS`.
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::lisp::definitions::{
     builtin_definition_names, builtin_definition_rows, expanded_definition_rows,
     freshen_duplicate_heads_rows, freshen_parameters, tree_definition,

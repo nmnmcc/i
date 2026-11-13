@@ -37,17 +37,17 @@ mod tests {
         let source = "T = (Int)\nx: Int\n(a, [b, ..c]) = f()\n[C(k = d)] = g()\ne: Int = 1";
         let (module, errors) = ilang_syntax::syn3::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
-        let (lowered, errors) = ilang_syntax::syn3::lower::lower(&module);
+        let (lowered, errors) = migration_syntax::syn3::lower::lower(&module);
         assert!(errors.is_empty(), "{errors:?}");
         let mut old = Vec::new();
         for item in &lowered.items {
             match &item.kind {
-                ilang_syntax::ast::ItemKind::Binding(binding) => {
-                    crate::body_walk::for_each_binder(&binding.pattern, |name, span| {
+                migration_syntax::ast::ItemKind::Binding(binding) => {
+                    migration_syntax::macro_body_walk::for_each_binder(&binding.pattern, |name, span| {
                         old.push((name, span))
                     })
                 }
-                ilang_syntax::ast::ItemKind::Declaration { name, .. } => {
+                migration_syntax::ast::ItemKind::Declaration { name, .. } => {
                     old.push((name.name.as_str(), name.span))
                 }
                 _ => {}

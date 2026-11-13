@@ -2837,6 +2837,13 @@ fn type_macro_keeps_its_standalone_need_channel() {
     use ilang_macro::{body_engine::BodyEngine, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
+    // The old and native engines agreed byte for byte before deletion.
+    // Keep the complete five answers as the independent historical oracle.
+    // §4 of syn3-final-ast.md removes the old production engine/tree; its
+    // standalone function-need and grouping boundaries remain asserted.
+    let oracle: serde_json::Value = serde_json::from_str(include_str!("fixtures/type_macro_engine_boundary.json")).unwrap();
+    let cases = oracle["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 5);
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2845,13 +2852,13 @@ fn type_macro_keeps_its_standalone_need_channel() {
         "(, id ignore)\n(@ macro (= id (-> (, e) _ e)))\n(@ macro (= ignore (-> (, e) _ `Int)))\n",
     )
     .unwrap();
-    for text in [
+    for (case, text) in [
         "(m = app/macros)\nf = <N>(g: (Int) <- N -> Int) {\n  x: m.id((Int) <- N -> Int) = g\n  x\n}\n",
         "(m = app/macros)\nf = <N>(g) {\n  x: m.id((Int) <- N -> Int) = g\n  x\n}\n",
         "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\n",
         "(m = app/macros)\nC = ()\nD = ()\nT = m.id(C | D)\n",
         "(m = app/macros)\nC = ()\nT = C\nf: m.ignore(C) = 1\n",
-    ] {
+    ].into_iter().enumerate() {
         std::fs::write(dir.path().join("src/main.i"), text).unwrap();
         let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -2859,8 +2866,6 @@ fn type_macro_keeps_its_standalone_need_channel() {
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
         let registry = Registry::new(&graph, &parsed).unwrap();
-        let mut answers = Vec::new();
-        for native in [false, true] {
             let mut session = ilang_macro::session::Session::default();
             let mut engine = BodyEngine::new(
                 &graph,
@@ -2876,7 +2881,7 @@ fn type_macro_keeps_its_standalone_need_channel() {
                 }),
                 &mut session,
             );
-            let lowered = if native {
+        let lowered = {
                 let mut tree = module.ast.clone();
                 for item in &mut tree.items {
                     if let ilang_syntax::syn3::ast::ItemKind::TypeDef(def) = &mut item.kind {
@@ -2884,28 +2889,19 @@ fn type_macro_keeps_its_standalone_need_channel() {
                     }
                 }
                 ilang_macro::body_walk3::expressions(&mut tree, &mut engine).unwrap();
-                ilang_syntax::syn3::lower::lower_with_transition(
+                migration_syntax::syn3::lower::lower_with_transition(
                     &tree,
                     false,
                     Some(engine.scoped.original_len()),
-                    &module.lowering,
-                    Some(engine.scoped.transition()),
+                    &migration_syntax::syn3::lower::Transition::from_native(&module.lowering),
+                    Some(&migration_syntax::syn3::lower::Transition::from_native(engine.scoped.transition())),
                 )
                 .0
-            } else {
-                let mut tree = ilang_syntax::syn3::lower::lower(&module.ast).0;
-                for item in &mut tree.items {
-                    if let ilang_syntax::ast::ItemKind::TypeDef(def) = &mut item.kind {
-                        ilang_macro::body_walk::type_definition(def, &mut engine).unwrap();
-                    }
-                }
-                ilang_macro::body_walk::expressions(&mut tree, &mut engine).unwrap();
-                tree
-            };
-            answers.push(ilang_syntax::print::print_module(&lowered));
-        }
+                    };
+        let actual = migration_syntax::print::print_module(&lowered);
+        assert_eq!(cases[case]["source"].as_str().unwrap(), text);
         assert_eq!(
-            answers[0], answers[1],
+            actual, cases[case]["expected_old"].as_str().unwrap(),
             "expansion must retain its lowering boundary: {text}"
         );
     }

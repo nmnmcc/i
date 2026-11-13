@@ -1,6 +1,8 @@
 //! `Syntax::show_as` in the rows of syntax three (docs/design/syntax-3.md
 //! §6.7 and §6.8): the counterparts of the `show_as` cases of `lisp_syntax`,
 //! and one case for every position and every row.
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::lisp::{
     parse,
     syntax::{Node, Position, Scope, Syntax, TypeHandle, validate_expansion},

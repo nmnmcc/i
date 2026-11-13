@@ -170,12 +170,12 @@ fn transfer(
 
 /// A normal-surface file as a Lisp-surface file, one datum per line.
 pub fn normal_to_lisp(source: &str) -> Converted {
-    let (module, errors) = super::parse_module(source);
+    let (module, errors) = crate::parse::parse_module(source);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let output = super::lisp::to_lisp(&module);
-    let (back, errors) = super::lisp::from_lisp(&output);
+    let output = crate::rows::to_lisp(&module);
+    let (back, errors) = crate::rows::from_lisp(&output);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -192,7 +192,7 @@ pub fn normal_to_lisp(source: &str) -> Converted {
 
 /// A Lisp-surface file as a normal-surface file.
 pub fn lisp_to_normal(source: &str) -> Converted {
-    let (module, errors) = super::lisp::from_lisp(source);
+    let (module, errors) = crate::rows::from_lisp(source);
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -207,8 +207,8 @@ pub fn lisp_to_normal(source: &str) -> Converted {
     }
     let mut grouped = module.clone();
     super::group::regroup(&mut grouped);
-    let output = super::print_module(&grouped);
-    let (back, errors) = super::parse_module(&output);
+    let output = crate::print::print_module(&grouped);
+    let (back, errors) = crate::parse::parse_module(&output);
     let (module, back) = (ungrouped(&module), ungrouped(&back));
     if !errors.is_empty() || module != back {
         // The text of a quote is Lisp; the normal surface has no place for it.
@@ -218,4 +218,18 @@ pub fn lisp_to_normal(source: &str) -> Converted {
     let from = anchors(&module, &lexed);
     let to = anchors(&back, &lex3(&output));
     Ok(transfer(source, &lexed, output, &from, &to))
+}
+
+/// Transfer comments for an already-read native module. The source spans of
+/// that module and the spans of its printed/read-back tree identify anchors.
+pub(crate) fn module_comments(
+    source: &str, module: &Module, output: String, input_lisp: bool, output_lisp: bool,
+) -> (String, Vec<Span>) {
+    let input = if input_lisp { lex3_lisp(source) } else { lex3(source) };
+    let (back, _) = if output_lisp { crate::rows::from_lisp(&output) }
+        else { crate::parse::parse_module(&output) };
+    let printed = if output_lisp { lex3_lisp(&output) } else { lex3(&output) };
+    let from = anchors(module, &input);
+    let to = anchors(&back, &printed);
+    transfer(source, &input, output, &from, &to)
 }

@@ -1,3 +1,5 @@
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::lisp::{
     parse,
     syntax::{Node, Position, Provenance, Scope, Substitution, Syntax},
@@ -700,12 +702,7 @@ fn definition_table_distinguishes_waits_catchable_and_compile_errors() {
     let of = root("Box");
     table.insert(
         1,
-        Definition::Written {
-            item: Box::new(module.items[0].clone()),
-            source: source.into(),
-            scope: of.scope().clone(),
-            ready: false,
-        },
+        native_written_definition(&module.items[0].clone(), source.into(), of.scope().clone(), false),
     );
     table.insert(2, Definition::Builtin { name: "Int".into() });
     table.insert(
@@ -1156,12 +1153,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
     let mut table = DefinitionTable::default();
     table.insert(
         1,
-        Definition::Written {
-            item: Box::new(module.items[0].clone()),
-            source: source.into(),
-            scope: of.scope().clone(),
-            ready: true,
-        },
+        native_written_definition(&module.items[0].clone(), source.into(), of.scope().clone(), true),
     );
     let expanded =
         ilang_syntax::lisp::definitions::builtin_definition("Result", of.scope(), of.span(), 9)
@@ -1398,4 +1390,21 @@ fn typed_macro_type_answers_share_marked_variable_nodes_across_queries() {
         panic!("application")
     };
     assert!(first[0].identical(&xs[1]));
+}
+
+// Stored definitions use the final rows while the assertion oracle keeps
+// the same old item span for its existing source fixtures.
+fn native_written_definition(
+    item: &migration_syntax::ast::Item, source: String,
+    scope: ilang_syntax::lisp::syntax::Scope, ready: bool,
+) -> ilang_syntax::lisp::definition_table::Definition {
+    let lisp = source[item.span.start as usize..item.span.end as usize].starts_with('(');
+    let (module, errors) = if lisp {
+        ilang_syntax::syn3::lisp::from_lisp(&source)
+    } else { ilang_syntax::syn3::parse_module(&source) };
+    assert!(errors.is_empty(), "{errors:?}");
+    let native = module.items.into_iter().find(|i| i.span.0 == item.span).expect("same written item");
+    let tree = ilang_syntax::lisp::source_tree::SourceTree::read(&scope, &source, lisp);
+    let datum = tree.item_datum(item.span).expect("same written datum");
+    ilang_syntax::lisp::definition_table::Definition::tree_with_datum(native, datum, scope, ready)
 }

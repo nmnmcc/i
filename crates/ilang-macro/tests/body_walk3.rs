@@ -3,7 +3,8 @@
 //! and a comparison with the old walker on the lowered tree over every
 //! source file of the repository.
 use ilang_macro::body_walk3::{self, Hook, Local};
-use ilang_macro::{body_engine3, body_walk, call, call3};
+use ilang_macro::{body_engine3, call3};
+use migration_syntax::{macro_body_walk as body_walk, macro_call as call};
 use ilang_syntax::{
     span::Span,
     syn3::ast::{
@@ -520,7 +521,7 @@ impl Hook for New {
         // Multi-shape values have a synthetic one-byte root in the
         // transition AST. Compare their classification at that root.
         let span = if matches!(e.kind, ExprKind::Chain(_)) {
-            ilang_syntax::syn3::lower::lower_expr(e)
+            migration_syntax::syn3::lower::lower_expr(e)
                 .map(|e| e.span)
                 .unwrap_or(e.span.0)
         } else {
@@ -538,8 +539,8 @@ struct Old {
     aliases: Vec<String>,
 }
 /// `BodyEngine::is_direct` of the old tree, with the module aliases given.
-fn old_is_direct(expression: &ilang_syntax::ast::Expr, aliases: &[String]) -> bool {
-    use ilang_syntax::ast::{BinOp, Expr, ExprKind, Stmt};
+fn old_is_direct(expression: &migration_syntax::ast::Expr, aliases: &[String]) -> bool {
+    use migration_syntax::ast::{BinOp, Expr, ExprKind, Stmt};
     fn ungroup(mut expression: &Expr) -> &Expr {
         while let ExprKind::Block(block) = &expression.kind {
             let [Stmt::Expr(inner)] = block.stmts.as_slice() else {
@@ -575,7 +576,7 @@ fn old_is_direct(expression: &ilang_syntax::ast::Expr, aliases: &[String]) -> bo
                 pending.extend(items);
                 pending.extend(rest.as_deref());
             }
-            ExprKind::Call { callee, args } if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == ilang_syntax::syn3::lower::MULTI) =>
+            ExprKind::Call { callee, args } if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == migration_syntax::syn3::lower::MULTI) =>
             {
                 pending.extend(args.iter().map(|arg| &arg.value));
             }
@@ -605,8 +606,8 @@ impl body_walk::Hook for Old {
     type Error = ();
     fn is_macro(
         &mut self,
-        e: &ilang_syntax::ast::Expr,
-        locals: &[Local],
+        e: &migration_syntax::ast::Expr,
+        locals: &[body_walk::Local],
         depth: u32,
     ) -> Result<bool, ()> {
         if let Some(call) = call::expression(e) {
@@ -625,23 +626,23 @@ impl body_walk::Hook for Old {
                     call.args.len(),
                     if call.prefix.is_some() { "+pipe" } else { "" }
                 ),
-                visible(locals, depth),
+                visible_old(locals, depth),
             ));
         }
         Ok(false)
     }
     fn expand(
         &mut self,
-        _: &ilang_syntax::ast::Expr,
-        _: &[Local],
+        _: &migration_syntax::ast::Expr,
+        _: &[body_walk::Local],
         _: u32,
-    ) -> Result<ilang_syntax::ast::Expr, ()> {
+    ) -> Result<migration_syntax::ast::Expr, ()> {
         unreachable!()
     }
     fn is_type_macro(
         &mut self,
-        t: &ilang_syntax::ast::TypeExpr,
-        locals: &[Local],
+        t: &migration_syntax::ast::TypeExpr,
+        locals: &[body_walk::Local],
         depth: u32,
     ) -> Result<bool, ()> {
         if let Some(call) = call::ty(t) {
@@ -654,21 +655,21 @@ impl body_walk::Hook for Old {
                     call.name.name,
                     call.args.len()
                 ),
-                visible(locals, depth),
+                visible_old(locals, depth),
             ));
         }
         Ok(false)
     }
     fn expand_type(
         &mut self,
-        _: &ilang_syntax::ast::TypeExpr,
-        _: &[Local],
+        _: &migration_syntax::ast::TypeExpr,
+        _: &[body_walk::Local],
         _: u32,
-    ) -> Result<ilang_syntax::ast::TypeExpr, ()> {
+    ) -> Result<migration_syntax::ast::TypeExpr, ()> {
         unreachable!()
     }
     fn depth_error(&mut self, _: Span) {}
-    fn is_direct(&mut self, e: &ilang_syntax::ast::Expr, _: &[Local], _: u32) -> bool {
+    fn is_direct(&mut self, e: &migration_syntax::ast::Expr, _: &[body_walk::Local], _: u32) -> bool {
         let direct = old_is_direct(e, &self.aliases);
         self.direct.insert(at(e.span), direct);
         direct
@@ -687,9 +688,9 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
         return false;
     }
     let (mut old, errors) = if lisp {
-        ilang_syntax::syn3::lower::lower_lisp(&new)
+        migration_syntax::syn3::lower::lower_lisp(&new)
     } else {
-        ilang_syntax::syn3::lower::lower(&new)
+        migration_syntax::syn3::lower::lower(&new)
     };
     if !errors.is_empty() {
         return false;
@@ -831,4 +832,12 @@ fn repository_sources_walk_as_their_lowered_trees() {
         }
     }
     assert!(compared > 1000, "only {compared} of {} files", files.len());
+}
+
+// The private oracle owns its walker locals. Compare the same source facts.
+fn visible_old(locals: &[body_walk::Local], depth: u32) -> Vec<(String, (u32, u32))> {
+    let locals: Vec<_> = locals.iter().map(|l| Local {
+        name: l.name.clone(), span: l.span, fn_only: l.fn_only,
+    }).collect();
+    visible(&locals, depth)
 }

@@ -24,7 +24,7 @@ mod groups;
 mod pre;
 
 use super::*;
-use ilang_syntax::ast as o;
+use ilang_syntax::syn3::ast::resolved as o;
 use ilang_syntax::syn3::ast as n;
 use ilang_syntax::syn3::walk as nwalk;
 use pre::{
@@ -961,11 +961,11 @@ impl<'a, 't> R3<'a, 't> {
         }
         // An export of a member of a sum alone is part of the export of
         // the sum.
-        let exports: Vec<o::ExportItem> = ast
+        let exports: Vec<SourceExport> = ast
             .exports
             .iter()
             .filter(|e| e.constructors || !pre.absorbed.contains(&e.name.name))
-            .map(|e| o::ExportItem {
+            .map(|e| SourceExport {
                 name: id(&e.name),
                 constructors: e.constructors,
                 span: e.span.0,
@@ -1277,7 +1277,7 @@ impl<'a, 't> R3<'a, 't> {
         }
         let modules = self.modules;
         for item in &modules[mi].imports {
-            let item = o::ImportItem {
+            let item = SourceImport {
                 alias: opt_id(&item.alias),
                 names: item.names.iter().map(id).collect(),
                 path: item.path.iter().map(id).collect(),
@@ -2163,7 +2163,7 @@ impl<'a, 't> R3<'a, 't> {
                 for next in operands {
                     acc = Expr {
                         kind: ExprKind::Binary {
-                            op: o::BinOp::Concat,
+                            op: n::BinOp::Concat,
                             lhs: Box::new(acc),
                             rhs: Box::new(next),
                         },
@@ -2384,7 +2384,7 @@ impl<'a, 't> R3<'a, 't> {
                     self.case(&VSubject::Expr(lhs), &clauses, span)
                 }
                 _ => ExprKind::Binary {
-                    op: o::BinOp::Pipe,
+                    op: n::BinOp::Pipe,
                     lhs: Box::new(self.expr(lhs)),
                     rhs: Box::new(self.expr(rhs)),
                 },
@@ -3301,7 +3301,7 @@ impl<'a, 't> R3<'a, 't> {
 }
 
 fn internal_multi(callee: &n::Expr) -> bool {
-    matches!(&callee.kind,n::ExprKind::Name { module:None,name } if name.name=="%multi")
+    matches!(&callee.kind,n::ExprKind::Name { module:None,name } if name.name==MULTI)
 }
 
 impl R3<'_, '_> {

@@ -8,6 +8,8 @@
 //! - indentation is tabs, and no line ends in a space or a tab, but in
 //!   documentation.
 
+#[path = "oracle.rs"]
+mod ilang_syntax;
 mod common;
 
 use ilang_syntax::format::format;

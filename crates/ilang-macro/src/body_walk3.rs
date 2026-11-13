@@ -43,7 +43,14 @@ use ilang_syntax::syn3::ast::{
 };
 use std::collections::HashSet;
 
-pub use crate::body_walk::Local;
+#[derive(Clone, Debug)]
+pub struct Local {
+    pub name: String,
+    pub span: Span,
+    /// A recursive direct binding is visible only inside a deeper function.
+    pub fn_only: Option<u32>,
+}
+
 
 pub trait Hook {
     type Error;

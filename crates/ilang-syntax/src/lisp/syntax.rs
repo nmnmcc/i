@@ -217,7 +217,8 @@ pub struct Capture {
 }
 
 impl Syntax {
-    pub(super) fn written(node: Node, scope: &Scope, span: Span) -> Self {
+    #[doc(hidden)]
+    pub fn written(node: Node, scope: &Scope, span: Span) -> Self {
         Self(Arc::new(SyntaxData {
             node,
             scope: scope.clone(),
@@ -289,7 +290,8 @@ impl Syntax {
     pub fn definition_head(&self) -> Option<u64> {
         self.0.definition_head
     }
-    pub(super) fn with_definition_head(&self, answer: u64) -> Self {
+    #[doc(hidden)]
+    pub fn with_definition_head(&self, answer: u64) -> Self {
         assert!(
             matches!(self.node(), Node::Round(_)),
             "a definition head is a round node"
@@ -337,7 +339,8 @@ impl Syntax {
             host_identity: Mutex::new(None),
         }))
     }
-    pub(super) fn with_node(&self, node: Node) -> Self {
+    #[doc(hidden)]
+    pub fn with_node(&self, node: Node) -> Self {
         Self(Arc::new(SyntaxData {
             node,
             scope: self.scope().clone(),
@@ -469,7 +472,8 @@ impl Syntax {
         *cached = Some(Arc::downgrade(&identity));
         identity
     }
-    pub(super) fn replace_scope_identity(&self, identity: ScopeIdentity) -> Self {
+    #[doc(hidden)]
+    pub fn replace_scope_identity(&self, identity: ScopeIdentity) -> Self {
         Self(Arc::new(SyntaxData {
             node: self.node().clone(),
             scope: self.scope().clone(),
@@ -582,11 +586,7 @@ impl Syntax {
     /// The code in the normal surface, read for `position`: in the rows of
     /// syntax three when [`ROWS3`] is on, else in the rows before it.
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
-        if ROWS3 {
-            self.show_as_rows3(position)
-        } else {
-            self.show_as_old_rows(position)
-        }
+        self.show_as_rows3(position)
     }
 
     fn no_type_view(&self) -> Result<(), SyntaxError> {
@@ -606,14 +606,6 @@ impl Syntax {
         Ok(())
     }
 
-    /// [`Syntax::show_as`] in the rows before syntax three.
-    fn show_as_old_rows(&self, position: Position) -> Result<String, SyntaxError> {
-        self.no_type_view()?;
-        super::to_source::show_as(&self.to_datum(), position).map_err(|e| SyntaxError {
-            message: e.message,
-            span: e.span,
-        })
-    }
 
     /// [`Syntax::show_as`] in the rows of syntax three (§6.8): the datum is
     /// read for `position` by the reader of syntax three and written by its

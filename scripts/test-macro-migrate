@@ -12,7 +12,7 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
-BINARY = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/migrate-tests'
+BINARY = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/migrate-tests'
 
 
 def package_of(path):
@@ -55,12 +55,12 @@ def main():
     parser.add_argument('--standalone', action='store_true', help='allow standalone editor/parser fixtures without a manifest')
     parser.add_argument('paths', nargs='+', type=Path)
     args = parser.parse_args()
-    if not BINARY.exists() or BINARY.stat().st_mtime < (ROOT / 'crates/ilang-syntax/examples/migrate-tests.rs').stat().st_mtime:
+    if not BINARY.exists() or BINARY.stat().st_mtime < (ROOT / 'crates/ilang-syntax/examples/legacy/migrate-tests.rs').stat().st_mtime:
         heavy, shell = ROOT.parent / 'cache/heavy', ROOT.parent.parent
         if not heavy.is_file():
             heavy, shell = ROOT / '.rd/cache/heavy', ROOT
         subprocess.run([str(heavy), 'direnv', 'exec', str(shell),
-                        'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked'], cwd=ROOT, check=True)
+                        'cargo', 'build', '--manifest-path', str(ROOT / 'crates/ilang-syntax/examples/legacy/Cargo.toml'), '--bin', 'migrate-tests', '--target-dir', str(BINARY.parent.parent), '--locked'], cwd=ROOT, check=True)
     extract = runpy.run_path(str(ROOT / 'scripts/check-snippets'))
     allowed = {'.i', '.is'} | ({'.rs', '.js', '.mjs', '.md', '.txt'} if args.embedded else set())
     files = sorted({f for p in args.paths for f in (p.rglob('*') if p.is_dir() else [p])

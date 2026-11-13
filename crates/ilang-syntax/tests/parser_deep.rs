@@ -1,5 +1,7 @@
 //! Deep lexer diagnostics.
 
+#[path = "oracle.rs"]
+mod ilang_syntax;
 #[test]
 fn many_mismatched_closers_keep_diagnostics_and_do_not_rescan_openers() {
     let n = 10_000;

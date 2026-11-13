@@ -135,9 +135,9 @@ def native_core(source):
                  'host_form', 'resolve_alias_pattern', 'type_pattern', 'ty', 'values',
                  'binding', 'is_direct', 'expr', 'alias_target', 'selection_tables',
                  'piped_table', 'group_call', 'clause_function', 'format', 'block',
-                 'function', 'clause', 'resolved_quote', 'pattern']:
+                 'function', 'clause', 'pattern']:
         source = remove_function(source, name, '    ')
-    source = source.replace('use ilang_syntax::ast;', '')
+    source = source.replace('use ilang_syntax::ast;', 'use ilang_syntax::syn3::ast::resolved::Ident;')
     source = source.replace('ast::ImportItem', 'SourceImport').replace('ast::ExportItem', 'SourceExport')
     source = source.replace('ast::Ident', 'Ident')
     source = source.replace('ast::LitValue', 'ilang_syntax::syn3::ast::LitValue')
@@ -177,6 +177,7 @@ def apply():
     path.write_text(native_core(source))
     path = directory / 'three.rs'
     text = path.read_text().replace('use ilang_syntax::ast as o;', 'use ilang_syntax::syn3::ast::resolved as o;')
+    text = text.replace('o::BinOp::', 'n::BinOp::')
     text = text.replace('o::ImportItem', 'SourceImport').replace('o::ExportItem', 'SourceExport')
     path.write_text(text)
     path = ROOT / 'crates/ilang-check/src/lib.rs'

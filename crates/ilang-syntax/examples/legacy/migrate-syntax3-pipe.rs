@@ -8,7 +8,7 @@
 //! touched again, so the tool is idempotent and can be re-run after merging other lanes.
 //!
 //! Usage (from the repository root):
-//!   cargo run -p ilang-syntax --example migrate-syntax3-pipe -- [--check] [--quiet] [FILE...]
+//!   cargo run --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --bin migrate-syntax3-pipe -- [--check] [--quiet] [FILE...]
 //! Without files it reads every tracked `.i`, `.md`, `.rs`, `.js` and `.mjs` file.
 //! `--check` writes nothing and exits 1 when an edit is due.
 //! Sources are `.i` files, `i` fences in Markdown, and string literals in Rust and
@@ -515,7 +515,7 @@ fn files() -> Vec<String> {
 /// legacy parser and this tool hold the old form on purpose.
 fn skipped(path: &str) -> bool {
     path == "docs/design/syntax-3.md"
-        || path == "crates/ilang-syntax/examples/migrate-syntax3-pipe.rs"
+        || path.starts_with("crates/ilang-syntax/examples/legacy/")
         || path.starts_with("scripts/")
 }
 

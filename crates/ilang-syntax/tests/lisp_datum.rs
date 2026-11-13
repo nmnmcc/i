@@ -1,3 +1,5 @@
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::lisp::{DatumKind, parse, show};
 
 #[test]

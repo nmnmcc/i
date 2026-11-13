@@ -233,7 +233,7 @@ mod tests {
         for source in sources {
             let (tree, errors) = syn3::parse_module(source);
             assert!(errors.is_empty(), "{source}: {errors:?}");
-            let (lowered, errors) = syn3::lower::lower(&tree);
+            let (lowered, errors) = migration_syntax::syn3::lower::lower(&tree);
             assert!(errors.is_empty(), "{source}: {errors:?}");
             drop(lowered);
             assert_eq!(

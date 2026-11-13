@@ -2,6 +2,7 @@
 //! change made in the tree of syntax three and then lowered is the change
 //! made in the lowered tree (docs/design/syn3-final-ast.md, step 2d).
 mod common;
+use migration_syntax as ilang_syntax;
 
 use common::tree::{new, old};
 use ilang_syntax::shape::equivalent;

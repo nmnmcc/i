@@ -404,3 +404,54 @@ both parents. No soundness golden is edited. The exact command below passes
 ```sh
 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
 ```
+
+
+## Applied deletion audit (in progress, 07:08)
+
+The original five-case engine test passes before deletion (1 passed,61
+filtered), with both complete answers equal for every input. Capture uses:
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test macro_run --locked type_macro_keeps_its_standalone_need_channel -- --exact --nocapture --test-threads=2
+python3 scripts/syn3-capture-engine.py collect
+python3 scripts/syn3-delete-old-tree.py --apply
+```
+
+The exact clean head is5dd20acf9041859d74ad3c56ac22b21d232eecc2; the private
+pre-stage12 oracle is green3=6de9a39b655edc8fad9dd7e14a848e359df22915. The
+first two answers keep the macro-produced type's needN separate from the
+written parameter's implicit errorN%E. The third keeps standalone%multi
+groups; the fourth keeps a generated union as an alias; the fifth keeps
+a written alias while an ignored macro argument becomes Int. Full strings,
+all five original inputs and their equality assertions are retained.
+
+Repeated all-target audit command (one wrapper at a time):
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --offline --message-format=short
+```
+
+| Attempt | Result and diagnosed boundary |
+|---|---|
+|1|101: obsolete show_as branch and missing from_document factor; native readers wired. CLI runner build reports the same underlying errors.|
+|2|101: private unused native renderer and missing shared quote/identifier/operator helpers; private duplication removed and HIR-only helpers retained.|
+|3|101: syntax unit/dependency type identities and private resolver expansion calls; comparisons routed through shared normal dependency types.|
+|4|101: internal normalizer helpers and remaining unit imports; production native normalization is shared with the old oracle.|
+|5|101: one private item reader; replaced by equivalent public item_from_datum.|
+|6|101: checker test helper still used the removed old tree; private compatibility imports retained.|
+|7|101: optional warning-inventory old forms; native Macro/Bind/Chain reader keeps original counting conditions.|
+|8|101: private binder visibility and backend benchmark spans; public private-oracle helper and native span access fixed.|
+|9|101: R2 fixture generator old binding/attribute/header fields; native equivalents retain all transformations and assertions.|
+|10|101: one native pattern name was still a String; direct comparison restored.|
+|11|PASS: workspace all targets compile, production and test consumers included.|
+
+Logs are target/fa-r3/delete-check1.log through delete-check9.log. No
+diagnostic golden is edited to address a compile failure. Full deletion
+tests, std, spec, generation, formatting and clippy remain pending.
+
+
+07:16: attempt11 completes successfully. The sole warning belongs to the
+non-workspace historical printer copy. No production normal dependency
+points to ilang-syntax-migration (verified in all four consumer manifests).
+`git diff --check` passes; no .out or .expect.json diagnostic golden changes.
+This compiling checkpoint is not the full green deletion gate.

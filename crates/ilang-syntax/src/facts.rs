@@ -67,7 +67,7 @@ impl Transition {
             match &datum.kind {
                 DatumKind::Unquote(inner) | DatumKind::Splice(inner) => {
                     self.expression(inner.span);
-                    if let Ok(native) = super::lisp::expr_from_datum(inner) {
+                    if let Ok(native) = crate::rows::expr_from_datum(inner) {
                         let _ = self.capture_expression(&native);
                     }
                 }
@@ -197,7 +197,7 @@ impl walk::Visitor for Capture<'_> {
 pub fn quote_captures(
     q: &n::QuotePattern,
 ) -> Result<std::borrow::Cow<'_, [(bool, n::Pattern)]>, Diagnostic> {
-    let parsed = super::lisp::quote_captures(&q.datum.0, true)?;
+    let parsed = crate::rows::quote_captures(&q.datum.0, true)?;
     Ok(if q.captures.is_empty() {
         std::borrow::Cow::Owned(parsed)
     } else {

@@ -489,16 +489,7 @@ pub fn charge_definition(
             }
             Ok(())
         }
-        ilang_syntax::lisp::definition_table::DefinitionCost::Event(event) => {
-            match event {
-                ilang_syntax::lisp::SyntaxCharge::EnterFrame(size) => budget.enter_frame(size)?,
-                ilang_syntax::lisp::SyntaxCharge::Charge { work, words } => {
-                    budget.charge(work, words)?
-                }
-                ilang_syntax::lisp::SyntaxCharge::LeaveFrame => budget.leave_frame(),
-            }
-            Ok(())
-        }
+
         // All five synthesized builtins fit this fixed bound, including the
         // lexer, answer nodes, parameter identities and temporary strings.
         ilang_syntax::lisp::definition_table::DefinitionCost::Builtin(_) => {

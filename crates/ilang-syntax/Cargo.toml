@@ -15,3 +15,5 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("legacy"))
 
 [dev-dependencies]
 serde_json.workspace = true
+
+migration-syntax = { package = "ilang-syntax-migration", path = "examples/legacy" }

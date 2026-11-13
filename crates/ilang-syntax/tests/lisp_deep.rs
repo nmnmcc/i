@@ -1,3 +1,5 @@
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::ast::{ExprKind, PatternKind, TypeKind};
 use ilang_syntax::lisp::{Datum, DatumKind as K, parse_expression, parse_pattern, parse_type};
 use ilang_syntax::span::Span;

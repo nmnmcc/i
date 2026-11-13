@@ -5,7 +5,6 @@
 //! the call site, including when several occurrences share an original span.
 use super::syntax::{Node, Syntax};
 use super::{Datum, DatumKind};
-use crate::ast::{Expr, Item, Pattern, TypeExpr};
 use crate::span::Span;
 use std::collections::HashMap;
 
@@ -445,50 +444,7 @@ impl ScopedSource {
             origin,
         }
     }
-    /// Convert one result while charging its construction to this macro run.
-    /// Resource failure occurs before the source or origin table is modified.
-    pub fn expression_metered(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-        mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<Expr, MeteredError> {
-        self.preflight(syntax, &mut charge)
-            .map_err(MeteredError::Resource)?;
-        self.expression(syntax, call_site)
-            .map_err(MeteredError::Syntax)
-    }
-    pub fn pattern_metered(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-        mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<Pattern, MeteredError> {
-        self.preflight(syntax, &mut charge)
-            .map_err(MeteredError::Resource)?;
-        self.pattern(syntax, call_site)
-            .map_err(MeteredError::Syntax)
-    }
-    pub fn ty_metered(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-        mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<TypeExpr, MeteredError> {
-        self.preflight(syntax, &mut charge)
-            .map_err(MeteredError::Resource)?;
-        self.ty(syntax, call_site).map_err(MeteredError::Syntax)
-    }
-    pub fn items_metered(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-        mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<Vec<Item>, MeteredError> {
-        self.preflight(syntax, &mut charge)
-            .map_err(MeteredError::Resource)?;
-        self.items(syntax, call_site).map_err(MeteredError::Syntax)
-    }
+
     // ---- The same conversions to the tree of syntax three ----
     //
     // The datum is read in the rows of syntax three (§6.8) by plain
@@ -588,50 +544,10 @@ impl ScopedSource {
         Ok(tree)
     }
 
-    pub fn expression(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Expr, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        if super::syntax::ROWS3 {
-            return crate::syn3::deep::deep(|| {
-                let tree = crate::syn3::lisp::expr_from_datum(&datum)?;
-                crate::syn3::lower::lower_expr(&tree)
-            })
-            .map_err(|error| self.error(error));
-        }
-        super::parse_expression(&datum).map_err(|error| self.error(error))
+    pub fn expression(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<crate::syn3::ast::Expr, ScopedError> {
+        self.expression3(syntax, call_site)
     }
-    pub fn pattern(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Pattern, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        if super::syntax::ROWS3 {
-            return crate::syn3::deep::deep(|| {
-                let tree = crate::syn3::lisp::pattern_from_datum(&datum)?;
-                crate::syn3::lower::lower_pattern(&tree)
-            })
-            .map_err(|error| self.error(error));
-        }
-        super::parse_pattern(&datum).map_err(|error| self.error(error))
-    }
-    pub fn ty(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<TypeExpr, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        if super::syntax::ROWS3 {
-            return crate::syn3::deep::deep(|| {
-                let tree = crate::syn3::lisp::type_from_datum(&datum)?;
-                crate::syn3::lower::lower_type(&tree)
-            })
-            .map_err(|error| self.error(error));
-        }
-        super::parse_type(&datum).map_err(|error| self.error(error))
-    }
-    pub fn items(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Vec<Item>, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        if super::syntax::ROWS3 {
-            return crate::syn3::deep::deep(|| {
-                let tree = crate::syn3::lisp::items_from_datum(&datum)?;
-                crate::syn3::lower::lower_items(&tree)
-            })
-            .map_err(|error| self.error(error));
-        }
-        super::parse_items(&datum).map_err(|error| self.error(error))
-    }
+
 }
 
 #[cfg(test)]
@@ -661,12 +577,12 @@ mod tests {
         let call = name("outer", 0, Span::new(0, 8), None);
         let first_template = name("inner", 1, Span::new(4, 9), Some(11));
         let first = source.expression(&first_template, &call).unwrap();
-        source.inherit_call_chain(first.span, call.span(), "outer");
-        let nested_call = source.origin(first.span).unwrap().syntax.clone();
+        source.inherit_call_chain(first.span.0, call.span(), "outer");
+        let nested_call = source.origin(first.span.0).unwrap().syntax.clone();
         let second_template = name("value", 2, Span::new(7, 12), Some(12));
         let second = source.expression(&second_template, &nested_call).unwrap();
-        source.inherit_call_chain(second.span, first.span, "inner");
-        let origin = source.origin(second.span).unwrap();
+        source.inherit_call_chain(second.span.0, first.span.0, "inner");
+        let origin = source.origin(second.span.0).unwrap();
         assert_eq!(origin.syntax.scope().module, 2);
         assert_eq!(origin.syntax.span(), Span::new(7, 12));
         assert_eq!(origin.call_chain.len(), 2);
@@ -741,7 +657,7 @@ mod tests {
         let syntax = Syntax::from_datum(&parsed[0], &scope);
         let mut source = ScopedSource::new("original".into());
         let mut remaining = 2;
-        let result = source.expression_metered(&syntax, &syntax, |_, _| {
+        let result = source.expression3_metered(&syntax, &syntax, |_, _| {
             if remaining == 0 {
                 return Err(Box::new(std::io::Error::other("resource limit")));
             }

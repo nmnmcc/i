@@ -1177,7 +1177,7 @@ mod tests {
     /// as the two rows they were made from: `Cx::needs_row` is the reverse.
     #[test]
     fn typed_macro_function_type_rows_are_read_back_by_the_lowering() {
-        use ilang_syntax::ast::{TypeBody, TypeKind as Old};
+        use migration_syntax::ast::{TypeBody, TypeKind as Old};
         let float = builtin(BuiltinType::Float);
         let cases = [
             (Ty::Never, Ty::Never, None, None),
@@ -1195,9 +1195,9 @@ mod tests {
             let t = function(vec![(None, int()), (Some("x"), string())], int(), err, env);
             let (_, new) = rows(&t);
             let source = format!("(= T {new})");
-            let (module, errors) = ilang_syntax::syn3::parse_lisp_lowered(&source);
+            let (module, errors) = migration_syntax::lisp::parse_source(&source);
             assert!(errors.is_empty(), "{source}: {errors:?}");
-            let ilang_syntax::ast::ItemKind::TypeDef(def) = &module.items[0].kind else {
+            let migration_syntax::ast::ItemKind::TypeDef(def) = &module.items[0].kind else {
                 panic!("{source}: a type definition")
             };
             let TypeBody::Alias(alias) = &def.body else {
@@ -1214,7 +1214,7 @@ mod tests {
             };
             assert_eq!(params.len(), 2, "{source}");
             assert!(matches!(&ret.kind, Old::Named { name, .. } if name.name == "Int"));
-            let show = |t: &Option<Box<ilang_syntax::ast::TypeExpr>>| {
+            let show = |t: &Option<Box<migration_syntax::ast::TypeExpr>>| {
                 t.as_ref().map(|t| match &t.kind {
                     Old::Named { name, .. } => name.name.clone(),
                     Old::Union(members) => {

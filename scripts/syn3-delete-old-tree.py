@@ -170,7 +170,10 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 use crate::lisp::{Datum, DatumKind as K};
 use crate::span::Span;
 ''' + quote_helpers)
-    put(dest / 'src/lisp/to_source.rs', old('src/lisp/to_source.rs').replace('pub(super)', 'pub'))
+    historical = old('src/lisp/to_source.rs').replace('pub(super)', 'pub')
+    begin = historical.index('// ---- The rows of syntax three')
+    end = historical.index('fn checked_expression(', begin)
+    put(dest / 'src/lisp/to_source.rs', historical[:begin] + historical[end:])
     private_mod = dest / 'src/lisp/mod.rs'
     private_mod.write_text(private_mod.read_text().replace('mod to_source;', 'pub mod to_source;\npub mod render;'))
     old_front = old('src/syn3/mod.rs')

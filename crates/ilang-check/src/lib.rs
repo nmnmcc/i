@@ -147,18 +147,6 @@ pub struct Parsed {
     pub typed_macros: Option<std::sync::Arc<dyn typed_macro::Expander>>,
 }
 
-#[derive(Clone)]
-pub(crate) struct LoweredParsed {
-    pub package: PackageId,
-    pub path: String,
-    pub source: SourceId,
-    pub kind: ModuleKind,
-    pub ast: ilang_syntax::ast::Module,
-    pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
-    pub compiler_generated: bool,
-    pub typed_macros: Option<std::sync::Arc<dyn typed_macro::Expander>>,
-}
-
 impl Clone for Parsed {
     fn clone(&self) -> Self {
         ilang_syntax::syn3::deep::deep(|| Self {
@@ -173,42 +161,6 @@ impl Clone for Parsed {
             typed_macros: self.typed_macros.clone(),
         })
     }
-}
-
-impl Parsed {
-    /// Preserve source identity and origins at the step 2d resolver boundary.
-    fn with_lowered_ast(&self, ast: ilang_syntax::ast::Module) -> LoweredParsed {
-        LoweredParsed {
-            package: self.package,
-            path: self.path.clone(),
-            source: self.source,
-            kind: self.kind,
-            ast,
-            scoped: self.scoped.clone(),
-            compiler_generated: self.compiler_generated,
-            typed_macros: self.typed_macros.clone(),
-        }
-    }
-}
-
-/// Step 2d boundary for consumers that still read the transition tree.
-/// Written lowering diagnostics were already retained by `parse`.
-pub(crate) fn lower_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Vec<LoweredParsed> {
-    parsed
-        .iter()
-        .map(|p| {
-            let (ast, _) = ilang_syntax::syn3::deep::deep(|| {
-                ilang_syntax::syn3::lower::lower_with_transition(
-                    &p.ast,
-                    graph.sources.get(p.source).display.ends_with(".is"),
-                    p.scoped.as_ref().map(|scoped| scoped.original_len()),
-                    &p.lowering,
-                    p.scoped.as_ref().map(|scoped| scoped.transition()),
-                )
-            });
-            p.with_lowered_ast(ast)
-        })
-        .collect()
 }
 
 /// Parses every module of the graph. Syntax errors keep their codes.

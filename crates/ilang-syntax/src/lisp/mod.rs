@@ -9,32 +9,19 @@ use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
 use num_bigint::BigUint;
 
-mod comments;
 pub mod definition_schedule;
 pub mod definition_table;
 pub mod definitions;
-mod encode;
-mod encode_charge;
 pub mod expansion;
 pub mod expansion3;
 mod format;
-mod from_ast;
 pub mod quote_lower;
 pub mod quote_lower3;
-mod render;
 pub mod scoped;
 pub mod source_syntax;
 pub mod source_tree;
 pub mod syntax;
-mod to_ast;
 mod to_source;
-pub(crate) mod trampoline;
-pub use encode::{SourceEncoder, expression_syntax, item_syntax, pattern_syntax, type_syntax};
-pub use encode_charge::SyntaxCharge;
-pub use from_ast::{print_module, print_with_comments};
-pub use to_ast::{
-    parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type,
-};
 pub use to_source::{normal_source, normal_with_comments};
 
 #[derive(Debug)]
@@ -266,7 +253,10 @@ fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> 
 
 /// Parse a Lisp-surface source file into the common core tree.
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
-    crate::syn3::parse_lisp_lowered(source)
+    let (module, mut errors) = crate::syn3::lisp::from_lisp(source);
+    errors.extend(crate::syn3::facts::Transition::capture_module(&module, true).1);
+    errors.sort_by_key(|d| (d.span.start, d.span.end));
+    (module, errors)
 }
 
 /// Format a Lisp module without discarding its ordinary comments.
@@ -558,4 +548,14 @@ fn float(n: f64) -> String {
         Some((mantissa, exponent)) if !mantissa.contains('.') => format!("{mantissa}.0e{exponent}"),
         _ => s,
     }
+}
+
+/// Print final syntax rows from the compiler's one tree.
+pub fn print_module(module: &crate::ast::Module) -> String {
+    crate::deep::deep(|| crate::rows::to_lisp(module))
+}
+pub fn print_with_comments(source: &str, module: &crate::ast::Module) -> (String, Vec<Span>) {
+    crate::deep::deep(|| crate::surface::module_comments(
+        source, module, crate::rows::to_lisp(module), false, true,
+    ))
 }

@@ -77,7 +77,61 @@ pub fn lower_expanded(
     (module, cx.errors)
 }
 
-pub use super::facts::Transition;
+#[derive(Clone, Debug, Default)]
+pub struct Transition {
+    native: Option<syntax3::syn3::facts::Transition>,
+    pub(crate) complete: bool,
+    pub(crate) parameters: HashMap<(Span, Span), Vec<(String, Span)>>,
+    pub(crate) sums: HashMap<Span, Vec<Span>>,
+    pub(crate) expressions: HashSet<Span>,
+    pub(crate) types: HashSet<Span>,
+    pub(crate) patterns: HashSet<Span>,
+}
+impl Transition {
+    pub fn extend(&mut self, other: &Self) {
+        if let Some(native) = &other.native {
+            self.native.get_or_insert_with(Default::default).extend(native);
+        }
+        self.complete |= other.complete;
+        self.parameters.extend(other.parameters.clone());
+        self.sums.extend(other.sums.clone());
+        self.expressions.extend(&other.expressions);
+        self.types.extend(&other.types);
+        self.patterns.extend(&other.patterns);
+    }
+    pub fn expression(&mut self, span: Span) {
+        self.expressions.insert(span);
+    }
+    pub fn ty(&mut self, span: Span) {
+        self.types.insert(span);
+    }
+    pub fn pattern(&mut self, span: Span) {
+        self.patterns.insert(span);
+    }
+    pub fn is_expression(&self, span: Span) -> bool {
+        self.expressions.contains(&span) || self.native.as_ref().is_some_and(|n| n.is_expression(span))
+    }
+    pub fn is_type(&self, span: Span) -> bool {
+        self.types.contains(&span) || self.native.as_ref().is_some_and(|n| n.is_type(span))
+    }
+    pub fn is_pattern(&self, span: Span) -> bool {
+        self.patterns.contains(&span) || self.native.as_ref().is_some_and(|n| n.is_pattern(span))
+    }
+    pub fn is_complete(&self) -> bool {
+        self.complete || self.native.as_ref().is_some_and(|n| n.is_complete())
+    }
+    pub fn formals(&self, binding: Span, pattern: Span) -> Option<&[(String, Span)]> {
+        self.parameters.get(&(binding, pattern)).map(Vec::as_slice).or_else(|| self.native.as_ref().and_then(|n| n.formals(binding, pattern)))
+    }
+    pub fn sum_members(&self, parent: Span) -> Option<&[Span]> {
+        self.sums.get(&parent).map(Vec::as_slice).or_else(|| self.native.as_ref().and_then(|n| n.sum_members(parent)))
+    }
+    /// Read-only native facts remain shared; old recording deltas stay private.
+    pub fn from_native(native: &syntax3::syn3::facts::Transition) -> Self {
+        Self { native: Some(native.clone()), ..Self::default() }
+    }
+}
+
 impl Transition {
     fn binding(&mut self, binding: &o::Binding) {
         self.parameters.insert(
@@ -498,9 +552,9 @@ impl Cx {
     fn boundary(&self, kind: u8, span: Span) -> bool {
         self.fragment != Some((kind, span))
             && match kind {
-                0 => self.transition.expressions.contains(&span),
-                1 => self.transition.types.contains(&span),
-                _ => self.transition.patterns.contains(&span),
+                0 => self.transition.is_expression(span),
+                1 => self.transition.is_type(span),
+                _ => self.transition.is_pattern(span),
             }
     }
     fn standalone(&self, kind: u8, span: Span) -> Cx {
@@ -645,9 +699,9 @@ impl Cx {
         let mut member_of: HashMap<usize, usize> = HashMap::new();
         let mut absorbed = HashSet::new();
         let mut single = Vec::new();
-        if self.transition.complete {
+        if self.transition.is_complete() {
             for (i, item) in items.iter().enumerate() {
-                if let Some(members) = self.transition.sums.get(&item.span.0) {
+                if let Some(members) = self.transition.sum_members(item.span.0) {
                     for member in members {
                         if let Some(at) = items.iter().position(|item| item.span.0 == *member) {
                             member_of.insert(at, i);
@@ -932,11 +986,7 @@ impl Cx {
                 }
             }
         }
-        let original = self
-            .transition
-            .parameters
-            .get(&(b.span.0, b.pattern.span.0))
-            .cloned();
+        let original = self.transition.formals(b.span.0, b.pattern.span.0).map(|p| p.to_vec());
         let mark = self.rows.len();
         self.rows.extend(generics.iter().map(|g| Row {
             name: g.name.clone(),

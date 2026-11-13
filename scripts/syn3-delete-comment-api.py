@@ -7,6 +7,32 @@ def apply():
     proof=json.loads((ROOT/'target/fa-night/step3-green.json').read_text())
     assert proof['commit']==subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     base=ROOT/'crates/ilang-syntax/src'
+    # The old-row dispatcher is inactive once ROWS3 is on; the one-tree
+    # build keeps only the native reader and its shared document entry point.
+    import importlib.util
+    helper_path=ROOT/'scripts/syn3-delete-resolver.py'
+    spec=importlib.util.spec_from_file_location('resolver_delete',helper_path)
+    helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
+    path=base/'lisp/syntax.rs'; text=path.read_text()
+    if 'fn show_as_old_rows(' in text:
+        text=helper.remove_function(text,'show_as_old_rows','    ')
+    text=text.replace('''        if ROWS3 {
+            self.show_as_rows3(position)
+        } else {
+            self.show_as_old_rows(position)
+        }''', '        self.show_as_rows3(position)')
+    path.write_text(text)
+    path=base/'rows.rs';text=path.read_text()
+    if 'pub fn from_document(' not in text:
+        start=text.index('pub fn from_lisp(source:')
+        at=text.index('    let mut module = Module::default();',start)
+        text=text[:at]+'''    from_document(&document)
+}
+
+/// Read a document already parsed with the final Lisp rows.
+pub fn from_document(document: &crate::lisp::Document) -> (Module, Vec<Diagnostic>) {
+'''+text[at:]
+    path.write_text(text)
     path=base/'surface.rs'
     text=path.read_text()+'''
 /// Transfer comments for an already-read native module. The source spans of

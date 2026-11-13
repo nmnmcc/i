@@ -2,6 +2,8 @@
 //! `(, .. e (= x v))`, `(,)`. These are the forms that the record rows
 //! `(.. r (: x v))`, `((: x v))` and `()` became; a record type with a base
 //! or a removed key, and a key parameter of a record, have no row any more.
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::ast::ExprKind as OldExprKind;
 use ilang_syntax::lisp::{Datum, DatumKind as K, parse};
 use ilang_syntax::span::Span;

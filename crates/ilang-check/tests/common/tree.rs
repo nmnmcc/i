@@ -10,6 +10,7 @@
 
 /// The tree before syntax three.
 pub mod old {
+    use migration_syntax as ilang_syntax;
     use ilang_syntax::ast::{Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Stmt, TypeExpr};
     use ilang_syntax::span::Span;
 

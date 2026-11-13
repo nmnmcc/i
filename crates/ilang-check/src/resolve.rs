@@ -10,17 +10,27 @@
 //! 6. check the rules about the whole program (entries, host services,
 //!    `[wasm] exports`).
 
-type Parsed = crate::LoweredParsed;
+type Parsed = crate::Parsed;
 use crate::code;
 use crate::hir::*;
+use ilang_syntax::syn3::ast::resolved::Ident;
 use crate::types::{Head, HostType, ShapeId, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
-use ilang_syntax::ast;
+
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
+
+/// Names and spans needed by shared import/export rules; no syntax nodes.
+struct SourceImport { alias: Option<Ident>, names: Vec<Ident>, path: Vec<Ident>, span: Span }
+struct SourceExport { name: Ident, constructors: bool, span: Span }
+#[cfg(test)]
+#[allow(dead_code)]
+mod legacy;
+#[cfg(test)]
+mod differential;
 mod three;
 pub use three::lowering_errors;
 pub(crate) use three::source_facts;
@@ -47,10 +57,6 @@ fn resolve_native(
     modules: &[ilang_syntax::syn3::ast::Module],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
-    let metadata: Vec<_> = parsed
-        .iter()
-        .map(|p| p.with_lowered_ast(Default::default()))
-        .collect();
     ilang_syntax::syn3::deep::deep(|| {
         let mut transitions: Vec<_> = parsed
             .iter()
@@ -67,98 +73,10 @@ fn resolve_native(
             .zip(&mut transitions)
             .map(|(m, t)| three::normalize_module(m, t))
             .collect();
-        three::resolve3(graph, &metadata, &modules, &transitions, report_errors)
+        three::resolve3(graph, parsed, &modules, &transitions, report_errors)
     })
 }
 
-/// Retained for the old/native differential until the old tree is deleted.
-pub fn resolve_transition(
-    graph: &PackageGraph,
-    parsed: &[crate::Parsed],
-    modules: &[ast::Module],
-) -> (Program, Vec<Diagnostic>) {
-    ilang_syntax::syn3::deep::deep(|| {
-        let lowered: Vec<_> = parsed
-            .iter()
-            .zip(modules)
-            .map(|(p, m)| p.with_lowered_ast(m.clone()))
-            .collect();
-        resolve_lowered(graph, &lowered)
-    })
-}
-
-fn resolve_lowered(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
-    let mut r = Resolver {
-        graph,
-        parsed,
-        p: Program::default(),
-        diags: Vec::new(),
-        generated_values: Vec::new(),
-        generated_types: Vec::new(),
-        defs_by_name: Vec::new(),
-        macros_by_name: Vec::new(),
-        types_by_name: Vec::new(),
-        ctors_by_name: Vec::new(),
-        slots: Vec::new(),
-        scopes: Vec::new(),
-        by_path: HashMap::new(),
-        builtin_values: HashMap::new(),
-        builtin_types: HashMap::new(),
-        cur: ModuleId(0),
-        locals: Vec::new(),
-        fn_depth: 0,
-        ty_frames: Vec::new(),
-        ty_def: None,
-        circular: HashSet::new(),
-        pending: Vec::new(),
-        reserved: Vec::new(),
-        def_tables: HashMap::new(),
-        local_tables: HashMap::new(),
-        checked_inputs: None,
-    };
-    r.create_modules();
-    for m in 0..parsed.len() {
-        r.collect(ModuleId(m as u32));
-    }
-    r.builtins();
-    for m in 0..parsed.len() {
-        r.imports(ModuleId(m as u32));
-    }
-    r.check_generated_collisions();
-    r.import_circles();
-    for m in 0..parsed.len() {
-        r.type_defs(ModuleId(m as u32));
-    }
-    summarize_aliases(&mut r.p);
-    r.alias_circles();
-    r.early_types();
-    r.selection_tables();
-    for m in 0..parsed.len() {
-        r.values(ModuleId(m as u32));
-    }
-    for m in 0..parsed.len() {
-        r.exported_types(ModuleId(m as u32));
-    }
-    r.environment_reads();
-    r.program_rules();
-    r.p.typed_expander = parsed.iter().find_map(|p| p.typed_macros.clone());
-    if !r.p.typed_macros.is_empty() {
-        r.p.expansion_names = Some(std::sync::Arc::new(ExpansionNames {
-            generated_values: r.generated_values,
-            generated_types: r.generated_types,
-            defs_by_name: r.defs_by_name,
-            macros_by_name: r.macros_by_name,
-            types_by_name: r.types_by_name,
-            ctors_by_name: r.ctors_by_name,
-            slots: r.slots,
-            scopes: r.scopes,
-            by_path: r.by_path,
-            builtin_values: r.builtin_values,
-            builtin_types: r.builtin_types,
-        }));
-    }
-    (r.p, r.diags)
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Entry {
@@ -277,16 +195,6 @@ type Table = std::rc::Rc<Vec<(ShapeId, ValueRef)>>;
 /// call with one argument per shape group, labelled by the shape.
 const MULTI: &str = "%multi";
 
-/// The groups of the transition form of a multi-shape value.
-fn multi_groups(e: &ast::Expr) -> Option<&[ast::Arg]> {
-    match &e.kind {
-        ast::ExprKind::Call { callee, args } => match &callee.kind {
-            ast::ExprKind::Name { module: None, name } if name.name == MULTI => Some(args),
-            _ => None,
-        },
-        _ => None,
-    }
-}
 
 /// The shape that a group label of the transition form writes: the number
 /// of positions, then each label after a comma.
@@ -311,60 +219,62 @@ fn is_upper(name: &str) -> bool {
     name.starts_with(|c: char| c.is_ascii_uppercase())
 }
 
-/// The names a pattern binds, in order, with repeats (§7.2).
-fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
-    use ast::PatternKind as P;
-    match &p.kind {
-        P::Quote { captures, .. } => captures.iter().for_each(|(_, p)| ast_binders(p, out)),
-        P::Var(n) => out.push((n.clone(), p.span)),
-        P::Typed { binder, .. } if !binder.discard => out.push((binder.name.clone(), binder.span)),
-        P::Named { name, pattern } => {
-            out.push((name.name.clone(), name.span));
-            ast_binders(pattern, out);
-        }
-        P::Prefix { rest, .. } if !rest.discard => out.push((rest.name.clone(), rest.span)),
-        P::Constructor { args, .. } | P::Tuple(args) => {
-            args.iter().for_each(|a| ast_binders(a, out));
-        }
-        P::List { items, rest } => {
-            items.iter().for_each(|a| ast_binders(a, out));
-            if let Some(Some(b)) = rest
-                && !b.discard
-            {
-                out.push((b.name.clone(), b.span));
-            }
-        }
-        P::BitArray(segs) => segs.iter().for_each(|s| ast_binders(&s.value, out)),
-        _ => {}
-    }
-}
-
-/// The label of a parameter (§6.11): the last name in the `=` chain at the
-/// top of its pattern.
-fn label_of(p: &ast::Pattern) -> Option<String> {
-    use ast::PatternKind as P;
-    match &p.kind {
-        // A compiler-made parameter has no label.
-        P::Var(n) if n.starts_with('%') => None,
-        P::Var(n) => Some(n.clone()),
-        P::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
-        P::Named { name, pattern } => label_of(pattern).or_else(|| Some(name.name.clone())),
-        _ => None,
-    }
-}
-
-/// `{ e }` with one expression is a group (§6.10): it is `e`.
-fn ungroup(e: &ast::Expr) -> &ast::Expr {
-    match &e.kind {
-        ast::ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
-            ast::Stmt::Expr(inner) => ungroup(inner),
-            _ => e,
-        },
-        _ => e,
-    }
-}
 
 impl<'a> Resolver<'a> {
+    fn resolved_quote(
+        &mut self,
+        template: Option<u32>,
+        captures: Vec<(bool, Pattern)>,
+        span: Span,
+    ) -> PatternKind {
+        if let Some(template) = template {
+            let module = Ident {
+                name: "\0quote-syntax".into(),
+                span,
+            };
+            let name = Ident {
+                name: "Syntax".into(),
+                span,
+            };
+            let syntax = self.lookup_type(Some(&module), &name);
+            let functions: Option<Vec<_>> = [
+                "_template",
+                "_match",
+                "_match_ok",
+                "_match_one",
+                "_match_many",
+            ]
+            .into_iter()
+            .map(|name| {
+                let name = Ident {
+                    name: name.into(),
+                    span,
+                };
+                match self.name(Some(&module), &name) {
+                    ExprKind::Name(ValueRef::Def(def)) => Some(def),
+                    _ => None,
+                }
+            })
+            .collect();
+            match (syntax, functions) {
+                (Some(TypeRef::Custom(syntax)), Some(functions)) => PatternKind::Quote {
+                    template,
+                    syntax,
+                    functions: functions.try_into().expect("five quote services"),
+                    captures,
+                },
+                _ => PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect()),
+            }
+        } else {
+            self.error(
+                code::MACRO_RESERVED,
+                span,
+                "a quote pattern must be evaluated inside a macro",
+            );
+            PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect())
+        }
+    }
+
     // ---- Helpers ----
 
     fn error(&mut self, code: &'static str, span: Span, message: impl Into<String>) {
@@ -568,489 +478,9 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn collect(&mut self, m: ModuleId) {
-        self.cur = m;
-        let parsed = self.parsed;
-        let ast = &parsed[m.0 as usize].ast;
-        let lisp = self
-            .graph
-            .sources
-            .get(parsed[m.0 as usize].source)
-            .display
-            .ends_with(".is");
-        if let Err(errors) = ilang_syntax::lisp::expansion::definitions(ast, lisp) {
-            for error in errors {
-                self.error(code::ATTRIBUTE_PLACE, error.span, error.message);
-            }
-        }
-        let placeholder_var = VarId(u32::MAX);
-        let typed: HashSet<_> = ilang_syntax::lisp::expansion::definitions(ast, lisp)
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|d| d.signature.is_some())
-            .map(|d| d.name)
-            .collect();
-        for item in &ast.items {
-            let typed_declaration = matches!(&item.kind, ast::ItemKind::Declaration { name, .. } if typed.contains(&name.name));
-            if item
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "macro")
-                && !typed_declaration
-            {
-                let mut remaining = item.clone();
-                remaining.attributes.retain(|attribute| {
-                    !(attribute.module.is_none() && attribute.name.name == "macro")
-                });
-                for attribute in &remaining.attributes {
-                    if attribute.module.is_none() && attribute.name.name == "main" {
-                        self.error(
-                            code::ATTRIBUTE_PLACE,
-                            attribute.span,
-                            "`@main` cannot be put on a macro",
-                        );
-                    }
-                }
-                remaining.attributes.retain(|attribute| {
-                    attribute.module.is_some() || attribute.name.name != "main"
-                });
-                self.attributes(&remaining);
-                if let ast::ItemKind::Binding(binding) = &item.kind {
-                    let mut names = Vec::new();
-                    ast_binders(&binding.pattern, &mut names);
-                    for (name, span) in names {
-                        if !typed.contains(&name) && self.value_free(m, &name, span) {
-                            self.macros_by_name[m.0 as usize].insert(name, false);
-                        }
-                    }
-                }
-                self.slots[m.0 as usize].push(Slot::None);
-                continue;
-            }
-            let mut attrs = if typed_declaration {
-                Attrs {
-                    external: Some(("ilang:typed-macro".into(), "".into())),
-                    ..Attrs::default()
-                }
-            } else {
-                self.attributes(item)
-            };
-            let here = self.p.module(m);
-            let root = self.graph.root == Some(here.package);
-            if root && let ast::ItemKind::Binding(b) = &item.kind {
-                let mut names = Vec::new();
-                ast_binders(&b.pattern, &mut names);
-                let pkg = &self.graph.packages[here.package];
-                let default = here.kind == ModuleKind::Src
-                    && here.path == format!("{}/main", pkg.name)
-                    && names.iter().any(|(n, span)| {
-                        n == "main"
-                            && self.name_key(n, *span).scope.marks.is_empty()
-                            && self.name_key(n, *span).scope.module == parsed[m.0 as usize].source.0
-                    });
-                let declared = pkg
-                    .entries
-                    .iter()
-                    .filter(|(_, e)| {
-                        e.module == here.path
-                            && names.iter().any(|(n, span)| {
-                                *n == e.function
-                                    && self.name_key(n, *span).scope.marks.is_empty()
-                                    && self.name_key(n, *span).scope.module
-                                        == parsed[m.0 as usize].source.0
-                            })
-                    })
-                    .collect::<Vec<_>>();
-                let selected = match &self.graph.entry {
-                    Some(name) => declared.iter().any(|(n, _)| n == name),
-                    None => default,
-                };
-                if default || !declared.is_empty() {
-                    self.entry_form(b.pattern.span, b);
-                }
-                if self.graph.entry.is_some() {
-                    attrs.main = selected;
-                } else if selected {
-                    attrs.main = true;
-                }
-            }
-            let slot = match &item.kind {
-                ast::ItemKind::TypeDef(def) if def.alias_pattern => {
-                    let pid = ProjectionId(self.p.alias_patterns.len() as u32);
-                    let mut binders = Vec::new();
-                    for part in &def.head {
-                        self.collect_pattern_binders(m, part, &attrs, &mut binders);
-                    }
-                    self.p.alias_patterns.push(AliasPattern {
-                        heads: Vec::new(),
-                        head_span: def.name.span,
-                        module: m,
-                        span: item.span,
-                        source: Type {
-                            kind: TypeKind::Error,
-                            span: item.span,
-                        },
-                        pattern: TypePattern::Error,
-                        binders,
-                    });
-                    Slot::Pattern(pid)
-                }
-                ast::ItemKind::TypeDef(def) => Slot::Type(self.collect_type(m, def, &attrs)),
-                ast::ItemKind::Binding(b) => {
-                    let index = self.p.module(m).bindings.len() as u32;
-                    let mut names = Vec::new();
-                    ast_binders(&b.pattern, &mut names);
-                    let mut seen = HashSet::new();
-                    let mut defs = Vec::new();
-                    for (name, span) in names {
-                        if !seen.insert(self.name_key(&name, span)) {
-                            continue; // reported when the pattern is resolved
-                        }
-                        let kind = DefKind::Binding {
-                            binding: index,
-                            var: placeholder_var,
-                        };
-                        let before = self.p.module(m).defs.len();
-                        self.add_def(m, &name, span, kind, &attrs);
-                        if self.p.module(m).defs.len() > before {
-                            defs.push(DefId {
-                                module: m,
-                                index: before as u32,
-                            });
-                        }
-                    }
-                    self.p.modules[m.0 as usize].bindings.push(TopBinding {
-                        binding: Binding {
-                            pattern: Pattern {
-                                kind: PatternKind::Error(Vec::new()),
-                                span: b.pattern.span,
-                            },
-                            value: Expr {
-                                kind: ExprKind::Error,
-                                span: b.value.span,
-                            },
-                            direct: false,
-                            ty_vars: Vec::new(),
-                            span: b.span,
-                        },
-                        defs,
-                        main: attrs.main,
-                    });
-                    Slot::Binding(index)
-                }
-                ast::ItemKind::MacroItem { name, args, .. } => {
-                    let message = if args.is_empty()
-                        && matches!(name.name.as_str(), "import" | "export")
-                    {
-                        "a call at the top level is kept for macros; if this was an old empty header, omit it"
-                    } else {
-                        "a call at the top level is kept for macros"
-                    };
-                    self.error(code::MACRO_RESERVED, item.span, message);
-                    Slot::None
-                }
-                ast::ItemKind::Declaration {
-                    name,
-                    ty,
-                    type_params: _,
-                } => {
-                    let (module, function) = attrs.external.clone().unwrap_or_default();
-                    let kind = DefKind::External {
-                        module,
-                        function,
-                        ty: Type {
-                            kind: TypeKind::Error,
-                            span: ty.span,
-                        },
-                        ty_vars: Vec::new(),
-                    };
-                    let before = self.p.module(m).defs.len();
-                    self.add_def(m, &name.name, name.span, kind, &attrs);
-                    if self.p.module(m).defs.len() > before {
-                        if typed_declaration {
-                            self.p.typed_macros.insert(DefId {
-                                module: m,
-                                index: before as u32,
-                            });
-                        }
-                        Slot::Decl(before as u32)
-                    } else {
-                        Slot::None
-                    }
-                }
-            };
-            self.slots[m.0 as usize].push(slot);
-        }
-        self.exports(m, &ast.exports);
-    }
-
-    fn collect_pattern_binders(
-        &mut self,
-        m: ModuleId,
-        t: &ast::TypeExpr,
-        attrs: &Attrs,
-        out: &mut Vec<TypeId>,
-    ) {
-        match &t.kind {
-            ast::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } if args.is_empty() => {
-                let def = ast::TypeDef {
-                    alias_pattern: false,
-                    name: name.clone(),
-                    params: Vec::new(),
-                    head: Vec::new(),
-                    body: ast::TypeBody::Alias(ast::TypeExpr {
-                        kind: ast::TypeKind::Hole,
-                        span: t.span,
-                    }),
-                };
-                out.push(self.collect_type(m, &def, attrs));
-            }
-            ast::TypeKind::Named { args, .. } | ast::TypeKind::Tuple(args) => {
-                for t in args {
-                    self.collect_pattern_binders(m, t, attrs, out);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn collect_type(&mut self, m: ModuleId, def: &ast::TypeDef, attrs: &Attrs) -> TypeId {
-        let id = TypeId(self.p.types.len() as u32);
-        let mi = m.0 as usize;
-        let key = self.name_key(&def.name.name, def.name.span);
-        self.check_binder(&def.name.name, def.name.span, true, false);
-        let occupied = if key.scope.marks.is_empty() {
-            self.types_by_name[mi].contains_key(&def.name.name)
-        } else {
-            self.generated_types[mi].contains_key(&key)
-        };
-        if occupied {
-            self.error(
-                code::DEFINED_TWICE,
-                def.name.span,
-                format!(
-                    "the type `{}` is defined more than once in this module",
-                    def.name.name
-                ),
-            );
-        } else if key.scope.marks.is_empty() {
-            self.types_by_name[mi].insert(def.name.name.clone(), id);
-        } else {
-            self.generated_types[mi].insert(key, id);
-        }
-        // A repeated parameter is reported, but it keeps its place, so that
-        // the parameters stay in line with the written ones and the number
-        // of parameters is the written number. Its name refers to the first.
-        let mut params: Vec<(String, TyVarId)> = Vec::new();
-        for p in &def.params {
-            self.check_binder(&p.name, p.span, false, true);
-            if def
-                .params
-                .iter()
-                .take(params.len())
-                .any(|q| self.name_key(&q.name, q.span) == self.name_key(&p.name, p.span))
-            {
-                self.error(
-                    code::TYPE_PARAM_TWICE,
-                    p.span,
-                    format!("the type parameter `{}` is given more than once", p.name),
-                );
-            }
-            let v = self.new_ty_var(&p.name);
-            params.push((p.name.clone(), v));
-        }
-        let body = match &def.body {
-            ast::TypeBody::Alias(t) => TypeBody::Alias(Type {
-                kind: TypeKind::Error,
-                span: t.span,
-            }),
-            ast::TypeBody::Custom(ctors) => {
-                let mut out = Vec::new();
-                for c in ctors {
-                    if !self.value_free(m, &c.name.name, c.name.span) {
-                        continue;
-                    }
-                    let index = out.len() as u32;
-                    let ctor = CtorRef { ty: id, index };
-                    let key = self.name_key(&c.name.name, c.name.span);
-                    if key.scope.marks.is_empty() {
-                        self.ctors_by_name[mi].insert(c.name.name.clone(), ctor);
-                    } else {
-                        self.generated_values[mi].insert(key, Entry::Ctor(ctor));
-                    }
-                    out.push(CtorDef {
-                        name: c.name.name.clone(),
-                        span: c.name.span,
-                        fields: Vec::new(),
-                    });
-                }
-                TypeBody::Custom(out)
-            }
-        };
-        self.p.types.push(TypeDef {
-            name: def.name.name.clone(),
-            span: def.name.span,
-            module: m,
-            params,
-            body,
-            exported: false,
-            constructors_exported: false,
-            host: attrs.host.clone(),
-            deprecated: attrs.deprecated.clone(),
-        });
-        self.p.modules[mi].types.push(id);
-        id
-    }
-
-    /// §2.2 and §10: the attributes of an item.
-    fn attributes(&mut self, item: &ast::Item) -> Attrs {
-        let mut out = Attrs::default();
-        let mut seen = HashSet::new();
-        for a in &item.attributes {
-            let name = a.name.name.as_str();
-            let written = a
-                .module
-                .as_ref()
-                .map_or_else(|| format!("@{name}"), |m| format!("@{}.{name}", m.name));
-            if a.module.is_some() || !matches!(name, "external" | "host" | "deprecated") {
-                self.error(code::UNKNOWN_ATTRIBUTE, a.span, format!("the attribute `{written}` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`"));
-                continue;
-            }
-            if !seen.insert(name) {
-                self.error(
-                    code::ATTRIBUTE_TWICE,
-                    a.span,
-                    format!("`@{name}` is given more than once on this item"),
-                );
-                continue;
-            }
-            let args: Vec<&str> = a.args.iter().map(|(s, _)| s.as_str()).collect();
-            let (counts, place_ok, place): (&[usize], bool, &str) = match name {
-                "external" => (
-                    &[2],
-                    matches!(item.kind, ast::ItemKind::Declaration { .. }),
-                    "a declaration `name: Type`",
-                ),
-                "host" => (
-                    &[1, 2],
-                    matches!(item.kind, ast::ItemKind::TypeDef(_)),
-                    "a type definition",
-                ),
-                "deprecated" => (&[1], true, "any item"),
-                _ => unreachable!(),
-            };
-            let form = match name {
-                "external" => r#"`@external("module", "function")`"#,
-                "host" => r#"`@host("namespace")` or `@host("namespace", "async")`"#,
-                _ => r#"`@deprecated("note")`"#,
-            };
-            if a.call.is_some() {
-                let message = format!(
-                    "the arguments of `@{name}` are string literals given by position: {form}"
-                );
-                self.error(code::ATTRIBUTE_ARGS, a.span, message);
-                continue;
-            }
-            if !counts.contains(&args.len())
-                || (name == "host" && args.len() == 2 && !matches!(args[1], "async" | "request"))
-            {
-                self.error(
-                    code::ATTRIBUTE_ARGS,
-                    a.span,
-                    format!("this attribute is written {form}"),
-                );
-                continue;
-            }
-            if !place_ok {
-                self.error(
-                    code::ATTRIBUTE_PLACE,
-                    a.span,
-                    format!("`@{name}` may only be on {place}"),
-                );
-                continue;
-            }
-            match name {
-                "external" | "host" => {
-                    if (args[0].starts_with("ilang:") || args[0].starts_with("i:compiler/"))
-                        && !self.in_library()
-                    {
-                        self.error(
-                            code::RESERVED_ILANG,
-                            a.args[0].1,
-                            if args[0].starts_with("ilang:") {
-                                "names that start with `ilang:` are kept for the runtime"
-                            } else {
-                                "names that start with `i:compiler/` are kept for the compiler"
-                            },
-                        );
-                    }
-                    if name == "external" {
-                        out.external = Some((args[0].to_string(), args[1].to_string()));
-                    } else {
-                        out.host = Some(Host {
-                            namespace: args[0].to_string(),
-                            is_async: args.len() == 2,
-                            is_request: args.get(1).is_some_and(|m| *m == "request"),
-                        });
-                    }
-                }
-                _ => out.deprecated = Some(args[0].to_string()),
-            }
-        }
-        if let ast::ItemKind::Declaration { name, .. } = &item.kind
-            && out.external.is_none()
-            && !item
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "external")
-        {
-            self.error(
-                code::DECLARATION_WITHOUT_EXTERNAL,
-                name.span,
-                "a declaration with no `@external` is kept for macros",
-            );
-        }
-        out
-    }
-
-    /// Entries bind one name to a function; compiled entries take no value parameters.
-    fn entry_form(&mut self, span: Span, b: &ast::Binding) -> bool {
-        let mut names = Vec::new();
-        ast_binders(&b.pattern, &mut names);
-        let written = "a program entry";
-        let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
-            self.error(
-                code::ENTRY_FORM,
-                span,
-                format!("{written} is on a binding whose value is a function expression"),
-            );
-            return false;
-        };
-        if names.len() != 1 {
-            self.error(
-                code::ENTRY_FORM,
-                span,
-                format!("{written} is on a binding whose pattern binds one name"),
-            );
-            return false;
-        }
-        if f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
-            self.error(
-                code::ENTRY_PARAMS,
-                span,
-                format!("an entry point has no parameters but environment parameters, so {written} may not be on this function"),
-            );
-            return false;
-        }
-        true
-    }
 
     /// §2.4.
-    fn exports(&mut self, m: ModuleId, items: &[ast::ExportItem]) {
+    fn exports(&mut self, m: ModuleId, items: &[SourceExport]) {
         let mi = m.0 as usize;
         for item in items {
             let name = &item.name.name;
@@ -1146,59 +576,9 @@ impl<'a> Resolver<'a> {
 
     // ---- Phase 2: imports (§2.3) ----
 
-    fn imports(&mut self, m: ModuleId) {
-        self.cur = m;
-        let mi = m.0 as usize;
-        let mut scope = Scope::default();
-        for (name, &d) in &self.defs_by_name[mi] {
-            let entry = Entry::Def(DefId {
-                module: m,
-                index: d,
-            });
-            scope.values.insert(name.clone(), (entry, false));
-        }
-        for (name, &exported) in &self.macros_by_name[mi] {
-            scope
-                .values
-                .insert(name.clone(), (Entry::Macro { exported }, false));
-        }
-        for (name, &c) in &self.ctors_by_name[mi] {
-            scope.values.insert(name.clone(), (Entry::Ctor(c), false));
-        }
-        for (name, &t) in &self.types_by_name[mi] {
-            scope
-                .types
-                .insert(name.clone(), (TypeRef::Custom(t), false));
-        }
-        let parsed = self.parsed;
-        for item in &parsed[mi].ast.imports {
-            let alias = item.alias.as_ref().unwrap_or(item.path.last().unwrap());
-            let Some(target) = self.import_target(item) else {
-                for n in item.names.iter().chain([alias]) {
-                    scope
-                        .values
-                        .entry(n.name.clone())
-                        .or_insert((Entry::Broken, true));
-                    if is_upper(&n.name) {
-                        scope.broken_types.insert(n.name.clone());
-                    }
-                }
-                continue;
-            };
-            self.p.modules[mi].imports.push(target);
-            self.p.modules[mi]
-                .import_names
-                .push((alias.name.clone(), target));
-            self.put_value(&mut scope, &alias.name, alias.span, Entry::Module(target));
-            for n in &item.names {
-                self.import_name(&mut scope, target, n);
-            }
-        }
-        self.scopes[mi] = scope;
-    }
 
     /// The module that an import path names (§2.1).
-    fn import_target(&mut self, item: &ast::ImportItem) -> Option<ModuleId> {
+    fn import_target(&mut self, item: &SourceImport) -> Option<ModuleId> {
         let me = self.p.module(self.cur);
         let pkg = &self.graph.packages[me.package];
         let first = item.path[0].name.as_str();
@@ -1302,7 +682,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// `(A, b) = path` (§2.3). Only exported names may be imported.
-    fn import_name(&mut self, scope: &mut Scope, target: ModuleId, n: &ast::Ident) {
+    fn import_name(&mut self, scope: &mut Scope, target: ModuleId, n: &Ident) {
         let ti = target.0 as usize;
         let module = self.module_name(target).to_string();
         if !is_upper(&n.name) {
@@ -1372,18 +752,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §2.1: modules may not import one another in a circle.
-    fn import_circles(&mut self) {
-        let parsed = self.parsed;
-        self.import_circles_of(&|m| {
-            parsed[m]
-                .ast
-                .imports
-                .iter()
-                .map(|i| (i.path.iter().map(|p| p.name.clone()).collect(), i.span))
-                .collect()
-        });
-    }
 
     /// `imports` gives the written imports of a module: the path and the
     /// span of each.
@@ -1451,112 +819,6 @@ impl<'a> Resolver<'a> {
 
     // ---- Phase 3: type definitions (§4.3) ----
 
-    fn type_defs(&mut self, m: ModuleId) {
-        self.cur = m;
-        let parsed = self.parsed;
-        let ast = &parsed[m.0 as usize].ast;
-        for (item, slot) in ast.items.iter().zip(self.slots[m.0 as usize].clone()) {
-            if let (ast::ItemKind::TypeDef(def), Slot::Pattern(pid)) = (&item.kind, slot) {
-                self.resolve_alias_pattern(def, pid);
-                continue;
-            }
-            let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot) else {
-                continue;
-            };
-            // §4.3: read a reserved head in full, but do not resolve its body.
-            if !def.head.is_empty() {
-                self.error(
-                    code::TYPE_PARAM_FORM,
-                    def.head[0].span,
-                    "a type parameter is an `UpName` with no module name and no arguments",
-                );
-                if def
-                    .head
-                    .iter()
-                    .any(|t| matches!(t.kind, ast::TypeKind::ValueOf { module: None, .. }))
-                {
-                    self.diags.last_mut().unwrap().message.push_str("; old lowercase type parameters are now declared as UpNames, as in `Box(A) { Box(A) }` or `Id(A) = A`");
-                }
-                continue;
-            }
-            let mut clashes = false;
-            for param in &def.params {
-                let key = self.name_key(&param.name, param.span);
-                if is_upper(&param.name) && self.conflicts_with_type(&key) {
-                    clashes = true;
-                    self.error(
-                        code::TYPE_VAR_IS_TYPE,
-                        param.span,
-                        "a type parameter may not have the name of a type",
-                    );
-                }
-            }
-            if clashes {
-                continue;
-            }
-            let params = self.p.ty(id).params.clone();
-            let mut by_name = HashMap::new();
-            for ((n, v), ident) in params.iter().zip(&def.params) {
-                by_name.entry(self.name_key(n, ident.span)).or_insert(*v);
-            }
-            self.ty_def = Some(TyDefMode {
-                params: by_name,
-                used: HashSet::new(),
-            });
-            match &def.body {
-                ast::TypeBody::Alias(t) => {
-                    let t = self.ty(t);
-                    self.p.types[id.0 as usize].body = TypeBody::Alias(t);
-                }
-                ast::TypeBody::Custom(ctors) => {
-                    for c in ctors {
-                        let fields: Vec<FieldDef> = c
-                            .fields
-                            .iter()
-                            .map(|f| FieldDef {
-                                label: f.label.clone(),
-                                ty: self.ty(&f.ty),
-                            })
-                            .collect();
-                        if let TypeBody::Custom(defs) = &mut self.p.types[id.0 as usize].body
-                            && let Some(d) = defs.iter_mut().find(|d| d.span == c.name.span)
-                        {
-                            d.fields = fields;
-                        }
-                    }
-                }
-            }
-            let mode = self.ty_def.take().unwrap();
-            for (i, (p, ident)) in params.iter().zip(&def.params).enumerate() {
-                let repeated = def.params[..i].iter().any(|q| {
-                    self.name_key(&q.name, q.span) == self.name_key(&ident.name, ident.span)
-                });
-                if !repeated && !mode.used.contains(&p.1) {
-                    self.error(
-                        code::TYPE_PARAM_UNUSED,
-                        ident.span,
-                        format!("the type parameter `{}` is not used", p.0),
-                    );
-                }
-            }
-        }
-    }
-
-    fn early_types(&mut self) {
-        self.early_type_checks();
-        for (mi, parsed) in self.parsed.iter().enumerate() {
-            self.cur = ModuleId(mi as u32);
-            for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
-                if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
-                    && self.p.ty(id).host.is_some()
-                    && !matches!(&self.p.ty(id).body, TypeBody::Alias(t) if value_dependent(&self.p,t))
-                    && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
-                {
-                    self.host_form(def);
-                }
-            }
-        }
-    }
 
     /// The part of `early_types` that reads no tree.
     fn early_type_checks(&mut self) {
@@ -1698,24 +960,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §9.7: a host service has one constructor, and every field has a
-    /// label and a function type.
-    fn host_form(&mut self, def: &ast::TypeDef) {
-        let ok = match &def.body {
-            ast::TypeBody::Custom(ctors) if ctors.len() == 1 => ctors[0]
-                .fields
-                .iter()
-                .all(|f| f.label.is_some() && matches!(f.ty.kind, ast::TypeKind::Fn { .. })),
-            _ => false,
-        };
-        if !ok {
-            self.error(
-                code::HOST_FORM,
-                def.name.span,
-                "a host service has exactly one constructor, and every field has a label and a function type (§9.7)",
-            );
-        }
-    }
 
     /// §4.3: an alias may not use itself, directly or through other aliases.
     fn alias_circles(&mut self) {
@@ -1765,7 +1009,7 @@ impl<'a> Resolver<'a> {
 
     // ---- Types ----
 
-    fn lookup_type(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> Option<TypeRef> {
+    fn lookup_type(&mut self, module: Option<&Ident>, name: &Ident) -> Option<TypeRef> {
         // §2.3: a local name may cover a module name, in types too.
         if let Some(m) = module
             && let Some(Found::Local(_)) = self.find(&m.name, m.span)
@@ -1907,7 +1151,7 @@ impl<'a> Resolver<'a> {
 
     /// The module named by the top-level name `m` in `m.T`. Local names
     /// that cover it are found by the caller.
-    fn module_of(&mut self, m: &ast::Ident) -> Option<ModuleId> {
+    fn module_of(&mut self, m: &Ident) -> Option<ModuleId> {
         match self.find(&m.name, m.span) {
             Some(Found::Entry(Entry::Module(t))) => Some(t),
             Some(Found::Private) => {
@@ -1978,8 +1222,8 @@ impl<'a> Resolver<'a> {
 
     fn value_type(
         &mut self,
-        module: Option<&ast::Ident>,
-        name: &ast::Ident,
+        module: Option<&Ident>,
+        name: &Ident,
         span: Span,
     ) -> TypeKind {
         let pending = |n: &str, span: Span| {
@@ -2029,305 +1273,10 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_alias_pattern(&mut self, def: &ast::TypeDef, pid: ProjectionId) {
-        let ids = self.p.alias_patterns[pid.0 as usize].binders.clone();
-        for id in &ids {
-            let name = self.p.ty(*id).name.clone();
-            let conflict = self.scopes[self.cur.0 as usize]
-                .types
-                .get(&name)
-                .is_some_and(|(_, imported)| *imported)
-                || self.builtin_types.contains_key(&name);
-            if conflict {
-                self.error(
-                    code::TYPE_PATTERN_BINDER_IS_TYPE,
-                    self.p.ty(*id).span,
-                    format!("the new alias `{name}` conflicts with an imported or built-in type"),
-                );
-            }
-        }
-        let ast::TypeBody::Alias(source) = &def.body else {
-            unreachable!()
-        };
-        let mut parts = Vec::new();
-        let mut heads = Vec::new();
-        for t in &def.head {
-            parts.push(self.type_pattern(t, &ids, &mut heads));
-        }
-        let head = self.lookup_type(None, &def.name);
-        let pattern = match head {
-            Some(ty) if self.arity(ty) == parts.len() => {
-                heads.push((def.name.span, ty));
-                TypePattern::Named(ty, parts)
-            }
-            Some(_) => {
-                self.error(
-                    code::TYPE_ARITY,
-                    def.name.span,
-                    "alias pattern head has the wrong number of arguments",
-                );
-                TypePattern::Error
-            }
-            None => TypePattern::Error,
-        };
-        self.p.alias_patterns[pid.0 as usize].heads = heads;
-        self.p.alias_patterns[pid.0 as usize].pattern = pattern;
-        let source = self.ty(source);
-        self.p.alias_patterns[pid.0 as usize].source = source.clone();
-        let TypeKind::Of { value, site, .. } = source.kind else {
-            return;
-        };
-        self.p.of_sites[site.0 as usize].permanent = true;
-        self.p.of_sites[site.0 as usize].projection = Some(pid);
-        for id in &ids {
-            let span = self.p.ty(*id).span;
-            let t = self.new_of(value, span, true, Some(pid));
-            self.p.types[id.0 as usize].body = TypeBody::Alias(t);
-        }
-        let slot = &mut self.p.alias_patterns[pid.0 as usize];
-        slot.source = source;
-    }
-
-    fn type_pattern(
-        &mut self,
-        t: &ast::TypeExpr,
-        ids: &[TypeId],
-        heads: &mut Vec<(Span, TypeRef)>,
-    ) -> TypePattern {
-        match &t.kind {
-            ast::TypeKind::Hole => TypePattern::Skip,
-            ast::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } if args.is_empty() => ids
-                .iter()
-                .copied()
-                .find(|id| self.p.ty(*id).span == name.span)
-                .map_or(TypePattern::Error, TypePattern::Bind),
-            ast::TypeKind::Named { module, name, args } => {
-                let parts = args
-                    .iter()
-                    .map(|t| self.type_pattern(t, ids, heads))
-                    .collect::<Vec<_>>();
-                match self.lookup_type(module.as_ref(), name) {
-                    Some(ty) if self.arity(ty) == parts.len() => {
-                        heads.push((name.span, ty));
-                        TypePattern::Named(ty, parts)
-                    }
-                    Some(_) => {
-                        self.error(
-                            code::TYPE_ARITY,
-                            t.span,
-                            "alias pattern has the wrong number of arguments",
-                        );
-                        TypePattern::Error
-                    }
-                    None => TypePattern::Error,
-                }
-            }
-            ast::TypeKind::Tuple(ts) => TypePattern::Tuple(
-                ts.iter()
-                    .map(|t| self.type_pattern(t, ids, heads))
-                    .collect(),
-            ),
-            _ => {
-                self.error(
-                    code::TYPE_PATTERN_FORM,
-                    t.span,
-                    "a type pattern is a binder, `_`, a named type, or a tuple",
-                );
-                TypePattern::Error
-            }
-        }
-    }
-
-    fn ty(&mut self, t: &ast::TypeExpr) -> Type {
-        use ast::TypeKind as T;
-        if let Some(origin) = self.parsed[self.cur.0 as usize]
-            .scoped
-            .as_ref()
-            .and_then(|s| s.origin(t.span))
-        {
-            let handle = match origin.syntax.node() {
-                ilang_syntax::lisp::syntax::Node::TypeView(h) => Some(h.index),
-                _ => match origin.syntax.scope_identity() {
-                    Some(ScopeIdentity::TypeVariable { variable, .. }) => Some(*variable as u32),
-                    _ => None,
-                },
-            };
-            if let Some(index) = handle {
-                if self.checked_inputs.is_none() {
-                    self.error(code::UNKNOWN_TYPE,t.span,"a frozen type handle is valid only during its module check's typed expansion");
-                    return Type {
-                        kind: TypeKind::Error,
-                        span: t.span,
-                    };
-                }
-                return Type {
-                    kind: TypeKind::Var(TyVarId(0x8000_0000 | index)),
-                    span: t.span,
-                };
-            }
-        }
-        let kind = match &t.kind {
-            T::Lit(v) => TypeKind::Lit(v.clone()),
-            T::Named { module, name, args } => {
-                let key = self.name_key(&name.name, name.span);
-                let variable = if module.is_none() {
-                    self.ty_frames
-                        .iter()
-                        .rev()
-                        .find_map(|f| f.names.get(&key).copied())
-                        .or_else(|| {
-                            self.ty_def.as_mut().and_then(|mode| {
-                                let var = mode.params.get(&key).copied()?;
-                                mode.used.insert(var);
-                                Some(var)
-                            })
-                        })
-                } else {
-                    None
-                };
-                if let Some(var) = variable {
-                    let kind = if args.is_empty() {
-                        TypeKind::Var(var)
-                    } else {
-                        self.error(
-                            code::TYPE_VAR_ARGS,
-                            t.span,
-                            "a type variable takes no arguments",
-                        );
-                        TypeKind::Error
-                    };
-                    return Type { kind, span: t.span };
-                }
-                let before = self.diags.len();
-                let found = self.lookup_type(module.as_ref(), name);
-                if found.is_none() && module.is_none() && args.is_empty() {
-                    let hint = if self.ty_def.is_some() {
-                        "to use a type parameter, declare it in the head, as in `Box(A) { … }`"
-                    } else {
-                        "to use a type variable, declare it after the name of the binding, as in `f(A) = …`"
-                    };
-                    for d in &mut self.diags[before..] {
-                        if d.code == code::UNKNOWN_TYPE {
-                            d.message.push_str("; ");
-                            d.message.push_str(hint);
-                        }
-                    }
-                }
-                let args: Vec<Type> = args.iter().map(|a| self.ty(a)).collect();
-                match found {
-                    Some(ty) if self.arity(ty) != args.len() => {
-                        let want = self.arity(ty);
-                        let tname = self.type_name(ty);
-                        self.error(
-                            code::TYPE_ARITY,
-                            t.span,
-                            format!(
-                                "the type `{tname}` has {want} type parameter{}, but {} {} given",
-                                if want == 1 { "" } else { "s" },
-                                args.len(),
-                                if args.len() == 1 { "is" } else { "are" }
-                            ),
-                        );
-                        TypeKind::Error
-                    }
-                    Some(ty) => TypeKind::Named { ty, args },
-                    None => TypeKind::Error,
-                }
-            }
-            T::ValueOf { module, name } => self.value_type(module.as_ref(), name, t.span),
-            T::Call { .. } => {
-                self.error(
-                    code::MACRO_RESERVED,
-                    t.span,
-                    "a call in a type is kept for macros",
-                );
-                TypeKind::Error
-            }
-            T::Hole => TypeKind::Hole,
-            T::Tuple(ts) => TypeKind::Tuple(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                // syntax-3 stage 6: records are closed labelled data.
-                if let Some(base) = base {
-                    self.error(
-                        code::INVALID_RECORD_KEY,
-                        base.span,
-                        "a data type has no spread: records are closed (syntax-3 §2.3)",
-                    );
-                }
-                for label in removed {
-                    self.error(
-                        code::INVALID_RECORD_KEY,
-                        label.span,
-                        "a data type has no forgotten labels: records are closed (syntax-3 §2.3)",
-                    );
-                }
-                let mut labels = HashSet::new();
-                for (label, _) in fields {
-                    if !labels.insert(&label.name) {
-                        self.error(
-                            code::DUPLICATE_RECORD_LABEL,
-                            label.span,
-                            format!("the record label `{}` is repeated", label.name),
-                        );
-                    }
-                    self.check_data_label(&label.ident, label.parameter);
-                }
-                TypeKind::Record {
-                    fields: fields
-                        .iter()
-                        .map(|(label, ty)| (label.ident.clone(), self.ty(ty)))
-                        .collect(),
-                }
-            }
-            T::Union(ts) => TypeKind::Union(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Inter(ts) => TypeKind::Inter(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Diff(ts) => TypeKind::Diff(ts.iter().map(|x| self.ty(x)).collect()),
-            T::Fn {
-                params,
-                ret,
-                err,
-                env,
-            } => TypeKind::Fn {
-                params: params
-                    .iter()
-                    .map(|p| {
-                        if let Some(label) = &p.label
-                            && crate::syn3_facts::on()
-                        {
-                            crate::syn3_facts::record(crate::syn3_facts::Fact::FnTypeLabel {
-                                file: crate::syn3_facts::File::of(
-                                    &self.graph.sources,
-                                    self.p.module(self.cur).source,
-                                ),
-                                label: label.span,
-                                ty: p.ty.span,
-                            });
-                        }
-                        FnParamType {
-                            label: p.label.clone(),
-                            ty: self.ty(&p.ty),
-                        }
-                    })
-                    .collect(),
-                ret: Box::new(self.ty(ret)),
-                err: err.as_ref().map(|e| Box::new(self.ty(e))),
-                env: env.as_ref().map(|e| Box::new(self.ty(e))),
-            },
-        };
-        Type { kind, span: t.span }
-    }
 
     /// A label of data is a `name` (syntax-3 §2.3): not a string that is
     /// not a name, an `UpName`, or a label parameter.
-    fn check_data_label(&mut self, label: &ast::Ident, parameter: bool) {
+    fn check_data_label(&mut self, label: &Ident, parameter: bool) {
         let name = label.name.as_str();
         let mut chars = name.chars();
         let first = chars.next();
@@ -2736,7 +1685,7 @@ impl<'a> Resolver<'a> {
             .items()
             .map(|v| {
                 if b == BuiltinType::String {
-                    ast::LitValue::Str(v.to_string()).text()
+                    ilang_syntax::syn3::ast::LitValue::Str(v.to_string()).text()
                 } else {
                     v.to_string()
                 }
@@ -2778,76 +1727,6 @@ impl<'a> Resolver<'a> {
 
     // ---- Phase 4: values ----
 
-    fn values(&mut self, m: ModuleId) {
-        self.cur = m;
-        let parsed = self.parsed;
-        let ast = &parsed[m.0 as usize].ast;
-        for (item, slot) in ast.items.iter().zip(self.slots[m.0 as usize].clone()) {
-            match (&item.kind, slot) {
-                (
-                    ast::ItemKind::Declaration {
-                        ty, type_params, ..
-                    },
-                    Slot::Decl(d),
-                ) => {
-                    let vars = self.push_declared_frame(type_params);
-                    let t = self.ty(ty);
-                    self.ty_frames.pop();
-                    // Intrinsic library operations are not host imports (§2.1).
-                    let intrinsic = self.p.typed_macros.contains(&DefId {
-                        module: m,
-                        index: d,
-                    }) || self.in_library()
-                        && matches!(&self.p.modules[m.0 as usize].defs[d as usize].kind,
-                            DefKind::External { module, .. } if module.starts_with("ilang:"));
-                    if !intrinsic {
-                        let before = self.diags.len();
-                        self.external_type(&t);
-                        if self.diags.len() == before
-                            && let Some(f) = self.host_fn(&t, false)
-                        {
-                            self.p.external_fns.insert(
-                                DefId {
-                                    module: m,
-                                    index: d,
-                                },
-                                f,
-                            );
-                        }
-                    }
-                    if let DefKind::External {
-                        ty: slot_ty,
-                        ty_vars,
-                        ..
-                    } = &mut self.p.modules[m.0 as usize].defs[d as usize].kind
-                    {
-                        *slot_ty = t;
-                        *ty_vars = vars;
-                    }
-                }
-                (ast::ItemKind::Binding(b), Slot::Binding(index)) => {
-                    let (binding, binders) = self.binding(b, true);
-                    let mi = m.0 as usize;
-                    for binder in binders {
-                        let def = self.p.modules[mi].bindings[index as usize]
-                            .defs
-                            .iter()
-                            .find(|d| self.p.def(**d).span == binder.span)
-                            .map(|d| d.index);
-                        if let Some(d) = def
-                            && let DefKind::Binding { binding: bi, var } =
-                                &mut self.p.modules[mi].defs[d as usize].kind
-                            && *bi == index
-                        {
-                            *var = binder.var;
-                        }
-                    }
-                    self.p.modules[mi].bindings[index as usize].binding = binding;
-                }
-                _ => {}
-            }
-        }
-    }
 
     /// A quiet lookup, after imports are known (§3.10 and §3.11).
     fn unqualified_type(&self, name: &str) -> Option<TypeRef> {
@@ -2867,7 +1746,7 @@ impl<'a> Resolver<'a> {
             }
     }
 
-    fn push_declared_frame(&mut self, params: &[ast::Ident]) -> Vec<TyVarId> {
+    fn push_declared_frame(&mut self, params: &[Ident]) -> Vec<TyVarId> {
         let mut names = HashMap::new();
         let mut vars = Vec::new();
         for param in params {
@@ -2899,106 +1778,6 @@ impl<'a> Resolver<'a> {
         vars
     }
 
-    /// A binding, at the top level or in a block. Gives back the binders of
-    /// its pattern; in a block, the caller makes them visible from the next
-    /// statement (§6.10).
-    fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
-        let ty_vars = self.push_declared_frame(&b.type_params);
-        let direct = self.is_direct(&b.value);
-        let mut binders = Vec::new();
-        let mut names = Vec::new();
-        ast_binders(&b.pattern, &mut names);
-        let names: HashSet<NameKey> = names
-            .into_iter()
-            .map(|(n, span)| self.name_key(&n, span))
-            .collect();
-        self.pending.push(names.clone());
-        let pattern = self.pattern(&b.pattern, &mut binders, None);
-        self.pending.pop();
-        let value = if direct && !top {
-            // §6.10: the names may be used inside the function bodies of a
-            // direct value.
-            self.locals.push(Frame {
-                names: binders
-                    .iter()
-                    .map(|b| (self.name_key(&b.name, b.span), b.var))
-                    .collect(),
-                fn_only: Some(self.fn_depth),
-            });
-            self.reserved.push((self.locals.len(), names.clone()));
-            let v = self.expr(&b.value);
-            self.reserved.pop();
-            self.locals.pop();
-            v
-        } else {
-            self.reserved.push((self.locals.len(), names));
-            let value = self.expr(&b.value);
-            self.reserved.pop();
-            value
-        };
-        self.ty_frames.pop();
-        let binding = Binding {
-            pattern,
-            value,
-            direct,
-            ty_vars,
-            span: b.span,
-        };
-        (binding, binders)
-    }
-
-    /// §6.10: a direct value is made without running code.
-    fn is_direct(&self, e: &ast::Expr) -> bool {
-        use ast::ExprKind as E;
-        match &ungroup(e).kind {
-            E::Fn(_) | E::Clauses(_) | E::Int(_) | E::Float(_) | E::String(_) | E::Name { .. } => {
-                true
-            }
-            E::Call { .. } if multi_groups(ungroup(e)).is_some() => true,
-            E::Unary { expr, .. } => {
-                matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_))
-            }
-            E::Field { target, .. } => match &target.kind {
-                // `m.x` is a name when `m` is a module.
-                E::Name { module: None, name } => {
-                    matches!(
-                        self.find(&name.name, name.span),
-                        Some(Found::Entry(Entry::Module(_)))
-                    )
-                }
-                _ => false,
-            },
-            E::Tuple(items) => items.iter().all(|x| self.is_direct(x)),
-            E::Record { base, fields } => {
-                base.as_deref().is_none_or(|b| self.is_direct(b))
-                    && fields.iter().all(|(_, value)| self.is_direct(value))
-            }
-            E::List { items, rest } => items
-                .iter()
-                .chain(rest.as_deref())
-                .all(|x| self.is_direct(x)),
-            // Constructors are the only values with an `UpName`.
-            E::Call { callee, args } => {
-                is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
-            }
-            // §6.9: `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)`.
-            E::Binary {
-                op: ast::BinOp::Pipe,
-                lhs,
-                rhs,
-            } => {
-                self.is_direct(lhs)
-                    && match &rhs.kind {
-                        E::Name { .. } => is_constructor(rhs),
-                        E::Call { callee, args } => {
-                            is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
-                        }
-                        _ => false,
-                    }
-            }
-            _ => false,
-        }
-    }
 
     fn check_binder(&mut self, name: &str, span: Span, top: bool, type_parameter: bool) {
         let parsed = &self.parsed[self.cur.0 as usize];
@@ -3125,12 +1904,12 @@ impl<'a> Resolver<'a> {
 
     /// Only compiler-created modules and unspellable compiler aliases may
     /// refer directly to private implementation members.
-    fn compiler_reference(&self, module: &ast::Ident) -> bool {
+    fn compiler_reference(&self, module: &Ident) -> bool {
         self.parsed[self.cur.0 as usize].compiler_generated || module.name.starts_with('\0')
     }
 
     /// A member `m.x` or `m.C` of another module.
-    fn member(&mut self, target: ModuleId, name: &ast::Ident, trusted: bool) -> ExprKind {
+    fn member(&mut self, target: ModuleId, name: &Ident, trusted: bool) -> ExprKind {
         let ti = target.0 as usize;
         let path = self.module_name(target).to_string();
         if let Some(&exported) = self.macros_by_name[ti].get(&name.name) {
@@ -3200,7 +1979,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn name(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> ExprKind {
+    fn name(&mut self, module: Option<&Ident>, name: &Ident) -> ExprKind {
         if let Some(m) = module {
             return match self.find(&m.name, m.span) {
                 Some(Found::Private) => {
@@ -3286,7 +2065,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// A constructor in a pattern or a record update.
-    fn ctor(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> Option<CtorRef> {
+    fn ctor(&mut self, module: Option<&Ident>, name: &Ident) -> Option<CtorRef> {
         if !is_upper(&name.name) {
             self.error(
                 code::NOT_A_CONSTRUCTOR,
@@ -3309,382 +2088,9 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn expr(&mut self, e: &ast::Expr) -> Expr {
-        use ast::ExprKind as E;
-        if let Some(old) = self.checked_inputs.and_then(|c| c.expressions.get(&e.span)) {
-            let mut free = HashSet::new();
-            let mut tree = old.clone();
-            visit_expr_mut(&mut tree, &mut |e| {
-                if let ExprKind::Name(ValueRef::Local(v)) = e.kind {
-                    free.insert(v);
-                }
-                true
-            });
-            for binder in expression_binders(old) {
-                free.remove(&binder.var);
-            }
-            if free.iter().any(|v| {
-                !self.locals.iter().any(|frame| {
-                    frame.fn_only.is_none_or(|depth| self.fn_depth > depth)
-                        && frame.names.values().any(|w| w == v)
-                })
-            }) {
-                self.error(
-                    code::MACRO_RESERVED,
-                    e.span,
-                    "typed macro output cannot escape an argument binder",
-                );
-                return Expr {
-                    kind: ExprKind::Error,
-                    span: e.span,
-                };
-            }
-            return old.clone();
-        }
-        if !self.p.typed_macros.is_empty()
-            && matches!(
-                e.kind,
-                E::Call { .. }
-                    | E::Binary {
-                        op: ast::BinOp::Pipe,
-                        ..
-                    }
-            )
-        {
-            self.p.expansion_scopes.insert(
-                (self.cur, e.span),
-                ExpansionScope {
-                    locals: self.locals.clone(),
-                    ty_frames: self.ty_frames.clone(),
-                    fn_depth: self.fn_depth,
-                    pending: self.pending.clone(),
-                    reserved: self.reserved.clone(),
-                },
-            );
-        }
-        let kind = match &e.kind {
-            E::Quote(_) => {
-                self.error(
-                    code::MACRO_RESERVED,
-                    e.span,
-                    "a quote must be evaluated inside a macro",
-                );
-                ExprKind::Error
-            }
-            E::Int(n) => ExprKind::Int(n.clone()),
-            E::Float(f) => ExprKind::Float(*f),
-            E::String(s) => ExprKind::String(s.clone()),
-            E::Name { module, name } => {
-                if self.parsed[self.cur.0 as usize]
-                    .scoped
-                    .as_ref()
-                    .and_then(|s| s.origin(e.span))
-                    .is_some_and(|o| {
-                        matches!(
-                            o.syntax.node(),
-                            ilang_syntax::lisp::syntax::Node::TypeView(_)
-                        )
-                    })
-                {
-                    self.error(
-                        code::MACRO_RESERVED,
-                        e.span,
-                        "a TypeView is valid only in type position",
-                    );
-                    ExprKind::Error
-                } else {
-                    self.name(module.as_ref(), name)
-                }
-            }
-            E::Tuple(items) => ExprKind::Tuple(items.iter().map(|x| self.expr(x)).collect()),
-            E::Record { base, fields } => ExprKind::Record {
-                base: {
-                    for (label, _) in fields {
-                        self.check_data_label(label, false);
-                    }
-                    base.as_ref().map(|b| Box::new(self.expr(b)))
-                },
-                fields: fields
-                    .iter()
-                    .map(|(label, value)| (label.clone(), self.expr(value)))
-                    .collect(),
-            },
-            E::List { items, rest } => ExprKind::List {
-                items: items.iter().map(|x| self.expr(x)).collect(),
-                rest: rest.as_ref().map(|r| Box::new(self.expr(r))),
-            },
-            E::BitArray(segs) => ExprKind::BitArray(
-                segs.iter()
-                    .map(|s| Segment {
-                        value: self.expr(&s.value),
-                        format: self.format(s.format.as_ref()),
-                        span: s.span,
-                    })
-                    .collect(),
-            ),
-            E::Block(b) => ExprKind::Block(self.block(b)),
-            E::Fn(f) => ExprKind::Fn(Box::new(self.function(f, e.span))),
-            E::Clauses(clauses) => self.clause_function(clauses, e.span),
-            E::Case { subject, clauses }
-                if clauses.len() == 1
-                    && clauses[0].guard.is_none()
-                    && clauses[0].patterns.len() == 1 =>
-            {
-                let clause = &clauses[0];
-                // §3.9: the subject precedes the new scope; no type frame,
-                // no generalization, and the binding stops at the pattern.
-                let value = self.expr(subject);
-                let mut binders = Vec::new();
-                let pattern = self.pattern(&clause.patterns[0], &mut binders, None);
-                self.locals.push(Frame {
-                    names: binders
-                        .into_iter()
-                        .map(|b| (self.name_key(&b.name, b.span), b.var))
-                        .collect(),
-                    fn_only: None,
-                });
-                let body = self.expr(&clause.body);
-                self.locals.pop();
-                let span = pattern.span;
-                ExprKind::Block(Block {
-                    stmts: vec![
-                        Stmt::Bind(Binding {
-                            pattern,
-                            value,
-                            direct: false,
-                            ty_vars: vec![],
-                            span,
-                        }),
-                        Stmt::Expr(body),
-                    ],
-                    span: e.span,
-                })
-            }
-            E::Case {
-                subject, clauses, ..
-            } => ExprKind::Case {
-                subject: Box::new(self.expr(subject)),
-                clauses: clauses.iter().map(|c| self.clause(c)).collect(),
-            },
-            E::Call { args, .. } if multi_groups(e).is_some() => ExprKind::Multi(
-                args.iter()
-                    .map(|a| MultiGroup {
-                        shape: shape_of_text(
-                            &a.label.as_ref().expect("a group has its shape").name,
-                        ),
-                        value: self.expr(&a.value),
-                    })
-                    .collect(),
-            ),
-            E::Call { callee, args } => {
-                let callee = self.expr(callee);
-                match self.table_of(&callee) {
-                    Some(table) => self.group_call(&table, &callee, None, args, e.span),
-                    None => ExprKind::Call {
-                        callee: Box::new(callee),
-                        args: args
-                            .iter()
-                            .map(|a| Arg {
-                                label: a.label.clone(),
-                                value: self.expr(&a.value),
-                            })
-                            .collect(),
-                    },
-                }
-            }
-            // `x |> f` and `x |> f(…)` with a named chain `f` are direct
-            // calls (syntax three §2.6.2): `x` is position 0.
-            E::Binary {
-                op: ast::BinOp::Pipe,
-                lhs,
-                rhs,
-            } if self.piped_table(rhs) => {
-                let first = self.expr(lhs);
-                let (callee, args): (&ast::Expr, &[ast::Arg]) = match &rhs.kind {
-                    E::Call { callee, args } => (callee, args),
-                    _ => (rhs, &[]),
-                };
-                let callee = self.expr(callee);
-                let table = self.table_of(&callee).expect("checked by piped_table");
-                self.group_call(&table, &callee, Some(first), args, e.span)
-            }
-            E::Field { target, name } => {
-                let module = match &target.kind {
-                    E::Name { module: None, name } => match self.find(&name.name, name.span) {
-                        Some(Found::Entry(Entry::Module(t))) => {
-                            Some(Some((t, self.compiler_reference(name))))
-                        }
-                        Some(Found::Entry(Entry::Broken)) => Some(None),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                match module {
-                    Some(Some((t, trusted))) => self.member(t, name, trusted),
-                    Some(None) => ExprKind::Error,
-                    None => ExprKind::Field {
-                        target: Box::new(self.expr(target)),
-                        name: name.clone(),
-                    },
-                }
-            }
-            E::TupleIndex {
-                target,
-                index,
-                index_span,
-            } => ExprKind::TupleIndex {
-                target: Box::new(self.expr(target)),
-                index: index.clone(),
-                index_span: *index_span,
-            },
-            E::RecordUpdate {
-                constructor,
-                base,
-                fields,
-            } => {
-                let ctor = match &constructor.kind {
-                    E::Name { module, name } => self.ctor(module.as_ref(), name),
-                    _ => {
-                        self.error(
-                            code::NOT_A_CONSTRUCTOR,
-                            constructor.span,
-                            "a record update starts with a constructor",
-                        );
-                        None
-                    }
-                };
-                let base = Box::new(self.expr(base));
-                let fields = fields
-                    .iter()
-                    .map(|(n, x)| (n.clone(), self.expr(x)))
-                    .collect();
-                match ctor {
-                    Some(ctor) => ExprKind::RecordUpdate {
-                        ctor,
-                        ctor_span: constructor.span,
-                        base,
-                        fields,
-                    },
-                    None => ExprKind::Error,
-                }
-            }
-            E::Unary { op, expr } => ExprKind::Unary {
-                op: *op,
-                expr: Box::new(self.expr(expr)),
-            },
-            E::Binary { op, lhs, rhs } => ExprKind::Binary {
-                op: *op,
-                lhs: Box::new(self.expr(lhs)),
-                rhs: Box::new(self.expr(rhs)),
-            },
-        };
-        Expr { kind, span: e.span }
-    }
 
     // ---- Shape groups (syntax three §2.6) ----
 
-    /// The top-level name that a direct alias `g = f` or `g = m.f` names,
-    /// read quietly in the module `self.cur`.
-    fn alias_target(&self, e: &ast::Expr) -> Option<DefId> {
-        use ast::ExprKind as E;
-        let in_module = |r: &Self, target: ModuleId, name: &ast::Ident| {
-            let index = *r.defs_by_name[target.0 as usize].get(&name.name)?;
-            Some(DefId {
-                module: target,
-                index,
-            })
-        };
-        match &ungroup(e).kind {
-            E::Name { module: None, name } => match self.find(&name.name, name.span)? {
-                Found::Entry(Entry::Def(d)) => Some(d),
-                _ => None,
-            },
-            E::Name {
-                module: Some(m),
-                name,
-            } => match self.find(&m.name, m.span)? {
-                Found::Entry(Entry::Module(t)) => in_module(self, t, name),
-                _ => None,
-            },
-            E::Field { target, name } => match &target.kind {
-                E::Name {
-                    module: None,
-                    name: m,
-                } => match self.find(&m.name, m.span)? {
-                    Found::Entry(Entry::Module(t)) => in_module(self, t, name),
-                    _ => None,
-                },
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
-    /// The selection tables of the top-level names, before any body is
-    /// resolved: a name bound to a multi chain has the table of its hidden
-    /// group bindings, and a direct alias has the table of the name it
-    /// names (§2.6.7).
-    fn selection_tables(&mut self) {
-        let parsed = self.parsed;
-        let mut aliases: Vec<(DefId, DefId)> = Vec::new();
-        for (mi, module) in parsed.iter().enumerate() {
-            let m = ModuleId(mi as u32);
-            self.cur = m;
-            for item in &module.ast.items {
-                let ast::ItemKind::Binding(b) = &item.kind else {
-                    continue;
-                };
-                let ast::PatternKind::Var(name) = &b.pattern.kind else {
-                    continue;
-                };
-                let Some(&index) = self.defs_by_name[mi].get(name) else {
-                    continue;
-                };
-                let def = DefId { module: m, index };
-                if let Some(groups) = multi_groups(&b.value) {
-                    let table: Option<Vec<(ShapeId, ValueRef)>> = groups
-                        .iter()
-                        .map(|g| {
-                            let ast::ExprKind::Name { module: None, name } = &g.value.kind else {
-                                return None;
-                            };
-                            let index = *self.defs_by_name[mi].get(&name.name)?;
-                            let shape = shape_of_text(&g.label.as_ref()?.name);
-                            Some((shape, ValueRef::Def(DefId { module: m, index })))
-                        })
-                        .collect();
-                    if let Some(table) = table {
-                        let groups = table
-                            .iter()
-                            .map(|(shape, g)| match g {
-                                ValueRef::Def(d) => (*shape, *d),
-                                _ => unreachable!(),
-                            })
-                            .collect();
-                        self.p.chain_groups.insert(def, groups);
-                        self.def_tables.insert(def, std::rc::Rc::new(table));
-                    }
-                } else if let Some(target) = self.alias_target(&b.value) {
-                    aliases.push((def, target));
-                }
-            }
-        }
-        // A chain of aliases ends at a chain literal; a circle of aliases
-        // is reported by the order rules and has no table.
-        loop {
-            let before = self.def_tables.len();
-            for (def, target) in &aliases {
-                if !self.def_tables.contains_key(def)
-                    && let Some(table) = self.def_tables.get(target).cloned()
-                {
-                    self.def_tables.insert(*def, table);
-                }
-            }
-            if self.def_tables.len() == before {
-                break;
-            }
-        }
-    }
 
     /// The selection table of a resolved callee, when it is a name with one.
     fn table_of(&self, callee: &Expr) -> Option<Table> {
@@ -3695,139 +2101,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// The right side of a pipe is a name with a table, or a call of one.
-    fn piped_table(&self, rhs: &ast::Expr) -> bool {
-        use ast::ExprKind as E;
-        let callee = match &rhs.kind {
-            E::Call { callee, .. } if multi_groups(rhs).is_none() => callee,
-            _ => rhs,
-        };
-        let quiet = |r: &Self, name: &ast::Ident| match r.find(&name.name, name.span) {
-            Some(Found::Local(v)) => r.local_tables.contains_key(&v),
-            Some(Found::Entry(Entry::Def(d))) => r.def_tables.contains_key(&d),
-            _ => false,
-        };
-        match &callee.kind {
-            E::Name { module: None, name } => quiet(self, name),
-            E::Name { .. } | E::Field { .. } => self
-                .alias_target(callee)
-                .is_some_and(|d| self.def_tables.contains_key(&d)),
-            _ => false,
-        }
-    }
-
-    /// A direct call of a named chain (§2.6.2, steps 1 and 2): the shape of
-    /// the argument data is read from the call, and the call becomes a call
-    /// of that group's function with the arguments in canonical order. The
-    /// arguments are worked out in written order.
-    fn group_call(
-        &mut self,
-        table: &Table,
-        callee: &Expr,
-        first: Option<Expr>,
-        args: &[ast::Arg],
-        span: Span,
-    ) -> ExprKind {
-        let mut labels: Vec<&ast::Ident> = args.iter().filter_map(|a| a.label.as_ref()).collect();
-        labels.sort_by(|a, b| a.name.cmp(&b.name));
-        let mut written: Vec<(Option<&ast::Ident>, Expr)> = Vec::new();
-        if let Some(first) = first {
-            written.push((None, first));
-        }
-        for a in args {
-            written.push((a.label.as_ref(), self.expr(&a.value)));
-        }
-        if let Some(pair) = labels.windows(2).find(|w| w[0].name == w[1].name) {
-            self.error(
-                code::PARAMS_SAME_LABEL,
-                pair[1].span,
-                format!("the label `{}` is given twice", pair[1].name),
-            );
-            return ExprKind::Error;
-        }
-        let positions = written.iter().filter(|(l, _)| l.is_none()).count();
-        let shape = ShapeId::new(positions as u32, labels.iter().map(|l| l.name.clone()));
-        let Some((_, group)) = table.iter().find(|(s, _)| *s == shape) else {
-            let shapes: Vec<String> = table.iter().map(|(s, _)| shape_shown(*s)).collect();
-            self.error(
-                code::NO_SHAPE_GROUP,
-                span,
-                format!(
-                    "no branch of this function takes {}; its shapes are {}",
-                    shape_shown(shape),
-                    shapes.join(", ")
-                ),
-            );
-            return ExprKind::Error;
-        };
-        if let ValueRef::Def(d) = group {
-            self.used_def(*d, callee.span);
-        }
-        if let ExprKind::Name(ValueRef::Def(d)) = &callee.kind {
-            self.p.chain_uses.push(*d);
-        }
-        let callee = Box::new(Expr {
-            kind: ExprKind::Name(*group),
-            span: callee.span,
-        });
-        // The canonical place of each written argument.
-        let place = |label: Option<&ast::Ident>, position: usize| match label {
-            None => position,
-            Some(l) => positions + labels.iter().position(|x| x.name == l.name).unwrap(),
-        };
-        let mut position = 0;
-        let places: Vec<usize> = written
-            .iter()
-            .map(|(l, _)| {
-                let at = place(*l, position);
-                if l.is_none() {
-                    position += 1;
-                }
-                at
-            })
-            .collect();
-        let plain = |value: Expr| Arg { label: None, value };
-        if places.iter().enumerate().all(|(i, at)| i == *at) {
-            return ExprKind::Call {
-                callee,
-                args: written.into_iter().map(|(_, value)| plain(value)).collect(),
-            };
-        }
-        // Written order is not canonical order: the arguments are bound in
-        // written order first.
-        let mut stmts = Vec::new();
-        let mut slots: Vec<Option<Arg>> = (0..written.len()).map(|_| None).collect();
-        for ((_, value), at) in written.into_iter().zip(places) {
-            let var = self.new_var();
-            let at_span = value.span;
-            stmts.push(Stmt::Bind(Binding {
-                pattern: Pattern {
-                    kind: PatternKind::Var(Binder {
-                        var,
-                        name: format!("%item{at}"),
-                        span: at_span,
-                    }),
-                    span: at_span,
-                },
-                value,
-                direct: false,
-                ty_vars: vec![],
-                span: at_span,
-            }));
-            slots[at] = Some(plain(Expr {
-                kind: ExprKind::Name(ValueRef::Local(var)),
-                span: at_span,
-            }));
-        }
-        stmts.push(Stmt::Expr(Expr {
-            kind: ExprKind::Call {
-                callee,
-                args: slots.into_iter().map(|a| a.unwrap()).collect(),
-            },
-            span,
-        }));
-        ExprKind::Block(Block { stmts, span })
-    }
 
     /// The table that a local binding gives its one name: the binding is
     /// a multi chain over local group bindings, or a direct alias.
@@ -3853,63 +2126,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn clause_function(&mut self, clauses: &[ast::Clause], span: Span) -> ExprKind {
-        let single =
-            clauses.len() == 1 && clauses[0].guard.is_none() && clauses[0].patterns.len() == 1;
-        let synthetic = Span::new(span.start, span.start);
-        let (param, body) = if single {
-            (clauses[0].patterns[0].clone(), clauses[0].body.clone())
-        } else {
-            let case_span = match (clauses.first(), clauses.last()) {
-                (Some(first), Some(last)) => first.span.to(last.span),
-                _ => Span::new(span.start + 1, span.start + 1),
-            };
-            (
-                ast::Pattern {
-                    kind: ast::PatternKind::Var("%arg".into()),
-                    span: synthetic,
-                },
-                ast::Expr {
-                    kind: ast::ExprKind::Case {
-                        subject: Box::new(ast::Expr {
-                            kind: ast::ExprKind::Name {
-                                module: None,
-                                name: ast::Ident {
-                                    name: "%arg".into(),
-                                    span: synthetic,
-                                },
-                            },
-                            span: synthetic,
-                        }),
-                        clauses: clauses.to_vec(),
-                    },
-                    span: case_span,
-                },
-            )
-        };
-        let mut function = self.function(
-            &ast::Function {
-                params: vec![ast::Param::Pattern(param)],
-                ret: None,
-                body: ast::Block {
-                    stmts: vec![ast::Stmt::Expr(body)],
-                    span,
-                },
-            },
-            span,
-        );
-        if !single && let Param::Pattern { label, .. } = &mut function.params[0] {
-            *label = None;
-        }
-        ExprKind::Fn(Box::new(function))
-    }
-
-    fn format(&mut self, f: Option<&ast::Format>) -> Option<Format> {
-        f.map(|f| Format {
-            name: f.name.clone(),
-            arg: f.arg.as_ref().map(|a| Box::new(self.expr(a))),
-        })
-    }
 
     /// Provider contracts are classified after aliases and imports resolve.
     /// A syntactically bare alias can still hide an inference hole.
@@ -3951,219 +2167,6 @@ impl<'a> Resolver<'a> {
         false
     }
 
-    fn block(&mut self, b: &ast::Block) -> Block {
-        let mark = self.locals.len();
-        let mut stmts = Vec::new();
-        use ilang_syntax::walk::{Visitor, Walk};
-        #[derive(Default)]
-        struct Uses(HashMap<String, usize>);
-        impl Visitor for Uses {
-            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
-                if enter && let ast::ExprKind::Name { module: None, name } = &e.kind {
-                    *self.0.entry(name.name.clone()).or_default() += 1;
-                }
-            }
-        }
-        #[derive(Default)]
-        struct Functions(bool);
-        impl Visitor for Functions {
-            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
-                if enter {
-                    self.0 |= matches!(e.kind, ast::ExprKind::Fn(_) | ast::ExprKind::Clauses(_));
-                }
-            }
-        }
-        let mut uses = Uses::default();
-        if b.stmts.windows(2).any(|ss| matches!(ss,
-            [ast::Stmt::Bind(ast::Binding { pattern: ast::Pattern { kind: ast::PatternKind::Typed { .. }, .. }, .. }),
-             ast::Stmt::Env { ty, .. }] if matches!(ty.kind, ast::TypeKind::Hole))) {
-            b.clone().walk(&mut uses);
-        }
-        let mut i = 0;
-        while i < b.stmts.len() {
-            if let (
-                ast::Stmt::Bind(binding),
-                Some(ast::Stmt::Env {
-                    ty: key,
-                    value,
-                    span,
-                }),
-            ) = (&b.stmts[i], b.stmts.get(i + 1))
-                && matches!(key.kind, ast::TypeKind::Hole)
-                && binding.type_params.is_empty()
-                && let ast::PatternKind::Typed { binder, ty } = &binding.pattern.kind
-                && !binder.discard
-                && matches!(&value.kind, ast::ExprKind::Name { module: None, name } if name.name == binder.name)
-                && uses.0.get(&binder.name) == Some(&1)
-            {
-                let contract = self.ty(ty);
-                let open = self.open_provider_contract(&contract);
-                let mut functions = Functions::default();
-                if !open {
-                    binding.value.clone().walk(&mut functions);
-                }
-                // An open contract must survive before local generalization.
-                // A closed function value keeps its existing scheme boundary
-                // and the actual-provider checks deferred through that scheme.
-                if open || !functions.0 {
-                    self.env_type(&contract);
-                    let value = self.expr(&binding.value);
-                    stmts.push(Stmt::Env {
-                        ty: contract,
-                        value,
-                        span: *span,
-                    });
-                    i += 2;
-                    continue;
-                }
-            }
-            stmts.push(match &b.stmts[i] {
-                ast::Stmt::Bind(binding) => {
-                    let (binding, binders) = self.binding(binding, false);
-                    self.local_table(&binding);
-                    self.locals.push(Frame {
-                        names: binders
-                            .into_iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    Stmt::Bind(binding)
-                }
-                ast::Stmt::Env { ty, value, span } => {
-                    let ty = self.ty(ty);
-                    // `_`: the key is read from the value (syntax three).
-                    if !matches!(ty.kind, TypeKind::Hole) {
-                        self.env_type(&ty);
-                    }
-                    let value = self.expr(value);
-                    Stmt::Env {
-                        ty,
-                        value,
-                        span: *span,
-                    }
-                }
-                ast::Stmt::Expr(e) => Stmt::Expr(self.expr(e)),
-            });
-            i += 1;
-        }
-        self.locals.truncate(mark);
-        Block {
-            stmts,
-            span: b.span,
-        }
-    }
-
-    /// §6.8 and §6.11.
-    fn function(&mut self, f: &ast::Function, span: Span) -> Function {
-        let mut params = Vec::new();
-        let mut env_heads: Vec<TypeRef> = Vec::new();
-        let mut all: Vec<Binder> = Vec::new();
-        let mut labels: Vec<String> = Vec::new();
-        let mut pending = Vec::new();
-        for p in &f.params {
-            match p {
-                ast::Param::Pattern(p) => ast_binders(p, &mut pending),
-                ast::Param::Env { name, .. } => pending.push((name.name.clone(), name.span)),
-            }
-        }
-        self.pending.push(
-            pending
-                .into_iter()
-                .map(|(n, span)| self.name_key(&n, span))
-                .collect(),
-        );
-        for p in &f.params {
-            match p {
-                ast::Param::Pattern(pat) => {
-                    let mut binders = Vec::new();
-                    let pattern = self.pattern(pat, &mut binders, None);
-                    for b in binders {
-                        self.param_name(&all, &b.name, b.span);
-                        all.push(b);
-                    }
-                    let label = label_of(pat);
-                    if let Some(l) = &label {
-                        if labels.contains(l) {
-                            self.error(
-                                code::PARAMS_SAME_LABEL,
-                                pat.span,
-                                format!("two parameters of this function have the label `{l}`"),
-                            );
-                        }
-                        labels.push(l.clone());
-                    }
-                    params.push(Param::Pattern { pattern, label });
-                }
-                ast::Param::Env { name, ty } => {
-                    let ty = self.ty(ty);
-                    // §9.2: two environment parameters of one function may
-                    // not have the same type constructor.
-                    if let Some(head) = self.env_type(&ty) {
-                        if env_heads.contains(&head) {
-                            let tname = self.type_name(head);
-                            self.error(
-                                code::ENV_PARAMS_SAME,
-                                ty.span,
-                                format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"),
-                            );
-                        }
-                        env_heads.push(head);
-                    }
-                    let var = self
-                        .checked_inputs
-                        .and_then(|c| c.binders.get(&name.span))
-                        .copied()
-                        .unwrap_or_else(|| self.new_var());
-                    self.check_binder(&name.name, name.span, false, false);
-                    self.param_name(&all, &name.name, name.span);
-                    all.push(Binder {
-                        var,
-                        name: name.name.clone(),
-                        span: name.span,
-                    });
-                    params.push(Param::Env {
-                        var,
-                        name: name.clone(),
-                        ty,
-                    });
-                }
-            }
-        }
-        let ret = f.ret.as_ref().map(|r| RetType {
-            value: self.ty(&r.value),
-            err: r.err.as_ref().map(|t| self.ty(t)),
-            env: r.env.as_ref().map(|t| self.ty(t)),
-        });
-        if let Some(ret) = &ret
-            && let Some(env) = &ret.env
-            && value_dependent(&self.p, env)
-        {
-            self.error(
-                code::VALUE_TYPE_PLACE,
-                env.span,
-                "a value-dependent type is not allowed inside an environment type",
-            );
-        }
-        self.pending.pop();
-        self.fn_depth += 1;
-        self.locals.push(Frame {
-            names: all
-                .into_iter()
-                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                .collect(),
-            fn_only: None,
-        });
-        let body = self.block(&f.body);
-        self.locals.pop();
-        self.fn_depth -= 1;
-        Function {
-            params,
-            ret,
-            body,
-            span,
-        }
-    }
 
     fn param_name(&mut self, all: &[Binder], name: &str, span: Span) {
         if all
@@ -4178,75 +2181,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn clause(&mut self, c: &ast::Clause) -> Clause {
-        let mut first: Vec<Binder> = Vec::new();
-        let mut patterns = Vec::new();
-        let mut pending = Vec::new();
-        for p in &c.patterns {
-            ast_binders(p, &mut pending);
-        }
-        self.pending.push(
-            pending
-                .into_iter()
-                .map(|(n, span)| self.name_key(&n, span))
-                .collect(),
-        );
-        for (i, p) in c.patterns.iter().enumerate() {
-            if i == 0 {
-                patterns.push(self.pattern(p, &mut first, None));
-                continue;
-            }
-            let shared: HashMap<NameKey, VarId> = first
-                .iter()
-                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                .collect();
-            let mut binders = Vec::new();
-            patterns.push(self.pattern(p, &mut binders, Some(&shared)));
-            let a: HashSet<NameKey> = first
-                .iter()
-                .map(|b| self.name_key(&b.name, b.span))
-                .collect();
-            let b: HashSet<NameKey> = binders
-                .iter()
-                .map(|b| self.name_key(&b.name, b.span))
-                .collect();
-            if a != b {
-                let mut diff: Vec<&str> = a
-                    .symmetric_difference(&b)
-                    .map(|k| k.text.as_str())
-                    .collect();
-                diff.sort();
-                self.error(
-                    code::CHOICES_DIFFER,
-                    p.span,
-                    format!(
-                        "every choice of a clause binds the same names, but not all bind {}",
-                        diff.iter()
-                            .map(|n| format!("`{n}`"))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                );
-            }
-        }
-        self.pending.pop();
-        self.locals.push(Frame {
-            names: first
-                .into_iter()
-                .map(|b| (self.name_key(&b.name, b.span), b.var))
-                .collect(),
-            fn_only: None,
-        });
-        let guard = c.guard.as_ref().map(|g| self.expr(g));
-        let body = self.expr(&c.body);
-        self.locals.pop();
-        Clause {
-            patterns,
-            guard,
-            body,
-            span: c.span,
-        }
-    }
 
     fn bind(
         &mut self,
@@ -4284,185 +2218,6 @@ impl<'a> Resolver<'a> {
         b
     }
 
-    /// The syntax services and template slot of a resolved quote. Both
-    /// syntax-tree resolvers resolve their own capture patterns first.
-    fn resolved_quote(
-        &mut self,
-        template: Option<u32>,
-        captures: Vec<(bool, Pattern)>,
-        span: Span,
-    ) -> PatternKind {
-        if let Some(template) = template {
-            let module = ast::Ident {
-                name: "\0quote-syntax".into(),
-                span,
-            };
-            let name = ast::Ident {
-                name: "Syntax".into(),
-                span,
-            };
-            let syntax = self.lookup_type(Some(&module), &name);
-            let functions: Option<Vec<_>> = [
-                "_template",
-                "_match",
-                "_match_ok",
-                "_match_one",
-                "_match_many",
-            ]
-            .into_iter()
-            .map(|name| {
-                let name = ast::Ident {
-                    name: name.into(),
-                    span,
-                };
-                match self.name(Some(&module), &name) {
-                    ExprKind::Name(ValueRef::Def(def)) => Some(def),
-                    _ => None,
-                }
-            })
-            .collect();
-            match (syntax, functions) {
-                (Some(TypeRef::Custom(syntax)), Some(functions)) => PatternKind::Quote {
-                    template,
-                    syntax,
-                    functions: functions.try_into().expect("five quote services"),
-                    captures,
-                },
-                _ => PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect()),
-            }
-        } else {
-            self.error(
-                code::MACRO_RESERVED,
-                span,
-                "a quote pattern must be evaluated inside a macro",
-            );
-            PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect())
-        }
-    }
-
-    fn pattern(
-        &mut self,
-        p: &ast::Pattern,
-        binders: &mut Vec<Binder>,
-        shared: Option<&HashMap<NameKey, VarId>>,
-    ) -> Pattern {
-        use ast::PatternKind as P;
-        let kind = match &p.kind {
-            P::Quote {
-                template, captures, ..
-            } => {
-                let captures = captures
-                    .iter()
-                    .map(|(many, p)| (*many, self.pattern(p, binders, shared)))
-                    .collect();
-                self.resolved_quote(*template, captures, p.span)
-            }
-            P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
-            P::Discard(_) => PatternKind::Discard,
-            P::Typed { binder, ty } => {
-                let binder = (!binder.discard)
-                    .then(|| self.bind(&binder.name, binder.span, binders, shared));
-                PatternKind::Typed {
-                    binder,
-                    ty: self.ty(ty),
-                }
-            }
-            P::Named { name, pattern } => {
-                let binder = self.bind(&name.name, name.span, binders, shared);
-                PatternKind::Named {
-                    binder,
-                    pattern: Box::new(self.pattern(pattern, binders, shared)),
-                }
-            }
-            P::Int { negative, value } => PatternKind::Int {
-                negative: *negative,
-                value: value.clone(),
-            },
-            P::Float { negative, value } => PatternKind::Float {
-                negative: *negative,
-                value: *value,
-            },
-            P::String(s) => PatternKind::String(s.clone()),
-            P::Prefix {
-                prefix,
-                suffix,
-                rest,
-            } => PatternKind::Prefix {
-                prefix: prefix.clone(),
-                suffix: suffix.clone(),
-                rest: (!rest.discard).then(|| self.bind(&rest.name, rest.span, binders, shared)),
-            },
-            P::Constructor {
-                module,
-                name,
-                args,
-                spread,
-            } => {
-                let ctor = self.ctor(module.as_ref(), name);
-                let args: Vec<Pattern> = args
-                    .iter()
-                    .map(|a| match same_name_part(a) {
-                        // §7.1: `label = label` writes the label of a part
-                        // and binds the name once.
-                        Some(inner) => Pattern {
-                            span: a.span,
-                            ..self.pattern(inner, binders, shared)
-                        },
-                        None => self.pattern(a, binders, shared),
-                    })
-                    .collect();
-                match ctor {
-                    Some(ctor) => PatternKind::Constructor {
-                        ctor,
-                        args,
-                        spread: *spread,
-                    },
-                    None => PatternKind::Error(args),
-                }
-            }
-            P::Tuple(items) => PatternKind::Tuple(
-                items
-                    .iter()
-                    .map(|a| self.pattern(a, binders, shared))
-                    .collect(),
-            ),
-            P::List { items, rest } => {
-                let items = items
-                    .iter()
-                    .map(|a| self.pattern(a, binders, shared))
-                    .collect();
-                let rest = rest.as_ref().map(|r| {
-                    r.as_ref()
-                        .filter(|b| !b.discard)
-                        .map(|b| self.bind(&b.name, b.span, binders, shared))
-                });
-                PatternKind::List { items, rest }
-            }
-            P::BitArray(segs) => {
-                let mut out = Vec::new();
-                for s in segs {
-                    let value = self.pattern(&s.value, binders, shared);
-                    // §8.4: a length may use names of earlier segments.
-                    self.locals.push(Frame {
-                        names: binders
-                            .iter()
-                            .map(|b| (self.name_key(&b.name, b.span), b.var))
-                            .collect(),
-                        fn_only: None,
-                    });
-                    let format = self.format(s.format.as_ref());
-                    self.locals.pop();
-                    out.push(Segment {
-                        value,
-                        format,
-                        span: s.span,
-                    });
-                }
-                PatternKind::BitArray(out)
-            }
-        };
-        Pattern { kind, span: p.span }
-    }
 
     // ---- Phase 5: exported types (§2.4) ----
 
@@ -4791,10 +2546,6 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
     }
 }
 
-/// `C` or `m.C`: constructors are the only values with an `UpName`.
-fn is_constructor(e: &ast::Expr) -> bool {
-    matches!(&e.kind, ast::ExprKind::Name { name, .. } if is_upper(&name.name))
-}
 
 /// Calls `f` on each type directly inside `t`.
 fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
@@ -5000,20 +2751,6 @@ fn projectable_body(
     }
 }
 
-/// A constructor pattern part `name = name` or `name = name: T`: the part
-/// after the written label.
-fn same_name_part(p: &ast::Pattern) -> Option<&ast::Pattern> {
-    let ast::PatternKind::Named { name, pattern } = &p.kind else {
-        return None;
-    };
-    match &pattern.kind {
-        ast::PatternKind::Var(n) if *n == name.name => Some(pattern),
-        ast::PatternKind::Typed { binder, .. } if !binder.discard && binder.name == name.name => {
-            Some(pattern)
-        }
-        _ => None,
-    }
-}
 
 #[derive(Clone, Debug)]
 pub(crate) struct ExpansionScope {
@@ -5090,13 +2827,9 @@ pub fn typed_output(
     ilang_syntax::syn3::deep::deep(|| {
         ilang_syntax::syn3::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
     });
-    let metadata: Vec<_> = parsed
-        .iter()
-        .map(|p| p.with_lowered_ast(Default::default()))
-        .collect();
     three::typed_output3(
         graph,
-        &metadata,
+        parsed,
         original,
         module,
         call,
@@ -5112,153 +2845,6 @@ pub fn typed_output(
     )
 }
 
-/// Resolve fresh output in the exact lexical scope captured before inference.
-#[allow(clippy::too_many_arguments)]
-pub fn typed_output_via_lowering(
-    graph: &PackageGraph,
-    parsed: &[crate::Parsed],
-    original: &Program,
-    module: ModuleId,
-    call: Span,
-    expression: &ilang_syntax::syn3::ast::Expr,
-    var_count: u32,
-    ty_var_count: u32,
-    checked: &CheckedInputs,
-) -> Result<(Expr, Program), Vec<Diagnostic>> {
-    let lowered = crate::lower_parsed(graph, parsed);
-    // A multi-shape chain has a synthetic one-byte root in the transition
-    // tree. Keep checked inputs at that root as well as their native span.
-    struct Inputs<'a>(&'a mut CheckedInputs);
-    impl ilang_syntax::syn3::walk::Visitor for Inputs<'_> {
-        fn expr(&mut self, e: &mut ilang_syntax::syn3::ast::Expr, enter: bool) {
-            use ilang_syntax::syn3::ast::ExprKind;
-            // Only a multi-shape chain changes its root span. Computing
-            // this from its head avoids lowering every forwarded subtree.
-            if enter
-                && let ExprKind::Chain(branches) = &e.kind
-                && branches.iter().any(|branch| {
-                    branch
-                        .params
-                        .iter()
-                        .any(|parameter| parameter.key.is_some())
-                        || branches
-                            .first()
-                            .is_some_and(|first| first.params.len() != branch.params.len())
-                })
-                && let Some(old) = self.0.expressions.get(&e.span.0).cloned()
-            {
-                let span = e.span.0;
-                self.0
-                    .expressions
-                    .insert(Span::new(span.end.saturating_sub(1), span.end), old);
-            }
-        }
-    }
-    let mut forwarded = CheckedInputs {
-        expressions: checked.expressions.clone(),
-        binders: checked.binders.clone(),
-    };
-    ilang_syntax::syn3::deep::deep(|| {
-        ilang_syntax::syn3::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
-    });
-    let expression = ilang_syntax::syn3::lower::lower_expr_with_transition(
-        expression,
-        parsed[module.0 as usize]
-            .scoped
-            .as_ref()
-            .map(|scoped| scoped.transition()),
-    )
-    .map_err(|d| {
-        vec![Diagnostic::error(
-            d.code.as_str(),
-            Some(parsed[module.0 as usize].source),
-            d.span,
-            d.message,
-        )]
-    })?;
-    typed_output_lowered(
-        graph,
-        &lowered,
-        original,
-        module,
-        call,
-        &expression,
-        var_count,
-        ty_var_count,
-        &forwarded,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn typed_output_lowered(
-    graph: &PackageGraph,
-    parsed: &[Parsed],
-    original: &Program,
-    module: ModuleId,
-    call: Span,
-    expression: &ast::Expr,
-    var_count: u32,
-    ty_var_count: u32,
-    checked: &CheckedInputs,
-) -> Result<(Expr, Program), Vec<Diagnostic>> {
-    let names = original
-        .expansion_names
-        .as_ref()
-        .expect("typed module has resolution tables");
-    let scope = original
-        .expansion_scopes
-        .get(&(module, call))
-        .expect("typed call has lexical scope");
-    let mut p = original.clone();
-    p.var_count = var_count;
-    p.ty_var_count = ty_var_count;
-    p.ty_var_names
-        .resize_with(ty_var_count as usize, || "Output".into());
-    let reads = p.of_sites.len();
-    let mut r = Resolver {
-        graph,
-        parsed,
-        p,
-        diags: Vec::new(),
-        generated_values: names.generated_values.clone(),
-        generated_types: names.generated_types.clone(),
-        defs_by_name: names.defs_by_name.clone(),
-        macros_by_name: names.macros_by_name.clone(),
-        types_by_name: names.types_by_name.clone(),
-        ctors_by_name: names.ctors_by_name.clone(),
-        slots: names.slots.clone(),
-        scopes: names.scopes.clone(),
-        by_path: names.by_path.clone(),
-        builtin_values: names.builtin_values.clone(),
-        builtin_types: names.builtin_types.clone(),
-        cur: module,
-        locals: scope.locals.clone(),
-        fn_depth: scope.fn_depth,
-        ty_frames: scope.ty_frames.clone(),
-        ty_def: None,
-        circular: HashSet::new(),
-        pending: scope.pending.clone(),
-        reserved: scope.reserved.clone(),
-        checked_inputs: Some(checked),
-        // A re-resolved expansion has no selection tables: a chain name in
-        // it is a multi-shape value.
-        def_tables: HashMap::new(),
-        local_tables: HashMap::new(),
-    };
-    let result = r.expr(expression);
-    if r.p.of_sites.len() != reads {
-        r.error(
-            code::VALUE_TYPE_PLACE,
-            expression.span,
-            "a typed macro result cannot add a direct value-type read (T5)",
-        );
-    }
-    if r.diags.iter().any(Diagnostic::is_error) {
-        Err(r.diags)
-    } else {
-        Ok((result, r.p))
-    }
-}
 
 pub(crate) fn normalize_source(
     module: &ilang_syntax::syn3::ast::Module,

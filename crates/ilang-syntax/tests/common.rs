@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::ast::Module;
 
 /// The debug form of a module without spans, to compare trees.

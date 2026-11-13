@@ -1,12 +1,12 @@
 //! Removed by the final deletion script, after the engine/resolver flip.
 use super::tree::*;
-use ilang_syntax::ast;
+use migration_syntax::ast;
 
 pub fn parse(text: &str, lisp: bool) -> Module {
     let tree = if lisp {
-        ilang_syntax::lisp::parse_source(text).0
+        migration_syntax::lisp::parse_source(text).0
     } else {
-        ilang_syntax::parse_module(text).0
+        migration_syntax::parse_module(text).0
     };
     let mut calls = Vec::new();
     let mut visit = |e: &ast::Expr| {

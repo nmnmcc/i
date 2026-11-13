@@ -274,7 +274,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
 | 3 resolver | GREEN: expanded Nov14 gate completes on native source `3499484118`; all requested Rust/CLI/std/spec/generation/fmt/clippy checks pass |
-| 4 deletion | IN PROGRESS on lane/fa-delete: stage12 merged and workspace all-targets check passes; original engine answers still to capture; production old tree not yet deleted |
+| 4 deletion | COMPILES on lane/fa-delete: production old tree/lowerer/old row helpers deleted; workspace all-targets check passes; private package and full deletion gate still pending |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -809,3 +809,35 @@ Wrapped workspace all-targets check passes; this is a compiling integration
 milestone, not the full deletion gate. Next capture the five matching
 engine answers, then apply the guarded deletion. The unchanged null-round
 assertion passed both2170-test std runs before this merge.
+
+
+Nov14 07:08 deletion audit: the five original engine comparisons pass on
+`5dd20acf9`; their complete matching answers are captured before removing
+the old hook. The probe is removed and the clean-head guard passes. The
+old tree/lowerer/encoder/readers move exclusively to the private migration
+package and cfg(test) resolver oracle; native syntax moves to the crate
+root. Production syntax and resolver libraries compile. All-target repairs
+retain native/old assertions through one normal dependency instance rather
+than mixing Rust unit-crate identities. Normalizer helpers exposed for this
+read-only test boundary contain no old nodes. Backend/inventory readers
+use native Macro/Bind/Chain forms and unwrap the same source spans.
+
+The successive all-target checks find and explain: three native reader
+entry references; private renderer visibility and shared quote/identifier
+references; historical unit type identities; a remaining normalizer reader
+visibility; checker old-tree test helpers; the optional unused inventory
+reader; and private binder/backend span references. These are compile
+boundaries, not diagnostic snapshot repairs. Their fixes are uncommitted
+until the workspace compiles. Check9 is queued; its exact output is
+`target/fa-r3/delete-check9.log`. Green3 remains`6de9a39b6` on lane/fa.
+
+
+07:16 compiling deletion milestone: wrapped workspace all-targets check
+passes on attempt11. All remaining generator/backend/inventory readers use
+the native tree; old-node assertions use dev-only private helpers. The
+migration package is absent from normal dependencies in all four consumers
+(syntax/check/macro/CLI), and the historical resolver is cfg(test) only.
+No diagnostic golden has changed. Initial all-target failures are explained
+in the verification ledger; private standalone checks and the complete
+deletion gate still follow. Green3 remains the landable prefix until they
+pass. Formatting and the private lockfile are next.

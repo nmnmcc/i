@@ -1,4 +1,6 @@
 //! STR surface spelling, desugaring and formatter round trips.
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::{
     format::format, lex, lisp, parse_module, print::print_module, shape, token::TokenKind,
 };

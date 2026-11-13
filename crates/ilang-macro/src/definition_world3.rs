@@ -123,7 +123,7 @@ pub fn type_parameters(item: &Item) -> Vec<&Ident> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ilang_syntax::ast as old;
+    use migration_syntax::ast as old;
 
     /// The answers on the tree of syntax three and on its lowering.
     #[test]
@@ -140,7 +140,7 @@ k = 1
 ";
         let (module, errors) = ilang_syntax::syn3::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
-        let (lowered, _) = ilang_syntax::syn3::lower::lower(&module);
+        let (lowered, _) = migration_syntax::syn3::lower::lower(&module);
         assert_eq!(module.items.len(), lowered.items.len());
         let names = |ids: Vec<&Ident>| ids.iter().map(|i| i.name.clone()).collect::<Vec<_>>();
         let old_names = |ids: &[old::Ident]| {

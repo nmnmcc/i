@@ -1,52 +1,207 @@
-//! The syntax tree. Every node has a span. Groups `{ e }` of one expression
-//! are kept as blocks; type groups `{ T }` leave no node.
+//! The syntax tree of syntax three (docs/design/syntax-3.md §3, with the
+//! services amendment: `<-` in types, heads and calls, `<A>(…)` generics).
+//!
+//! Every node keeps its span in an [`Sp`], which never takes part in
+//! equality, so `parse(print(t)) == t` compares trees and not positions.
 
+use crate::lisp::Datum;
 use crate::span::Span;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 
-pub use crate::syn3::ast::resolved::Ident;
-
-/// A record type label is either a literal string or a declared label parameter.
-#[derive(Clone, Debug, PartialEq)]
-pub struct RecordLabel {
-    pub ident: Ident,
-    pub parameter: bool,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnOp {
+    Neg,
+    NegFloat,
 }
 
-impl std::ops::Deref for RecordLabel {
-    type Target = Ident;
-    fn deref(&self) -> &Ident {
-        &self.ident
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BinOp {
+    Or,
+    And,
+    Eq,
+    NotEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+    LtFloat,
+    LtEqFloat,
+    GtFloat,
+    GtEqFloat,
+    Concat,
+    Pipe,
+    Add,
+    Sub,
+    AddFloat,
+    SubFloat,
+    Mul,
+    Div,
+    Rem,
+    MulFloat,
+    DivFloat,
+}
+
+impl BinOp {
+    /// The level of §6.9, from 1 (weakest) to 8.
+    pub fn level(self) -> u8 {
+        use BinOp::*;
+        match self {
+            Pipe => 1,
+            Or => 2,
+            And => 3,
+            Eq | NotEq => 4,
+            Lt | LtEq | Gt | GtEq | LtFloat | LtEqFloat | GtFloat | GtEqFloat => 5,
+            Concat => 6,
+            Add | Sub | AddFloat | SubFloat => 7,
+            Mul | Div | Rem | MulFloat | DivFloat => 8,
+        }
+    }
+
+    pub fn text(self) -> &'static str {
+        use BinOp::*;
+        match self {
+            Or => "||",
+            And => "&&",
+            Eq => "==",
+            NotEq => "!=",
+            Lt => "<",
+            LtEq => "<=",
+            Gt => ">",
+            GtEq => ">=",
+            LtFloat => "<.",
+            LtEqFloat => "<=.",
+            GtFloat => ">.",
+            GtEqFloat => ">=.",
+            Concat => "<>",
+            Pipe => "|>",
+            Add => "+",
+            Sub => "-",
+            AddFloat => "+.",
+            SubFloat => "-.",
+            Mul => "*",
+            Div => "/",
+            Rem => "%",
+            MulFloat => "*.",
+            DivFloat => "/.",
+        }
+    }
+}
+
+/// Canonical integer or decoded string value, shared by written and tested types.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum LitValue {
+    Int(BigInt),
+    Str(String),
+}
+
+impl LitValue {
+    pub fn text(&self) -> String {
+        match self {
+            Self::Int(n) => n.to_string(),
+            Self::Str(s) => crate::print::string_literal(s),
+        }
+    }
+}
+
+/// Names retained by HIR with exact source spans.
+pub mod resolved {
+    use crate::span::Span;
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct Ident {
+        pub name: String,
+        pub span: Span,
+    }
+}
+
+/// A span that is equal to every other span.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Sp(pub Span);
+
+impl PartialEq for Sp {
+    fn eq(&self, _: &Sp) -> bool {
+        true
+    }
+}
+
+impl From<Span> for Sp {
+    fn from(span: Span) -> Sp {
+        Sp(span)
+    }
+}
+
+/// A quoted datum. Two are equal when they are written the same.
+#[derive(Clone, Debug)]
+pub struct Quoted(pub Box<Datum>);
+
+impl PartialEq for Quoted {
+    fn eq(&self, other: &Quoted) -> bool {
+        crate::lisp::show(&self.0) == crate::lisp::show(&other.0)
+    }
+}
+
+/// A quote pattern of a compile-time macro: the quoted datum, the slot of
+/// its template in the table of the compiler program, and the patterns of
+/// its unquotes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct QuotePattern {
+    pub datum: Quoted,
+    /// Template table slot, filled when a compiler program is prepared
+    /// (`lisp::quote_lower3`).
+    pub template: Option<u32>,
+    /// Capture patterns in matcher order; the flag marks a splice.
+    pub captures: Vec<(bool, Pattern)>,
+}
+
+impl QuotePattern {
+    /// A quote pattern whose captures were not read.
+    pub fn unread(datum: Datum) -> QuotePattern {
+        QuotePattern {
+            datum: Quoted(Box::new(datum)),
+            template: None,
+            captures: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Ident {
+    pub name: String,
+    pub span: Sp,
+}
+
+impl Ident {
+    pub fn new(name: impl Into<String>, span: Span) -> Ident {
+        Ident {
+            name: name.into(),
+            span: Sp(span),
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Module {
-    /// The `////` comments of the file (§1.2), one entry per line.
+    /// The `////` comments of the file, one entry per line.
     pub doc: Vec<String>,
-    pub imports: Vec<ImportItem>,
-    pub exports: Vec<ExportItem>,
+    pub imports: Vec<Import>,
+    pub exports: Vec<Export>,
     pub items: Vec<Item>,
-    /// The imports group.
-    pub imports_span: Option<Span>,
-    pub exports_span: Option<Span>,
 }
 
-/// `[alias =] [(A, b) =] a/b/c` (§2.3).
+/// `[alias =] [(A, b) =] a/b/c`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ImportItem {
+pub struct Import {
     pub alias: Option<Ident>,
     pub names: Vec<Ident>,
     pub path: Vec<Ident>,
-    pub span: Span,
+    pub span: Sp,
 }
 
-/// `name`, `T`, or `T(..)` (§2.4).
+/// `name`, `T`, or `T(..)`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExportItem {
+pub struct Export {
     pub name: Ident,
     pub constructors: bool,
-    pub span: Span,
+    pub span: Sp,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,217 +210,208 @@ pub struct Item {
     pub doc: Vec<String>,
     pub attributes: Vec<Attribute>,
     pub kind: ItemKind,
-    pub span: Span,
+    pub span: Sp,
 }
 
-/// `@[module.]name[(args)]` (§2.2). `args` holds the arguments when every
-/// one is a string literal with no label and there is at least one; `call`
-/// holds them, with the span of the `( )`, in every other case with `( )`.
+/// `@[module.]name[(data)]`. `args` is `None` when there are no brackets.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attribute {
     pub module: Option<Ident>,
     pub name: Ident,
-    pub args: Vec<(String, Span)>,
-    pub call: Option<(Vec<Arg>, Span)>,
-    pub span: Span,
+    pub args: Option<Vec<DItem>>,
+    pub span: Sp,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ItemKind {
     TypeDef(TypeDef),
-    Binding(Binding),
-    /// `name[(A, …)]: Type` (§2.5, §10.1).
-    Declaration {
+    Bind(Binding),
+    /// `name: Type` with no value (`@external`, `@js`).
+    Decl {
         name: Ident,
-        type_params: Vec<Ident>,
-        ty: TypeExpr,
+        ty: Type,
     },
-    /// `[module.]name(args)` at the top level, kept for macros (§2.2).
-    MacroItem {
+    /// `[module.]name(data)` at the top level, kept for macros.
+    Macro {
         module: Option<Ident>,
         name: Ident,
-        args: Vec<Arg>,
+        args: Vec<DItem>,
     },
 }
 
-/// `T(A, B) { C1 C2 }` or `T(A) = Type` (§4.3). `params` holds a head of
-/// plain `UpName`s with no module and no arguments. `head` holds any other head,
-/// and `params` is then empty.
+/// `Name [ (head) ] = right side` (§2.8). The head is read as type patterns;
+/// the kind follows from the written right side.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeDef {
-    /// Frozen from the written RHS before expansion (§4.3).
+    pub name: Ident,
+    pub head: Vec<Type>,
+    pub rhs: TypeRhs,
+    /// Classification of the written right side, before type expansion
+    /// (spec §4.7). Replacing the right side never reclassifies the head.
     pub alias_pattern: bool,
-    pub name: Ident,
-    pub params: Vec<Ident>,
-    pub head: Vec<TypeExpr>,
-    pub body: TypeBody,
+}
+
+impl TypeDef {
+    pub fn new(name: Ident, head: Vec<Type>, rhs: TypeRhs) -> Self {
+        let alias_pattern = !head.is_empty()
+            && matches!(&rhs, TypeRhs::Type(t) if matches!(t.kind, TypeKind::ValueOf { .. }));
+        Self {
+            name,
+            head,
+            rhs,
+            alias_pattern,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TypeBody {
-    Custom(Vec<Constructor>),
-    Alias(TypeExpr),
+pub enum TypeRhs {
+    /// `T = Opaque`.
+    Opaque,
+    /// `T = (items)`: a labelled type with data, its own constructor.
+    Data(Vec<TItem>),
+    /// Anything else: a name (alias), or an alias pattern when the type is a
+    /// value type. A data type here is printed in a group, `{ (A, B) }`.
+    Type(Type),
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Constructor {
-    pub name: Ident,
-    pub fields: Vec<Field>,
-    pub span: Span,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Field {
-    pub label: Option<Ident>,
-    pub ty: TypeExpr,
-    pub span: Span,
-}
-
-/// `pattern = value`, or `name(A, …)[: T] = value` (§2.5, §6.10).
+/// `Pattern = Expr`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Binding {
     pub pattern: Pattern,
     pub value: Expr,
-    pub span: Span,
-    /// The type variables declared after the name (§4.7).
-    pub type_params: Vec<Ident>,
+    pub span: Sp,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Bind(Binding),
-    /// `! T = e` (§6.10, §9.2).
-    Env {
-        ty: TypeExpr,
-        value: Expr,
-        span: Span,
-    },
     Expr(Expr),
 }
 
+/// `{ s1 … sn e }`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
-    pub span: Span,
+    pub span: Sp,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
-    pub span: Span,
+    pub span: Sp,
 }
-
-pub use crate::syn3::ast::{BinOp, UnOp};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
-    /// A Lisp template; expanded by the compile-time macro phase.
-    Quote(Box<crate::lisp::Datum>),
+    /// A Lisp template (Lisp surface only).
+    Quote(Quoted),
     Int(BigUint),
     Float(f64),
     String(String),
-    /// `x`, `C`, or `m.C`. `m.x` is a `Field`, because the parser does not
-    /// know whether `m` is a module (§2.3).
+    /// A string with `\( … )` parts.
+    Interp(Vec<InterpPart>),
+    /// `x`, `C`, or `m.C`. `m.x` is a `Field`.
     Name {
         module: Option<Ident>,
         name: Ident,
     },
-    Tuple(Vec<Expr>),
-    /// A structural record, with an optional spread evaluated before its fields.
-    Record {
-        base: Option<Box<Expr>>,
-        fields: Vec<(Ident, Expr)>,
-    },
+    /// `( items )`: data.
+    Data(Vec<DItem>),
     List {
         items: Vec<Expr>,
         rest: Option<Box<Expr>>,
     },
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
-    Fn(Box<Function>),
-    /// The match `e |> { … }` (§6.12).
-    Case {
-        subject: Box<Expr>,
-        clauses: Vec<Clause>,
-    },
-    /// A clause block that is not the right side of `|>` (§6.12).
-    Clauses(Vec<Clause>),
+    /// `F1 | F2 | …`, one or more function literals (§2.5).
+    Chain(Vec<Function>),
+    /// `callee(items)`: the argument is data.
     Call {
         callee: Box<Expr>,
-        args: Vec<Arg>,
+        args: Vec<DItem>,
+    },
+    /// `f(x) <- (s)` and `{ … } <- (s)`: the target runs with the services
+    /// of the right side added to its environment.
+    Provide {
+        target: Box<Expr>,
+        services: Box<Expr>,
     },
     Field {
         target: Box<Expr>,
         name: Ident,
     },
-    TupleIndex {
+    /// `d.0`.
+    Index {
         target: Box<Expr>,
         index: BigUint,
-        index_span: Span,
-    },
-    /// `C(..base, f: e)` (§6.7).
-    RecordUpdate {
-        constructor: Box<Expr>,
-        base: Box<Expr>,
-        fields: Vec<(Ident, Expr)>,
     },
     Unary {
         op: UnOp,
         expr: Box<Expr>,
     },
+    /// Never `BinOp::Pipe`.
     Binary {
         op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+    /// `a |> f`, `a |> f(b)`, and the match `a |> F1 | F2` (§2.11).
+    Pipe {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arg {
-    pub label: Option<Ident>,
-    pub value: Expr,
+pub enum InterpPart {
+    Text(String),
+    Expr(Expr),
 }
 
+/// An item of a data value or of a call's data.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Clause {
-    pub patterns: Vec<Pattern>,
-    pub guard: Option<Expr>,
-    pub body: Expr,
-    pub span: Span,
+pub enum DItem {
+    Pos(Expr),
+    Label(Ident, Expr),
+    Spread(Expr),
 }
 
-/// `(params) -> A ^ E ! N { body }` (§6.8).
+/// `[<A, …>] (params [? guard]) [<- (services)] [-> R] { body }`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function {
-    pub params: Vec<Param>,
-    pub ret: Option<RetType>,
+    pub generics: Vec<Ident>,
+    pub params: Vec<PItem>,
+    pub guard: Option<Expr>,
+    /// `None` when there is no `<-` part.
+    pub services: Option<Vec<SItem>>,
+    pub ret: Option<Type>,
     pub body: Block,
+    pub span: Sp,
 }
 
-/// The part of a function after `->`.
+/// An item of a parameter group: `[key =] p1 | p2 | …`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct RetType {
-    pub value: TypeExpr,
-    pub err: Option<TypeExpr>,
-    pub env: Option<TypeExpr>,
+pub struct PItem {
+    pub key: Option<Ident>,
+    pub choices: Vec<Pattern>,
 }
 
+/// An item of the service pattern of a function head: `name: T` binds the
+/// service whose key is the named type `T`; `..name: N`, the last item,
+/// binds the whole environment as one value of the row type `N`.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Param {
-    Pattern(Pattern),
-    /// `name ! T` (§6.11).
-    Env {
-        name: Ident,
-        ty: TypeExpr,
-    },
+pub struct SItem {
+    pub rest: bool,
+    pub name: Ident,
+    pub ty: Type,
 }
 
-/// A part of a bit array (§8.1).
+/// A part of a bit array.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Segment<T> {
     pub value: T,
     pub format: Option<Format>,
-    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -274,41 +420,30 @@ pub struct Format {
     pub arg: Option<Box<Expr>>,
 }
 
-#[derive(Debug)]
-pub struct Pattern {
-    pub kind: PatternKind,
-    pub span: Span,
-}
-
-/// A name or a discard in a place where only those may be.
+/// A name or a discard.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Binder {
     pub name: String,
     pub discard: bool,
-    pub span: Span,
+    pub span: Sp,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pattern {
+    pub kind: PatternKind,
+    pub span: Sp,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {
-    /// A Lisp quote pattern used by a compile-time macro.
-    Quote {
-        datum: Box<crate::lisp::Datum>,
-        /// Template table slot, populated when preparing a compiler program.
-        template: Option<u32>,
-        /// Capture patterns in matcher order; bool denotes a splice.
-        captures: Vec<(bool, Pattern)>,
-    },
+    /// A Lisp quote pattern (Lisp surface only).
+    Quote(QuotePattern),
     Var(String),
     Discard(String),
-    /// `x: T` (§7.1).
+    /// `x: T`.
     Typed {
         binder: Binder,
-        ty: TypeExpr,
-    },
-    /// `x = p`.
-    Named {
-        name: Ident,
-        pattern: Box<Pattern>,
+        ty: Type,
     },
     Int {
         negative: bool,
@@ -325,32 +460,37 @@ pub enum PatternKind {
         suffix: String,
         rest: Binder,
     },
-    /// `C`, `m.C(p, …)`, `C(p, ..)`.
-    Constructor {
+    /// `C`, `m.C(items)`. `args` is `None` when there are no brackets.
+    Ctor {
         module: Option<Ident>,
         name: Ident,
-        args: Vec<Pattern>,
-        spread: bool,
+        args: Option<Vec<DPItem>>,
     },
-    Tuple(Vec<Pattern>),
+    /// `( items )`.
+    Data(Vec<DPItem>),
     /// `[p, …]`, `[p, …, ..]`, `[p, …, ..r]`.
     List {
         items: Vec<Pattern>,
         rest: Option<Option<Binder>>,
     },
     BitArray(Vec<Segment<Pattern>>),
+    /// `p1 = p2 = …`, two or more parts that match the same value.
+    And(Vec<Pattern>),
 }
 
-#[derive(Debug)]
-pub struct TypeExpr {
-    pub kind: TypeKind,
-    pub span: Span,
+/// An item of a data pattern or of a constructor pattern.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DPItem {
+    Pos(Pattern),
+    Key(Ident, Pattern),
+    /// `..`, `..name`, `.._`; the last item.
+    Rest(Option<Binder>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FnParamType {
-    pub label: Option<Ident>,
-    pub ty: TypeExpr,
+pub struct Type {
+    pub kind: TypeKind,
+    pub span: Sp,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -359,48 +499,78 @@ pub enum TypeKind {
     Named {
         module: Option<Ident>,
         name: Ident,
-        args: Vec<TypeExpr>,
+        args: Vec<Type>,
     },
-    /// `name` or `a.x` with a lowercase `x`, kept for the type of a value (§3).
+    /// `name` or `a.x`: the type of a value.
     ValueOf {
         module: Option<Ident>,
         name: Ident,
     },
-    /// `[a.]m(args)` with a lowercase `m`, kept for macros (§3).
+    /// `[a.]m(args)` with a lowercase `m`, kept for macros.
     Call {
         module: Option<Ident>,
         name: Ident,
-        args: Vec<TypeArg>,
+        args: Vec<Type>,
     },
     /// `_`.
     Hole,
-    Tuple(Vec<TypeExpr>),
-    Record {
-        base: Option<Box<TypeExpr>>,
-        fields: Vec<(RecordLabel, TypeExpr)>,
-        removed: Vec<RecordLabel>,
-    },
-    Fn {
-        params: Vec<FnParamType>,
-        ret: Box<TypeExpr>,
-        err: Option<Box<TypeExpr>>,
-        env: Option<Box<TypeExpr>>,
-    },
-    /// `A | B | …`, two or more members.
-    Union(Vec<TypeExpr>),
-    /// `A & B & …`, two or more members.
-    Inter(Vec<TypeExpr>),
-    /// `A - B - …`, from left to right, two or more members.
-    Diff(Vec<TypeExpr>),
+    /// `( items )`.
+    Data(Vec<TItem>),
+    Fn(Box<FnType>),
+    Union(Vec<Type>),
+    Inter(Vec<Type>),
+    Diff(Vec<Type>),
 }
 
-/// A type-call argument is a type, including a literal type (§3).
-pub type TypeArg = TypeExpr;
+/// `[<A, …>] P [<- Needs] -> R`. `param` is a data type, or any other type,
+/// which is then written in a group: `{ (Float) | (Float, Float) } -> Float`.
+/// `services` (the needs) is a data type whose items are named types and at
+/// most one spread `..N`, or one named type `N`, a row variable.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FnType {
+    pub generics: Vec<Ident>,
+    pub param: Type,
+    pub services: Option<Type>,
+    pub ret: Type,
+}
 
-pub use crate::syn3::ast::LitValue;
+/// An item of a data type. `Spread` is only legal after `<-`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum TItem {
+    Pos(Type),
+    Label(Ident, Type),
+    Spread(Type),
+}
+
+impl Expr {
+    pub fn new(kind: ExprKind, span: Span) -> Expr {
+        Expr {
+            kind,
+            span: Sp(span),
+        }
+    }
+}
+
+impl Pattern {
+    pub fn new(kind: PatternKind, span: Span) -> Pattern {
+        Pattern {
+            kind,
+            span: Sp(span),
+        }
+    }
+}
+
+impl Type {
+    pub fn new(kind: TypeKind, span: Span) -> Type {
+        Type {
+            kind,
+            span: Sp(span),
+        }
+    }
+}
 
 // Trees produced by macros can be much deeper than the host call stack. Move
-// children onto one explicit worklist before dropping their owning node.
+// children onto one explicit work list before dropping their owning node.
 mod iterative_drop {
     use super::*;
 
@@ -409,10 +579,11 @@ mod iterative_drop {
         Pattern(PatternKind),
         Type(TypeKind),
     }
+
     fn expr(e: &mut Expr, work: &mut Vec<Part>) {
         work.push(Part::Expr(std::mem::replace(
             &mut e.kind,
-            ExprKind::Tuple(Vec::new()),
+            ExprKind::Data(Vec::new()),
         )));
     }
     fn pattern(p: &mut Pattern, work: &mut Vec<Part>) {
@@ -421,7 +592,7 @@ mod iterative_drop {
             PatternKind::Discard(String::new()),
         )));
     }
-    fn ty(t: &mut TypeExpr, work: &mut Vec<Part>) {
+    fn ty(t: &mut Type, work: &mut Vec<Part>) {
         work.push(Part::Type(std::mem::replace(&mut t.kind, TypeKind::Hole)));
     }
     fn format(f: &mut Option<Format>, work: &mut Vec<Part>) {
@@ -436,42 +607,50 @@ mod iterative_drop {
                     pattern(&mut b.pattern, work);
                     expr(&mut b.value, work);
                 }
-                Stmt::Env { ty: t, value, .. } => {
-                    ty(t, work);
-                    expr(value, work);
-                }
                 Stmt::Expr(e) => expr(e, work),
             }
         }
     }
-    fn clauses(cs: &mut [Clause], work: &mut Vec<Part>) {
-        for c in cs {
-            for p in &mut c.patterns {
-                pattern(p, work);
+    fn ditems(items: &mut [DItem], work: &mut Vec<Part>) {
+        for i in items {
+            match i {
+                DItem::Pos(e) | DItem::Label(_, e) | DItem::Spread(e) => expr(e, work),
             }
-            if let Some(g) = &mut c.guard {
-                expr(g, work);
-            }
-            expr(&mut c.body, work);
         }
     }
+    fn dpitems(items: &mut [DPItem], work: &mut Vec<Part>) {
+        for i in items {
+            match i {
+                DPItem::Pos(p) | DPItem::Key(_, p) => pattern(p, work),
+                DPItem::Rest(_) => {}
+            }
+        }
+    }
+    fn titems(items: &mut [TItem], work: &mut Vec<Part>) {
+        for i in items {
+            match i {
+                TItem::Pos(t) | TItem::Label(_, t) | TItem::Spread(t) => ty(t, work),
+            }
+        }
+    }
+
     fn drain(mut work: Vec<Part>) {
         while let Some(part) = work.pop() {
             match part {
                 Part::Expr(mut kind) => match &mut kind {
-                    ExprKind::Tuple(xs) => {
-                        for x in xs {
-                            expr(x, &mut work);
+                    ExprKind::Quote(_)
+                    | ExprKind::Int(_)
+                    | ExprKind::Float(_)
+                    | ExprKind::String(_)
+                    | ExprKind::Name { .. } => {}
+                    ExprKind::Interp(parts) => {
+                        for p in parts {
+                            if let InterpPart::Expr(e) = p {
+                                expr(e, &mut work);
+                            }
                         }
                     }
-                    ExprKind::Record { base, fields } => {
-                        if let Some(base) = base {
-                            expr(base, &mut work);
-                        }
-                        for (_, value) in fields {
-                            expr(value, &mut work);
-                        }
-                    }
+                    ExprKind::Data(items) => ditems(items, &mut work),
                     ExprKind::List { items, rest } => {
                         for x in items {
                             expr(x, &mut work);
@@ -487,76 +666,61 @@ mod iterative_drop {
                         }
                     }
                     ExprKind::Block(b) => block(b, &mut work),
-                    ExprKind::Fn(f) => {
-                        for p in &mut f.params {
-                            match p {
-                                Param::Pattern(p) => pattern(p, &mut work),
-                                Param::Env { ty: t, .. } => ty(t, &mut work),
+                    ExprKind::Chain(fs) => {
+                        for f in fs {
+                            for p in &mut f.params {
+                                for c in &mut p.choices {
+                                    pattern(c, &mut work);
+                                }
                             }
+                            if let Some(g) = &mut f.guard {
+                                expr(g, &mut work);
+                            }
+                            for s in f.services.iter_mut().flatten() {
+                                ty(&mut s.ty, &mut work);
+                            }
+                            if let Some(r) = &mut f.ret {
+                                ty(r, &mut work);
+                            }
+                            block(&mut f.body, &mut work);
                         }
-                        if let Some(r) = &mut f.ret {
-                            ty(&mut r.value, &mut work);
-                            if let Some(t) = &mut r.err {
-                                ty(t, &mut work);
-                            }
-                            if let Some(t) = &mut r.env {
-                                ty(t, &mut work);
-                            }
-                        }
-                        block(&mut f.body, &mut work);
                     }
-                    ExprKind::Case {
-                        subject,
-                        clauses: cs,
-                    } => {
-                        expr(subject, &mut work);
-                        clauses(cs, &mut work);
-                    }
-                    ExprKind::Clauses(cs) => clauses(cs, &mut work),
                     ExprKind::Call { callee, args } => {
                         expr(callee, &mut work);
-                        for a in args {
-                            expr(&mut a.value, &mut work);
-                        }
+                        ditems(args, &mut work);
+                    }
+                    ExprKind::Provide { target, services } => {
+                        expr(target, &mut work);
+                        expr(services, &mut work);
                     }
                     ExprKind::Field { target, .. }
-                    | ExprKind::TupleIndex { target, .. }
+                    | ExprKind::Index { target, .. }
                     | ExprKind::Unary { expr: target, .. } => expr(target, &mut work),
-                    ExprKind::RecordUpdate {
-                        constructor,
-                        base,
-                        fields,
-                    } => {
-                        expr(constructor, &mut work);
-                        expr(base, &mut work);
-                        for (_, e) in fields {
-                            expr(e, &mut work);
-                        }
-                    }
-                    ExprKind::Binary { lhs, rhs, .. } => {
+                    ExprKind::Binary { lhs, rhs, .. } | ExprKind::Pipe { lhs, rhs } => {
                         expr(lhs, &mut work);
                         expr(rhs, &mut work);
                     }
-                    ExprKind::Quote(_)
-                    | ExprKind::Int(_)
-                    | ExprKind::Float(_)
-                    | ExprKind::String(_)
-                    | ExprKind::Name { .. } => {}
                 },
                 Part::Pattern(mut kind) => match &mut kind {
-                    PatternKind::Quote { captures, .. } => {
-                        for (_, p) in captures {
-                            pattern(p, &mut work);
+                    PatternKind::Quote(quote) => {
+                        for (_, capture) in &mut quote.captures {
+                            pattern(capture, &mut work);
                         }
                     }
+                    PatternKind::Var(_)
+                    | PatternKind::Discard(_)
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_)
+                    | PatternKind::Prefix { .. } => {}
                     PatternKind::Typed { ty: t, .. } => ty(t, &mut work),
-                    PatternKind::Named { pattern: p, .. } => pattern(p, &mut work),
-                    PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-                        for p in args {
-                            pattern(p, &mut work);
+                    PatternKind::Ctor { args, .. } => {
+                        if let Some(args) = args {
+                            dpitems(args, &mut work);
                         }
                     }
-                    PatternKind::List { items, .. } => {
+                    PatternKind::Data(items) => dpitems(items, &mut work),
+                    PatternKind::List { items, .. } | PatternKind::And(items) => {
                         for p in items {
                             pattern(p, &mut work);
                         }
@@ -567,17 +731,11 @@ mod iterative_drop {
                             format(&mut x.format, &mut work);
                         }
                     }
-                    PatternKind::Var(_)
-                    | PatternKind::Discard(_)
-                    | PatternKind::Int { .. }
-                    | PatternKind::Float { .. }
-                    | PatternKind::String(_)
-                    | PatternKind::Prefix { .. } => {}
                 },
                 Part::Type(mut kind) => match &mut kind {
+                    TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
                     TypeKind::Named { args, .. }
                     | TypeKind::Call { args, .. }
-                    | TypeKind::Tuple(args)
                     | TypeKind::Union(args)
                     | TypeKind::Inter(args)
                     | TypeKind::Diff(args) => {
@@ -585,36 +743,19 @@ mod iterative_drop {
                             ty(t, &mut work);
                         }
                     }
-                    TypeKind::Record { base, fields, .. } => {
-                        if let Some(base) = base {
-                            ty(base, &mut work);
+                    TypeKind::Data(items) => titems(items, &mut work),
+                    TypeKind::Fn(f) => {
+                        ty(&mut f.param, &mut work);
+                        if let Some(s) = &mut f.services {
+                            ty(s, &mut work);
                         }
-                        for (_, value) in fields {
-                            ty(value, &mut work);
-                        }
+                        ty(&mut f.ret, &mut work);
                     }
-                    TypeKind::Fn {
-                        params,
-                        ret,
-                        err,
-                        env,
-                    } => {
-                        for p in params {
-                            ty(&mut p.ty, &mut work);
-                        }
-                        ty(ret, &mut work);
-                        if let Some(t) = err {
-                            ty(t, &mut work);
-                        }
-                        if let Some(t) = env {
-                            ty(t, &mut work);
-                        }
-                    }
-                    TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
                 },
             }
         }
     }
+
     impl Drop for Expr {
         fn drop(&mut self) {
             if matches!(
@@ -624,7 +765,7 @@ mod iterative_drop {
                     | ExprKind::String(_)
                     | ExprKind::Name { .. }
                     | ExprKind::Quote(_)
-            ) || matches!(&self.kind, ExprKind::Tuple(xs) if xs.is_empty())
+            ) || matches!(&self.kind, ExprKind::Data(xs) if xs.is_empty())
             {
                 return;
             }
@@ -643,7 +784,8 @@ mod iterative_drop {
                     | PatternKind::Float { .. }
                     | PatternKind::String(_)
                     | PatternKind::Prefix { .. }
-            ) {
+            ) || matches!(&self.kind, PatternKind::Quote(quote) if quote.captures.is_empty())
+            {
                 return;
             }
             let mut work = Vec::new();
@@ -651,7 +793,7 @@ mod iterative_drop {
             drain(work);
         }
     }
-    impl Drop for TypeExpr {
+    impl Drop for Type {
         fn drop(&mut self) {
             if matches!(
                 &self.kind,

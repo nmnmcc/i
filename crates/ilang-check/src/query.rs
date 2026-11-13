@@ -14,6 +14,7 @@ use crate::types::{Access, Typed};
 use crate::{Checked, order, parse, resolve, types};
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
 mod tree;
+#[cfg(test)]
 mod tree_legacy;
 use ilang_syntax::span::Span;
 use std::collections::{HashMap, HashSet};
@@ -331,19 +332,7 @@ impl<'a> Query<'a> {
     }
 
     fn parse_ast(&self, m: ModuleId) -> tree::Module {
-        let module = self.program.module(m);
-        let source = self.graph.sources.get(module.source);
-        let text = module
-            .scoped
-            .as_ref()
-            .map_or(source.text.as_str(), |scoped| {
-                &source.text[..scoped.original_len() as usize]
-            });
-        if ilang_syntax::syn3::FINAL_AST_READERS {
-            ilang_syntax::syn3::deep::deep(|| tree::from_new(&self.syntax(m), self.is_lisp(m)))
-        } else {
-            tree_legacy::parse(text, source.display.ends_with(".is"))
-        }
+        ilang_syntax::syn3::deep::deep(|| tree::from_new(&self.syntax(m), self.is_lisp(m)))
     }
 
     // ---- type_at ----

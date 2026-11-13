@@ -2,8 +2,9 @@
 //! amendment): each production and each rule P1 to P13, the examples of the
 //! note, and the examples of the services proposal.
 
-#[path = "../examples/support/legacy/mod.rs"]
-mod legacy;
+#[path = "oracle.rs"]
+mod ilang_syntax;
+use migration_syntax::legacy;
 
 use ilang_syntax::syn3::ast::*;
 use ilang_syntax::syn3::{self, convert, lisp};

@@ -33,6 +33,7 @@ ilang-macro.workspace = true
 ilang-syntax.workspace = true
 
 [dev-dependencies]
+migration-syntax = { package = "ilang-syntax-migration", path = "../ilang-syntax/examples/legacy" }
 num-bigint.workspace = true
 rcgen = "0.14.10"
 wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "cranelift", "gc", "gc-drc", "runtime", "std"] }

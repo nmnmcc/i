@@ -8,7 +8,7 @@ use crate::Diagnostic;
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 #[derive(Clone, Copy)]
-pub(super) enum P {
+pub enum P {
     Import,
     ImportPart,
     Export,
@@ -40,11 +40,11 @@ enum Step<'a> {
     Boundary,
 }
 
-pub(super) fn render(d: &Datum, pos: P) -> Result<String> {
+pub fn render(d: &Datum, pos: P) -> Result<String> {
     render_anchored(d, pos).map(|(text, _)| text)
 }
 
-pub(super) fn render_anchored(
+pub fn render_anchored(
     d: &Datum,
     pos: P,
 ) -> Result<(String, Vec<(crate::span::Span, usize)>)> {

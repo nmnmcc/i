@@ -1,7 +1,6 @@
 //! Scoped macro input from either source surface, with transparent groups removed.
-use super::syntax::{Node, ROWS3, Scope, Syntax};
+use super::syntax::{Node, Scope, Syntax};
 use super::{Datum, DatumKind};
-use crate::ast::{Expr, Item, Pattern, TypeExpr};
 use crate::span::Span;
 
 fn find(datum: &Datum, span: Span) -> Option<&Datum> {
@@ -30,7 +29,7 @@ pub fn written_lisp_syntax(span: Span, scope: &Scope, source: &str) -> Syntax {
 fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     let document = super::parse(source).expect("parsed Lisp source remains valid");
     let mut datum = document.iter().find_map(|x| find(x, span));
-    if datum.is_none() && ROWS3 {
+    if datum.is_none() {
         // Multi-shape values have a synthetic root in the transition AST.
         // Recover the source node's span, then use its original datum so
         // Lisp operator tokens and all occurrence identities stay written.
@@ -43,237 +42,11 @@ fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     let datum = datum.expect("AST node belongs to a Lisp datum");
     // Keep the written rows and occurrence spans when macro syntax uses
     // syntax three. The inactive legacy path needs its old-row adapter.
-    if ROWS3 {
-        Syntax::from_datum(datum, scope)
-    } else {
-        Syntax::from_datum(&crate::syn3::lisp::unconvert_quote(datum), scope)
-    }
+    Syntax::from_datum(datum, scope)
+
 }
 fn symbol(s: &Syntax, expected: &str) -> bool {
     matches!(s.node(), Node::Symbol(value) if value == expected)
-}
-fn children(s: &Syntax, f: impl Fn(&Syntax) -> Syntax) -> Syntax {
-    match s.node() {
-        Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => {
-            s.replace_children(xs.iter().map(f).collect())
-        }
-        _ => s.clone(),
-    }
-}
-#[derive(Clone, Copy)]
-enum Mode {
-    Expr,
-    Type,
-    Pattern,
-    SegmentExpr,
-    SegmentPattern,
-    Params,
-    Param,
-    Statement,
-    Block,
-    ClauseHead,
-    Clause,
-    Clauses,
-    Keep,
-}
-
-// Normalize source datums without consuming the host stack on nested input.
-fn normalize(root: &Syntax, mode: Mode) -> Syntax {
-    enum Task {
-        Enter(Syntax, Mode),
-        Finish(Syntax, usize, bool),
-        Wrap(Syntax),
-    }
-    let mut work = vec![Task::Enter(root.clone(), mode)];
-    let mut built = Vec::new();
-    while let Some(task) = work.pop() {
-        let (node, mode) = match task {
-            Task::Finish(node, count, unwrap) => {
-                let children = built.split_off(built.len() - count);
-                built.push(if unwrap {
-                    children.into_iter().next().expect("group child")
-                } else {
-                    node.replace_children(children)
-                });
-                continue;
-            }
-            Task::Wrap(like) => {
-                let child = built.pop().expect("function body");
-                built.push(Syntax::written(
-                    Node::Curly(vec![child]),
-                    like.scope(),
-                    like.span(),
-                ));
-                continue;
-            }
-            Task::Enter(node, mode) => (node, mode),
-        };
-        let xs = match node.node() {
-            Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => xs,
-            _ => {
-                built.push(node);
-                continue;
-            }
-        };
-        let mut modes = vec![Mode::Keep; xs.len()];
-        let mut unwrap = false;
-        let mut wrap_last = false;
-        match mode {
-            Mode::Keep => {
-                built.push(node);
-                continue;
-            }
-            Mode::Type => {
-                if matches!(node.node(), Node::Curly(_)) && xs.len() == 1 {
-                    unwrap = true;
-                }
-                modes.fill(Mode::Type);
-            }
-            Mode::Pattern => {
-                if matches!(node.node(), Node::Round(_)) && xs.len() == 3 && symbol(&xs[0], ":") {
-                    modes[2] = Mode::Type;
-                } else if matches!(node.node(), Node::Bits(_)) {
-                    modes.fill(Mode::SegmentPattern);
-                } else {
-                    modes.fill(Mode::Pattern);
-                }
-            }
-            Mode::SegmentExpr | Mode::SegmentPattern => {
-                let value = if matches!(mode, Mode::SegmentExpr) {
-                    Mode::Expr
-                } else {
-                    Mode::Pattern
-                };
-                if matches!(node.node(), Node::Round(_)) && xs.len() == 3 && symbol(&xs[0], ":") {
-                    modes[1] = value;
-                    modes[2] = Mode::Expr;
-                } else {
-                    work.push(Task::Enter(node, value));
-                    continue;
-                }
-            }
-            Mode::Params => modes.fill(Mode::Param),
-            Mode::Param => {
-                if matches!(node.node(), Node::Round(_)) && xs.len() == 3 && symbol(&xs[0], "!") {
-                    modes[2] = Mode::Type;
-                } else {
-                    work.push(Task::Enter(node, Mode::Pattern));
-                    continue;
-                }
-            }
-            Mode::Statement => {
-                if matches!(node.node(), Node::Round(_)) && xs.len() == 3 && symbol(&xs[0], "=") {
-                    modes[1] = Mode::Pattern;
-                    modes[2] = Mode::Expr;
-                } else if matches!(node.node(), Node::Round(_))
-                    && xs.len() == 3
-                    && symbol(&xs[0], "!")
-                {
-                    modes[1] = Mode::Type;
-                    modes[2] = Mode::Expr;
-                } else {
-                    work.push(Task::Enter(node, Mode::Expr));
-                    continue;
-                }
-            }
-            Mode::Block => modes.fill(Mode::Statement),
-            Mode::ClauseHead => {
-                if matches!(node.node(), Node::Round(_)) && xs.len() == 3 && symbol(&xs[0], "?") {
-                    modes[1] = Mode::Pattern;
-                    modes[2] = Mode::Expr;
-                } else if matches!(node.node(), Node::Round(_))
-                    && !xs.is_empty()
-                    && symbol(&xs[0], "|")
-                {
-                    for m in &mut modes[1..] {
-                        *m = Mode::Pattern;
-                    }
-                } else {
-                    work.push(Task::Enter(node, Mode::Pattern));
-                    continue;
-                }
-            }
-            Mode::Clause => {
-                assert!(
-                    xs.len() == 3 && symbol(&xs[0], "->"),
-                    "parsed clause has invalid shape"
-                );
-                modes[1] = Mode::ClauseHead;
-                modes[2] = Mode::Expr;
-            }
-            Mode::Clauses => modes.fill(Mode::Clause),
-            Mode::Expr => {
-                if matches!(node.node(), Node::Curly(_)) {
-                    {
-                        let clause = xs.first().is_some_and(|x| matches!(x.node(), Node::Round(parts) if parts.len() == 3 && symbol(&parts[0], "->")));
-                        if xs.is_empty() || clause {
-                            modes.fill(Mode::Clause);
-                        } else if xs.len() == 1
-                            && !matches!(xs[0].node(), Node::Round(parts) if parts.len() == 3 && (symbol(&parts[0], "=") || symbol(&parts[0], "!")))
-                        {
-                            unwrap = true;
-                            modes[0] = Mode::Expr;
-                        } else {
-                            modes.fill(Mode::Statement);
-                        }
-                    }
-                } else if matches!(node.node(), Node::Round(_))
-                    && xs.len() == 4
-                    && symbol(&xs[0], "->")
-                {
-                    modes[1] = Mode::Params;
-                    modes[2] = Mode::Type;
-                    if matches!(xs[3].node(), Node::Curly(_)) {
-                        modes[3] = Mode::Block;
-                    } else {
-                        modes[3] = Mode::Expr;
-                        wrap_last = true;
-                    }
-                } else if matches!(node.node(), Node::Round(_))
-                    && xs.len() == 3
-                    && symbol(&xs[0], ".")
-                    && matches!(xs[2].node(), Node::Curly(_))
-                {
-                    modes[1] = Mode::Expr;
-                    modes[2] = Mode::Clauses;
-                } else if matches!(node.node(), Node::Bits(_)) {
-                    modes.fill(Mode::SegmentExpr);
-                } else {
-                    modes.fill(Mode::Expr);
-                }
-            }
-        }
-        let children = xs.clone();
-        work.push(Task::Finish(node, children.len(), unwrap));
-        for (i, (child, mode)) in children.into_iter().zip(modes).enumerate().rev() {
-            if wrap_last && i == 3 {
-                work.push(Task::Wrap(child.clone()));
-            }
-            work.push(Task::Enter(child, mode));
-        }
-    }
-    built.pop().expect("normalization produced a root")
-}
-fn ty(s: &Syntax) -> Syntax {
-    if ROWS3 {
-        normalize3(s, Mode3::Type)
-    } else {
-        normalize(s, Mode::Type)
-    }
-}
-fn pattern(s: &Syntax) -> Syntax {
-    if ROWS3 {
-        normalize3(s, Mode3::Pattern)
-    } else {
-        normalize(s, Mode::Pattern)
-    }
-}
-fn expr(s: &Syntax) -> Syntax {
-    if ROWS3 {
-        normalize3(s, Mode3::Expr)
-    } else {
-        normalize(s, Mode::Expr)
-    }
 }
 
 // ---- The rows of syntax three (docs/design/syntax-3.md §6.8) ----
@@ -284,7 +57,8 @@ fn expr(s: &Syntax) -> Syntax {
 /// expression). Every other Curly stays: a block, and the `{ }` of a name
 /// whose right side is a data type, which is part of the item form.
 #[derive(Clone, Copy)]
-enum Mode3 {
+#[doc(hidden)]
+pub enum Mode3 {
     /// An expression; a function body and a branch of a chain are ones.
     Expr,
     /// An item of data or of a call: `e`, `(= label e)`.
@@ -366,7 +140,8 @@ pub fn normalize_item(s: &Syntax) -> Syntax {
 
 // Normalize source datums of the rows of syntax three without consuming the
 // host stack on nested input.
-fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
+#[doc(hidden)]
+pub fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
     enum Task {
         Enter(Syntax, Mode3),
         Finish(Syntax, usize, bool),
@@ -544,132 +319,16 @@ fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
     }
     built.pop().expect("normalization produced a root")
 }
-fn item(s: &Syntax, kind: &crate::ast::ItemKind) -> Syntax {
-    if ROWS3 {
-        return normalize3(s, Mode3::Item);
-    }
-    let mut wrappers = Vec::new();
-    let mut current = s.clone();
-    while let Node::Round(xs) = current.node() {
-        if let [at, attribute, inner] = xs.as_slice()
-            && symbol(at, "@")
-        {
-            wrappers.push((current.clone(), at.clone(), children(attribute, expr)));
-            current = inner.clone();
-        } else {
-            break;
-        }
-    }
-    let s = &current;
-    let Node::Round(xs) = s.node() else {
-        unreachable!("item is round")
-    };
-    let mut result = match kind {
-        crate::ast::ItemKind::TypeDef(_) => match xs.as_slice() {
-            [head, body] if matches!(body.node(), Node::Curly(_)) => {
-                let constructors = children(body, |constructor| match constructor.node() {
-                    Node::Round(fields) if !fields.is_empty() => constructor.replace_children(
-                        fields
-                            .iter()
-                            .enumerate()
-                            .map(|(i, x)| if i == 0 { x.clone() } else { ty(x) })
-                            .collect(),
-                    ),
-                    _ => constructor.clone(),
-                });
-                s.replace_children(vec![ty(head), constructors])
-            }
-            [eq, head, value] if symbol(eq, "=") => {
-                s.replace_children(vec![eq.clone(), ty(head), ty(value)])
-            }
-            _ => unreachable!("type definition shape"),
-        },
-        crate::ast::ItemKind::Binding(_) => match xs.as_slice() {
-            [eq, head, value] if symbol(eq, "=") => {
-                s.replace_children(vec![eq.clone(), pattern(head), expr(value)])
-            }
-            _ => unreachable!("binding shape"),
-        },
-        crate::ast::ItemKind::Declaration { .. } => match xs.as_slice() {
-            [colon, head, value] if symbol(colon, ":") => {
-                s.replace_children(vec![colon.clone(), head.clone(), ty(value)])
-            }
-            _ => unreachable!("declaration shape"),
-        },
-        crate::ast::ItemKind::MacroItem { .. } => children(s, expr),
-    };
-    for (wrapper, at, attribute) in wrappers.into_iter().rev() {
-        result = wrapper.replace_children(vec![at, attribute, result]);
-    }
-    result
-}
-
-/// Encode a source expression for a macro, preserving each written atom's span.
-pub fn source_expression_syntax(
-    expr_ast: &Expr,
-    scope: &Scope,
-    source: &str,
-    lisp: bool,
-) -> Syntax {
-    if lisp {
-        expr(&lisp_source(expr_ast.span, scope, source))
-    } else if ROWS3 {
-        let syntax = super::source_tree::SourceTree::new(scope, source)
-            .expression(expr_ast.span)
-            .expect("a written node belongs to its source tree");
-        normalize_expression(&syntax)
-    } else {
-        super::expression_syntax(expr_ast, scope, source)
-    }
-}
-/// Encode a source type for a macro, preserving each written atom's span.
-pub fn source_type_syntax(type_ast: &TypeExpr, scope: &Scope, source: &str, lisp: bool) -> Syntax {
-    if lisp {
-        ty(&lisp_source(type_ast.span, scope, source))
-    } else if ROWS3 {
-        let syntax = super::source_tree::SourceTree::new(scope, source)
-            .ty(type_ast.span)
-            .expect("a written node belongs to its source tree");
-        normalize_type(&syntax)
-    } else {
-        super::type_syntax(type_ast, scope, source)
-    }
-}
-/// Encode a source item for a macro, preserving each written atom's span.
-pub fn source_item_syntax(item_ast: &Item, scope: &Scope, source: &str, lisp: bool) -> Syntax {
-    if lisp {
-        item(&lisp_source(item_ast.span, scope, source), &item_ast.kind)
-    } else if ROWS3 {
-        let syntax = super::source_tree::SourceTree::new(scope, source)
-            .item(item_ast.span)
-            .expect("a written node belongs to its source tree");
-        normalize_item(&syntax)
-    } else {
-        super::item_syntax(item_ast, scope, source)
-    }
-}
-/// Encode a source pattern for a macro, preserving each written atom's span.
-pub fn source_pattern_syntax(
-    pattern_ast: &Pattern,
-    scope: &Scope,
-    source: &str,
-    lisp: bool,
-) -> Syntax {
-    if lisp {
-        pattern(&lisp_source(pattern_ast.span, scope, source))
-    } else if ROWS3 {
-        let syntax = super::source_tree::SourceTree::new(scope, source)
-            .pattern(pattern_ast.span)
-            .expect("a written node belongs to its source tree");
-        normalize_pattern(&syntax)
-    } else {
-        super::pattern_syntax(pattern_ast, scope, source)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use migration_syntax::lisp::source_syntax::*;
+    use migration_syntax::lisp::syntax::{Scope, Syntax, Node};
+    use migration_syntax::span::Span;
+    use migration_syntax::lisp::syntax::ROWS3;
+    use migration_syntax::lisp::source_syntax::{normalize_expression as expr, normalize_type as ty};
+    use migration_syntax::lisp::source_syntax::{
+        source_item_syntax,
+    };
     use std::collections::BTreeSet;
 
     #[test]
@@ -677,7 +336,7 @@ mod tests {
         // Syntax-three empty data is `(,)`; the legacy item reader rejects
         // this function head, so the accepted item must not be reparsed there.
         let source = "(test \"quote\" (-> (,) _ { Nil }))";
-        let (module, errors) = super::super::parse_source(source);
+        let (module, errors) = migration_syntax::lisp::parse_source(source);
         assert!(errors.is_empty(), "{errors:?}");
         let scope = Scope {
             module: 0,
@@ -700,10 +359,10 @@ mod tests {
             module: 0,
             marks: BTreeSet::new(),
         };
-        let datum = super::super::parse("((: x { T }))").unwrap();
+        let datum = migration_syntax::lisp::parse("((: x { T }))").unwrap();
         let syntax = Syntax::from_datum(&datum[0], &scope);
         assert_eq!(ty(&syntax).show(), "((: x T))");
-        let datum = super::super::parse("((: x { y }))").unwrap();
+        let datum = migration_syntax::lisp::parse("((: x { y }))").unwrap();
         let syntax = Syntax::from_datum(&datum[0], &scope);
         assert_eq!(expr(&syntax).show(), "((: x y))");
     }
@@ -717,7 +376,7 @@ mod tests {
                     module: 0,
                     marks: BTreeSet::new(),
                 };
-                let datum = super::super::parse("x").unwrap();
+                let datum = migration_syntax::lisp::parse("x").unwrap();
                 let mut value = Syntax::from_datum(&datum[0], &scope);
                 for _ in 0..20_000 {
                     value = Syntax::make(Node::Curly(vec![value.clone()]), &value).unwrap();
@@ -740,7 +399,7 @@ mod tests {
     }
 
     fn normal3(source: &str, mode: Mode3) -> String {
-        let datum = super::super::parse(source).unwrap();
+        let datum = migration_syntax::lisp::parse(source).unwrap();
         assert_eq!(datum.len(), 1, "{source}");
         normalize3(&Syntax::from_datum(&datum[0], &scope()), mode).show()
     }
@@ -878,7 +537,7 @@ mod tests {
     #[test]
     fn written_atoms_keep_their_spans_and_removed_groups_their_content() {
         let source = "(-> (, x) _ { (+ { x } 1) })";
-        let datum = super::super::parse(source).unwrap();
+        let datum = migration_syntax::lisp::parse(source).unwrap();
         let syntax = normalize3(&Syntax::from_datum(&datum[0], &scope()), Mode3::Expr);
         let Node::Round(parts) = syntax.node() else {
             panic!()
@@ -898,7 +557,7 @@ mod tests {
     /// give for the same text: the tree without groups, written as datums.
     #[test]
     fn the_table_agrees_with_the_reader_of_syntax_three() {
-        use crate::syn3::{ast::Module, lisp, surface};
+        use migration_syntax::syn3::{ast::Module, lisp, surface};
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut files = Vec::new();
         let mut dirs = vec![
@@ -921,11 +580,11 @@ mod tests {
         let mut checked = 0;
         for path in files {
             let source = std::fs::read_to_string(&path).unwrap();
-            let Ok(document) = super::super::parse(&source) else {
+            let Ok(document) = migration_syntax::lisp::parse(&source) else {
                 continue;
             };
             for datum in document.iter() {
-                let Ok(item) = lisp::position::item(datum) else {
+                let Ok(item) = lisp::item_from_datum(datum) else {
                     // A header, or a file that is an error on purpose.
                     continue;
                 };
@@ -933,7 +592,7 @@ mod tests {
                     items: vec![item],
                     ..Module::default()
                 });
-                let expected = super::super::show(&lisp::item_datum(&module.items[0]));
+                let expected = migration_syntax::lisp::show(&lisp::item_datum(&module.items[0]));
                 let syntax = Syntax::from_datum(datum, &scope());
                 assert_eq!(
                     normalize3(&syntax, Mode3::Item).show(),
@@ -952,7 +611,7 @@ mod tests {
         std::thread::Builder::new()
             .stack_size(256 * 1024)
             .spawn(|| {
-                let datum = super::super::parse("x").unwrap();
+                let datum = migration_syntax::lisp::parse("x").unwrap();
                 let mut value = Syntax::from_datum(&datum[0], &scope());
                 for _ in 0..20_000 {
                     value = Syntax::make(Node::Curly(vec![value.clone()]), &value).unwrap();
@@ -960,7 +619,7 @@ mod tests {
                 for mode in [Mode3::Expr, Mode3::Type, Mode3::Statement, Mode3::ValueItem] {
                     assert_eq!(normalize3(&value, mode).show(), "x");
                 }
-                let f = Syntax::from_datum(&super::super::parse("f").unwrap()[0], &scope());
+                let f = Syntax::from_datum(&migration_syntax::lisp::parse("f").unwrap()[0], &scope());
                 let mut call = value.clone();
                 for _ in 0..20_000 {
                     call = Syntax::make(Node::Round(vec![f.clone(), call]), &f).unwrap();
