@@ -323,6 +323,13 @@ pub const WASI_RUNTIME: &str = r#"
 /// runtime alone: they stop.
 pub const LIBRARY_ABSENT: &str = "\
 (func $float_to_string (param eqref) (result eqref) unreachable)
+(func $big_compare (param eqref eqref) (result eqref) unreachable)
+(func $big_add (param eqref eqref) (result eqref) unreachable)
+(func $big_subtract (param eqref eqref) (result eqref) unreachable)
+(func $big_multiply (param eqref eqref) (result eqref) unreachable)
+(func $big_divide (param eqref eqref) (result eqref) unreachable)
+(func $big_remainder (param eqref eqref) (result eqref) unreachable)
+(func $big_to_text (param eqref eqref) (result eqref) unreachable)
 (func $bits_from_int_wide (param eqref eqref eqref) (result eqref) unreachable)
 (func $bits_read_int_wide (param eqref eqref eqref eqref eqref) (result eqref) unreachable)
 ";
