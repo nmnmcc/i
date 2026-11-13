@@ -141,7 +141,31 @@ i/task.set_task : (s: State, t: TaskState) -> State
 i/task.add_task : (s: State, t: TaskState) -> State
 i/task.set_scope : (s: State, scope: ScopeState) -> State
 i/task.guarded : (own: Scheduler, owner: Maybe(Address), body: () -> Completion) -> Completion
+i/task.complete : (body: () -> A ^ E ! N, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Completion ! N
 i/task.make_start : (body: () -> A ^ E ! N, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
+i/task.worker_enabled : () -> Bool
+i/task.worker_publish : (job: Job) -> Int
+i/task.worker_claim : (ticket: Int) -> Bool
+i/task.worker_adopt : (ticket: Int, task: Int) -> Nil
+i/task.worker_placeholder : () -> Continuation(StepAnswer, Turn, Never, Never)
+i/task.worker_away : (k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
+i/task.worker_send : (task: Int, resume: Resume) -> Nil
+i/task.worker_inbox : () -> Int
+i/task.worker_message : () -> Remote
+i/task.worker_pending : () -> Bool
+i/task.worker_wait : () -> Nil
+i/task.worker_share_put : (run: Key(Nil), address: Address, value: Keyed) -> Nil
+i/task.worker_share_get : (run: Key(Nil), address: Address) -> List(Keyed)
+i/task.worker_share_drop : (run: Key(Nil), address: Address) -> Nil
+i/task.drop_shares : (s: State, ids: List(Address)) -> Nil
+i/task.remote_turn : (turn: Turn, finals: List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool), run: Key(Nil)) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.remote_begin : (job: Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.remote_resume : (input: (Continuation(StepAnswer, Turn, Never, Never), Resume)) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.publish : (s: State, task_path: List(Int), start: Start) -> Start
+i/task.frame_finals : (frames: List(Frame)) -> List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool)
+i/task.split_flags : (frames: List(Frame), flags: List(Bool)) -> (List(Bool), List(Bool))
+i/task.apply_finals : (frames: List(Frame), flags: List(Bool)) -> List(Frame)
+i/task.pull : (s: State) -> State
 i/task.path : () -> List(Int) ! Scheduler
 i/task.random : () -> rng.Generator ! Scheduler
 i/task.yield : () -> Nil ! Scheduler
@@ -218,7 +242,7 @@ i/task.do_command : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, N
 i/task.cancellation_reply : (t: TaskState) -> Bool
 i/task.finals_changed : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
 i/task.update_finals : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> List(Frame)
-i/task.on_command : (s: State, task_path: Int, command: Command, k: Continuation(StepAnswer, Turn, Never, Never)) -> State
+i/task.on_command : (s: State, task_path: Int, command: Command, k: Continuation(StepAnswer, Turn, Never, Never), flags: Maybe(List(Bool))) -> State
 i/task.observe_completion : (s: State, t: TaskState, completion: Completion) -> State
 i/task.turn : (s: State, t: TaskState) -> Turn
 i/task.interests_tasks : (s: State, paths: List(Int)) -> List(Ticket)
