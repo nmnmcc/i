@@ -706,6 +706,10 @@ pub(super) const EFFECTS: &str = r#"
   (local $c (ref $cap)) (local $x exnref)
   (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
   (local.set $kept (ref.cast (ref null $env) (array.get $values (local.get $saved) (i32.const 0))))
+  ;; Resume and cancel use their caller's Fail too (§9.4 rule 3).
+  ;; Inner provides are replayed by tramp_run after this base is restored.
+  (local.set $kept (call $env_with (local.get $kept) (i32.const 1)
+    (array.get $env (local.get $env) (i32.const 1))))
   (block $captured (result (ref $cap) exnref)
     (return (try_table (result eqref) (catch_ref $capture $captured)
       (call $tramp_run
