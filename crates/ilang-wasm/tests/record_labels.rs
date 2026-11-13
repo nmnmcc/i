@@ -52,11 +52,12 @@ fn record_labels_have_the_same_order_in_rust_and_the_runtime() {
         "(module\n{}\n\
          (func $host_panic (param i32 i32) unreachable)\n\
          (func $host_reference_id (param externref) (result i64) (i64.const 1))\n\
-         {}\n\
+         {}\n{}\n\
          (func $assert (param i32) (if (i32.eqz (local.get 0)) (then unreachable)))\n\
          (func (export \"label_order\") (result i32) {checks} (i32.const 1)))",
         ilang_wasm::runtime::TYPES,
         ilang_wasm::runtime::wat(),
+        ilang_wasm::runtime::LIBRARY_ABSENT,
     );
     let temp = tempfile::tempdir().unwrap();
     let source = temp.path().join("labels.wat");

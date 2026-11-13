@@ -330,13 +330,30 @@ pub const WASI_RUNTIME: &str = r#"
  (unreachable))
 "#;
 
+/// Stands in for the library functions written in i that the runtime calls
+/// (`ir::RUNTIME_CALLS`), in a module made without a program, such as the
+/// runtime alone: they stop.
+pub const LIBRARY_ABSENT: &str = "\
+(func $float_to_string (param eqref) (result eqref) unreachable)
+(func $big_compare (param eqref eqref) (result eqref) unreachable)
+(func $big_add (param eqref eqref) (result eqref) unreachable)
+(func $big_subtract (param eqref eqref) (result eqref) unreachable)
+(func $big_multiply (param eqref eqref) (result eqref) unreachable)
+(func $big_divide (param eqref eqref) (result eqref) unreachable)
+(func $big_remainder (param eqref eqref) (result eqref) unreachable)
+(func $big_to_text (param eqref eqref) (result eqref) unreachable)
+(func $bits_from_int_wide (param eqref eqref eqref) (result eqref) unreachable)
+(func $bits_read_int_wide (param eqref eqref eqref eqref eqref) (result eqref) unreachable)
+";
+
 /// The first constructor id that the code generator may use.
 pub const FIRST_CONSTRUCTOR: u32 = 16;
 
-/// The runtime definitions. They need [`TYPES`] in the module, and the
+/// The runtime definitions. They need [`TYPES`] in the module, the
 /// functions `$host_panic` and `$host_reference_id`: the imports of
 /// [`HOST`], or on the WASI target [`WASI_HOST`] with [`WASI_RUNTIME`] and
-/// [`WASI_REFERENCE_ID_IMPORT`] or [`WASI_REFERENCE_ID`].
+/// [`WASI_REFERENCE_ID_IMPORT`] or [`WASI_REFERENCE_ID`], and the library
+/// functions of `ir::RUNTIME_CALLS` (or [`LIBRARY_ABSENT`]).
 pub fn wat() -> &'static str {
     wat_for_host_references(true)
 }

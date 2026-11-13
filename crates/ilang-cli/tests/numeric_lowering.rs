@@ -697,7 +697,11 @@ bounded_div = (x: Float, y: Float) -> Float { { y >=. -.1.0e-300 } |> { True -> 
 }
 
 #[test]
-fn nonnumeric_emission_and_optimization_are_byte_equal() {
+fn nonnumeric_functions_are_emitted_byte_equal() {
+    // Every program has the library code that the runtime calls
+    // (`lib/i/float_text.i`), which has Int arithmetic, so no whole module is
+    // free of numeric regions any more. A function with no numeric region
+    // must still be emitted byte for byte the same at every level.
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
@@ -721,9 +725,17 @@ fn nonnumeric_emission_and_optimization_are_byte_equal() {
     );
     let program = checked.program.as_ref().unwrap();
     let typed = checked.types.as_ref().unwrap();
+    // The text of the function with this debug name, up to the next one.
+    fn function<'t>(text: &'t str, name: &str) -> &'t str {
+        let start = text
+            .find(&format!("\n;; {name}\n"))
+            .unwrap_or_else(|| panic!("no function {name}"));
+        let end = text[start + 1..]
+            .find("\n;; ")
+            .map_or(text.len(), |end| start + 1 + end);
+        &text[start..end]
+    }
     let reference = ilang_wasm::compile_wat(&graph, program, typed, Options::default()).unwrap();
-    let (bytes, _) =
-        ilang_wasm::compile_with_bindings(&graph, program, typed, Options::default()).unwrap();
     for mode in [Numeric::Visible, Numeric::Scalars] {
         let text = ilang_wasm::compile_wat_numeric(
             &graph,
@@ -733,22 +745,10 @@ fn nonnumeric_emission_and_optimization_are_byte_equal() {
         )
         .unwrap();
         assert_eq!(
-            text, reference,
+            function(&text, "plain/pass.pass"),
+            function(&reference, "plain/pass.pass"),
             "no numeric region must leave WAT unchanged"
         );
-        let (candidate, _) = ilang_wasm::compile_with_bindings_numeric(
-            &graph,
-            program,
-            typed,
-            Options::default().numeric(mode),
-        )
-        .unwrap();
-        for level in [ilang_cli::Level::O2, ilang_cli::Level::O3] {
-            assert_eq!(
-                ilang_cli::optimize(&bytes, level).unwrap(),
-                ilang_cli::optimize(&candidate, level).unwrap()
-            );
-        }
     }
 }
 

@@ -3,14 +3,13 @@
 //! Objects are never exposed to a host formatter. In particular, arbitrary precision
 //! integers and bit-array slices retain their exact value on every supported host.
 
-mod float_format;
-
 /// Runtime definitions, to be inserted after the common value types.
 pub fn wat() -> String {
     let source = r#"
   ;; The text form is written into one growable byte buffer, `$ib` with the
   ;; length `$il`, so that inspecting is linear in the size of the text. Only
-  ;; `$inspect` uses it, and it runs no i code.
+  ;; `$inspect` uses it. The only i code it runs is the text of a Float
+  ;; (`$float_to_string`, `lib/i/float_text.i`), which does not inspect.
   (global $ib (mut (ref null $bytes)) (ref.null $bytes))
   (global $il (mut i32) (i32.const 0))
 
@@ -409,7 +408,7 @@ pub fn wat() -> String {
 "#
     .to_owned();
 
-    let mut source = crate::runtime::with_literals(
+    crate::runtime::with_literals(
         source,
         &[
             ("comma", ", "),
@@ -439,9 +438,7 @@ pub fn wat() -> String {
             ("codepoint_open", "//utfcodepoint("),
             ("unknown", "//wasm(unknown)"),
         ],
-    );
-    source.push_str(&float_format::wat());
-    source
+    )
 }
 
 #[cfg(test)]

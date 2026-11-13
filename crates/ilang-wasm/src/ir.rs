@@ -74,6 +74,24 @@
 //! ([`Value::HostReply`]). So the control machinery of §9.4 saves the frames
 //! while the program waits.
 
+/// The library functions written in i that the runtime calls: the WAT name
+/// of a runtime function with the same `eqref` parameters and an `eqref`
+/// result, the module, and the name. Every
+/// program has them, before any of its own code runs; they need no service
+/// and never suspend.
+pub const RUNTIME_CALLS: &[(&str, &str, &str)] = &[
+    ("$float_to_string", "i/float_text", "to_string"),
+    ("$big_compare", "i/big", "compare"),
+    ("$big_add", "i/big", "add"),
+    ("$big_subtract", "i/big", "subtract"),
+    ("$big_multiply", "i/big", "multiply"),
+    ("$big_divide", "i/big", "divide"),
+    ("$big_remainder", "i/big", "remainder"),
+    ("$big_to_text", "i/big", "to_text"),
+    ("$bits_from_int_wide", "i/bits", "from_int"),
+    ("$bits_read_int_wide", "i/bits", "read_int"),
+];
+
 /// The service id of `Assert` (§9.6).
 pub const ASSERT_SERVICE: u32 = 0;
 
@@ -862,6 +880,9 @@ pub struct Program {
     pub joins: Vec<Join>,
     /// The functions with one constant closure, used by `Atom::Func`.
     pub constants: Vec<FuncId>,
+    /// The library functions written in i that the runtime calls, by the
+    /// WAT name of the runtime function that calls them ([`RUNTIME_CALLS`]).
+    pub runtime_calls: Vec<(&'static str, FuncId)>,
     /// The number of globals for top-level values.
     pub globals: u32,
     /// The number of service ids, at least 1 for `Assert` (§9.2).

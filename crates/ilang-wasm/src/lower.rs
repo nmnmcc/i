@@ -953,6 +953,26 @@ impl<'a> Lowerer<'a> {
                 || (self.options.tests && self.options.target != ir::Target::Wasi))
     }
 
+    /// A definition of the library package, by module path and name.
+    fn library_def(&self, path: &str, name: &str) -> DefId {
+        let (mi, m) = self
+            .program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path && m.package == self.graph.library)
+            .unwrap_or_else(|| panic!("library module {path}"));
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .unwrap_or_else(|| panic!("library definition {path}.{name}"));
+        DefId {
+            module: ModuleId(mi as u32),
+            index: index as u32,
+        }
+    }
+
     fn is_library(&self, m: ModuleId) -> bool {
         self.program.module(m).package == self.graph.library
     }
@@ -1138,6 +1158,12 @@ impl<'a> Lowerer<'a> {
             return;
         }
         self.entries();
+        for &(wat, module, name) in ir::RUNTIME_CALLS {
+            let def = self.library_def(module, name);
+            let f = self.def_func(def);
+            self.constants.insert(f);
+            self.out.runtime_calls.push((wat, f));
+        }
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
             let tb = self.program.binding(b);
@@ -2521,6 +2547,40 @@ impl<'a> Lowerer<'a> {
         };
         match module.as_str() {
             "ilang:prelude" if function == "panic" => Ok((Op::Panic, arity)),
+            // The private primitives of `lib/i/bits.i`.
+            "ilang:bits" => Ok((
+                Op::Runtime {
+                    name: match function.as_str() {
+                        "read_unsigned" => "bits_read_unsigned",
+                        "from_unsigned" => "bits_from_unsigned",
+                        _ => return Err(format!("`bits.{function}` is not known")),
+                    },
+                    arity,
+                },
+                arity,
+            )),
+            // The private primitives of `lib/i/big.i`.
+            "ilang:big" => Ok((
+                Op::Runtime {
+                    name: match function.as_str() {
+                        "sign" => "big_sign",
+                        "digits" => "big_digits",
+                        "from_digits" => "big_from_digits",
+                        "size" => "big_size",
+                        "limb" => "big_limb",
+                        "from_top" => "big_from_top",
+                        "builder" => "big_builder",
+                        "put" => "big_put",
+                        "finish" => "big_finish",
+                        "multiply_low" => "big_multiply_low",
+                        "multiply_high" => "big_multiply_high",
+                        "divide_digit" => "big_divide_digit",
+                        _ => return Err(format!("`big.{function}` is not known")),
+                    },
+                    arity,
+                },
+                arity,
+            )),
             "ilang:core" => match CORE.iter().position(|n| n == function) {
                 Some(i) => Ok((
                     Op::Runtime {

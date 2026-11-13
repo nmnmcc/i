@@ -290,6 +290,24 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         );
     }
     m.push_str(&e.out);
+    // The runtime calls these library functions written in i. An
+    // intermediate program made without lowering has no library.
+    if p.runtime_calls.is_empty() {
+        m.push_str(runtime::LIBRARY_ABSENT);
+    }
+    for (wat, f) in &p.runtime_calls {
+        let arity = p.funcs[f.0 as usize].arity();
+        let params: String = (0..arity)
+            .map(|i| format!(" (param $p{i} eqref)"))
+            .collect();
+        let args: String = (0..arity).map(|i| format!(" (local.get $p{i})")).collect();
+        let _ = writeln!(
+            m,
+            "(func {wat}{params} (result eqref) \
+             (call $f{} (global.get $c{}) (ref.null $env){args}))",
+            f.0, f.0
+        );
+    }
     let mut declared: Vec<String> = (0..p.funcs.len()).map(|i| format!("$f{i}")).collect();
     declared.extend((0..p.points.len()).map(|i| format!("$r{i}")));
     declared.extend(DECLARED.iter().map(|d| d.to_string()));

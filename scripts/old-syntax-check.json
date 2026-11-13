@@ -3247,5 +3247,16 @@
   },
   "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
     "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/big_int.rs:16b691ee8beb299b": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-cli/tests/float_text.rs:cca1ac99a7986d4f": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-wasm/tests/multi_shape.rs:4414029af964b61f": {
+    "not_source": "Wasmtime preload argument, not i source."
   }
 }
