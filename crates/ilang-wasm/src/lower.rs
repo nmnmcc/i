@@ -2513,19 +2513,6 @@ impl<'a> Lowerer<'a> {
                 },
                 arity,
             )),
-            // The private primitives of `lib/i/big.i`.
-            "ilang:big" => Ok((
-                Op::Runtime {
-                    name: match function.as_str() {
-                        "sign" => "big_sign",
-                        "digits" => "big_digits",
-                        "from_digits" => "big_from_digits",
-                        _ => return Err(format!("`big.{function}` is not known")),
-                    },
-                    arity,
-                },
-                arity,
-            )),
             "ilang:core" => match CORE.iter().position(|n| n == function) {
                 Some(i) => Ok((
                     Op::Runtime {

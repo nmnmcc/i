@@ -20,93 +20,13 @@ pub(crate) const STUB_HOST: &str = r#"
 (func $float_to_string (param $value eqref) (result eqref)
   (call $int_to_string (call $int_from_i64
     (i64.reinterpret_f64 (call $float_get (local.get $value))))))
-;; Large Int arithmetic is i code too (`lib/i/big.i`): it stops here.
-;; Two large Ints with the same sign compare by their limbs.
-(func $big_compare (param $a eqref) (param $b eqref) (result eqref)
-  (local $x (ref $limbs)) (local $y (ref $limbs)) (local $i i32) (local $order i32)
-  (local.set $x (call $int_limbs (local.get $a)))
-  (local.set $y (call $int_limbs (local.get $b)))
-  (local.set $i (array.len (local.get $x)))
-  (if (i32.ne (local.get $i) (array.len (local.get $y)))
-    (then (local.set $order
-      (select (i32.const 1) (i32.const -1) (i32.gt_u (local.get $i) (array.len (local.get $y))))))
-    (else (block $done (loop $limb
-      (br_if $done (i32.eqz (local.get $i)))
-      (local.set $i (i32.sub (local.get $i) (i32.const 1)))
-      (if (i32.ne (array.get $limbs (local.get $x) (local.get $i)) (array.get $limbs (local.get $y) (local.get $i)))
-        (then
-          (local.set $order (select (i32.const 1) (i32.const -1)
-            (i32.gt_u (array.get $limbs (local.get $x) (local.get $i)) (array.get $limbs (local.get $y) (local.get $i)))))
-          (br $done)))
-      (br $limb)))))
-  (ref.i31 (i32.mul (local.get $order) (call $int_sign (local.get $a)))))
-(func $big_add (param eqref eqref) (result eqref) unreachable)
-(func $big_subtract (param eqref eqref) (result eqref) unreachable)
-(func $big_multiply (param eqref eqref) (result eqref) unreachable)
-(func $big_divide (param eqref eqref) (result eqref) unreachable)
-(func $big_remainder (param eqref eqref) (result eqref) unreachable)
 ;; Integer segments wider than 63 bits are i code (`lib/i/bits.i`).
 (func $bits_from_int_wide (param eqref eqref eqref) (result eqref) unreachable)
 (func $bits_read_int_wide (param eqref eqref eqref eqref eqref) (result eqref) unreachable)
-;; A small Int in decimal.
-(func $small_decimal (param $v i32) (result eqref)
-  (local $m i64) (local $out (ref $bytes)) (local $at i32) (local $text (ref $bytes))
-  (local.set $out (array.new_default $bytes (i32.const 12)))
-  (local.set $m (i64.extend_i32_s (local.get $v)))
-  (if (i64.lt_s (local.get $m) (i64.const 0)) (then (local.set $m (i64.sub (i64.const 0) (local.get $m)))))
-  (local.set $at (i32.const 12))
-  (loop $digit
-    (local.set $at (i32.sub (local.get $at) (i32.const 1)))
-    (array.set $bytes (local.get $out) (local.get $at)
-      (i32.add (i32.const 48) (i32.wrap_i64 (i64.rem_u (local.get $m) (i64.const 10)))))
-    (local.set $m (i64.div_u (local.get $m) (i64.const 10)))
-    (br_if $digit (i64.ne (local.get $m) (i64.const 0))))
-  (if (i32.lt_s (local.get $v) (i32.const 0))
-    (then (local.set $at (i32.sub (local.get $at) (i32.const 1)))
-      (array.set $bytes (local.get $out) (local.get $at) (i32.const 45))))
-  (local.set $text (array.new_default $bytes (i32.sub (i32.const 12) (local.get $at))))
-  (array.copy $bytes $bytes (local.get $text) (i32.const 0) (local.get $out) (local.get $at)
-    (i32.sub (i32.const 12) (local.get $at)))
-  (call $string_from_bytes (local.get $text)))
-;; The text of a large Int is written in hexadecimal from its limbs, as
-;; `0x…` with `-` in front when it is negative ([`float_bits`] maps
-;; expected decimal text to this form).
-(func $big_to_text (param $v eqref) (param eqref) (result eqref)
-  (local $a (ref $limbs)) (local $out (ref $bytes)) (local $n i32) (local $i i32)
-  (local $at i32) (local $nibble i32) (local $started i32) (local $text (ref $bytes))
-  (if (ref.test (ref i31) (local.get $v))
-    (then (return (call $small_decimal (i31.get_s (ref.cast (ref i31) (local.get $v)))))))
-  (local.set $a (call $int_limbs (local.get $v)))
-  (local.set $n (array.len (local.get $a)))
-  (local.set $out (array.new_default $bytes (i32.add (i32.mul (local.get $n) (i32.const 8)) (i32.const 3))))
-  (if (i32.lt_s (call $int_sign (local.get $v)) (i32.const 0))
-    (then (array.set $bytes (local.get $out) (i32.const 0) (i32.const 45))
-      (local.set $at (i32.const 1))))
-  (array.set $bytes (local.get $out) (local.get $at) (i32.const 48))
-  (array.set $bytes (local.get $out) (i32.add (local.get $at) (i32.const 1)) (i32.const 120))
-  (local.set $at (i32.add (local.get $at) (i32.const 2)))
-  (local.set $i (i32.mul (local.get $n) (i32.const 8)))
-  (block $done (loop $digit
-    (br_if $done (i32.eqz (local.get $i)))
-    (local.set $i (i32.sub (local.get $i) (i32.const 1)))
-    (local.set $nibble (i32.and (i32.shr_u
-      (array.get $limbs (local.get $a) (i32.shr_u (local.get $i) (i32.const 3)))
-      (i32.shl (i32.and (local.get $i) (i32.const 7)) (i32.const 2))) (i32.const 15)))
-    (if (i32.or (local.get $started) (local.get $nibble)) (then
-      (local.set $started (i32.const 1))
-      (array.set $bytes (local.get $out) (local.get $at)
-        (i32.add (local.get $nibble)
-          (select (i32.const 48) (i32.const 55) (i32.lt_u (local.get $nibble) (i32.const 10)))))
-      (local.set $at (i32.add (local.get $at) (i32.const 1)))))
-    (br $digit)))
-  (local.set $text (array.new_default $bytes (local.get $at)))
-  (array.copy $bytes $bytes (local.get $text) (i32.const 0) (local.get $out) (i32.const 0) (local.get $at))
-  (call $string_from_bytes (local.get $text)))
 "#;
 
 /// The text form of [`STUB_HOST`]: each Float literal of `text`, such as
-/// `-1.5` or `1.0e-7`, written as the signed decimal of its 64 bits, and
-/// then each large Int in hexadecimal ([`big_hex`]).
+/// `-1.5` or `1.0e-7`, written as the signed decimal of its 64 bits.
 pub(crate) fn float_bits(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = Vec::new();
@@ -146,52 +66,7 @@ pub(crate) fn float_bits(text: &str) -> String {
         out.push(bytes[i]);
         i += 1;
     }
-    big_hex(&String::from_utf8(out).expect("UTF-8 is kept"))
-}
-
-/// Each Int literal of `text` outside the small range written as the
-/// `$big_to_text` of [`STUB_HOST`]: `0x` and capital hexadecimal digits.
-fn big_hex(text: &str) -> String {
-    let bytes = text.as_bytes();
-    let mut out = String::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        let previous = i.checked_sub(1).map(|p| bytes[p]);
-        let begins = !previous.is_some_and(|b| b.is_ascii_alphanumeric() || b == b'.');
-        let digits_from = i + usize::from(bytes[i] == b'-');
-        let mut end = digits_from;
-        while end < bytes.len() && bytes[end].is_ascii_digit() {
-            end += 1;
-        }
-        let ends = bytes
-            .get(end)
-            .is_none_or(|b| !(b.is_ascii_alphanumeric() || *b == b'.'));
-        if begins && ends && end > digits_from {
-            let value: num_bigint::BigInt = text[i..end].parse().expect("an Int literal");
-            if value < num_bigint::BigInt::from(-(1_i64 << 30))
-                || value >= num_bigint::BigInt::from(1_i64 << 30)
-            {
-                let sign = if value < num_bigint::BigInt::from(0) {
-                    "-"
-                } else {
-                    ""
-                };
-                let magnitude = if sign.is_empty() { value } else { -value };
-                out.push_str(&format!(
-                    "{sign}0x{}",
-                    magnitude.to_str_radix(16).to_uppercase()
-                ));
-            } else {
-                out.push_str(&text[i..end]);
-            }
-            i = end;
-            continue;
-        }
-        let width = text[i..].chars().next().map_or(1, char::len_utf8);
-        out.push_str(&text[i..i + width]);
-        i += width;
-    }
-    out
+    String::from_utf8(out).expect("UTF-8 is kept")
 }
 
 /// A list of checks, each an `i32` expression that must not be 0.
@@ -317,30 +192,9 @@ fn int(value: i64) -> String {
     format!("(call $int_from_i64 (i64.const {value}))")
 }
 
-/// 2^a − 2^b in decimal (large arithmetic is i code, which these modules
-/// do not have).
-fn difference(a: usize, b: usize) -> String {
-    ((num_bigint::BigInt::from(1) << a) - (num_bigint::BigInt::from(1) << b)).to_string()
-}
-
-/// An Int from its decimal text, for values beyond i64, made from its limbs
-/// (the arithmetic of large Ints is i code, which these modules do not have).
+/// An Int from its decimal text, for values beyond i64.
 fn big(text: &str) -> String {
-    let value: num_bigint::BigInt = text.parse().expect("a decimal Int");
-    let (sign, limbs) = value.to_u32_digits();
-    let sign = match sign {
-        num_bigint::Sign::Minus => -1,
-        num_bigint::Sign::NoSign => 0,
-        num_bigint::Sign::Plus => 1,
-    };
-    let limbs: String = limbs
-        .iter()
-        .map(|l| format!(" (i32.const {})", *l as i32))
-        .collect();
-    format!(
-        "(call $int_pack (i32.const {sign}) (array.new_fixed $limbs {}{limbs}))",
-        value.to_u32_digits().1.len()
-    )
+    format!("(call $parse_decimal {})", literal(text))
 }
 
 fn float(value: f64) -> String {
@@ -373,6 +227,12 @@ fn bits(bytes: &[u8], offset: u32, length: u64) -> String {
 }
 
 const HELPERS: &str = r#"
+(func $parse_decimal (param $text eqref) (result eqref)
+  (local $value eqref) (local $ok i32)
+  (call $int_parse (local.get $text) (ref.i31 (i32.const 10)))
+  (local.set $ok) (local.set $value)
+  (if (i32.eqz (local.get $ok)) (then unreachable))
+  (local.get $value))
 (func $function (param $arity i64) (result eqref)
   (struct.new $obj (i32.const 7) (i32.const 0) (local.get $arity) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
@@ -596,8 +456,11 @@ fn equality_is_structural_with_identity_for_functions_and_references() {
         (
             "big ints",
             big("123456789012345678901234567890"),
-            // A second object with the same value.
-            big("123456789012345678901234567890"),
+            format!(
+                "(call $int_add {} {})",
+                big("123456789012345678901234567889"),
+                int(1)
+            ),
         ),
         ("strings", string("中文🙂"), string("中文🙂")),
         (
@@ -757,9 +620,41 @@ fn core_operations_follow_the_specification() {
         // Int division by zero and rounding (spec §11.2).
         (format!("(call $int_div {} {})", int(7), int(0)), "0"),
         (format!("(call $int_rem {} {})", int(7), int(0)), "0"),
+        (
+            format!(
+                "(call $int_div {} {})",
+                big("100000000000000000000"),
+                int(0)
+            ),
+            "0",
+        ),
+        (
+            format!(
+                "(call $int_rem {} {})",
+                big("-100000000000000000000"),
+                int(0)
+            ),
+            "0",
+        ),
         (format!("(call $int_div {} {})", int(-7), int(2)), "-3"),
         (format!("(call $int_rem {} {})", int(-7), int(2)), "-1"),
         (format!("(call $int_rem {} {})", int(7), int(-2)), "1"),
+        (
+            format!(
+                "(call $int_div {} {})",
+                big("-100000000000000000001"),
+                big("10000000000")
+            ),
+            "-10000000000",
+        ),
+        (
+            format!(
+                "(call $int_rem {} {})",
+                big("-100000000000000000001"),
+                big("10000000000")
+            ),
+            "-1",
+        ),
         (
             format!("(call $int_div {} {})", int(-1073741824), int(-1)),
             "1073741824",
@@ -857,6 +752,10 @@ fn core_operations_follow_the_specification() {
         (format!("(call $core_bit_or {} {})", int(-8), int(3)), "-5"),
         (format!("(call $core_bit_xor {} {})", int(-1), int(5)), "-6"),
         (format!("(call $core_bit_not {})", int(5)), "-6"),
+        (
+            format!("(call $core_bit_not {})", big("-18446744073709551616")),
+            "18446744073709551615",
+        ),
         (
             format!(
                 "(call $core_bit_and {} {})",
@@ -1147,8 +1046,9 @@ fn core_operations_follow_the_specification() {
         (
             "to_float rounding to infinity",
             format!(
-                "(drop (call $core_to_float {}))",
-                big(&difference(1024, 970))
+                "(drop (call $core_to_float (call $int_sub {} {})))",
+                big(&num_text(1024)),
+                big(&num_text(970))
             ),
             "float: result is not finite",
         ),
@@ -1205,8 +1105,9 @@ fn core_operations_follow_the_specification() {
     checks.check(
         "to_float of the largest finite integer",
         format!(
-            "(f64.eq (call $float_get (call $core_to_float {})) (f64.const 0x1.fffffffffffffp+1023))",
-            big(&difference(1024, 971))
+            "(f64.eq (call $float_get (call $core_to_float (call $int_sub {} {}))) (f64.const 0x1.fffffffffffffp+1023))",
+            big(&num_text(1024)),
+            big(&num_text(971))
         ),
     );
     checks.check(

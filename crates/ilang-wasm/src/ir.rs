@@ -81,13 +81,6 @@
 /// and never suspend.
 pub const RUNTIME_CALLS: &[(&str, &str, &str)] = &[
     ("$float_to_string", "i/float_text", "to_string"),
-    ("$big_compare", "i/big", "compare"),
-    ("$big_add", "i/big", "add"),
-    ("$big_subtract", "i/big", "subtract"),
-    ("$big_multiply", "i/big", "multiply"),
-    ("$big_divide", "i/big", "divide"),
-    ("$big_remainder", "i/big", "remainder"),
-    ("$big_to_text", "i/big", "to_text"),
     ("$bits_from_int_wide", "i/bits", "from_int"),
     ("$bits_read_int_wide", "i/bits", "read_int"),
 ];

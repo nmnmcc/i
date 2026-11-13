@@ -1,10 +1,9 @@
-//! Large Int arithmetic is i code, `lib/i/big.i`, which the runtime calls
-//! when an operand is not small. These tests compile one program at O0 and
-//! at O2 with scalar lowering and compare `+ - * / %`, the comparisons and
-//! the text form with `num-bigint`, on the edges of the small range, of 32
-//! and 64 bits, and on pseudo-random values of up to 40 limbs. The bitwise
-//! operations, shifts and Float conversions stay in the runtime, but they
-//! use the arithmetic, so they are compared here too.
+//! Large Int arithmetic of compiled programs, compared with `num-bigint` at
+//! O0 and at O2 with scalar lowering: `+ - * / %`, the comparisons, the text
+//! form, the bitwise operations, shifts and Float conversions, on the edges
+//! of the small range, of 32 and 64 bits, and on pseudo-random values of up
+//! to 40 limbs; and integer bit-array segments wider than 64 bits, which are
+//! i code (`lib/i/bits.i`).
 use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
 use ilang_wasm::{Numeric, Options};
 use num_bigint::BigInt;

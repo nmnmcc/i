@@ -27,8 +27,7 @@
 to_string = (x: Float) -> String {
 	bits = core.float_to_bits(x)
 	// The fields of the bits are taken apart with shifts and masks, so that
-	// every number below stays under 2^62 for ordinary Floats, where the
-	// runtime does the arithmetic in 64 bits. Bit 63 is the sign; the
+	// the numbers below stay small for ordinary Floats. Bit 63 is the sign; the
 	// numbers are written out in place, because a top-level value is
 	// worked out at start, in the frame of every program.
 	sign = { core.shift_right(bits, 63) == 1 } |> {

@@ -1,6 +1,7 @@
 //! Integer conversions implemented in the generated Wasm runtime.
 //!
-//! Rendering is i code (`lib/i/big.i`), with uppercase ASCII digits.
+//! `$int_parse` returns `(integer, success)` and consumes the entire UTF-8 string.
+//! Rendering uses uppercase ASCII digits, matching `i/int`.
 
 pub fn wat() -> String {
     r#"
@@ -160,15 +161,127 @@ pub fn wat() -> String {
 (func $int_to_string (param $value eqref) (result eqref)
   (call $int_to_base_string (local.get $value) (ref.i31 (i32.const 10))))
 
-;; The text is i code (`lib/i/big.i`, `to_text`).
+;; Divide a private working magnitude in place by the small output base. Each
+;; quotient step uses an exact unsigned 64-bit dividend (remainder < base <= 36).
 (func $int_to_base_string (param $value eqref) (param $base_value eqref) (result eqref)
+  (local $sign i32) (local $base i64) (local $a (ref $limbs))
+  (local $work (ref $limbs)) (local $n i32) (local $i i32)
+  (local $count i32) (local $remainder i64) (local $dividend i64)
+  (local $digit i32) (local $reverse (ref $bytes)) (local $bytes (ref $bytes))
   (if
     (i32.or
       (i32.lt_s (call $int_compare (local.get $base_value) (ref.i31 (i32.const 2))) (i32.const 0))
       (i32.gt_s (call $int_compare (local.get $base_value) (ref.i31 (i32.const 36))) (i32.const 0)))
     (then unreachable))
-  (call $big_to_text (local.get $value) (local.get $base_value)))
+  (local.set $base (call $int_to_i64 (local.get $base_value)))
+  (local.set $sign (call $int_sign (local.get $value)))
+  (if (i32.eqz (local.get $sign))
+    (then (return (call $conv_string (array.new_fixed $bytes 1 (i32.const 48))))))
+  (local.set $a (call $int_limbs (local.get $value)))
+  (local.set $n (array.len (local.get $a)))
+  (if (i32.gt_u (local.get $n) (i32.const 0x07ffffff)) (then unreachable))
+  (local.set $work (array.new_default $limbs (local.get $n)))
+  (array.copy $limbs $limbs (local.get $work) (i32.const 0)
+    (local.get $a) (i32.const 0) (local.get $n))
+  (local.set $reverse
+    (array.new_default $bytes (i32.add (i32.mul (local.get $n) (i32.const 32)) (i32.const 1))))
+  (block $digits_done
+    (loop $digits
+      (br_if $digits_done (i32.eqz (local.get $n)))
+      (local.set $i (local.get $n))
+      (local.set $remainder (i64.const 0))
+      (block $division_done
+        (loop $division
+          (br_if $division_done (i32.eqz (local.get $i)))
+          (local.set $i (i32.sub (local.get $i) (i32.const 1)))
+          (local.set $dividend
+            (i64.or (i64.shl (local.get $remainder) (i64.const 32))
+              (i64.extend_i32_u (array.get $limbs (local.get $work) (local.get $i)))))
+          (array.set $limbs (local.get $work) (local.get $i)
+            (i32.wrap_i64 (i64.div_u (local.get $dividend) (local.get $base))))
+          (local.set $remainder (i64.rem_u (local.get $dividend) (local.get $base)))
+          (br $division)))
+      (local.set $digit (i32.wrap_i64 (local.get $remainder)))
+      (array.set $bytes (local.get $reverse) (local.get $count)
+        (i32.add (local.get $digit)
+          (if (result i32) (i32.lt_u (local.get $digit) (i32.const 10))
+            (then (i32.const 48)) (else (i32.const 55)))))
+      (local.set $count (i32.add (local.get $count) (i32.const 1)))
+      (block $trimmed
+        (loop $trim
+          (br_if $trimmed (i32.eqz (local.get $n)))
+          (br_if $trimmed
+            (array.get $limbs (local.get $work) (i32.sub (local.get $n) (i32.const 1))))
+          (local.set $n (i32.sub (local.get $n) (i32.const 1)))
+          (br $trim)))
+      (br $digits)))
+  (if (i32.lt_s (local.get $sign) (i32.const 0))
+    (then
+      (array.set $bytes (local.get $reverse) (local.get $count) (i32.const 45))
+      (local.set $count (i32.add (local.get $count) (i32.const 1)))))
+  (local.set $bytes (array.new_default $bytes (local.get $count)))
+  (local.set $i (i32.const 0))
+  (block $reversed
+    (loop $reverse_digits
+      (br_if $reversed (i32.ge_u (local.get $i) (local.get $count)))
+      (array.set $bytes (local.get $bytes) (local.get $i)
+        (array.get_u $bytes (local.get $reverse)
+          (i32.sub (i32.sub (local.get $count) (local.get $i)) (i32.const 1))))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br $reverse_digits)))
+  (call $conv_string (local.get $bytes)))
 
+;; Return the parsed integer plus a success flag. No partial prefix, whitespace,
+;; underscore, non-ASCII digit, or sign without digits is accepted.
+(func $int_parse (param $string eqref) (param $base eqref) (result eqref i32)
+  (local $bytes (ref $bytes)) (local $n i32) (local $i i32)
+  (local $negative i32) (local $digit i32) (local $char i32)
+  (local $radix i32) (local $value eqref)
+  (block $invalid
+    (br_if $invalid
+      (i32.or
+        (i32.lt_s (call $int_compare (local.get $base) (ref.i31 (i32.const 2))) (i32.const 0))
+        (i32.gt_s (call $int_compare (local.get $base) (ref.i31 (i32.const 36))) (i32.const 0))))
+    (local.set $radix (i32.wrap_i64 (call $int_to_i64 (local.get $base))))
+    (local.set $bytes
+      (ref.as_non_null (struct.get $obj 4 (ref.cast (ref $obj) (local.get $string)))))
+    (local.set $n (array.len (local.get $bytes)))
+    (br_if $invalid (i32.eqz (local.get $n)))
+    (local.set $char (array.get_u $bytes (local.get $bytes) (i32.const 0)))
+    (if (i32.or (i32.eq (local.get $char) (i32.const 43)) (i32.eq (local.get $char) (i32.const 45)))
+      (then
+        (local.set $negative (i32.eq (local.get $char) (i32.const 45)))
+        (local.set $i (i32.const 1))))
+    (br_if $invalid (i32.eq (local.get $i) (local.get $n)))
+    (local.set $value (ref.i31 (i32.const 0)))
+    (block $parsed
+      (loop $parse_digit
+        (br_if $parsed (i32.ge_u (local.get $i) (local.get $n)))
+        (local.set $char (array.get_u $bytes (local.get $bytes) (local.get $i)))
+        (local.set $digit
+          (if (result i32)
+            (i32.and (i32.ge_u (local.get $char) (i32.const 48)) (i32.le_u (local.get $char) (i32.const 57)))
+            (then (i32.sub (local.get $char) (i32.const 48)))
+            (else
+              (if (result i32)
+                (i32.and (i32.ge_u (local.get $char) (i32.const 65)) (i32.le_u (local.get $char) (i32.const 90)))
+                (then (i32.sub (local.get $char) (i32.const 55)))
+                (else
+                  (if (result i32)
+                    (i32.and (i32.ge_u (local.get $char) (i32.const 97)) (i32.le_u (local.get $char) (i32.const 122)))
+                    (then (i32.sub (local.get $char) (i32.const 87)))
+                    (else (i32.const -1))))))))
+        (br_if $invalid (i32.ge_u (local.get $digit) (local.get $radix)))
+        (local.set $value
+          (call $int_add
+            (call $int_mul (local.get $value) (local.get $base))
+            (ref.i31 (local.get $digit))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $parse_digit)))
+    (if (local.get $negative)
+      (then (local.set $value (call $int_neg (local.get $value)))))
+    (return (local.get $value) (i32.const 1)))
+  (ref.i31 (i32.const 0)) (i32.const 0))
 "#
     .to_owned()
 }
