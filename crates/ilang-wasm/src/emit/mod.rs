@@ -257,7 +257,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
     for &n in &e.lazy_calls {
-        m.push_str(&control::lazy_call(n));
+        m.push_str(&control::lazy_call(n, &ShapeId::from(n).to_string()));
     }
     m.push_str(&host::effects());
     m.push_str(ENTRY);
@@ -942,6 +942,7 @@ impl<'p> Emitter<'p> {
             Callee::Lazy { service, field } => {
                 self.arities.insert(n + 1);
                 self.lazy_calls.insert(n);
+                self.dispatch.insert(n);
                 let s = self.atom(service);
                 format!("({prefix}call $lazy_call{n} {s} (i32.const {field}) {env}{raw_args})")
             }
