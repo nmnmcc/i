@@ -9,6 +9,6 @@ int_phantom = () -> Phantom(Int) { new() }
 
 string_phantom = () -> Phantom(String) { new() }
 
-change = (p: Phantom(Int)) -> Phantom(String) { p }
+change = (p : Phantom(Int)) -> Phantom(String) { p }
 
-change_back = (p: Phantom(String)) -> Phantom(Int) { p }
+change_back = (p : Phantom(String)) -> Phantom(Int) { p }

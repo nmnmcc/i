@@ -8,7 +8,7 @@
 	std/http
 )
 
-handle = (req: http.Request) {
+handle = (req : http.Request) {
 	(req.method, req.target) |>
 		((http.Method("GET"), "/redirect")) {
 			r = http.response(http.Status(302))
@@ -65,7 +65,7 @@ test("network_client", () {
 
 test("client_timeout", () {
 	result = task.run(() {
-		provider = (send = (_: http.Request) { task.sync(task.never()) })
+		provider = (send = (_ : http.Request) { task.sync(task.never()) })
 		fail.catch(() {
 			http.send_timeout(
 				provider.send,

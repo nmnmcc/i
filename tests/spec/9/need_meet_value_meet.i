@@ -8,9 +8,9 @@ S(N) = (f = () <- N -> Nil)
 
 Dep = (v = Int)
 
-needs_never = () <- (s: S(Never)) { Nil }
+needs_never = () <- (s : S(Never)) { Nil }
 
-needs_dep = () <- (s: S(Dep)) { Nil }
+needs_dep = () <- (s : S(Dep)) { Nil }
 
 // The need path: the two needs merge to S(Never).
 both = () -> Nil {
@@ -19,13 +19,13 @@ both = () -> Nil {
 }
 
 // The value path: the intersection of the two forms is S(Never).
-meet = (x: S(Never) & S(Dep)) -> S(Never) { x }
+meet = (x : S(Never) & S(Dep)) -> S(Never) { x }
 
 // As a value union the same-direction argument gives the row union Dep.
-join = (x: { S(Never) | S(Dep) }) -> S(Dep) { x }
+join = (x : { S(Never) | S(Dep) }) -> S(Dep) { x }
 
 main = () {
-	_syn3_0: S(Never) = S(f = () { Nil })
+	_syn3_0 : S(Never) = S(f = () { Nil })
 	{
 		both()
 		meet(S(f = () { Nil }))

@@ -39,4 +39,4 @@ Many = -20
 	| 18
 	| 19
 	| 20
-f = (x: Many) { x == "wrong" }
+f = (x : Many) { x == "wrong" }

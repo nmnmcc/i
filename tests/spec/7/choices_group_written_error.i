@@ -4,4 +4,4 @@
 // inferred); the written full type of the binding closes them, so the
 // failing choice does not fit `() -> Int`.
 s = "b"
-f: () -> Int = () { s |> ("a" | "c") { 1 } }
+f : () -> Int = () { s |> ("a" | "c") { 1 } }

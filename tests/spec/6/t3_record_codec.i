@@ -8,8 +8,8 @@
 	main
 )
 Codec(D, E) = (decode = () -> D, encode = (E) -> String)
-object: Codec(Record, Record) = Codec(decode = () { () }, encode = (x) { "" })
-field = <R, E, K, V>(s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec(
+object : Codec(Record, Record) = Codec(decode = () { () }, encode = (x) { "" })
+field = <R, E, K, V>(s : Codec(R, E), key : K, value : Codec(V, V)) -> Codec(
 	(k = V),
 	E & (k = V),
 ) {
@@ -20,7 +20,7 @@ field = <R, E, K, V>(s: Codec(R, E), key: K, value: Codec(V, V)) -> Codec(
 }
 
 main = () {
-	value = Codec(decode = () { 1 }, encode = (x: Int) { "x" })
+	value = Codec(decode = () { 1 }, encode = (x : Int) { "x" })
 	user = field(object, "age", value)
 	assert(user.decode().age == 1)
 	assert(user.encode((age = 2)) == "x")

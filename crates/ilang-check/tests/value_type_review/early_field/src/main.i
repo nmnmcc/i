@@ -1,3 +1,3 @@
-n: Int = 1
+n : Int = 1
 N = n
 Box = (N)

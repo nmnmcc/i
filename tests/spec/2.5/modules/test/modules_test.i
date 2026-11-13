@@ -5,7 +5,7 @@
 	app/app/base
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -16,7 +16,7 @@ test("across_modules", () {
 	check(core.inspect(top.colors), "[Red, Blue(0), Green]")
 })
 
-each = (xs: List(base.Color)) {
+each = (xs : List(base.Color)) {
 	xs |> ([]) { [] } | ([c, ..rest]) { [base.describe(c), ..each(rest)] }
 }
 

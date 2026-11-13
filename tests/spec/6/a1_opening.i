@@ -4,7 +4,7 @@
 	main
 )
 make = (n) { (x) -> Int { x + n } }
-read = (v: { Int | String }) { v |> (x: Int) { x } | (_) { 0 } }
+read = (v : { Int | String }) { v |> (x : Int) { x } | (_) { 0 } }
 
 main = () {
 	assert(make(4)(3) == 7)

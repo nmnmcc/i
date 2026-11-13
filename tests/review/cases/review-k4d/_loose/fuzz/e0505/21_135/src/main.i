@@ -1,29 +1,29 @@
 Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
+get = () <- (d : Dep) { d.v }
 S(N) = (f = () <- N -> Int, m = (N) -> Nil)
 T(N) = (f = () <- N -> Int, m = (N) -> Nil)
-us = <N>() <- (s: S(N)) {
+us = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
 }
-ut = <N>() <- (t: T(N)) {
+ut = <N>() <- (t : T(N)) {
 	T(f = f, ..) = t
 	f()
 }
-usa = <N>() <- (s: S(N)) -> Int {
+usa = <N>() <- (s : S(N)) -> Int {
 	S(f = f, ..) = s
 	f()
 }
-run = <A, N>(body: () <- N -> A) { body() }
+run = <A, N>(body : () <- N -> A) { body() }
 h0 = () { us() }
 h1 = () { run(h0) + run(() { ut() }) }
 
 main = () {
 	k = () { h1() }
 	w = () {
-		_syn3_0: T(S(Never)) = T(
+		_syn3_0 : T(S(Never)) = T(
 			f = () { us() + h0() },
-			m = (_: S(Never)) { Nil },
+			m = (_ : S(Never)) { Nil },
 		)
 		usa() + get() + run(() { us() }) <- (_syn3_0)
 	}

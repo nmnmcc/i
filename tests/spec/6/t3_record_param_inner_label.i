@@ -3,8 +3,8 @@
 (
 	main
 )
-f = <K>(r: Record, key: K) -> Int {
-	h = (s: (k = Int)) { s }
+f = <K>(r : Record, key : K) -> Int {
+	h = (s : (k = Int)) { s }
 	0
 }
 

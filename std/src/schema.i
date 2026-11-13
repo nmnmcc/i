@@ -50,15 +50,15 @@ Syntax = (json.JsonError)
 Decode = (SchemaError)
 ParseError = Syntax | Decode
 
-decode = <A, E>(schema: Schema(A, E), value: json.Json) -> Result(A, E) {
+decode = <A, E>(schema : Schema(A, E), value : json.Json) -> Result(A, E) {
 	schema.read(value)
 }
 
-encode = <A, E>(schema: Schema(A, E), value: A) -> json.Json {
+encode = <A, E>(schema : Schema(A, E), value : A) -> json.Json {
 	schema.write(value)
 }
 
-parse = <A>(schema: Schema(A, SchemaError), text: String) -> Result(
+parse = <A>(schema : Schema(A, SchemaError), text : String) -> Result(
 	A,
 	ParseError,
 ) {
@@ -71,15 +71,15 @@ parse = <A>(schema: Schema(A, SchemaError), text: String) -> Result(
 		}
 }
 
-print = <A, E>(schema: Schema(A, E), value: A) -> String {
+print = <A, E>(schema : Schema(A, E), value : A) -> String {
 	json.print(encode(schema, value))
 }
 
-error = (expected: String) -> SchemaError {
+error = (expected : String) -> SchemaError {
 	SchemaError(path = [], expected = expected)
 }
 
-at = (part: Path, e: SchemaError) -> SchemaError {
+at = (part : Path, e : SchemaError) -> SchemaError {
 	SchemaError(path = [part, ..e.path], expected = e.expected)
 }
 
@@ -116,7 +116,7 @@ null = Schema(
 	write = (_) { json.Null },
 )
 
-literal_string = <K>(value: K) -> Schema(K, SchemaError) {
+literal_string = <K>(value : K) -> Schema(K, SchemaError) {
 	Schema(
 		read = (x) {
 			x |>
@@ -127,7 +127,7 @@ literal_string = <K>(value: K) -> Schema(K, SchemaError) {
 	)
 }
 
-literal_int = <K>(value: K) -> Schema(K, SchemaError) {
+literal_int = <K>(value : K) -> Schema(K, SchemaError) {
 	Schema(
 		read = (x) {
 			x |>
@@ -138,7 +138,7 @@ literal_int = <K>(value: K) -> Schema(K, SchemaError) {
 	)
 }
 
-nullable = <A>(s: Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
+nullable = <A>(s : Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 	Schema(
 		read = (x) {
 			x |>
@@ -155,7 +155,7 @@ nullable = <A>(s: Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 
 optional = nullable
 
-list = <A>(s: Schema(A, SchemaError)) -> Schema(List(A), SchemaError) {
+list = <A>(s : Schema(A, SchemaError)) -> Schema(List(A), SchemaError) {
 	Schema(
 		read = (x) {
 			x |>
@@ -167,9 +167,9 @@ list = <A>(s: Schema(A, SchemaError)) -> Schema(List(A), SchemaError) {
 }
 
 read_list = <A>(
-	s: Schema(A, SchemaError),
-	xs: List(json.Json),
-	index: Int
+	s : Schema(A, SchemaError),
+	xs : List(json.Json),
+	index : Int
 ) -> Result(List(A), SchemaError) {
 	xs |>
 		([]) { Ok([]) }
@@ -184,7 +184,7 @@ read_list = <A>(
 		}
 }
 
-dict = <A>(s: Schema(A, SchemaError)) -> Schema(
+dict = <A>(s : Schema(A, SchemaError)) -> Schema(
 	ds.Dict(String, A),
 	SchemaError,
 ) {
@@ -206,8 +206,8 @@ dict = <A>(s: Schema(A, SchemaError)) -> Schema(
 }
 
 read_dict = <A>(
-	s: Schema(A, SchemaError),
-	xs: List((String, json.Json))
+	s : Schema(A, SchemaError),
+	xs : List((String, json.Json))
 ) -> Result(ds.Dict(String, A), SchemaError) {
 	xs |>
 		([]) { Ok(ds.new()) }
@@ -222,10 +222,10 @@ read_dict = <A>(
 		}
 }
 
-tuple = <A, B>(a: Schema(A, SchemaError), b: Schema(B, SchemaError)) -> Schema(
-	(A, B),
-	SchemaError,
-) {
+tuple = <A, B>(
+	a : Schema(A, SchemaError),
+	b : Schema(B, SchemaError)
+) -> Schema((A, B), SchemaError) {
 	Schema(
 		read = (x) {
 			x |>
@@ -247,7 +247,7 @@ tuple = <A, B>(a: Schema(A, SchemaError), b: Schema(B, SchemaError)) -> Schema(
 	)
 }
 
-object = <A>(empty: A) -> Schema(A, SchemaError) {
+object = <A>(empty : A) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
 			x |> (json.Object(_)) { Ok(empty) } | (_) { Error(error("object")) }
@@ -257,11 +257,11 @@ object = <A>(empty: A) -> Schema(A, SchemaError) {
 }
 
 field = <A, V>(
-	base: Schema(A, SchemaError),
-	key: String,
-	value: Schema(V, SchemaError),
-	get: (A) -> V,
-	put: (A, V) -> A
+	base : Schema(A, SchemaError),
+	key : String,
+	value : Schema(V, SchemaError),
+	get : (A) -> V,
+	put : (A, V) -> A
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
@@ -293,11 +293,11 @@ field = <A, V>(
 }
 
 optional_field = <A, V>(
-	base: Schema(A, SchemaError),
-	key: String,
-	value: Schema(V, SchemaError),
-	get: (A) -> Option(V),
-	put: (A, Option(V)) -> A
+	base : Schema(A, SchemaError),
+	key : String,
+	value : Schema(V, SchemaError),
+	get : (A) -> Option(V),
+	put : (A, Option(V)) -> A
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
@@ -330,9 +330,9 @@ optional_field = <A, V>(
 }
 
 map = <A, B>(
-	s: Schema(A, SchemaError),
-	forward: (A) -> B,
-	backward: (B) -> A
+	s : Schema(A, SchemaError),
+	forward : (A) -> B,
+	backward : (B) -> A
 ) -> Schema(B, SchemaError) {
 	Schema(
 		read = (x) {
@@ -345,9 +345,9 @@ map = <A, B>(
 transform = map
 
 refine = <A>(
-	s: Schema(A, SchemaError),
-	predicate: (A) -> Bool,
-	message: String
+	s : Schema(A, SchemaError),
+	predicate : (A) -> Bool,
+	message : String
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
@@ -363,13 +363,13 @@ refine = <A>(
 	)
 }
 
-lazy = <A>(get: () -> Schema(A, SchemaError)) -> Schema(A, SchemaError) {
+lazy = <A>(get : () -> Schema(A, SchemaError)) -> Schema(A, SchemaError) {
 	Schema(read = (x) { decode(get(), x) }, write = (x) { encode(get(), x) })
 }
 
 union = <A>(
-	schemas: List(Schema(A, SchemaError)),
-	choose: (A) -> Int
+	schemas : List(Schema(A, SchemaError)),
+	choose : (A) -> Int
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) { read_union(schemas, x) },
@@ -381,10 +381,10 @@ union = <A>(
 	)
 }
 
-read_union = <A>(schemas: List(Schema(A, SchemaError)), x: json.Json) -> Result(
-	A,
-	SchemaError,
-) {
+read_union = <A>(
+	schemas : List(Schema(A, SchemaError)),
+	x : json.Json
+) -> Result(A, SchemaError) {
 	schemas |>
 		([]) { Error(error("union")) }
 		| ([s, ..rest]) {
@@ -395,9 +395,9 @@ read_union = <A>(schemas: List(Schema(A, SchemaError)), x: json.Json) -> Result(
 }
 
 tagged_union = <A>(
-	key: String,
-	cases: List((String, Schema(A, SchemaError))),
-	tag: (A) -> String
+	key : String,
+	cases : List((String, Schema(A, SchemaError))),
+	tag : (A) -> String
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {

@@ -21,5 +21,5 @@ Box(A) = (A)
 boxed = True |> (True) { Box(1) } | (False) { Box(2) }
 Box(Number) = boxed
 
-methods: { "GET" | "POST" } = "GET"
+methods : { "GET" | "POST" } = "GET"
 Methods = methods

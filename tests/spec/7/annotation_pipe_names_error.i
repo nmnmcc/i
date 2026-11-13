@@ -3,4 +3,7 @@
 // Both alternatives are parsed, but every alternative must bind the same names.
 y = 1
 f = (x : Int | y) { 1 }
-main = () { f(1) Nil }
+main = () {
+	f(1)
+	Nil
+}

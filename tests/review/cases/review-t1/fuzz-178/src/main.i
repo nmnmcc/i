@@ -1,4 +1,4 @@
-f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
+f = (x : ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
 		((_, False) ? False) { 0 }
 		| (("ab", _) ? False) { 1 }

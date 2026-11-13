@@ -1,11 +1,11 @@
 S(N) = (() <- N -> Nil)
-use = <N>() <- (s: S(N)) {
+use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
-run = <N>(f: () <- N -> Nil) { f() }
+run = <N>(f : () <- N -> Nil) { f() }
 bad = <N>() {
-	_syn3_0: S(N) = S(() { use() })
+	_syn3_0 : S(N) = S(() { use() })
 	{
 		local = () { use() }
 		local()

@@ -51,59 +51,59 @@ AsyncA = (get_a = () -> A)
 AsyncB = (get_b = () -> B)
 
 @external("app:opaque/v1", "get")
-get_a: () -> A
+get_a : () -> A
 
 @external("app:opaque/v1", "get")
-get_b: () -> B
+get_b : () -> B
 
 @external("app:opaque/v1", "echo")
-echo_a: (A) -> A
+echo_a : (A) -> A
 
 @external("app:opaque/v1", "echo")
-echo_b: (A) -> B
+echo_b : (A) -> B
 
-equal = <X, Y>(a: X, b: Y) { a == b }
+equal = <X, Y>(a : X, b : Y) { a == b }
 
-direct_aa = (a: A, b: A) { a == b }
+direct_aa = (a : A, b : A) { a == b }
 
 // Section 6.9 rejects equality of known disjoint types. Widen the local
 // known types so this direct operator reaches runtime equality.
-direct_ab = (a: A, b: B) {
-	left: { A | B } = a
-	right: { A | B } = b
+direct_ab = (a : A, b : B) {
+	left : { A | B } = a
+	right : { A | B } = b
 	left == right
 }
 
-generic_aa = (a: A, b: A) { equal(a, b) }
+generic_aa = (a : A, b : A) { equal(a, b) }
 
-generic_ab = (a: A, b: B) { equal(a, b) }
+generic_ab = (a : A, b : B) { equal(a, b) }
 
-alias_aa = (a: A, b: Alias) { equal(a, b) }
+alias_aa = (a : A, b : Alias) { equal(a, b) }
 
-module_ab = (a: A, b: other.A) { equal(a, b) }
+module_ab = (a : A, b : other.A) { equal(a, b) }
 
-collection_aa = (a: A, b: A) { equal([a], [b]) }
+collection_aa = (a : A, b : A) { equal([a], [b]) }
 
-collection_ab = (a: A, b: B) { equal([a], [b]) }
+collection_ab = (a : A, b : B) { equal([a], [b]) }
 
-hash_aa = (a: A, b: A) { core.hash(a) == core.hash(b) }
+hash_aa = (a : A, b : A) { core.hash(a) == core.hash(b) }
 
-inspect_a = (a: A) { core.inspect(a) }
+inspect_a = (a : A) { core.inspect(a) }
 
-echo = (a: A) { a }
+echo = (a : A) { a }
 
-roundtrip_aa = (a: A, b: A) { equal(a, echo_a(b)) }
+roundtrip_aa = (a : A, b : A) { equal(a, echo_a(b)) }
 
-roundtrip_ab = (a: A) { equal(a, echo_b(a)) }
+roundtrip_ab = (a : A) { equal(a, echo_b(a)) }
 
 import_aa = () { equal(get_a(), get_a()) }
 
 import_ab = () { equal(get_a(), get_b()) }
 
-sync_aa = () <- (a: SyncA) { equal(a.get_a(), a.get_a()) }
+sync_aa = () <- (a : SyncA) { equal(a.get_a(), a.get_a()) }
 
-sync_ab = () <- (a: SyncA, b: SyncB) { equal(a.get_a(), b.get_b()) }
+sync_ab = () <- (a : SyncA, b : SyncB) { equal(a.get_a(), b.get_b()) }
 
-async_aa = () <- (a: AsyncA) { equal(a.get_a(), a.get_a()) }
+async_aa = () <- (a : AsyncA) { equal(a.get_a(), a.get_a()) }
 
-async_ab = () <- (a: AsyncA, b: AsyncB) { equal(a.get_a(), b.get_b()) }
+async_ab = () <- (a : AsyncA, b : AsyncB) { equal(a.get_a(), b.get_b()) }

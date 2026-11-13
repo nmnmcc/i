@@ -4,4 +4,4 @@ Red = ()
 
 Green = ()
 Color = Red | Green
-name = (c: Color) { c |> (Red) { "red" } | (Green ? False) { "green" } }
+name = (c : Color) { c |> (Red) { "red" } | (Green ? False) { "green" } }

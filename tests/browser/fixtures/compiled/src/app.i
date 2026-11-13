@@ -26,27 +26,27 @@ Storage = (read = (String) <- (Fail(String)) -> String)
 Clock = (later = (Float) <- (Fail(String)) -> Float, tick = (Int) -> Int)
 
 @external("app:math/v1", "hypot")
-hypot: (Float, Float) -> Float
+hypot : (Float, Float) -> Float
 
 /// A sync host export with a sync service: prints, and gives the size.
-greet = (name: String) <- (console: Console) {
+greet = (name : String) <- (console : Console) {
 	console.print("hello " <> name)
 	core.byte_size(name)
 }
 
 /// A sync host export whose service gives errors.
-lookup = (key: String) <- (storage: Storage) { storage.read(key) }
+lookup = (key : String) <- (storage : Storage) { storage.read(key) }
 
 /// A host export that calls an external function.
-distance = (a: Float, b: Float) { hypot(a, b) }
+distance = (a : Float, b : Float) { hypot(a, b) }
 
 /// An async host export: it waits for the host two times.
-wait_sum = (a: Float, b: Float) <- (clock: Clock) {
+wait_sum = (a : Float, b : Float) <- (clock : Clock) {
 	clock.later(a) +. clock.later(b)
 }
 
 /// An async program entry.
-main = () <- (console: Console, clock: Clock) {
+main = () <- (console : Console, clock : Clock) {
 	n = clock.tick(41)
 	x = clock.later(1.5)
 	console.print("main " <> core.inspect(n) <> " " <> core.inspect(x))

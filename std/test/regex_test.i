@@ -7,13 +7,13 @@
 	(Some, None) = std/option
 )
 
-compile = (pattern: String) -> regex.Regex {
+compile = (pattern : String) -> regex.Regex {
 	regex.compile(pattern) |>
 		(Ok(re)) { re }
 		| (Error(_)) { panic("test pattern") }
 }
 
-text = (pattern: String, input: String) -> String {
+text = (pattern : String, input : String) -> String {
 	regex.find(compile(pattern), input) |>
 		(Some(m)) { m.text }
 		| (None) { "<no match>" }

@@ -8,7 +8,7 @@
 )
 
 main = () {
-	c: task.Channel(Int) = task.scope((_) { task.channel() })
+	c : task.Channel(Int) = task.scope((_) { task.channel() })
 	event = task.send_event(c, 7)
 	assert(core.portable(event))
 }

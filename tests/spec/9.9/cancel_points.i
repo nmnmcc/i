@@ -18,7 +18,7 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
 // §9.9 lets the failure come before or after any one step of the waiting
 // child, so the child repeats its step until the cancellation reaches it.
@@ -34,10 +34,10 @@ sync_forever = () -> Nil {
 	sync_forever()
 }
 
-probe = (label: String, wait: () <- (task.Scheduler, request.Root) -> Nil) {
+probe = (label : String, wait : () <- (task.Scheduler, request.Root) -> Nil) {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
@@ -63,14 +63,14 @@ probe = (label: String, wait: () <- (task.Scheduler, request.Root) -> Nil) {
 
 main = () {
 	probe("yield", () { yield_forever() })
-	c: task.Channel(Nil) = task.channel()
+	c : task.Channel(Nil) = task.channel()
 	probe("send", () { task.send(c, Nil) })
 	probe("receive", () { task.receive(c) })
 	probe("sync", () { sync_forever() })
 	result = fail.catch(() {
 		task.scope((s) {
 			target = task.go(s, () { task.sync(task.never()) })
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {

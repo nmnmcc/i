@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: BitArray, want: BitArray) {
+check = (got : BitArray, want : BitArray) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) {
@@ -13,7 +13,7 @@ check = (got: BitArray, want: BitArray) {
 		}
 }
 
-same = (got: String, want: String) {
+same = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }

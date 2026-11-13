@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -13,15 +13,15 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-span = (from: Int, to: Int) { to - from }
+span = (from : Int, to : Int) { to - from }
 
-describe = (name: String, age: Int, city: String) {
+describe = (name : String, age : Int, city : String) {
 	name <> "/" <> core.inspect(age) <> "/" <> city
 }
 
 User = (name = String, age = Int)
 
-relabel = (first: Int = x, (a, b), last: Int) { x + first + a + b + last }
+relabel = (first : Int = x, (a, b), last : Int) { x + first + a + b + last }
 
 test("labels", () {
 	check(

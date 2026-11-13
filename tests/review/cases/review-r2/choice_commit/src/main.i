@@ -9,9 +9,9 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) {
-		c: task.Channel(Int) = task.channel()
+		c : task.Channel(Int) = task.channel()
 		task.go(s, () { task.send(c, 7) })
 		// The sender may not have reached its send at any one step (spec §9.9), so
 		// the choice waits for it: exactly one alternative commits.

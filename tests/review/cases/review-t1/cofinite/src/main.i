@@ -1,14 +1,18 @@
-g = (s: String) {
+g = (s : String) {
 	s |>
-		(_: String - "a" - "b") { 3 }
+		(_ : String - "a" - "b") { 3 }
 		| ("a") { 1 }
 		| (r) {
-			x: "b" = r
+			x : "b" = r
 			2
 		}
 }
-h = (n: { Int | String }) {
-	n |> (_: String - "a") { 1 } | ("a") { 2 } | (_: Int - 0) { 3 } | (0) { 4 }
+h = (n : { Int | String }) {
+	n |>
+		(_ : String - "a") { 1 }
+		| ("a") { 2 }
+		| (_ : Int - 0) { 3 }
+		| (0) { 4 }
 }
 
 main = () {

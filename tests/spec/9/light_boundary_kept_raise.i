@@ -10,8 +10,8 @@
 // after the catch has ended: the program stops, because the boundary is
 // not active, at the same place as when the `Fail` value itself is used.
 main = () {
-	r: Result((Int) -> Nil, Int) = failure.catch(() {
-		control.keep_env((x: Int) { failure.raise(x) })
+	r : Result((Int) -> Nil, Int) = failure.catch(() {
+		control.keep_env((x : Int) { failure.raise(x) })
 	})
 	r |> (Ok(k)) { k(1) } | (Error(_)) { Nil }
 }

@@ -1,8 +1,8 @@
-a = (x: Bool) { x |> (True) { use() } | (False) { b(True) } }
+a = (x : Bool) { x |> (True) { use() } | (False) { b(True) } }
 S(N) = (() <- N -> Nil)
-b = (x: Bool) { x |> (True) { use() } | (False) { a(True) } }
-run = <N>(body: () <- N -> Nil) { body() }
-use = <N>() <- (s: S(N)) {
+b = (x : Bool) { x |> (True) { use() } | (False) { a(True) } }
+run = <N>(body : () <- N -> Nil) { body() }
+use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }

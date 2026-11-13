@@ -6,6 +6,6 @@ a = old
 
 b = lib.old
 
-c: lib.Old = lib.OldC
+c : lib.Old = lib.OldC
 
 d = lib.fresh

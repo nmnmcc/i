@@ -8,21 +8,21 @@
 
 /// Ends the computation with `error`.
 @external("ilang:fail", "raise")
-raise: <E>(E) <- (Fail(E)) -> Never
+raise : <E>(E) <- (Fail(E)) -> Never
 
 /// Changes every error into `Error(…)`.
 @external("ilang:fail", "catch")
-catch: <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E)
+catch : <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E)
 
 /// Gives the error `x` for `Error(x)`.
-from_result = <A, E>(result: Result(A, E)) -> A {
+from_result = <A, E>(result : Result(A, E)) -> A {
 	result |> (Ok(value)) { value } | (Error(error)) { raise(error) }
 }
 
 /// Changes the errors.
 map_error = <A, E, N, E2>(
-	body: () <- (Fail(E), ..N) -> A,
-	with: (E) <- N -> E2
+	body : () <- (Fail(E), ..N) -> A,
+	with : (E) <- N -> E2
 ) -> A {
 	catch(body) |> (Ok(value)) { value } | (Error(error)) { raise(with(error)) }
 }

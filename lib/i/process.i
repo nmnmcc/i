@@ -139,7 +139,7 @@ decode_args =
 	}
 	| (_) { panic("process: invalid arguments") }
 
-args = () <- (raw: Arguments) {
+args = () <- (raw : Arguments) {
 	request.await_owned(raw.args()) |>
 		(Ok(value)) { decode_args(value) }
 		| (Error(code)) {
@@ -147,7 +147,7 @@ args = () <- (raw: Arguments) {
 		}
 }
 
-env = (name) <- (raw: Environment) {
+env = (name) <- (raw : Environment) {
 	request.await_owned(raw.env(name)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -155,7 +155,7 @@ env = (name) <- (raw: Environment) {
 		}
 }
 
-cwd = () <- (raw: WorkingDirectory) {
+cwd = () <- (raw : WorkingDirectory) {
 	request.await_owned(raw.cwd()) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -163,7 +163,7 @@ cwd = () <- (raw: WorkingDirectory) {
 		}
 }
 
-entropy = (bytes) <- (raw: Entropy) {
+entropy = (bytes) <- (raw : Entropy) {
 	request.await_owned(raw.entropy(bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -171,7 +171,7 @@ entropy = (bytes) <- (raw: Entropy) {
 		}
 }
 
-spawn = (program, values) <- (raw: Process) {
+spawn = (program, values) <- (raw : Process) {
 	r = raw.spawn(program, encode_args(values))
 	number = resource.ensure(
 		() {
@@ -194,7 +194,7 @@ spawn = (program, values) <- (raw: Process) {
 	Child(number)
 }
 
-wait = (Child(number)) <- (raw: Process) {
+wait = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.wait(number)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -202,7 +202,7 @@ wait = (Child(number)) <- (raw: Process) {
 		}
 }
 
-terminate = (Child(number)) <- (raw: Process) {
+terminate = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.terminate(number)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -210,13 +210,13 @@ terminate = (Child(number)) <- (raw: Process) {
 		}
 }
 
-close = (Child(number)) <- (raw: Process) {
+close = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close(number))
 }
 
 stdio_mode = (Inherit) { "inherit" } | (Null) { "null" } | (Piped) { "piped" }
 
-spawn_piped = (program, values, input, output, errors) <- (raw: Process) {
+spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 	r = raw.spawn_piped(
 		program,
 		encode_args(values),
@@ -255,7 +255,7 @@ spawn_config = (
 	errors,
 	environment,
 	directory
-) <- (raw: Process) {
+) <- (raw : Process) {
 	(env_mode, entries) = environment |>
 		(InheritEnvironment(entries)) { ("inherit", entries) }
 		| (ReplaceEnvironment(entries)) { ("replace", entries) }
@@ -294,7 +294,7 @@ spawn_config = (
 	Child(number)
 }
 
-read_stdout = (Child(number), max) <- (raw: Process) {
+read_stdout = (Child(number), max) <- (raw : Process) {
 	request.await_owned(raw.read_stdout(number, max)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -302,7 +302,7 @@ read_stdout = (Child(number), max) <- (raw: Process) {
 		}
 }
 
-read_stderr = (Child(number), max) <- (raw: Process) {
+read_stderr = (Child(number), max) <- (raw : Process) {
 	request.await_owned(raw.read_stderr(number, max)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -310,7 +310,7 @@ read_stderr = (Child(number), max) <- (raw: Process) {
 		}
 }
 
-write_stdin = (Child(number), bytes) <- (raw: Process) {
+write_stdin = (Child(number), bytes) <- (raw : Process) {
 	request.await_owned(raw.write_stdin(number, bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -318,7 +318,7 @@ write_stdin = (Child(number), bytes) <- (raw: Process) {
 		}
 }
 
-close_stdin = (Child(number)) <- (raw: Process) {
+close_stdin = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close_stdin(number)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {

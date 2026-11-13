@@ -3,11 +3,11 @@
 	app/facade
 )
 
-id = <A>(value: A) { value }
+id = <A>(value : A) { value }
 
-pass = <A>(value: secret.Secret(A)) { id(value) }
+pass = <A>(value : secret.Secret(A)) { id(value) }
 
-public = (value: facade.OpenAlias) { value.value }
+public = (value : facade.OpenAlias) { value.value }
 
 allowed = () {
 	value = pass(facade.value)

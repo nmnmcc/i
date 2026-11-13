@@ -6,7 +6,7 @@
 	testlib = (test) = std/test
 )
 
-f = (s: String) {
+f = (s : String) {
 	"a" <> r = s
 	r == "bc"
 }
@@ -18,6 +18,6 @@ test("prefixes", () {
 })
 
 // §5.4: the excluded full string does not exclude the sliced remainder.
-cofinite = (s: String - "a") { s |> ("x" <> r) { r == "a" } | (_) { False } }
+cofinite = (s : String - "a") { s |> ("x" <> r) { r == "a" } | (_) { False } }
 
 test("cofinite_remainder", () { assert(cofinite("xa")) })

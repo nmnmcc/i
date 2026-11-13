@@ -5,7 +5,7 @@
 
 // The example of §11.7: the call of `assert` is in tail position, and it is
 // still the first position.
-positive = (n: Int) { assert(n > 0) }
+positive = (n : Int) { assert(n > 0) }
 
 main = () {
 	positive(-1)

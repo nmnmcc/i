@@ -9,7 +9,7 @@
 )
 
 main = () {
-	callback = control.keep_env((_: Nil) {
+	callback = control.keep_env((_ : Nil) {
 		task.scope((s) {
 			task.go(s, () { fail.raise("callback") })
 			task.sync(task.never())

@@ -15,10 +15,10 @@ Bias = (value = Int)
 needs_bias = () -> stream.Stream(Int, Never, Bias) { stream.new() }
 
 positive = () -> stream.Stream(Int, Never, Bias) {
-	stream.make(() <- (b: Bias) { stream.Next(b.value, stream.new()) })
+	stream.make(() <- (b : Bias) { stream.Next(b.value, stream.new()) })
 }
 
-source = (xs: List(Int)) -> stream.Stream(Int, Never, Never) {
+source = (xs : List(Int)) -> stream.Stream(Int, Never, Never) {
 	stream.from_list(xs)
 }
 
@@ -26,19 +26,21 @@ broken = () -> stream.Stream(Int, String, Never) {
 	stream.make(() { fail.raise("bad") })
 }
 
-head = <A, E, N>(s: stream.Stream(A, E, N)) -> option.Option(A) {
+head = <A, E, N>(s : stream.Stream(A, E, N)) -> option.Option(A) {
 	stream.pull(s) |> (stream.Done) { None } | (stream.Next(x, _)) { Some(x) }
 }
 
 // §3.3's finite-observation laws, with distinct functions for composition.
-check_laws = (xs: List(Int), ys: List(Int), zs: List(Int)) -> Nil {
+check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 	a = source(xs)
 	b = source(ys)
 	c = source(zs)
-	f = (x: Int) -> Int { x + 1 }
-	g = (x: Int) -> Int { x * 2 }
-	singleton = (x: Int) -> stream.Stream(Int, Never, Never) { stream.wrap(x) }
-	expand = (x: Int) -> stream.Stream(Int, Never, Never) { source([x, x + 1]) }
+	f = (x : Int) -> Int { x + 1 }
+	g = (x : Int) -> Int { x * 2 }
+	singleton = (x : Int) -> stream.Stream(Int, Never, Never) { stream.wrap(x) }
+	expand = (x : Int) -> stream.Stream(Int, Never, Never) {
+		source([x, x + 1])
+	}
 	assert(stream.to_list(a) == xs)
 	assert(
 		stream.to_list(stream.zip(a, b)) == list.zip(xs, ys),
@@ -266,10 +268,10 @@ test("stream_examples", () {
 
 Trace = (visit = (Int) -> Nil)
 
-visit = (x: Int) <- (trace: Trace) -> Nil { trace.visit(x) }
+visit = (x : Int) <- (trace : Trace) -> Nil { trace.visit(x) }
 
-traced = (xs: List(Int)) -> stream.Stream(Int, Never, Trace) {
-	stream.unfold(xs, (rest: List(Int)) {
+traced = (xs : List(Int)) -> stream.Stream(Int, Never, Trace) {
+	stream.unfold(xs, (rest : List(Int)) {
 		rest |>
 			([]) {
 				visit(0)
@@ -360,7 +362,7 @@ test("stream_replay_and_services", () {
 		(stream.Done) { panic("missing first step") }
 		| (stream.Next(_, tail)) { assert(stream.to_list(tail) == [2]) }
 	// Runner supplies Bias for each attempted input pull, including Done.
-	run = (body: () <- (Bias) -> stream.Step(Int, Never, Bias)) -> stream.Step(
+	run = (body : () <- (Bias) -> stream.Step(Int, Never, Bias)) -> stream.Step(
 		Int,
 		Never,
 		Bias,
@@ -375,13 +377,13 @@ test("stream_replay_and_services", () {
 Scale = (value = Int)
 
 common = () -> stream.Stream(Int, Never, Bias | Scale) {
-	stream.make(() <- (b: Bias) -> stream.Step(Int, Never, Bias | Scale) {
+	stream.make(() <- (b : Bias) -> stream.Step(Int, Never, Bias | Scale) {
 		stream.Next(b.value, stream.new())
 	})
 }
 
 test("stream_common_environment", () {
-	s = stream.map(common(), (x: Int) <- (scale: Scale) { x * scale.value })
+	s = stream.map(common(), (x : Int) <- (scale : Scale) { x * scale.value })
 	{
 		assert(stream.to_list(s) == [30])
 		Nil
@@ -414,7 +416,7 @@ test("stream_error_positions", () {
 			Error(CallbackError),
 	)
 	outer = stream.from_results([Ok(1), Error(OuterError)])
-	f = (x: Int) -> stream.Stream(Int, InnerError, Never) {
+	f = (x : Int) -> stream.Stream(Int, InnerError, Never) {
 		{ x < 0 } |>
 			(True) { fail.raise(CallbackError) }
 			| (False) { stream.from_results([Ok(x), Error(InnerError)]) }
@@ -440,7 +442,7 @@ test("stream_error_positions", () {
 			[Ok(1), Error(OuterError)],
 	)
 	runner = (
-		body: () <- (Fail(String)) -> stream.Step(Int, String, Never)
+		body : () <- (Fail(String)) -> stream.Step(Int, String, Never)
 	) -> stream.Step(Int, String, Never) {
 		body()
 		fail.raise("runner")
@@ -460,7 +462,7 @@ test("stream_error_positions", () {
 })
 
 test("stream_long_searches", () {
-	numbers = stream.unfold(0, (n: Int) { Some((n, n + 1)) })
+	numbers = stream.unfold(0, (n : Int) { Some((n, n + 1)) })
 	assert(
 		stream.to_list(stream.take(numbers, 3)) == [0, 1, 2],
 	)
@@ -511,7 +513,7 @@ test("stream_runner_demand", () {
 	trace = control.boundary((b) {
 		{
 			run = (
-				body: () <- (Bias) -> stream.Step(Int, Never, Bias)
+				body : () <- (Bias) -> stream.Step(Int, Never, Bias)
 			) -> stream.Step(Int, Never, Bias) {
 				visit(99)
 				body() <- (Bias(value = 10))
@@ -533,7 +535,7 @@ test("stream_runner_demand", () {
 	Nil
 })
 
-reject = (x: Int) -> Int {
+reject = (x : Int) -> Int {
 	{ x == 2 } |> (True) { fail.raise("callback") } | (False) { x }
 }
 
@@ -582,7 +584,7 @@ test("stream_callback_failures", () {
 	assert(
 		stream.to_list(
 			stream.attempt(
-				stream.unfold(1, (n: Int) { Some((reject(n), n + 1)) }),
+				stream.unfold(1, (n : Int) { Some((reject(n), n + 1)) }),
 			),
 		) ==
 			[Ok(1), Error("callback")],
@@ -594,7 +596,7 @@ test("stream_callback_failures", () {
 			[Error("deferred")],
 	)
 	runner = (
-		body: () <- (Fail(String)) -> stream.Step(Int, String, Never)
+		body : () <- (Fail(String)) -> stream.Step(Int, String, Never)
 	) -> stream.Step(Int, String, Never) {
 		body()
 		fail.raise("runner")
@@ -679,7 +681,7 @@ Item = (value = Int)
 Count = (total = Int)
 
 test("stream_nominal_callbacks", () {
-	s: stream.Stream(Item, Never, Never) = stream.from_list(
+	s : stream.Stream(Item, Never, Never) = stream.from_list(
 		[Item(value = 2), Item(value = 3)],
 	)
 	assert(
@@ -751,7 +753,7 @@ test("stream_factory_demand", () {
 				visit(99)
 				stream.wrap(7)
 			})
-			u = stream.unfold(0, (n: Int) -> option.Option((Int, Int)) {
+			u = stream.unfold(0, (n : Int) -> option.Option((Int, Int)) {
 				visit(n)
 				{ n < 2 } |> (True) { Some((n, n + 1)) } | (False) { None }
 			})

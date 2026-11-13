@@ -7,7 +7,7 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K = other) -> Int {
+f = <K>(r : (k = Int), key : K = other) -> Int {
 	record.get(r, key) + record.get(r, other)
 }
 

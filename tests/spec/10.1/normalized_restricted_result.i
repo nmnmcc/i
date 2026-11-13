@@ -4,4 +4,4 @@
 // This normalizes to 1, not all of Int (§10.3).
 One = Int - { Int - 1 }
 @external("test:math/v1", "add")
-add: (Int, Int) -> One
+add : (Int, Int) -> One

@@ -9,11 +9,11 @@
 
 rounds = 3_000_000
 
-check = (ok: Bool, what: String) -> Nil {
+check = (ok : Bool, what : String) -> Nil {
 	ok |> (True) { Nil } | (False) { panic(what) }
 }
 
-caught = (i: Int, acc: Int) -> Int {
+caught = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
 		| (_) {
@@ -24,7 +24,7 @@ caught = (i: Int, acc: Int) -> Int {
 		}
 }
 
-passed = (i: Int, acc: Int) -> Int {
+passed = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
 		| (_) {
@@ -33,7 +33,7 @@ passed = (i: Int, acc: Int) -> Int {
 		}
 }
 
-builtin_caught = (i: Int, acc: Int) -> Int {
+builtin_caught = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
 		| (_) {
@@ -44,7 +44,7 @@ builtin_caught = (i: Int, acc: Int) -> Int {
 		}
 }
 
-builtin_passed = (i: Int, acc: Int) -> Int {
+builtin_passed = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
 		| (_) {

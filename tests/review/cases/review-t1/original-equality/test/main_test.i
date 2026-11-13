@@ -5,15 +5,15 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
 }
 
-yes = (b: Bool) { check(core.inspect(b), "True") }
+yes = (b : Bool) { check(core.inspect(b), "True") }
 
-no = (b: Bool) { check(core.inspect(b), "False") }
+no = (b : Bool) { check(core.inspect(b), "False") }
 
 User = (name = String, age = Int)
 
@@ -63,7 +63,7 @@ test("structures", () {
 	yes(Nil == Nil)
 })
 
-mixed = (x: { Int | String | Nil }) { x == Nil }
+mixed = (x : { Int | String | Nil }) { x == Nil }
 
 test("different_types", () {
 	yes(mixed(Nil))

@@ -7,7 +7,7 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 
-first = (xs: List(Option(Int))) -> Int {
+first = (xs : List(Option(Int))) -> Int {
 	xs |> ([Some(x), ..r]) { x } | (_) { 0 }
 }
 

@@ -20,19 +20,19 @@
 
 /// The `width` bits at `start`, big endian, as a number from 0.
 @external("ilang:bits", "read_unsigned")
-read_unsigned: (BitArray, Int, Int) -> Int
+read_unsigned : (BitArray, Int, Int) -> Int
 
 /// `value`, from 0 to 2^width - 1, as `width` bits, big endian.
 @external("ilang:bits", "from_unsigned")
-from_unsigned: (Int, Int) -> BitArray
+from_unsigned : (Int, Int) -> BitArray
 
 /// The Int in the `width` bits of `bits` at `start`.
 read_int = (
-	bits: BitArray,
-	start: Int,
-	width: Int,
-	signed: Bool,
-	little: Bool
+	bits : BitArray,
+	start : Int,
+	width : Int,
+	signed : Bool,
+	little : Bool
 ) -> Int {
 	value = little |>
 		(True) { read_little(bits, start, width, 0, 1) }
@@ -43,7 +43,7 @@ read_int = (
 }
 
 // Big endian: the bits in chunks, most significant first.
-read_big = (bits: BitArray, start: Int, left: Int, acc: Int) -> Int {
+read_big = (bits : BitArray, start : Int, left : Int, acc : Int) -> Int {
 	{ left == 0 } |>
 		(True) { acc }
 		| (False) {
@@ -60,11 +60,11 @@ read_big = (bits: BitArray, start: Int, left: Int, acc: Int) -> Int {
 // Little endian: groups of 8 bits, least significant first; `scale` is the
 // value of the lowest bit of the group.
 read_little = (
-	bits: BitArray,
-	start: Int,
-	left: Int,
-	acc: Int,
-	scale: Int
+	bits : BitArray,
+	start : Int,
+	left : Int,
+	acc : Int,
+	scale : Int
 ) -> Int {
 	{ left == 0 } |>
 		(True) { acc }
@@ -81,7 +81,7 @@ read_little = (
 }
 
 /// The `width` low bits of `value`, in two's complement.
-from_int = (value: Int, width: Int, little: Bool) -> BitArray {
+from_int = (value : Int, width : Int, little : Bool) -> BitArray {
 	u = core.bit_and(value, core.shift_left(1, width) - 1)
 	core.bit_array_concat(
 		little |>
@@ -91,7 +91,7 @@ from_int = (value: Int, width: Int, little: Bool) -> BitArray {
 }
 
 // Big endian: chunks from the least significant one, each put in front.
-write_big = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
+write_big = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |>
 		(True) { acc }
 		| (False) {
@@ -107,7 +107,7 @@ write_big = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
 
 // Little endian: groups of 8 bits from the least significant one, in
 // order; the last group has the bits that are left.
-write_little = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
+write_little = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |>
 		(True) { reverse(acc, []) }
 		| (False) {
@@ -121,8 +121,8 @@ write_little = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
 		}
 }
 
-reverse = (list: List(BitArray), acc: List(BitArray)) -> List(BitArray) {
+reverse = (list : List(BitArray), acc : List(BitArray)) -> List(BitArray) {
 	list |> ([]) { acc } | ([x, ..xs]) { reverse(xs, [x, ..acc]) }
 }
 
-min = (a: Int, b: Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
+min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } | (False) { b } }

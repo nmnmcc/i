@@ -13,10 +13,10 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
@@ -30,7 +30,7 @@ main = () <- (later: Later) {
 						)
 						task.yield()
 						task.scope((fresh) {
-							c: task.Channel(Nil) = task.channel()
+							c : task.Channel(Nil) = task.channel()
 							task.go(fresh, () { task.send(c, Nil) })
 							task.receive(c)
 						})

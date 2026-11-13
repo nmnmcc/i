@@ -7,7 +7,7 @@
 
 main = () {
 	task.scope((outer) {
-		carrier: task.Channel(task.Scope(Never)) = task.channel()
+		carrier : task.Channel(task.Scope(Never)) = task.channel()
 		task.go(outer, () {
 			scope = task.receive(carrier)
 			task.share(scope, 7)

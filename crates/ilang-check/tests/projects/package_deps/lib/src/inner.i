@@ -2,4 +2,4 @@
 	bang
 )
 
-bang = (s: String) { s <> "!" }
+bang = (s : String) { s <> "!" }

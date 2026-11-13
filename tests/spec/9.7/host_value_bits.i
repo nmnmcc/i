@@ -8,7 +8,7 @@
 @host("test:bad/v1")
 Bad = (bits = () -> BitArray)
 
-take = () <- (bad: Bad) { bad.bits() }
+take = () <- (bad : Bad) { bad.bits() }
 
 main = () {
 	take()

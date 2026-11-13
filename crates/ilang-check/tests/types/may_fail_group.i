@@ -23,7 +23,7 @@ total_pair = (
 	},
 )
 
-f = (s: String) -> Int {
+f = (s : String) -> Int {
 	(a, b) = (1, 2)
 	{
 		"a" = s

@@ -3,7 +3,7 @@
 (
 	main
 )
-id = (x: Missing) { x }
+id = (x : Missing) { x }
 
 main = () {
 	assert(True)

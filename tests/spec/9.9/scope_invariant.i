@@ -5,4 +5,4 @@
 	i/task
 )
 
-widen = (x: task.Scope(Int)) -> task.Scope(Int | String) { x }
+widen = (x : task.Scope(Int)) -> task.Scope(Int | String) { x }

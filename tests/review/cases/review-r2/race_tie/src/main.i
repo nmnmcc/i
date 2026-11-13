@@ -4,12 +4,12 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) {
-		armed: task.Channel(Nil) = task.channel()
-		release: task.Channel(Nil) = task.channel()
-		finals: task.Channel(Int) = task.channel()
-		acknowledged: task.Channel(Nil) = task.channel()
+		armed : task.Channel(Nil) = task.channel()
+		release : task.Channel(Nil) = task.channel()
+		finals : task.Channel(Int) = task.channel()
+		acknowledged : task.Channel(Nil) = task.channel()
 		collected = task.go(s, () {
 			a = task.receive(finals)
 			b = task.receive(finals)

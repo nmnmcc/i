@@ -1,10 +1,10 @@
-f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
+f = (x : ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
 		((_, _)) { 0 }
 		| (("b", True)) { 1 }
 		| (("a", True)) { 2 }
-		| ((_: String - "a", False)) { 3 }
-		| ((_: { "a" | "b" }, False)) { 4 }
+		| ((_ : String - "a", False)) { 3 }
+		| ((_ : { "a" | "b" }, False)) { 4 }
 }
 
 main = () {

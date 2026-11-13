@@ -9,10 +9,10 @@
 	i/fail
 )
 
-probe = (wait: () <- (request.Await) -> Nil) {
+probe = (wait : () <- (request.Await) -> Nil) {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.send(armed, Nil)
 				// §9.9: the failure may come before or after the await; the

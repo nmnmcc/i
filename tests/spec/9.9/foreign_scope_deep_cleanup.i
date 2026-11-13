@@ -14,24 +14,24 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
-	callback = control.keep_env((work: (() -> Nil) -> Nil) {
+	callback = control.keep_env((work : (() -> Nil) -> Nil) {
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
+			gate : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.receive(gate)
 				fail.raise("callback")
 			})
-			signal = control.keep_env((_: Nil) { task.send(gate, Nil) })
+			signal = control.keep_env((_ : Nil) { task.send(gate, Nil) })
 			work(() { signal(Nil) })
 		})
 	})
 	assert(
 		task.run(() {
 			task.run(() {
-				work = control.keep_env((notify: () -> Nil) {
+				work = control.keep_env((notify : () -> Nil) {
 					task.scope((inner) {
 						task.go(inner, () {
 							resource.ensure(

@@ -8,13 +8,13 @@
 
 main = () {
 	task.scope((outer) {
-		carrier: task.Channel(task.Channel(Int)) = task.channel()
+		carrier : task.Channel(task.Channel(Int)) = task.channel()
 		reader = task.go(outer, () {
 			c = task.receive(carrier)
 			task.receive(c)
 		})
 		task.scope((_) {
-			c: task.Channel(Int) = task.channel()
+			c : task.Channel(Int) = task.channel()
 			task.send(carrier, c)
 			task.send(c, 7)
 		})

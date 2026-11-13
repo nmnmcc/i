@@ -8,7 +8,7 @@
 	rng = i/random
 	(Io) = i/io
 )
-spawn = (s, c, n: Int) {
+spawn = (s, c, n : Int) {
 	{ n == 0 } |>
 		(True) { Nil }
 		| (False) {
@@ -18,7 +18,7 @@ spawn = (s, c, n: Int) {
 }
 // Every run is some serial order of task steps (spec §9.9); the senders may
 // pair in any order, so check that each value arrives exactly once.
-receive_all = (c, n: Int, seen: Int) {
+receive_all = (c, n : Int, seen : Int) {
 	{ n == 0 } |>
 		(True) { seen }
 		| (False) {
@@ -29,9 +29,9 @@ receive_all = (c, n: Int, seen: Int) {
 		}
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) {
-		c: task.Channel(Int) = task.channel()
+		c : task.Channel(Int) = task.channel()
 		spawn(s, c, 1000)
 		assert(receive_all(c, 1000, 0) == core.shift_left(1, 1000 + 1) - 2)
 	})

@@ -4,7 +4,7 @@
 // at: spec/main:11:4
 
 // The function is worked out before the arguments.
-pick = (n: Int) -> (Int) -> Int { panic("callee") }
+pick = (n : Int) -> (Int) -> Int { panic("callee") }
 
 main = () {
 	n = 1

@@ -1,5 +1,5 @@
 Pair(A) = (A, A)
-f = (x: Pair("a" | "b")) {
+f = (x : Pair("a" | "b")) {
 	x |>
 		(Pair("a", "a")) { 0 }
 		| (Pair("a", "b")) { 1 }

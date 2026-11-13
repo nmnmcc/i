@@ -11,7 +11,7 @@ Tip(A) = (A)
 
 Node(A) = (Tree(A), Tree(A))
 Tree(A) = Tip(A) | Node(A)
-make = <A>(value: A, depth: Int) -> Tree(A) {
+make = <A>(value : A, depth : Int) -> Tree(A) {
 	depth |>
 		(0) { Tip(value) }
 		| (_) {
@@ -20,7 +20,7 @@ make = <A>(value: A, depth: Int) -> Tree(A) {
 		}
 }
 
-spawn = (depth: Int) {
+spawn = (depth : Int) {
 	value = make(1, depth)
 	task.scope((s) {
 		child = task.go(s, () { value |> (Tip(_)) { 0 } | (Node(_, _)) { 1 } })

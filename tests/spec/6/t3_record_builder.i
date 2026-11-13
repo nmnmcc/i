@@ -7,7 +7,7 @@
 (
 	main
 )
-set = <R, K, V>(r: R & Record, key: K, value: V) -> (k = V) {
+set = <R, K, V>(r : R & Record, key : K, value : V) -> (k = V) {
 	record.put(r, key, value)
 }
 

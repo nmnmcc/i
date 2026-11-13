@@ -6,7 +6,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -16,7 +16,7 @@ show = (x) { core.inspect(x) }
 
 Name = (text = String)
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 Paused = (Continuation(Nil, Paused, Never, Name))
 Done = (String)

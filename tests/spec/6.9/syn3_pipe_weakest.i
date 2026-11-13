@@ -6,8 +6,8 @@
 	main
 )
 
-not = (b: Bool) { b |> (True) { False } | (False) { True } }
-inc = (n: Int) { n + 1 }
+not = (b : Bool) { b |> (True) { False } | (False) { True } }
+inc = (n : Int) { n + 1 }
 
 main = () {
 	assert(1 == 2 |> not)

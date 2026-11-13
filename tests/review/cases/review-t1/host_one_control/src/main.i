@@ -1,2 +1,2 @@
 @external("app", "write")
-write: (1) -> Nil
+write : (1) -> Nil

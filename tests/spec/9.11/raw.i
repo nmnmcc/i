@@ -11,7 +11,7 @@ Later = (
 	echo = (String) -> Request(String),
 )
 
-main = () <- (later: Later, root: request.Root, owner: request.Owner) {
+main = () <- (later : Later, root : request.Root, owner : request.Owner) {
 	a = later.double(21)
 	b = later.echo("answer")
 	assert(request.count(owner) == 2)

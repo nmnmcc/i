@@ -15,6 +15,6 @@ y = p("y")
 
 z = p("z")
 
-p = (s: String) { panic(s) }
+p = (s : String) { panic(s) }
 
 main = () { core.inspect(a) }

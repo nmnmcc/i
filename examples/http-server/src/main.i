@@ -39,7 +39,7 @@ reply = (status, text) {
 	)
 }
 
-handle = (req: http.Request) {
+handle = (req : http.Request) {
 	(req.method, req.target) |>
 		((http.Method("GET"), "/health")) {
 			r = http.response(http.Status(200))

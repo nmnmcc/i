@@ -6,6 +6,6 @@
 )
 
 main = () {
-	c: task.Channel(Int) = task.channel()
+	c : task.Channel(Int) = task.channel()
 	task.run(() { task.send(c, 1) })
 }
