@@ -3258,5 +3258,22 @@
   },
   "crates/ilang-wasm/tests/multi_shape.rs:4414029af964b61f": {
     "not_source": "Wasmtime preload argument, not i source."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b8adf43384a85784": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |> {\n\t\tTrue  -> x\n\t\tFalse -> spin(n - 1, { x * 75 + 74 } % 65537)\n\t}\n}\n"
+      ]
+    ],
+    "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
   }
 }

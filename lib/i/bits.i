@@ -28,7 +28,13 @@ read_unsigned: (bits: BitArray, start: Int, width: Int) -> Int
 from_unsigned: (value: Int, width: Int) -> BitArray
 
 /// The Int in the `width` bits of `bits` at `start`.
-read_int = (bits: BitArray, start: Int, width: Int, signed: Bool, little: Bool) -> Int {
+read_int = (
+	bits: BitArray
+	start: Int
+	width: Int
+	signed: Bool
+	little: Bool
+) -> Int {
 	value = little |> {
 		True  -> read_little(bits, start, width, 0, 1)
 		False -> read_big(bits, start, width, 0)
@@ -82,12 +88,10 @@ read_little = (
 /// The `width` low bits of `value`, in two's complement.
 from_int = (value: Int, width: Int, little: Bool) -> BitArray {
 	u = core.bit_and(value, core.shift_left(1, width) - 1)
-	core.bit_array_concat(
-		little |> {
-			True  -> write_little(u, width, [])
-			False -> write_big(u, width, [])
-		}
-	)
+	core.bit_array_concat(little |> {
+		True  -> write_little(u, width, [])
+		False -> write_big(u, width, [])
+	})
 }
 
 // Big endian: chunks from the least significant one, each put in front.
@@ -97,7 +101,11 @@ write_big = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
 		False -> {
 			n = min(left, 14)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
-			write_big(core.shift_right(u, n), left - n, [from_unsigned(low, n), ..acc])
+			write_big(
+				core.shift_right(u, n)
+				left - n
+				[from_unsigned(low, n), ..acc]
+			)
 		}
 	}
 }
@@ -110,7 +118,11 @@ write_little = (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray) {
 		False -> {
 			n = min(left, 8)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
-			write_little(core.shift_right(u, n), left - n, [from_unsigned(low, n), ..acc])
+			write_little(
+				core.shift_right(u, n)
+				left - n
+				[from_unsigned(low, n), ..acc]
+			)
 		}
 	}
 }
