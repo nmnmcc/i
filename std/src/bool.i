@@ -74,7 +74,7 @@ compare = (a: Bool, with: Bool) -> Order {
 /// when not. It is used to end early:
 ///
 /// ```i
-/// bool.guard(when: n < 0, return: "negative", otherwise: () { "positive" })
+/// bool.guard(n < 0, "negative", () { "positive" })
 /// ```
 guard(A, E, N) = (
 	when: Bool

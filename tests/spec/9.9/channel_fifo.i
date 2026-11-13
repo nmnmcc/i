@@ -2,12 +2,14 @@
 // expect: pass
 // runtime.md 6.4: FIFO pending partners; new ready alternatives use source order;
 // committing one alternative removes all its losing registrations.
+// The scripted run fixes registration order before testing FIFO and choice.
 (
 	i/task
+	i/random
 )
 
 
-main = () {
+main = () { task.test(random.from_seed(1), [], () {
 	task.scope((s) {
 		c: task.Channel(Int) = task.channel()
 		task.go(s, () { task.send(c, 1) })
@@ -27,5 +29,6 @@ main = () {
 			(first, task.receive(a))
 		})
 		assert(task.join(reader) == (22, 11))
+	})
 	})
 }

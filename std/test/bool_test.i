@@ -145,22 +145,20 @@ test("to_string_false_test", () {
 	Nil
 })
 
-test("guard_when_true_test", () {
-	assert(bool.guard(when: True, return: 2, otherwise: () { 1 }) == 2)
-})
+test("guard_when_true_test", () { assert(bool.guard(True, 2, () { 1 }) == 2) })
 
 test("guard_when_false_test", () {
-	assert(bool.guard(when: False, return: 2, otherwise: () { 1 }) == 1)
+	assert(bool.guard(False, 2, () { 1 }) == 1)
 })
 
 test("lazy_guard_when_true_test", () {
 	oops = () { panic("this shouldn't run!") }
-	assert(bool.lazy_guard(when: True, return: () { 2 }, otherwise: oops) == 2)
+	assert(bool.lazy_guard(True, () { 2 }, oops) == 2)
 })
 
 test("lazy_guard_when_false_test", () {
 	oops = () { panic("this shouldn't run!") }
-	assert(bool.lazy_guard(when: False, return: oops, otherwise: () { 1 }) == 1)
+	assert(bool.lazy_guard(False, oops, () { 1 }) == 1)
 })
 
 test("compare_test", () {

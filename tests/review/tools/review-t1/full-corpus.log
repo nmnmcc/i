@@ -1,5 +1,0 @@
-{"added": 53, "kept": 262, "gained": 0, "lost": 1}
-crates/ilang-check/tests/types/spec.i src/main.i:94:10: error[E0520]: both sides are constants, `1` and `2`, so `==` is always `False` (§6.9). To compare two constants when the program runs, pass them as parameters.
-src/main.i:101:2: warning[W0502]: this value is not used, and working it out does nothing
-1 error
-

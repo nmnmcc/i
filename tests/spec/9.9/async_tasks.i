@@ -9,13 +9,23 @@
 
 @host("test:async/v1", "async")
 Later {
-	Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String)
+	Later(double: (Int) -> Int ^ String, echo: (String) -> String)
 }
 
 
 main = (later ! Later) {
+	// §9.9 leaves the order of the two host calls open ("some serial order of
+	// task steps"), so the second starts after the first has answered.
+	c: task.Channel(Nil) = task.channel()
 	assert(
-		task.both(() { later.double(21) }, () { later.echo("answer") }) ==
+		task.both(() {
+			value = later.double(21)
+			task.send(c, Nil)
+			value
+		}, () {
+			task.receive(c)
+			later.echo("answer")
+		}) ==
 			(42, "answer")
 	)
 }

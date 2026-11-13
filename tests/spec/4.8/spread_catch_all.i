@@ -15,24 +15,24 @@ User {
 
 kind = (u: User) {
 	u |> {
-		User(age, ..) ? age > 10 -> 1
+		User(age = age, ..) ? age > 10 -> 1
 		User(..)                 -> 2
 	}
 }
 
 label = (u: User) {
 	u |> {
-		User(age, name) ? age > 10 -> name
-		User(name, ..)             -> "young " <> name
+		User(age = age, name = name) ? age > 10 -> name
+		User(name = name, ..)             -> "young " <> name
 	}
 }
 
 test("spread_is_a_catch_all", () {
-	(kind(User("a", 20)), kind(User("b", 5))) |> {
+	(kind(User(name: "a", age: 20)), kind(User(name: "b", age: 5))) |> {
 		(1, 2) -> Nil
 		_      -> panic("kind")
 	}
-	(label(User("a", 20)), label(User("b", 5))) |> {
+	(label(User(name: "a", age: 20)), label(User(name: "b", age: 5))) |> {
 		("a", "young b") -> Nil
 		_                -> panic("label")
 	}

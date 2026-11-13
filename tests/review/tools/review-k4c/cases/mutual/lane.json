@@ -1,6 +1,0 @@
-{
-  "code": 0,
-  "out": "app/main.a : (b: Bool) -> Nil ! N | S(N)\napp/main.z : (b: Bool) -> Nil ! N | S(N)\n",
-  "err": "",
-  "seconds": 0.01984447194263339
-}

@@ -24,7 +24,9 @@ fn library_resolves_cleanly() {
             "i/request",
             "i/key",
             "i/core",
-            "i/record",
+            "i/float_text",
+            "i/big",
+            "i/bits",
             "i/io",
             "i/task",
             "i/clock",
@@ -71,7 +73,9 @@ fn library_names() {
         ("i/failure", &["raise", "catch"]),
         (
             "i/control",
-            &["boundary", "suspend", "escape", "resume", "cancel", "keep_env"],
+            &[
+                "boundary", "suspend", "escape", "resume", "cancel", "keep_env",
+            ],
         ),
         ("i/key", &["new", "wrap", "unwrap"]),
         (
@@ -140,9 +144,19 @@ fn library_names() {
             ],
         ),
         ("i/prelude", &["panic", "assert"]),
+        ("i/float_text", &["to_string"]),
+        ("i/bits", &["read_int", "from_int"]),
         (
-            "i/record",
-            &["get", "put", "remove", "has", "keys", "size", "texts"],
+            "i/big",
+            &[
+                "compare",
+                "add",
+                "subtract",
+                "multiply",
+                "divide",
+                "remainder",
+                "to_text",
+            ],
         ),
         ("i/io", &[]),
         (
@@ -321,8 +335,9 @@ fn library_names() {
     }
 }
 
-/// The labels of the parameters in the spec tables, for example
-/// `control.suspend: (b: …, f: (k: …) -> …) -> A`.
+/// The parameters of the external functions in the spec tables have no
+/// labels (syntax three, stage 4), for example
+/// `control.suspend: (Boundary(…), (Continuation(…)) -> …) -> A`.
 #[test]
 fn library_labels() {
     let (_, program, _) = common::check_files(&[]);
@@ -339,13 +354,13 @@ fn library_labels() {
             .map(|p| p.label.as_ref().map_or("_".into(), |l| l.name.clone()))
             .collect()
     };
-    assert_eq!(labels("i/control", "suspend"), ["b", "f"]);
-    assert_eq!(labels("i/control", "resume"), ["k", "value"]);
-    assert_eq!(labels("i/fail", "catch"), ["body"]);
-    assert_eq!(labels("i/resource", "ensure"), ["body", "with"]);
-    assert_eq!(labels("i/core", "byte_slice"), ["_", "start", "length"]);
-    assert_eq!(labels("i/core", "index_of"), ["in", "find", "from"]);
-    assert_eq!(labels("i/prelude", "panic"), ["message"]);
+    assert_eq!(labels("i/control", "suspend"), ["_", "_"]);
+    assert_eq!(labels("i/control", "resume"), ["_", "_"]);
+    assert_eq!(labels("i/fail", "catch"), ["_"]);
+    assert_eq!(labels("i/resource", "ensure"), ["_", "_"]);
+    assert_eq!(labels("i/core", "byte_slice"), ["_", "_", "_"]);
+    assert_eq!(labels("i/core", "index_of"), ["_", "_", "_"]);
+    assert_eq!(labels("i/prelude", "panic"), ["_"]);
 }
 
 /// The built-in custom types of §4.2 and §9.6 are in the prelude.

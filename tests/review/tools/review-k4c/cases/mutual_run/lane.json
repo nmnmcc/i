@@ -1,6 +1,0 @@
-{
-  "code": 0,
-  "out": "app/main.use : () -> Int ! N | S(N)\napp/main.a : (x: Int) -> Int ! N | S(N)\napp/main.b : (x: Int) -> Int ! N | S(N)\napp/main.main : () -> Nil ! Assert\n",
-  "err": "",
-  "seconds": 0.01884018280543387
-}

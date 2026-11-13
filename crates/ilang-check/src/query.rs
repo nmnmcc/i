@@ -743,28 +743,11 @@ impl<'a> Query<'a> {
                 let parts: Vec<String> = parts.iter().map(|a| self.show_type(a)).collect();
                 format!("({})", parts.join(", "))
             }
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let mut parts = Vec::new();
-                if let Some(base) = base {
-                    parts.push(format!("..{}", self.show_type(base)));
-                }
-                parts.extend(fields.iter().map(|(name, ty)| {
-                    format!(
-                        "{}: {}",
-                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some()),
-                        self.show_type(ty)
-                    )
-                }));
-                parts.extend(removed.iter().map(|name| {
-                    format!(
-                        "-{}",
-                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some())
-                    )
-                }));
+            TypeKind::Record { fields } => {
+                let parts: Vec<String> = fields
+                    .iter()
+                    .map(|(name, ty)| format!("{}: {}", name.name, self.show_type(ty)))
+                    .collect();
                 format!("({})", parts.join(", "))
             }
             TypeKind::Fn {
@@ -1934,10 +1917,7 @@ impl Walk<'_> {
             | TypeKind::Union(ts)
             | TypeKind::Inter(ts)
             | TypeKind::Diff(ts) => ts.iter().for_each(|a| self.ty(a)),
-            TypeKind::Record { base, fields, .. } => {
-                if let Some(base) = base {
-                    self.ty(base);
-                }
+            TypeKind::Record { fields } => {
                 for (_, field) in fields {
                     self.ty(field);
                 }
@@ -2076,6 +2056,7 @@ impl Walk<'_> {
                 }
             }
             ExprKind::TupleIndex { target, .. } => self.expr(target),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate {
                 ctor,
                 ctor_span,
@@ -2123,29 +2104,7 @@ fn contains(span: Span, offset: u32) -> bool {
 }
 
 fn pattern_binders(p: &Pattern, out: &mut Vec<Binder>) {
-    match &p.kind {
-        PatternKind::Quote { captures, .. } => {
-            captures.iter().for_each(|(_, p)| pattern_binders(p, out))
-        }
-        PatternKind::Var(b) => out.push(b.clone()),
-        PatternKind::Typed { binder, .. } => out.extend(binder.clone()),
-        PatternKind::Named { binder, pattern } => {
-            out.push(binder.clone());
-            pattern_binders(pattern, out);
-        }
-        PatternKind::Prefix { rest, .. } => out.extend(rest.clone()),
-        PatternKind::Constructor { args: ps, .. }
-        | PatternKind::Tuple(ps)
-        | PatternKind::Error(ps) => ps.iter().for_each(|q| pattern_binders(q, out)),
-        PatternKind::List { items, rest } => {
-            items.iter().for_each(|q| pattern_binders(q, out));
-            if let Some(Some(b)) = rest {
-                out.push(b.clone());
-            }
-        }
-        PatternKind::BitArray(segs) => segs.iter().for_each(|s| pattern_binders(&s.value, out)),
-        _ => {}
-    }
+    crate::hir::pattern_binders(p, &mut |b| out.push(b.clone()));
     out.retain(|b| !b.name.starts_with('%'));
 }
 
@@ -2249,6 +2208,7 @@ impl Scope<'_> {
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
                 self.expr(target)
             }
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate { base, fields, .. } => {
                 self.expr(base);
                 fields.iter().for_each(|(_, x)| self.expr(x));

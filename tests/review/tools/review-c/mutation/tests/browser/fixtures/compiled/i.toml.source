@@ -1,4 +1,0 @@
-name = "app"
-
-[wasm]
-exports = ["app/app.greet", "app/app.lookup", "app/app.distance", "app/app.wait_sum"]

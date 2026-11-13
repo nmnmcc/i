@@ -75,15 +75,15 @@ pub(super) const EFFECTS: &str = r#"
     (br $each)))
   (local.get $new))
 
-;; Calls a computation (§9.1) with the environment.
+;; Calls a computation (§9.1) with the environment. A function value may be
+;; a closure or a multi-shape value (syntax-3.md §6.4): the dispatcher calls
+;; the group of the shape `()`.
 (func $call0 (param $f eqref) (param $env (ref null $env)) (result eqref)
-  (call_ref $fn0 (ref.cast (ref $clo0) (local.get $f)) (local.get $env)
-    (struct.get $clo0 8 (ref.cast (ref $clo0) (local.get $f)))))
+  (return_call $dispatch0 (local.get $f) (i64.const 0) (local.get $env)))
 
 ;; Calls a function of one parameter with the environment.
 (func $call1 (param $f eqref) (param $a eqref) (param $env (ref null $env)) (result eqref)
-  (call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env) (local.get $a)
-    (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f)))))
+  (return_call $dispatch1 (local.get $f) (i64.const 1) (local.get $env) (local.get $a)))
 
 ;; Adds the frame record `f` at the end of the capture `c` (the list is
 ;; innermost first), and throws `x` again.
@@ -496,11 +496,10 @@ pub(super) const EFFECTS: &str = r#"
         ;; Rule 2: `f(k)` is done in the place of the boundary.
         (call $shadow_restore (local.get $depth))
         (local.set $f (struct.get $cap 1 (local.get $c)))
-        (return_call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env)
+        (return_call $dispatch1 (local.get $f) (i64.const 1) (local.get $env)
           (struct.new $cont (i32.const 12) (i32.const 0) (i64.const 0) (f64.const 0)
             (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))) (ref.null eq))
-          (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f))))))
+            (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))) (ref.null eq)))))
     ;; A capture for an outer boundary: this one is paused with it.
     (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $boundary_reenter)
       (local.get $b))
@@ -838,10 +837,10 @@ pub(super) const EFFECTS: &str = r#"
       (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
-  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 1)
     (ref.null $bytes)
     (array.new_fixed $values 2 (local.get $f) (call $tuple (local.get $slots)))
-    (ref.null $limbs) (ref.null $call) (ref.func $keep_call)))
+    (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $keep_call)))
 
 (func $keep_call (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
     (param $arg eqref) (result eqref)
@@ -898,7 +897,7 @@ pub(super) const EFFECTS: &str = r#"
   (return_call $control_suspend (call $host_root_boundary)
     (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
       (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-      (ref.func $request_handoff))))
+      (i64.const 0) (ref.func $request_handoff))))
 (func $request_wait_loop (param $tickets eqref) (param $env (ref null $env)) (result eqref)
   (if (call $request_any_settled (local.get $tickets)) (then (return (ref.null eq))))
   (block $captured (result (ref $cap) exnref)
@@ -1113,6 +1112,8 @@ impl<'p> Emitter<'p> {
         self.numeric_enabled =
             self.p.numeric != crate::Numeric::Reference && numeric::has_float(&f.body);
         let ty = |l: Local| local_type(f.locals[l as usize]);
+        let begin = self.out.len();
+        self.call_locals.clear();
         let _ = write!(
             self.out,
             ";; {} {}\n(func ${name} (param $env (ref null $env))",
@@ -1130,10 +1131,6 @@ impl<'p> Emitter<'p> {
         }
         self.out
             .push_str(" (result eqref)\n (local $clo (ref null $obj))");
-        if self.p.labels.len() > super::FIXED_MAX / 2 {
-            self.out
-                .push_str(" (local $record_pairs (ref null $values))");
-        }
         if f.frame {
             self.out.push_str(" (local $slot i32)");
         }
@@ -1147,6 +1144,7 @@ impl<'p> Emitter<'p> {
                 " (local $numeric_a f64) (local $numeric_b f64) (local $numeric_result f64)\n",
             );
         }
+        let mark = self.out.len();
         for (j, &l) in params.iter().enumerate() {
             let _ = writeln!(self.out, "(local.set $l{l} (local.get $a{j}))");
         }
@@ -1160,6 +1158,7 @@ impl<'p> Emitter<'p> {
         self.stmts(&mut body, code, f.frame);
         self.out.push_str(&body);
         self.out.push_str("(unreachable))\n");
+        self.declare_call_locals(begin, mark);
         self.numeric_plan = numeric::Plan::default();
         self.numeric_enabled = false;
     }
@@ -1273,8 +1272,9 @@ impl<'p> Emitter<'p> {
 /// the value, `Program::lazy_fields`), that code is called with the
 /// arguments and the boundary, and the value is not made: it would hold a
 /// closure of the same code over the same boundary. Otherwise the value is
-/// made (`$service_force`) and its field is called.
-pub(super) fn lazy_call(n: u32) -> String {
+/// made (`$service_force`) and its field is called as a call with `n`
+/// positions is (`$dispatch{n}`).
+pub(super) fn lazy_call(n: u32, shape: &str) -> String {
     let m = n + 1;
     let params: String = (0..n).map(|i| format!(" (param $a{i} eqref)")).collect();
     let args: String = (0..n).map(|i| format!(" (local.get $a{i})")).collect();
@@ -1296,10 +1296,10 @@ pub(super) fn lazy_call(n: u32) -> String {
                   (if (ref.test (ref $clo{m}) (local.get $f))
                     (then
                       (return_call_ref $fn{m} (ref.cast (ref $clo{m}) (local.get $f)) (local.get $env){args}
-                        (local.get $s) (struct.get $clo{m} 8 (ref.cast (ref $clo{m}) (local.get $f))))))))))))))
-  (local.set $f (call $field (call $service_force (local.get $s) (local.get $env)) (local.get $k)))
-  (return_call_ref $fn{n} (ref.cast (ref $clo{n}) (local.get $f)) (local.get $env){args}
-    (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) (local.get $f)))))
+                        (local.get $s) (struct.get $clo{m} 9 (ref.cast (ref $clo{m}) (local.get $f))))))))))))))
+  (return_call $dispatch{n}
+    (call $field (call $service_force (local.get $s) (local.get $env)) (local.get $k))
+    (i64.const {shape}) (local.get $env){args}))
 "
     )
 }

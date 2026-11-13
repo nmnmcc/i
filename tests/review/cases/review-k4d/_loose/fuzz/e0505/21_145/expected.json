@@ -1,6 +1,6 @@
 {
-  "compiler": "cfe52a677bb4d23ebdd15695f5a1eb01d621fa08",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "5dda78bad9683aa09eb2c66eb0ba1b9237ea2b04",
+  "binary_sha256": "949ad211006493843ce0f2384caa9ff3fe9f0e5d2c37fb624bf1d1db875b57cc",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | Dep | S(N)\napp/main.h1 : () -> Int ! N - Dep | S(N)\napp/main.main : () -> Nil ! N - Dep - S(Dep) - S(Dep | T(Dep)) | T(N)\n",
-      "stderr": "src/main.i:25:38: error[E0501]: `S(_)` is not a subtype of `Dep | T(Dep)` (the type at 25:23 needs it)\n1 error\n"
+      "stderr": "src/main.i:25:44: error[E0501]: `S(_)` is not a subtype of `Dep | T(Dep)` (the type at 25:23 needs it)\n1 error\n"
     }
   }
 }

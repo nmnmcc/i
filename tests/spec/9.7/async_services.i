@@ -22,12 +22,12 @@
 // program, and a final function waits too.
 @host("test:async/v1", "async")
 Later {
-	Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String)
+	Later(double: (Int) -> Int ^ String, echo: (String) -> String)
 }
 
 @host("test:io/v1")
 Io {
-	Io(print: (text: String) -> Nil)
+	Io(print: (String) -> Nil)
 }
 
 twice = (n: Int, later ! Later) { later.double(later.double(n)) }

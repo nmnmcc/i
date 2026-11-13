@@ -56,6 +56,27 @@ impl Built {
     }
 }
 
+/// The native runner (crates/ilang-runner), built for this `i` by build.rs.
+pub const RUNNER: &[u8] = include_bytes!(env!("ILANG_RUNNER"));
+
+/// The target triple of [`RUNNER`]: statically linked (musl) on Linux.
+pub const RUNNER_TARGET: &str = env!("ILANG_RUNNER_TARGET");
+
+impl Built {
+    /// A native package (docs/design/native.md, N2): a copy of [`RUNNER`]
+    /// with this module compiled for the runner's target triple.
+    pub fn native_package(&self, name: &str) -> anyhow::Result<Vec<u8>> {
+        ilang_host::native::package(
+            RUNNER,
+            RUNNER_TARGET,
+            name,
+            &self.wasm,
+            &self.binding_plan,
+            &self.trusted_package,
+        )
+    }
+}
+
 /// Why a build failed.
 #[derive(Debug)]
 pub enum BuildError {
@@ -224,7 +245,9 @@ pub fn build_tests(
     options: BuildOptions,
     collection: Option<&str>,
 ) -> Result<(Built, Vec<CollectionEntry>), BuildError> {
+    let stage = ilang_syntax::trace::stage("load");
     let (mut graph, mut diags) = load(project, options.tests, options.offline);
+    drop(stage);
     graph.test_run = options.tests;
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
@@ -662,6 +685,7 @@ pub fn optimize(wasm: &[u8], level: Level) -> Result<Vec<u8>, BuildError> {
     if level == Level::O0 {
         return Ok(wasm.to_vec());
     }
+    let _stage = ilang_syntax::trace::stage("Binaryen");
     let out = ilang_binaryen::optimize(&ilang_wasm::strip_names(wasm), level)
         .map_err(|e| BuildError::Internal(format!("Binaryen: {e}")))?;
     ilang_wasm::validate(&out)

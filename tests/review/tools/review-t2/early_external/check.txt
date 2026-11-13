@@ -1,2 +1,0 @@
-src/main.i:4:3: error[E0531]: a value-dependent type is not allowed in an external declaration
-1 error

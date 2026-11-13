@@ -44,11 +44,15 @@ probe = (phase: Int, typed: Bool) {
 		task.scope((s) {
 			gate: task.Channel(Nil) = task.channel()
 			never: task.Channel(Nil) = task.channel()
+			started: task.Channel(Nil) = task.channel()
 			child = task.go(s, () {
 				fail.catch(() {
 					resource.ensure(() {
 						phase |> {
-							0 -> task.receive(never)
+							0 -> {
+								task.send(started, Nil)
+								task.receive(never)
+							}
 							_ -> Nil
 						}
 						typed |> {
@@ -71,8 +75,10 @@ probe = (phase: Int, typed: Bool) {
 				})
 				Nil
 			})
+			// §9.9: "Timing may choose ... which failures precede
+			// cancellation"; the child says it started before the parent fails.
 			phase |> {
-				0 -> task.yield()
+				0 -> task.receive(started)
 				1 -> task.receive(gate)
 				_ -> task.join(child)
 			}

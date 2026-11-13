@@ -13,6 +13,7 @@ pub mod order;
 pub mod providers;
 pub mod query;
 pub mod resolve;
+pub mod syn3_facts;
 pub mod typed_macro;
 pub mod types;
 mod unused;
@@ -120,6 +121,9 @@ pub mod code {
     pub const BIT_PATTERN: &str = "E0519";
     // E0520 became warning W0503: disjoint equality is well defined (§6.9).
     pub const ENTRY_TYPE: &str = "E0521";
+    // Shape groups (syntax three §2.6).
+    pub const NO_SHAPE_GROUP: &str = "E0550";
+    pub const NO_BRANCH_SELECTED: &str = "E0552";
     pub const NEVER_USED: &str = "W0501";
     pub const VALUE_NOT_USED: &str = "W0502";
     pub const EQ_DISJOINT: &str = "W0503";

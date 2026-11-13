@@ -202,5 +202,6 @@ fn cli_selects_entries_and_passes_arguments() {
         "{}",
         String::from_utf8_lossy(&build.stderr)
     );
-    assert!(dir.path().join("build/app.wasm").exists());
+    // A native executable named after the entry.
+    assert!(dir.path().join("build/tool").exists());
 }

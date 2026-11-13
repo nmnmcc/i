@@ -1,27 +1,27 @@
-i/prelude.panic : (message: String) -> Never
+i/prelude.panic : (String) -> Never
 i/prelude.assert : (c: Bool) -> Nil ! Assert
-i/fail.raise : (error: A) -> Never ^ A
-i/fail.catch : (body: () -> A ^ E ! N) -> Result(A, E) ! N
+i/fail.raise : (A) -> Never ^ A
+i/fail.catch : (() -> A ^ E ! N) -> Result(A, E) ! N
 i/fail.from_result : (result: Result(A, B)) -> A ^ B
 i/fail.map_error : (body: () -> A ^ E ! N, with: (E) -> B ! N) -> A ^ B ! N
-i/control.boundary : (body: (b: Boundary(A, B, C)) -> A ^ B ! C) -> A ^ B ! C
-i/control.suspend : (b: Boundary(A, B, C), f: (k: Continuation(D, A, B, C)) -> A ^ B ! C) -> D
-i/control.resume : (k: Continuation(A, B, C, D), value: A) -> B ^ C ! D
-i/control.cancel : (k: Continuation(A, B, C, D)) -> Nil ! D
-i/control.keep_env : (f: (x: A) -> B ^ E ! N) -> { (x: A) -> B ^ E } ! N
-i/resource.ensure : (body: () -> A ^ E ! N, with: () -> Nil ! N) -> A ^ E ! N
+i/control.boundary : ((Boundary(A, B, C)) -> A ^ B ! C) -> A ^ B ! C
+i/control.suspend : (Boundary(A, B, C), (Continuation(D, A, B, C)) -> A ^ B ! C) -> D
+i/control.resume : (Continuation(A, B, C, D), A) -> B ^ C ! D
+i/control.cancel : (Continuation(A, B, C, D)) -> Nil ! D
+i/control.keep_env : ((A) -> B ^ E ! N) -> { (A) -> B ^ E } ! N
+i/resource.ensure : (() -> A ^ E ! N, () -> Nil ! N) -> A ^ E ! N
 i/resource.acquire : (open: () -> A ^ E ! N, release: (A) -> Nil ! N, use: (A) -> B ^ E ! N) -> B ^ E ! N
 i/assertion.catch : (body: () -> A ^ E ! N) -> Result(A, AssertionFailure) ^ E ! N - Assert
-i/request.new_root : (parent: Key(Nil)) -> Key(Nil)
-i/request.end_root : (root: Key(Nil)) -> Nil
-i/request.new_owner : (root: Key(Nil)) -> Key(Nil)
-i/request.end_owner : (owner: Key(Nil)) -> Nil
-i/request.group_count : (owner: Key(Nil)) -> Int
-i/request.root_count : (root: Key(Nil)) -> Int
-i/request.cancel_group : (owner: Key(Nil)) -> Nil
-i/request.cancel_root : (root: Key(Nil)) -> Nil
-i/request.observe_owner : (owner: Key(Nil)) -> Request(Nil)
-i/request.observe_root : (root: Key(Nil)) -> Request(Nil)
+i/request.new_root : (Key(Nil)) -> Key(Nil)
+i/request.end_root : (Key(Nil)) -> Nil
+i/request.new_owner : (Key(Nil)) -> Key(Nil)
+i/request.end_owner : (Key(Nil)) -> Nil
+i/request.group_count : (Key(Nil)) -> Int
+i/request.root_count : (Key(Nil)) -> Int
+i/request.cancel_group : (Key(Nil)) -> Nil
+i/request.cancel_root : (Key(Nil)) -> Nil
+i/request.observe_owner : (Key(Nil)) -> Request(Nil)
+i/request.observe_root : (Key(Nil)) -> Request(Nil)
 i/request.open_root : () -> Root ! Root
 i/request.close_root : (root: Root) -> Nil
 i/request.open_owner : () -> Owner ! Root
@@ -36,16 +36,16 @@ i/request.retain : (value: A) -> A
 i/request.within : (body: () -> A ^ E ! N) -> A ^ E ! N - Owner | Root
 i/request.wait_none : (owner: Owner) -> Nil ! Await
 i/request.wait_none_root : (root: Root) -> Nil ! Await
-i/request.ready : (value: A) -> Request(A)
-i/request.ticket : (r: Request(A)) -> Ticket
-i/request.read_state : (r: Request(A)) -> Result(A, Int)
-i/request.take : (r: Request(A)) -> A
-i/request.settled : (r: Ticket) -> Bool
-i/request.cancel : (r: Ticket) -> Nil
+i/request.ready : (A) -> Request(A)
+i/request.ticket : (Request(A)) -> Ticket
+i/request.read_state : (Request(A)) -> Result(A, Int)
+i/request.take : (Request(A)) -> A
+i/request.settled : (Ticket) -> Bool
+i/request.cancel : (Ticket) -> Nil
 i/request.state : (r: Request(A)) -> RequestState(A)
 i/request.await : (r: Request(A)) -> A ! Await
 i/request.await_owned : (r: Request(A)) -> A ! Await
-i/request.wait_any : (rs: List(Ticket)) -> Nil
+i/request.wait_any : (List(Ticket)) -> Nil
 i/request.poll : () -> Nil
 i/request.entry_root : () -> Key(Nil)
 i/request.entry_end : () -> Nil
@@ -54,8 +54,8 @@ i/request._provider_root : (seeds: List(Root), key: Key(Nil)) -> Root
 i/request._provider_owner : (seeds: List(Owner)) -> Owner ! Root
 i/request._provider_await : (seeds: List(Await)) -> Await
 i/key.new : () -> Key(A)
-i/key.wrap : (k: Key(A), value: A) -> Keyed
-i/key.read : (k: Key(A), value: Keyed) -> Result(A, Nil)
+i/key.wrap : (Key(A), A) -> Keyed
+i/key.read : (Key(A), Keyed) -> Result(A, Nil)
 i/key.unwrap : (k: Key(A), x: Keyed) -> Lookup(A)
 i/core.not : (Bool) -> Bool
 i/core.to_float : (Int) -> Float
@@ -73,28 +73,104 @@ i/core.shift_left : (Int, Int) -> Int
 i/core.shift_right : (Int, Int) -> Int
 i/core.concat : (List(String)) -> String
 i/core.byte_size : (String) -> Int
-i/core.byte_slice : (String, start: Int, length: Int) -> Result(String, Nil)
+i/core.byte_slice : (String, Int, Int) -> Result(String, Nil)
 i/core.codepoints : (String) -> List(UtfCodepoint)
 i/core.from_codepoints : (List(UtfCodepoint)) -> String
 i/core.codepoint_to_int : (UtfCodepoint) -> Int
 i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, Nil)
 i/core.to_upper : (String) -> String
 i/core.to_lower : (String) -> String
-i/core.index_of : (in: String, find: String, from: Int) -> Result(Int, Nil)
+i/core.index_of : (String, String, Int) -> Result(Int, Nil)
 i/core.bit_size : (BitArray) -> Int
 i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
-i/core.portable : (value: A) -> Bool
-i/record.get : (r: (K: A), key: K) -> A
-i/record.put : (r: Record & A, key: K, value: B) -> (K: B) & (..A, -K)
-i/record.remove : (r: Record & A, key: K) -> (..A, -K)
-i/record.has : (r: Record, key: String) -> Bool
-i/record.keys : (r: Record) -> List(String)
-i/record.size : (r: Record) -> Int
-i/record.texts : (r: Record) -> List((String, String))
-i/task.finalizing : (k: Continuation(A, B, C, D), b: Boundary(F, G, H)) -> Bool
+i/core.portable : (A) -> Bool
+i/float_text.to_string : (x: Float) -> String
+i/float_text.positive : (encoded: Int, fraction: Int) -> List(String)
+i/float_text.floor_divide : (a: Int, b: Int) -> Int
+i/float_text.power_of_ten : (n: Int) -> Int
+i/float_text.small_power : (n: Int, acc: Int) -> Int
+i/float_text.sixteens : (k: Int) -> Int
+i/float_text.grow : (r: Int, s: Int, k: Int) -> (Int, Int)
+i/float_text.shrink : (r: Int, s: Int, minus: Int, plus: Int, k: Int) -> (Int, Int, Int, Int)
+i/float_text.generate : (r: Int, s: Int, minus: Int, plus: Int, inclusive: Bool, acc: List(Int), k: Int) -> (List(Int), Int)
+i/float_text.carry : (reversed: List(Int)) -> (List(Int), Bool)
+i/float_text.trim : (reversed: List(Int)) -> List(Int)
+i/float_text.reverse_onto : (list: List(Int), acc: List(Int)) -> List(Int)
+i/float_text.length : (list: List(Int), n: Int) -> Int
+i/float_text.layout : (digits: List(Int), n: Int, k: Int, imprecise: Bool) -> List(String)
+i/float_text.split : (digits: List(Int), k: Int, acc: List(String)) -> List(String)
+i/float_text.reverse_texts : (list: List(String), acc: List(String)) -> List(String)
+i/float_text.append : (front: List(String), back: List(String)) -> List(String)
+i/float_text.zeros : (count: Int, rest: List(String)) -> List(String)
+i/float_text.texts : (digits: List(Int), rest: List(String)) -> List(String)
+i/float_text.digit_list : (digits: List(Int), acc: List(String)) -> List(String)
+i/float_text.int_text : (e: Int) -> List(String)
+i/float_text.int_digits : (e: Int, acc: List(String)) -> List(String)
+i/float_text.digit_text : (d: Int) -> String
+i/big.sign : (Int) -> Int
+i/big.digits : (Int) -> List(Int)
+i/big.from_digits : (sign: Int, digits: List(Int)) -> Int
+i/big.size : (Int) -> Int
+i/big.limb : (x: Int, index: Int) -> Int
+i/big.from_top : (sign: Int, digits: List(Int)) -> Int
+i/big.builder : (Int) -> Digits
+i/big.put : (Digits, Int, Int) -> Digits
+i/big.finish : (Int, Digits) -> Int
+i/big.multiply_low : (Int, Int, Int) -> Int
+i/big.multiply_high : (Int, Int, Int) -> Int
+i/big.divide_digit : (Int, Int, Int) -> (Int, Int)
+i/big.compare : (a: Int, b: Int) -> Int
+i/big.magnitude_order : (a: Int, b: Int) -> Int
+i/big.order_from : (a: Int, b: Int, i: Int) -> Int
+i/big.digit_order : (a: Int, b: Int) -> Int
+i/big.add : (a: Int, b: Int) -> Int
+i/big.subtract : (a: Int, b: Int) -> Int
+i/big.signed_add : (a: Int, sa: Int, b: Int, sb: Int) -> Int
+i/big.add_up : (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
+i/big.subtract_up : (a: Int, b: Int, i: Int, n: Int, borrow: Int, out: Digits) -> Digits
+i/big.multiply : (a: Int, b: Int) -> Int
+i/big.multiply_range : (a: Int, ao: Int, na: Int, b: Int, bo: Int, nb: Int) -> Int
+i/big.sum_halves : (x: Int, offset: Int, k: Int, n: Int, i: Int, end: Int, carry: Int, out: Digits) -> Digits
+i/big.combine : (low: Int, middle: Int, high: Int, k: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
+i/big.scale_up : (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
+i/big.columns : (a: Int, ao: Int, b: Int, bo: Int, na: Int, nb: Int, k: Int, carry: Int, out: Digits) -> Digits
+i/big.column : (a: Int, ao: Int, b: Int, bo: Int, i: Int, last: Int, k: Int, low: Int, high: Int, extra: Int) -> (Int, Int, Int)
+i/big.max : (a: Int, b: Int) -> Int
+i/big.min : (a: Int, b: Int) -> Int
+i/big.divide : (a: Int, b: Int) -> Int
+i/big.remainder : (a: Int, b: Int) -> Int
+i/big.to_text : (value: Int, radix: Int) -> String
+i/big.magnitude_divide : (a: Int, b: Int) -> (Int, Int)
+i/big.normalized : (x: Int, factor: Int) -> Int
+i/big.initial_remainder : (x: Int, offset: Int, i: Int, n: Int, out: Digits) -> Digits
+i/big.short_divide_number : (x: Int, d: Int, i: Int, r: Int, out: Digits) -> (Int, Int)
+i/big.long_divide : (x: Int, y: Int, i: Int, m: Int, top: Int, r: Int, q: Digits) -> (Int, Int)
+i/big.reduce_digit : (r: Int, a: Int, y: Int, d: Int, i: Int, n: Int, carry: Int, borrow: Int, out: Digits) -> Digits
+i/big.correct : (r: Int, y: Int, digit: Int) -> (Int, Int)
+i/big.normal_shift : (top: Int, s: Int) -> Int
+i/big.power_of_two : (s: Int, acc: Int) -> Int
+i/big.short_divide : (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), Int)
+i/big.reverse : (x: List(Int), acc: List(Int)) -> List(Int)
+i/big.trim : (x: List(Int)) -> List(Int)
+i/big.drop_zeros : (x: List(Int)) -> List(Int)
+i/big.chunk_of : (radix: Int, chunk: Int, width: Int) -> (Int, Int)
+i/big.text_chunks : (x: List(Int), chunk: Int, radix: Int, width: Int, acc: List(String)) -> List(String)
+i/big.chunk_text : (v: Int, radix: Int, width: Int, padded: Bool, acc: List(String)) -> List(String)
+i/big.digit_text : (d: Int) -> String
+i/bits.read_unsigned : (bits: BitArray, start: Int, width: Int) -> Int
+i/bits.from_unsigned : (value: Int, width: Int) -> BitArray
+i/bits.read_int : (bits: BitArray, start: Int, width: Int, signed: Bool, little: Bool) -> Int
+i/bits.read_big : (bits: BitArray, start: Int, left: Int, acc: Int) -> Int
+i/bits.read_little : (bits: BitArray, start: Int, left: Int, acc: Int, scale: Int) -> Int
+i/bits.from_int : (value: Int, width: Int, little: Bool) -> BitArray
+i/bits.write_big : (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray)
+i/bits.write_little : (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray)
+i/bits.reverse : (list: List(BitArray), acc: List(BitArray)) -> List(BitArray)
+i/bits.min : (a: Int, b: Int) -> Int
+i/task.finalizing : (Continuation(A, B, C, D), Boundary(F, G, H)) -> Bool
 i/task.no_waiters : WaitQueue
 i/task.address_key : Key(Address)
 i/task.path_key : Key(List(Int))
@@ -148,13 +224,37 @@ i/task.set_task : (s: State, t: TaskState) -> State
 i/task.add_task : (s: State, t: TaskState) -> State
 i/task.set_scope : (s: State, scope: ScopeState) -> State
 i/task.guarded : (own: Scheduler, owner: Maybe(Address), body: () -> Completion) -> Completion
+i/task.complete : (body: () -> A ^ E ! N, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Completion ! N
 i/task.make_start : (body: () -> A ^ E ! N, result: Key(Result(A, E)), errors: Key(E), check: Bool) -> Start ! N - Scheduler - Runner - request.Await
+i/task.worker_enabled : () -> Bool
+i/task.worker_publish : (job: Job) -> Int
+i/task.worker_claim : (ticket: Int) -> Bool
+i/task.worker_adopt : (ticket: Int, task: Int) -> Nil
+i/task.worker_placeholder : () -> Continuation(StepAnswer, Turn, Never, Never)
+i/task.worker_away : (k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
+i/task.worker_send : (task: Int, resume: Resume) -> Nil
+i/task.worker_inbox : () -> Int
+i/task.worker_message : () -> Remote
+i/task.worker_pending : () -> Bool
+i/task.worker_wait : () -> Nil
+i/task.worker_share_put : (run: Key(Nil), address: Address, value: Keyed) -> Nil
+i/task.worker_share_get : (run: Key(Nil), address: Address) -> List(Keyed)
+i/task.worker_share_drop : (run: Key(Nil), address: Address) -> Nil
+i/task.drop_shares : (s: State, ids: List(Address)) -> Nil
+i/task.remote_turn : (turn: Turn, finals: List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool), run: Key(Nil)) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.remote_begin : (job: Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.remote_resume : (input: (Continuation(StepAnswer, Turn, Never, Never), Resume)) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.publish : (s: State, task_path: List(Int), start: Start) -> Start
+i/task.frame_finals : (frames: List(Frame)) -> List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool)
+i/task.split_flags : (frames: List(Frame), flags: List(Bool)) -> (List(Bool), List(Bool))
+i/task.apply_finals : (frames: List(Frame), flags: List(Bool)) -> List(Frame)
+i/task.pull : (s: State) -> State
 i/task.path : () -> List(Int) ! Scheduler
 i/task.random : () -> rng.Generator ! Scheduler
 i/task.yield : () -> Nil ! Scheduler
 i/task.top : (seed: rng.Generator) -> Runner ! Runner
-i/task.observe_change : (root: Key(Nil)) -> Request(Nil)
-i/task.has_work : (ticket: Ticket) -> Bool
+i/task.observe_change : (Key(Nil)) -> Request(Nil)
+i/task.has_work : (Ticket) -> Bool
 i/task.wait_root : (_run: Key(Nil), root: request.Root, tickets: List(Ticket)) -> RunControl
 i/task.root_poll : (_run: Key(Nil), tickets: List(Ticket), runnable: Bool) -> RunControl
 i/task.root_forget : (_run: Key(Nil)) -> Nil
@@ -225,7 +325,7 @@ i/task.do_command : (s: State, t: TaskState, k: Continuation(StepAnswer, Turn, N
 i/task.cancellation_reply : (t: TaskState) -> Bool
 i/task.finals_changed : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool
 i/task.update_finals : (frames: List(Frame), k: Continuation(StepAnswer, Turn, Never, Never)) -> List(Frame)
-i/task.on_command : (s: State, task_path: Int, command: Command, k: Continuation(StepAnswer, Turn, Never, Never)) -> State
+i/task.on_command : (s: State, task_path: Int, command: Command, k: Continuation(StepAnswer, Turn, Never, Never), flags: Maybe(List(Bool))) -> State
 i/task.observe_completion : (s: State, t: TaskState, completion: Completion) -> State
 i/task.turn : (s: State, t: TaskState) -> Turn
 i/task.interests_tasks : (s: State, paths: List(Int)) -> List(Ticket)
@@ -239,8 +339,8 @@ i/task.script_task : (s: State, wanted: List(Int)) -> Maybe(TaskState)
 i/task.choose_turn : (state: State) -> State
 i/task.loop : (state: State) -> RunReply
 i/task.scope_call_body : (body: (Scope(A)) -> B ^ A ! N, witness: Witness, mode: Mode, own: Scheduler) -> ScopeResult(B) ^ A ! N
-i/task.scope : (body: (s: Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler
-i/task.local_scope : (body: (s: Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler
+i/task.scope : (body: (Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler
+i/task.local_scope : (body: (Scope(A)) -> B ^ A ! N) -> B ^ A ! N | Scheduler
 i/task.go_key : (s: Scope(A), body: () -> B ^ A ! N, result: Key(Result(B, A))) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
 i/task.go : (s: Scope(A), body: () -> B ^ A ! N) -> Task(B, A) ! N - Scheduler - Runner - request.Await | Scheduler
 i/task.branch_at : (branches: List(Branch(A, B, C)), index: Int) -> Branch(A, B, C)
@@ -476,28 +576,28 @@ i/net.slice : (text: String, start: Int, length: Int) -> String
 i/net.parts : (text: String, start: Int) -> List(String)
 i/net.resolve : (name: String) -> List(String) ^ NetError ! Net | request.Await | request.Owner
 i/net.stream_number : (Stream) -> Int
-i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { Net | request.Await } }, read: (max: Int) -> BitArray ^ NetError ! { request.Owner | { Net | request.Await } }, shutdown_write: () -> Nil ^ NetError ! { request.Owner | { Net | request.Await } }, write: (bytes: BitArray) -> Nil ^ NetError ! { request.Owner | { Net | request.Await } })
+i/net.byte_stream : (stream: Stream) -> (close: () -> Nil ! Net | request.Await | request.Owner, read: (max: Int) -> BitArray ^ NetError ! Net | request.Await | request.Owner, shutdown_write: () -> Nil ^ NetError ! Net | request.Await | request.Owner, write: (bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner)
 i/net.bind : (address: String, port: Int) -> Datagram ^ NetError ! Net | request.Await | request.Owner
 i/net.send_to : (Datagram, address: String, port: Int, bytes: BitArray) -> Nil ^ NetError ! Net | request.Await | request.Owner
 i/net.receive_from : (Datagram, max_bytes: Int) -> (address: String, data: BitArray, port: Int) ^ NetError ! Net | request.Await | request.Owner
 i/net.decode_datagram : (A) -> (address: String, data: BitArray, port: Int)
 i/net.local_address : (Datagram) -> String ^ NetError ! Net | request.Await | request.Owner
 i/net.close_datagram : (Datagram) -> Nil ! Net | request.Await | request.Owner
-i/tls.options : () -> (alpn: List(Never), cert: BitArray, key: BitArray, roots: BitArray)
+i/tls.options : () -> (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)
 i/tls.identity : (cert: BitArray, key: BitArray) -> (cert: BitArray, key: BitArray)
 i/tls.join : (items: List(String)) -> String
 i/tls.slice : (text: String, start: Int, len: Int) -> String
 i/tls.raise : (message: String) -> Never ^ TlsError
 i/tls.finish : (r: Request(Result(Int, String))) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.connect : (stream: net.Stream, name: String, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
-i/tls.accept : (stream: net.Stream, ident: (cert: BitArray, key: BitArray), opts: (alpn: List(String))) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
+i/tls.accept : (stream: net.Stream, ident: (cert: BitArray, key: BitArray), opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.dial : (host: String, port: Int, opts: (alpn: List(String), cert: BitArray, key: BitArray, roots: BitArray)) -> Stream ^ TlsError | net.NetError ! Tls | net.Net | request.Await | request.Owner
 i/tls.alpn : (Stream) -> String ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.read : (Stream, max: Int) -> BitArray ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.write : (Stream, bytes: BitArray) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.shutdown_write : (Stream) -> Nil ^ TlsError ! Tls | request.Await | request.Owner
 i/tls.close : (Stream) -> Nil ! Tls | request.Await | request.Owner
-i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! { request.Owner | { request.Await | Tls } }, read: (max: Int) -> BitArray ^ TlsError ! { request.Owner | { request.Await | Tls } }, shutdown_write: () -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } }, write: (bytes: BitArray) -> Nil ^ TlsError ! { request.Owner | { request.Await | Tls } })
+i/tls.byte_stream : (stream: Stream) -> (close: () -> Nil ! Tls | request.Await | request.Owner, read: (max: Int) -> BitArray ^ TlsError ! Tls | request.Await | request.Owner, shutdown_write: () -> Nil ^ TlsError ! Tls | request.Await | request.Owner, write: (bytes: BitArray) -> Nil ^ TlsError ! Tls | request.Await | request.Owner)
 i/fetch.open : (method: String, url: String, headers: String, body: BitArray) -> Response ^ String ! Fetch | request.Await | request.Owner
 i/fetch.status : (Response) -> Int ^ String ! Fetch | request.Await | request.Owner
 i/fetch.headers : (Response) -> String ^ String ! Fetch | request.Await | request.Owner

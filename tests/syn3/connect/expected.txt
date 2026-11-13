@@ -1,0 +1,13 @@
+a.com:80
+b.com:8080
+12.0
+12.0
+42
+zero
+one 5
+pair 5
+none
+12.0
+15.0
+c.com:1
+14

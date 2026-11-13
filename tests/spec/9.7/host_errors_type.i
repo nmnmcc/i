@@ -11,7 +11,7 @@ Handle {}
 // `Float`, `String`, and `BitArray`.
 @host("test:kv/v1")
 Kv {
-	Kv(get: (key: String) -> String ^ Handle)
+	Kv(get: (String) -> String ^ Handle)
 }
 
 test("t", () { Nil })

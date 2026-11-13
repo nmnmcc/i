@@ -23,8 +23,9 @@ env:
 
 # The release `i` is built once, in `release`; the jobs `i` and `corpus`
 # download it and run the parts of `scripts/dev-verify i` with it. The Rust
-# formatting and Clippy (`lint`), the Rust tests (`test`) and the JavaScript
-# tests (`js`) each build what they need, at the same time as `release`.
+# formatting and Clippy (`lint`), the Rust tests (`test`), the JavaScript
+# tests (`js`) and the editor checks (`editors`) each build what they need, at
+# the same time as `release`.
 #
 # Swatinem/rust-cache keeps the built dependencies and the ccache objects of
 # Binaryen, by job and Cargo.lock. Pushes to main, redesign and ci/** write it;
@@ -205,6 +206,30 @@ jobs:
           name: browser-${{ github.run_id }}
           path: target/browser
           retention-days: 14
+
+  # The editor support: VS Code extension tests, the tree-sitter grammar (generate, tests, the
+  # queries on every .i source) and a check of the Zed extension. Needs only what the Devenv
+  # shell has (node and npm, a C compiler for tree-sitter, Rust), network access for `npm ci`,
+  # and no release `i`. Without the wasm32-wasip1 target the Zed check runs for the host.
+  editors:
+    name: verify (editors)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Verify editors
+        run: devenv shell -- ./scripts/dev-verify editors
 
   # `scripts/dev-verify i` without the build and without the review corpus,
   # which the job `corpus` runs in shards.

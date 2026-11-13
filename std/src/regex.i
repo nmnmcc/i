@@ -82,7 +82,7 @@ bump = (p: Parser) -> Parser {
 }
 
 syntax_error = (p: Parser, reason: String) -> Never ^ RegexError {
-	fail.raise(RegexError(p.position, reason))
+	fail.raise(RegexError(position: p.position, reason: reason))
 }
 
 peek = (p: Parser) -> Int {
@@ -501,7 +501,7 @@ Regex {
 }
 
 emit = (inst: Inst, b: Build) -> (Int, Build) {
-	(b.size, Build(dict.insert(b.code, b.size, inst), b.size + 1))
+	(b.size, Build(code: dict.insert(b.code, b.size, inst), size: b.size + 1))
 }
 
 sequence_code = (xs: List(Ast), next: Int, b: Build) -> (Int, Build) {
@@ -564,7 +564,7 @@ at_least_code = (
 	b: Build
 ) -> (Int, Build) {
 	loop = b.size
-	(child, end) = lower(body, loop, Build(b.code, b.size + 1))
+	(child, end) = lower(body, loop, Build(code: b.code, size: b.size + 1))
 	fork = lazy |> {
 		True  -> Fork(next, child)
 		False -> Fork(child, next)
@@ -620,20 +620,20 @@ lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
 compile = (pattern: String) -> Result(Regex, RegexError) {
 	fail.catch(() {
 		p = Parser(
-			list.map(core.codepoints(pattern), core.codepoint_to_int)
-			0
-			Flags(False, False, False)
-			0
-			dict.new()
+			rest:     list.map(core.codepoints(pattern), core.codepoint_to_int)
+			position: 0
+			flags:    Flags(insensitive: False, multiline: False, dotall: False)
+			count:    0
+			names:    dict.new()
 		)
 		(a, end) = parse_alternation(p)
 		{ peek(end) != -1 } |> {
 			True  -> syntax_error(end, "unexpected closing group")
 			False -> Nil
 		}
-		(accept, b) = emit(Accept, Build(dict.new(), 0))
+		(accept, b) = emit(Accept, Build(code: dict.new(), size: 0))
 		(pc, tail) = lower(Capture(0, a), accept, b)
-		Regex(tail.code, pc, end.names)
+		Regex(code: tail.code, start: pc, names: end.names)
 	})
 }
 
@@ -726,10 +726,10 @@ Captures {
 
 input = (text: String) -> Input {
 	Input(
-		text
-		list.map(core.codepoints(text), core.codepoint_to_int)
-		-1
-		Offset(0, 0)
+		text:     text
+		rest:     list.map(core.codepoints(text), core.codepoint_to_int)
+		previous: -1
+		at:       Offset(scalar: 0, byte: 0)
 	)
 }
 
@@ -754,10 +754,10 @@ advance = (i: Input) -> Input {
 	i.rest |> {
 		[] -> panic("regex: advance after end")
 		[c, ..tail] -> Input(
-			i.text
-			tail
-			c
-			Offset(i.at.scalar + 1, i.at.byte + byte_width(c))
+			text:     i.text
+			rest:     tail
+			previous: c
+			at:       Offset(scalar: i.at.scalar + 1, byte: i.at.byte + byte_width(c))
 		)
 	}
 }
@@ -856,7 +856,7 @@ step_threads = (
 			instruction(re, pc) |> {
 				Accept -> (
 					list.reverse(acc)
-					Some(Captures(slots, re.names, i.text))
+					Some(Captures(slots: slots, names: re.names, text: i.text))
 				)
 				Eat(cls, _, next) -> i.rest |> {
 					[c, .._] ? class_has(cls, c) -> step_threads(
@@ -900,7 +900,7 @@ bytes = (text: String, start: Int, end: Int) -> String {
 }
 
 /// Capture by index; zero is the full match. An unmatched group is None.
-/// `regex.group(captures, index: 1)`.
+/// `regex.group(captures, 1)`.
 group = (captures: Captures, index: Int) -> Option(Match) {
 	{ index < 0 } |> {
 		True -> None
@@ -910,9 +910,9 @@ group = (captures: Captures, index: Int) -> Option(Match) {
 		) |> {
 			(Some(start), Some(end)) -> Some(
 				Match(
-					start.scalar
-					end.scalar
-					bytes(captures.text, start.byte, end.byte)
+					start: start.scalar
+					end:   end.scalar
+					text:  bytes(captures.text, start.byte, end.byte)
 				)
 			)
 			_ -> None
@@ -942,7 +942,7 @@ captures = (regex: Regex, input: String) -> Option(Captures) {
 
 regex_input = input
 
-/// Finds the leftmost-first match: `regex.find(re, input: "abc")`.
+/// Finds the leftmost-first match: `regex.find(re, "abc")`.
 find = (regex: Regex, input: String) -> Option(Match) {
 	captures(regex, input) |> {
 		None    -> None

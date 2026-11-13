@@ -6,8 +6,5 @@ left_fn : String
 left_fn_later : List(Int)
 pair : (p: ((User) -> Int, Int)) -> ((User) -> Int, Int)
 left_tuple : ((User) -> Int, Int)
-unknown : (g: ((u: (name: A)) -> A) -> B ^ E ! N) -> B ^ E ! N
-22:1: warning[W0504]: top-level binding `left_fn` is not used
-24:1: warning[W0504]: top-level binding `left_fn_later` is not used
-29:1: warning[W0504]: top-level binding `left_tuple` is not used
-32:1: warning[W0504]: top-level binding `unknown` is not used
+unknown : (g: ((u: A) -> Never) -> B ^ E ! N) -> B ^ E ! N
+32:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

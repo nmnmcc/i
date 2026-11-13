@@ -1,5 +1,5 @@
 Cell(A) { Cell(run: (A) -> A) }
-make = () { Cell((x) { x }) }
+make = () { Cell(run: (x) { x }) }
 ci: Cell(Int) = make()
 cs: Cell(String) = make()
 id(A) = (x: A) -> A { x }

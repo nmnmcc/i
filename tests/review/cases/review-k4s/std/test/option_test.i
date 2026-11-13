@@ -191,9 +191,9 @@ test("map2_test", () {
 })
 
 test("labels_test", () {
-	assert(option.unwrap(None, or: 5) == 5)
-	assert(option.map(over: Some(1), with: (x) { x * 10 }) == Some(10))
-	assert(option.lazy_unwrap(None, or: () { 7 }) == 7)
+	assert(option.unwrap(None, 5) == 5)
+	assert(option.map(Some(1), (x) { x * 10 }) == Some(10))
+	assert(option.lazy_unwrap(None, () { 7 }) == 7)
 })
 
 test("all_long_test", () {
@@ -216,7 +216,7 @@ build_plain = (n, acc) {
 }
 
 test("known_types_test", () {
-	user = Some(User("ann", 30))
+	user = Some(User(name: "ann", age: 30))
 	// The field `name` is known from the type of `option.map`.
 	assert(option.map(user, (u) { u.name }) == Some("ann"))
 	assert(option.then(user, (u) {

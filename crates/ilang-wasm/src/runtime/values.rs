@@ -1,7 +1,6 @@
 //! Shared, boxed WasmGC values. The generated functions never expose GC addresses.
 
 mod inspect;
-mod record;
 mod strings;
 
 pub fn wat(references: bool) -> String {
@@ -15,7 +14,6 @@ pub fn wat(references: bool) -> String {
     }
     source.push_str(&strings::wat());
     source.push_str(&inspect::wat());
-    source.push_str(record::WAT);
     source
 }
 
@@ -73,6 +71,21 @@ const CORE: &str = r#"
 (func $tuple (param $fields (ref $values)) (result eqref)
   (struct.new $obj (i32.const 4) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
+;; Data with labels (syntax-3 §6.4): field 1 is the index of its label set.
+(func $data (param $set i32) (param $fields (ref $values)) (result eqref)
+  (struct.new $obj (i32.const 4) (local.get $set) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
+;; The label sets of data, installed by `ilang_start`: set `i` is entry `i - 1`.
+(global $shape_labels (mut (ref null $values)) (ref.null $values))
+(func $shapes_install (param $shapes (ref $values))
+  (global.set $shape_labels (local.get $shapes)))
+;; The labels of a data value, or null for a tuple.
+(func $data_labels (param $v eqref) (result (ref null $values))
+  (local $set i32)
+  (local.set $set (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
+  (if (i32.eqz (local.get $set)) (then (return (ref.null $values))))
+  (ref.cast (ref $values) (array.get $values (ref.as_non_null (global.get $shape_labels))
+    (i32.sub (local.get $set) (i32.const 1)))))
 (func $list_is_empty (param $v eqref) (result i32)
   (i32.eqz (ref.test (ref $cons) (local.get $v))))
 (func $list_head (param $v eqref) (result eqref)
@@ -155,6 +168,11 @@ const CORE: &str = r#"
       (if (i32.eq (local.get $ka) (i32.const 10)) (then
         (local.set $c (call $compare_i64 (call $host_id (local.get $a)) (call $host_id (local.get $b))))
         (br $compared)))
+      ;; Copies of one key or function on two workers keep its id (multicore D6).
+      (if (i32.eq (local.get $ka) (i32.const 15)) (then
+        (br_if $compared (call $key_same (local.get $a) (local.get $b)))))
+      (if (i32.eq (local.get $ka) (i32.const 7)) (then
+        (br_if $compared (call $closure_same (local.get $a) (local.get $b)))))
       ;; Identity values that are not ref.eq are different. The order between
       ;; them only has to be consistent within one comparison.
       (if (call $value_identity_kind (local.get $ka)) (then (return (i32.const 1))))
@@ -394,15 +412,37 @@ const CORE: &str = r#"
   (call $int_from_i64 (i64.extend_i32_u (call $value_hash_u32 (local.get $v)))))
 
 ;; Keys are identity values. Tag 14 remains reserved for structural records.
+;; Field 2 is the key's id (multicore D6): start-up takes 1, 2, ... the same
+;; on every worker; a worker then takes ids above its own prefix. A copy of a
+;; key on another worker keeps the id, so it is the same key. Only `==` and
+;; `key.read` read ids.
+(global $id_prefix (mut i64) (i64.const 0))
+(global $id_next (mut i64) (i64.const 0))
 (func $key_new (result eqref)
-  (struct.new $obj (i32.const 15) (i32.const 0) (i64.const 0) (f64.const 0)
+  (global.set $id_next (i64.add (global.get $id_next) (i64.const 1)))
+  (struct.new $obj (i32.const 15) (i32.const 0) (i64.or (global.get $id_prefix) (global.get $id_next)) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
+(func $closure_same (param $a eqref) (param $b eqref) (result i32)
+  (if (i32.eqz (i32.and (ref.test (ref $clo) (local.get $a)) (ref.test (ref $clo) (local.get $b))))
+    (then (return (i32.const 0))))
+  (i32.and
+    (i64.ne (struct.get $clo 8 (ref.cast (ref $clo) (local.get $a))) (i64.const 0))
+    (i64.eq (struct.get $clo 8 (ref.cast (ref $clo) (local.get $a)))
+            (struct.get $clo 8 (ref.cast (ref $clo) (local.get $b))))))
+(func $key_same (param $a eqref) (param $b eqref) (result i32)
+  (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
+  (if (i32.eqz (i32.and (ref.test (ref $obj) (local.get $a)) (ref.test (ref $obj) (local.get $b))))
+    (then (return (i32.const 0))))
+  (i32.and
+    (i64.ne (struct.get $obj 2 (ref.cast (ref $obj) (local.get $a))) (i64.const 0))
+    (i64.eq (struct.get $obj 2 (ref.cast (ref $obj) (local.get $a)))
+            (struct.get $obj 2 (ref.cast (ref $obj) (local.get $b))))))
 (func $key_wrap (param $key eqref) (param $value eqref) (result eqref)
   (struct.new $obj (i32.const 16) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (array.new_fixed $values 2 (local.get $key) (local.get $value))
     (ref.null $limbs) (ref.null $call)))
 (func $key_read (param $key eqref) (param $value eqref) (result eqref)
-  (if (ref.eq (local.get $key) (call $field (local.get $value) (i32.const 0)))
+  (if (call $key_same (local.get $key) (call $field (local.get $value) (i32.const 0)))
     (then (return_call $result_ok (call $field (local.get $value) (i32.const 1)))))
   (call $result_error (ref.null eq)))
 

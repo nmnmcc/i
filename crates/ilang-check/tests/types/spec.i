@@ -38,12 +38,12 @@ fixed = () {
 
 // §9.4
 Yield(A) {
-	Yield(emit: (value: A) -> Nil)
+	Yield(emit: (A) -> Nil)
 }
 
 collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
 	control.boundary((b) {
-		! Yield(A) = Yield((x) {
+		! Yield(A) = Yield(emit: (x) {
 			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 		})
 		body()
@@ -62,7 +62,7 @@ numbers = () {
 my_assert = (c: Bool, a ! Assert) {
 	c |> {
 		True  -> Nil
-		False -> a.fail(AssertionFailure("assert"))
+		False -> a.fail(AssertionFailure(message: "assert"))
 	}
 }
 
@@ -70,7 +70,7 @@ my_assert = (c: Bool, a ! Assert) {
 
 catch = (body) {
 	control.boundary((b) {
-		! Assert = Assert((failure) {
+		! Assert = Assert(fail: (failure) {
 			control.suspend(b, (k) {
 				control.cancel(k)
 				Error(failure)

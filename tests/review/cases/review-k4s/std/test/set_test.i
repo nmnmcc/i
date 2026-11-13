@@ -47,12 +47,12 @@ test("is_empty_after_delete_test", () {
 })
 
 test("contains_present_test", () {
-	assert(set.new() |> set.insert(1) |> set.contains(this: 1))
+	assert(set.new() |> set.insert(1) |> set.contains(1))
 	Nil
 })
 
 test("contains_absent_test", () {
-	assert(core.not(set.contains(set.new(), this: 1)))
+	assert(core.not(set.contains(set.new(), 1)))
 	Nil
 })
 
@@ -71,7 +71,7 @@ test("to_list_test", () {
 				|> set.insert(3)
 				|> set.insert(4)
 				|> set.to_list
-				|> list.sort(by: int.compare)
+				|> list.sort(int.compare)
 		} ==
 			[2, 3, 4]
 	)
@@ -84,7 +84,7 @@ test("from_list_test", () {
 			[1, 1, 2, 4, 3, 2]
 				|> set.from_list
 				|> set.to_list
-				|> list.sort(by: int.compare)
+				|> list.sort(int.compare)
 		} ==
 			[1, 2, 3, 4]
 	)
@@ -94,7 +94,7 @@ test("from_list_test", () {
 test("fold_test", () {
 	assert(
 		{
-			[1, 3, 9] |> set.from_list |> set.fold(from: 0, with: (m, a) {
+			[1, 3, 9] |> set.from_list |> set.fold(0, (m, a) {
 				m + a
 			})
 		} ==
@@ -105,7 +105,7 @@ test("fold_test", () {
 
 test("map_test", () {
 	assert(
-		{ [1, 2, 3, 4] |> set.from_list |> set.map(with: int.to_string) } ==
+		{ [1, 2, 3, 4] |> set.from_list |> set.map(int.to_string) } ==
 			set.from_list(["1", "2", "3", "4"])
 	)
 	Nil
@@ -116,7 +116,7 @@ test("filter_test", () {
 		{
 			[1, 4, 6, 3, 675, 44, 67]
 				|> set.from_list()
-				|> set.filter(keeping: int.is_even)
+				|> set.filter(int.is_even)
 				|> set.to_list
 				|> list.sort(int.compare)
 		} ==

@@ -1,5 +1,0 @@
-# spec: 4.9, 10.2
-# expect: compile-error E0320
-name = "spec"
-[wasm]
-exports = ["spec/m.pick"]

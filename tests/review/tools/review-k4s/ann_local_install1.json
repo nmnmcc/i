@@ -1,6 +1,0 @@
-{
-  "name": "ann_local_install1",
-  "code": 0,
-  "time": 0.02371882414445281,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N | S(N)\n"
-}

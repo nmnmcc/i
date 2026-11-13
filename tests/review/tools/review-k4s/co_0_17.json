@@ -1,6 +1,0 @@
-{
-  "name": "co_0_17",
-  "code": 0,
-  "time": 0.01898808521218598,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f : () -> Nil ! N | S(N)\n"
-}

@@ -12,13 +12,17 @@ mod control;
 mod host;
 pub(crate) mod numeric;
 mod wasi;
-
-pub(super) const FIXED_MAX: usize = 10_000;
+mod workers;
 
 /// Support functions of the generated code, for tests in patterns.
 const SUPPORT: &str = r#"
-(func $is_record (param $v eqref) (result i32)
-  (i32.eq (call $value_tag (local.get $v)) (i32.const 14)))
+(func $is_data (param $v eqref) (param $set i32) (param $n i32) (result i32)
+  (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 4))
+    (then (i32.and
+      (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $set))
+      (i32.eq (array.len (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v)))))
+        (local.get $n))))
+    (else (i32.const 0))))
 (func $is_ctor (param $v eqref) (param $c i32) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 5))
     (then (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $c)))
@@ -44,10 +48,7 @@ const SUPPORT: &str = r#"
     (then (i32.eqz (call $string_compare (local.get $v) (local.get $s))))
     (else (i32.const 0))))
 (func $is_tuple (param $v eqref) (param $n i32) (result i32)
-  (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 4))
-    (then (i32.eq (array.len (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v)))))
-      (local.get $n)))
-    (else (i32.const 0))))
+  (call $is_data (local.get $v) (i32.const 0) (local.get $n)))
 "#;
 
 /// The `fail` of the `Assert` of entry points, after the host part.
@@ -93,6 +94,14 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         numeric_enabled: false,
         numeric_plan: numeric::Plan::default(),
         worker: None,
+        self_loop: None,
+        pending: Vec::new(),
+        deferring: false,
+        carry: false,
+        joins: HashMap::new(),
+        split: Default::default(),
+        mismatch: Default::default(),
+        dead: false,
         arities: BTreeSet::new(),
         ctors: BTreeSet::new(),
         strings: HashMap::new(),
@@ -100,11 +109,19 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         out: String::new(),
         lights: 0,
         lazy_calls: BTreeSet::new(),
+        dispatch: BTreeSet::new(),
+        call_locals: BTreeSet::new(),
+        blocks: 0,
     };
     e.arities.insert(0);
     e.arities.insert(1);
+    let mut async_funcs = Vec::new();
     for (i, f) in p.funcs.iter().enumerate() {
+        let at = e.out.len();
         e.func(FuncId(i as u32), f);
+        if e.out[at..].contains("(call $req_start") {
+            async_funcs.push(i);
+        }
     }
     for i in 0..p.points.len() {
         e.point(i as PointId);
@@ -118,6 +135,12 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     e.start();
     e.exports();
     e.resume_exports();
+    // The worker operations bring the multicore codec and transport imports.
+    let uses_workers = e.out.contains("(call $worker_");
+    // `$call0` and `$call1` of the runtime dispatch too.
+    e.dispatch.extend([0, 1]);
+    let dispatchers: String = e.dispatch.iter().map(|&n| dispatcher(n)).collect();
+    e.out.push_str(&dispatchers);
     let mut m = String::from("(module\n");
     for decision in &p.numeric_log {
         let _ = writeln!(m, ";; numeric: {}", decision.replace('\n', " "));
@@ -145,9 +168,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         let _ = writeln!(
             m,
             "(type $fn{n} (func (param (ref null $obj) (ref null $env){params}) (result eqref)))\n\
-             (type $clo{n} (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64) \
+             (type $clo{n} (sub final $clo (struct (field (mut i32)) (field i32) (field i64) (field f64) \
              (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
-             (field (ref null $call)) (field (ref $fn{n})))))"
+             (field (ref null $call)) (field (mut i64)) (field (ref $fn{n})))))"
         );
     }
     let wasi = p.target == Target::Wasi;
@@ -158,6 +181,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         }
     } else {
         m.push_str(runtime::HOST);
+        if uses_workers {
+            m.push_str(workers::IMPORTS);
+        }
     }
     if p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
         m.push_str("(import \"ilang:host/v1\" \"cancel\" (func $host_cancel (param i32)))\n");
@@ -231,26 +257,18 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
     for &n in &e.lazy_calls {
-        m.push_str(&control::lazy_call(n));
+        m.push_str(&control::lazy_call(n, &ShapeId::from(n).to_string()));
     }
     m.push_str(&host::effects());
     m.push_str(ENTRY);
-    m.push_str(&e.data);
-    for (id, label) in p.labels.iter().enumerate() {
-        if label.len() > FIXED_MAX {
-            let _ = writeln!(m, "(global $label_{id} (mut eqref) (ref.null eq))");
-        } else {
-            let bytes = label
-                .bytes()
-                .map(|b| format!(" (i32.const {b})"))
-                .collect::<String>();
-            let _ = writeln!(
-                m,
-                "(global $label_{id} (ref $obj) (struct.new $obj (i32.const 3) (i32.const 0) (i64.const 0) (f64.const 0) (array.new_fixed $bytes {}{bytes}) (ref.null $values) (ref.null $limbs) (ref.null $call)))",
-                label.len()
-            );
+    if uses_workers {
+        if wasi {
+            m.push_str(workers::WASI_STUBS);
         }
+        m.push_str(workers::WAT);
+        m.push_str(&workers::closures(&e.arities, p.funcs.len(), &async_funcs));
     }
+    m.push_str(&e.data);
     for (ctor, ty) in &e.ctors {
         let _ = writeln!(
             m,
@@ -290,6 +308,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
                             " {}",
                             closure(
                                 p.funcs[g.0 as usize].arity(),
+                                p.func_shape(*g),
                                 *g,
                                 "(ref.null $values)",
                                 false
@@ -306,10 +325,28 @@ fn wat_inner(p: &Program, metered: bool) -> String {
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, f, &captures, false)
+            closure(n, p.func_shape(f), f, &captures, false)
         );
     }
     m.push_str(&e.out);
+    // The runtime calls these library functions written in i. An
+    // intermediate program made without lowering has no library.
+    if p.runtime_calls.is_empty() {
+        m.push_str(runtime::LIBRARY_ABSENT);
+    }
+    for (wat, f) in &p.runtime_calls {
+        let arity = p.funcs[f.0 as usize].arity();
+        let params: String = (0..arity)
+            .map(|i| format!(" (param $p{i} eqref)"))
+            .collect();
+        let args: String = (0..arity).map(|i| format!(" (local.get $p{i})")).collect();
+        let _ = writeln!(
+            m,
+            "(func {wat}{params} (result eqref) \
+             (call $f{} (global.get $c{}) (ref.null $env){args}))",
+            f.0, f.0
+        );
+    }
     let mut declared: Vec<String> = (0..p.funcs.len()).map(|i| format!("$f{i}")).collect();
     declared.extend((0..p.points.len()).map(|i| format!("$r{i}")));
     declared.extend(DECLARED.iter().map(|d| d.to_string()));
@@ -318,12 +355,46 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m
 }
 
-fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
+/// A closure of the function `f`: field 2 is the id of its shape
+/// (syntax-3.md §6.4), which is its arity when it has no labels.
+fn closure(arity: u32, shape: ShapeId, f: FuncId, captures: &str, patched: bool) -> String {
     let flags = u32::from(patched);
     format!(
-        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const 0) \
-         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
+        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {shape}) (f64.const {}) \
+         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $f{}))",
+        f.0 + 3,
         f.0
+    )
+}
+
+/// `$dispatch{n}`: calls the function value `f` with argument data of the
+/// shape `shape` and `n` keys (syntax-3.md §6.4). A `$clo{n}` is called;
+/// a `$multi` is scanned for the group of the shape, whose closure is
+/// called. Every call is a `return_call_ref`, so the dispatcher leaves no
+/// frame: a tail call through it stays a tail call, and a capture never
+/// sees it. A value of another shape stops, as a closure of another arity
+/// always did.
+fn dispatcher(n: u32) -> String {
+    let params: String = (0..n).map(|i| format!(" (param $a{i} eqref)")).collect();
+    let args: String = (0..n).map(|i| format!(" (local.get $a{i})")).collect();
+    format!(
+        "(func $dispatch{n} (param $f eqref) (param $shape i64) (param $env (ref null $env)){params} (result eqref)\n\
+         (local $c (ref null $clo{n})) (local $m (ref $multi)) (local $shapes (ref $shapes)) (local $i i32)\n\
+         (drop (block $multi (result eqref)\n\
+           (local.set $c (br_on_cast_fail $multi eqref (ref $clo{n}) (local.get $f)))\n\
+           (return_call_ref $fn{n} (local.get $c) (local.get $env){args} (struct.get $clo{n} 9 (local.get $c)))))\n\
+         (local.set $m (ref.cast (ref $multi) (local.get $f)))\n\
+         (local.set $shapes (struct.get $multi 9 (local.get $m)))\n\
+         (loop $scan\n\
+           (if (i32.ge_u (local.get $i) (array.len (local.get $shapes))) (then unreachable))\n\
+           (if (i64.eq (array.get $shapes (local.get $shapes) (local.get $i)) (local.get $shape))\n\
+             (then\n\
+               (local.set $c (ref.cast (ref $clo{n}) (array.get $values\n\
+                 (ref.as_non_null (struct.get $multi 5 (local.get $m))) (local.get $i))))\n\
+               (return_call_ref $fn{n} (local.get $c) (local.get $env){args} (struct.get $clo{n} 9 (local.get $c)))))\n\
+           (local.set $i (i32.add (local.get $i) (i32.const 1)))\n\
+           (br $scan))\n\
+         (unreachable))\n"
     )
 }
 
@@ -333,6 +404,25 @@ struct Emitter<'p> {
     numeric_enabled: bool,
     numeric_plan: numeric::Plan,
     worker: Option<crate::numeric::Worker>,
+    /// The function whose self tail calls branch back to its loop, and the
+    /// non-parameter locals that the back edge resets to their entry values.
+    self_loop: Option<(FuncId, Vec<(String, String)>)>,
+    /// Site stores not written yet, by frame: index 0 is the slot `sp - 1`.
+    /// A store waits until something could read the shadow stack; a failed
+    /// Float check writes them in its own cold branch (§11.7 traces stay the
+    /// same because every reader sees every store).
+    pending: Vec<Option<Site>>,
+    /// Set while a `Let` is emitted whose site store is decided afterwards.
+    deferring: bool,
+    /// Whether waiting stores may cross block labels (see `stmts`), the
+    /// waiting stores on the branches to each open label, the labels that
+    /// are written joins, the labels found to need it in this pass, and
+    /// whether the code here cannot be reached.
+    carry: bool,
+    joins: HashMap<u32, Option<Vec<Option<Site>>>>,
+    split: std::collections::HashSet<u32>,
+    mismatch: std::collections::HashSet<u32>,
+    dead: bool,
     arities: BTreeSet<u32>,
     /// The constructors without fields that are used, as (constructor id,
     /// type id).
@@ -345,6 +435,13 @@ struct Emitter<'p> {
     /// The arities of the `Callee::Lazy` calls, each with its
     /// `$lazy_call{n}`.
     lazy_calls: BTreeSet<u32>,
+    /// The arities of the dispatchers that are used (`dispatcher`).
+    dispatch: BTreeSet<u32>,
+    /// The arities of the closure calls of the function being written: it
+    /// declares a local `$cc{n}` for each.
+    call_locals: BTreeSet<u32>,
+    /// A counter for the labels of the blocks of closure calls.
+    blocks: u32,
 }
 
 impl<'p> Emitter<'p> {
@@ -364,9 +461,11 @@ impl<'p> Emitter<'p> {
                 let fields: String = (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
                 let _ = writeln!(
                     self.out,
-                    "(call $shadow_enter_call)\n\
+                    "{}\
                      (local.set $l{arity} (call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields})))\n\
-                     (call $shadow_leave) (local.get $l{arity}))"
+                     {} (local.get $l{arity}))",
+                    self.enter_call(),
+                    self.leave()
                 );
             }
             FuncKind::Runtime { op, arity } => {
@@ -379,8 +478,10 @@ impl<'p> Emitter<'p> {
                 let body = self.op(*op, &args, "(local.get $env)");
                 let _ = writeln!(
                     self.out,
-                    "(call $shadow_enter_call)\n(local.set $l{arity} {body})\n\
-                     (call $shadow_leave) (local.get $l{arity}))"
+                    "{}(local.set $l{arity} {body})\n\
+                     {} (local.get $l{arity}))",
+                    self.enter_call(),
+                    self.leave()
                 );
             }
         }
@@ -427,10 +528,6 @@ impl<'p> Emitter<'p> {
                 }
             }
         }
-        if self.p.labels.len() > FIXED_MAX / 2 {
-            self.out
-                .push_str(" (local $record_pairs (ref null $values))\n");
-        }
         for (i, t) in locals.iter().enumerate().skip(arity as usize) {
             let _ = write!(self.out, " (local $l{i} {})", local_type(*t));
         }
@@ -438,7 +535,10 @@ impl<'p> Emitter<'p> {
     }
 
     fn code(&mut self, name: &str, f: &Func, id: Option<FuncId>) {
+        let begin = self.out.len();
+        self.call_locals.clear();
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
+        let start = self.out.len();
         self.worker = id.and_then(|id| self.p.workers.get(&id)).cloned();
         self.header(name, f.arity, &f.locals);
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
@@ -479,6 +579,9 @@ impl<'p> Emitter<'p> {
             // `$slot` keeps the slot of the frame for the frame records of
             // its points.
             self.out.push_str(" (local $slot i32)\n");
+        }
+        let mark = self.out.len();
+        if f.frame {
             if self.metered {
                 let _ = writeln!(
                     self.out,
@@ -486,7 +589,16 @@ impl<'p> Emitter<'p> {
                     f.budget_frame
                 );
             }
-            self.out.push_str("(call $shadow_enter_call)\n");
+            self.out.push_str(self.enter_call());
+        }
+        // A self tail call of a function with a frame becomes a branch back
+        // to the start of its body: the frame stays, and the back edge does
+        // what leaving with a tail site and entering again would do to it.
+        let looped = id.filter(|&id| f.frame && self.fast_frames() && self_tail_loop(id, &f.body));
+        if let Some(id) = looped {
+            let resets = local_resets(&self.out[start..]);
+            self.self_loop = Some((id, resets));
+            self.out.push_str("(loop $self_loop\n");
         }
         let mut parameters = self.numeric_plan.parameters(f.arity);
         if let Some(worker) = &self.worker {
@@ -506,26 +618,109 @@ impl<'p> Emitter<'p> {
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
         self.out.push_str(&body);
+        if self.self_loop.take().is_some() {
+            self.out.push_str(")\n");
+        }
         self.out.push_str("(unreachable))\n");
+        self.declare_call_locals(begin, mark);
         self.numeric_enabled = false;
         self.worker = None;
         self.numeric_plan = numeric::Plan::default();
     }
 
+    /// Declares the locals `$cc{n}` of the closure calls of the function
+    /// written from `begin` on, at `mark`, after its other declarations.
+    fn declare_call_locals(&mut self, begin: usize, mark: usize) {
+        if self.call_locals.is_empty() {
+            return;
+        }
+        let mut text = self.out.split_off(begin);
+        let locals: String = self
+            .call_locals
+            .iter()
+            .map(|n| format!(" (local $cc{n} (ref null $clo{n}))"))
+            .collect();
+        text.insert_str(mark - begin, &format!("{locals}\n"));
+        self.out.push_str(&text);
+        self.call_locals.clear();
+    }
+
+    /// Statements with deferred site stores. A block label is a join: the
+    /// stores still waiting on every path into it must be the same, or they
+    /// are written before each branch to it and at its end. Which labels need
+    /// that is found by emitting again until no new one turns up (the set only
+    /// grows). Bodies with points keep every label a written join.
     fn stmts(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
+        let saved = (
+            std::mem::take(&mut self.pending),
+            std::mem::take(&mut self.joins),
+            std::mem::take(&mut self.split),
+            std::mem::take(&mut self.mismatch),
+            std::mem::replace(&mut self.carry, false),
+        );
+        self.carry = self.defers(frame) && !has_points(stmts);
+        loop {
+            self.pending.clear();
+            self.joins.clear();
+            self.mismatch.clear();
+            self.dead = false;
+            let mut text = String::new();
+            self.stmts_once(&mut text, stmts, frame);
+            if self.mismatch.is_empty() {
+                out.push_str(&text);
+                break;
+            }
+            let mismatch = std::mem::take(&mut self.mismatch);
+            self.split.extend(mismatch);
+        }
+        (
+            self.pending,
+            self.joins,
+            self.split,
+            self.mismatch,
+            self.carry,
+        ) = saved;
+    }
+
+    fn stmts_once(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
         enum Action<'a> {
             Stmt(&'a Stmt),
             Text(&'static str),
+            End(u32),
         }
         let mut work: Vec<_> = stmts.iter().rev().map(Action::Stmt).collect();
         while let Some(action) = work.pop() {
             match action {
-                Action::Text(text) => out.push_str(text),
+                Action::Text(text) => {
+                    out.push_str(&self.flush());
+                    out.push_str(text);
+                    self.dead = false;
+                }
+                Action::End(label) => {
+                    let fallthrough = (!self.dead).then(|| normal(&self.pending));
+                    let joined = self.joins.remove(&label).flatten();
+                    let state = match (fallthrough, joined) {
+                        _ if !self.carry || self.split.contains(&label) => None,
+                        (Some(a), Some(b)) if a != b => {
+                            self.mismatch.insert(label);
+                            None
+                        }
+                        (Some(a), _) | (None, Some(a)) => Some(a),
+                        (None, None) => None,
+                    };
+                    match state {
+                        Some(state) => self.pending = state,
+                        None => out.push_str(&self.flush()),
+                    }
+                    self.dead = false;
+                    out.push_str(")\n");
+                }
                 Action::Stmt(Stmt::If {
                     cond,
                     then,
                     otherwise,
                 }) => {
+                    out.push_str(&self.flush());
                     if self.metered {
                         out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
                     }
@@ -537,16 +732,30 @@ impl<'p> Emitter<'p> {
                     work.extend(then.iter().rev().map(Action::Stmt));
                 }
                 Action::Stmt(Stmt::Block { label, body }) => {
+                    if !self.carry || self.split.contains(label) {
+                        out.push_str(&self.flush());
+                    }
                     if self.metered {
                         out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
                     }
                     let _ = writeln!(out, "(block $b{label}");
-                    work.push(Action::Text(")\n"));
+                    self.joins.insert(*label, None);
+                    work.push(Action::End(*label));
                     work.extend(body.iter().rev().map(Action::Stmt));
                 }
-                Action::Stmt(stmt) => self.stmt(out, stmt, frame),
+                Action::Stmt(stmt) => {
+                    self.deferred_stmt(out, stmt, frame);
+                    self.dead = matches!(
+                        stmt,
+                        Stmt::Break(_)
+                            | Stmt::Return(_)
+                            | Stmt::TailCall { .. }
+                            | Stmt::Unreachable
+                    );
+                }
             }
         }
+        out.push_str(&self.flush());
     }
 
     fn stmt(&mut self, out: &mut String, s: &Stmt, frame: bool) {
@@ -557,23 +766,18 @@ impl<'p> Emitter<'p> {
             Stmt::Logical(action) => match action {
                 Logical::Enter(site) => {
                     if let Some(site) = site {
-                        let _ =
-                            writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                        out.push_str(&self.shadow_site(*site, frame));
                     }
-                    out.push_str("(call $shadow_enter_call)\n");
+                    out.push_str(self.enter_call());
                 }
-                Logical::Leave => out.push_str("(call $shadow_leave)\n"),
-                Logical::Tail(site) => {
-                    let _ = writeln!(
-                        out,
-                        "(call $shadow_leave_tail (i32.const {}))",
-                        site.map_or(-1, site_code)
-                    );
-                }
+                Logical::Leave => out.push_str(self.leave()),
+                Logical::Tail(site) => out.push_str(&self.leave_tail(*site)),
             },
             Stmt::Let { dst, value, site } => {
-                if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                if let Some(site) = site
+                    && !self.deferring
+                {
+                    out.push_str(&self.shadow_site(*site, frame));
                 }
                 if let Some(assignment) = self.scalar_assignment(*dst, value) {
                     out.push_str(&assignment);
@@ -589,8 +793,10 @@ impl<'p> Emitter<'p> {
                 }
             }
             Stmt::LetNum { dst, value, site } => {
-                if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                if let Some(site) = site
+                    && !self.deferring
+                {
+                    out.push_str(&self.shadow_site(*site, frame));
                 }
                 let v = self.num_value(value);
                 let _ = writeln!(out, "(local.set $l{dst} {v})");
@@ -626,7 +832,7 @@ impl<'p> Emitter<'p> {
                     self.atom(a)
                 };
                 if frame {
-                    out.push_str("(call $shadow_leave)\n");
+                    out.push_str(self.leave());
                 }
                 let _ = writeln!(out, "(return {a})");
             }
@@ -636,9 +842,16 @@ impl<'p> Emitter<'p> {
                 env,
                 site,
             } => {
+                if frame
+                    && let Some((id, _)) = &self.self_loop
+                    && matches!(callee, Callee::Direct(f) | Callee::Known { func: f, .. } if f == id)
+                {
+                    let back = self.self_tail(callee, args, &env_text(*env), *site);
+                    let _ = writeln!(out, "{back}");
+                    return;
+                }
                 if frame {
-                    let s = site.map_or(-1, site_code);
-                    let _ = writeln!(out, "(call $shadow_leave_tail (i32.const {s}))");
+                    out.push_str(&self.leave_tail(*site));
                 }
                 let call = self.call(callee, args, true, &env_text(*env));
                 let _ = writeln!(out, "{call}");
@@ -685,6 +898,11 @@ impl<'p> Emitter<'p> {
         }
     }
 
+    /// A call. A call of a function value has a fast path, when the value is
+    /// a closure of the arity of the call: one type test, which keeps the
+    /// closure in the local `$cc{n}`, and `call_ref`. Any other value goes to
+    /// the dispatcher with the shape of the call (syntax-3.md §6.4). At a
+    /// tail site both paths are tail calls.
     fn call(&mut self, callee: &Callee, args: &[Atom], tail: bool, env: &str) -> String {
         let n = args.len() as u32;
         self.arities.insert(n);
@@ -724,14 +942,32 @@ impl<'p> Emitter<'p> {
             Callee::Lazy { service, field } => {
                 self.arities.insert(n + 1);
                 self.lazy_calls.insert(n);
+                self.dispatch.insert(n);
                 let s = self.atom(service);
                 format!("({prefix}call $lazy_call{n} {s} (i32.const {field}) {env}{raw_args})")
             }
-            Callee::Value(a) => {
+            Callee::Value(a) | Callee::Shaped(a, _) => {
+                let shape = callee.shape(n);
                 let a = self.atom(a);
-                format!(
-                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
-                )
+                self.dispatch.insert(n);
+                self.call_locals.insert(n);
+                let k = self.blocks;
+                self.blocks += 1;
+                let fast = format!(
+                    "(local.set $cc{n} (br_on_cast_fail $cs{k} eqref (ref $clo{n}) {a}))\n\
+                     ({prefix}call_ref $fn{n} (local.get $cc{n}) {env}{raw_args} (struct.get $clo{n} 9 (local.get $cc{n})))"
+                );
+                let slow = format!("(i64.const {shape}) {env}{raw_args}");
+                if tail {
+                    format!(
+                        "(return_call $dispatch{n} (block $cs{k} (result eqref)\n{fast})\n{slow})"
+                    )
+                } else {
+                    format!(
+                        "(block $cd{k} (result eqref) (call $dispatch{n} (block $cs{k} (result eqref)\n\
+                         (br $cd{k} {fast}))\n{slow}))"
+                    )
+                }
             }
         };
         if guards.is_empty() {
@@ -753,6 +989,252 @@ impl<'p> Emitter<'p> {
         let result = if tail { "" } else { " (result eqref)" };
         format!(
             "(if{result} {guard} (then {call}) (else ({prefix}call $f{} {closure} {env}{canonical})))",
+            worker.origin.0
+        )
+    }
+
+    /// A call of a function value where no local can be declared (an entry
+    /// point): the dispatcher alone.
+    fn call_dispatched(&mut self, callee: &Callee, args: &[String], env: &str) -> String {
+        let n = args.len() as u32;
+        self.arities.insert(n);
+        self.dispatch.insert(n);
+        let a = self.atom(callee.value().expect("a function value"));
+        format!(
+            "(call $dispatch{n} {a} (i64.const {}) {env} {})",
+            callee.shape(n),
+            args.join(" ")
+        )
+    }
+
+    /// Numeric (O2/O3) code writes the shadow-stack actions out and turns self
+    /// tail calls into loops; reference code, the O0 oracle, and metered code
+    /// keep the runtime calls.
+    fn fast_frames(&self) -> bool {
+        self.p.numeric != crate::Numeric::Reference
+            && !self.metered
+            && (self.numeric_enabled
+                || self.worker.is_some()
+                || !self.numeric_plan.locals.is_empty())
+    }
+
+    fn enter_call(&self) -> &'static str {
+        if self.fast_frames() {
+            SHADOW_ENTER_CALL
+        } else {
+            "(call $shadow_enter_call)\n"
+        }
+    }
+
+    fn leave(&self) -> &'static str {
+        if self.fast_frames() {
+            SHADOW_LEAVE
+        } else {
+            "(call $shadow_leave)\n"
+        }
+    }
+
+    fn shadow_site(&self, site: Site, frame: bool) -> String {
+        shadow_site(site, frame && self.fast_frames())
+    }
+
+    fn leave_tail(&self, site: Option<Site>) -> String {
+        if self.fast_frames() {
+            leave_tail(site)
+        } else {
+            format!(
+                "(call $shadow_leave_tail (i32.const {}))\n",
+                site.map_or(-1, site_code)
+            )
+        }
+    }
+
+    fn defers(&self, frame: bool) -> bool {
+        frame && self.fast_frames()
+    }
+
+    /// The pending site stores, written out (they stay pending).
+    fn pending_text(&self) -> String {
+        let mut text = String::new();
+        for (k, site) in self.pending.iter().enumerate() {
+            if let Some(site) = site {
+                let _ = writeln!(
+                    text,
+                    "(array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const {})) (i32.const {}))",
+                    k + 1,
+                    site_code(*site)
+                );
+            }
+        }
+        text
+    }
+
+    fn flush(&mut self) -> String {
+        let text = self.pending_text();
+        self.pending.clear();
+        text
+    }
+
+    fn defer_site(&mut self, site: Site) {
+        if self.pending.is_empty() {
+            self.pending.push(None);
+        }
+        self.pending[0] = Some(site);
+    }
+
+    /// One statement with the site stores that wait. Code that can only stop
+    /// through a Float check leaves its own site store waiting, and the check's
+    /// failure branch writes every waiting store before `$stop_float`. Logical
+    /// frames move the waiting stores with them; anything else that could read
+    /// the shadow stack (a call, a throw, a point, control flow) writes them
+    /// first, in the order the eager code would have.
+    fn deferred_stmt(&mut self, out: &mut String, s: &Stmt, frame: bool) {
+        if !self.defers(frame) {
+            return self.stmt(out, s, frame);
+        }
+        match s {
+            Stmt::Logical(Logical::Enter(site)) => {
+                if let Some(site) = site {
+                    self.defer_site(*site);
+                }
+                out.push_str(self.enter_call());
+                if !self.pending.is_empty() {
+                    self.pending.insert(0, None);
+                }
+            }
+            Stmt::Logical(Logical::Leave) => {
+                if !self.pending.is_empty() {
+                    self.pending.remove(0);
+                }
+                out.push_str(self.leave());
+            }
+            Stmt::Return(_) | Stmt::TailCall { site: Some(_), .. } => {
+                // The frame's own slot is left, or overwritten by the back
+                // edge; a tail call without a site reads it.
+                if let Some(own) = self.pending.first_mut() {
+                    *own = None;
+                }
+                out.push_str(&self.flush());
+                self.stmt(out, s, frame);
+            }
+            Stmt::Let { site, .. } | Stmt::LetNum { site, .. } => {
+                self.deferring = true;
+                let mut text = String::new();
+                self.stmt(&mut text, s, frame);
+                self.deferring = false;
+                let quiet = text.matches("call").count()
+                    == text.matches("(call $stop_float)").count()
+                    && !text.contains("throw")
+                    && !text.contains("return");
+                if quiet {
+                    if let Some(site) = site {
+                        self.defer_site(*site);
+                    }
+                    let cold = format!("{}(call $stop_float)", self.pending_text());
+                    out.push_str(&text.replace("(call $stop_float)", &cold));
+                } else {
+                    out.push_str(&self.flush());
+                    if let Some(site) = site {
+                        out.push_str(&self.shadow_site(*site, frame));
+                    }
+                    out.push_str(&text);
+                }
+            }
+            Stmt::Break(label) if self.carry && !self.split.contains(label) => {
+                let state = normal(&self.pending);
+                match self.joins.get_mut(label) {
+                    Some(slot @ None) => *slot = Some(state),
+                    Some(Some(joined)) if *joined == state => {}
+                    _ => {
+                        self.mismatch.insert(*label);
+                    }
+                }
+                self.stmt(out, s, frame);
+            }
+            _ => {
+                out.push_str(&self.flush());
+                self.stmt(out, s, frame);
+            }
+        }
+    }
+
+    /// A self tail call as a back edge of `$self_loop`. Leaving with the tail
+    /// site and entering again leaves `sp` as it was, the tail site in the
+    /// frame's slot and `$tail` at -1; the back edge does exactly that. The
+    /// arguments are all worked out before any parameter is set, and the other
+    /// locals get their entry values again.
+    fn self_tail(
+        &mut self,
+        callee: &Callee,
+        args: &[Atom],
+        env: &str,
+        site: Option<Site>,
+    ) -> String {
+        let worker = self.worker.clone();
+        let closure = match callee {
+            Callee::Known { closure, .. } => {
+                format!("(ref.cast (ref null $obj) {})", self.atom(closure))
+            }
+            _ => "(ref.null $obj)".into(),
+        };
+        let mut guards = Vec::new();
+        let mut values = format!("{closure} {env}");
+        let mut sets = Vec::new();
+        for (i, a) in args.iter().enumerate() {
+            let (raw, param) = if worker.as_ref().is_some_and(|w| w.floats[i]) {
+                (self.float_atom(a), format!("$numeric_f{i}"))
+            } else if worker.as_ref().is_some_and(|w| w.ints[i]) {
+                let (guard, raw) = self.small_int(a);
+                guards.push(guard);
+                (raw, format!("$numeric_i{i}"))
+            } else {
+                (self.atom(a), format!("$l{i}"))
+            };
+            let _ = write!(values, " {raw}");
+            sets.push(param);
+        }
+        let mut back = values;
+        for param in sets.iter().rev() {
+            let _ = write!(back, " (local.set {param})");
+        }
+        back.push_str(" (local.set $env) (local.set $clo)\n");
+        let (_, resets) = self.self_loop.as_ref().expect("in a self loop");
+        for (local, default) in resets {
+            let _ = writeln!(back, "(local.set {local} {default})");
+        }
+        match site {
+            Some(site) => {
+                let _ = writeln!(back, "{SHADOW_SLOT_SET}(i32.const {}))", site_code(site));
+            }
+            None => back.push_str(
+                "(if (i32.gt_s (array.get $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1))) (i32.const -2))\n\
+                 (then {SHADOW_SLOT_SET}(i32.const -1))))\n"
+                    .replace("{SHADOW_SLOT_SET}", SHADOW_SLOT_SET)
+                    .as_str(),
+            ),
+        }
+        back.push_str("(global.set $tail (i32.const -1))\n(br $self_loop)");
+        if guards.is_empty() {
+            return back;
+        }
+        let worker = worker.expect("integer guards have a worker");
+        let guard = guards
+            .into_iter()
+            .reduce(|a, b| format!("(i32.and {a} {b})"))
+            .unwrap();
+        let canonical = args
+            .iter()
+            .map(|a| format!(" {}", self.atom(a)))
+            .collect::<String>();
+        let closure = match callee {
+            Callee::Known { closure, .. } => {
+                format!("(ref.cast (ref null $obj) {})", self.atom(closure))
+            }
+            _ => "(ref.null $obj)".into(),
+        };
+        format!(
+            "(if {guard} (then {back}) (else {}(return_call $f{} {closure} {env}{canonical})))",
+            self.leave_tail(site),
             worker.origin.0
         )
     }
@@ -796,7 +1278,6 @@ impl<'p> Emitter<'p> {
                 None => format!("(local.get $l{l})"),
             },
             Atom::Global(g) => format!("(global.get $g{})", g.0),
-            Atom::Label(label) => self.label(*label),
             Atom::Func(f) => format!("(global.get $c{})", f.0),
             Atom::Nil => "(ref.null eq)".into(),
             Atom::Bool(true) => "(global.get $value_true)".into(),
@@ -820,46 +1301,6 @@ impl<'p> Emitter<'p> {
 
     fn atoms(&mut self, atoms: &[Atom]) -> String {
         atoms.iter().map(|a| format!(" {}", self.atom(a))).collect()
-    }
-
-    fn label(&self, label: LabelConst) -> String {
-        if self.p.labels[label.0 as usize].len() > FIXED_MAX {
-            format!("(ref.as_non_null (global.get $label_{}))", label.0)
-        } else {
-            format!("(global.get $label_{})", label.0)
-        }
-    }
-
-    fn record_pairs(&mut self, fields: &[(LabelConst, Atom)]) -> String {
-        let mut fields: Vec<_> = fields.iter().collect();
-        fields.sort_unstable_by(|a, b| {
-            self.p.labels[a.0.0 as usize]
-                .as_bytes()
-                .cmp(self.p.labels[b.0.0 as usize].as_bytes())
-        });
-        let len = 2 * fields.len();
-        if len <= FIXED_MAX {
-            let pairs = fields
-                .into_iter()
-                .map(|(label, atom)| format!(" {} {}", self.label(*label), self.atom(atom)))
-                .collect::<String>();
-            return format!("(array.new_fixed $values {len}{pairs})");
-        }
-        let mut body = format!(
-            "(block (result (ref $values)) (local.set $record_pairs (array.new_default $values (i32.const {len})))\n"
-        );
-        for (index, (label, atom)) in fields.into_iter().enumerate() {
-            let label = self.label(*label);
-            let value = self.atom(atom);
-            let _ = writeln!(
-                body,
-                "(array.set $values (ref.as_non_null (local.get $record_pairs)) (i32.const {}) {label})\n(array.set $values (ref.as_non_null (local.get $record_pairs)) (i32.const {}) {value})",
-                2 * index,
-                2 * index + 1
-            );
-        }
-        body.push_str("(ref.as_non_null (local.get $record_pairs)))");
-        body
     }
 
     /// An operation; those that call i code get the environment `env`.
@@ -952,6 +1393,24 @@ impl<'p> Emitter<'p> {
                         &numeric::float_op(*op, &args).expect("float operation"),
                     );
                 }
+                if let (
+                    Op::Runtime {
+                        name: "core_truncate",
+                        ..
+                    },
+                    [Atom::Local(l)],
+                ) = (op, args.as_slice())
+                    && self.numeric_plan.locals.get(l) == Some(&numeric::Repr::Float)
+                {
+                    // A scalar Float below 2^30 in magnitude truncates to an
+                    // i31, the canonical small Int; only others need the box.
+                    let boxed = self.atom(&args[0]);
+                    return format!(
+                        "(if (result eqref) (f64.lt (f64.abs (local.get $numeric_f{l})) (f64.const 1073741824)) \
+                         (then (ref.i31 (i32.trunc_f64_s (local.get $numeric_f{l})))) \
+                         (else (call $core_truncate {boxed})))"
+                    );
+                }
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, "(local.get $env)")
             }
@@ -1009,6 +1468,22 @@ impl<'p> Emitter<'p> {
                     read
                 }
             }
+            Value::Multi(groups) => {
+                let closures: String = groups
+                    .iter()
+                    .map(|(_, a)| format!(" {}", self.atom(a)))
+                    .collect();
+                let shapes: String = groups
+                    .iter()
+                    .map(|(s, _)| format!(" (i64.const {s})"))
+                    .collect();
+                format!(
+                    "(struct.new $multi (i32.const 7) (i32.const 0) (i64.const -1) (f64.const 0) \
+                     (ref.null $bytes) (array.new_fixed $values {k}{closures}) (ref.null $limbs) (ref.null $call) \
+                     (i64.const 0) (array.new_fixed $shapes {k}{shapes}))",
+                    k = groups.len()
+                )
+            }
             Value::Closure {
                 func,
                 captures,
@@ -1026,23 +1501,17 @@ impl<'p> Emitter<'p> {
                         if *patched { " (ref.null eq)" } else { "" }
                     )
                 };
-                closure(n, *func, &caps, *patched)
+                closure(n, self.p.func_shape(*func), *func, &caps, *patched)
             }
             Value::Tuple(parts) => format!(
                 "(call $tuple (array.new_fixed $values {}{}))",
                 parts.len(),
                 self.atoms(parts)
             ),
-            Value::RecNew(fields) => format!("(call $record_new {})", self.record_pairs(fields)),
-            Value::RecGet(base, label) => format!(
-                "(call $record_get {} {})",
-                self.atom(base),
-                self.label(*label)
-            ),
-            Value::RecWith(base, fields) => format!(
-                "(call $record_with {} {})",
-                self.atom(base),
-                self.record_pairs(fields)
+            Value::Data(set, parts) => format!(
+                "(call $data (i32.const {set}) (array.new_fixed $values {}{}))",
+                parts.len(),
+                self.atoms(parts)
             ),
             Value::Record { ctor, ty, fields } => format!(
                 "(call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {}{}))",
@@ -1231,7 +1700,10 @@ impl<'p> Emitter<'p> {
                 self.atom(a),
                 *t as i32
             ),
-            Cond::IsRec(a) => format!("(call $is_record {})", self.atom(a)),
+            Cond::Data(a, set, n) => format!(
+                "(call $is_data {} (i32.const {set}) (i32.const {n}))",
+                self.atom(a)
+            ),
             Cond::Bool(a, b) => {
                 format!("(call $is_bool {} (i32.const {}))", self.atom(a), *b as i32)
             }
@@ -1301,6 +1773,52 @@ impl<'p> Emitter<'p> {
         }
     }
 
+    /// Build runtime metadata in bounded pieces. A single array.new_fixed
+    /// keeps every earlier GC reference live across every later allocation;
+    /// large site-note tables then make native compilation need quadratic
+    /// amounts of GC liveness information. Store each value immediately and
+    /// keep the generated initialization functions small as well.
+    fn metadata_array(&mut self, name: &str, values: &[String]) -> String {
+        const CHUNK: usize = 64;
+        // Macro execution accounts for emitted instructions and allocations;
+        // preserve that accounting sequence in metered compiler modules.
+        if self.metered || values.len() <= CHUNK {
+            return format!(
+                "(array.new_fixed $values {} {})",
+                values.len(),
+                values.join(" ")
+            );
+        }
+        for (chunk, items) in values.chunks(CHUNK).enumerate() {
+            let _ = writeln!(
+                self.out,
+                "(func $metadata_{name}_{chunk} (param $items (ref $values))"
+            );
+            for (offset, value) in items.iter().enumerate() {
+                let _ = writeln!(
+                    self.out,
+                    "(array.set $values (local.get $items) (i32.const {}) {value})",
+                    chunk * CHUNK + offset
+                );
+            }
+            self.out.push_str(")\n");
+        }
+        let _ = writeln!(
+            self.out,
+            "(func $metadata_{name} (result (ref $values)) (local $items (ref $values))\n\
+             (local.set $items (array.new_default $values (i32.const {})))",
+            values.len()
+        );
+        for chunk in 0..values.len().div_ceil(CHUNK) {
+            let _ = writeln!(
+                self.out,
+                "(call $metadata_{name}_{chunk} (local.get $items))"
+            );
+        }
+        self.out.push_str("(local.get $items))\n");
+        format!("(call $metadata_{name})")
+    }
+
     /// `ilang_start` (B.1): the site table, the constructor names, and the
     /// top-level values.
     fn start(&mut self) {
@@ -1315,25 +1833,24 @@ impl<'p> Emitter<'p> {
         let _ = writeln!(self.data, "(data $site_data \"{sites}\")");
         let modules: Vec<String> = self.p.site_modules.iter().map(|m| self.string(m)).collect();
         let names: Vec<String> = self.p.constructors.iter().map(|m| self.string(m)).collect();
-        let _ = writeln!(self.out, "(func $ilang_start (export \"ilang_start\")");
-        for (id, label) in self.p.labels.iter().enumerate() {
-            if label.len() > FIXED_MAX {
-                let value = self.string(label);
-                let _ = writeln!(self.out, "(global.set $label_{id} {value})");
-            }
-        }
-        let _ = writeln!(
-            self.out,
-            "(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {}))\n\
-             (array.new_fixed $values {} {}))\n\
-             (call $constructors_install (array.new_fixed $values {} {}))",
-            self.p.sites.len() * 3,
-            modules.len(),
-            modules.join(" "),
-            names.len(),
-            names.join(" ")
-        );
-        if self.p.site_notes.iter().any(Option::is_some) {
+        let shapes: Vec<String> = self
+            .p
+            .shapes
+            .clone()
+            .iter()
+            .map(|labels| {
+                let labels: Vec<String> = labels.iter().map(|l| self.string(l)).collect();
+                format!(
+                    "(array.new_fixed $values {} {})",
+                    labels.len(),
+                    labels.join(" ")
+                )
+            })
+            .collect();
+        let shapes = self.metadata_array("shapes", &shapes);
+        let modules = self.metadata_array("modules", &modules);
+        let names = self.metadata_array("constructors", &names);
+        let notes = if self.p.site_notes.iter().any(Option::is_some) {
             assert_eq!(self.p.site_notes.len(), self.p.sites.len());
             let notes: Vec<String> = self
                 .p
@@ -1341,12 +1858,21 @@ impl<'p> Emitter<'p> {
                 .iter()
                 .map(|note| self.string(note.as_deref().unwrap_or("")))
                 .collect();
-            let _ = writeln!(
-                self.out,
-                "(call $site_notes_install (array.new_fixed $values {} {}))",
-                notes.len(),
-                notes.join(" ")
-            );
+            Some(self.metadata_array("notes", &notes))
+        } else {
+            None
+        };
+        let _ = writeln!(self.out, "(func $ilang_start (export \"ilang_start\")");
+        let _ = writeln!(self.out, "(call $shapes_install {shapes})");
+        let _ = writeln!(
+            self.out,
+            "(call $sites_install (array.new_data $sites $site_data (i32.const 0) (i32.const {}))\n\
+             {modules})\n\
+             (call $constructors_install {names})",
+            self.p.sites.len() * 3,
+        );
+        if let Some(notes) = notes {
+            let _ = writeln!(self.out, "(call $site_notes_install {notes})");
         }
         // The root environment: the `Assert` of the runtime (§9.6), and
         // no other service yet.
@@ -1355,8 +1881,8 @@ impl<'p> Emitter<'p> {
             "(global.set $root_env (array.new $env (ref.null eq) (i32.const {})))\n\
              (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {ASSERT_SERVICE})\n\
              (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1\n\
-             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0) (ref.null $bytes)\n\
-             (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
+             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 2) (ref.null $bytes)\n\
+             (ref.null $values) (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $entry_assert_fail)))))",
             self.p.services.max(1)
         );
         if self.p.start.is_some() {
@@ -1381,7 +1907,12 @@ impl<'p> Emitter<'p> {
             }
             match &e.abi {
                 None => {
-                    let call = self.call(&e.callee, &[], false, "(global.get $root_env)");
+                    let call = match &e.callee {
+                        Callee::Direct(_) => {
+                            self.call(&e.callee, &[], false, "(global.get $root_env)")
+                        }
+                        _ => self.call_dispatched(&e.callee, &[], "(global.get $root_env)"),
+                    };
                     let site = e.site.map_or(-1, |s| s as i64);
                     let id = export_id(&e.name);
                     let _ = writeln!(
@@ -1419,14 +1950,7 @@ impl<'p> Emitter<'p> {
                     converted.join(" ")
                 )
             }
-            Callee::Value(a) => {
-                let a = self.atom(a);
-                format!(
-                    "(call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env} {} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))",
-                    converted.join(" ")
-                )
-            }
+            Callee::Value(_) | Callee::Shaped(..) => self.call_dispatched(callee, &converted, env),
             Callee::Lazy { .. } => unreachable!("an export calls a function"),
         };
         if abi.errors.is_empty() {
@@ -1613,6 +2137,128 @@ fn local_type(t: LocalType) -> &'static str {
     }
 }
 
+/// `$shadow_enter_call` written out (runtime/stops.rs): push `$tail` and
+/// clear it. The array grows in the cold call.
+const SHADOW_ENTER_CALL: &str = "(if (i32.ge_u (global.get $sp) (array.len (global.get $shadow))) (then (call $shadow_grow)))\n\
+(array.set $frames (global.get $shadow) (global.get $sp) (global.get $tail))\n\
+(global.set $sp (i32.add (global.get $sp) (i32.const 1)))\n\
+(global.set $tail (i32.const -1))\n";
+
+/// `$shadow_leave` written out.
+const SHADOW_LEAVE: &str = "(global.set $sp (i32.sub (global.get $sp) (i32.const 1)))\n";
+
+/// `$shadow_site`: in a function with a frame the slot `sp - 1` is its own,
+/// so the store is written out; elsewhere `sp` may be 0.
+fn shadow_site(site: Site, frame: bool) -> String {
+    if frame {
+        format!("{SHADOW_SLOT_SET}(i32.const {}))\n", site_code(site))
+    } else {
+        format!("(call $shadow_site (i32.const {}))\n", site_code(site))
+    }
+}
+
+/// The start of a store into the slot of the running frame, `sp - 1`; the
+/// caller gives the value and the closing parenthesis.
+const SHADOW_SLOT_SET: &str =
+    "(array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1)) ";
+
+/// `$shadow_leave_tail` written out when the site is known: the frame is
+/// gone and its tail site waits in `$tail` for the callee.
+fn leave_tail(site: Option<Site>) -> String {
+    match site {
+        Some(site) => format!(
+            "(global.set $sp (i32.sub (global.get $sp) (i32.const 1)))\n(global.set $tail (i32.const {}))\n",
+            site_code(site)
+        ),
+        None => "(call $shadow_leave_tail (i32.const -1))\n".into(),
+    }
+}
+
+/// Waiting stores without the frames past the last one that waits.
+fn normal(pending: &[Option<Site>]) -> Vec<Option<Site>> {
+    let n = pending
+        .iter()
+        .rposition(Option::is_some)
+        .map_or(0, |i| i + 1);
+    pending[..n].to_vec()
+}
+
+/// Whether statements have a point or join anywhere.
+fn has_points(body: &[Stmt]) -> bool {
+    let mut work = vec![body];
+    while let Some(stmts) = work.pop() {
+        for stmt in stmts {
+            match stmt {
+                Stmt::Suspendable { .. } | Stmt::Continue(_) | Stmt::Join(_) => return true,
+                Stmt::If {
+                    then, otherwise, ..
+                } => {
+                    work.push(then);
+                    work.push(otherwise);
+                }
+                Stmt::Block { body, .. } => work.push(body),
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// Whether a function's body calls itself in tail position and has no point
+/// or join, so that its self tail calls can branch back to its start.
+fn self_tail_loop(id: FuncId, body: &[Stmt]) -> bool {
+    let mut found = false;
+    let mut work = vec![body];
+    while let Some(stmts) = work.pop() {
+        for stmt in stmts {
+            match stmt {
+                Stmt::TailCall {
+                    callee: Callee::Direct(f) | Callee::Known { func: f, .. },
+                    ..
+                } if *f == id => found = true,
+                Stmt::Suspendable { .. } | Stmt::Continue(_) | Stmt::Join(_) => return false,
+                Stmt::If {
+                    then, otherwise, ..
+                } => {
+                    work.push(then);
+                    work.push(otherwise);
+                }
+                Stmt::Block { body, .. } => work.push(body),
+                _ => {}
+            }
+        }
+    }
+    found
+}
+
+/// The locals declared in a function's text so far (its header), with the
+/// value each has when the function is entered.
+fn local_resets(header: &str) -> Vec<(String, String)> {
+    header
+        .split("(local $")
+        .skip(1)
+        .map(|rest| {
+            let (name, ty) = rest.split_once(' ').expect("a local has a type");
+            let default = if ty.starts_with("f64") {
+                "(f64.const 0)".to_owned()
+            } else if ty.starts_with("i64") {
+                "(i64.const 0)".to_owned()
+            } else if ty.starts_with("i32") {
+                "(i32.const 0)".to_owned()
+            } else if ty.starts_with("eqref") {
+                "(ref.null eq)".to_owned()
+            } else {
+                let heap = ty
+                    .strip_prefix("(ref null ")
+                    .and_then(|t| t.split(')').next())
+                    .expect("locals have defaultable types");
+                format!("(ref.null {heap})")
+            };
+            (format!("${name}"), default)
+        })
+        .collect()
+}
+
 fn env_text(e: Env) -> String {
     match e {
         Env::Param => "(local.get $env)".into(),
@@ -1702,7 +2348,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), lights:0, lazy_calls:BTreeSet::new() };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, dispatch:BTreeSet::new(), call_locals:BTreeSet::new(), blocks:0, self_loop:None, pending:Vec::new(), deferring:false, carry:false, joins:HashMap::new(), split:Default::default(), mismatch:Default::default(), dead:false, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), lights:0, lazy_calls:BTreeSet::new() };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

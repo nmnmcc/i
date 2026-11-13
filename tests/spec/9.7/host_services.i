@@ -14,14 +14,14 @@
 // field is the import `label` of the module `namespace`.
 @host("test:io/v1")
 Io {
-	Io(print: (text: String) -> Nil)
+	Io(print: (String) -> Nil)
 }
 
 @host("test:kv/v1")
 Kv {
 	Kv(
-		get:   (key: String) -> String ^ String
-		check: (n: Int) -> Int ^ Nil | Int | String
+		get:   (String) -> String ^ String
+		check: (Int) -> Int ^ Nil | Int | String
 	)
 }
 

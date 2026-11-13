@@ -12,7 +12,7 @@ map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
 	}
 }
 
-users = [User("bob", 3)]
+users = [User(name: "bob", age: 3)]
 
 name = map(users, (p) {
 	q = p

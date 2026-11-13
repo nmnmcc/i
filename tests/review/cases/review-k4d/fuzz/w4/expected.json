@@ -1,6 +1,6 @@
 {
-  "compiler": "cfe52a677bb4d23ebdd15695f5a1eb01d621fa08",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "5dda78bad9683aa09eb2c66eb0ba1b9237ea2b04",
+  "binary_sha256": "949ad211006493843ce0f2384caa9ff3fe9f0e5d2c37fb624bf1d1db875b57cc",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int\napp/main.h1 : () -> Int ! Dep\napp/main.h2 : () -> Int ! N - T(Never) - Dep | S(N)\napp/main.main : () -> Nil ! N | T(N)\n",
-      "stderr": "src/main.i:19:52: error[E0501]: `S(_)` is not a subtype of `T(T(T(Never)))` (the type at 19:25 needs it)\nsrc/main.i:25:39: error[E0501]: `T(_)` is not a subtype of `Dep` (the type at 25:16 needs it)\nsrc/main.i:28:32: error[E0501]: `Dep` is not a subtype of `Never` (the type at 28:16 needs it)\nsrc/main.i:29:61: error[E0501]: `T(_)` is not a subtype of `S(Never)` (the type at 29:19 needs it)\nsrc/main.i:35:43: error[E0501]: `T(_)` is not a subtype of `S(Dep)` (the type at 35:21 needs it)\nsrc/main.i:36:46: error[E0501]: `S(_)` is not a subtype of `Dep` (the type at 36:18 needs it)\nsrc/main.i:39:5: error[E0515]: `S(_)` and `S(S(Never))` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:43:52: error[E0501]: `Dep` is not a subtype of `Never` (the type at 43:16 needs it)\n8 errors\n"
+      "stderr": "src/main.i:19:58: error[E0501]: `S(_)` is not a subtype of `T(T(T(Never)))` (the type at 19:25 needs it)\nsrc/main.i:25:45: error[E0501]: `T(_)` is not a subtype of `Dep` (the type at 25:16 needs it)\nsrc/main.i:28:38: error[E0501]: `Dep` is not a subtype of `Never` (the type at 28:16 needs it)\nsrc/main.i:29:67: error[E0501]: `T(_)` is not a subtype of `S(Never)` (the type at 29:19 needs it)\nsrc/main.i:35:49: error[E0501]: `T(_)` is not a subtype of `S(Dep)` (the type at 35:21 needs it)\nsrc/main.i:36:52: error[E0501]: `S(_)` is not a subtype of `Dep` (the type at 36:18 needs it)\nsrc/main.i:39:5: error[E0515]: `S(_)` and `S(S(Never))` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:43:58: error[E0501]: `Dep` is not a subtype of `Never` (the type at 43:16 needs it)\n8 errors\n"
     }
   }
 }

@@ -127,6 +127,13 @@ fn scheme_names(s: &Solver, t: &Ty) -> Result<SchemeNames, ()> {
     })
 }
 
+/// [`shown`] and [`scheme`] of the same type, simplified once.
+pub(crate) fn shown_and_scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<(Ty, ShownType), ()> {
+    let t = simplify_with(s, t, None, opts)?;
+    let scheme = Namer::new(s).show(s, &t);
+    Ok((t, scheme))
+}
+
 /// The shown type, as a type, for checks of what it uses.
 pub(crate) fn shown(s: &Solver, t: &Ty, opts: Opts) -> Result<Ty, ()> {
     simplify_with(s, t, None, opts)
@@ -172,6 +179,9 @@ fn simplify_steps(
         mono: opts.mono,
         stack: HashMap::default(),
         memo: HashMap::default(),
+        cyclic: HashMap::default(),
+        pushed: Vec::new(),
+        hits: Vec::new(),
         cycle_generation: 0,
         occurs: false,
         rep,
@@ -202,10 +212,25 @@ fn simplify_steps(
         r.members = std::mem::take(&mut c.members);
     }
     // Each step takes a variable out of the type, so the steps end.
+    let mut budget = StepBudget::default();
     loop {
         let steps = n.steps(&t);
         if steps.is_empty() {
             break;
+        }
+        if !budget.allows(&steps) {
+            // A variable taken out came back: the steps would not end.
+            // Show the coalesced type without the steps instead.
+            return Ok(match record {
+                Some(r) => {
+                    r.steps.clear();
+                    r.start.clone()
+                }
+                None => budget.start.unwrap_or(t),
+            });
+        }
+        if budget.start.is_none() && record.is_none() {
+            budget.start = Some(t.clone());
         }
         t = n.norm(replace_all(&t, &steps));
         if let Some(r) = record.as_deref_mut() {
@@ -213,6 +238,25 @@ fn simplify_steps(
         }
     }
     Ok(t)
+}
+
+/// The bound on the steps of a simplification. Each step takes its variable
+/// out of the type, and no step brings in a variable that the type did not
+/// have, so the steps end after at most one per variable. A variable taken
+/// out twice means that the steps would not end: the simplification stops
+/// there, and the type is shown as it was before the steps.
+#[derive(Default)]
+struct StepBudget {
+    /// The variables taken out so far.
+    taken: HashSet<V>,
+    /// The type before the steps.
+    start: Option<Ty>,
+}
+
+impl StepBudget {
+    fn allows(&mut self, steps: &[(V, Ty)]) -> bool {
+        steps.iter().all(|(v, _)| self.taken.insert(*v))
+    }
 }
 
 /// A variable that is a mark: the first is `MARK`. A variable on one side
@@ -241,20 +285,11 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
     };
     match (a, b) {
         _ if is_top(a) && is_top(b) => true,
-        (Ty::Graph(g), Ty::Graph(h)) => {
-            let strip = &mut |v: V| if v.0 >= MARK { Ty::Top } else { Ty::Var(v) };
-            let a = g.map_vars(strip);
-            let b = h.map_vars(strip);
-            g.pool().import(&a) == g.pool().import(&b)
-        }
         (Ty::Con(h, a, xs), Ty::Con(g, b, ys)) => h == g && a == b && all(xs, ys),
         (Ty::Union(xs), Ty::Union(ys)) | (Ty::Inter(xs), Ty::Inter(ys)) => all(xs, ys),
         (Ty::Fn(f), Ty::Fn(g)) => {
-            f.params.len() == g.params.len()
-                && f.params
-                    .iter()
-                    .zip(&g.params)
-                    .all(|(p, q)| p.0 == q.0 && same_unmarked(&p.1, &q.1))
+            f.labels == g.labels
+                && same_unmarked(&f.param, &g.param)
                 && same_unmarked(&f.ret, &g.ret)
                 && same_unmarked(&f.err, &g.err)
                 && same_unmarked(&f.env, &g.env)
@@ -350,7 +385,7 @@ fn trace(s: &Solver, t: &Ty, opts: Opts) -> Result<Traced, ()> {
 fn rigid(s: &Solver, keep: Option<u32>, v: V) -> bool {
     s.vars
         .get(v.0 as usize)
-        .is_some_and(|x| x.label_key.is_some() || keep.is_some_and(|k| x.level <= k))
+        .is_some_and(|x| keep.is_some_and(|k| x.level <= k))
 }
 
 /// A type as it is in the solver, for messages: variables are `_`.
@@ -442,15 +477,14 @@ fn cycles(s: &Solver, t: &Ty, keep: Option<u32>) -> HashMap<V, V> {
 }
 
 /// The variables of a type, with repeats.
-fn ty_vars(t: &Ty, out: &mut Vec<V>) {
+pub(super) fn ty_vars(t: &Ty, out: &mut Vec<V>) {
     match t {
-        Ty::Graph(g) => out.extend(g.variables()),
         Ty::Var(v) => out.push(*v),
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
             xs.iter().for_each(|x| ty_vars(x, out))
         }
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| ty_vars(&p.1, out));
+            ty_vars(&f.param, out);
             [&f.ret, &f.err, &f.env]
                 .into_iter()
                 .for_each(|x| ty_vars(x, out));
@@ -534,6 +568,14 @@ struct Coalescer<'s> {
     /// Completed acyclic expansions only. A cycle-dependent result belongs
     /// to its active path and cannot be reused by another branch.
     memo: HashMap<(V, bool, bool), Ty>,
+    /// Completed expansions that met a variable being expanded, each with
+    /// what it depends on (see [`Cyclic`]).
+    cyclic: HashMap<(V, bool, bool), Cyclic>,
+    /// Each variable put on `stack`, in order, also by a reused expansion.
+    pushed: Vec<V>,
+    /// Each time a variable on `stack` was met: the variable and the
+    /// number of type constructors above the place where it was met.
+    hits: Vec<(V, u32)>,
     cycle_generation: u64,
 
     occurs: bool,
@@ -543,59 +585,94 @@ struct Coalescer<'s> {
     members: HashMap<V, Vec<V>>,
 }
 
+/// An expansion of a variable that met variables being expanded around it.
+/// Expanding the variable again gives the same type when the same variables
+/// are being expanded: each of `outer`, and none of `inner`. Then it meets
+/// the variables of `outer` again, at the same depths below it.
+struct Cyclic {
+    ty: Ty,
+    /// The variables met that were being expanded around it, each with the
+    /// greatest number of type constructors from it to a place where it
+    /// was met.
+    outer: Vec<(V, u32)>,
+    /// The variables expanded inside it, and the variable itself.
+    inner: Vec<V>,
+}
+
 impl Coalescer<'_> {
+    /// The expansion of `v` done again from `cyclic`, when it is the same:
+    /// it meets the same variables, with the same effects.
+    fn reuse(&mut self, key: (V, bool, bool), depth: u32) -> Option<Ty> {
+        let c = self.cyclic.get(&key)?;
+        if !c.outer.iter().all(|(w, _)| self.stack.contains_key(w))
+            || c.inner.iter().any(|w| self.stack.contains_key(w))
+        {
+            return None;
+        }
+        self.cycle_generation += 1;
+        for &(w, rel) in &c.outer {
+            if depth + rel > self.stack[&w] {
+                self.occurs = true;
+            }
+            self.hits.push((w, depth + rel));
+        }
+        self.pushed.extend(c.inner.iter().copied());
+        Some(c.ty.clone())
+    }
+
+    /// Keeps the expansion of `key.0` at `depth`, which met variables
+    /// being expanded: `pushed` and `hits` from `start` are its own.
+    fn keep_cyclic(&mut self, key: (V, bool, bool), depth: u32, start: (usize, usize), ty: &Ty) {
+        if self.occurs {
+            return;
+        }
+        let mut inner = self.pushed[start.0..].to_vec();
+        inner.sort_unstable();
+        inner.dedup();
+        let mut outer: HashMap<V, u32> = HashMap::default();
+        for &(w, at) in &self.hits[start.1..] {
+            // Still being expanded: around `key.0` (or `key.0` itself,
+            // which is met inside its own expansion).
+            if w != key.0 && self.stack.contains_key(&w) {
+                let rel = at - depth;
+                let e = outer.entry(w).or_insert(rel);
+                *e = (*e).max(rel);
+            }
+        }
+        let mut outer: Vec<(V, u32)> = outer.into_iter().collect();
+        outer.sort_unstable();
+        self.cyclic.insert(
+            key,
+            Cyclic {
+                ty: ty.clone(),
+                outer,
+                inner,
+            },
+        );
+    }
+
+    /// Outside every expansion, nothing reads what was met before.
+    fn clear_logs(&mut self) {
+        if self.stack.is_empty() {
+            self.pushed.clear();
+            self.hits.clear();
+        }
+    }
+
+    /// [`Self::bound_key`], borrowed when there is no cycle of variables:
+    /// then the key of a bound is the bound itself.
+    fn bound_key_of<'b>(&self, t: &'b Ty) -> std::borrow::Cow<'b, Ty> {
+        if self.rep.is_empty() {
+            std::borrow::Cow::Borrowed(t)
+        } else {
+            std::borrow::Cow::Owned(self.bound_key(t))
+        }
+    }
+
     /// Alias-class variables expand identically when their row roles agree.
     /// Graph aliases also keep their row and constructor-path roles.
     fn bound_key(&self, t: &Ty) -> Ty {
         match t {
-            Ty::Graph(g) => {
-                use super::solve::Pol;
-                let variables = g.variables();
-                if !variables
-                    .iter()
-                    .any(|v| self.rep.get(v).is_some_and(|r| r != v))
-                {
-                    return t.clone();
-                }
-                let mut roles: HashMap<_, [u8; 4]> =
-                    variables.into_iter().map(|v| (v, [0; 4])).collect();
-                for (i, (pol, env)) in [
-                    (Pol::Pos, false),
-                    (Pol::Neg, false),
-                    (Pol::Pos, true),
-                    (Pol::Neg, true),
-                ]
-                .into_iter()
-                .enumerate()
-                {
-                    for (v, p, constructor) in g.variable_sites(self.s, pol, false, env) {
-                        if constructor {
-                            roles.get_mut(&v).expect("graph variable has a role")[i] |= match p {
-                                Pol::Pos => 1,
-                                Pol::Neg => 2,
-                                Pol::Both => 4,
-                            };
-                        }
-                    }
-                }
-                let mut class_roles = HashMap::default();
-                let mut distinct = HashSet::default();
-                for (&v, &role) in &roles {
-                    let rep = self.rep.get(&v).copied().unwrap_or(v);
-                    if self.s.is_row(&Ty::Var(v)) != self.s.is_row(&Ty::Var(rep)) {
-                        distinct.insert(rep);
-                    }
-                    if let Some(old) = class_roles.insert(rep, role)
-                        && old != role
-                    {
-                        distinct.insert(rep);
-                    }
-                }
-                g.map_vars(&mut |v| {
-                    let rep = self.rep.get(&v).copied().unwrap_or(v);
-                    Ty::Var(if distinct.contains(&rep) { v } else { rep })
-                })
-            }
             Ty::Var(v) => {
                 let rep = self.rep.get(v).copied().unwrap_or(*v);
                 if self.s.is_row(t) == self.s.is_row(&Ty::Var(rep)) {
@@ -610,11 +687,8 @@ impl Coalescer<'_> {
                 xs.iter().map(|x| self.bound_key(x)).collect(),
             ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), self.bound_key(p)))
-                    .collect(),
+                param: self.bound_key(&f.param),
+                labels: f.labels.clone(),
                 ret: self.bound_key(&f.ret),
                 err: self.bound_key(&f.err),
                 env: self.bound_key(&f.env),
@@ -644,34 +718,6 @@ impl Coalescer<'_> {
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
         let env = env || self.s.is_row(t);
         match t {
-            Ty::Graph(g) => {
-                use super::solve::Pol;
-                let pol = if pos { Pol::Pos } else { Pol::Neg };
-                let mut constructors = HashMap::default();
-                for (v, p, con) in g.variable_sites(self.s, pol, false, env) {
-                    constructors
-                        .entry((v, p))
-                        .and_modify(|old| *old |= con)
-                        .or_insert(con);
-                }
-                let variance = self.s.variance.clone();
-                g.map_leaves_env(pol, env, &variance, &mut |leaf, p, env| {
-                    let con = if let Ty::Var(v) = leaf {
-                        constructors.get(&(*v, p)).copied().unwrap_or(false)
-                    } else {
-                        false
-                    };
-                    let depth = depth + u32::from(con);
-                    match p {
-                        Pol::Pos => self.go(leaf, true, depth, env),
-                        Pol::Neg => self.go(leaf, false, depth, env),
-                        Pol::Both => Ty::Both(
-                            Box::new(self.go(leaf, true, depth, false)),
-                            Box::new(self.go(leaf, false, depth, false)),
-                        ),
-                    }
-                })
-            }
             Ty::Var(v) => {
                 let v = self.rep.get(v).copied().unwrap_or(*v);
                 if rigid(self.s, self.keep, v) {
@@ -683,6 +729,7 @@ impl Coalescer<'_> {
                     if depth > d {
                         self.occurs = true;
                     }
+                    self.hits.push((v, depth));
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
                 let empty = |m: V| {
@@ -705,9 +752,14 @@ impl Coalescer<'_> {
                 if let Some(t) = self.memo.get(&(v, pos, env)) {
                     return t.clone();
                 }
+                if let Some(t) = self.reuse((v, pos, env), depth) {
+                    return t;
+                }
                 let generation = self.cycle_generation;
+                let start = (self.pushed.len(), self.hits.len());
 
                 self.stack.insert(v, depth);
+                self.pushed.push(v);
                 let mut parts = Vec::new();
                 let solver = self.s;
                 // Alias-class members can share stored bounds. Expand each
@@ -721,7 +773,7 @@ impl Coalescer<'_> {
                     for m in self.members(v) {
                         let st = &solver.vars[m.0 as usize];
                         for b in &st.lower {
-                            if expanded_bounds.insert(self.bound_key(b)) {
+                            if expanded_bounds.insert(self.bound_key_of(b)) {
                                 parts.push(self.go(b, true, depth, env));
                             }
                         }
@@ -735,7 +787,7 @@ impl Coalescer<'_> {
                         let st = &solver.vars[m.0 as usize];
                         let bounds = if pos { &st.lower } else { &st.upper };
                         for b in bounds {
-                            if expanded_bounds.insert(self.bound_key(b)) {
+                            if expanded_bounds.insert(self.bound_key_of(b)) {
                                 parts.push(self.go(b, pos, depth, env));
                             }
                         }
@@ -761,7 +813,10 @@ impl Coalescer<'_> {
                     };
                     if self.cycle_generation == generation {
                         self.memo.insert((v, pos, env), t.clone());
+                    } else {
+                        self.keep_cyclic((v, pos, env), depth, start, &t);
                     }
+                    self.clear_logs();
                     return t;
                 }
                 let mut flat = Vec::new();
@@ -784,7 +839,10 @@ impl Coalescer<'_> {
                 };
                 if self.cycle_generation == generation {
                     self.memo.insert((v, pos, env), t.clone());
+                } else {
+                    self.keep_cyclic((v, pos, env), depth, start, &t);
                 }
+                self.clear_logs();
                 t
             }
             Ty::Con(h, values, args) => {
@@ -811,11 +869,8 @@ impl Coalescer<'_> {
                 Ty::Con(*h, values.clone(), args)
             }
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1, false)))
-                    .collect(),
+                param: self.go(&f.param, !pos, depth + 1, false),
+                labels: f.labels.clone(),
                 ret: self.go(&f.ret, pos, depth + 1, false),
                 err: self.go(&f.err, pos, depth + 1, true),
                 env: self.go(&f.env, pos, depth + 1, true),
@@ -841,16 +896,6 @@ impl Coalescer<'_> {
 /// input side has nothing, the output side (§4.5 rules 6 and 7).
 pub(crate) fn both(t: &Ty) -> Ty {
     match t {
-        Ty::Graph(g) => g.map_nodes(false, &mut |t, _| match t {
-            Ty::Both(a, b) => {
-                if is_top(&b) {
-                    *a
-                } else {
-                    *b
-                }
-            }
-            t => t,
-        }),
         Ty::Both(a, b) => {
             if is_top(b) {
                 both(a)
@@ -862,7 +907,8 @@ pub(crate) fn both(t: &Ty) -> Ty {
         Ty::Union(xs) => Ty::Union(xs.iter().map(both).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(both).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), both(p))).collect(),
+            param: both(&f.param),
+            labels: f.labels.clone(),
             ret: both(&f.ret),
             err: both(&f.err),
             env: both(&f.env),
@@ -942,21 +988,6 @@ impl<'a> With<'a> {
 impl Norm<'_> {
     fn norm(&self, t: Ty) -> Ty {
         match t {
-            Ty::Graph(g) => g.map_nodes(false, &mut |t, env| match t {
-                Ty::Union(ms) => self.union_in(ms, env),
-                Ty::Inter(ms) => self.inter(ms),
-                Ty::Diff(base, heads) => self.diff(*base, heads),
-                Ty::Both(a, b) => {
-                    if a == b {
-                        *a
-                    } else if same_unmarked(&a, &b) {
-                        if *b == Ty::Top { *a } else { *b }
-                    } else {
-                        Ty::Both(a, b)
-                    }
-                }
-                t => t,
-            }),
             Ty::Union(ms) => self.union(ms.into_iter().map(|m| self.norm(m)).collect()),
             Ty::Inter(ms) => self.inter(ms.into_iter().map(|m| self.norm(m)).collect()),
             Ty::Diff(a, h) => {
@@ -982,11 +1013,8 @@ impl Norm<'_> {
             Ty::Fn(f) => {
                 let f = *f;
                 Ty::Fn(Box::new(FnTy {
-                    params: f
-                        .params
-                        .into_iter()
-                        .map(|(l, p)| (l, self.norm(p)))
-                        .collect(),
+                    param: self.norm(f.param),
+                    labels: f.labels,
                     ret: self.norm(f.ret),
                     err: self.env(f.err),
                     env: self.services(f.env),
@@ -1046,10 +1074,9 @@ impl Norm<'_> {
         let mut out: Vec<Ty> = Vec::new();
         for m in ms {
             let directed = |t: &Ty| match t {
-                Ty::Con(h, _, xs) if !xs.is_empty() => self
-                    .s
-                    .variances(*h, xs.len())
-                    .all(|v| v != Variance::Inv),
+                Ty::Con(h, _, xs) if !xs.is_empty() => {
+                    self.s.variances(*h, xs.len()).all(|v| v != Variance::Inv)
+                }
                 _ => false,
             };
             if directed(&m)
@@ -1073,18 +1100,6 @@ impl Norm<'_> {
     fn union_in(&self, ms: Vec<Ty>, env: bool) -> Ty {
         let mut flat = Vec::new();
         super::solve::flatten_union(&ms, &mut flat);
-        let mut records = Vec::new();
-        flat.retain(|t| {
-            if matches!(t, Ty::Graph(g) if g.record_only()) {
-                records.push(t.clone());
-                false
-            } else {
-                true
-            }
-        });
-        if !records.is_empty() {
-            flat.push(self.s.records.union(&records));
-        }
         if !env {
             flat = super::solve::join_literals(flat);
         }
@@ -1092,40 +1107,41 @@ impl Norm<'_> {
         // Equal members have the same head. Keep the original order within
         // each head, including distinct invariant service instantiations.
         let mut by_head: HashMap<Option<Head>, Vec<usize>> = HashMap::default();
+        // Only the first member of a head is ever merged into; the members
+        // after it stay as they are, so they are found again by hash.
+        #[allow(clippy::mutable_key_type)]
+        let mut later: HashSet<Ty> = HashSet::default();
         for m in flat {
-            let m = match m {
-                Ty::Graph(g) if g.is_ordinary_head() => g.view().expect("ordinary graph head"),
-                m => m,
-            };
             let head = m.head();
             let positions = by_head.entry(head).or_default();
-            if m == Ty::Never || positions.iter().any(|&i| out[i] == m) {
+            if m == Ty::Never
+                || positions.first().is_some_and(|&i| out[i] == m)
+                || (positions.len() > 1 && later.contains(&m))
+            {
                 continue;
             }
             if is_top(&m) {
                 return Ty::Top;
             }
             match head.and_then(|_| positions.first().copied()) {
-                Some(_) if env || m.value_head() == Some(Head::Record) => {
-                    positions.push(out.len());
-                    out.push(m);
-                }
-                Some(i) => {
+                Some(i) if !env => {
                     let old = std::mem::replace(&mut out[i], Ty::Never);
                     out[i] = self.merge(old, m, true);
                 }
-                None => {
+                _ => {
+                    if !positions.is_empty() {
+                        later.insert(m.clone());
+                    }
                     positions.push(out.len());
                     out.push(m);
                 }
             }
         }
         // `a | a - H` is `a`, and `a | a & T` is `a`.
-        let snapshot = out.clone();
-        out.retain(|m| match m {
-            Ty::Diff(a, _) => !snapshot.contains(a),
-            Ty::Inter(xs) => !xs.iter().any(|x| snapshot.contains(x)),
-            _ => true,
+        drop_absorbed(&mut out, |m, member| match m {
+            Ty::Diff(a, _) => member(a),
+            Ty::Inter(xs) => xs.iter().any(member),
+            _ => false,
         });
         // `T | r - T`, where `r` has no effect and `T` has every value of
         // its type constructor, is every value.
@@ -1156,18 +1172,18 @@ impl Norm<'_> {
                 Some(_) => (2, String::new()),
                 None => (0, String::new()),
             });
-            let mut ranks = Vec::new();
+            // Each variable with the place where it is first found.
+            let mut ranks: HashMap<V, usize> = HashMap::default();
             for member in out.iter().filter(|m| m.head().is_some()) {
                 visit(member, &mut |t| {
-                    if let Ty::Var(v) = t
-                        && !ranks.contains(v)
-                    {
-                        ranks.push(*v);
+                    if let Ty::Var(v) = t {
+                        let next = ranks.len();
+                        ranks.entry(*v).or_insert(next);
                     }
                 });
             }
             out.sort_by_key(|t| match t {
-                Ty::Var(v) => (0, ranks.iter().position(|w| w == v).unwrap_or(usize::MAX)),
+                Ty::Var(v) => (0, ranks.get(v).copied().unwrap_or(usize::MAX)),
                 t if t.head().is_none() => (0, usize::MAX),
                 _ => (1, 0),
             });
@@ -1191,10 +1207,7 @@ impl Norm<'_> {
                     Variance::Inv => false,
                 })
             }
-            Ty::Fn(f) => {
-                f.params.iter().all(|p| p.1 == Ty::Never)
-                    && [&f.ret, &f.err, &f.env].iter().all(|x| is_top(x))
-            }
+            Ty::Fn(f) => f.param == Ty::Never && [&f.ret, &f.err, &f.env].iter().all(|x| is_top(x)),
             _ => false,
         }
     }
@@ -1207,19 +1220,6 @@ impl Norm<'_> {
                 m => flat.push(m),
             }
         }
-        if flat
-            .iter()
-            .any(|t| matches!(t, Ty::Graph(g) if g.record_only()))
-        {
-            return self.s.records.inter(&flat);
-        }
-        let flat = flat
-            .into_iter()
-            .map(|m| match m {
-                Ty::Graph(g) if g.is_ordinary_head() => g.view().expect("ordinary graph head"),
-                m => m,
-            })
-            .collect::<Vec<_>>();
         // `{ A | B } & C` is `A & C | B & C` (§4.4), for unions of types
         // with type constructors.
         let (unions, rest): (Vec<Ty>, Vec<Ty>) =
@@ -1307,10 +1307,9 @@ impl Norm<'_> {
             }
         }
         // `a & { a | T }` is `a`.
-        let snapshot = out.clone();
-        out.retain(|m| match m {
-            Ty::Union(xs) => !xs.iter().any(|x| snapshot.contains(x)),
-            _ => true,
+        drop_absorbed(&mut out, |m, member| match m {
+            Ty::Union(xs) => xs.iter().any(member),
+            _ => false,
         });
         match out.len() {
             0 => Ty::Top,
@@ -1327,17 +1326,6 @@ impl Norm<'_> {
             return a;
         }
         match a {
-            Ty::Graph(g) if g.record_only() => {
-                if hs.iter().any(|h| h.value_head() == Some(Head::Record)) {
-                    Ty::Never
-                } else {
-                    Ty::Graph(g)
-                }
-            }
-            Ty::Graph(g) => match g.view() {
-                Some(view) => self.diff(view, hs),
-                None => Ty::Diff(Box::new(Ty::Graph(g)), hs),
-            },
             Ty::Never => Ty::Never,
             Ty::Union(ms) => self.union(ms.into_iter().map(|m| self.diff(m, hs.clone())).collect()),
             Ty::Con(..) if a.scalar().is_some() => {
@@ -1402,20 +1390,17 @@ impl Norm<'_> {
                         .collect(),
                 )
             }
-            (Ty::Fn(f), Ty::Fn(g)) if f.params.len() == g.params.len() => {
+            (Ty::Fn(f), Ty::Fn(g)) => {
                 let (f, g) = (*f, *g);
+                let labels = f
+                    .labels
+                    .iter()
+                    .zip(&g.labels)
+                    .map(|(l1, l2)| if l1 == l2 { l1.clone() } else { None })
+                    .collect();
                 Ty::Fn(Box::new(FnTy {
-                    params: f
-                        .params
-                        .into_iter()
-                        .zip(g.params)
-                        .map(|((l1, p), (l2, q))| {
-                            (
-                                if l1 == l2 { l1 } else { None },
-                                pick(p, q, Variance::Contra),
-                            )
-                        })
-                        .collect(),
+                    param: pick(f.param, g.param, Variance::Contra),
+                    labels,
                     ret: pick(f.ret, g.ret, Variance::Co),
                     err: pick(f.err, g.err, Variance::Co),
                     env: pick(f.env, g.env, Variance::Co),
@@ -1543,7 +1528,14 @@ impl Norm<'_> {
             kept(&o.pos_with, dropped).unwrap_or_default(),
             kept(&o.neg_with, dropped).unwrap_or_default(),
         );
-        for w in pw.iter().filter(|w| nw.contains(w)) {
+        // Graph keys hash their immutable pool identity and node ID.
+        #[allow(clippy::mutable_key_type)]
+        let in_nw: Option<HashSet<&Ty>> = (nw.len() > 8).then(|| nw.iter().copied().collect());
+        let both_sides = |w: &&Ty| match &in_nw {
+            Some(set) => set.contains(*w),
+            None => nw.contains(w),
+        };
+        for w in pw.iter().filter(|w| both_sides(w)) {
             match w {
                 Ty::Var(x) if *x == v => {}
                 Ty::Var(x) if named && !self.named(*x) => return Some((*x, Ty::Var(v))),
@@ -1586,19 +1578,6 @@ impl Norm<'_> {
         };
         for (i, m) in group.iter().enumerate() {
             match m {
-                Ty::Graph(g) => {
-                    use super::solve::Pol;
-                    for (v, pol, _) in
-                        g.variable_sites(self.s, if pos { Pol::Pos } else { Pol::Neg }, false, env)
-                    {
-                        if pol != Pol::Neg {
-                            record(occ, order, v, true, None);
-                        }
-                        if pol != Pol::Pos {
-                            record(occ, order, v, false, None);
-                        }
-                    }
-                }
                 Ty::Var(v) => {
                     record(occ, order, *v, pos, together.then_some((group, i)));
                 }
@@ -1623,9 +1602,7 @@ impl Norm<'_> {
                     }
                 }
                 Ty::Fn(f) => {
-                    for (_, p) in &f.params {
-                        self.walk(p, !pos, occ, order, false);
-                    }
+                    self.walk(&f.param, !pos, occ, order, false);
                     self.walk(&f.ret, pos, occ, order, false);
                     self.walk(&f.err, pos, occ, order, true);
                     self.walk(&f.env, pos, occ, order, true);
@@ -1664,6 +1641,19 @@ fn record<'a>(
     }
 }
 
+/// Takes out of `out` each member that `absorbed` finds absorbed by a member
+/// of `out` as it was before any was taken out. The members are looked up
+/// by hash, and only when some member could be absorbed at all.
+fn drop_absorbed(out: &mut Vec<Ty>, absorbed: impl Fn(&Ty, &dyn Fn(&Ty) -> bool) -> bool) {
+    if !out.iter().any(|m| absorbed(m, &|_| true)) {
+        return;
+    }
+    // Graph keys hash their immutable pool identity and node ID.
+    #[allow(clippy::mutable_key_type)]
+    let before: HashSet<Ty> = out.iter().cloned().collect();
+    out.retain(|m| !absorbed(m, &|x| before.contains(x)));
+}
+
 fn mentions(t: &Ty, v: V) -> bool {
     let mut found = false;
     visit(t, &mut |x| found |= *x == Ty::Var(v));
@@ -1673,14 +1663,9 @@ fn mentions(t: &Ty, v: V) -> bool {
 fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
     f(t);
     match t {
-        Ty::Graph(g) => {
-            for v in g.variables() {
-                f(&Ty::Var(v));
-            }
-        }
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
-            g.params.iter().for_each(|p| visit(&p.1, f));
+            visit(&g.param, f);
             [&g.ret, &g.err, &g.env]
                 .into_iter()
                 .for_each(|x| visit(x, f));
@@ -1711,13 +1696,13 @@ fn replace_all(t: &Ty, steps: &[(V, Ty)]) -> Ty {
 fn replace_map(t: &Ty, map: &HashMap<V, &Ty>) -> Ty {
     let r = |x: &Ty| replace_map(x, map);
     match t {
-        Ty::Graph(g) => g.map_vars(&mut |x| map.get(&x).map_or(Ty::Var(x), |by| (*by).clone())),
         Ty::Var(x) => map.get(x).map_or_else(|| t.clone(), |by| (*by).clone()),
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
+            param: r(&f.param),
+            labels: f.labels.clone(),
             ret: r(&f.ret),
             err: r(&f.err),
             env: r(&f.env),
@@ -1732,13 +1717,13 @@ fn replace_map(t: &Ty, map: &HashMap<V, &Ty>) -> Ty {
 fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
     let r = |x: &Ty| replace(x, v, by);
     match t {
-        Ty::Graph(g) => g.map_vars(&mut |x| if x == v { by.clone() } else { Ty::Var(x) }),
         Ty::Var(x) if *x == v => by.clone(),
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(r).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(r).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(r).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
+            param: r(&f.param),
+            labels: f.labels.clone(),
             ret: r(&f.ret),
             err: r(&f.err),
             env: r(&f.env),
@@ -1761,7 +1746,6 @@ enum Role {
 struct Namer {
     names: HashMap<V, String>,
     taken: HashSet<String>,
-    label_names: HashMap<V, String>,
 }
 
 impl Namer {
@@ -1780,17 +1764,6 @@ impl Namer {
         Namer {
             names: HashMap::default(),
             taken,
-            label_names: s
-                .vars
-                .iter()
-                .enumerate()
-                .filter_map(|(i, state)| {
-                    state
-                        .label_key
-                        .and_then(|_| state.name.clone())
-                        .map(|name| (V(i as u32), name))
-                })
-                .collect(),
         }
     }
 
@@ -1804,12 +1777,6 @@ impl Namer {
     fn assign(&mut self, t: &Ty) {
         let mut order = Vec::new();
         roles(t, Role::Value, &mut order);
-        for (v, _) in &order {
-            if let Some(name) = self.label_names.get(v) {
-                self.taken.insert(name.clone());
-                self.names.insert(*v, name.clone());
-            }
-        }
         for (v, role) in &order {
             if self.names.contains_key(v) {
                 continue;
@@ -1945,11 +1912,8 @@ fn fit_pattern(p: &Ty, t: &Ty, args: &mut [Option<Ty>]) -> bool {
                 && xs.iter().zip(ys).all(|(x, y)| fit_pattern(x, y, args))
         }
         (Ty::Fn(f), Ty::Fn(g)) => {
-            f.params.len() == g.params.len()
-                && f.params
-                    .iter()
-                    .zip(&g.params)
-                    .all(|(x, y)| x.0 == y.0 && fit_pattern(&x.1, &y.1, args))
+            f.labels == g.labels
+                && fit_pattern(&f.param, &g.param, args)
                 && fit_pattern(&f.ret, &g.ret, args)
                 && fit_pattern(&f.err, &g.err, args)
                 && fit_pattern(&f.env, &g.env, args)
@@ -1977,7 +1941,8 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
     match t {
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            param: go(&f.param),
+            labels: f.labels.clone(),
             ret: go(&f.ret),
             err: go(&f.err),
             env: go(&f.env),
@@ -2001,7 +1966,7 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
                 None => Ty::Union(xs),
             }
         }
-        Ty::Graph(_) | Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
+        Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
     }
 }
 
@@ -2021,7 +1986,8 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            param: go(&f.param),
+            labels: f.labels.clone(),
             ret: go(&f.ret),
             err: go(&f.err),
             env: go(&f.env),
@@ -2040,13 +2006,6 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
 /// function type it is first a member of.
 fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
     match t {
-        Ty::Graph(g) => {
-            for v in g.variables() {
-                if !out.iter().any(|x| x.0 == v) {
-                    out.push((v, role));
-                }
-            }
-        }
         Ty::Var(v) => {
             if !out.iter().any(|x| x.0 == *v) {
                 out.push((*v, role));
@@ -2059,7 +2018,7 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
         }
         Ty::Con(_, _, xs) => xs.iter().for_each(|x| roles(x, Role::Value, out)),
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| roles(&p.1, Role::Value, out));
+            roles(&f.param, Role::Value, out);
             roles(&f.ret, Role::Value, out);
             roles(&f.err, Role::Err, out);
             roles(&f.env, Role::Env, out);
@@ -2083,7 +2042,6 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
         xs.iter().map(|x| tree_with(x, name)).collect()
     };
     match t {
-        Ty::Graph(g) => ShownType::Graph(super::ShownGraph::new(g, name)),
         Ty::Var(v) => name(*v),
         Ty::Never => ShownType::Never,
         Ty::Top => ShownType::Hole,
@@ -2117,18 +2075,40 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
             }
         }
         Ty::Con(Head::Named(r), _, args) => ShownType::Named(*r, all(args, name)),
+        Ty::Con(Head::Shape(shape), _, parts) if shape.has_labels() => {
+            ShownType::Record(shape.keys(), all(parts, name))
+        }
         Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
-            let params = f
-                .params
-                .iter()
-                .map(|(l, p)| (l.clone(), tree_with(p, name)))
-                .collect();
+            // syntax-3 §6.1: a parameter that is not data of one shape is
+            // shown as a group: `{ Never } -> A`.
+            let (params, group) = match f.parts() {
+                Some(parts) => {
+                    // A label of the shape is part of the type; the other
+                    // labels are the written parameter names.
+                    let keys = match &f.param {
+                        Ty::Con(Head::Shape(shape), _, _) if shape.has_labels() => shape.keys(),
+                        _ => vec![None; parts.len()],
+                    };
+                    (
+                        parts
+                            .iter()
+                            .enumerate()
+                            .map(|(i, p)| {
+                                (keys[i].clone().or_else(|| f.label(i)), tree_with(p, name))
+                            })
+                            .collect(),
+                        false,
+                    )
+                }
+                None => (vec![(None, tree_with(&f.param, name))], true),
+            };
             let ret = tree_with(&f.ret, name);
             let err = (f.err != Ty::Never).then(|| tree_with(&f.err, name));
             let env = (f.env != Ty::Never).then(|| tree_with(&f.env, name));
             ShownType::Fn(Box::new(ShownFn {
                 params,
+                group,
                 ret,
                 err,
                 env,
@@ -2163,22 +2143,6 @@ fn holes(t: &Ty) -> Ty {
 
 fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
     match t {
-        Ty::Graph(g) => {
-            let mut seen = HashSet::default();
-            let mut pending = vec![g.id];
-            while let Some(id) = pending.pop() {
-                if !seen.insert(id) {
-                    continue;
-                }
-                match g.node_at(id) {
-                    super::records::Node::Var(v) => {
-                        out.insert(v);
-                    }
-                    super::records::Node::Diff(base, _) => pending.push(base),
-                    node => pending.extend(node.children()),
-                }
-            }
-        }
         Ty::Var(v) => {
             out.insert(*v);
         }
@@ -2186,7 +2150,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
             xs.iter().for_each(|x| outer_vars(x, out))
         }
         Ty::Fn(f) => {
-            f.params.iter().for_each(|p| outer_vars(&p.1, out));
+            outer_vars(&f.param, out);
             [&f.ret, &f.err, &f.env]
                 .into_iter()
                 .for_each(|x| outer_vars(x, out));
@@ -2203,13 +2167,6 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
 fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
     let go = |x: &Ty| hide(x, outside, in_h);
     match t {
-        Ty::Graph(g) => g.map_nodes(false, &mut |t, _| match t {
-            Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(&v)) => Ty::Top,
-            Ty::Diff(base, heads) => {
-                Ty::Diff(base, heads.iter().map(|h| hide(h, outside, true)).collect())
-            }
-            t => t,
-        }),
         Ty::Var(v) if in_h && (v.0 >= MARK || !outside.contains(v)) => Ty::Top,
         Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
@@ -2222,7 +2179,8 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
             }
         }
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            param: go(&f.param),
+            labels: f.labels.clone(),
             ret: go(&f.ret),
             err: go(&f.err),
             env: go(&f.env),
@@ -2279,7 +2237,8 @@ fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
         Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
+            param: go(&f.param),
+            labels: f.labels.clone(),
             ret: go(&f.ret),
             err: go(&f.err),
             env: go(&f.env),
@@ -2401,5 +2360,72 @@ mod literal_display_tests {
         assert_eq!(tree.text(&[]).matches('|').count(), 39);
         assert!(tree.text_limited(&[], 12).ends_with("… (30 more)"));
         assert!(!tree.text(&[]).contains('…'));
+    }
+}
+
+#[cfg(test)]
+mod lazy_display_tests {
+    use super::*;
+    use crate::hir::{BuiltinType, TypeRef};
+
+    fn vars(s: &mut Solver, n: usize) -> Vec<V> {
+        (0..n).map(|_| s.fresh_at(1)).collect()
+    }
+
+    #[test]
+    fn shown_and_scheme_is_shown_and_scheme() {
+        // The checker simplifies the scheme of a definition once for its
+        // text and for the check of the types it uses (§2.4): both must be
+        // what `shown` and `scheme` give on their own.
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let vs = vars(&mut s, 3);
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let t = Ty::Fn(Box::new(FnTy {
+            param: Ty::tuple(vec![Ty::Var(vs[0]), int.clone()]),
+            labels: vec![None, None],
+            ret: Ty::Union(vec![Ty::Var(vs[0]), Ty::Var(vs[1]), int]),
+            err: Ty::Never,
+            env: Ty::Var(vs[2]),
+        }));
+        for opts in [
+            Opts::default(),
+            Opts {
+                mono: true,
+                written: false,
+            },
+        ] {
+            let (ty, shown_scheme) = shown_and_scheme(&s, &t, opts).unwrap();
+            assert_eq!(ty, shown(&s, &t, opts).unwrap());
+            assert_eq!(shown_scheme, scheme(&s, &t, opts).unwrap());
+        }
+    }
+
+    #[test]
+    fn wide_unions_keep_their_order_and_drop_repeats() {
+        // Members are found again by hash; the first of each is kept, in
+        // the order written.
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let vs = vars(&mut s, 300);
+        let mut ms: Vec<Ty> = vs.iter().map(|v| Ty::Var(*v)).collect();
+        ms.extend(vs.iter().rev().map(|v| Ty::Var(*v)));
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        // `a | a - H` is `a`, and `a | a & T` is `a`.
+        ms.push(Ty::Diff(Box::new(Ty::Var(vs[7])), vec![string.clone()]));
+        ms.push(Ty::Inter(vec![Ty::Var(vs[9]), string.clone()]));
+        let u = known_union(&s, ms);
+        assert_eq!(u, Ty::Union(vs.iter().map(|v| Ty::Var(*v)).collect()));
+        // A difference whose base is not a member stays.
+        let other = s.fresh_at(1);
+        let d = Ty::Diff(Box::new(Ty::Var(other)), vec![string]);
+        let u = known_union(&s, vec![Ty::Var(vs[0]), d.clone(), Ty::Var(vs[0])]);
+        assert_eq!(u, Ty::Union(vec![Ty::Var(vs[0]), d]));
+    }
+
+    #[test]
+    fn a_variable_taken_out_twice_stops_the_steps() {
+        let mut budget = StepBudget::default();
+        assert!(budget.allows(&[(V(1), Ty::Top), (V(2), Ty::Never)]));
+        assert!(budget.allows(&[(V(3), Ty::Var(V(4)))]));
+        assert!(!budget.allows(&[(V(2), Ty::Top)]));
     }
 }

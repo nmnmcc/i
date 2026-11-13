@@ -1,6 +1,7 @@
-//! The cross-process cache of compiled machine code (`ILANG_COMPILE_CACHE`):
-//! a warm run gives the same output as a cold one and as a run without the
-//! cache, and a changed source byte is never served from the cache.
+//! The cross-process cache of compiled machine code, kept in the global cache
+//! store (`I_CACHE_DIR`): a warm run gives the same output as a cold one and as
+//! a run without the cache, and a changed source byte is never served from the
+//! cache. `I_CACHE=off` and the older `ILANG_COMPILE_CACHE=0` turn it off.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -40,21 +41,42 @@ fn i(project: &Path, cache: &str, args: &[&str]) -> Output {
         .args(args)
         .args(["--offline", "--project"])
         .arg(project)
-        .env("ILANG_COMPILE_CACHE", cache)
+        .env_remove("ILANG_COMPILE_CACHE")
+        .env(
+            if cache == "0" {
+                "I_CACHE"
+            } else {
+                "I_CACHE_DIR"
+            },
+            if cache == "0" { "off" } else { cache },
+        )
         .env("RAYON_NUM_THREADS", "1")
         .output()
         .unwrap()
 }
 
-/// The compiled modules in the cache (one file each, beside `functions/`).
-fn modules(cache: &Path) -> usize {
-    std::fs::read_dir(cache)
-        .map(|entries| {
-            entries
-                .filter(|e| e.as_ref().unwrap().file_type().unwrap().is_file())
+/// The entries of one kind in the store at `cache`.
+fn entries(cache: &Path, kind: &str) -> usize {
+    let Ok(shards) = std::fs::read_dir(cache.join("v1").join(kind)) else {
+        return 0;
+    };
+    shards
+        .map(|shard| {
+            std::fs::read_dir(shard.unwrap().path())
+                .unwrap()
+                .filter(|e| {
+                    let e = e.as_ref().unwrap();
+                    e.file_type().unwrap().is_file()
+                        && !e.file_name().to_string_lossy().starts_with('.')
+                })
                 .count()
         })
-        .unwrap_or(0)
+        .sum()
+}
+
+/// The compiled modules in the cache.
+fn modules(cache: &Path) -> usize {
+    entries(cache, "wasmtime-module")
 }
 
 fn same(a: &Output, b: &Output) {
@@ -100,7 +122,8 @@ fn warm_runs_match_cold_runs_and_changed_sources_miss() {
             "a warm run is served from the cache"
         );
     }
-    assert!(cache.join("functions").read_dir().unwrap().next().is_some());
+    assert!(entries(&cache, "cranelift-function") > 0);
+    assert!(cache.join("CACHEDIR.TAG").is_file());
 
     // One changed byte in the source is a different module: never a hit.
     let main = project.join("src/main.i");
@@ -111,6 +134,47 @@ fn warm_runs_match_cold_runs_and_changed_sources_miss() {
     assert_eq!(String::from_utf8_lossy(&changed.stdout), "Hello from j!\n");
     assert_eq!(modules(&cache), stored + 1);
     same(&changed, &i(&project, "0", &["run", "--opt", "0"]));
+}
+
+#[test]
+fn cache_command_reports_collects_and_cleans() {
+    let root = tempfile::tempdir().unwrap();
+    let project = project(root.path());
+    let cache = root.path().join("cache");
+    let cache_text = cache.to_str().unwrap();
+    assert!(
+        i(&project, cache_text, &["run", "--opt", "0"])
+            .status
+            .success()
+    );
+    assert!(modules(&cache) > 0);
+    let cache_cmd = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .arg("cache")
+            .args(args)
+            .env_remove("ILANG_COMPILE_CACHE")
+            .env("I_CACHE_DIR", &cache)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    let status = cache_cmd(&["status"]);
+    assert!(status.contains("wasmtime-module: "), "{status}");
+    assert!(status.contains(cache_text), "{status}");
+    // Every entry was used within the hour: a collection keeps them all.
+    let gc = cache_cmd(&["gc", "--max-size", "1"]);
+    assert!(gc.starts_with("removed 0 entries"), "{gc}");
+    assert!(cache.join("gc.stamp").is_file());
+    cache_cmd(&["clean", "--tests"]);
+    assert_eq!(modules(&cache), 0);
+    assert_eq!(entries(&cache, "cranelift-function"), 0);
+    let status = cache_cmd(&["status"]);
+    assert!(status.contains("total: 0 entries"), "{status}");
 }
 
 #[test]
@@ -127,4 +191,15 @@ fn zero_turns_the_cache_off() {
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout), "Hello from i!\n");
     assert!(!root.path().join("0").exists());
+    let cache = root.path().join("cache");
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--opt", "0", "--offline", "--project"])
+        .arg(&project)
+        .env_remove("ILANG_COMPILE_CACHE")
+        .env("I_CACHE", "off")
+        .env("I_CACHE_DIR", &cache)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(!cache.exists(), "I_CACHE=off writes nothing");
 }

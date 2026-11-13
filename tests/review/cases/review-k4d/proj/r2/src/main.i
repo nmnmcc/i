@@ -19,7 +19,7 @@ tell = (x: Int) { x |> {
 
 
 main = () {
-  ! S(Dep) = S(() { get() })
+  ! S(Dep) = S(f: () { get() })
   fw() + fr()
   Nil
 }

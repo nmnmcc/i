@@ -26,11 +26,11 @@ allowed = () {
 	assert(secret.read(facade.constructor(19)) == 19)
 	assert(secret.local_known == 42)
 	assert(secret.callback(value)() == 42)
-	assert(secret.Other(17).value == 17)
+	assert(secret.Other(value: 17).value == 17)
 	assert({
 		facade.open |> {
-			secret.Open(value)  -> value
-			secret.Other(value) -> value
+			secret.Open(value = value)  -> value
+			secret.Other(value = value) -> value
 		}
 	} == 11)
 }

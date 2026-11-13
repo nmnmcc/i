@@ -9,18 +9,18 @@ outer = (runner) {
   a = inner()
   b = inner()
   fa = () {
-    ! State(Int) = State(() { 1 })
+    ! State(Int) = State(get: () { 1 })
     a() + 1
   }
   fb = () {
-    ! State(String) = State(() { "s" })
+    ! State(String) = State(get: () { "s" })
     b() <> "t"
   }
   (fa(), fb())
 }
 
 main = () {
-  ! State(Int) = State(() { 5 })
+  ! State(Int) = State(get: () { 5 })
   outer((c: () -> Int ! State(Int)) { c() })
   Nil
 }

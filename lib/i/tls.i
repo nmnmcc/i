@@ -35,31 +35,27 @@ TlsError {
 @host("i:tls/v1", "request")
 Tls {
 	Tls(
-		connect: (
-			stream: Int
-			name:   String
-			alpn:   String
-			roots:  BitArray
-			cert:   BitArray
-			key:    BitArray
-		) -> Request(Result(Int, String))
-		accept: (
-			stream: Int
-			cert:   BitArray
-			key:    BitArray
-			alpn:   String
-		) -> Request(Result(Int, String))
-		alpn:           (stream: Int) -> Request(Result(String, String))
-		read:           (stream: Int, max: Int) -> Request(Result(BitArray, String))
-		write:          (stream: Int, bytes: BitArray) -> Request(Result(Nil, String))
-		shutdown_write: (stream: Int) -> Request(Result(Nil, String))
-		close:          (stream: Int) -> Request(Nil)
+		connect: (Int, String, String, BitArray, BitArray, BitArray) -> Request(
+			Result(Int, String)
+		)
+		accept: (Int, BitArray, BitArray, String) -> Request(
+			Result(Int, String)
+		)
+		alpn:           (Int) -> Request(Result(String, String))
+		read:           (Int, Int) -> Request(Result(BitArray, String))
+		write:          (Int, BitArray) -> Request(Result(Nil, String))
+		shutdown_write: (Int) -> Request(Result(Nil, String))
+		close:          (Int) -> Request(Nil)
 	)
 }
 
-options = () { (alpn: [], roots: <<>>, cert: <<>>, key: <<>>) }
+options = () -> (alpn: List(String), roots: BitArray, cert: BitArray, key: BitArray) {
+	(alpn: [], roots: <<>>, cert: <<>>, key: <<>>)
+}
 
-identity = (cert: BitArray, key: BitArray) { (cert: cert, key: key) }
+identity = (cert: BitArray, key: BitArray) -> (cert: BitArray, key: BitArray) {
+	(cert: cert, key: key)
+}
 
 join = (items: List(String)) -> String {
 	items |> {
@@ -80,8 +76,8 @@ raise = (message) {
 	core.index_of(message, ":", 0) |> {
 		Ok(n) -> fail.raise(
 			TlsError(
-				slice(message, 0, n)
-				slice(message, n + 1, core.byte_size(message) - n - 1)
+				stage:  slice(message, 0, n)
+				reason: slice(message, n + 1, core.byte_size(message) - n - 1)
 			)
 		)
 		Error(_) -> panic("tls: invalid error")
@@ -104,7 +100,12 @@ finish = (r: Request(Result(Int, String)), raw ! Tls) {
 	Stream(number)
 }
 
-connect = (stream, name, opts, raw ! Tls) {
+connect = (
+	stream
+	name
+	opts: (alpn: List(String), roots: BitArray, cert: BitArray, key: BitArray)
+	raw ! Tls
+) {
 	finish(
 		raw.connect(
 			net.stream_number(stream)
@@ -117,7 +118,12 @@ connect = (stream, name, opts, raw ! Tls) {
 	)
 }
 
-accept = (stream, ident, opts, raw ! Tls) {
+accept = (
+	stream
+	ident: (cert: BitArray, key: BitArray)
+	opts: (alpn: List(String), roots: BitArray, cert: BitArray, key: BitArray)
+	raw ! Tls
+) {
 	finish(
 		raw.accept(
 			net.stream_number(stream)

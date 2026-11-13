@@ -11,7 +11,7 @@ adapter = (property: () -> Nil ! Assert, caller ! Assert) -> Nil ! Assert {
 		Ok(_) -> Nil
 		Error(failure) -> caller.fail(
 			AssertionFailure(
-				"std/property v1: falsified\nseed: 0\nreason: " <>
+				message: "std/property v1: falsified\nseed: 0\nreason: " <>
 					failure.message
 			)
 		)
