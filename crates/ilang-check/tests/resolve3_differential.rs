@@ -386,7 +386,12 @@ fn resolve3_deep() {
     let mut modules = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
-            let (module, errors) = syn3::parse_module(&graph.sources.get(m.source).text);
+            // Parsing is recursive too; keep this test focused on the resolver
+            // entry point by preparing its input on a deep stack.
+            let (module, errors) =
+                syn3::deep::deep(|| syn3::parse_module(&graph.sources.get(m.source).text));
+            assert!(errors.is_empty(), "{}: {errors:?}", m.path);
+            let errors = resolve::lowering_errors(&module, false);
             assert!(errors.is_empty(), "{}: {errors:?}", m.path);
             parsed.push(Parsed {
                 package,

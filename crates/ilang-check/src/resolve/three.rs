@@ -35,7 +35,7 @@ use std::ops::{Deref, DerefMut};
 /// three that this compiler cannot type yet. `lisp` is set for a module
 /// read from the Lisp surface.
 pub fn lowering_errors(module: &n::Module, lisp: bool) -> Vec<ilang_syntax::Diagnostic> {
-    pre::pre(module, lisp).errors
+    ilang_syntax::syn3::deep::deep(|| pre::pre(module, lisp).errors)
 }
 
 /// Resolves the modules of a graph from their syntax-three trees. `parsed`
