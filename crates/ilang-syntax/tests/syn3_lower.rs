@@ -317,7 +317,7 @@ read = (d ! Dependency) { Nil }
 use(N) = (s ! S(N)) { S(f) = s f() }
 apply(N) = () { local: () -> Nil ! N = () { use() } local() }
 main = () { ! S(Dependency) = S(() { read() }) apply() }";
-    let (old, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
+    let (old, diags) = legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{diags:#?}");
     let (converted, notes) =
         syn3::convert::convert(&old, None, &syn3::convert::Signatures::default());
