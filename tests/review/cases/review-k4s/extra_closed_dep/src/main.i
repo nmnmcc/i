@@ -6,4 +6,7 @@ use = <N>() <- (s: S(N)) {
 run = <A, N>(f: () <- N -> A) { f() }
 D = ()
 forward = <N>() <- (s: S(N)) { run(() { use() }) }
-f = () { forward() <- (D, S(() <- (d: D) { Nil }, (_: D) { Nil })) }
+f = () {
+	_syn3_0: S(D) = S(() <- (d: D) { Nil }, (_: D) { Nil })
+	forward() <- (D, _syn3_0)
+}

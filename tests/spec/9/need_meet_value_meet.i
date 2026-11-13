@@ -25,10 +25,11 @@ meet = (x: S(Never) & S(Dep)) -> S(Never) { x }
 join = (x: S(Never) | S(Dep)) -> S(Dep) { x }
 
 main = () {
+	_syn3_0: S(Never) = S(f = () { Nil })
 	{
 		both()
 		meet(S(f = () { Nil }))
 		join(S(f = () { Nil }))
 		Nil
-	} <- (S(f = () { Nil }))
+	} <- (_syn3_0)
 }

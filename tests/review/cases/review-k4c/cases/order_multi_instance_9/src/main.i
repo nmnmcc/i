@@ -3,11 +3,17 @@ use = <A, N>(x: A) <- (s: S(A, N)) {
 	f(x)
 }
 run = <A, N>(body: () <- N -> A) { body() }
-texts = () { wrap("a") <- (S((x: String) { x <> "!" })) }
+texts = () {
+	_syn3_0: S(String, Never) = S((x: String) { x <> "!" })
+	wrap("a") <- (_syn3_0)
+}
 wrap = <A, N>(x: A) {
 	local = () { use(x) }
 	run(local)
 }
 Dep = ()
 S(A, N) = ((A) <- N -> A)
-ints = () { wrap(1) <- (S((x: Int) { x + 1 })) }
+ints = () {
+	_syn3_1: S(Int, Never) = S((x: Int) { x + 1 })
+	wrap(1) <- (_syn3_1)
+}

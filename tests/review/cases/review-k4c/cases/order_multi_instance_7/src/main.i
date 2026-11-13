@@ -1,6 +1,12 @@
 S(A, N) = ((A) <- N -> A)
-texts = () { wrap("a") <- (S((x: String) { x <> "!" })) }
-ints = () { wrap(1) <- (S((x: Int) { x + 1 })) }
+texts = () {
+	_syn3_0: S(String, Never) = S((x: String) { x <> "!" })
+	wrap("a") <- (_syn3_0)
+}
+ints = () {
+	_syn3_1: S(Int, Never) = S((x: Int) { x + 1 })
+	wrap(1) <- (_syn3_1)
+}
 wrap = <A, N>(x: A) {
 	local = () { use(x) }
 	run(local)

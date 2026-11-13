@@ -4,10 +4,11 @@
 	i/failure
 )
 
+Syn3ServiceFail(E) = Fail(E)
 // The other-direction parameter gives the same union on both paths.
-need_int = () <- (f: Fail(Int)) { Nil }
+need_int = () <- (f: Syn3ServiceFail(Int)) { Nil }
 
-need_string = () <- (f: Fail(String)) { Nil }
+need_string = () <- (f: Syn3ServiceFail(String)) { Nil }
 
 both_fail = () -> Nil {
 	need_int()
@@ -31,6 +32,7 @@ both_read = () -> Nil {
 read_value = (x: Read(Int) & Read(1)) -> Read(1) { x }
 
 main = () {
+	_syn3_0: Read(1) = read_value(Read(value = 1))
 	{
 		both_read()
 		failure.catch(() {
@@ -38,5 +40,5 @@ main = () {
 			Nil
 		})
 		Nil
-	} <- (read_value(Read(value = 1)))
+	} <- (_syn3_0)
 }

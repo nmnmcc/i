@@ -6,6 +6,9 @@ use = <A, B>() <- (s: S(A, B)) {
 	s.f()
 	s.g()
 }
-helper = <A, B>() { use() <- (S(f = () { get() }, g = () { get() })) }
+helper = <A, B>() {
+	_syn3_0: S(Dep, Dep) = S(f = () { get() }, g = () { get() })
+	use() <- (_syn3_0)
+}
 
 main = () { helper() }

@@ -5,8 +5,9 @@ S(E, N) = (f = () <- (Fail(E), ..N) -> Nil)
 use = <E, N>() <- (s: S(E, N)) { s.f() }
 
 main = <E, N>() {
+	_syn3_0: S(Never, Dep) = S(f = () { get() })
 	{
 		local = () { use() }
 		local()
-	} <- (S(f = () { get() }))
+	} <- (_syn3_0)
 }

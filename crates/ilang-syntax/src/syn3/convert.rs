@@ -947,6 +947,44 @@ impl Cx<'_> {
         }
     }
 
+    // A bound ordinary Fail service must not become the transition
+    // lowerer's unbound shorthand for the legacy error channel.
+    fn service_type(&mut self, ty: &o::TypeExpr) -> n::Type {
+        if let o::TypeKind::Named { module: None, name, args } = &ty.kind
+            && name.name == "Fail" && args.len() == 1
+        {
+            self.service_fail_used = true;
+            let args = args.iter().map(|a| self.ty(a)).collect();
+            named(&self.service_fail_name, args, ty.span)
+        } else {
+            self.ty(ty)
+        }
+    }
+
+    // Keep the written service form: inference from a constructor alone
+    // can change its arguments (and turn a rejected provider into a valid one).
+    fn provided(&mut self, ty: &o::TypeExpr, value: &o::Expr, out: &mut Vec<n::Stmt>) -> n::DItem {
+        if matches!(&ty.kind, o::TypeKind::Named { args, .. } if !args.is_empty()) {
+            let name = format!("_syn3_{}", self.fresh);
+            self.fresh += 1;
+            let at = value.span;
+            let ty = self.service_type(ty);
+            out.push(n::Stmt::Bind(n::Binding {
+                pattern: n::Pattern::new(n::PatternKind::Typed {
+                    binder: n::Binder { name: name.clone(), discard: false, span: n::Sp(at) },
+                    ty,
+                }, at),
+                value: self.expr(value),
+                span: n::Sp(Span::default()),
+            }));
+            n::DItem::Pos(n::Expr::new(n::ExprKind::Name {
+                module: None, name: n::Ident::new(name, at),
+            }, at))
+        } else {
+            n::DItem::Pos(self.expr(value))
+        }
+    }
+
     /// `! T = e` followed by the rest `r` of its block becomes `{ r } <- (e)`.
     fn stmts(&mut self, stmts: &[o::Stmt], span: Span) -> Vec<n::Stmt> {
         let mut out = Vec::new();
@@ -955,20 +993,20 @@ impl Cx<'_> {
                 o::Stmt::Bind(b) => out.push(n::Stmt::Bind(self.binding(b))),
                 o::Stmt::Expr(e) => out.push(n::Stmt::Expr(self.expr(e))),
                 o::Stmt::Env {
+                    ty,
                     value,
                     span: env_span,
-                    ..
                 } => {
                     // §7.3: consecutive statements whose values are direct
                     // values are one provide; others nest, because a later
                     // value may need an earlier service.
-                    let mut provided = vec![n::DItem::Pos(self.expr(value))];
+                    let mut provided = vec![self.provided(ty, value, &mut out)];
                     let mut i = i;
                     while is_direct(value)
-                        && let Some(o::Stmt::Env { value: next, .. }) = stmts.get(i + 1)
+                        && let Some(o::Stmt::Env { ty: next_ty, value: next, .. }) = stmts.get(i + 1)
                         && is_direct(next)
                     {
-                        provided.push(n::DItem::Pos(self.expr(next)));
+                        provided.push(self.provided(next_ty, next, &mut out));
                         i += 1;
                     }
                     let rest_span = Span::new(env_span.end, span.end.max(env_span.end));
@@ -1064,7 +1102,7 @@ impl Cx<'_> {
                 o::Param::Env { name, ty } => services.push(n::SItem {
                     rest: false,
                     name: id(name),
-                    ty: self.ty(ty),
+                    ty: self.service_type(ty),
                 }),
             }
         }

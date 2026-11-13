@@ -4,7 +4,10 @@
 // the needed service, also when the function is generalized.
 Reader(S) = (get = () -> S)
 
-with_int = (body) { body() <- (Reader(get = () { 1 })) }
+with_int = (body) {
+	_syn3_0: Reader(Int) = Reader(get = () { 1 })
+	body() <- (_syn3_0)
+}
 
 get_s = () <- (r: Reader(String)) { r.get() }
 

@@ -49,9 +49,9 @@ bad_value = () { (1, 2) }
 
 generic = (x) { x }
 
-bad_errors = () -> Int { fail.raise((1, 2)) }
+bad_errors: () <- (Fail((Int, Int))) -> Int = () { fail.raise((1, 2)) }
 
-twice_error = () -> Int { 1 }
+twice_error: () <- (Fail(Handle)) -> Int = () { 1 }
 
 // A host export is a function.
 number = 1

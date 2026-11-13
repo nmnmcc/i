@@ -8,8 +8,9 @@ use = <N>() <- (s: S(N)) {
 run = <A, N>(body: () <- N -> A) { body() }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
 	{
 		use()
 		Nil
-	} <- (S(() { get() }))
+	} <- (_syn3_0)
 }

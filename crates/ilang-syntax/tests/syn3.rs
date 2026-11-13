@@ -1194,3 +1194,20 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let shown = ilang_syntax::print::print_module(&lowered);
     assert!(shown.contains(carrier.as_str()), "{shown}");
 }
+
+#[test]
+fn converted_bound_fail_remains_a_service_parameter() {
+    let text = converted("use(E) = (error: E, handler ! Fail(E)) { handler.raise(error) }\n");
+    let (module, diags) = syn3::parse_lowered(&text);
+    assert!(diags.is_empty(), "{text}\n{diags:#?}");
+    let function = module.items.iter().find_map(|item| match &item.kind {
+        ilang_syntax::ast::ItemKind::Binding(binding) => match &binding.value.kind {
+            ilang_syntax::ast::ExprKind::Fn(function) => Some(function),
+            _ => None,
+        },
+        _ => None,
+    }).unwrap();
+    assert!(function.params.iter().any(|param| matches!(param,
+        ilang_syntax::ast::Param::Env { name, .. } if name.name == "handler"
+    )), "the body still has its bound service: {text}");
+}

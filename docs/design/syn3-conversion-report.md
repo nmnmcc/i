@@ -569,3 +569,22 @@ types and 42 exact requirement type fragments. Requirement outcomes and
 error-code lists are unchanged. The queued converter was stopped by its
 own process IDs and rerun using the already-built migrator; that source-only
 run performs no build or compiler/corpus verification.
+
+The E1 merge exposed two migration omissions. A bound ordinary Fail(E)
+service now uses the same transparent alias as ordinary Fail in a need;
+otherwise the transition lowerer removes its binder as legacy error syntax.
+A lowering regression requires that the original handler binder remains an
+environment parameter. Parameterized environment statements now bind their
+value with the written service type before providing that local: dropping
+that annotation could let inference choose a different service form. This
+preserves spec §9.2's provider-subtyping requirement instead of weakening a
+negative test. Re-converted 1,250 original batch2 sources/snippets; five
+known invalid files retain their original registered diagnostic markers.
+
+The checker display fixture's non-function polymorphic empty-list binding
+uses inference for the same empty List(Never), since syntax-3 §2.16 puts
+type parameters only on function values/types. The host-export fixtures
+retain their written wider error types as binding annotations, preserving
+the original non-host-passable error checks. Guarded corpus observation and
+full checker verification are pending; no observation with a changed phase
+exit or error-code set may be recorded.
