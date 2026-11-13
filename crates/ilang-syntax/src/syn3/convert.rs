@@ -747,16 +747,17 @@ impl Cx<'_> {
         };
         let ctors = match &def.body {
             o::TypeBody::Alias(ty) => {
-                return vec![n::TypeDef {
-                    name: id(&def.name),
+                return vec![n::TypeDef::new(
+                    id(&def.name),
                     head,
-                    rhs: n::TypeRhs::Type(self.ty(ty)),
-                }];
+                    n::TypeRhs::Type(self.ty(ty)),
+                )];
             }
             o::TypeBody::Custom(ctors) => ctors,
         };
         if ctors.is_empty() {
             return vec![n::TypeDef {
+                alias_pattern: def.alias_pattern,
                 name: id(&def.name),
                 head,
                 rhs: n::TypeRhs::Opaque,
@@ -778,6 +779,7 @@ impl Cx<'_> {
             && only.name.name == def.name.name
         {
             return vec![n::TypeDef {
+                alias_pattern: def.alias_pattern,
                 name: id(&def.name),
                 head,
                 rhs: n::TypeRhs::Data(data(self, only)),
@@ -809,6 +811,7 @@ impl Cx<'_> {
                 .collect();
             members.push(named(&c.name.name, own.clone(), c.span));
             out.push(n::TypeDef {
+                alias_pattern: def.alias_pattern,
                 name: id(&c.name),
                 head: own,
                 rhs: n::TypeRhs::Data(data(self, c)),
@@ -820,6 +823,7 @@ impl Cx<'_> {
             n::Type::new(n::TypeKind::Union(members), span)
         };
         out.push(n::TypeDef {
+            alias_pattern: def.alias_pattern,
             name: id(&def.name),
             head,
             rhs: n::TypeRhs::Type(rhs),
@@ -1384,11 +1388,9 @@ impl Cx<'_> {
     /// alias names go after the pattern.
     fn pattern(&mut self, p: &o::Pattern, item: bool) -> n::Pattern {
         let kind = match &p.kind {
-            o::PatternKind::Quote { datum, .. } => {
-                n::PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(
-                    &super::lisp::convert_quote(datum),
-                ))
-            }
+            o::PatternKind::Quote { datum, .. } => n::PatternKind::Quote(
+                crate::lisp::quote_lower3::read_pattern_lenient(&super::lisp::convert_quote(datum)),
+            ),
             o::PatternKind::Var(s) => n::PatternKind::Var(s.clone()),
             o::PatternKind::Discard(s) => n::PatternKind::Discard(s.clone()),
             o::PatternKind::Typed { binder: b, ty } => n::PatternKind::Typed {

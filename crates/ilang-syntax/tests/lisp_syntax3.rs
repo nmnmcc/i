@@ -717,3 +717,41 @@ fn source_tree_finds_the_original_multi_shape_argument() {
     );
     assert!(!syntax.show().contains("%multi"));
 }
+
+#[test]
+fn item_result_keeps_its_sum_absorption_boundary() {
+    use ilang_syntax::lisp::{
+        parse,
+        scoped::ScopedSource,
+        syntax::{Scope, Syntax},
+    };
+    let source = "C = ()\n";
+    let (mut native, errors) = ilang_syntax::syn3::parse_module(source);
+    assert!(errors.is_empty());
+    let (mut old, errors) = ilang_syntax::syn3::lower::lower(&native);
+    assert!(errors.is_empty());
+    let mut written = ilang_syntax::syn3::lower::Transition::default();
+    written.record_items(&mut old.items);
+    let scope = Scope {
+        module: 0,
+        marks: Default::default(),
+    };
+    let result = Syntax::from_datum(&parse("(= T C)").unwrap()[0], &scope);
+    let call = Syntax::from_datum(&parse("m").unwrap()[0], &scope);
+    let mut before = ScopedSource::new(source.into());
+    old.items.extend(before.items(&result, &call).unwrap());
+    let mut after = ScopedSource::new(source.into());
+    native.items.extend(after.items3(&result, &call).unwrap());
+    let (lowered, errors) = ilang_syntax::syn3::lower::lower_with_transition(
+        &native,
+        false,
+        Some(after.original_len()),
+        &written,
+        Some(after.transition()),
+    );
+    assert!(errors.is_empty());
+    assert_eq!(
+        ilang_syntax::print::print_module(&old),
+        ilang_syntax::print::print_module(&lowered)
+    );
+}

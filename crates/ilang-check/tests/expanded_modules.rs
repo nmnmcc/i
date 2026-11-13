@@ -1,9 +1,8 @@
 //! Expanded modules must enter the same resolver and checker as parsed source.
 mod common;
 
-// The tree that `Parsed.ast` holds: `tree::new` once it is the tree of syntax
-// three (docs/design/syn3-final-ast.md, step 2d).
-use common::tree::old as tree;
+// Parsed.ast holds the syntax-three tree (final-ast step 2d).
+use common::tree::new as tree;
 
 #[test]
 fn checks_transformed_modules_without_reparsing_the_source() {

@@ -14,8 +14,7 @@ use ilang_syntax::syn3::ast::{
 /// `T(head) = value` where the right side is the type of a value and the
 /// head is not empty: an alias pattern, which binds the names of its head.
 pub fn alias_pattern(def: &TypeDef) -> bool {
-    !def.head.is_empty()
-        && matches!(&def.rhs, TypeRhs::Type(t) if matches!(t.kind, TypeKind::ValueOf { .. }))
+    def.alias_pattern
 }
 
 /// The type names that a definition binds: its own name, or for an alias

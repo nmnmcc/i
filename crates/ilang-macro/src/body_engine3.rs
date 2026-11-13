@@ -22,8 +22,12 @@ pub trait Encode {
     /// `syn3::lisp::*_datum`.
     fn datum(&self) -> Datum;
     fn span(&self) -> Span;
+    fn normalize(&self, syntax: &Syntax) -> Syntax;
 }
 impl Encode for Expr {
+    fn normalize(&self, syntax: &Syntax) -> Syntax {
+        ilang_syntax::lisp::source_syntax::normalize_expression(syntax)
+    }
     fn datum(&self) -> Datum {
         ilang_syntax::syn3::lisp::expr_datum(self)
     }
@@ -32,6 +36,9 @@ impl Encode for Expr {
     }
 }
 impl Encode for Type {
+    fn normalize(&self, syntax: &Syntax) -> Syntax {
+        ilang_syntax::lisp::source_syntax::normalize_type(syntax)
+    }
     fn datum(&self) -> Datum {
         ilang_syntax::syn3::lisp::type_datum(self)
     }
@@ -40,6 +47,9 @@ impl Encode for Type {
     }
 }
 impl Encode for Pattern {
+    fn normalize(&self, syntax: &Syntax) -> Syntax {
+        ilang_syntax::lisp::source_syntax::normalize_pattern(syntax)
+    }
     fn datum(&self) -> Datum {
         ilang_syntax::syn3::lisp::pattern_datum(self)
     }
@@ -48,6 +58,9 @@ impl Encode for Pattern {
     }
 }
 impl Encode for Item {
+    fn normalize(&self, syntax: &Syntax) -> Syntax {
+        ilang_syntax::lisp::source_syntax::normalize_item(syntax)
+    }
     fn datum(&self) -> Datum {
         ilang_syntax::syn3::lisp::item_datum(self)
     }
@@ -202,7 +215,18 @@ impl BodyEngine<'_> {
         if let Some(origin) = self.scoped.origin(node.span()) {
             return origin.syntax.clone();
         }
-        encode_node(node, &self.scope())
+        let file = self.graph.sources.get(self.source);
+        let syntax = if file.display.ends_with(".is") {
+            ilang_syntax::lisp::source_syntax::written_lisp_syntax(
+                node.span(),
+                &self.scope(),
+                &file.text,
+            )
+        } else {
+            self.source_encoder()
+                .with_tokens(|| encode_node(node, &self.scope()))
+        };
+        node.normalize(&syntax)
     }
 }
 

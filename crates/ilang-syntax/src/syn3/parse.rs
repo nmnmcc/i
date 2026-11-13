@@ -605,7 +605,7 @@ impl Parser<'_> {
                 span: ty.span,
             }),
         };
-        Ok(TypeDef { name, head, rhs })
+        Ok(TypeDef::new(name, head, rhs))
     }
 
     // ---- Statements ----

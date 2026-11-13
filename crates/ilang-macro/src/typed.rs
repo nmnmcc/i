@@ -14,14 +14,13 @@ use ilang_check::{
 };
 use ilang_package::{Diagnostic, PackageGraph};
 use ilang_syntax::{
-    ast,
     lisp::{
         expansion::MacroArgument,
         scoped::ScopedSource,
         syntax::{Node, Scope, Syntax},
     },
     span::Span,
-    walk::{Visitor, Walk},
+    syn3::ast,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -106,14 +105,6 @@ fn diagnostic(
         message,
     )]
 }
-struct Expressions(HashMap<Span, ast::Expr>);
-impl Visitor for Expressions {
-    fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
-        if enter {
-            self.0.insert(e.span, e.clone());
-        }
-    }
-}
 fn children(s: &Syntax) -> &[Syntax] {
     match s.node() {
         Node::Round(xs) | Node::Square(xs) | Node::Curly(xs) | Node::Bits(xs) => xs,
@@ -121,22 +112,35 @@ fn children(s: &Syntax) -> &[Syntax] {
     }
 }
 fn syntax_for(p: &Parsed, graph: &PackageGraph, e: &ast::Expr) -> Syntax {
-    if let Some(origin) = p.scoped.as_ref().and_then(|s| s.origin(e.span)) {
+    if let Some(origin) = p.scoped.as_ref().and_then(|s| s.origin(e.span.0)) {
         return origin.syntax.clone();
     }
     let file = graph.sources.get(p.source);
-    ilang_syntax::lisp::source_syntax::source_expression_syntax(
-        e,
-        &Scope {
-            module: p.source.0,
-            marks: Default::default(),
-        },
-        &file.text,
-        file.display.ends_with(".is"),
-    )
+    let scope = Scope {
+        module: p.source.0,
+        marks: Default::default(),
+    };
+    let syntax = if file.display.ends_with(".is") {
+        ilang_syntax::lisp::source_syntax::written_lisp_syntax(e.span.0, &scope, &file.text)
+    } else {
+        let tokens = Arc::new(ilang_syntax::syn3::lisp::TokenIndex::new(&file.text));
+        ilang_syntax::syn3::lisp::with_tokens(&tokens, || {
+            Syntax::from_datum(&ilang_syntax::syn3::lisp::expr_datum(e), &scope)
+        })
+    };
+    ilang_syntax::lisp::source_syntax::normalize_expression(&syntax)
 }
 impl Expander for Driver {
     fn expand(
+        &self,
+        call: Invocation<'_>,
+        query: Arc<TypedMacroQuery>,
+    ) -> Result<Output, Vec<Diagnostic>> {
+        ilang_syntax::syn3::deep::deep(|| self.expand_here(call, query))
+    }
+}
+impl Driver {
+    fn expand_here(
         &self,
         call: Invocation<'_>,
         query: Arc<TypedMacroQuery>,
@@ -152,10 +156,8 @@ impl Expander for Driver {
         let mut caller = self.parsed[module.0 as usize].clone();
         caller.scoped = program.module(module).scoped.clone();
         let p = &caller;
-        let mut expressions = Expressions(HashMap::new());
-        p.ast.clone().walk(&mut expressions);
+        let expressions = crate::typed3::module_expressions(&p.ast);
         let original = expressions
-            .0
             .get(&span)
             .cloned()
             .or_else(|| {
@@ -167,13 +169,12 @@ impl Expander for Driver {
                     .cloned()
             })
             .expect("resolved typed call has source syntax");
-        let written = crate::call::expression(&original).expect("typed expression is a call");
-        let mut arguments: Vec<_> = written
-            .prefix
-            .into_iter()
-            .chain(written.args.iter().map(|a| &a.value))
-            .map(|e| syntax_for(p, &self.graph, e))
-            .collect();
+        let written = crate::call3::expression(&original).expect("typed expression is a call");
+        let mut arguments: Vec<_> =
+            crate::body_engine3::expression_arguments(&written, |e| syntax_for(p, &self.graph, e))
+                .into_iter()
+                .map(|arg| arg.syntax)
+                .collect();
         let order = query.argument_order();
         arguments = order
             .iter()
@@ -201,22 +202,8 @@ impl Expander for Driver {
                             .clone(),
                     )
                 });
-            let ty = scoped.ty(syntax, &parser_call).map_err(|e| e.message)?;
-            let expr = ast::Expr {
-                span: ty.span,
-                kind: ast::ExprKind::Fn(Box::new(ast::Function {
-                    params: Vec::new(),
-                    ret: Some(ast::RetType {
-                        value: ty,
-                        err: None,
-                        env: None,
-                    }),
-                    body: ast::Block {
-                        stmts: Vec::new(),
-                        span: Span::default(),
-                    },
-                })),
-            };
+            let ty = scoped.ty3(syntax, &parser_call).map_err(|e| e.message)?;
+            let expr = crate::typed3::output_type_function(ty);
             let resolved = with_scoped(&parser_scratch, &parser_parsed, index, scoped, |parsed| {
                 ilang_check::resolve::typed_output(
                     &parser_graph,
@@ -289,7 +276,7 @@ impl Expander for Driver {
         let name = &program.def(definition).name;
         let target_source = program.module(definition.module).source;
         let target = &self.parsed[definition.module.0 as usize];
-        let definitions = ilang_syntax::lisp::expansion::definitions(&target.ast, true)
+        let definitions = ilang_syntax::lisp::expansion3::definitions(&target.ast, true)
             .expect("typed definition validated");
         let mac = crate::registry::Macro {
             source: target_source,
@@ -342,7 +329,7 @@ impl Expander for Driver {
             })?;
         let mut syntax = engine
             .scoped
-            .expression_metered(&result, &call, |work, words| {
+            .expression3_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|e| {
@@ -353,31 +340,13 @@ impl Expander for Driver {
                     format!("typed macro must return expression syntax: {e:?}"),
                 )
             })?;
-        engine.scoped.inherit_call_chain(syntax.span, span, name);
+        engine.scoped.inherit_call_chain(syntax.span.0, span, name);
         // Ordinary syntax macros in the result still run in expression/type
         // position. No Items service exists in this phase.
-        let mut wrapper = ast::Module::default();
-        wrapper.items.push(ast::Item {
-            doc: Vec::new(),
-            attributes: Vec::new(),
-            span: syntax.span,
-            kind: ast::ItemKind::Binding(ast::Binding {
-                pattern: ast::Pattern {
-                    kind: ast::PatternKind::Discard("_".into()),
-                    span: syntax.span,
-                },
-                value: syntax,
-                type_params: Vec::new(),
-                span,
-            }),
-        });
-        crate::body_walk::expressions(&mut wrapper, &mut engine)
+        let mut wrapper = crate::typed3::wrapper(syntax, span);
+        crate::body_walk3::expressions(&mut wrapper, &mut engine)
             .map_err(|e| crate::diagnostics::body(p.source, e))?;
-        let ast::ItemKind::Binding(binding) = wrapper.items.pop().expect("output wrapper").kind
-        else {
-            unreachable!()
-        };
-        syntax = binding.value;
+        syntax = crate::typed3::unwrap(wrapper);
         let scoped = engine.scoped.clone();
         drop(engine);
         state.session.types = None;
@@ -404,62 +373,36 @@ impl Expander for Driver {
                 input_binders.insert(binder.span, binder.var);
             }
         }
-        struct Inputs<'a> {
-            scoped: &'a ScopedSource,
-            inputs: &'a [Syntax],
-            query: &'a TypedMacroQuery,
-            originals: &'a HashMap<Span, hir::Expr>,
-            binders: &'a HashMap<Span, hir::VarId>,
-            caller: &'a Program,
-            module: ModuleId,
-            checked: &'a mut ilang_check::resolve::CheckedInputs,
-        }
-        impl Visitor for Inputs<'_> {
-            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
-                if enter
-                    && let Some(origin) = self.scoped.origin(e.span)
-                    && let Some(input) = self.inputs.iter().find(|s| s.same_input(&origin.syntax))
-                    && let Some(old) = self
-                        .query
-                        .input_span(input)
-                        .and_then(|span| self.originals.get(&span))
-                {
-                    self.checked.expressions.insert(e.span, old.clone());
-                }
+        crate::typed3::for_each_expression_span(&syntax, |new| {
+            if let Some(origin) = scoped.origin(new)
+                && let Some(input) = input_nodes.iter().find(|s| s.same_input(&origin.syntax))
+                && let Some(old) = query
+                    .input_span(input)
+                    .and_then(|span| original_nodes.get(&span))
+            {
+                checked.expressions.insert(new, old.clone());
             }
-            fn span(&mut self, new: &mut Span) {
-                if let Some(origin) = self.scoped.origin(*new)
-                    && self
-                        .inputs
-                        .iter()
-                        .any(|input| input.same_input(&origin.syntax))
-                    && let Some((_, var)) = self.binders.iter().find(|(old, _)| {
-                        if let Some(original) = self
-                            .caller
-                            .module(self.module)
-                            .scoped
-                            .as_ref()
-                            .and_then(|s| s.origin(**old))
-                        {
-                            original.syntax.same_input(&origin.syntax)
-                        } else {
-                            **old == origin.syntax.span()
-                        }
-                    })
-                {
-                    self.checked.binders.insert(*new, *var);
-                }
+        });
+        crate::typed3::for_each_span(&syntax, |new| {
+            if let Some(origin) = scoped.origin(new)
+                && input_nodes
+                    .iter()
+                    .any(|input| input.same_input(&origin.syntax))
+                && let Some((_, var)) = input_binders.iter().find(|(old, _)| {
+                    if let Some(original) = program
+                        .module(module)
+                        .scoped
+                        .as_ref()
+                        .and_then(|s| s.origin(**old))
+                    {
+                        original.syntax.same_input(&origin.syntax)
+                    } else {
+                        **old == origin.syntax.span()
+                    }
+                })
+            {
+                checked.binders.insert(new, *var);
             }
-        }
-        syntax.clone().walk(&mut Inputs {
-            scoped: &scoped,
-            inputs: &input_nodes,
-            query: &query,
-            originals: &original_nodes,
-            binders: &input_binders,
-            caller: program,
-            module,
-            checked: &mut checked,
         });
         let holes = checked
             .expressions
@@ -499,64 +442,22 @@ impl Expander for Driver {
             }
             ds
         })?;
-        struct Delayed<'a> {
-            depth: usize,
-            holes: &'a [(Span, Span)],
-            query: &'a TypedMacroQuery,
-            invalid: bool,
-        }
-        impl Visitor for Delayed<'_> {
-            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
-                if enter {
-                    if self.depth > 0
-                        && let Some((_, old)) = self.holes.iter().find(|(new, _)| *new == e.span)
-                    {
-                        self.invalid |= self.query.argument_is_effectful(*old);
-                    }
-                    if matches!(e.kind, ast::ExprKind::Fn(_) | ast::ExprKind::Clauses(_)) {
-                        self.depth += 1;
-                    }
-                } else if matches!(e.kind, ast::ExprKind::Fn(_) | ast::ExprKind::Clauses(_)) {
-                    self.depth -= 1;
-                }
+        let mut spans = Vec::new();
+        crate::typed3::for_each_expression_span(&syntax, |new| {
+            if let Some(origin) = scoped.origin(new)
+                && let Some(input) = input_nodes.iter().find(|s| s.same_input(&origin.syntax))
+                && let Some(old) = query.input_span(input)
+            {
+                spans.push((new, old));
             }
-        }
-        // The source output uses virtual spans; match each forwarded input by
-        // its retained origin before inspecting function boundaries.
-        // Populate the source occurrences using their immutable Syntax origins.
-        struct HoleSpans<'a> {
-            scoped: &'a ScopedSource,
-            inputs: &'a [Syntax],
-            query: &'a TypedMacroQuery,
-            out: Vec<(Span, Span)>,
-        }
-        impl Visitor for HoleSpans<'_> {
-            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
-                if enter
-                    && let Some(o) = self.scoped.origin(e.span)
-                    && let Some(s) = self.inputs.iter().find(|s| s.same_input(&o.syntax))
-                    && let Some(span) = self.query.input_span(s)
-                {
-                    self.out.push((e.span, span));
-                }
-            }
-        }
-        let mut source = syntax.clone();
-        let mut spans = HoleSpans {
-            scoped: &scoped,
-            inputs: &input_nodes,
-            query: &query,
-            out: Vec::new(),
-        };
-        source.walk(&mut spans);
-        let mut delayed = Delayed {
-            depth: 0,
-            holes: &spans.out,
-            query: &query,
-            invalid: false,
-        };
-        source.walk(&mut delayed);
-        if delayed.invalid {
+        });
+        let delayed = crate::typed3::hole_inside_function(&syntax, |new| {
+            spans
+                .iter()
+                .find(|(span, _)| *span == new)
+                .is_some_and(|(_, old)| query.argument_is_effectful(*old))
+        });
+        if delayed {
             return Err(diagnostic(
                 program,
                 module,
@@ -565,11 +466,10 @@ impl Expander for Driver {
             ));
         }
         check_dependencies(program, module, span, &expression)?;
-        let mut generated = Expressions(HashMap::new());
-        syntax.clone().walk(&mut generated);
+        let generated = crate::typed3::expressions(&syntax);
         state
             .generated
-            .extend(generated.0.into_iter().map(|(span, e)| ((module, span), e)));
+            .extend(generated.into_iter().map(|(span, e)| ((module, span), e)));
         resolution.modules[module.0 as usize].scoped = Some(scoped.clone());
         for binding in &mut resolution.modules[module.0 as usize].bindings {
             hir::visit_expr_mut(&mut binding.binding.value, &mut |e| {

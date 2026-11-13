@@ -272,7 +272,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2a `i fmt --to` on the new tree | done |
 | 2b datum builder; `needs_row` | done |
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
-| 2d engine on the new tree | not started; faE readers are beside the old engine, with no production switch-over |
+| 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
 | 3 resolver | not started; faD is deliberately not merged in this prefix |
 | 4 deletion | not started |
 
@@ -443,3 +443,62 @@ Conversion final commit `9365b311f` is integrated after the green rows flip.
 Its four Rust-file changes are formatting only; its other changes document
 conversion verification and fix inventory extraction. Workspace/all-targets
 check passed again (`conv-final-check.log`).
+
+Step 2d implementation begins from green `9badcec8` (18:50). `Parsed.ast`
+is a `syn3::Module`; the production driver uses the part-E readers and
+walkers. The old resolver gets a private `LoweredParsed` at entry. Written
+lowering diagnostics are retained at parse time, and generated readers
+validate the same transition restrictions before retaining the native tree.
+Written Lisp and standalone macro-result pipe classification keep their
+existing boundary through the source map's virtual suffix. Native clones,
+walkers, and quote lowering use `syn3::deep`.
+
+The native type definition stores its written alias-pattern classification.
+Spec §4.7 says, “This classification is made before expanding the right
+side; it never depends on imports or on what a macro returns there.” A
+baseline run of `Alias(A) = m.id(value)` reports E0221 at 3:7 for unused A;
+the new regression retains that error and excludes reclassification as an
+unknown alias-pattern head. The baseline command is recorded in
+`target/fa-integration/2d-classification-baseline.log`.
+
+2d checkpoint (19:35): workspace/all-targets check and syntax/macro tests
+passed, then CLI fmt 6, lisp 7, macro_budget 9, macro_run 61,
+syntax_runtime 10 and typed_macros 36 passed (129). Expanded-module and
+origin tests passed. Hygiene 20 and quote-pattern 5 retries passed after
+preserving prepared nested capture slots and locating the same f binding
+among the now-separate native member items. Wasm source sites 2, CLI source
+sites 1 and the LSP expansion-suffix regression 1 passed.
+
+An additional old-engine/new-engine differential then found a real
+transition-context mismatch: a returned `(Int) <- N -> Int` inherited
+`N%E` when re-lowered inside a generic binding, whereas the old standalone
+reader supplied no such error channel. The fix retains standalone fragment
+boundaries, original formal-parameter lists and original sum membership as
+names and spans only. This also prevents a macro-returned chain or union
+from being regrouped as though it had been written at its final location.
+Five differential inputs plus an item-result absorption case cover those
+boundaries. Their fix and the final 2d gate are pending; 2d is uncommitted.
+Newer conv commits after 9365b311f are still marked NOT LANDABLE by that
+lane, so the last green conversion checkpoint remains the integration base.
+
+Final 2d gate progress (19:53): workspace/all-targets check passed, all
+syntax/macro tests passed (216), all six CLI binaries passed (130: fmt 6,
+lisp 7, budget 9, macro_run 62, runtime 10, typed_macros 36), and examples
+passed 13 with one existing skip. The five-case old/new differential and
+the item-result absorption regression passed with the boundary metadata.
+Std O0, spec 15.7/ + 6/ + 7/, and the final boundary rerun remain pending;
+2d is not committed until the entire gate passes.
+
+Final 2d gate (20:08): **GREEN**. Workspace/all-targets check passed;
+syntax/macro 216, CLI fmt/lisp/budget/macro_run/runtime/typed 130, examples
+13 with one existing skip, and all 2,170 std O0 tests passed. Spec filters
+15.7/ 28, 6/ 80, 7/ 104 passed at both O0/O2 with the existing pending
+counts 1/28/1. The final checker boundary rerun passed all 30 cases. The
+five-case fragment differential and item-result sum-boundary regression
+passed. Additional Wasm source-site 2, CLI source-site 1 and LSP suffix 1
+checks passed before the final boundary-metadata refinement. Complete
+commands, earlier explained failures and retries are in
+`target/fa-integration/evening-verification.txt`; final logs use `2d-final-*`.
+The initial queued std wrapper was cancelled by its own PID before starting,
+so the spec and boundary checks could run first; std then ran last through
+the wrapper. Step 3 is next; no deletion is authorized before its green gate.

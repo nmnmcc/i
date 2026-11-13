@@ -355,19 +355,21 @@ impl<'a> Query<'a> {
                 .min_by_key(|((_, call), _)| call.end - call.start)
         {
             code.push_str("\n\n// expansion\n");
+            let syntax = ilang_syntax::syn3::lower::lower_expr(&output.syntax)
+                .expect("checked typed output lowers at the query boundary");
             let module = ast::Module {
                 items: vec![ast::Item {
                     doc: Vec::new(),
                     attributes: Vec::new(),
-                    span: output.syntax.span,
+                    span: syntax.span,
                     kind: ast::ItemKind::Binding(ast::Binding {
                         pattern: ast::Pattern {
                             kind: ast::PatternKind::Discard("_".into()),
-                            span: output.syntax.span,
+                            span: syntax.span,
                         },
-                        value: output.syntax.clone(),
+                        value: syntax.clone(),
                         type_params: Vec::new(),
-                        span: output.syntax.span,
+                        span: syntax.span,
                     }),
                 }],
                 ..ast::Module::default()

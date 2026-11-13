@@ -10,7 +10,7 @@
 //! 6. check the rules about the whole program (entries, host services,
 //!    `[wasm] exports`).
 
-use crate::Parsed;
+type Parsed = crate::LoweredParsed;
 use crate::code;
 use crate::hir::*;
 use crate::types::{Head, HostType, ShapeId, Ty};
@@ -21,7 +21,12 @@ use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
-pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
+pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
+    let lowered = crate::lower_parsed(graph, parsed);
+    resolve_lowered(graph, &lowered)
+}
+
+fn resolve_lowered(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
     let mut r = Resolver {
         graph,
         parsed,
@@ -4846,6 +4851,82 @@ pub struct CheckedInputs {
 /// Resolve fresh output in the exact lexical scope captured before inference.
 #[allow(clippy::too_many_arguments)]
 pub fn typed_output(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+    original: &Program,
+    module: ModuleId,
+    call: Span,
+    expression: &ilang_syntax::syn3::ast::Expr,
+    var_count: u32,
+    ty_var_count: u32,
+    checked: &CheckedInputs,
+) -> Result<(Expr, Program), Vec<Diagnostic>> {
+    let lowered = crate::lower_parsed(graph, parsed);
+    // A multi-shape chain has a synthetic one-byte root in the transition
+    // tree. Keep checked inputs at that root as well as their native span.
+    struct Inputs<'a>(&'a mut CheckedInputs);
+    impl ilang_syntax::syn3::walk::Visitor for Inputs<'_> {
+        fn expr(&mut self, e: &mut ilang_syntax::syn3::ast::Expr, enter: bool) {
+            use ilang_syntax::syn3::ast::ExprKind;
+            // Only a multi-shape chain changes its root span. Computing
+            // this from its head avoids lowering every forwarded subtree.
+            if enter
+                && let ExprKind::Chain(branches) = &e.kind
+                && branches.iter().any(|branch| {
+                    branch
+                        .params
+                        .iter()
+                        .any(|parameter| parameter.key.is_some())
+                        || branches
+                            .first()
+                            .is_some_and(|first| first.params.len() != branch.params.len())
+                })
+                && let Some(old) = self.0.expressions.get(&e.span.0).cloned()
+            {
+                let span = e.span.0;
+                self.0
+                    .expressions
+                    .insert(Span::new(span.end.saturating_sub(1), span.end), old);
+            }
+        }
+    }
+    let mut forwarded = CheckedInputs {
+        expressions: checked.expressions.clone(),
+        binders: checked.binders.clone(),
+    };
+    ilang_syntax::syn3::deep::deep(|| {
+        ilang_syntax::syn3::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
+    });
+    let expression = ilang_syntax::syn3::lower::lower_expr_with_transition(
+        expression,
+        parsed[module.0 as usize]
+            .scoped
+            .as_ref()
+            .map(|scoped| scoped.transition()),
+    )
+    .map_err(|d| {
+        vec![Diagnostic::error(
+            d.code.as_str(),
+            Some(parsed[module.0 as usize].source),
+            d.span,
+            d.message,
+        )]
+    })?;
+    typed_output_lowered(
+        graph,
+        &lowered,
+        original,
+        module,
+        call,
+        &expression,
+        var_count,
+        ty_var_count,
+        &forwarded,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn typed_output_lowered(
     graph: &PackageGraph,
     parsed: &[Parsed],
     original: &Program,

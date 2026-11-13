@@ -1,9 +1,8 @@
 //! Expanded code points to written arguments or its call and template (§9).
 mod common;
 
-// The tree that `Parsed.ast` holds: `tree::new` once it is the tree of syntax
-// three (docs/design/syn3-final-ast.md, step 2d).
-use common::tree::old as tree;
+// Parsed.ast holds the syntax-three tree (final-ast step 2d).
+use common::tree::new as tree;
 
 use ilang_check::query::{Query, check_parsed_for_queries};
 use ilang_syntax::lisp::{
@@ -49,7 +48,7 @@ fn template_error_uses_call_site_and_related_template_and_suppresses_warnings() 
     let template_span = Span::new(3, 10);
     let generated = syntax("missing", ts.0, template_span, &[9]);
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression(&generated, &call).unwrap();
+    let expanded = scoped.expression3(&generated, &call).unwrap();
     let generated_span = tree::span(&expanded);
     scoped.inherit_call_chain(tree::span(&expanded), call_span, "fake");
     *last = expanded;
@@ -109,7 +108,7 @@ fn argument_location_and_query_use_written_source() {
     let call = syntax("fake", ms.0, call_span, &[]);
     let argument = syntax("x", ms.0, Span::new(x_offset, x_offset + 1), &[]);
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression(&argument, &call).unwrap();
+    let expanded = scoped.expression3(&argument, &call).unwrap();
     let generated_span = tree::span(&expanded);
     scoped.inherit_call_chain(tree::span(&expanded), call_span, "fake");
     *last = expanded;
@@ -174,10 +173,10 @@ fn nested_template_error_uses_outer_call_and_both_template_locations() {
     let call = syntax("first", ms.0, call_span, &[]);
     let mut scoped = ScopedSource::new(main.into());
     let inner = syntax("second", first.0, Span::new(3, 9), &[1]);
-    let intermediate = scoped.expression(&inner, &call).unwrap();
+    let intermediate = scoped.expression3(&inner, &call).unwrap();
     scoped.inherit_call_chain(tree::span(&intermediate), call_span, "first");
     let missing = syntax("missing", second.0, Span::new(3, 10), &[2]);
-    let result = scoped.expression(&missing, &inner).unwrap();
+    let result = scoped.expression3(&missing, &inner).unwrap();
     scoped.inherit_call_chain(tree::span(&result), tree::span(&intermediate), "second");
     *last = result;
     graph.sources.set_text(ms, scoped.text().into());
@@ -219,7 +218,7 @@ fn template_name_hover_and_definition_navigate_across_modules() {
     let call = syntax("fake", ms.0, call_span, &[]);
     let reference = syntax("helper", ts.0, Span::new(3, 9), &[7]);
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression(&reference, &call).unwrap();
+    let expanded = scoped.expression3(&reference, &call).unwrap();
     scoped.inherit_call_chain(tree::span(&expanded), call_span, "fake");
     *last = expanded;
     graph.sources.set_text(ms, scoped.text().into());

@@ -258,7 +258,7 @@ impl<'a> BodyEngine<'a> {
                 .expect("registered macro must be prepared");
             let (path, name) = prepare::add_wrapper(&mut graph, &mut parsed, binding, position);
             let wrapper_source = parsed.last().expect("wrapper module was added").source;
-            let definition_span = module.ast.items[mac.definition.item].span;
+            let definition_span = module.ast.items[mac.definition.item].span.0;
             let program =
                 run::compile_owned(graph, &parsed, &[(&path, &name)]).map_err(|error| {
                     let mut diagnostics = match error {

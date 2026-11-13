@@ -5,7 +5,7 @@ use crate::{
 };
 use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
-use ilang_syntax::lisp::expansion;
+use ilang_syntax::lisp::expansion3 as expansion;
 
 /// Checks all macro signatures and capabilities of one module under the full
 /// compiler environment available in item position. Dependencies must have
@@ -53,7 +53,7 @@ pub fn module(
         wrappers.push((
             wrapper_source,
             definition.name.clone(),
-            root.ast.items[definition.item].span,
+            root.ast.items[definition.item].span.0,
         ));
         entries.push((path, name));
     }
@@ -66,7 +66,7 @@ pub fn module(
         Err(CompileError::Internal(message)) => Err(vec![Diagnostic::error(
             ilang_check::code::MACRO_RESERVED,
             Some(source),
-            root.ast.items[definitions[0].item].span,
+            root.ast.items[definitions[0].item].span.0,
             format!("compiler error while compiling macros: {message}"),
         )]),
         Err(CompileError::Program(mut diagnostics)) => {

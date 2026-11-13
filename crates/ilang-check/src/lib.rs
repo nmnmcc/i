@@ -19,7 +19,7 @@ pub mod types;
 mod unused;
 
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId, SourceId};
-use ilang_syntax::ast;
+use ilang_syntax::syn3::ast;
 
 /// The stable codes of the problems found by this crate.
 pub mod code {
@@ -132,18 +132,83 @@ pub mod code {
 }
 
 /// A parsed module of the graph.
-#[derive(Clone)]
 pub struct Parsed {
     pub package: PackageId,
     pub path: String,
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
+    /// Names and spans needed by the temporary transition boundary.
+    pub lowering: ilang_syntax::syn3::lower::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
     pub compiler_generated: bool,
     pub typed_macros: Option<std::sync::Arc<dyn typed_macro::Expander>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct LoweredParsed {
+    pub package: PackageId,
+    pub path: String,
+    pub source: SourceId,
+    pub kind: ModuleKind,
+    pub ast: ilang_syntax::ast::Module,
+    pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
+    pub compiler_generated: bool,
+    pub typed_macros: Option<std::sync::Arc<dyn typed_macro::Expander>>,
+}
+
+impl Clone for Parsed {
+    fn clone(&self) -> Self {
+        ilang_syntax::syn3::deep::deep(|| Self {
+            package: self.package,
+            path: self.path.clone(),
+            source: self.source,
+            kind: self.kind,
+            ast: self.ast.clone(),
+            lowering: self.lowering.clone(),
+            scoped: self.scoped.clone(),
+            compiler_generated: self.compiler_generated,
+            typed_macros: self.typed_macros.clone(),
+        })
+    }
+}
+
+impl Parsed {
+    /// Preserve source identity and origins at the step 2d resolver boundary.
+    fn with_lowered_ast(&self, ast: ilang_syntax::ast::Module) -> LoweredParsed {
+        LoweredParsed {
+            package: self.package,
+            path: self.path.clone(),
+            source: self.source,
+            kind: self.kind,
+            ast,
+            scoped: self.scoped.clone(),
+            compiler_generated: self.compiler_generated,
+            typed_macros: self.typed_macros.clone(),
+        }
+    }
+}
+
+/// Step 2d boundary for consumers that still read the transition tree.
+/// Written lowering diagnostics were already retained by `parse`.
+pub(crate) fn lower_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Vec<LoweredParsed> {
+    parsed
+        .iter()
+        .map(|p| {
+            let (ast, _) = ilang_syntax::syn3::deep::deep(|| {
+                ilang_syntax::syn3::lower::lower_with_transition(
+                    &p.ast,
+                    graph.sources.get(p.source).display.ends_with(".is"),
+                    p.scoped.as_ref().map(|scoped| scoped.original_len()),
+                    &p.lowering,
+                    p.scoped.as_ref().map(|scoped| scoped.transition()),
+                )
+            });
+            p.with_lowered_ast(ast)
+        })
+        .collect()
 }
 
 /// Parses every module of the graph. Syntax errors keep their codes.
@@ -153,11 +218,21 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
             let source = graph.sources.get(m.source);
-            let (ast, errors) = if source.display.ends_with(".is") {
-                ilang_syntax::lisp::parse_source(&source.text)
+            let lisp = source.display.ends_with(".is");
+            let (ast, mut errors) = if lisp {
+                ilang_syntax::syn3::lisp::from_lisp(&source.text)
             } else {
-                ilang_syntax::parse_module(&source.text)
+                ilang_syntax::syn3::parse_module(&source.text)
             };
+            let (mut lowered, more) = if lisp {
+                ilang_syntax::syn3::lower::lower_lisp(&ast)
+            } else {
+                ilang_syntax::syn3::lower::lower(&ast)
+            };
+            let mut lowering = ilang_syntax::syn3::lower::Transition::default();
+            ilang_syntax::syn3::deep::deep(|| lowering.record_items(&mut lowered.items));
+            errors.extend(more);
+            errors.sort_by_key(|d| (d.span.start, d.span.end));
             diags.extend(
                 errors
                     .into_iter()
@@ -169,6 +244,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 source: m.source,
                 kind: m.kind,
                 ast,
+                lowering,
                 scoped: None,
                 compiler_generated: false,
                 typed_macros: None,
@@ -182,17 +258,21 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
-    let (mut parsed, diags) = parse(graph);
+    let (mut parsed, mut diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
     }
     // Direct checking resolves quotes in the same form as the expansion driver.
     let mut templates = Vec::new();
     for module in &mut parsed {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
-            &mut module.ast,
-            module.source.0,
-            &mut templates,
+        diags.extend(
+            ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+                &mut module.ast,
+                module.source.0,
+                &mut templates,
+            )
+            .into_iter()
+            .map(|d| Diagnostic::error(d.code.as_str(), Some(module.source), d.span, d.message)),
         );
     }
     let (program, more) = resolve_parsed(graph, &parsed);

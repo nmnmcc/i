@@ -42,8 +42,22 @@ pub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
 }
 
 fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
+    lower_expanded(m, lisp, None)
+}
+
+/// Step 2d boundary: written Lisp keeps its transition spelling, while
+/// expansion results use the same expression reader as standalone results.
+/// The source map gives the start of the virtual expansion suffix.
+pub fn lower_expanded(
+    m: &n::Module,
+    lisp: bool,
+    generated_from: Option<u32>,
+) -> (o::Module, Vec<Diagnostic>) {
     let mut cx = Cx {
+        transition: Default::default(),
+        fragment: None,
         lisp,
+        generated_from,
         errors: Vec::new(),
         rows: Vec::new(),
         fresh: 0,
@@ -63,9 +77,168 @@ fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
     (module, cx.errors)
 }
 
+/// Metadata retained across native-tree expansion for the temporary
+/// transition adapter. It contains names and source spans, never old nodes.
+#[derive(Clone, Debug, Default)]
+pub struct Transition {
+    complete: bool,
+    parameters: HashMap<(Span, Span), Vec<(String, Span)>>,
+    sums: HashMap<Span, Vec<Span>>,
+    expressions: HashSet<Span>,
+    types: HashSet<Span>,
+    patterns: HashSet<Span>,
+}
+impl Transition {
+    pub fn extend(&mut self, other: &Self) {
+        self.complete |= other.complete;
+        self.parameters.extend(other.parameters.clone());
+        self.sums.extend(other.sums.clone());
+        self.expressions.extend(&other.expressions);
+        self.types.extend(&other.types);
+        self.patterns.extend(&other.patterns);
+    }
+    fn binding(&mut self, binding: &o::Binding) {
+        self.parameters.insert(
+            (binding.span, binding.pattern.span),
+            binding
+                .type_params
+                .iter()
+                .map(|p| (p.name.clone(), p.span))
+                .collect(),
+        );
+    }
+    fn block(&mut self, block: &o::Block) {
+        for statement in &block.stmts {
+            if let o::Stmt::Bind(binding) = statement {
+                self.binding(binding);
+            }
+        }
+    }
+    fn record<T: crate::walk::Walk>(&mut self, expression: &mut T) {
+        struct Bindings<'a>(&'a mut Transition);
+        impl crate::walk::Visitor for Bindings<'_> {
+            fn expr(&mut self, expression: &mut o::Expr, enter: bool) {
+                if !enter {
+                    return;
+                }
+                match &expression.kind {
+                    o::ExprKind::Quote(datum) => self.0.quoted(datum),
+                    o::ExprKind::Block(block) => self.0.block(block),
+                    o::ExprKind::Fn(function) => self.0.block(&function.body),
+                    _ => {}
+                }
+            }
+        }
+        crate::walk::Walk::walk(expression, &mut Bindings(self));
+    }
+    fn quoted(&mut self, datum: &crate::lisp::Datum) {
+        use crate::lisp::DatumKind;
+        let mut work = vec![datum];
+        while let Some(datum) = work.pop() {
+            match &datum.kind {
+                DatumKind::Unquote(inner) | DatumKind::Splice(inner) => {
+                    self.expressions.insert(inner.span);
+                    if let Ok(native) = super::lisp::expr_from_datum(inner)
+                        && let Ok(mut lowered) = lower_expr(&native)
+                    {
+                        self.record_expression(&mut lowered);
+                    }
+                }
+                DatumKind::Quote(inner) => work.push(inner),
+                DatumKind::Round(children)
+                | DatumKind::Square(children)
+                | DatumKind::Curly(children)
+                | DatumKind::Bits(children) => work.extend(children),
+                _ => {}
+            }
+        }
+    }
+    pub fn record_expression(&mut self, expression: &mut o::Expr) {
+        self.record(expression);
+    }
+    pub fn record_pattern(&mut self, pattern: &mut o::Pattern) {
+        self.record(pattern);
+    }
+    pub fn record_items(&mut self, items: &mut [o::Item]) {
+        self.complete = true;
+        for item in items {
+            match &mut item.kind {
+                o::ItemKind::Binding(binding) => {
+                    self.binding(binding);
+                    self.record_pattern(&mut binding.pattern);
+                    self.record_expression(&mut binding.value);
+                }
+                o::ItemKind::TypeDef(def) => {
+                    if let o::TypeBody::Custom(constructors) = &def.body {
+                        let members: Vec<_> = constructors
+                            .iter()
+                            .map(|c| c.span)
+                            .filter(|span| *span != item.span)
+                            .collect();
+                        if !members.is_empty() {
+                            self.sums.insert(item.span, members);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    pub fn expression(&mut self, span: Span) {
+        self.expressions.insert(span);
+    }
+    pub fn ty(&mut self, span: Span) {
+        self.types.insert(span);
+    }
+    pub fn pattern(&mut self, span: Span) {
+        self.patterns.insert(span);
+    }
+}
+
+/// Lower after expansion with the original binding and fragment boundaries.
+pub fn lower_with_transition(
+    m: &n::Module,
+    lisp: bool,
+    generated_from: Option<u32>,
+    written: &Transition,
+    generated: Option<&Transition>,
+) -> (o::Module, Vec<Diagnostic>) {
+    let mut transition = written.clone();
+    if let Some(generated) = generated {
+        transition.extend(generated);
+    }
+    let mut cx = Cx::plain();
+    cx.lisp = lisp;
+    cx.generated_from = generated_from;
+    cx.core_free = !m.imports.iter().any(|i| {
+        let named = match &i.alias {
+            Some(a) => a.name == "core",
+            None => i.names.is_empty() && i.path.last().is_some_and(|p| p.name == "core"),
+        };
+        let library = matches!(i.path.as_slice(), [a, b] if a.name == "i" && b.name == "core");
+        named && !library
+    });
+    cx.transition = std::sync::Arc::new(transition);
+    let module = cx.module(m);
+    (module, cx.errors)
+}
+
 /// Lowers one expression (macro results, tests).
 pub fn lower_expr(e: &n::Expr) -> Result<o::Expr, Diagnostic> {
     let mut cx = Cx::plain();
+    let out = cx.expr(e);
+    cx.finish(out)
+}
+
+/// Standalone typed output, including fragments expanded inside it.
+pub fn lower_expr_with_transition(
+    e: &n::Expr,
+    transition: Option<&Transition>,
+) -> Result<o::Expr, Diagnostic> {
+    let mut cx = Cx::plain();
+    if let Some(transition) = transition {
+        cx.transition = std::sync::Arc::new(transition.clone());
+    }
     let out = cx.expr(e);
     cx.finish(out)
 }
@@ -161,7 +334,10 @@ fn pattern_fail_rows(p: &n::Pattern, out: &mut HashSet<String>) {
 }
 
 struct Cx {
+    transition: std::sync::Arc<Transition>,
+    fragment: Option<(u8, Span)>,
     lisp: bool,
+    generated_from: Option<u32>,
     errors: Vec<Diagnostic>,
     /// The type parameters of the bindings around, for the error parameter
     /// that a row variable carries.
@@ -346,9 +522,26 @@ fn member_name(t: &n::Type) -> Option<&str> {
 }
 
 impl Cx {
+    fn boundary(&self, kind: u8, span: Span) -> bool {
+        self.fragment != Some((kind, span))
+            && match kind {
+                0 => self.transition.expressions.contains(&span),
+                1 => self.transition.types.contains(&span),
+                _ => self.transition.patterns.contains(&span),
+            }
+    }
+    fn standalone(&self, kind: u8, span: Span) -> Cx {
+        let mut cx = Cx::plain();
+        cx.transition = self.transition.clone();
+        cx.fragment = Some((kind, span));
+        cx
+    }
     fn plain() -> Cx {
         Cx {
+            transition: Default::default(),
+            fragment: None,
             lisp: false,
+            generated_from: None,
             errors: Vec::new(),
             rows: Vec::new(),
             fresh: 0,
@@ -479,49 +672,68 @@ impl Cx {
         let mut member_of: HashMap<usize, usize> = HashMap::new();
         let mut absorbed = HashSet::new();
         let mut single = Vec::new();
-        for (i, item) in items.iter().enumerate() {
-            let n::ItemKind::TypeDef(def) = &item.kind else {
-                continue;
-            };
-            if plain.contains(&i) {
-                continue;
-            }
-            let n::TypeRhs::Type(rhs) = &def.rhs else {
-                continue;
-            };
-            let members: Vec<&n::Type> = match &rhs.kind {
-                n::TypeKind::Union(ms) => ms.iter().collect(),
-                _ => vec![rhs],
-            };
-            let k = members.len();
-            if k > i || head_params(&def.head).is_none() {
-                continue;
-            }
-            let fits = members.iter().enumerate().all(|(j, m)| {
-                let at = i - k + j;
-                !member_of.contains_key(&at)
-                    && match &items[at].kind {
-                        n::ItemKind::TypeDef(n::TypeDef {
-                            name,
-                            rhs: n::TypeRhs::Data(_),
-                            ..
-                        }) => member_name(m) == Some(name.name.as_str()),
-                        _ => false,
+        if self.transition.complete {
+            for (i, item) in items.iter().enumerate() {
+                if let Some(members) = self.transition.sums.get(&item.span.0) {
+                    for member in members {
+                        if let Some(at) = items.iter().position(|item| item.span.0 == *member) {
+                            member_of.insert(at, i);
+                            if let n::ItemKind::TypeDef(def) = &items[at].kind {
+                                if let n::ItemKind::TypeDef(parent) = &item.kind
+                                    && def.name.name != parent.name.name
+                                {
+                                    absorbed.insert(def.name.name.clone());
+                                }
+                            }
+                        }
                     }
-            });
-            if fits {
-                for j in 0..k {
-                    member_of.insert(i - k + j, i);
-                    let n::ItemKind::TypeDef(member) = &items[i - k + j].kind else {
-                        unreachable!()
-                    };
-                    if member.name.name != def.name.name {
-                        absorbed.insert(member.name.name.clone());
-                        // Only a one-member right side: a union keeps today's
-                        // reading (its members are constructors), as the
-                        // exports of i/syntax and std rely on it.
-                        if k == 1 && !matches!(rhs.kind, n::TypeKind::Union(_)) {
-                            single.push((i, member.name.name.clone()));
+                }
+            }
+        } else {
+            for (i, item) in items.iter().enumerate() {
+                let n::ItemKind::TypeDef(def) = &item.kind else {
+                    continue;
+                };
+                if plain.contains(&i) {
+                    continue;
+                }
+                let n::TypeRhs::Type(rhs) = &def.rhs else {
+                    continue;
+                };
+                let members: Vec<&n::Type> = match &rhs.kind {
+                    n::TypeKind::Union(ms) => ms.iter().collect(),
+                    _ => vec![rhs],
+                };
+                let k = members.len();
+                if k > i || head_params(&def.head).is_none() {
+                    continue;
+                }
+                let fits = members.iter().enumerate().all(|(j, m)| {
+                    let at = i - k + j;
+                    !member_of.contains_key(&at)
+                        && match &items[at].kind {
+                            n::ItemKind::TypeDef(n::TypeDef {
+                                name,
+                                rhs: n::TypeRhs::Data(_),
+                                ..
+                            }) => member_name(m) == Some(name.name.as_str()),
+                            _ => false,
+                        }
+                });
+                if fits {
+                    for j in 0..k {
+                        member_of.insert(i - k + j, i);
+                        let n::ItemKind::TypeDef(member) = &items[i - k + j].kind else {
+                            unreachable!()
+                        };
+                        if member.name.name != def.name.name {
+                            absorbed.insert(member.name.name.clone());
+                            // Only a one-member right side: a union keeps today's
+                            // reading (its members are constructors), as the
+                            // exports of i/syntax and std rely on it.
+                            if k == 1 && !matches!(rhs.kind, n::TypeKind::Union(_)) {
+                                single.push((i, member.name.name.clone()));
+                            }
                         }
                     }
                 }
@@ -679,8 +891,7 @@ impl Cx {
             }
             n::TypeRhs::Type(t) => {
                 let source = self.ty(t);
-                let alias_pattern =
-                    !def.head.is_empty() && matches!(source.kind, o::TypeKind::ValueOf { .. });
+                let alias_pattern = def.alias_pattern;
                 let (params, head) = match params {
                     Some(params) if !alias_pattern => (params, Vec::new()),
                     _ => (Vec::new(), def.head.iter().map(|t| self.ty(t)).collect()),
@@ -713,7 +924,7 @@ impl Cx {
             }
         }
         let typed_fn = match &b.pattern.kind {
-            n::PatternKind::Typed { ty, .. } => match &ty.kind {
+            n::PatternKind::Typed { ty, .. } if !self.boundary(1, ty.span.0) => match &ty.kind {
                 n::TypeKind::Fn(f) => Some(f),
                 _ => None,
             },
@@ -743,10 +954,22 @@ impl Cx {
                 }
             }
         }
+        let original = self
+            .transition
+            .parameters
+            .get(&(b.span.0, b.pattern.span.0))
+            .cloned();
         let mark = self.rows.len();
         self.rows.extend(generics.iter().map(|g| Row {
             name: g.name.clone(),
-            carries: !with_fail.contains(&g.name),
+            carries: original.as_ref().map_or_else(
+                || !with_fail.contains(&g.name),
+                |parameters| {
+                    parameters
+                        .iter()
+                        .any(|(name, _)| *name == format!("{}%E", g.name))
+                },
+            ),
             used: false,
         }));
         let pattern = match (&b.pattern.kind, typed_fn) {
@@ -760,7 +983,9 @@ impl Cx {
             _ => self.pattern(&b.pattern),
         };
         let value = match &b.value.kind {
-            n::ExprKind::Chain(fs) => self.chain(fs, b.value.span.0, true),
+            n::ExprKind::Chain(fs) if !self.boundary(0, b.value.span.0) => {
+                self.chain(fs, b.value.span.0, true)
+            }
             _ => self.expr(&b.value),
         };
         let mut type_params: Vec<o::Ident> = generics.iter().map(|g| id(g)).collect();
@@ -768,6 +993,12 @@ impl Cx {
             if row.used {
                 type_params.push(ident(format!("{}%E", row.name), b.span.0));
             }
+        }
+        if let Some(original) = original {
+            type_params = original
+                .into_iter()
+                .map(|(name, span)| ident(name, span))
+                .collect();
         }
         o::Binding {
             pattern,
@@ -815,7 +1046,7 @@ impl Cx {
         else {
             return vec![self.binding(b)];
         };
-        if !is_multi(fs) {
+        if !is_multi(fs) || self.boundary(0, b.value.span.0) {
             return vec![self.binding(b)];
         }
         let span = b.value.span.0;
@@ -1224,6 +1455,12 @@ impl Cx {
     }
 
     fn expr(&mut self, e: &n::Expr) -> o::Expr {
+        if self.boundary(0, e.span.0) {
+            let mut cx = self.standalone(0, e.span.0);
+            let result = cx.expr(e);
+            self.errors.extend(cx.errors);
+            return result;
+        }
         let span = e.span.0;
         let kind = match &e.kind {
             n::ExprKind::Quote(q) => {
@@ -1354,7 +1591,8 @@ impl Cx {
             n::ExprKind::Pipe { lhs, rhs } => match &rhs.kind {
                 // A match (§2.11): one position per branch.
                 n::ExprKind::Chain(fs)
-                    if !self.lisp
+                    if (!self.lisp
+                        || self.generated_from.is_some_and(|start| span.start >= start))
                         && fs.iter().all(|f| {
                             f.params.len() == 1
                                 && f.services.is_none()
@@ -1388,6 +1626,12 @@ impl Cx {
     // ---- Patterns ----
 
     fn pattern(&mut self, p: &n::Pattern) -> o::Pattern {
+        if self.boundary(2, p.span.0) {
+            let mut cx = self.standalone(2, p.span.0);
+            let result = cx.pattern(p);
+            self.errors.extend(cx.errors);
+            return result;
+        }
         let span = p.span.0;
         let kind = match &p.kind {
             n::PatternKind::Quote(q) if crate::lisp::syntax::ROWS3 => {
@@ -1395,10 +1639,17 @@ impl Cx {
                     Ok(captures) => o::PatternKind::Quote {
                         datum: q.datum.0.clone(),
                         template: q.template,
-                        captures: captures
-                            .iter()
-                            .map(|(splice, pattern)| (*splice, self.pattern(pattern)))
-                            .collect(),
+                        // Native quote preparation and type expansion update
+                        // the capture patterns. Keep their template slots and
+                        // replacements instead of reconstructing stale nodes.
+                        captures: (if q.captures.is_empty() {
+                            &captures
+                        } else {
+                            &q.captures
+                        })
+                        .iter()
+                        .map(|(splice, pattern)| (*splice, self.pattern(pattern)))
+                        .collect(),
                     },
                     Err(error) => {
                         self.errors.push(error);
@@ -1704,6 +1955,12 @@ impl Cx {
     }
 
     fn ty(&mut self, t: &n::Type) -> o::TypeExpr {
+        if self.boundary(1, t.span.0) {
+            let mut cx = self.standalone(1, t.span.0);
+            let result = cx.ty(t);
+            self.errors.extend(cx.errors);
+            return result;
+        }
         let span = t.span.0;
         let kind = match &t.kind {
             n::TypeKind::Lit(v) => o::TypeKind::Lit(v.clone()),

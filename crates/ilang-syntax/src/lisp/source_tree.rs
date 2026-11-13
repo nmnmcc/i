@@ -94,6 +94,12 @@ impl SourceTree {
         find.found.map(|d| Syntax::from_datum(&d, &self.scope))
     }
 
+    /// Encode an already available syntax-three node with this source's
+    /// lexical index. No token lookup reparses the source or mutates the index.
+    pub fn with_tokens<T>(&self, f: impl FnOnce() -> T) -> T {
+        with_tokens(&self.tokens, f)
+    }
+
     /// The outermost written expression with this span.
     pub fn expression(&self, span: Span) -> Option<Syntax> {
         self.find(span, Kind::Expr)

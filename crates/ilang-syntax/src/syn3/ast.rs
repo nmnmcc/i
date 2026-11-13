@@ -143,6 +143,22 @@ pub struct TypeDef {
     pub name: Ident,
     pub head: Vec<Type>,
     pub rhs: TypeRhs,
+    /// Classification of the written right side, before type expansion
+    /// (spec §4.7). Replacing the right side never reclassifies the head.
+    pub alias_pattern: bool,
+}
+
+impl TypeDef {
+    pub fn new(name: Ident, head: Vec<Type>, rhs: TypeRhs) -> Self {
+        let alias_pattern = !head.is_empty()
+            && matches!(&rhs, TypeRhs::Type(t) if matches!(t.kind, TypeKind::ValueOf { .. }));
+        Self {
+            name,
+            head,
+            rhs,
+            alias_pattern,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

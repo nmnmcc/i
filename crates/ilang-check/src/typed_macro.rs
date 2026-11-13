@@ -1,7 +1,7 @@
 //! Typed expansion runs at the inference group barrier, through this compiler hook.
 use crate::hir::{DefId, Expr, ModuleId, Program};
 use ilang_package::Diagnostic;
-use ilang_syntax::{ast, lisp::scoped::ScopedSource, span::Span};
+use ilang_syntax::{lisp::scoped::ScopedSource, span::Span, syn3::ast};
 use std::sync::Arc;
 
 pub struct Invocation<'a> {
@@ -19,7 +19,7 @@ pub trait Expander: std::fmt::Debug + Send + Sync {
         query: Arc<crate::types::TypedMacroQuery>,
     ) -> Result<Output, Vec<Diagnostic>>;
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Output {
     pub expression: Expr,
     pub syntax: ast::Expr,
@@ -31,6 +31,22 @@ pub struct Output {
     pub holes: Vec<(Span, Span)>,
     pub trace: Vec<String>,
     pub notes: Vec<String>,
+}
+
+impl Clone for Output {
+    fn clone(&self) -> Self {
+        ilang_syntax::syn3::deep::deep(|| Self {
+            expression: self.expression.clone(),
+            syntax: self.syntax.clone(),
+            scoped: self.scoped.clone(),
+            var_count: self.var_count,
+            ty_var_count: self.ty_var_count,
+            resolution: self.resolution.clone(),
+            holes: self.holes.clone(),
+            trace: self.trace.clone(),
+            notes: self.notes.clone(),
+        })
+    }
 }
 
 /// Install checked output without re-inferring the caller or its schemes.

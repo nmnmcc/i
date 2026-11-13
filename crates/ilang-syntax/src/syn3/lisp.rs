@@ -1011,7 +1011,7 @@ fn item(d: &Datum) -> R<Item> {
                     }
                     _ => TypeRhs::Type(type_of(value)?),
                 };
-                ItemKind::TypeDef(TypeDef { name, head, rhs })
+                ItemKind::TypeDef(TypeDef::new(name, head, rhs))
             }
             None => ItemKind::Bind(Binding {
                 pattern: pattern_of(head)?,

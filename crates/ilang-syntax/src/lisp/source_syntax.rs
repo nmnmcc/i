@@ -21,6 +21,12 @@ fn find(datum: &Datum, span: Span) -> Option<&Datum> {
     }
     None
 }
+/// A written Lisp node for a consumer that already has the new tree.
+/// Position normalization remains the caller's choice.
+pub fn written_lisp_syntax(span: Span, scope: &Scope, source: &str) -> Syntax {
+    lisp_source(span, scope, source)
+}
+
 fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     let document = super::parse(source).expect("parsed Lisp source remains valid");
     let mut datum = document.iter().find_map(|x| find(x, span));
