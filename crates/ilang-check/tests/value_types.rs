@@ -378,7 +378,7 @@ fn query_sources_heads_binders_and_outline() {
     let source = src.find("= value").unwrap() as u32 + 2;
     assert_eq!(
         q.definition_at(m, source).unwrap().span.start,
-        src.find("value:").unwrap() as u32
+        src.find("value :").unwrap() as u32
     );
     let left = src.find("Left, Right").unwrap() as u32;
     assert!(q.type_at(m, left).unwrap().code.contains("Left = Int"));
@@ -872,7 +872,10 @@ fn dependency_diagnostics_keep_reader_span_alias_chain_and_return_path() {
         .iter()
         .find(|d| d.code == code::VALUE_TYPE_CIRCLE)
         .unwrap();
-    assert_eq!(d.span.start as usize, src.find("x : Alias").unwrap() + 3);
+    assert_eq!(
+        d.span.start as usize,
+        src.find("x : Alias").unwrap() + "x : ".len()
+    );
     assert!(d.message.contains("through Alias"), "{}", d.message);
     assert!(d.message.contains("a -> b -> a"), "{}", d.message);
 }

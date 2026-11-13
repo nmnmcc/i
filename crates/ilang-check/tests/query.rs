@@ -621,7 +621,7 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     assert!(
         fixture
             .hover("app/main", "many", 0)
-            .contains("(A) -> 1 | 2")
+            .contains("(A) -> { 1 | 2 }")
     );
 }
 

@@ -60,9 +60,7 @@ fn ty(source: &str) -> String {
 }
 
 fn pat(source: &str) -> String {
-    syn3::print_pattern(
-        &syn3::parse_pattern(source).unwrap_or_else(|d| panic!("{source}\n{d:#?}")),
-    )
+    syn3::print_pattern(&syn3::parse_pattern(source).unwrap_or_else(|d| panic!("{source}\n{d:#?}")))
 }
 
 fn chain(e: &Expr) -> &[Function] {
@@ -496,8 +494,8 @@ fn patterns() {
         "[..]",
         "<<a:size(8), rest:bytes>>",
         "a = b = (c, d)",
-        "(port = p: Int)",
-        "(label: T = x)",
+        "(port = p : Int)",
+        "(label : T = x)",
     ] {
         assert_eq!(pat(p), p);
     }

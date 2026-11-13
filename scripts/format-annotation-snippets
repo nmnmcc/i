@@ -45,6 +45,10 @@ def selected(item):
     if item['path']=='crates/ilang-syntax/tests/syn3.rs' and source=='x: Int = 1':
         return False # deliberate whitespace-insensitivity regression input
     context = (ROOT/item['path']).read_text()[max(0,item['start']-140):item['start']] if item['kind']=='rust' else ''
+    if item['path'] == 'crates/ilang-syntax/tests/syn3_lower.rs':
+        # shown() takes normal source but returns the historical lowering
+        # printer's diagnostic surface, whose spelling is pinned separately.
+        return bool(re.search(r'\bshown\(\s*$', context))
     item['source_context'] = bool(re.search(r'parse_(?:module|expr|pattern|type)\(\s*(?:&?\s*format!\(\s*)?$', context))
     if item.get('entry', {}).get('not_source') or item.get('entry', {}).get('preserve_spelling'):
         return False

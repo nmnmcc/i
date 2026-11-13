@@ -4,5 +4,5 @@ wrong_cell : (Cell(Int)) -> Cell(Never)
 run_never : (() <- (Sink(Never)) -> Nil) -> Nil
 bad_computation : () -> Nil
 10:18: error[E0515]: `Sink(Int)` and `Sink(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)
-16:46: error[E0501]: `Int` is not a subtype of `Never` (the type at 16:32 needs it)
+16:47: error[E0501]: `Int` is not a subtype of `Never` (the type at 16:33 needs it)
 21:34: error[E0515]: `Sink(Int)` and `Sink(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 21:24 needs it)

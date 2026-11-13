@@ -205,7 +205,7 @@ fn joint_queries_keep_full_literal_aliases_and_nested_head_targets() {
     let q = query::Query::new(&g, p, c.types.as_ref());
     let pos = source.find("Method) = v").unwrap() as u32;
     assert!(q.type_at(m, pos).unwrap().code.contains("\"GET\""));
-    let pos = source.find("x : Method").unwrap() as u32 + 3;
+    let pos = source.find("x : Method").unwrap() as u32 + "x : ".len() as u32;
     assert_eq!(
         q.definition_at(m, pos).unwrap().span.start as usize,
         source.find("Method) = v").unwrap()

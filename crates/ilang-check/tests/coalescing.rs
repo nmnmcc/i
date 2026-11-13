@@ -44,7 +44,7 @@ fn local_scheme_is_shown_without_an_entry() {
     let query = ilang_check::query::Query::new(&graph, &program, Some(&types));
     let module = common::module(&program, "app/other");
     let local = query
-        .type_at(module, source.find("local:").unwrap() as u32)
+        .type_at(module, source.find("local :").unwrap() as u32)
         .unwrap();
     assert_eq!(local.code, "local : () <- (S(N), ..N) -> Nil");
 }

@@ -434,7 +434,7 @@ fn a_definition_in_the_library() {
     let uri: lsp::Uri = target.parse().unwrap();
     let written = fs::read_to_string(uri::to_path(&uri).unwrap()).unwrap();
     let line = d["range"]["start"]["line"].as_u64().unwrap() as usize;
-    assert!(written.lines().nth(line).unwrap().starts_with("panic:"));
+    assert!(written.lines().nth(line).unwrap().starts_with("panic :"));
     c.shutdown();
 }
 
@@ -467,7 +467,7 @@ fn the_library_is_written_in_a_private_directory() {
     let target = uri::to_path(&uri).unwrap();
     let library = target.parent().unwrap().to_path_buf();
     assert!(!target.starts_with(&old), "{}", target.display());
-    assert!(fs::read_to_string(&target).unwrap().contains("panic:"));
+    assert!(fs::read_to_string(&target).unwrap().contains("panic :"));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -933,7 +933,7 @@ fn semantic_tokens_and_hover_inside_raw_interpolation() {
     assert!(
         hover["contents"]["value"]
             .as_str()
-            .is_some_and(|s| s.contains("name:")),
+            .is_some_and(|s| s.contains("name :")),
         "{hover:?}"
     );
 }
@@ -1378,7 +1378,7 @@ fn lsp_rename_top_level_across_files() {
         shapes.contains("\tShape(..)\n\tsurface\n\torigin"),
         "{shapes}"
     );
-    assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
+    assert!(shapes.contains("surface = (s : Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
     c.shutdown();
@@ -1428,12 +1428,12 @@ fn lsp_rename_constructor_and_type() {
     assert!(
         shapes.contains("\tFigure(..)\n\tarea")
             && shapes.contains("Figure = Circle | Rect")
-            && shapes.contains("(s: Figure)"),
+            && shapes.contains("(s : Figure)"),
         "{shapes}"
     );
     let main = apply(&ws.main_text, &edit, &ws.main);
     assert!(
-        main.contains("(Figure, Circle, area)") && main.contains("(s: Figure)"),
+        main.contains("(Figure, Circle, area)") && main.contains("(s : Figure)"),
         "{main}"
     );
     c.shutdown();
@@ -1634,7 +1634,7 @@ fn lsp_rename_lisp_surface() {
         main.contains("surface s") && !main.contains("area"),
         "{main}"
     );
-    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s: Shape)"));
+    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s : Shape)"));
     // A local.
     let edit = rename(&mut c, &ws.main, &ws.main_text, "(= a ", 0, 3, "total").unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
@@ -2497,7 +2497,7 @@ fn lsp_inlay_types_of_bindings_and_parameters() {
     assert!(
         !hints
             .iter()
-            .any(|h| h.position == range_of(text, "x:", 0).with_len(1).end)
+            .any(|h| h.position == range_of(text, "x :", 0).with_len(1).end)
     );
     c.shutdown();
 }

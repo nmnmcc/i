@@ -1218,10 +1218,6 @@
     "not_source": true,
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
   },
-  "crates/ilang-cli/tests/numeric_lowering.rs:2738ce9e7e1c2f7d": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
-  },
   "crates/ilang-cli/tests/numeric_lowering.rs:eec5224efc6b3aed": {
     "not_source": true,
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
@@ -1447,9 +1443,6 @@
     "not_source": "Position/search substring inside a complete source fixture"
   },
   "crates/ilang-lsp/tests/protocol.rs:0f1c00c95cc031e0": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
   "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
@@ -2958,5 +2951,18 @@
   "crates/ilang-cli/tests/commands.rs:7605d4ed451035f1": {
     "not_source": true,
     "reason": "Runtime stop output with source locations; colons are message punctuation and line/column separators, not annotations."
+  },
+  "crates/ilang-check/tests/literal_types.rs:c232af9957180e53": {
+    "not_source": "Expected inferred scheme display, not a source annotation; Typed::lines keeps the full Type grammar."
+  },
+  "crates/ilang-check/tests/literal_types.rs:b469df68067e6c5d": {
+    "not_source": "Expected inferred scheme display, not a source annotation; Typed::lines keeps the full Type grammar."
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:c00b42d9b7aef1ed": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-lsp/tests/protocol.rs:32fda7e52795222b": {
+    "not_source": "Position/search substring inside a complete source fixture"
   }
 }

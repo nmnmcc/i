@@ -181,11 +181,11 @@ Alias(N) = T(N)
     // Value unions keep ordinary variance; distinct row constructors may
     // also coexist. Neither is a same-form collision under rule 4.
     types(&format!(
-        "{head}value = (x: S(Never) | S(Dep)) {{ x }}
+        "{head}value = (x : {{ S(Never) | S(Dep) }}) {{ x }}
 "
     ));
     types(&format!(
-        "{head}value = (x: T(S(Never) | Dep)) {{ x }}
+        "{head}value = (x : T(S(Never) | Dep)) {{ x }}
 "
     ));
 }
@@ -348,8 +348,8 @@ fn syntax_three_provision_retains_the_actual_provider_form() {
     let shown = types(source);
     assert!(!shown["app/main.main"].contains("Read"), "{shown:?}");
     let bad = source.replace(
-        "() <- (r: Read(Int)) { r.get() }",
-        "() <- (r: Read(String)) { r.get() }",
+        "() <- (r : Read(Int)) { r.get() }",
+        "() <- (r : Read(String)) { r.get() }",
     );
     let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
     let checked = ilang_check::check(&graph);

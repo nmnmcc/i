@@ -758,7 +758,7 @@ bounded_div = (x : Float, y : Float) -> Float {
             _ => unreachable!(),
         };
         source.push_str(&format!(
-            "case_{i} = (x: {ty}) -> String {{ {} }}\n",
+            "case_{i} = (x : {ty}) -> String {{ {} }}\n",
             case.body
         ));
     }

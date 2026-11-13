@@ -1,0 +1,77 @@
+{
+  "old_parser": "078107490",
+  "compared": 10,
+  "differences": [],
+  "entries": [
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal-Int - -1-1",
+      "tree_sha256": "bb5168a317419ffd079953e3bde94ba8ef5c18f5d55b09686c6b2bb2b797f911",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal-Int - -1--1",
+      "tree_sha256": "1398440a030093b2a1b2f74d3cbbb44804d983bce2ab6ba2dcf8daa326982c26",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal-Int - 1--1",
+      "tree_sha256": "ce2ee14f3821a01606133339a4e7610adca9374b79f668beb2b30119024e17dd",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal-Int - 1-1",
+      "tree_sha256": "f7c0f8b54b7c5a37b4d59aea89f3844ae40bd1044b4cd1e30c935a313b7db3eb",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal--1 | 1--1",
+      "tree_sha256": "f518eca0f5986cc4a61cb328600518a6a098968c683bc4651cba977ad61c6dcc",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal--1 | 1-0",
+      "tree_sha256": "fb54cda845c62b8c459a88c0ae29f1267acafaab57f4c1e54e3e94540507ca54",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal--{1}--1",
+      "tree_sha256": "6b339ef61cb39407690cee35a429ba8ed15ba119e12c738060d9122c711310c6",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/literal_types.rs",
+      "name": "literal--{1}-1",
+      "tree_sha256": "637efc612bfbad778297936df49148140cb775c7443f1820da6111e302bd96f6",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/row_schemes.rs",
+      "name": "row-S(Never) | S(Dep)",
+      "tree_sha256": "a25ff559f1b13f9a7e46ab12fc7d91c00995d1e8d27bf37473e1a9abc2c8be96",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/tests/row_schemes.rs",
+      "name": "row-T(S(Never) | Dep)",
+      "tree_sha256": "f85aec28fbd8f4514f7068ed0ea34d0460529bed20f583f3b1967595fd9f7833",
+      "equal": true,
+      "diagnostics_equal": true
+    }
+  ]
+}

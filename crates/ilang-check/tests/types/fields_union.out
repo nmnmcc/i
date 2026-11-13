@@ -20,12 +20,12 @@ wrong : (List(Rock)) -> List(Int)
 part : ((Int, String) | (Float, Bool, Int)) -> String | Bool
 short : ((Int) | (Int, Int)) -> Never
 not_tuple : ((Int, Int) | Nil) -> Never
-25:64: error[E0512]: not every constructor of `Cat` has a field with the label `label` (§4.8 rule 13)
-38:31: error[E0512]: not every constructor of `Rock` has a field with the label `name` (§4.8 rule 13)
-40:33: error[E0512]: `.name` needs every member of the known type `Cat | Int` of its value to be a custom type (§6.7), but `Int` is not one
-42:26: error[E0512]: `Opaque` has no constructors, so its values have no fields
+25:69: error[E0512]: not every constructor of `Cat` has a field with the label `label` (§4.8 rule 13)
+38:36: error[E0512]: not every constructor of `Rock` has a field with the label `name` (§4.8 rule 13)
+40:38: error[E0512]: `.name` needs every member of the known type `Cat | Int` of its value to be a custom type (§6.7), but `Int` is not one
+42:27: error[E0512]: `Opaque` has no constructors, so its values have no fields
 44:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
-68:34: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
-78:14: error[E0501]: `Rock` is not a subtype of `Cat` (the type at 78:2 needs it)
-84:37: error[E0512]: the data `(Int)` has no part `1` (§2.3)
-86:39: error[E0512]: `.0` needs every member of the known type `(Int, Int) | Nil` of its value to be data (§4.8 rule 13), but `Nil` is not
+70:39: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+80:14: error[E0501]: `Rock` is not a subtype of `Cat` (the type at 80:2 needs it)
+86:42: error[E0512]: the data `(Int)` has no part `1` (§2.3)
+88:44: error[E0512]: `.0` needs every member of the known type `(Int, Int) | Nil` of its value to be data (§4.8 rule 13), but `Nil` is not

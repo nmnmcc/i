@@ -112,7 +112,7 @@ fn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {
     assert!(
         lines
             .iter()
-            .any(|l| l.ends_with("kind : { (\"a\" | \"b\") -> 1 | 2 }")),
+            .any(|l| l.ends_with("kind : (\"a\" | \"b\") -> 1 | 2")),
         "{lines:?}"
     );
     assert!(
@@ -295,7 +295,7 @@ fn written_literals_and_negative_differences_constrain_calls() {
         ("-1 | 1", "-1", "0"),
         ("-{1}", "-1", "1"),
     ] {
-        let source = format!("f = (n : {annotation}) {{ n }}\nv = f({accepted})\n");
+        let source = format!("f = (n : {{ {annotation} }}) {{ n }}\nv = f({accepted})\n");
         let (ds, _) = check(&source);
         assert!(ds.is_empty(), "{source}: {ds:?}");
         let (ds, _) = check(&source.replace(&format!("f({accepted})"), &format!("f({rejected})")));
@@ -385,7 +385,7 @@ fn prefix_after_complement_does_not_erase_other_columns() {
     // Without it, neither remaining clause may be called never used.
     let (covered, _) = check(&source.replace(" | (_) { 2 }", ""));
     assert!(covered.is_empty(), "{covered:?}");
-    let (ds, _) = check(&source.replace("(n: Int)", "(n: String)"));
+    let (ds, _) = check(&source.replace("(n : Int)", "(n : String)"));
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
 }
 
@@ -678,7 +678,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "W0503");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : { (1) -> 0 | 1 }")),
+        lines.iter().any(|l| l.ends_with("f : (1) -> 0 | 1")),
         "{lines:?}"
     );
     // The impossible guard does not let an invalid body escape checking.

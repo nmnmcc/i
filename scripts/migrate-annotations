@@ -115,6 +115,8 @@ def edits(source, offsets):
 
 def rewritten(item):
     entry = item.get('entry', {})
+    if entry.get('not_source'):
+        return item['source']
     if entry.get('substitutions') and item['result']['edits']:
         raise SystemExit(f"review substituted snippet before rewriting: {item['path']}:{item['start']}")
     prefix = len(entry.get('prefix', '').encode())
@@ -144,6 +146,8 @@ def rewrite(items):
     registry = json.loads(CHECK['DATA'].read_text())
     counts = Counter()
     for item in sorted(items, key=lambda i: (i['path'], -i['start'])):
+        if item.get('entry', {}).get('not_source'):
+            continue
         if not item['result']['edits']:
             continue
         path = item['path']
@@ -173,7 +177,9 @@ def main():
     args = parser.parse_args()
     os.chdir(ROOT)
     if args.mode == 'snapshot':
-        items = list(inventory())
+        # Host IDs, messages and inferred-scheme displays are bytes, not i
+        # programs. Keep the registry's explicit classification on replay.
+        items = [i for i in inventory() if not i.get('entry', {}).get('not_source')]
         results = parse(items, args.binary)
         assert len(items) == len(results)
         with gzip.open(args.baseline, 'wt') as f:

@@ -107,7 +107,7 @@ fn type_parameters_and_row_variables() {
         "map = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) { [] }\n\ncatch : <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E)\n",
     );
     assert!(text.contains("map(A, B, N, N%E) ="), "{text}");
-    assert!(text.contains("f : (A) -> B ^ N%E ! N"), "{text}");
+    assert!(text.contains("f: (A) -> B ^ N%E ! N"), "{text}");
     assert!(
         text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"),
         "{text}"
@@ -140,7 +140,7 @@ fn shape_groups() {
         "{text}"
     );
     assert!(
-        bindings[2].starts_with("area = %multi(1 : area%g0, 2 : area%g1)"),
+        bindings[2].starts_with("area = %multi(1: area%g0, 2: area%g1)"),
         "{text}"
     );
     assert!(
@@ -148,7 +148,7 @@ fn shape_groups() {
         "{text}"
     );
     assert!(
-        bindings[4].starts_with("open = %multi(1,addr,port : open%g0)"),
+        bindings[4].starts_with("open = %multi(1,addr,port: open%g0)"),
         "{text}"
     );
     // A chain that is not bound to a name has its group functions in place.
