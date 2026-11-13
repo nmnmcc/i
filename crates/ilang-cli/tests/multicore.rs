@@ -648,3 +648,70 @@ main = () {{
     assert_eq!(eight.stdout.trim(), "[True, True, False, True]");
     assert_eq!(trace.published, 1);
 }
+
+/// R4a: shielded finals joining cancelled tasks must stop, on every worker.
+/// Run in a child process so I_WORKERS does not race other Rust tests.
+#[test]
+fn cancelled_join_cycle_stress() {
+    const CHILD: &str = "ILANG_CANCELLED_JOIN_STRESS_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let status = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "cancelled_join_cycle_stress", "--nocapture"])
+            .env(CHILD, "1")
+            .env("I_WORKERS", "4")
+            .env("I_WORKERS_TRACE", "1")
+            .status()
+            .unwrap();
+        assert!(status.success(), "cancelled join stress child failed");
+        return;
+    }
+    use ilang_cli::{BuildOptions, Level, build_entry};
+    use ilang_host::{HostOptions, Outcome, Program};
+    let fixture = include_str!("../../../tests/spec/9.9/cancelled_join_cycle.i");
+    let (waiter, _) = fixture.split_once("\nmain =").unwrap();
+    for pairs in [1, 8] {
+        let mut source = format!(
+            "{waiter}\nmain = () {{\n task.scope((s) {{\n armed: task.Channel(Nil) = task.channel()\n"
+        );
+        for _ in 0..pairs {
+            source.push_str("{\n a: task.Channel(task.Task(Nil, String)) = task.channel()\n b: task.Channel(task.Task(Nil, String)) = task.channel()\n left = task.go(s, waiter(a, armed))\n right = task.go(s, waiter(b, armed))\n task.send(a, right)\n task.send(b, left)\n}\n");
+        }
+        for _ in 0..2 * pairs {
+            source.push_str("task.receive(armed)\n");
+        }
+        source.push_str("fail.raise(\"outer\")\n })\n}\n");
+        if pairs == 1 {
+            source = fixture.to_owned();
+        }
+        let dir = project(&format!("cancelled_join_{pairs}"), &source);
+        let built = build_entry(
+            &dir,
+            BuildOptions {
+                opt: Level::O0,
+                tests: false,
+                offline: false,
+                target: Default::default(),
+            },
+            None,
+        )
+        .unwrap();
+        // Compile once; each run makes fresh stores, workers and resources.
+        let program = Program::from_bytes(&built.wasm).unwrap();
+        for iteration in 0..200 {
+            let outcome = program
+                .run_entry(HostOptions::default())
+                .unwrap_or_else(|error| panic!("{pairs} pairs, iteration {iteration}: {error:#}"));
+            match outcome {
+                Outcome::Stop(stop) => assert_eq!(
+                    stop.message
+                        .as_deref()
+                        .and_then(|message| message.lines().next()),
+                    Some("panic: task: join of a cancelled task"),
+                    "{pairs} pairs, iteration {iteration}: {stop:?}"
+                ),
+                other => panic!("{pairs} pairs, iteration {iteration}: {other:?}"),
+            }
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}

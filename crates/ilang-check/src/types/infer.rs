@@ -1310,6 +1310,11 @@ impl<'a> Checker<'a> {
                 "this type has itself inside it, through a type variable (§4.7)",
             );
         }
+        let failures = self.s.failures.len();
+        self.s.check_need_meets();
+        if self.s.failures.len() > failures {
+            self.flush(span, None);
+        }
         self.report_coalescing(span);
     }
 
@@ -1383,10 +1388,16 @@ impl<'a> Checker<'a> {
                     "`{l}` and `{r}` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)"
                 ),
             ),
+            FailKind::NeedMeet => (
+                code::ENV_FORMS,
+                format!(
+                    "the service requirements `{l}` and `{r}` have an empty intersection and cannot be satisfied (§4.4, §9.2)"
+                ),
+            ),
             FailKind::EnvForms => (
                 code::ENV_FORMS,
                 format!(
-                    "`{l}` and `{r}` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)"
+                    "`{l}` and `{r}` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)"
                 ),
             ),
             FailKind::Ambiguous => (

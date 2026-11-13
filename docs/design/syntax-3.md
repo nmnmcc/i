@@ -920,13 +920,10 @@ plus at most one row variable. A computation has a value type and a need,
 written `A <- M` in this note (today's `A ^ E ! M` with `E` moved into `M` as
 `Fail(E)`).
 
-- **Merge.** Two entries `C(S1, …)` and `C(T1, …)` merge into one, parameter by
-  parameter, by the direction of the parameter (spec §4.5 rule 6): a
-  parameter that goes in the other direction (the `E` of `Fail(E)`) gives the
-  union `Si | Ti`; a parameter that goes in the same direction gives the
-  intersection `Si & Ti`, and when that is `Never` while neither is `Never` it
-  is a compile error; a parameter that does not change must be equal, else it
-  is a compile error. This is the value-type meet `C(S…) & C(T…)` of spec §4.4.
+- **Merge (owner ruling).** A need is the intersection of its services:
+  `<- (Db, Log, Fail(E))` is `Db & Log & Fail(E)`, and `<- (..N, Db)` is
+  the open intersection `N & Db`. The merge of two needs is their
+  intersection (spec §4.4).
 - **Satisfying.** A provided value of type `P` satisfies the need entry `S`
   when `P <: S` as values. Because `Fail` is contravariant,
   `Fail(A | B) <: Fail(A)`.

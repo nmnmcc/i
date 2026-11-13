@@ -1,6 +1,6 @@
 {
-  "compiler": "cc02dc36481b29de48de9db520056cc950174d3e",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.inner : (body: () -> A ^ E ! N, svc: S(Dep)) -> A ^ E ! N - S(Dep)\napp/main.wrap : (body: () -> Int ! N, svc: S(Dep)) -> Int ! N\napp/main.main : () -> Nil ! Dep\n",
-      "stderr": "src/main.i:13:1: error[E0515]: the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)\nsrc/main.i:16:3: error[E0515]: `S(_)` and `S(Never)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n2 errors\n"
+      "stderr": "src/main.i:13:1: error[E0515]: the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)\nsrc/main.i:16:3: error[E0515]: `S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n2 errors\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:13:1: error[E0515]: the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)\nsrc/main.i:16:3: error[E0515]: `S(_)` and `S(Never)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n2 errors\n"
+      "stderr": "src/main.i:13:1: error[E0515]: the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)\nsrc/main.i:16:3: error[E0515]: `S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n2 errors\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:13:1: error[E0515]: the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)\nsrc/main.i:16:3: error[E0515]: `S(_)` and `S(Never)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n2 errors\n"
+      "stderr": "src/main.i:13:1: error[E0515]: the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)\nsrc/main.i:16:3: error[E0515]: `S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n2 errors\n"
     }
   }
 }

@@ -1,12 +1,12 @@
 use_int : () -> 1 ! State(Int)
 use_string : () -> 1 ! State(String)
-both : () -> 1 ! State(Int) | State(String)
+both : () -> 1 ! State(Int)
 ok : () -> 1 ! State(Int)
 fns : List((Never) -> Int)
 tuples : List((1 | "b", "a" | 2))
 sizes : List((1, 2) | (1, 2, 3))
 bad_diff : (x: Never) -> Never
 var_diff : (x: Int) -> Int
-11:8: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
+11:8: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
 30:16: error[E0501]: `Int` is not a subtype of `String`
 33:25: error[E0513]: the right side of `-` may only have members with a type constructor (§4.4)

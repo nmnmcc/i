@@ -7,17 +7,15 @@ run_int : (body: () -> Nil ! Yield(Int)) -> 1
 good_int : () -> 1
 emit_int : () -> Nil ! Yield(Int)
 emit_string : () -> Nil ! Yield(String)
-both_yields : () -> Nil ! Yield(Int) | Yield(String)
+both_yields : () -> Nil ! Yield(Int | String)
 next_int : () -> Int ! Source(Int)
 next_string : () -> String ! Source(String)
-both_sources : () -> String ! Source(Int) | Source(String)
-both_fns : List(() -> Nil ! Yield(Never))
+both_sources : () -> String ! Source(Never)
+both_fns : List(() -> Nil ! Yield(Int | String))
 written : () -> Nil ! Source(Int) | Yield(Int)
 emit_any : () -> Nil ! Yield(Int | String)
 given_narrow : () -> Nil
 given_same : () -> Nil
-39:28: error[E0515]: `Int` and `Never` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 39:18 needs it)
-52:15: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
-61:16: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
-67:32: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
-79:2: error[E0515]: `Yield(Int | String)` and `Yield(Int)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
+39:28: error[E0515]: `Yield(Int)` and `Yield(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 39:18 needs it)
+61:16: error[E0515]: the service requirements `Source(Int)` and `Source(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2)
+79:2: error[E0515]: `Yield(Int | String)` and `Yield(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)

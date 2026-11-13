@@ -17,6 +17,7 @@ fn library_resolves_cleanly() {
         [
             "i/prelude",
             "i/fail",
+            "i/failure",
             "i/control",
             "i/resource",
             "i/assertion",
@@ -69,9 +70,12 @@ fn library_names() {
     let program = program.unwrap();
     let expect: &[(&str, &[&str])] = &[
         ("i/fail", &["raise", "catch", "from_result", "map_error"]),
+        ("i/failure", &["raise", "catch"]),
         (
             "i/control",
-            &["boundary", "suspend", "resume", "cancel", "keep_env"],
+            &[
+                "boundary", "suspend", "escape", "resume", "cancel", "keep_env",
+            ],
         ),
         ("i/key", &["new", "wrap", "unwrap"]),
         (
@@ -381,6 +385,7 @@ fn prelude_types() {
         ("Assert", vec!["Assert"]),
         ("AssertionFailure", vec!["AssertionFailure"]),
         ("Bool", vec!["True", "False"]),
+        ("Fail", vec!["Fail"]),
         ("Nil", vec!["Nil"]),
         ("Result", vec!["Ok", "Error"]),
     ];

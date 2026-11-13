@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.example : () -> Int | String\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:8:3: error[E0515]: `S(_, _)` and `S(Int, S(String, Never))` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.example : () -> Int\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:6:1: error[E0515]: the service requirements `S(String, Never)` and `S(Int, S(String, Never))` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:8:3: error[E0515]: `S(_, _)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n2 errors\n"
     }
   }
 }

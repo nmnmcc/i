@@ -3,6 +3,7 @@
 (
 	boundary
 	suspend
+	escape
 	resume
 	cancel
 	keep_env
@@ -19,6 +20,13 @@ suspend(R, E, N, A): (
 	Boundary(R, E, N)
 	(Continuation(A, R, E, N)) -> R ^ E ! N
 ) -> A
+
+/// Ends the boundary `b` at once with `value`, as `suspend(b, (k) { cancel(k)
+/// value })` does, but without keeping the paused computation: no frame
+/// records are made, and `resource.ensure` functions inside `b` run as for an
+/// error.
+@external("ilang:control", "escape")
+escape(R, E, N): (b: Boundary(R, E, N), value: R) -> Never
 
 /// Goes on with the paused computation, with `value` as the value of `suspend`.
 @external("ilang:control", "resume")
