@@ -63,6 +63,70 @@ has every change below.
 | `i test --project std --opt 0` | | 39 s |
 | type check of the suspend-point chain below, n=800 | 1.6 s | 0.8 s |
 
+## Numeric lowering
+
+The six kernels in `tests/perf/numeric` isolate arithmetic, known calls,
+short-lived aggregates and list walks. The step-3 paired run compared the
+landing module before these changes with the final module using the same
+Wasmtime build, alternating order over five batches of 1001 samples. These
+are the previous worker's recorded measurements, not a new timing run after
+the reboot. The machine was shared (load average 40 in the final run), and
+the timer resolves about 10 ns. Times are medians of the five batch medians.
+Allocations subtract the 11 nonnumeric entry/root allocations but include
+the input and result Float boxes.
+
+| Kernel | Before ns / allocations | After ns / allocations | Target ns / allocations |
+|---|---|---|---|
+| fast sine | 4116 / 39 | 3305 / 39 | <=500 / <=8 |
+| Horner | 49 / 2 | 10 / 2 | <=40 / <=2 |
+| dot | 1432 / 2 | 261 / 2 | <=300 / <=2 |
+| integer | 1243 / 3 | 330 / 2 | <=500 / <=2, no Int objects |
+| tuples | 40 / 2 | 21 / 2 | <=40 / <=2, no tuple/array objects |
+| closures (fold) | 1433 / 5 | 260 / 2 | <=400 / <=4 |
+
+The recovery run at 12:34 HKT on 2026-11-13 rebuilt the current compiler
+and repeated the driver without the missing historical baseline modules.
+Its scalar O2 results follow. All allocation and fuel counts match the
+recorded final module exactly; the optimized scalar module is 160585 bytes.
+This is a fresh candidate measurement, not a quiet historical comparison.
+The driver also checks the results against its fixed expected values.
+
+| Kernel | Five batch medians, ns | Median ns | Allocations | Fuel |
+|---|---|---:|---:|---:|
+| fast sine | 3337, 3334, 3455, 3364, 3245 | 3337 | 39 | 6444 |
+| Horner | 19, 2, 20, 10, 11 | 11 | 2 | 1335 |
+| dot | 261, 260, 270, 262, 262 | 262 | 2 | 3217 |
+| integer | 322, 330, 321, 321, 321 | 321 | 2 | 6931 |
+| tuples | 20, 20, 10, 20, 22 | 20 | 2 | 1373 |
+| closures (fold) | 260, 260, 261, 261, 260 | 260 | 2 | 3505 |
+
+The ignored `target/num3-measure-current/` contains `samples.csv`,
+`medians.csv`, `allocation-sites.json`, and the optimized and instrumented
+modules. Run the driver through the heavy wrapper:
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo run --release -p ilang-cli --example numeric_measure --locked -- target/num3-measure-current
+```
+
+The changes write shadow-stack actions inline in numeric functions, turn
+self tail calls into loops, delay source-site stores until the stack can be
+read, keep small `to_float`/`truncate` conversions unboxed, run two extra
+Heap2Local rounds, and test list cells before their common value tag.
+The integer regression from N4 is removed; the list test change accounts
+for most of the dot and fold gains. Values, effects and complete logical
+stop traces must still agree at O0/O2/O3.
+
+Fast sine still misses both targets: two helpers return allocated records
+above the inline limit. Out-of-line multivalue aggregate workers remain
+deferred by numeric-lowering R5. The other five kernels are within their
+time and allocation thresholds in this run; a quiet paired comparison is
+still needed for the performance acceptance gate, especially for the short
+Horner and tuple kernels. These measurements do not establish the std/float
+release gates or a full-range worst case. Raw batch medians from a new
+quiet run, std check/build cost and benchmark Wasm size acceptance also
+remain to be verified. See [the step-3 report](design/numeric-step3-report.md)
+for the per-step measurements, fuel counts and surviving allocations.
+
 ## Garbage collection
 
 Wasmtime 50 has three collectors:

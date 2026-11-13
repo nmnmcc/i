@@ -4,7 +4,8 @@ No new language or library state surface.
 
 Owner's rule kept: values, effects and complete stop traces are identical at
 O0/O2/O3. The oracle is `cargo test -p ilang-cli --test numeric_lowering`
-(455 programs, reference O0 against visible O2 and scalar O2/O3), plus the
+(the 455-program base plus boundary and loop cases, reference O0 against
+visible O2 and scalar O2/O3), plus the
 spec chapters with stop traces and suspension (`-- 11/ 9/`).
 
 ## Method
@@ -253,13 +254,70 @@ integer kernel is now 3.2x faster than N3's.
 
 ## Verification
 
-After each step: `cargo test -p ilang-cli --locked --test numeric_lowering`
+The previous worker recorded after each step:
+`cargo test -p ilang-cli --locked --test numeric_lowering`
 (the 455-program corpus plus the cases added here), `cargo test -p
 ilang-wasm --locked`, and `cargo test -p ilang-cli --locked --test spec --
 11/ 9/` (50 of 50 at --opt 0 and --opt 2). For step 4 the corpus ran
 together with step 5 (the first step-4 run failed to compile a test case
 added in step 3, fixed in that commit); ilang-wasm and spec passed for
-step 4 alone. At the end: clippy `-D warnings` on
-ilang-wasm, ilang-binaryen and ilang-cli (all targets), `cargo test -p
-ilang-binaryen`, rustfmt, the corpus again, and std at O0 and O2 (STD_RESULT).
+step 4 alone. The reboot recovery reruns the required checks below; the
+previous report's unfinished `STD_RESULT` placeholder did not establish a
+passing std run at either optimization level.
+
+## Reboot recovery
+
+The remaining uncommitted change raised the numeric inline limit from 32
+to 96 statements for helpers detected as returning a tuple or record. It
+had no recorded measurements or dedicated regression test, and cloned
+each callee body to decide eligibility. It was read and removed from the
+landing candidate, with its patch saved in the ignored
+`target/num3-deferred-inline.patch`. The existing 32-statement limit and
+growth budgets are retained. Numeric-lowering R5 says "Expose cross-call
+pairs first by R3 inlining. Defer out-of-line multivalue aggregate workers
+and typed heap layouts"; R3 starts with "at most 32 source IR statements
+and 2x per-caller growth", and coordinator decision 9.3 makes budgets
+internal heuristics whose fallback never changes source acceptance or
+principal inference. Recovery retains the established heuristic without
+claiming that the discarded experiment passed or failed a performance gate.
+
+The six-kernel table above is now also in `docs/performance.md`. These are
+the earlier worker's measurements; the reboot recovery does not claim a
+new quiet baseline/candidate comparison. The historical before/after Wasm
+artifacts are absent from this worktree's `target/`, so that paired run
+cannot be repeated directly. The fast-sine targets and the quiet timing,
+std check/build cost and Wasm-size acceptance gates remain unverified or
+unmet as described there. No source acceptance, runtime meaning, reported
+error or test expectation was changed during recovery.
+
+Recovery checks run sequentially in this worktree through
+`/home/agent/Programming/i/.rd/cache/heavy`. Cargo and measurement commands
+also used `direnv exec /home/agent/Programming/i` after that prefix.
+
+| Command after the prefix | Result |
+|---|---|
+| `cargo test -p ilang-wasm --locked` | 70 tests passed; doc tests passed (0 tests) |
+| `cargo test -p ilang-cli --test numeric_lowering --locked` | 4 tests passed, including the differential corpus and exact resumed-stop fixture |
+| `cargo test -p ilang-cli --test spec --locked -- 11/ 9/` | 50/50 cases passed at O0 and O2 |
+| `cargo clippy -p ilang-wasm -p ilang-binaryen -p ilang-cli --all-targets --locked -- -D warnings` | passed |
+| `cargo fmt --all -- --check` | passed |
+| `cargo build --release -p ilang-cli --bin i --example numeric_measure --locked` | passed |
+| `./target/release/examples/numeric_measure target/num3-measure-current` | passed; expected results checked, allocations and fuel equal the recorded final module |
+| `./target/release/i test --project std --opt 0` (heavy prefix only) | 2170 passed, 0 failed |
+
+All commands exited 0. `git diff --check` passed, as did
+`git diff --exit-code -- crates lib std examples tests`: recovery leaves
+compiler, library, examples and test files unchanged from `cc73cf90`.
+
+The fresh five batch medians and counts are in `docs/performance.md`;
+raw samples and modules are under `target/num3-measure-current/`. Verification
+logs are `target/num3-*-verification.log`.
+
+The full workspace test run, unfiltered spec suite, review corpus and
+`scripts/dev-verify` were left to the coordinator as requested. Recovery
+did not rerun std O2, JS/WASI probes, the independent rounding corpus or
+byte comparisons against the pre-lane compiler. The representation-mode
+byte-equality test passed, but it is not a substitute for those historical
+comparisons. No claim is made that all numeric-lowering acceptance gates
+are complete.
 
