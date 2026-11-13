@@ -87,89 +87,89 @@ i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
 i/core.portable : (A) -> Bool
-i/float_text.to_string : (x: Float) -> String
-i/float_text.positive : (encoded: Int, fraction: Int) -> List(String)
-i/float_text.floor_divide : (a: Int, b: Int) -> Int
-i/float_text.power_of_ten : (n: Int) -> Int
-i/float_text.small_power : (n: Int, acc: Int) -> Int
-i/float_text.sixteens : (k: Int) -> Int
-i/float_text.grow : (r: Int, s: Int, k: Int) -> (Int, Int)
-i/float_text.shrink : (r: Int, s: Int, minus: Int, plus: Int, k: Int) -> (Int, Int, Int, Int)
-i/float_text.generate : (r: Int, s: Int, minus: Int, plus: Int, inclusive: Bool, acc: List(Int), k: Int) -> (List(Int), Int)
-i/float_text.carry : (reversed: List(Int)) -> (List(Int), Bool)
-i/float_text.trim : (reversed: List(Int)) -> List(Int)
-i/float_text.reverse_onto : (list: List(Int), acc: List(Int)) -> List(Int)
-i/float_text.length : (list: List(Int), n: Int) -> Int
-i/float_text.layout : (digits: List(Int), n: Int, k: Int, imprecise: Bool) -> List(String)
-i/float_text.split : (digits: List(Int), k: Int, acc: List(String)) -> List(String)
-i/float_text.reverse_texts : (list: List(String), acc: List(String)) -> List(String)
-i/float_text.append : (front: List(String), back: List(String)) -> List(String)
-i/float_text.zeros : (count: Int, rest: List(String)) -> List(String)
-i/float_text.texts : (digits: List(Int), rest: List(String)) -> List(String)
-i/float_text.digit_list : (digits: List(Int), acc: List(String)) -> List(String)
-i/float_text.int_text : (e: Int) -> List(String)
-i/float_text.int_digits : (e: Int, acc: List(String)) -> List(String)
-i/float_text.digit_text : (d: Int) -> String
+i/float_text.to_string : (Float) -> String
+i/float_text.positive : (Int, Int) -> List(String)
+i/float_text.floor_divide : (Int, Int) -> Int
+i/float_text.power_of_ten : (Int) -> Int
+i/float_text.small_power : (Int, Int) -> Int
+i/float_text.sixteens : (Int) -> Int
+i/float_text.grow : (Int, Int, Int) -> (Int, Int)
+i/float_text.shrink : (Int, Int, Int, Int, Int) -> (Int, Int, Int, Int)
+i/float_text.generate : (Int, Int, Int, Int, Bool, List(Int), Int) -> (List(Int), Int)
+i/float_text.carry : (List(Int)) -> (List(Int), Bool)
+i/float_text.trim : (List(Int)) -> List(Int)
+i/float_text.reverse_onto : (List(Int), List(Int)) -> List(Int)
+i/float_text.length : (List(Int), Int) -> Int
+i/float_text.layout : (List(Int), Int, Int, Bool) -> List(String)
+i/float_text.split : (List(Int), Int, List(String)) -> List(String)
+i/float_text.reverse_texts : (List(String), List(String)) -> List(String)
+i/float_text.append : (List(String), List(String)) -> List(String)
+i/float_text.zeros : (Int, List(String)) -> List(String)
+i/float_text.texts : (List(Int), List(String)) -> List(String)
+i/float_text.digit_list : (List(Int), List(String)) -> List(String)
+i/float_text.int_text : (Int) -> List(String)
+i/float_text.int_digits : (Int, List(String)) -> List(String)
+i/float_text.digit_text : (Int) -> String
 i/big.sign : (Int) -> Int
 i/big.digits : (Int) -> List(Int)
-i/big.from_digits : (sign: Int, digits: List(Int)) -> Int
+i/big.from_digits : (Int, List(Int)) -> Int
 i/big.size : (Int) -> Int
-i/big.limb : (x: Int, index: Int) -> Int
-i/big.from_top : (sign: Int, digits: List(Int)) -> Int
+i/big.limb : (Int, Int) -> Int
+i/big.from_top : (Int, List(Int)) -> Int
 i/big.builder : (Int) -> Digits
 i/big.put : (Digits, Int, Int) -> Digits
 i/big.finish : (Int, Digits) -> Int
 i/big.multiply_low : (Int, Int, Int) -> Int
 i/big.multiply_high : (Int, Int, Int) -> Int
 i/big.divide_digit : (Int, Int, Int) -> (Int, Int)
-i/big.compare : (a: Int, b: Int) -> Int
-i/big.magnitude_order : (a: Int, b: Int) -> Int
-i/big.order_from : (a: Int, b: Int, i: Int) -> Int
-i/big.digit_order : (a: Int, b: Int) -> Int
-i/big.add : (a: Int, b: Int) -> Int
-i/big.subtract : (a: Int, b: Int) -> Int
-i/big.signed_add : (a: Int, sa: Int, b: Int, sb: Int) -> Int
-i/big.add_up : (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
-i/big.subtract_up : (a: Int, b: Int, i: Int, n: Int, borrow: Int, out: Digits) -> Digits
-i/big.multiply : (a: Int, b: Int) -> Int
-i/big.multiply_range : (a: Int, ao: Int, na: Int, b: Int, bo: Int, nb: Int) -> Int
-i/big.sum_halves : (x: Int, offset: Int, k: Int, n: Int, i: Int, end: Int, carry: Int, out: Digits) -> Digits
-i/big.combine : (low: Int, middle: Int, high: Int, k: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
-i/big.scale_up : (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
-i/big.columns : (a: Int, ao: Int, b: Int, bo: Int, na: Int, nb: Int, k: Int, carry: Int, out: Digits) -> Digits
-i/big.column : (a: Int, ao: Int, b: Int, bo: Int, i: Int, last: Int, k: Int, low: Int, high: Int, extra: Int) -> (Int, Int, Int)
-i/big.max : (a: Int, b: Int) -> Int
-i/big.min : (a: Int, b: Int) -> Int
-i/big.divide : (a: Int, b: Int) -> Int
-i/big.remainder : (a: Int, b: Int) -> Int
-i/big.to_text : (value: Int, radix: Int) -> String
-i/big.magnitude_divide : (a: Int, b: Int) -> (Int, Int)
-i/big.normalized : (x: Int, factor: Int) -> Int
-i/big.initial_remainder : (x: Int, offset: Int, i: Int, n: Int, out: Digits) -> Digits
-i/big.short_divide_number : (x: Int, d: Int, i: Int, r: Int, out: Digits) -> (Int, Int)
-i/big.long_divide : (x: Int, y: Int, i: Int, m: Int, top: Int, r: Int, q: Digits) -> (Int, Int)
-i/big.reduce_digit : (r: Int, a: Int, y: Int, d: Int, i: Int, n: Int, carry: Int, borrow: Int, out: Digits) -> Digits
-i/big.correct : (r: Int, y: Int, digit: Int) -> (Int, Int)
-i/big.normal_shift : (top: Int, s: Int) -> Int
-i/big.power_of_two : (s: Int, acc: Int) -> Int
-i/big.short_divide : (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), Int)
-i/big.reverse : (x: List(Int), acc: List(Int)) -> List(Int)
-i/big.trim : (x: List(Int)) -> List(Int)
-i/big.drop_zeros : (x: List(Int)) -> List(Int)
-i/big.chunk_of : (radix: Int, chunk: Int, width: Int) -> (Int, Int)
-i/big.text_chunks : (x: List(Int), chunk: Int, radix: Int, width: Int, acc: List(String)) -> List(String)
-i/big.chunk_text : (v: Int, radix: Int, width: Int, padded: Bool, acc: List(String)) -> List(String)
-i/big.digit_text : (d: Int) -> String
-i/bits.read_unsigned : (bits: BitArray, start: Int, width: Int) -> Int
-i/bits.from_unsigned : (value: Int, width: Int) -> BitArray
-i/bits.read_int : (bits: BitArray, start: Int, width: Int, signed: Bool, little: Bool) -> Int
-i/bits.read_big : (bits: BitArray, start: Int, left: Int, acc: Int) -> Int
-i/bits.read_little : (bits: BitArray, start: Int, left: Int, acc: Int, scale: Int) -> Int
-i/bits.from_int : (value: Int, width: Int, little: Bool) -> BitArray
-i/bits.write_big : (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray)
-i/bits.write_little : (u: Int, left: Int, acc: List(BitArray)) -> List(BitArray)
-i/bits.reverse : (list: List(BitArray), acc: List(BitArray)) -> List(BitArray)
-i/bits.min : (a: Int, b: Int) -> Int
+i/big.compare : (Int, Int) -> Int
+i/big.magnitude_order : (Int, Int) -> Int
+i/big.order_from : (Int, Int, Int) -> Int
+i/big.digit_order : (Int, Int) -> Int
+i/big.add : (Int, Int) -> Int
+i/big.subtract : (Int, Int) -> Int
+i/big.signed_add : (Int, Int, Int, Int) -> Int
+i/big.add_up : (Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.subtract_up : (Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.multiply : (Int, Int) -> Int
+i/big.multiply_range : (Int, Int, Int, Int, Int, Int) -> Int
+i/big.sum_halves : (Int, Int, Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.combine : (Int, Int, Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.scale_up : (Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.columns : (Int, Int, Int, Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.column : (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int) -> (Int, Int, Int)
+i/big.max : (Int, Int) -> Int
+i/big.min : (Int, Int) -> Int
+i/big.divide : (Int, Int) -> Int
+i/big.remainder : (Int, Int) -> Int
+i/big.to_text : (Int, Int) -> String
+i/big.magnitude_divide : (Int, Int) -> (Int, Int)
+i/big.normalized : (Int, Int) -> Int
+i/big.initial_remainder : (Int, Int, Int, Int, Digits) -> Digits
+i/big.short_divide_number : (Int, Int, Int, Int, Digits) -> (Int, Int)
+i/big.long_divide : (Int, Int, Int, Int, Int, Int, Digits) -> (Int, Int)
+i/big.reduce_digit : (Int, Int, Int, Int, Int, Int, Int, Int, Digits) -> Digits
+i/big.correct : (Int, Int, Int) -> (Int, Int)
+i/big.normal_shift : (Int, Int) -> Int
+i/big.power_of_two : (Int, Int) -> Int
+i/big.short_divide : (List(Int), Int, Int, List(Int)) -> (List(Int), Int)
+i/big.reverse : (List(Int), List(Int)) -> List(Int)
+i/big.trim : (List(Int)) -> List(Int)
+i/big.drop_zeros : (List(Int)) -> List(Int)
+i/big.chunk_of : (Int, Int, Int) -> (Int, Int)
+i/big.text_chunks : (List(Int), Int, Int, Int, List(String)) -> List(String)
+i/big.chunk_text : (Int, Int, Int, Bool, List(String)) -> List(String)
+i/big.digit_text : (Int) -> String
+i/bits.read_unsigned : (BitArray, Int, Int) -> Int
+i/bits.from_unsigned : (Int, Int) -> BitArray
+i/bits.read_int : (BitArray, Int, Int, Bool, Bool) -> Int
+i/bits.read_big : (BitArray, Int, Int, Int) -> Int
+i/bits.read_little : (BitArray, Int, Int, Int, Int) -> Int
+i/bits.from_int : (Int, Int, Bool) -> BitArray
+i/bits.write_big : (Int, Int, List(BitArray)) -> List(BitArray)
+i/bits.write_little : (Int, Int, List(BitArray)) -> List(BitArray)
+i/bits.reverse : (List(BitArray), List(BitArray)) -> List(BitArray)
+i/bits.min : (Int, Int) -> Int
 i/task.finalizing : (Continuation(A, B, C, D), Boundary(F, G, H)) -> Bool
 i/task.no_waiters : WaitQueue
 i/task.address_key : Key(Address)
