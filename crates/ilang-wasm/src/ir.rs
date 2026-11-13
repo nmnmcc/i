@@ -233,8 +233,9 @@ pub enum Op {
     Resume,
     /// `control.cancel(k)`.
     Cancel,
-    /// Keeps all currently bound services in a fresh one-argument function.
-    KeepEnv,
+    /// Private host-adapter pinning across capture/re-entry. Source `keep`
+    /// is an ordinary library function using captured service rows.
+    PinEnvironment,
     WaitRequests,
     PollRequests,
 }
@@ -270,7 +271,7 @@ impl Op {
                 | Op::Boundary
                 | Op::Resume
                 | Op::Cancel
-                | Op::KeepEnv
+                | Op::PinEnvironment
                 | Op::WaitRequests
                 | Op::PollRequests
         )

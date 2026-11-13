@@ -15,16 +15,8 @@ catch: <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E) = (body) {
 	})
 }
 
-// syntax-3 §2.10.8: keep N and use Fail from the later caller.
-keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (
-	Fail(E),
-) -> A {
-	(x) {
-		// D16: keep a frame until B2 preserves tail-provided environments.
-		value = f(x) <- env
-		value
-	}
-}
+// Exercise the shared library implementation of syntax-3 §2.10.8.
+keep = control.keep
 
 Done = ()
 Paused = (Continuation(Nil, Step, Fail(String)))
@@ -42,21 +34,28 @@ main = () {
 			assert(catch(() { control.resume(k, Nil) }) == Error("resumed"))
 		}
 		| (_) { panic("expected a paused kept call") }
-	with_final = keep((b) {
-		resource.ensure(
-			() {
-				control.suspend(b, (k) { Paused(k) })
-				Done
-			},
-			() { raise("cancelled") },
-		)
+	// §9.5: a final function may not raise errors. Observe cancellation by
+	// an error-free escape, then check the later caller's Fail separately.
+	cancelled = control.boundary((finished) {
+		with_final = keep((b) {
+			resource.ensure(
+				() {
+					control.suspend(b, (k) { Paused(k) })
+					Done
+				},
+				() { control.escape(finished, "cancelled") },
+			)
+		})
+		second = catch(() { control.boundary((b) { with_final(b) }) })
+		second |>
+			(Ok(Paused(k))) {
+				control.cancel(k)
+				panic("the cancelled final did not run")
+			}
+			| (_) { panic("expected a paused kept final") }
 	})
-	second = catch(() { control.boundary((b) { with_final(b) }) })
-	second |>
-		(Ok(Paused(k))) {
-			assert(catch(() { control.cancel(k) }) == Error("cancelled"))
-		}
-		| (_) { panic("expected a paused kept final") }
+	assert(cancelled == "cancelled")
+	assert(catch(() { raise(cancelled) }) == Error("cancelled"))
 	// A handler provided inside the paused part still wins over the resumer.
 	inner_catch = keep((b) {
 		answer = catch(() {

@@ -11,7 +11,7 @@ i/control.suspend : (Boundary(A, B, C), (Continuation(D, A, B, C)) <- (Fail(B), 
 i/control.escape : (Boundary(A, B, C), A) -> Never
 i/control.resume : (Continuation(A, B, C, D), A) <- (Fail(C), ..D) -> B
 i/control.cancel : (Continuation(A, B, C, D)) <- D -> Nil
-i/control.keep_env : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B
+i/control.keep : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B
 i/resource.ensure : (() <- (Fail(E), ..N) -> A, () <- N -> Nil) <- (Fail(E), ..N) -> A
 i/resource.acquire : (() <- (Fail(E), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
 i/assertion.catch : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Assert) -> Result(A, AssertionFailure)

@@ -15,16 +15,8 @@ catch: <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E) = (body) {
 	})
 }
 
-// syntax-3 §2.10.8: keep N and use Fail from the later caller.
-keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (
-	Fail(E),
-) -> A {
-	(x) {
-		// D16: keep a frame until B2 preserves tail-provided environments.
-		value = f(x) <- env
-		value
-	}
-}
+// Exercise the shared library implementation of syntax-3 §2.10.8.
+keep = control.keep
 
 Name = (text = String)
 Db = (value = Int)

@@ -1764,7 +1764,12 @@ impl<'a> Lowerer<'a> {
                 site: None,
             });
         });
-        let kept = let_value(fx, out, Value::OpEnv(Op::KeepEnv, vec![body], env), None);
+        let kept = let_value(
+            fx,
+            out,
+            Value::OpEnv(Op::PinEnvironment, vec![body], env),
+            None,
+        );
         let_value(
             fx,
             out,
@@ -2680,7 +2685,6 @@ impl<'a> Lowerer<'a> {
                 "escape" => Ok((Op::Escape, arity)),
                 "resume" => Ok((Op::Resume, arity)),
                 "cancel" => Ok((Op::Cancel, arity)),
-                "keep_env" => Ok((Op::KeepEnv, arity)),
                 "finalizing" => Ok((
                     Op::Runtime {
                         name: "control_finalizing",
