@@ -408,11 +408,19 @@ fn typed_macro_library_inside_syntax_generated_test_runs() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(
-        String::from_utf8_lossy(&output.stdout).contains("passed, 0 failed"),
-        "{}",
-        String::from_utf8_lossy(&output.stdout)
-    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("passed, 0 failed"), "{stdout}");
+    for name in [
+        "outer / inner / service",
+        "provided groups / outer before",
+        "provided groups / inner / override",
+        "provided groups / inner / cases / one",
+        "provided groups / inner / cases / two",
+        "provided groups / outer after",
+        "provided groups / sibling",
+    ] {
+        assert!(stdout.contains(name), "missing {name}: {stdout}");
+    }
 }
 
 #[test]
