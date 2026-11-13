@@ -324,3 +324,31 @@ fn deep_quoted_lisp_text_restores_context_and_spans() {
         .join()
         .unwrap();
 }
+
+/// A macro result deeper than the host stack is read into the tree of
+/// syntax three, and the tree is dropped, without overflowing.
+#[test]
+fn deep_datum_is_read_and_dropped_as_the_new_tree() {
+    use ilang_syntax::lisp::{Datum, DatumKind as K};
+    use ilang_syntax::syn3::{deep::deep, lisp::expr_from_datum};
+    let at = |kind| Datum {
+        kind,
+        span: Default::default(),
+        docs: Vec::new(),
+    };
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(move || {
+            let mut datum = at(K::Name("x".into()));
+            for _ in 0..50_000 {
+                datum = at(K::Round(vec![at(K::Name("f".into())), datum]));
+            }
+            let tree = deep(|| expr_from_datum(&datum)).unwrap();
+            let again = deep(|| ilang_syntax::syn3::lisp::expr_datum(&tree));
+            assert!(again.span == datum.span);
+            drop(tree);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
