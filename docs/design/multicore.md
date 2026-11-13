@@ -723,3 +723,13 @@ acknowledges installation of its final before failure is allowed. The related
 explicit channel ordering too. Existing assertions and output expectations are
 unchanged. This follows the workers paragraph and §9.5's rule that an unstarted
 child has no installed final functions.
+
+`review-r2/race_tie` previously required the left winner and a particular order
+of distinct final outputs. The spec's workers paragraph and §9.9 allow either
+winner and either order. The case now arms both finalizers before releasing a
+body, checks that the winner is 1 or 2, and collects one distinct token from
+each finalizer. The collector checks the tokens, prints their identities in a
+fixed order and acknowledges both finals before either can finish. The winner
+line must still follow both final lines. This retains the cleanup-before-return
+and exactly-once assertions while making the output independent of the order of
+finalizers.

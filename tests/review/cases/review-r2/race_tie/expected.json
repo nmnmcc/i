@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.main : () -> Nil ! Io | task.Scheduler\n",
+      "stdout": "app/main.main : () -> Nil ! Assert | Io | task.Scheduler\n",
       "stderr": ""
     },
     "test0": {
@@ -30,7 +30,7 @@
         "0"
       ],
       "exit": 0,
-      "stdout": "left-final\nright-final\n1\n",
+      "stdout": "left-final\nright-final\nwinner\n",
       "stderr": ""
     },
     "test2": {
@@ -50,7 +50,7 @@
         "2"
       ],
       "exit": 0,
-      "stdout": "left-final\nright-final\n1\n",
+      "stdout": "left-final\nright-final\nwinner\n",
       "stderr": ""
     }
   }
