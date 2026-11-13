@@ -15,9 +15,10 @@ ping2 = (n: Int) { n |> (0) { use() } | (_) { pong2(n - 1) } }
 pong2 = (n: Int) { ping2(n) }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
 	{
 		pong2(3)
 		pong(3)
 		Nil
-	} <- (S(() { get() }))
+	} <- (_syn3_0)
 }

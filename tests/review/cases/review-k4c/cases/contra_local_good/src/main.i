@@ -6,8 +6,9 @@ wrap = <A>(x: A) {
 }
 
 main = () {
+	_syn3_0: S(Int) = S(f = (x: Int) { x + 1 })
 	{
 		wrap(1)
 		Nil
-	} <- (S(f = (x: Int) { x + 1 }))
+	} <- (_syn3_0)
 }

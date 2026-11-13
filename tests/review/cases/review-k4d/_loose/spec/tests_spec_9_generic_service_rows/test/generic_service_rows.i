@@ -21,10 +21,11 @@ run = <A, N>(body: () <- N -> A) { body() }
 
 // §4.8 rules 3–5 instantiate N with Never; rule 9 removes S(Never).
 test("finite", () {
+	_syn3_0: S(Never) = S(() { Nil }, (_: Never) { Nil })
 	{
 		assert(run(() { use() }) == Nil)
 		assert(run(() { annotated() }) == Nil)
-	} <- (S(() { Nil }, (_: Never) { Nil }))
+	} <- (_syn3_0)
 })
 
 Dependency = (value = Int)
@@ -47,14 +48,15 @@ read_outer = <N>() <- (s: Outer(N)) -> Int {
 
 // §9.2: callbacks get services at the call site, also with nested rows.
 test("nested", () {
+	_syn3_1: Inner(Dependency) = Inner(() { get() }, (_: Dependency) { Nil })
+	_syn3_2: Outer(Dependency | Inner(Dependency)) = Outer(
+		() { read() },
+		(_: Dependency | Inner(Dependency)) { Nil },
+	)
 	{
 		assert(run(() { read_outer() }) == 7)
 		assert(run(() { read_outer() }) == 11) <- (Dependency(value = 11))
-	} <- (
-		Inner(() { get() }, (_: Dependency) { Nil }),
-		Outer(() { read() }, (_: Dependency | Inner(Dependency)) { Nil }),
-		Dependency(value = 7),
-	)
+	} <- (_syn3_1, _syn3_2, Dependency(value = 7))
 })
 
 // Std-2 §7's logging example, including its original error and marker.
@@ -80,11 +82,12 @@ write_annotated = <E, N>(entry: Entry) <- (sink: Sink(E, N)) -> Nil {
 // the installed sink to calls through functions made before installation.
 test("logging", () {
 	producer = () { write(Entry(message = "seen")) }
+	_syn3_3: Sink(String, Never) = make((entry) { fail.raise(entry.message) })
 	{
 		assert(fail.catch(producer) == Error("seen"))
 		assert(
 			fail.catch(() { write_annotated(Entry(message = "annotated")) }) ==
 				Error("annotated"),
 		)
-	} <- (make((entry) { fail.raise(entry.message) }))
+	} <- (_syn3_3)
 })

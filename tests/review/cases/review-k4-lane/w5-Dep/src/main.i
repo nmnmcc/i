@@ -9,7 +9,7 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = (body, svc) { body() <- (svc) }
+wrap = <N>(body, svc: S(N)) { body() <- (svc) }
 
 main = () {
 	assert(wrap(() { use() }, S(f = () { get() })) == 7) <- (Dep(value = 7))

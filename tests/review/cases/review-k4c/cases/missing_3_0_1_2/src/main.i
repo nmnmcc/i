@@ -8,6 +8,9 @@ use = <A, B>() <- (s: S(A, B)) {
 }
 
 main = <A, B>() {
-	local2 = () { use() <- (S(f = () { get() }, g = () { get() })) }
+	local2 = () {
+		_syn3_0: S(Dep, Dep) = S(f = () { get() }, g = () { get() })
+		use() <- (_syn3_0)
+	}
 	run(local2)
 }

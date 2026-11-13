@@ -9,6 +9,7 @@
 	Result(..)
 	AssertionFailure(..)
 	Assert(..)
+	Fail(..)
 	panic
 	assert
 )
@@ -26,6 +27,9 @@ Result(A, E) = Ok(A) | Error(E)
 AssertionFailure = (message = String)
 
 Assert = (fail = (AssertionFailure) -> Never)
+
+/// The service that ends a computation with an error of type `E` (§9.3).
+Fail(E) = (raise = (E) -> Never)
 
 /// Stops the program with `panic: ` and the message (§11.7).
 @external("ilang:prelude", "panic")

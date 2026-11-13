@@ -4,13 +4,12 @@ use = <A, N>() <- (s: S(A, N)) {
 	f()
 }
 example = () {
-	use() <- (
-		S(() { "a" }),
-		S(() {
-			use()
-			1
-		}),
-	)
+	_syn3_0: S(String, Never) = S(() { "a" })
+	_syn3_1: S(Int, S(String, Never)) = S(() {
+		use()
+		1
+	})
+	use() <- (_syn3_0, _syn3_1)
 }
 
 main = () {

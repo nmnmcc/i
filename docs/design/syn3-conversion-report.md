@@ -548,3 +548,413 @@ legacy spec cases each have their own written reason. Checker and CLI
 pending lists are empty. Whole-workspace tests, unfiltered spec/corpus and
 dev-verify remain coordinator-only. R2 opt-in measurements and the bigint
 baseline benchmark were not enabled.
+
+### Tonight integration: batch2 E1 and multicore
+
+Merged batch2 1cb245b4. Kept its substantive fixture and row-scheme changes,
+converted the incoming programs, retained both independent syntax tests,
+and preserved the folded syntax-three spec with its E1 paragraphs. Two
+old declarations inserted into already converted library modules needed
+direct translation: control.escape's signature and the new prelude Fail.
+The converter retry converts the remaining 31 embedded row-scheme snippets.
+Batch2 golden observations are retained pending reviewed syntax/display and
+coordinate translation. Corpus baseline snapshots are taken from batch2;
+only the 1,216 review-k4 cases whose program text differs from that revision
+may be re-recorded, with each phase exit and error-code set checked first.
+The other nine cases must keep their observations unchanged.
+
+Authority: spec §9.2, "The merge of two needs is their intersection (§4.4)."
+"When the intersection for one service of a need is Never while neither
+side is Never, the need cannot be satisfied: it is a compile error (E0515)."
+"A provided value of type P satisfies the need entry S when P <: S (§4.5
+rule 4)." Batch2's runtime/default-worker and fixture changes are preserved.
+
+Merged num4 024ac887 and light-boundary 7c8e490a within their 15-minute
+integration limits. Kept shaped and lazy callees together, retained both
+sets of emitter fields and lowering passes, and adapted lazy closure calls
+to the current shape argument and function-pointer field 9. Converted five
+incoming fixtures, all numeric differential helpers, 316 E1 review shown
+types and 42 exact requirement type fragments. Requirement outcomes and
+error-code lists are unchanged. The queued converter was stopped by its
+own process IDs and rerun using the already-built migrator; that source-only
+run performs no build or compiler/corpus verification.
+
+The E1 merge exposed two migration omissions. A bound ordinary Fail(E)
+service now uses the same transparent alias as ordinary Fail in a need;
+otherwise the transition lowerer removes its binder as legacy error syntax.
+A lowering regression requires that the original handler binder remains an
+environment parameter. Parameterized environment statements now bind their
+value with the written service type before providing that local: dropping
+that annotation could let inference choose a different service form. This
+preserves spec §9.2's provider-subtyping requirement instead of weakening a
+negative test. Re-converted 1,250 original batch2 sources/snippets; five
+known invalid files retain their original registered diagnostic markers.
+
+The checker display fixture's non-function polymorphic empty-list binding
+uses inference for the same empty List(Never), since syntax-3 §2.16 puts
+type parameters only on function values/types. The host-export fixtures
+retain their written wider error types as binding annotations, preserving
+the original non-host-passable error checks. Guarded corpus observation and
+full checker verification are pending; no observation with a changed phase
+exit or error-code set may be recorded.
+
+E1 provider inference correction: syntax-three provision had selected the
+needed service form from the rest, or invented fresh arguments, then
+subtracted that form. It now subtracts the actual provided form, as the
+legacy explicit-provider path already does. Spec §9.2 requires P <: S for
+the provider P, and Rule B retains the directed obligation on the remaining
+row. The focused regression passes: a concrete Read(Int) handler is not
+falsely hidden, and Read(String) reports E0515 without an extra E0501.
+
+The first guarded K4 pass was stopped at a checkpoint (about 100 cases):
+92 matching observations were recorded and eight outcome changes refused.
+No refused expectation was changed. Retained an anonymous closure's written
+need through a typed binding and kept literal callback result annotations.
+The new checker regressions pin all eight batch2 checker code sets. Seven
+golden outputs were translated after reviewing types and source positions;
+their diagnostic-code sets exactly equal batch2. Library/spec outputs still
+await fresh verification. Exact post-fix full gates and corpus run are pending.
+
+Keep handler callback types directly on function literals, rather than
+erasing them behind an outer binding annotation: the former shares the
+callback/provider parameters during body inference. The i/failure checker
+reproducer now shows catch with only N and a caller with no Fail need.
+The inline typed raise callback retains the light-boundary optimization.
+Row-scheme replacement fragments were also translated: every permutation
+or hole test now changes actual syntax-three text, and the value- and
+error-row branches remain distinct.
+
+The post-fix type suite now passes, including both library and spec snapshots.
+Their observations were reviewed and diagnostic-code sets checked against
+batch2 before translating. The eight refused K4 checker outcomes also pass
+together; recursive-row cases retain their written function need through a
+binding annotation. All refused corpus expectations remain untouched.
+
+The first complete checker run found nine test failures: eight row-scheme
+cases and the captured-row coalescing case. Corrections retain written wider
+needs as binding types (syntax-3 §7.3: "A written `! N` that is wider than
+what the body needs is kept as a type annotation on the binding
+(`f: (P) <- … -> R = …`), so that the type does not change."). The inferred
+provider fixture also keeps its original S(A) annotation. Bare legacy ! N
+callback annotations retain Fail(Never), avoiding an unconstrained error
+variable in this transitional lowerer. Four remaining expected strings only
+change to syntax-three type display (unlabelled positions and `<-`). Row
+algebra is supplied through a named alias spread rather than a union of
+list items. The unused-local variant now actually removes
+the call and asserts that its substitution changes the source.
+
+Two snippet-inventory entries render actual function-header/template
+fragments with their real surroundings; no diagnostic allowance was added.
+All 37 row-scheme snippets parse, and the 4,761-snippet inventory has no stale
+entries. The complete compiler-package run and focused correction rerun,
+CLI/spec/std/corpus gates, clippy and final snippet gate remain pending;
+this checkpoint is not a landable result.
+
+The complete syntax, Wasm and LSP packages pass (98 protocol tests). The
+checker package run had only the identified row/coalescing fixture failures.
+The coalescing provider now preserves its original S(Dependency) annotation
+through a local binding, under §7.3's environment-statement conversion and
+spec §9.2's known provider form. The row algebra is named by a transparent
+alias before it is spread: the grammar permits a named spread, not a
+parenthesized algebra expression. Assertions and all three algebra operators
+remain; this changes the representation, not the intended accepted/rejected
+programs. Focused verification is recorded in the command ledger.
+
+The last row-alias failure exposed a lowering bug: adjacent Bad = S(Never)
+was mistaken for a constructor group, absorbing generic S(N) and leaving N
+unbound. Constructor-group absorption now requires the member's arguments
+to match the declaration's parameter names. Specialized aliases retain the
+original constructor and scope, as syntax-3 §2.8 kind 4 requires: "A name is
+a transparent alias, as today." A lowering unit test pins both definitions
+and S's N parameter; that focused lowering regression passes. The final
+checker row-algebra rerun and remaining gates are pending.
+
+All nine initial checker fixture failures now pass focused verification,
+including the row-algebra test after the alias correction. The complete
+compiler packages are being repeated for that lowering change. Formatted
+the edited library handler and verified its focused format check. The
+stopped first corpus recording finalized 92 observations (90 was the live
+checkpoint count); all 92 have source changes and batch2-equivalent phase
+exits/error-code sets. The eight refused observations remain unrecorded.
+
+The fresh compiler-package run and workspace all-target check pass. The
+requested CLI command, multicore and syntax-three fixture binaries pass
+(14, 11 and 1 cases). Typed macros exposed old Lisp declaration/function
+fragments reintroduced by a prior main integration: 35 parser failures.
+Restored the earlier reviewed conversion of those exact fragments, converted
+the newer closed-data and determinism fragments, and gave SyntaxError calls
+their written message/at labels. No assertion or expected rejection changed.
+Authority: syntax-3 §6.8 uses `(-> [A] (, A) A)` for polymorphic function
+signatures, `(-> (, value) _ body)` for functions and `|>`/`|` for pipes and
+chains; §7.3 explicitly includes Lisp strings in Rust tests.
+
+The ordinary inventory did not extract these Lisp fragments. A companion
+Lisp check now parses every repository .is file and the complete modules,
+signatures and functions assembled by macro_run/typed_macros. The existing
+length-prefixed parser driver has a --lisp mode; normal inventory semantics
+are unchanged. New gate and typed-macro rerun are pending behind the shared
+load guard. This remains an unlandable checkpoint until all gates finish.
+
+Typed macros now pass all 36 cases. Connected the companion Lisp inventory
+to the ordinary inventory command, with actual generator substitutions for
+the row-algebra and declared-macro templates. No diagnostics were allowed
+or weakened. Combined inventory passes: 4,762 normal snippets, 34 .is files
+and 89 CLI macro fragments; the eight inventory helper tests also pass.
+Feature-enabled syntax/clippy, requested spec/std and full corpus gates
+remain in progress.
+
+Spec 4.4/ and 4.5/ pass at both optimization levels. The 9/ batch completed
+134/139; all five failures were conversion omissions. Three light-boundary
+fixtures now use the transparent alias for a bound ordinary Fail, and the
+unused wider Fail need in directed_rows uses the same alias. The collect
+examples in control/directed_rows/light_boundary keep callback and provider
+parameter A directly on the literals, as the already-verified spec type
+fixture does; Fail(Never) retains the original empty legacy error channel.
+A manually provided Fail value retains its written Int form and raise label.
+
+Focused reruns pass all six light-boundary cases and control.i and
+directed_rows.i at O0 and O2. Thus all 139 cases are covered by the original
+batch plus targeted source-only corrections; the unchanged long cases were
+not repeated. No compiler code changed. Two stop-fixture headers moved only
+by the inserted alias lines; positions were derived from the same f.raise,
+fail.raise and control.resume call anchors (§11.7), and the exact stop checks
+pass. The fixture format check also passes. Required 11/, release/std and
+full corpus verification remain.
+
+Merged main 46a6d43b6; its benchmark grouping/format correction was already
+present in this lane, so the merge has no tree delta or new old-syntax text.
+Spec 11/ passes all 51 cases at O0/O2, and the fresh release build passes.
+The first std O0 run found the same erased generator callback/provider A
+in std/test/list_test.i. Kept those annotations directly on the literals,
+using the already-verified spec helper pattern. Entry compilation now
+passes and the std O0 suite is executing; O2 and corpus remain pending.
+
+The complete K4 check-only audit found 53 conversion gaps. Of these, 51 now
+match batch2's check exits and error-code sets in one focused 51-case run:
+24 two-row annotations retain both rows through a named transparent alias;
+written recursive needs stay on the binding; callback/provider types remain
+on literals/parameters where inference needs them. Five malformed programs
+retain their original error intent in syntax three: unsupported block-comment
+delimiters, a service statement without an expression, a typed binding in an
+expression position, and a block ending in a binding. Their parser inventory
+entries were individually explained and rekeyed, and their batch2 E0101 or
+E0105 sets are unchanged. No corpus observation was changed by this audit.
+
+Two copies of p1 still differ from batch2 (accepted instead of E0515).
+An experiment preferring a provider's known binding form failed its new
+regression twice; it was saved under target/conv-tonight and discarded,
+including its uncommitted reproducer. Existing committed tests and production
+code remain unchanged. The source-only p1 experiments were also discarded.
+Std O0 and O2 now both pass all 2,170 tests. Workspace all-feature clippy and
+the full requested compiler-package rerun pass. Complete K4 recording and
+zero-failure validation remain required; this checkpoint is not landable.
+
+A read-only audit of all required type fragments found twelve forwarder
+fixtures (q25/q30/q35/q40 in three directories) whose written complete needs
+were erased by conversion. Their bindings now retain those needs. The unused direct service read is
+omitted: these functions only forward the need through use(), as §2.10.1
+requires; retaining that redundant read alongside the annotation caused
+false E0505 cycles. The
+literal also retains the original empty legacy error channel with the
+transition Fail(Never) marker. All twelve accept and match the unchanged
+required type fragments. Their parser checks pass. No requirement was
+changed, and their observations remain subject to the batch2 outcome guard.
+
+Merged main 29515fbfa native-test executable-busy retry without changing any
+embedded literal, compiler or runtime code. The requested latest-main std
+O0/O2 suites each pass 2,170 tests; workspace all-feature clippy, both format
+checks and the official normal/Lisp inventories pass. Native verification
+for the incoming test-harness change is queued behind the corpus.
+
+The first 100 complete K4 observations now pass the guarded recording and
+an independent source-change/phase audit, including all eight initially
+refused cases. Every source changed; phase exits, diagnostic-code sets and
+runtime stdout equal batch2. The complete corpus is still running, and the
+two p1 correctness blockers remain unresolved. This is not a landing claim.
+
+The complete first 200 K4 observations have now passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only these stable completed observations are committed; recording continues.
+The full corpus and the two known p1 regressions still block landing.
+
+The complete first 400 K4 observations have now passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only these stable completed observations are committed; recording continues.
+The full corpus and the two known p1 regressions still block landing.
+
+A total of 600 completed K4 observations have passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only eligible completed observations are committed; refused cases remain
+untouched and recording continues.
+The full corpus, two known p1 regressions and pending phase refusals still block landing.
+
+The ongoing recorder refused multi_run: test0 printed its passing result but
+hit the unchanged ten CPU-second bound; its other phases match. A guarded
+retry with the same bound is pending. The first p1 copy has also been refused
+as predicted; its original expectation is untouched.
+
+Six source-unchanged programs need only type-display translations in their
+current observations: stress_plain_1024/128/32/512, finite_never and
+recursive_never. A proposed patch changes six check.stdout fields; all 1,698
+type lines are exact notation translations and every other JSON field is
+byte-preserved. Because the brief permits re-recording only source-changed
+cases, an explicit exception was requested. The patch remains unapplied
+pending the user's answer. No source was changed merely to permit recording.
+
+A total of 800 completed K4 observations have passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only eligible completed observations are committed; refused cases remain
+untouched and recording continues.
+The full corpus, two known p1 regressions and pending phase refusals still block landing.
+
+Coordinator b15 item 1: the lost p1 obligation was caused by generalizing the
+migration's typed provider temporary before its provide. The inferred pure
+service form replaced the old explicit `S(_)` provider contract. Merely
+choosing the checker's known type, or copying the annotation onto a provide
+of the already-generalized variable, did not restore the obligation.
+
+The lowerer now rejoins an immediately preceding typed provider temporary
+with its environment statement when the temporary has exactly one use.
+Both the written contract and original value reach inference together, as
+in the legacy statement. Other locals retain their binding. Both complete
+p1 copies now report exactly E0515; all 26 row-scheme tests and all 20
+lowering tests pass, including single-use/reused-provider regressions.
+The requirement remains reject E0515, and no expectation was re-recorded.
+
+Coordinator b15 item 2: E0523 is the entry-provider plan error, here
+`service std/list_test.Yield(A) must be closed`. The copied std fixture lost
+its generator callback's direct parameter annotation during conversion,
+leaving A open at the native test entry. Restored the original callback type
+on the function literal and the emitter's x:A annotation, using the already
+verified repository std helper. At O0 and O2 the complete test bundle builds
+before CLI runtime filtering, then generator_callbacks_test passes. This is
+not a full runtime run of the copied std suite. No bound or expectation was
+changed, and there is no longer an E0523 compilation failure.
+
+Coordinator b15 item 3: measured stdout differs only at failure source
+positions: 12:21 became 13:4, and 24:2/29:2/34:2 became 25:2/30:2/35:2.
+The converted fixture now retains the original call-token coordinates.
+Both O0 and O2 stdout are byte-for-byte equal to main again: the same four
+intentional failures and two passing tests, including the corpus startup
+probe. No failure was suppressed and no expectation was changed. The
+before/after execution diff is in target/conv-b15/failure-output-results.json.
+
+Coordinator b15 item 4: each case ran alone three times per build, interleaved
+main/converted, with CPU time from waited child processes. The reference
+was built from exact main 29515fbfa in this worktree under a separate binary
+name; dependency versions and registry identities equal main. Its old-surface
+p1 check rejects E0515. No compiler executable was copied. All samples use
+O2 and the same injected startup test, and all exit 0 with identical stdout.
+
+| Case | Main CPU seconds (three runs) | Converted CPU seconds (three runs) |
+|---|---|---|
+| mutual200 | 10.788, 8.666, 8.767 | 10.584, 10.735, 8.694 |
+| stress-keys-2000 | 11.289, 5.289, 5.355 | 11.447, 5.311, 5.497 |
+
+Both builds exceed the saved ten-CPU-second bound when cold. Thus the gate
+timeout alone is not evidence of a conversion regression. The converted
+mutual200 second run has a checker outlier (8.21 CPU seconds versus roughly
+6.2 in the other paired runs); its default-cache median must not be described
+as steady-state cost. With cache disabled on both sides, three more isolated
+mutual200 pairs use 9.318/9.468/9.439 CPU seconds on main and
+9.690/9.639/9.634 converted: medians 9.439 versus 9.639, about 2.1% apart.
+Median stage deltas are +0.05 expansion, +0.08 checking, +0.04 lowering and
++0.08 Binaryen CPU seconds; runtime execution is 0.03 seconds on both. This
+localizes the small difference to compilation, with transition-front-end
+work in expansion/lowering, rather than a runtime slowdown. The small
+checker/Binaryen differences cannot be separated from machine variation
+with these samples. No large repeatable conversion-specific slowdown was
+found. No case bound or expected observation was changed. Raw per-stage,
+CPU and wall samples are in target/conv-b15/perf-results.json and
+perf-controlled-results.json; the probes run through the heavy wrapper.
+
+Coordinator b15 item 5: all six intentionally old A1 programs are now valid.
+No existing requirement matched any of them. Their source is unchanged.
+Syntax-three §2.2 says: “In an expression, every `{` begins a block:
+`{ s1 … sn e }`. The statements run in order and the value is `e`. A block
+with only an expression is a group: `{ a - 48 } * 100`.” Section 2.4 says:
+“A function is a parameter group, an optional `->` part, and a block:”.
+The old brace-decision rejection is explicitly removed by §2.2. Each case
+now has an accept requirement quoting these paragraphs, with its inferred
+f type pinned; runtime copies retain their assertions and empty stdout.
+
+| Case | Prior requirement | Syntax-three reading |
+|---|---|---|
+| `review-a1/_loose/cases/17_old_unbound_fn_group/original` | None | Block calls `(x) -> Int { x + 1 }` at 41; f returns 42. |
+| `review-a1/_loose/cases/18_old_expected_fn_group/original` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+| `review-a1/_loose/runtime/17/original` | None | Block calls `(x) -> Int { x + 1 }` at 41; f returns 42. |
+| `review-a1/_loose/runtime/18/original` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+| `review-a1/cases/18_old_expected_fn_group` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+| `review-a1/runtime/18` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+
+All six pass checking and O0/O2 native test compilation/execution. The three
+runtime copies also pass their O0/O2 assertions. These observations were
+read-only; expected.json files remain unchanged. Probe results are saved in
+target/conv-b15/a1-observations.json.
+
+Coordinator b15 supersedes the earlier per-hundred recording and display
+exception discussion above. The coordinator accepts the 1,621 display cases
+and owns all remaining gate recordings. This lane did not audit those display
+cases. The 800 post-841 incremental recordings were removed deliberately;
+all source fixes remain. No observation was re-recorded for this audit.
+
+Coordinator b15 item 6: the 120 same-exit/different-code cases form the
+following groups. Counts are cases, not diagnostics or phases. The initial
+read-only comparison used exact main 29515fbfa and the converted release on
+63 cases: every non-permutation case, plus p0/p36/p9 from the 60 permutations.
+The source contracts were compared in all 60 permutations. Complete old/new
+stderr is saved in target/conv-b15/code-observations.json; the guard's long
+stream/tree lines were truncated and are not a complete diagnostic inventory.
+
+| Cases | Count | Reason for the diagnostic change |
+|---|---:|---|
+| K4 `generic_conflict`; K4d x1/x4/x6/x8/x9, z1/z3/z4, h1 in both `_loose/p` and `proj`; K4d `perm/p0`–`p59` | 79 | Conversion erased written complete needs, as with the earlier forwarders. These are lost constraints, not harmless deduplication. Restore them on binding types under §7.3. In the permutations, the missing error belongs to `bad`, independently of the retained `loop` error; `both` and `uset` also retain their original complete needs. Handler binding types retain the obligation-hiding E0515, and h1 retains its written-service E0501 checks. |
+| K4c `recursive_co_2`; K4s `mixed_install_6`, `mixed_install_12` | 3 | A synthetic provider local was generalized before its provide. Item 1's contract/value fusion restores the original inference point. Fresh checks now have main's multisets: one E0505 for the recursive case; respectively three/two E0515 and one E0501 for the mixed cases. No error code disappeared. |
+| K4d b1 in both copies | 2 | The two distinct main errors remain: an empty same-key service intersection and incompatible provider arguments. The migrated joint provide also reports the reverse-ordered empty intersection at the combined scope. This is an additional report of the same contradiction, not a new rejection condition. §7.3 permits consecutive direct providers to merge into one provide; §4.5 rule 4 / §9.2 still require the incompatible service forms to reject. |
+| A1 mixed_headers 03 in its two copies | 2 | The misplaced header still reports E0115. Its old clause block is now an ordinary computation block (§2.2), invalid on the right of `\|>` (§2.11); E0111 and an arrow-expression E0101 are additional recovery diagnostics. |
+| A1 param_shadow 29 in its two copies | 2 | The old binding-head type parameters are forbidden by §2.16 / §3.2. E0101 now rejects `outer(A) =` before the old parser's end-of-block E0105. The parameter-shadowing body is not reached by either invalid program. |
+| A1 ungrouped_product 48 and tuple_clauses_joined 53, each in two copies | 4 | Removed clause blocks are computation blocks, not chain literals (§2.2 / §2.5). The product still has E0111 and also an invalid expression arrow; the tuple case is E0111/E0102 at the invalid pipe/body instead of the old discard-as-value E0106. The bare old clause form never becomes accepted. |
+| A1 old_guard_lines 56 in its two copies | 2 | `case`, `if`, and the old brace clauses no longer form a match. Under §2.5 / §3.3 the free `\|` must join function literals; recovery also reaches the arrow and `_` in expression positions. E0101 remains, with a further E0106. |
+| A1 capture and its five confirmed/loose copies | 6 | Their intentionally invalid `src/types.i` still contains `export (Box(..))` and `Box { Box(Int) }`. E0101 remains at the old export; §3.2's removal of constructor lists adds a second E0101 at `Box {`. The converted caller is not the rejection's cause. |
+| K4d typediff_41_16 and typediff_46_85 | 2 | Both retain the invalid `/* … */` delimiters. The old diagnostic dump between them is now line-commented, eliminating secondary errors in that dump while preserving the unsupported opening delimiter's E0101. Spec §1.2 defines only `//` comments; no block-comment feature was added, and no original error code was lost. |
+| K4s mut_ord_tmp | 1 | The original illegal typed binding in an expression position is retained as `run(h1: _ = …)`. §2.3 / §3.3 read a call's data items, where `:` cannot introduce a label or a binding. It fails at that item, rather than producing two legacy pattern-recovery E0101 reports. |
+| Native3 alias/direct/external/int_assign/raw_ctor | 5 | The retained old `import(…)` / `export(…)` text now parses as ordinary calls with data arguments (§3.3), not header groups (§7.3). Resolver E0234 rejects those top-level macro-reserved calls; E0201 reports the unbound module/value that the call did not import. The main E0101 is therefore completely replaced by later-phase E0234/E0201; these programs remain rejected. |
+| Native3 field/injection_control/positive; std1 stream/stream-positive | 5 | P0 (§3.5) explicitly makes bare `!` and `^` lexer errors, so retained old service/error syntax adds E0001 before recovery. Main's E0101/E0102 do **not** disappear completely in these cases: the streams have E0101×5/E0102×3 → E0101×11/E0102×5 plus E0001×10 each; field, injection_control and positive retain respectively 2, 7 and 1 E0101, adding 1, 3 and 1 E0001. These are removed-token errors, not generic substitutes for a dropped type error. |
+| Rec loose/probes | 1 | Conversion dropped the illegal type spread `..R`, which incorrectly removed E0541. Restore that syntax so the closed-data rule is tested rather than silently deleting its counterexample. Under §2.3, “A data type has no spread”; syntax three diagnoses it in the parser (E0107), before resolution. Thus E0541 is replaced by the direct no-type-spread error. The original E0210 import rejection is independently pinned by `library::unknown_library_path_is_missing` for `i/record`, and both E0202 lookups by `front_end::closed_data_has_no_record_type_even_without_a_spread_error`; all 15 tests in these two binaries pass. The existing corpus requirement now names E0107 and documents that split, keeping all three original negative-test intents. |
+| Runtime echo-types | 1 | Its old `import(task = …, net = …, i/fail, i/resource)` is read as a call: two positional items follow labels, producing E0110 under §2.3. Its old `case` clauses still have invalid expression arrows (§2.5 / §3.3), while the stub task module has two forbidden lowercase data-definition heads (§3.2). These separately reached syntax errors explain the additional diagnostics; no run phase is enabled. |
+| S6 probe; std1 factory/tree/variance | 4 | Lowercase data-definition heads remain forbidden. §3.2 requires bare UpNames in those heads; the new parser rejects the head as E0101 before resolution. Consequently main's E0232, free lowercase E0201 and consequent arity E0224 disappear together. This is earlier enforcement of the same invalid head, not removal of those resolver checks from valid parsed programs. |
+| T1 assert_group | 1 | The fitted pattern `(\"a\", _)` is impossible for the known first part `\"b\"`. Section 2.12 requires the warning when the known type is disjoint from the fitted pattern. W0505 is the documented behaviour change 1 above; `assertion.catch` still catches the same Assert, and the program remains accepted. |
+
+The counts above sum to 120. The disappeared E0541 and the genuinely replaced
+E0101 in the five native-call cases have distinct causes; they are not
+classified together as display changes. The stream cases retain both of
+their original parser codes, as the full diagnostics show.
+
+After restoring the sources, all 120 check exits equal main, and all 79
+restored-contract diagnostic multisets equal main exactly. The three
+provider-generalization cases also match, so 82 of the 120 original code
+changes are repaired; the remaining 38 are the individually explained
+parser, duplicate-provider and warning groups above. Both main and converted
+positive controls (temporary permutation copies without `bad` or `loop`)
+check successfully with the same two unused-binding warnings. The real
+fixtures retain both negative functions. Raw final checks and controls are
+in target/conv-b15/final-code-observations.json and positive-controls.json.
+No expected.json was re-recorded. The deliberate no-type-spread fixture is
+registered with its exact E0107 in the snippet inventory and the converter's
+unconvertible list, so conversion cannot silently erase it again.
+
+Authority for all restored needs, §7.3: “A written `! N` that is wider than
+what the body needs is kept as a type annotation on the binding
+(`f: (P) <- … -> R = …`), so that the type does not change.” The literals also
+retain their original empty error channel through the transition lowerer's
+`Fail(Never)` marker. The restored type spread follows §2.3: “A data type has
+no spread.” The old removed-library/type checks were split out, not dropped.
+
+Final item-6 verification also passes workspace all-target/all-feature clippy,
+normal snippet inventory (4,766 snippets, five unchanged future-track entries)
+and Lisp inventory (34 files and 89 CLI macro fragments). The inventory first
+exposed an unexpanded Rust format template in the new provider regression;
+literal concatenation now produces the same i programs while exposing valid
+literal snippets to the inventory. Its focused checker regression passes.
+No tests were parked. The coordinator's final whole-corpus recording and
+merged-gate run are outside this read-only anomaly audit.

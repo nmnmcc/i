@@ -98,6 +98,7 @@ tests/review/cases/review-native3/positive/.invalid/src/main.i expected `,` or `
 tests/review/cases/review-native3/update/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` w
 tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i expected an expression, found `..`
 tests/review/cases/review-rec/_loose/probes/.invalid/src/main.i expected `}`, found `:`
+tests/review/cases/review-rec/_loose/probes/src/main.i deliberate no-type-spread negative fixture; syntax-three §2.3 reports E0107 before resolution
 tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i expected an expression, found `:`
 tests/review/cases/review-runtime/echo-types/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … 
 tests/review/cases/review-std1/stream/.invalid/src/stream.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }`

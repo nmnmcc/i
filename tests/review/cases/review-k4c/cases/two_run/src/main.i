@@ -1,3 +1,4 @@
+RowPair(A, B) = A | B
 D = (Int)
 read = () <- (d: D) {
 	D(n) = d
@@ -10,13 +11,16 @@ use = <A, B>() <- (s: S(A, B)) {
 }
 run = <N>(f: () <- N -> Int) { f() }
 wrap = <A, B>() {
-	local: () <- (S(A, B), ..A) -> Int = () { run(() { use() }) }
+	local: () <- (Fail(Never), S(A, B), RowPair(A, B)) -> Int = () {
+		run(() { use() })
+	}
 	run(local)
 }
 
 main = () {
+	_syn3_0: S(D, Never) = S(() { read() }, () { 3 })
 	{
 		assert(wrap() == 10)
 		Nil
-	} <- (D(7), S(() { read() }, () { 3 }))
+	} <- (D(7), _syn3_0)
 }

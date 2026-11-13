@@ -22,14 +22,14 @@ length = (xs, n) { xs |> ([]) { n } | ([_, ..rest]) { length(rest, n + 1) } }
 // The example of §9.4.
 Yield(A) = (emit = (A) -> Nil)
 
-collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
 			[]
 		} <- (
 			Yield(
-				emit = (x) {
+				emit = (x: A) {
 					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 				},
 			),

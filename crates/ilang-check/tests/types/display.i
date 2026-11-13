@@ -30,7 +30,7 @@ one_side = <A>(x: A) -> Int { x }
 errors_only = () -> Int { fail.raise(1) }
 
 empty_list = () {
-	y: List(A) = []
+	y = []
 	y
 }
 

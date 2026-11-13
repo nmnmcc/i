@@ -5,6 +5,9 @@ use = <N>() <- (s: S(N)) {
 }
 run = <N>(body: () <- N -> Nil) { body() }
 forward = <N>() <- (s: S(N)) { run(() { use() }) }
-example = () { forward() <- (S(() { Nil }, (_: Never) { Nil })) }
+example = () {
+	_syn3_0: S(Never) = S(() { Nil }, (_: Never) { Nil })
+	forward() <- (_syn3_0)
+}
 
 main = () { example() }

@@ -4,8 +4,11 @@ i/fail.raise : (A) <- (Fail(A)) -> Never
 i/fail.catch : (() <- (Fail(E), ..N) -> A) <- N -> Result(A, E)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
 i/fail.map_error : (() <- (Fail(E), ..N) -> A, (E) <- N -> B) <- (Fail(B), ..N) -> A
+i/failure.raise : (A) <- (Fail(A)) -> Never
+i/failure.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/control.boundary : ((Boundary(A, B, C)) <- (Fail(B), ..C) -> A) <- (Fail(B), ..C) -> A
 i/control.suspend : (Boundary(A, B, C), (Continuation(D, A, B, C)) <- (Fail(B), ..C) -> A) -> D
+i/control.escape : (Boundary(A, B, C), A) -> Never
 i/control.resume : (Continuation(A, B, C, D), A) <- (Fail(C), ..D) -> B
 i/control.cancel : (Continuation(A, B, C, D)) <- D -> Nil
 i/control.keep_env : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B

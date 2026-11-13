@@ -1,3 +1,4 @@
+// old-syntax-check: E0107
 (
 	i/record
 )
@@ -16,6 +17,6 @@ pair_annotated = () -> (data = (Int, Int)) | (error = String) {
 choose = <R>(c: Bool, r: R & Record) {
 	c |> (True) { record.put(r, "a", 1) } | (False) { (b = 2) }
 }
-choose_written = <R>(c: Bool, r: R & Record) -> (a = 1) | (b = 2) {
+choose_written = <R>(c: Bool, r: R & Record) -> (..R, a = 1) | (b = 2) {
 	c |> (True) { record.put(r, "a", 1) } | (False) { (b = 2) }
 }

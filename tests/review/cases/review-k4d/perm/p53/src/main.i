@@ -4,7 +4,10 @@ fr = () { run(() { use() }) }
 
 Dep = (v = Int)
 
-uset = <A, N>(x: A) <- (t: T(A, N)) -> A {
+uset: <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x: A) <- (
+	t: T(A, N),
+	fail: Fail(Never),
+) -> A {
 	T(g = g, ..) = t
 	g(x)
 }
@@ -20,11 +23,9 @@ T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
 run = <A, N>(body: () <- N -> A) { body() }
 
 closed = () {
-	both() <- (
-		Dep(v = 1),
-		T(g = (x: Int) { x + get() }, m = (_: Dep) { Nil }),
-		S(f = () { get() }),
-	)
+	_syn3_0: T(Int, Dep) = T(g = (x: Int) { x + get() }, m = (_: Dep) { Nil })
+	_syn3_1: S(Dep) = S(f = () { get() })
+	both() <- (Dep(v = 1), _syn3_0, _syn3_1)
 }
 
 main = () {
@@ -32,9 +33,14 @@ main = () {
 	Nil
 }
 
-both = () -> Int { pong(2) }
+both: <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
+	fail: Fail(Never),
+) -> Int { pong(2) }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (
+	s: S(N),
+	fail: Fail(Never),
+) -> Int {
 	S(f = f) = s
 	f()
 }

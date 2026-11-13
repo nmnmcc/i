@@ -19,8 +19,9 @@ h0 = () { ut() }
 h1 = () { run(h0) + run(() { ut() }) }
 
 main = () {
+	_syn3_0: S(Never) = S(f = () { 1 }, m = (_: Never) { Nil })
 	{
 		k() + ut()
 		Nil
-	} <- (S(f = () { 1 }, m = (_: Never) { Nil }))
+	} <- (_syn3_0)
 }

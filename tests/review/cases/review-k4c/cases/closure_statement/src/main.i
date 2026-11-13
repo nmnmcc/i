@@ -8,6 +8,9 @@ use = <N>() <- (s: S(N)) {
 run = <N>(f: () <- N -> Int) { f() }
 
 main = () {
-	local = () { run(() { use() }) <- (S(() { get() })) }
+	local = () {
+		_syn3_0: S(Dep) = S(() { get() })
+		run(() { use() }) <- (_syn3_0)
+	}
 	local()
 }

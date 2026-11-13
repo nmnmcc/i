@@ -305,3 +305,75 @@ fn labelled_function_type_parameters_keep_their_data_keys() {
         ["x", "y"]
     );
 }
+
+#[test]
+fn migrated_captured_row_provider_keeps_its_written_contract() {
+    // §4.7: annotations participate in inference. §9.2: the provided
+    // value must satisfy the needed service by subtyping. Dropping the
+    // old provider's S(Dependency) contract changes those constraints.
+    let old = "S(N) { S(() -> Nil ! N) }
+Dependency { Dependency }
+read = (d ! Dependency) { Nil }
+use(N) = (s ! S(N)) { S(f) = s f() }
+apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+main = () { ! S(Dependency) = S(() { read() }) apply() }";
+    let (old, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let (converted, notes) =
+        syn3::convert::convert(&old, None, &syn3::convert::Signatures::default());
+    assert!(notes.is_empty(), "{notes:#?}");
+    let (lowered, diags) = syn3::lower::lower(&converted);
+    assert!(diags.is_empty(), "{diags:#?}");
+    assert_eq!(
+        print_module(&lowered),
+        shown(
+            "S(N) = (() <- N -> Nil)
+Dependency = ()
+read = () <- (d: Dependency) { Nil }
+use = <N>() <- (s: S(N)) { S(f) = s f() }
+apply = <N>() { local: () <- N -> Nil = () { use() } local() }
+main = () {
+    _syn3_0: S(Dependency) = S(() { read() })
+    apply() <- (_syn3_0)
+}",
+        ),
+    );
+}
+
+#[test]
+fn a_single_use_provider_keeps_its_contract_before_generalization() {
+    let source = "S(N) = (f = () <- N -> Int)\nwrap = (body) { provided: S(_) = S(f = () { 1 }) body() <- (provided) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[1].kind else {
+        panic!()
+    };
+    let ilang_syntax::ast::ExprKind::Fn(function) = &binding.value.kind else {
+        panic!()
+    };
+    assert_eq!(function.body.stmts.len(), 2);
+    let ilang_syntax::ast::Stmt::Env { ty, value, .. } = &function.body.stmts[0] else {
+        panic!()
+    };
+    assert!(
+        matches!(&ty.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "S")
+    );
+    assert!(matches!(
+        &value.kind,
+        ilang_syntax::ast::ExprKind::Call { .. }
+    ));
+
+    let used = source.replace("body() <-", "body(provided) <-");
+    let (module, errors) = ilang_syntax::parse_module(&used);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[1].kind else {
+        panic!()
+    };
+    let ilang_syntax::ast::ExprKind::Fn(function) = &binding.value.kind else {
+        panic!()
+    };
+    assert!(matches!(
+        &function.body.stmts[0],
+        ilang_syntax::ast::Stmt::Bind(_)
+    ));
+}
