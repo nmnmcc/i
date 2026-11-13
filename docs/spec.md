@@ -1862,7 +1862,9 @@ running map callbacks. Among ready alternatives use source order; among partner
 registrations use FIFO arrival order. Distinct leaves from the same registration
 must never rendezvous with one another. A registration may commit once. Commit
 atomically marks both partner registrations, removes all their losing leaves,
-transfers one value, then queues the tasks. Apply only the winning branch's map
+and transfers one value. Keep already-runnable tasks in their order. Append the
+older blocked partner to the runnable queue first, then append the committing
+task at the tail. Neither runs in the middle of the commit. Apply only the winning branch's map
 functions, in composition order, in the syncing task after commit. A mapper can
 raise, await, spawn, or stop; it cannot roll back the message. No guard or nack
 operation is exported. Cancelling a sync unregisters all leaves before unwinding.
