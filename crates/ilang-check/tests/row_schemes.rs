@@ -936,6 +936,9 @@ fn intersection_inference_never_selects_a_variable_by_operand_order() {
 #[test]
 fn flexible_value_bounds_do_not_close_deferred_need_arguments() {
     let source = include_str!("../../../tests/spec/9/need_meet_deferred_values.i");
+    // Keep the audit's original type-only probe here; the spec fixture's
+    // empty entry exists only to give its executable harness a root.
+    let source = source.split_once("\nmain =").map_or(source, |(probe, _)| probe);
     types(source);
     types(&source.replace("read(x) read(y)", "read(y) read(x)"));
 }

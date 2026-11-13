@@ -7,3 +7,5 @@ Read(A) = (read = () -> A)
 read = <A>(x: A) <- (r: Read(A)) { r.read() }
 both = <A, B>(x: A, y: B) { read(x) read(y) }
 use = () { both(1, "s") }
+
+main = () { Nil }
