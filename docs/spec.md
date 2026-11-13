@@ -1867,13 +1867,27 @@ functions, in composition order, in the syncing task after commit. A mapper can
 raise, await, spawn, or stop; it cannot roll back the message. No guard or nack
 operation is exported. Cancelling a sync unregisters all leaves before unwinding.
 
-go appends the child to the FIFO queue and returns to the parent in the same
-turn, after cancellation checks and a host poll only if a task needs host
-progress; it does not yield the parent. yield ends the current turn and queues the caller at the tail. A blocking command removes
-its task until ready; a nonblocking sync/join still makes a scheduling point.
+A **turn** lasts until the running task blocks, yields, or reaches an
+operation that ends its turn in the table below. A script choice is consumed
+only when the scheduler chooses a runnable task for a new turn, including the
+first turn. Cancellation bookkeeping and host polling do not consume choices.
+
+| Operation | Turn behavior |
+|---|---|
+| `path`, `random` | Data reads; no cancellation check, poll, or turn end |
+| `top`, `keep`, event construction (`always`, `never`, `choose`, `map`, `send_event`, `receive_event`, `join_event`) | No scheduler command or turn end |
+| `go`, `channel`, `local_channel`, `share`, `get`, `ref`, `update`, scope entry | Check cancellation and perform the command in the current turn; poll only if a task needs host progress; no turn end |
+| `yield` | End the turn and queue the caller at the tail |
+| `sync`, `join`, `send`, `receive` | End the turn even when ready immediately; if blocked, remove the task until ready |
+| Scope exit | End the turn; wait for children and cleanup as required by R3 |
+| Async await through the task's `Await` | End the turn even when the request is already terminal |
+| `run`, `test` | Run the nested scheduler; the outer task ends its turn only when the nested Runner waits or polls |
+| `scope`, `local_scope`, `both`, `race`, `map_concurrently` | Their constituent operations have the behavior above; there is no additional turn end at a wrapper call |
+
+`go` appends the child to the FIFO queue before returning in the same turn.
 A completion queues waiters FIFO. Cancellation bookkeeping runs before another
-normal task turn; a task already unwinding is queued normally. Scope ends,
-async awaits, and each loop switch are poll points too. path/random are not.
+normal task turn; a task already unwinding is queued normally. Each loop switch
+is a poll point, subject to the progress-interest rule below.
 
 At every switch, first run cancellation bookkeeping and scan terminal ticket
 waiters. Build the progress-interest set from tasks actually suspended in
