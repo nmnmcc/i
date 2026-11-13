@@ -77,26 +77,8 @@ pub fn lower_expanded(
     (module, cx.errors)
 }
 
-/// Metadata retained across native-tree expansion for the temporary
-/// transition adapter. It contains names and source spans, never old nodes.
-#[derive(Clone, Debug, Default)]
-pub struct Transition {
-    complete: bool,
-    parameters: HashMap<(Span, Span), Vec<(String, Span)>>,
-    sums: HashMap<Span, Vec<Span>>,
-    expressions: HashSet<Span>,
-    types: HashSet<Span>,
-    patterns: HashSet<Span>,
-}
+pub use super::facts::Transition;
 impl Transition {
-    pub fn extend(&mut self, other: &Self) {
-        self.complete |= other.complete;
-        self.parameters.extend(other.parameters.clone());
-        self.sums.extend(other.sums.clone());
-        self.expressions.extend(&other.expressions);
-        self.types.extend(&other.types);
-        self.patterns.extend(&other.patterns);
-    }
     fn binding(&mut self, binding: &o::Binding) {
         self.parameters.insert(
             (binding.span, binding.pattern.span),
@@ -183,15 +165,6 @@ impl Transition {
                 _ => {}
             }
         }
-    }
-    pub fn expression(&mut self, span: Span) {
-        self.expressions.insert(span);
-    }
-    pub fn ty(&mut self, span: Span) {
-        self.types.insert(span);
-    }
-    pub fn pattern(&mut self, span: Span) {
-        self.patterns.insert(span);
     }
 }
 
@@ -1029,10 +1002,118 @@ impl Cx {
                 _ => stmts.push(self.stmt(s)),
             }
         }
-        o::Block {
+        let mut block = o::Block {
             stmts,
             span: b.span.0,
+        };
+        // A migrated typed provider is a single-use local immediately before
+        // its provide. Keep its annotation on the environment statement and
+        // its value there too: a separate let would generalize it too early.
+        let candidate = block.stmts.windows(2).any(|ss| {
+            matches!(
+                ss,
+                [
+                    o::Stmt::Bind(o::Binding {
+                        pattern: o::Pattern {
+                            kind: o::PatternKind::Typed { .. },
+                            ..
+                        },
+                        ..
+                    }),
+                    o::Stmt::Env { .. }
+                ]
+            )
+        });
+        if candidate {
+            use crate::walk::{Visitor, Walk};
+            #[derive(Default)]
+            struct Uses(HashMap<String, usize>);
+            impl Visitor for Uses {
+                fn expr(&mut self, e: &mut o::Expr, enter: bool) {
+                    if enter && let o::ExprKind::Name { module: None, name } = &e.kind {
+                        *self.0.entry(name.name.clone()).or_default() += 1;
+                    }
+                }
+            }
+            let mut uses = Uses::default();
+            block.walk(&mut uses);
+            let mut i = 0;
+            while i + 1 < block.stmts.len() {
+                let contract = match (&block.stmts[i], &block.stmts[i + 1]) {
+                    (o::Stmt::Bind(b), o::Stmt::Env { value, .. }) => {
+                        match (&b.pattern.kind, &value.kind) {
+                            (
+                                o::PatternKind::Typed { binder, ty },
+                                o::ExprKind::Name { module: None, name },
+                            ) if !binder.discard
+                                && binder.name == name.name
+                                && uses.0.get(&binder.name) == Some(&1) =>
+                            {
+                                Some(ty.clone())
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                if let Some(mut contract) = contract {
+                    // Closed function-valued providers keep their original
+                    // generalization point and its deferred obligations.
+                    // Open contracts still have to reach the provide before
+                    // generalization; scalar providers carry no function scheme.
+                    struct Boundary<'a> {
+                        rows: &'a [Row],
+                        contract: bool,
+                        open: bool,
+                        function: bool,
+                    }
+                    impl Visitor for Boundary<'_> {
+                        fn ty(&mut self, t: &mut o::TypeExpr) {
+                            if self.contract {
+                                self.open |= matches!(&t.kind, o::TypeKind::Hole)
+                                    || matches!(&t.kind, o::TypeKind::Named { module: None, name, args }
+                                        if args.is_empty() && self.rows.iter().any(|r| r.name == name.name));
+                            }
+                        }
+                        fn expr(&mut self, e: &mut o::Expr, enter: bool) {
+                            if enter {
+                                self.function |=
+                                    matches!(e.kind, o::ExprKind::Fn(_) | o::ExprKind::Clauses(_));
+                            }
+                        }
+                    }
+                    let mut boundary = Boundary {
+                        rows: &self.rows,
+                        contract: true,
+                        open: false,
+                        function: false,
+                    };
+                    contract.walk(&mut boundary);
+                    if !boundary.open {
+                        boundary.contract = false;
+                        let o::Stmt::Bind(binding) = &mut block.stmts[i] else {
+                            unreachable!()
+                        };
+                        binding.value.walk(&mut boundary);
+                        if boundary.function {
+                            i += 1;
+                            continue;
+                        }
+                    }
+                    let o::Stmt::Bind(binding) = block.stmts.remove(i) else {
+                        unreachable!()
+                    };
+                    let o::Stmt::Env { ty, value, .. } = &mut block.stmts[i] else {
+                        unreachable!()
+                    };
+                    *ty = contract;
+                    *value = binding.value;
+                } else {
+                    i += 1;
+                }
+            }
         }
+        block
     }
 
     fn stmt(&mut self, s: &n::Stmt) -> o::Stmt {

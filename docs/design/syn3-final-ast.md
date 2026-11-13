@@ -273,8 +273,8 @@ These are not mechanical, and each changes what a macro sees.
 | 2b datum builder; `needs_row` | done |
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
-| 3 resolver | not started; faD is deliberately not merged in this prefix |
-| 4 deletion | not started |
+| 3 resolver | IN PROGRESS: latest conv a599 integrated; native closed-provider boundary ported; new affected checks pending, earlier gate is historical |
+| 4 deletion | PREPARED: fa2 script adapted outside production; apply only after a committed green step 3 |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -636,3 +636,117 @@ E0515 regressions and converted corpus repairs) arrived during this gate.
 It is next, together with the native resolver switch; it is not claimed by
 this checkpoint. The old solver experiment remains discarded. No deletion
 has started, and the updated native provider-plan draft is not yet compiled.
+
+00:27: green `baf2e3b11` was published before advancing. Pending integration
+now includes faD `549e50510` and latest conv `d916037a5`. The complete conv
+merge was saved and replayed alongside faD, including all reviewed source,
+requirement and documentation changes. Its new provider-contract rejoining
+is ported to native planning/resolution and macro scope traversal; ordinary
+and reused locals remain bindings. Nested rewritten providers are counted
+before their parent, matching the old pass. These new native changes still
+require compilation and the full gate; they are not covered by the earlier
+677-file preview. Deletion remains unapplied.
+
+00:54 checkpoint: native workspace check and provider lowering regression pass.
+Focused native walker (19), rows (26), and strict differential (677 files,
+519 programs; all 628 repository `.i` files) pass. The full Rust gate again
+passes that differential and row suite, but `types::types` has one golden
+mismatch: `soundness.out` loses the outer-call E0515 at 14:5 and 16:5.
+No expected output changed. The fixture's `get = () -> Int { 1 }` annotation
+was introduced by conversion `ee039fd4d` before the newer provider-contract
+rejoining pass. The original main and the initial retained-contract fixture
+both had `get = () { 1 }`. That original body is restored; its unchanged
+golden and the differential must be rerun before any green claim. The rest
+of the serialized expanded gate is continuing. Fa2 deletion is still only
+prepared under ignored `target/fa-night`; no production file was deleted.
+
+01:03: restoring the original callback body did not change the missing two
+outer-call diagnostics, so that hypothesis is rejected and the annotation
+is restored. The actual distinction is the new adjacent-temporary pass:
+it replaces the ordinary local's generalization with direct typed-Env
+inference. The soundness fixture is about generalization and now provides
+`{ _syn3_0 }` to keep that ordinary local in the test. §2.2: “A block with
+only an expression is a group: `{ a - 48 } * 100`.” Every expected type and
+diagnostic remains. Direct rejoined contracts remain independently tested
+by rows/lowering, including both full p1 E0515 cases. This second repair
+still requires the focused golden run. The other full-run failure is only
+the formatter skip inventory: conv d916 restored the intentionally invalid
+review-rec type spread (§2.3 “A data type has no spread”), so that one source
+is added to the inventory; every formatting property assertion remains.
+
+01:07 checkpoint: the repaired soundness golden passes with its expected
+file byte-for-byte unchanged. Full formatting target passes after the one
+explained skip-inventory update; native walker passes all 19 again; resolver
+prepared quotes, 20,000-deep tree and strict whole-repository/program
+differential all pass again on the final source snapshot. Together with the
+full run this gives 690 passing Rust tests, four existing ignored and only
+the requested recovery-corpus skip. The earlier full Rust exit is retained
+as historical failure, not hidden; its only two failed tests have passing
+focused reruns. The remaining serialized CLI/std/spec/fmt/clippy gate resumed
+at 01:06. No deletion is applied and no native-switch commit is claimed yet.
+
+01:13: all seven requested CLI binaries pass 144 tests; examples pass 13
+with their existing skip. Std O0 now running with final readers enabled;
+spec chapter filters, Rust/source fmt, clippy and std O2 remain. No switch
+commit is claimed until those complete.
+
+01:18: `std/schema_test.null_round` passes with FINAL_AST_READERS=true
+on the final native snapshot; source and assertion are unchanged. It also
+passed on the committed baseline at both levels. The old fa2 failure is
+not reproduced; no guessed backend change or expectation relaxation is
+made. Current std O0 still finishing and native O2 remains pending.
+
+01:29: native std O0 passes 2170; spec 6 passes 80 and spec 7 passes
+104 at both levels (existing pending list unchanged). Spec 9 queued from
+01:23:54 until about 01:29:09 behind the shared load guard, then started
+normally. No second heavy command, priority override or wrapper edit was
+used. Chapter 15.7, formatting, clippy and std O2 still gate the commit.
+
+01:34: latest conv a5992fda arrived while the earlier chapter-9 run was
+active. It fixes the real closed-function provider regression in 9117cb588:
+closed function-valued locals retain their generalization boundary; open
+contracts and scalar providers still rejoin. The native provider planner is
+ported with binding generic context, and the temporary soundness group is
+removed: the original fixture and every golden byte remain. The upstream
+exact four-E0515 regression and formatter-inventory explanation are retained.
+The native walker gains closed/open/generic/scalar differential coverage.
+Spec §4.7: “A binding is generalized when its value is a direct value (§6.10):
+the type variables of its type that are not in the types of names from
+outside it become general, so each use of the name may give them different
+types.” Earlier passing gates are historical; this new source still needs
+its affected reruns. The scheduler is paused while its active chapter-9
+command finishes; no second heavy command runs. No green commit is claimed.
+
+01:43 latest-source checkpoint: workspace check and clippy -D warnings
+pass. All syntax/macro tests, including the legacy feature, pass 272.
+Affected checker unit tests pass 68 (four existing ignored); strict resolver
+differential and prepared/deep tests pass again; the 27-row suite is still
+finishing. The original four-Reader-diagnostic regression passes. Remaining
+checks are running serially. No green switch commit and no deletion claim.
+
+01:55: affected checker suite passes 103 (68 units, 27 rows, five type
+goldens, three strict resolver/deep/quote tests; four existing ignored).
+All 144 CLI tests pass on the final source, including the metadata forwarding
+for standalone expression fragments added during the oracle run. The latter
+small forwarding change is compiled/exercised by CLI; the prior oracle
+binaries predate it and should be repeated with the full final gate. Std
+O2 is compiling since 01:52:44. LSP and format checks remain queued behind
+it. Step 3 is not committed and deletion remains unapplied; only baf2e3b11
+is claimed landable. The final-source complete checker integration, std O0,
+macro examples and spec chapter matrix have not been repeated after a599.
+
+Deadline freeze (01:58, before 02:00): candidate remains uncommitted on
+lane/fa, with faD549 and latest conv a599 merge parents. Baf2e3b11 remains
+the only landable hash. The scheduler is paused; the already-running std
+O2 check may finish, but no further queued heavy checks will start after
+the merge deadline. Compiler sources are frozen. Full final-source checker
+integration, LSP, examples, std O0, chapters 6/7/9/15.7 and final formatting/
+clippy repetition remain unverified; the exact matrix/commands are in
+syn3-final-ast-fa-verification.md. Step 4 is prepared only, not applied.
+
+Post-deadline read-only result (2026-11-14T02:01:53.534619+08:00): the already-running std O2
+finishes 2170/2170, including unchanged schema.null_round. Wrapper kernel
+exit status is zero. Only the paused own scheduler is stopped afterward;
+no queued heavy check starts. No compiler source or commit changes after
+the deadline. Full final-source gate remains incomplete, so step 3 stays
+uncommitted and deletion remains unapplied.

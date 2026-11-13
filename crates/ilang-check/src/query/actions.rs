@@ -703,7 +703,7 @@ fn with_line_end(text: &str, span: Span) -> Span {
 }
 
 /// An item with its documentation comment before it and its line end.
-fn with_doc_and_line_end(text: &str, item: Span, ast: &ast::Module) -> Span {
+fn with_doc_and_line_end(text: &str, item: Span, ast: &tree::Module) -> Span {
     let mut start = item.start as usize;
     let has_doc = ast
         .items

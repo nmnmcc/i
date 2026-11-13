@@ -2092,7 +2092,7 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                 .map(|v| {
                     ShownType::Lit(
                         if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::String) {
-                            ilang_syntax::print::string_literal(&v)
+                            ilang_syntax::syn3::string_literal(&v)
                         } else {
                             v
                         },

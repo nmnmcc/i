@@ -21,9 +21,70 @@ use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
+mod three;
+pub use three::lowering_errors;
+pub(crate) use three::source_facts;
+
+/// Resolve directly from the native tree. Source identity and origins are
+/// shared with the transition resolver; no old syntax nodes are constructed.
 pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
-    let lowered = crate::lower_parsed(graph, parsed);
-    resolve_lowered(graph, &lowered)
+    ilang_syntax::syn3::deep::deep(|| {
+        let modules: Vec<_> = parsed.iter().map(|p| p.ast.clone()).collect();
+        resolve_native(graph, parsed, &modules, false)
+    })
+}
+
+pub fn resolve3(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+    modules: &[ilang_syntax::syn3::ast::Module],
+) -> (Program, Vec<Diagnostic>) {
+    resolve_native(graph, parsed, modules, true)
+}
+fn resolve_native(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+    modules: &[ilang_syntax::syn3::ast::Module],
+    report_errors: bool,
+) -> (Program, Vec<Diagnostic>) {
+    let metadata: Vec<_> = parsed
+        .iter()
+        .map(|p| p.with_lowered_ast(Default::default()))
+        .collect();
+    ilang_syntax::syn3::deep::deep(|| {
+        let mut transitions: Vec<_> = parsed
+            .iter()
+            .map(|p| {
+                let mut t = p.lowering.clone();
+                if let Some(scoped) = &p.scoped {
+                    t.extend(scoped.transition());
+                }
+                t
+            })
+            .collect();
+        let modules: Vec<_> = modules
+            .iter()
+            .zip(&mut transitions)
+            .map(|(m, t)| three::normalize_module(m, t))
+            .collect();
+        three::resolve3(graph, &metadata, &modules, &transitions, report_errors)
+    })
+}
+
+/// Retained for the old/native differential until the old tree is deleted.
+pub fn resolve_transition(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+    modules: &[ast::Module],
+) -> (Program, Vec<Diagnostic>) {
+    ilang_syntax::syn3::deep::deep(|| {
+        let lowered: Vec<_> = parsed
+            .iter()
+            .zip(modules)
+            .map(|(p, m)| p.with_lowered_ast(m.clone()))
+            .collect();
+        resolve_lowered(graph, &lowered)
+    })
 }
 
 fn resolve_lowered(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
@@ -1313,6 +1374,20 @@ impl<'a> Resolver<'a> {
 
     /// §2.1: modules may not import one another in a circle.
     fn import_circles(&mut self) {
+        let parsed = self.parsed;
+        self.import_circles_of(&|m| {
+            parsed[m]
+                .ast
+                .imports
+                .iter()
+                .map(|i| (i.path.iter().map(|p| p.name.clone()).collect(), i.span))
+                .collect()
+        });
+    }
+
+    /// `imports` gives the written imports of a module: the path and the
+    /// span of each.
+    fn import_circles_of(&mut self, imports: &dyn Fn(usize) -> Vec<(Vec<String>, Span)>) {
         let mut g = petgraph::graph::DiGraph::<u32, ()>::new();
         let nodes: Vec<_> = (0..self.p.modules.len() as u32)
             .map(|i| g.add_node(i))
@@ -1337,13 +1412,13 @@ impl<'a> Resolver<'a> {
                 .map(|&m| self.p.modules[m as usize].path.as_str())
                 .collect();
             let names = names.join(", ");
-            let parsed = self.parsed;
             for &m in &members {
                 self.cur = ModuleId(m);
                 // Report at the first import that goes into the circle.
-                let item = parsed[m as usize].ast.imports.iter().find(|item| {
+                let written = imports(m as usize);
+                let item = written.iter().find(|(path, _)| {
                     let me = self.p.module(ModuleId(m));
-                    let first = &item.path[0].name;
+                    let first = &path[0];
                     let pkg = &self.graph.packages[me.package];
                     let package = if first == "i" {
                         Some(self.graph.library)
@@ -1356,7 +1431,7 @@ impl<'a> Resolver<'a> {
                             .find(|(n, _)| n == first)
                             .and_then(|(_, id)| *id)
                     };
-                    let rest: Vec<&str> = item.path[1..].iter().map(|p| p.name.as_str()).collect();
+                    let rest: Vec<&str> = path[1..].iter().map(|p| p.as_str()).collect();
                     package.is_some_and(|p| {
                         let path = format!("{}/{}", self.graph.packages[p].name, rest.join("/"));
                         self.by_path
@@ -1364,7 +1439,7 @@ impl<'a> Resolver<'a> {
                             .is_some_and(|t| members.contains(&t.0))
                     })
                 });
-                let span = item.map_or(Span::default(), |i| i.span);
+                let span = item.map_or(Span::default(), |i| i.1);
                 self.error(
                     code::IMPORT_CIRCLE,
                     span,
@@ -1468,6 +1543,23 @@ impl<'a> Resolver<'a> {
     }
 
     fn early_types(&mut self) {
+        self.early_type_checks();
+        for (mi, parsed) in self.parsed.iter().enumerate() {
+            self.cur = ModuleId(mi as u32);
+            for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
+                if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
+                    && self.p.ty(id).host.is_some()
+                    && !matches!(&self.p.ty(id).body, TypeBody::Alias(t) if value_dependent(&self.p,t))
+                    && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
+                {
+                    self.host_form(def);
+                }
+            }
+        }
+    }
+
+    /// The part of `early_types` that reads no tree.
+    fn early_type_checks(&mut self) {
         for i in 0..self.p.alias_patterns.len() {
             let pattern = self.p.alias_patterns[i].clone();
             if !self.projectable_pattern(&pattern.pattern, &mut HashSet::new()) {
@@ -1520,18 +1612,6 @@ impl<'a> Resolver<'a> {
         for (m, t) in host_aliases {
             self.cur = m;
             self.reject_value_type(&t, "a host declaration");
-        }
-        for (mi, parsed) in self.parsed.iter().enumerate() {
-            self.cur = ModuleId(mi as u32);
-            for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
-                if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
-                    && self.p.ty(id).host.is_some()
-                    && !matches!(&self.p.ty(id).body, TypeBody::Alias(t) if value_dependent(&self.p,t))
-                    && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
-                {
-                    self.host_form(def);
-                }
-            }
         }
     }
 
@@ -4101,6 +4181,62 @@ impl<'a> Resolver<'a> {
         b
     }
 
+    /// The syntax services and template slot of a resolved quote. Both
+    /// syntax-tree resolvers resolve their own capture patterns first.
+    fn resolved_quote(
+        &mut self,
+        template: Option<u32>,
+        captures: Vec<(bool, Pattern)>,
+        span: Span,
+    ) -> PatternKind {
+        if let Some(template) = template {
+            let module = ast::Ident {
+                name: "\0quote-syntax".into(),
+                span,
+            };
+            let name = ast::Ident {
+                name: "Syntax".into(),
+                span,
+            };
+            let syntax = self.lookup_type(Some(&module), &name);
+            let functions: Option<Vec<_>> = [
+                "_template",
+                "_match",
+                "_match_ok",
+                "_match_one",
+                "_match_many",
+            ]
+            .into_iter()
+            .map(|name| {
+                let name = ast::Ident {
+                    name: name.into(),
+                    span,
+                };
+                match self.name(Some(&module), &name) {
+                    ExprKind::Name(ValueRef::Def(def)) => Some(def),
+                    _ => None,
+                }
+            })
+            .collect();
+            match (syntax, functions) {
+                (Some(TypeRef::Custom(syntax)), Some(functions)) => PatternKind::Quote {
+                    template,
+                    syntax,
+                    functions: functions.try_into().expect("five quote services"),
+                    captures,
+                },
+                _ => PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect()),
+            }
+        } else {
+            self.error(
+                code::MACRO_RESERVED,
+                span,
+                "a quote pattern must be evaluated inside a macro",
+            );
+            PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect())
+        }
+    }
+
     fn pattern(
         &mut self,
         p: &ast::Pattern,
@@ -4112,56 +4248,11 @@ impl<'a> Resolver<'a> {
             P::Quote {
                 template, captures, ..
             } => {
-                let captures: Vec<_> = captures
+                let captures = captures
                     .iter()
                     .map(|(many, p)| (*many, self.pattern(p, binders, shared)))
                     .collect();
-                if let Some(template) = template {
-                    let module = ast::Ident {
-                        name: "\0quote-syntax".into(),
-                        span: p.span,
-                    };
-                    let name = ast::Ident {
-                        name: "Syntax".into(),
-                        span: p.span,
-                    };
-                    let syntax = self.lookup_type(Some(&module), &name);
-                    let functions: Option<Vec<_>> = [
-                        "_template",
-                        "_match",
-                        "_match_ok",
-                        "_match_one",
-                        "_match_many",
-                    ]
-                    .into_iter()
-                    .map(|name| {
-                        let name = ast::Ident {
-                            name: name.into(),
-                            span: p.span,
-                        };
-                        match self.name(Some(&module), &name) {
-                            ExprKind::Name(ValueRef::Def(def)) => Some(def),
-                            _ => None,
-                        }
-                    })
-                    .collect();
-                    match (syntax, functions) {
-                        (Some(TypeRef::Custom(syntax)), Some(functions)) => PatternKind::Quote {
-                            template: *template,
-                            syntax,
-                            functions: functions.try_into().expect("five quote services"),
-                            captures,
-                        },
-                        _ => PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect()),
-                    }
-                } else {
-                    self.error(
-                        code::MACRO_RESERVED,
-                        p.span,
-                        "a quote pattern must be evaluated inside a macro",
-                    );
-                    PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect())
-                }
+                self.resolved_quote(*template, captures, p.span)
             }
             P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
             P::Discard(_) => PatternKind::Discard,
@@ -4848,9 +4939,79 @@ pub struct CheckedInputs {
     pub expressions: HashMap<Span, Expr>,
     pub binders: HashMap<Span, VarId>,
 }
-/// Resolve fresh output in the exact lexical scope captured before inference.
+/// Resolve a typed macro result directly from its native expression.
 #[allow(clippy::too_many_arguments)]
 pub fn typed_output(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+    original: &Program,
+    module: ModuleId,
+    call: Span,
+    expression: &ilang_syntax::syn3::ast::Expr,
+    var_count: u32,
+    ty_var_count: u32,
+    checked: &CheckedInputs,
+) -> Result<(Expr, Program), Vec<Diagnostic>> {
+    // A multi-shape chain has a synthetic one-byte root in the transition
+    // tree. Keep checked inputs at that root as well as their native span.
+    struct Inputs<'a>(&'a mut CheckedInputs);
+    impl ilang_syntax::syn3::walk::Visitor for Inputs<'_> {
+        fn expr(&mut self, e: &mut ilang_syntax::syn3::ast::Expr, enter: bool) {
+            use ilang_syntax::syn3::ast::ExprKind;
+            // Only a multi-shape chain changes its root span. Computing
+            // this from its head avoids lowering every forwarded subtree.
+            if enter
+                && let ExprKind::Chain(branches) = &e.kind
+                && branches.iter().any(|branch| {
+                    branch
+                        .params
+                        .iter()
+                        .any(|parameter| parameter.key.is_some())
+                        || branches
+                            .first()
+                            .is_some_and(|first| first.params.len() != branch.params.len())
+                })
+                && let Some(old) = self.0.expressions.get(&e.span.0).cloned()
+            {
+                let span = e.span.0;
+                self.0
+                    .expressions
+                    .insert(Span::new(span.end.saturating_sub(1), span.end), old);
+            }
+        }
+    }
+    let mut forwarded = CheckedInputs {
+        expressions: checked.expressions.clone(),
+        binders: checked.binders.clone(),
+    };
+    ilang_syntax::syn3::deep::deep(|| {
+        ilang_syntax::syn3::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
+    });
+    let metadata: Vec<_> = parsed
+        .iter()
+        .map(|p| p.with_lowered_ast(Default::default()))
+        .collect();
+    three::typed_output3(
+        graph,
+        &metadata,
+        original,
+        module,
+        call,
+        expression,
+        var_count,
+        ty_var_count,
+        &forwarded,
+        &parsed[module.0 as usize]
+            .scoped
+            .as_ref()
+            .map(|s| s.transition().clone())
+            .unwrap_or_default(),
+    )
+}
+
+/// Resolve fresh output in the exact lexical scope captured before inference.
+#[allow(clippy::too_many_arguments)]
+pub fn typed_output_via_lowering(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
     original: &Program,
@@ -4994,4 +5155,10 @@ fn typed_output_lowered(
     } else {
         Ok((result, r.p))
     }
+}
+
+pub(crate) fn normalize_source(
+    module: &ilang_syntax::syn3::ast::Module,
+) -> ilang_syntax::syn3::ast::Module {
+    three::normalize_module(module, &mut Default::default())
 }

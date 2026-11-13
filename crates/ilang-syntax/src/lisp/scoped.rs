@@ -47,7 +47,7 @@ pub type ChargeResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 pub struct ScopedSource {
     text: String,
     original_len: u32,
-    transition: crate::syn3::lower::Transition,
+    transition: crate::syn3::facts::Transition,
     spans: HashMap<Span, Origin>,
     starts: HashMap<u32, Origin>,
     children: HashMap<Span, Vec<Span>>,
@@ -70,7 +70,7 @@ impl ScopedSource {
     pub fn text(&self) -> &str {
         &self.text
     }
-    pub fn transition(&self) -> &crate::syn3::lower::Transition {
+    pub fn transition(&self) -> &crate::syn3::facts::Transition {
         &self.transition
     }
     pub fn original_len(&self) -> u32 {
@@ -542,63 +542,49 @@ impl ScopedSource {
         call_site: &Syntax,
     ) -> Result<crate::syn3::ast::Expr, ScopedError> {
         let datum = self.append(syntax, call_site);
-        let (tree, mut lowered) = crate::syn3::deep::deep(|| {
-            let tree = crate::syn3::lisp::expr_from_datum(&datum)?;
-            let lowered = crate::syn3::lower::lower_expr(&tree)?;
-            Ok::<_, crate::Diagnostic>((tree, lowered))
-        })
-        .map_err(|error| self.error(error))?;
-        self.transition.expression(tree.span.0);
-        crate::syn3::deep::deep(|| self.transition.record_expression(&mut lowered));
+        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::expr_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        self.transition
+            .capture_expression(&tree)
+            .map_err(|error| self.error(error))?;
         Ok(tree)
     }
-
     pub fn pattern3(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
     ) -> Result<crate::syn3::ast::Pattern, ScopedError> {
         let datum = self.append(syntax, call_site);
-        let (tree, mut lowered) = crate::syn3::deep::deep(|| {
-            let tree = crate::syn3::lisp::pattern_from_datum(&datum)?;
-            let lowered = crate::syn3::lower::lower_pattern(&tree)?;
-            Ok::<_, crate::Diagnostic>((tree, lowered))
-        })
-        .map_err(|error| self.error(error))?;
-        self.transition.pattern(tree.span.0);
-        crate::syn3::deep::deep(|| self.transition.record_pattern(&mut lowered));
+        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::pattern_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        self.transition
+            .capture_pattern(&tree)
+            .map_err(|error| self.error(error))?;
         Ok(tree)
     }
-
     pub fn ty3(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
     ) -> Result<crate::syn3::ast::Type, ScopedError> {
         let datum = self.append(syntax, call_site);
-        let (tree, _lowered) = crate::syn3::deep::deep(|| {
-            let tree = crate::syn3::lisp::type_from_datum(&datum)?;
-            let lowered = crate::syn3::lower::lower_type(&tree)?;
-            Ok::<_, crate::Diagnostic>((tree, lowered))
-        })
-        .map_err(|error| self.error(error))?;
+        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::type_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        crate::syn3::facts::Transition::validate_type(&tree).map_err(|error| self.error(error))?;
         self.transition.ty(tree.span.0);
         Ok(tree)
     }
-
     pub fn items3(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
     ) -> Result<Vec<crate::syn3::ast::Item>, ScopedError> {
         let datum = self.append(syntax, call_site);
-        let (tree, mut lowered) = crate::syn3::deep::deep(|| {
-            let tree = crate::syn3::lisp::items_from_datum(&datum)?;
-            let lowered = crate::syn3::lower::lower_items(&tree)?;
-            Ok::<_, crate::Diagnostic>((tree, lowered))
-        })
-        .map_err(|error| self.error(error))?;
-        crate::syn3::deep::deep(|| self.transition.record_items(&mut lowered));
+        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::items_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        self.transition
+            .capture_items(&tree)
+            .map_err(|error| self.error(error))?;
         Ok(tree)
     }
 

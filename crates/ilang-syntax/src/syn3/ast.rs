@@ -6,9 +6,112 @@
 
 use crate::lisp::Datum;
 use crate::span::Span;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 
-pub use crate::ast::{BinOp, LitValue, UnOp};
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnOp {
+    Neg,
+    NegFloat,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BinOp {
+    Or,
+    And,
+    Eq,
+    NotEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+    LtFloat,
+    LtEqFloat,
+    GtFloat,
+    GtEqFloat,
+    Concat,
+    Pipe,
+    Add,
+    Sub,
+    AddFloat,
+    SubFloat,
+    Mul,
+    Div,
+    Rem,
+    MulFloat,
+    DivFloat,
+}
+
+impl BinOp {
+    /// The level of §6.9, from 1 (weakest) to 8.
+    pub fn level(self) -> u8 {
+        use BinOp::*;
+        match self {
+            Pipe => 1,
+            Or => 2,
+            And => 3,
+            Eq | NotEq => 4,
+            Lt | LtEq | Gt | GtEq | LtFloat | LtEqFloat | GtFloat | GtEqFloat => 5,
+            Concat => 6,
+            Add | Sub | AddFloat | SubFloat => 7,
+            Mul | Div | Rem | MulFloat | DivFloat => 8,
+        }
+    }
+
+    pub fn text(self) -> &'static str {
+        use BinOp::*;
+        match self {
+            Or => "||",
+            And => "&&",
+            Eq => "==",
+            NotEq => "!=",
+            Lt => "<",
+            LtEq => "<=",
+            Gt => ">",
+            GtEq => ">=",
+            LtFloat => "<.",
+            LtEqFloat => "<=.",
+            GtFloat => ">.",
+            GtEqFloat => ">=.",
+            Concat => "<>",
+            Pipe => "|>",
+            Add => "+",
+            Sub => "-",
+            AddFloat => "+.",
+            SubFloat => "-.",
+            Mul => "*",
+            Div => "/",
+            Rem => "%",
+            MulFloat => "*.",
+            DivFloat => "/.",
+        }
+    }
+}
+
+/// Canonical integer or decoded string value, shared by written and tested types.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum LitValue {
+    Int(BigInt),
+    Str(String),
+}
+
+impl LitValue {
+    pub fn text(&self) -> String {
+        match self {
+            Self::Int(n) => n.to_string(),
+            Self::Str(s) => super::string_literal(s),
+        }
+    }
+}
+
+/// Names retained by HIR with exact source spans.
+pub mod resolved {
+    use crate::span::Span;
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct Ident {
+        pub name: String,
+        pub span: Span,
+    }
+}
 
 /// A span that is equal to every other span.
 #[derive(Clone, Copy, Debug, Default)]

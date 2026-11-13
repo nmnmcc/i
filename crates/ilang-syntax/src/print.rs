@@ -272,37 +272,9 @@ fn float(x: f64) -> String {
     }
 }
 
-pub fn record_label(name: &str, parameter: bool) -> String {
-    let rest = name.strip_prefix('_').unwrap_or(name);
-    if parameter
-        || rest.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
-            && name
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
-    {
-        name.to_string()
-    } else {
-        string_literal(name)
-    }
-}
+pub use crate::syn3::record_label;
 
-pub fn string_literal(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            '\u{c}' => out.push_str("\\f"),
-            c if c.is_control() => out.push_str(&format!("\\u{{{:04X}}}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
+pub use crate::syn3::string_literal;
 
 impl Printer {
     fn new(explicit: bool) -> Printer {

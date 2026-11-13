@@ -13,7 +13,8 @@ use crate::hir::*;
 use crate::types::{Access, Typed};
 use crate::{Checked, order, parse, resolve, types};
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
-use ilang_syntax::ast;
+mod tree;
+mod tree_legacy;
 use ilang_syntax::span::Span;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
@@ -190,7 +191,8 @@ pub struct Query<'a> {
 /// that a request reads them instead of working them out again.
 pub struct Cache {
     walks: Vec<OnceLock<Arc<Occurrences>>>,
-    asts: Vec<OnceLock<Arc<ast::Module>>>,
+    asts: Vec<OnceLock<Arc<tree::Module>>>,
+    trees: Vec<OnceLock<Arc<ilang_syntax::syn3::ast::Module>>>,
 }
 
 impl Cache {
@@ -199,6 +201,7 @@ impl Cache {
         Cache {
             walks: (0..n).map(|_| OnceLock::new()).collect(),
             asts: (0..n).map(|_| OnceLock::new()).collect(),
+            trees: (0..n).map(|_| OnceLock::new()).collect(),
         }
     }
 }
@@ -301,11 +304,24 @@ impl<'a> Query<'a> {
 
     /// The syntax tree of a module, as the parser recovered it from the
     /// written text.
-    pub fn syntax(&self, m: ModuleId) -> Arc<ast::Module> {
-        self.ast(m)
+    pub fn syntax(&self, m: ModuleId) -> Arc<ilang_syntax::syn3::ast::Module> {
+        let parse = || {
+            Arc::new(ilang_syntax::syn3::deep::deep(|| {
+                let text = self.written_text(m);
+                if self.is_lisp(m) {
+                    ilang_syntax::syn3::lisp::from_lisp(text).0
+                } else {
+                    ilang_syntax::syn3::parse_module(text).0
+                }
+            }))
+        };
+        match self.cache {
+            Some(c) => c.trees[m.0 as usize].get_or_init(parse).clone(),
+            None => parse(),
+        }
     }
 
-    fn ast(&self, m: ModuleId) -> Arc<ast::Module> {
+    fn ast(&self, m: ModuleId) -> Arc<tree::Module> {
         match self.cache {
             Some(c) => c.asts[m.0 as usize]
                 .get_or_init(|| Arc::new(self.parse_ast(m)))
@@ -314,7 +330,7 @@ impl<'a> Query<'a> {
         }
     }
 
-    fn parse_ast(&self, m: ModuleId) -> ast::Module {
+    fn parse_ast(&self, m: ModuleId) -> tree::Module {
         let module = self.program.module(m);
         let source = self.graph.sources.get(module.source);
         let text = module
@@ -323,10 +339,10 @@ impl<'a> Query<'a> {
             .map_or(source.text.as_str(), |scoped| {
                 &source.text[..scoped.original_len() as usize]
             });
-        if source.display.ends_with(".is") {
-            ilang_syntax::lisp::parse_source(text).0
+        if ilang_syntax::syn3::FINAL_AST_READERS {
+            ilang_syntax::syn3::deep::deep(|| tree::from_new(&self.syntax(m), self.is_lisp(m)))
         } else {
-            ilang_syntax::parse_module(text).0
+            tree_legacy::parse(text, source.display.ends_with(".is"))
         }
     }
 
@@ -355,26 +371,7 @@ impl<'a> Query<'a> {
                 .min_by_key(|((_, call), _)| call.end - call.start)
         {
             code.push_str("\n\n// expansion\n");
-            let syntax = ilang_syntax::syn3::lower::lower_expr(&output.syntax)
-                .expect("checked typed output lowers at the query boundary");
-            let module = ast::Module {
-                items: vec![ast::Item {
-                    doc: Vec::new(),
-                    attributes: Vec::new(),
-                    span: syntax.span,
-                    kind: ast::ItemKind::Binding(ast::Binding {
-                        pattern: ast::Pattern {
-                            kind: ast::PatternKind::Discard("_".into()),
-                            span: syntax.span,
-                        },
-                        value: syntax.clone(),
-                        type_params: Vec::new(),
-                        span: syntax.span,
-                    }),
-                }],
-                ..ast::Module::default()
-            };
-            code.push_str(&ilang_syntax::syn3::print_current(&module, true));
+            code.push_str(&output.print_syntax(true));
         }
         Some(Hover {
             span,
@@ -666,7 +663,7 @@ impl<'a> Query<'a> {
         }
     }
 
-    /// `T(a) { C1(a) C2 }` or `T(a) = Type` (§4.3).
+    /// The definition in the syntax-three surface (§4.3).
     fn type_definition(&self, t: TypeId) -> String {
         let def = self.program.ty(t);
         let head = self.type_head(t);
@@ -688,6 +685,28 @@ impl<'a> Query<'a> {
                 .get(self.program.module(pattern.module).source)
                 .text;
             return source[pattern.span.start as usize..pattern.span.end as usize].to_string();
+        }
+        // Alias hovers keep the existing human-readable literal limit.
+        if let TypeBody::Alias(ty) = &def.body {
+            return format!("{head} = {}", self.show_type(ty));
+        }
+        // A source definition has the syntax-three form chosen before
+        // expansion (§4.3), including a sum's separate member definitions.
+        let source_facts = self.ast(def.module);
+        if let Some(item) = source_facts.items.iter().find(|item| {
+            matches!(&item.kind, tree::ItemKind::TypeDef { name, .. } if name.span == def.span && name.name == def.name)
+        }) && let Some(text) = self.written_text(def.module).get(item.span.start as usize..item.span.end as usize) {
+            // Completion asks for definitions from many modules. Parse only
+            // this item, rather than reparsing each complete source module.
+            return ilang_syntax::syn3::deep::deep(|| {
+                let (mut module, _) = if self.is_lisp(def.module) {
+                    ilang_syntax::syn3::lisp::from_lisp(text)
+                } else {
+                    ilang_syntax::syn3::parse_module(text)
+                };
+                for item in &mut module.items { item.doc.clear(); item.attributes.clear(); }
+                ilang_syntax::syn3::print_tree(&module, false).trim_end().to_string()
+            });
         }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
@@ -1102,19 +1121,20 @@ impl<'a> Query<'a> {
         let ast = self.ast(m);
         let p = self.program;
         for item in &ast.items {
-            let (params, from_def): (&[ast::Ident], Option<TypeId>) = match &item.kind {
-                ast::ItemKind::TypeDef(def) => (
-                    &def.params,
-                    p.module(m)
-                        .types
-                        .iter()
-                        .copied()
-                        .find(|t| p.ty(*t).span == def.name.span),
-                ),
-                ast::ItemKind::Binding(b) => (&b.type_params, None),
-                ast::ItemKind::Declaration { type_params, .. } => (type_params, None),
-                ast::ItemKind::MacroItem { .. } => continue,
-            };
+            let (params, from_def): (&[ilang_syntax::syn3::ast::resolved::Ident], Option<TypeId>) =
+                match &item.kind {
+                    tree::ItemKind::TypeDef { name, params, .. } => (
+                        params,
+                        p.module(m)
+                            .types
+                            .iter()
+                            .copied()
+                            .find(|t| p.ty(*t).span == name.span),
+                    ),
+                    tree::ItemKind::Binding { type_params, .. } => (type_params, None),
+                    tree::ItemKind::Declaration { type_params, .. } => (type_params, None),
+                    tree::ItemKind::MacroItem => continue,
+                };
             for (i, param) in params.iter().enumerate() {
                 let var = from_def
                     .and_then(|t| p.ty(t).params.get(i).map(|(_, v)| *v))
@@ -1153,7 +1173,7 @@ impl<'a> Query<'a> {
             let Some(item) = ast
                 .items
                 .iter()
-                .find(|i| matches!(&i.kind, ast::ItemKind::TypeDef(d) if d.name.span == def.span))
+                .find(|i| matches!(&i.kind, tree::ItemKind::TypeDef { name, .. } if name.span == def.span))
             else {
                 continue;
             };
@@ -1410,6 +1430,31 @@ impl<'a> Query<'a> {
         out
     }
 
+    /// Auto-imports offer values only. Filter names before rendering details,
+    /// so a completion does not parse definitions it will immediately discard.
+    fn module_values_with_prefix(&self, t: ModuleId, prefix: &str) -> Vec<Completion> {
+        let p = self.program;
+        let mut out = Vec::new();
+        for (i, d) in p.module(t).defs.iter().enumerate() {
+            if d.exported && d.name.starts_with(prefix) {
+                out.push(self.def_completion(DefId {
+                    module: t,
+                    index: i as u32,
+                }));
+            }
+        }
+        for &ty in &p.module(t).types {
+            if p.ty(ty).constructors_exported {
+                out.extend(
+                    self.ctor_completions(ty)
+                        .into_iter()
+                        .filter(|c| c.label.starts_with(prefix)),
+                );
+            }
+        }
+        out
+    }
+
     fn def_completion(&self, d: DefId) -> Completion {
         let def = self.program.def(d);
         let detail = self.def_type(d);
@@ -1576,8 +1621,11 @@ impl<'a> Query<'a> {
         for item in &ast.items {
             let within = |s: Span| item.span.start <= s.start && s.end <= item.span.end;
             match &item.kind {
-                ast::ItemKind::MacroItem { .. } => {}
-                ast::ItemKind::TypeDef(def) if def.alias_pattern => {
+                tree::ItemKind::MacroItem => {}
+                tree::ItemKind::TypeDef {
+                    alias_pattern: true,
+                    ..
+                } => {
                     for pattern in &p.alias_patterns {
                         if pattern.module != m || pattern.span != item.span {
                             continue;
@@ -1595,16 +1643,15 @@ impl<'a> Query<'a> {
                         }
                     }
                 }
-                ast::ItemKind::TypeDef(def) => {
-                    let Some(&t) = module
-                        .types
-                        .iter()
-                        .find(|t| p.ty(**t).span == def.name.span)
-                    else {
+                tree::ItemKind::TypeDef {
+                    name, constructors, ..
+                } => {
+                    let Some(&t) = module.types.iter().find(|t| p.ty(**t).span == name.span) else {
                         continue;
                     };
                     let mut children = Vec::new();
-                    if let ast::TypeBody::Custom(cs) = &def.body {
+                    {
+                        let cs = constructors;
                         for (i, c) in cs.iter().enumerate() {
                             children.push(Symbol {
                                 name: c.name.name.clone(),
@@ -1620,15 +1667,15 @@ impl<'a> Query<'a> {
                         }
                     }
                     out.push(Symbol {
-                        name: def.name.name.clone(),
+                        name: name.name.clone(),
                         kind: SymbolKind::Type,
                         span: item.span,
-                        name_span: def.name.span,
+                        name_span: name.span,
                         detail: Some(self.type_head(t)),
                         children,
                     });
                 }
-                ast::ItemKind::Binding(_) | ast::ItemKind::Declaration { .. } => {
+                tree::ItemKind::Binding { .. } | tree::ItemKind::Declaration { .. } => {
                     for (i, d) in module.defs.iter().enumerate() {
                         if !within(d.span) {
                             continue;

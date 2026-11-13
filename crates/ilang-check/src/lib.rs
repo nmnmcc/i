@@ -139,7 +139,7 @@ pub struct Parsed {
     pub kind: ModuleKind,
     pub ast: ast::Module,
     /// Names and spans needed by the temporary transition boundary.
-    pub lowering: ilang_syntax::syn3::lower::Transition,
+    pub lowering: ilang_syntax::syn3::facts::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
@@ -224,13 +224,8 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             } else {
                 ilang_syntax::syn3::parse_module(&source.text)
             };
-            let (mut lowered, more) = if lisp {
-                ilang_syntax::syn3::lower::lower_lisp(&ast)
-            } else {
-                ilang_syntax::syn3::lower::lower(&ast)
-            };
-            let mut lowering = ilang_syntax::syn3::lower::Transition::default();
-            ilang_syntax::syn3::deep::deep(|| lowering.record_items(&mut lowered.items));
+            let (lowering, more) =
+                ilang_syntax::syn3::facts::Transition::capture_module(&ast, lisp);
             errors.extend(more);
             errors.sort_by_key(|d| (d.span.start, d.span.end));
             diags.extend(

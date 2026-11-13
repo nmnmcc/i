@@ -752,6 +752,12 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
 fn snippets_walk_as_their_lowered_trees() {
     let cases = [
         "f = (m) { m(1) }",
+        "S = (f = () -> Int)\nf = (body) { provided: S = S(f = () { g() }) body() <- (provided) }",
+        "S(N) = (f = () <- N -> Int)\nf = <N>(body) { provided: S(N) = S(f = () { g() }) body() <- (provided) }",
+        "S(N) = (f = () <- N -> Int)\nf = (body) { provided: S(_) = S(f = () { g() }) body() <- (provided) }",
+        "S(A) = (A)\nf = (body) { provided: S(Int) = S(1) body() <- (provided) }",
+        "S = (f = () -> Int)\nf = (body) { provided: S = S(f = () { g() }) touch(provided) body() <- (provided) }",
+        "S = (f = () -> Int)\nf = (body) { p: S = S(f = () { g() }) { p: S = S(f = () { h() }) body() <- (p) } <- (p) }",
         "f = () <- (failure: Fail(Int), service: S) -> Int { g() }",
         "f = (x) <- (failure: Fail(Int)) -> Int { g(x) } | (x) <- (failure: Fail(Int)) { h(x) }",
         "Alias(E) = Fail(E)\nf = () <- (failure: Alias(Int)) { g() }",

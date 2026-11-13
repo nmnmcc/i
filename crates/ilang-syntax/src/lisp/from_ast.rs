@@ -1,6 +1,6 @@
 //! Write the core AST as Lisp datums, following the position tables in meta §2.3.
 use crate::ast::*;
-use crate::print::string_literal;
+use crate::syn3::string_literal;
 
 fn form(head: &str, parts: impl IntoIterator<Item = String>) -> String {
     let parts = parts.into_iter().collect::<Vec<_>>();

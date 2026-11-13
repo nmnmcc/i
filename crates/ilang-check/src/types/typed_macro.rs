@@ -537,9 +537,11 @@ impl TypedMacroQuery {
                         .items()
                         .map(|v| {
                             let lit = if b == BuiltinType::Int {
-                                ilang_syntax::ast::LitValue::Int(v.parse().expect("integer type"))
+                                ilang_syntax::syn3::ast::LitValue::Int(
+                                    v.parse().expect("integer type"),
+                                )
                             } else {
-                                ilang_syntax::ast::LitValue::Str(v.to_string())
+                                ilang_syntax::syn3::ast::LitValue::Str(v.to_string())
                             };
                             let text = lit.text();
                             let d = ilang_syntax::lisp::parse(&text).expect("literal type prints");
@@ -602,9 +604,9 @@ impl TypedMacroQuery {
                     let mut xs = vec![base];
                     for v in values.items() {
                         let lit = if t.scalar() == Some(BuiltinType::Int) {
-                            ilang_syntax::ast::LitValue::Int(v.parse().expect("integer"))
+                            ilang_syntax::syn3::ast::LitValue::Int(v.parse().expect("integer"))
                         } else {
-                            ilang_syntax::ast::LitValue::Str(v.to_string())
+                            ilang_syntax::syn3::ast::LitValue::Str(v.to_string())
                         };
                         let d = ilang_syntax::lisp::parse(&lit.text()).expect("literal");
                         xs.push(Syntax::from_datum(&d.datums[0], scope));

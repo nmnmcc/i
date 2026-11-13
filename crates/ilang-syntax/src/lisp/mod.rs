@@ -547,7 +547,7 @@ fn show_tree<T: Printable>(tree: &T) -> String {
             View::Atom(s) => out.push_str(s),
             View::Int(n) => write!(&mut out, "{n}").expect("writing to a String"),
             View::Float(n) => out.push_str(&float(n)),
-            View::String(s) => out.push_str(&crate::print::string_literal(s)),
+            View::String(s) => out.push_str(&crate::syn3::string_literal(s)),
             View::Prefix(prefix, child) => {
                 out.push_str(prefix);
                 pending.push(Task::Node(child));

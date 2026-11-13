@@ -96,6 +96,10 @@ pub fn expressions_on_this_stack<H: Hook>(
         hook,
         locals: Vec::new(),
         fn_depth: 0,
+        providers: ilang_syntax::syn3::facts::providers::module(module)
+            .into_iter()
+            .map(|(b, p, _)| (b, p))
+            .collect(),
     };
     for item in &mut module.items {
         match &mut item.kind {
@@ -134,6 +138,7 @@ pub fn type_definition_on_this_stack<H: Hook>(
         hook,
         locals: Vec::new(),
         fn_depth: 0,
+        providers: HashSet::new(),
     };
     for head in &mut definition.head {
         walker.ty(head, 0)?;
@@ -179,6 +184,7 @@ struct Walker<'a, H> {
     hook: &'a mut H,
     locals: Vec<Local>,
     fn_depth: u32,
+    providers: HashSet<(Span, Span)>,
 }
 
 fn collected(pattern: &Pattern) -> Vec<Local> {
@@ -220,6 +226,11 @@ impl<H: Hook> Walker<'_, H> {
                 return Err(self.hook.depth_error(expr.span.0));
             }
             *expr = self.hook.expand(expr, &self.locals, self.fn_depth)?;
+            self.providers.extend(
+                ilang_syntax::syn3::facts::providers::expression(expr)
+                    .into_iter()
+                    .map(|(b, p, _)| (b, p)),
+            );
             depth += 1;
         }
         match &mut expr.kind {
@@ -420,7 +431,12 @@ impl<H: Hook> Walker<'_, H> {
         let mark = self.mark();
         for stmt in &mut block.stmts {
             match stmt {
-                Stmt::Bind(binding) => self.bind(binding, depth)?,
+                Stmt::Bind(binding) => {
+                    let visible = !self
+                        .providers
+                        .contains(&(binding.span.0, binding.pattern.span.0));
+                    self.bind(binding, depth, visible)?;
+                }
                 Stmt::Expr(value) => self.expr(value, depth)?,
             }
         }
@@ -428,16 +444,17 @@ impl<H: Hook> Walker<'_, H> {
         Ok(())
     }
 
-    fn bind(&mut self, binding: &mut Binding, depth: u16) -> Result<(), H::Error> {
+    fn bind(&mut self, binding: &mut Binding, depth: u16, visible: bool) -> Result<(), H::Error> {
         // The binders can be gathered before the pattern is visited: the
         // only expansions inside a pattern are types and format arguments,
         // which cannot change its names.
         let bindings = collected(&binding.pattern);
         self.pattern(&mut binding.pattern, depth)?;
         let before = self.locals.len();
-        if self
-            .hook
-            .is_direct(&binding.value, &self.locals, self.fn_depth)
+        if visible
+            && self
+                .hook
+                .is_direct(&binding.value, &self.locals, self.fn_depth)
         {
             let level = self.fn_depth;
             self.locals.extend(bindings.iter().cloned().map(|mut b| {
@@ -447,7 +464,9 @@ impl<H: Hook> Walker<'_, H> {
         }
         self.expr(&mut binding.value, depth)?;
         self.locals.truncate(before);
-        self.locals.extend(bindings);
+        if visible {
+            self.locals.extend(bindings);
+        }
         Ok(())
     }
 

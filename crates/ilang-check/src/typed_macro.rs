@@ -130,3 +130,12 @@ pub fn restore(program: &mut Program) {
         );
     }
 }
+
+impl Output {
+    pub fn syntax3(&self) -> ilang_syntax::syn3::ast::Expr {
+        ilang_syntax::syn3::deep::deep(|| self.syntax.clone())
+    }
+    pub fn print_syntax(&self, lisp: bool) -> String {
+        ilang_syntax::syn3::print_tree(&ilang_syntax::syn3::expression_module(self.syntax3()), lisp)
+    }
+}

@@ -2935,5 +2935,11 @@
     "diagnostics": [
       "E0105: a block ends with an expression"
     ]
+  },
+  "tests/review/cases/review-rec/_loose/probes/src/main.i:0678a9bb74604084": {
+    "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three §2.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
+    "diagnostics": [
+      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
+    ]
   }
 }

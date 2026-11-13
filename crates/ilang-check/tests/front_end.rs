@@ -222,3 +222,26 @@ fn kept_form_messages_are_independent_checks() {
         );
     }
 }
+
+#[test]
+fn closed_data_has_no_record_type_even_without_a_spread_error() {
+    // Syntax-three §2.3: "There is no width subtyping, no `Record`, no
+    // field addition or removal at run time." Keep both Record lookups of
+    // review-rec/probes independent of the restored invalid type spread,
+    // which syntax three rejects before resolution.
+    let (graph, _, diags) = common::check_files(&[(
+        "src/main.i",
+        "left = <R>(r: R & Record) { r }\nright = <R>(r: R & Record) { r }",
+    )]);
+    assert_eq!(
+        diags.iter().map(|d| d.code).collect::<Vec<_>>(),
+        ["E0202", "E0202"]
+    );
+    assert!(
+        diags
+            .iter()
+            .all(|d| d.message.contains("the type `Record` is not defined")),
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}

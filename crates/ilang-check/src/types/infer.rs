@@ -15,8 +15,8 @@ use crate::code;
 use crate::hir::*;
 use crate::resolve::subst;
 use ilang_package::{Diagnostic, Sources};
-use ilang_syntax::ast::{BinOp, Ident, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
+use ilang_syntax::syn3::ast::{BinOp, UnOp, resolved::Ident};
 use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 
