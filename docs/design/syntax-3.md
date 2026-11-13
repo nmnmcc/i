@@ -377,8 +377,8 @@ function literals), is a **match**. It works out `e` and calls `C` with the
 one-tuple `(e)`, in place: it adds no call frame, a call in a branch body of
 a match in tail position is in tail position (spec §11.6), the match is not a
 call in a stop message (spec §11.7), and a branch pattern `C(…)` that matches
-a name subject makes that name known to be made by `C` in the branch (spec
-§7.5). So matching uses the group of shape "one position". Branches of other
+a name subject gives that name the branch-local view of spec §7.5. So matching
+uses the group of shape "one position". Branches of other
 shapes in a matched chain literal can never run and give the "never used"
 warning. A match is typed by rule 11 with all branches of that group; there
 is no selection in a match [R4]. A match whose chain has

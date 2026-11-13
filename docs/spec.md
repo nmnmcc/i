@@ -938,7 +938,7 @@ Types are worked out by inference with subtypes (algebraic subtyping).
     A group with one branch and no guard is not typed by this rule. It is the function of rule 4: its parameter group is fitted to the parameter type (below), it is not checked for coverage, and `Assert` is in its need when the pattern may fail. A match `s |> (p) { e }` with such a chain is typed as the binding `p = s` followed by `e` (rule 10), with the one difference that `p` is not generalized, as a parameter is not. So the subject `s` gets the expected type that a binding gives its value (below).
 
 12. **Narrowing.** Let a catch-all be at some place in a parameter pattern of a group, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the branch's pattern matches, with a value of `T` at that place, is matched by an earlier branch of the group without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the pattern matches with it at that place is matched by an earlier branch without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s |> ("a") { 0 } | (rest) { f(rest) }` with `s: String`, `rest` gets `String - "a"`. Guarded branches take nothing.
-13. **Keys.** For `v.k` and `v.f`, `v` must have a known type, and every member of it must be data with that key, or a labelled type whose data has that key and whose constructor may be used here (§2.4). The inferred result is the union of those parts with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v` must fit the bound. If not, it is a compile error. The bound takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Use this bound also when a known function type constrains a call. Known key results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
+13. **Keys.** For `v.k` and `v.f`, `v` must have a known type, and every member of it must be data with that key, or a labelled type whose data has that key and whose constructor may be used here (§2.4). The inferred result is the union of those parts with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v`, using its branch-local view when there is one (§7.5), must fit the bound. If not, it is a compile error. The bound takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Use this bound also when a known function type constrains a call. Known key results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s: String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
 14. **Generalization.** A binding whose value is a direct value is generalized (§4.7) after its value is typed. Other bindings and parameter groups are not.
 
 A **catch-all** is a `name`, a discard, or a conjunction `p1 = … = pk` whose parts are all catch-alls.
@@ -1249,7 +1249,21 @@ Only a group with more than one branch or with a guard must cover the type of it
 
 ### 7.5 Known constructors
 
-When a conjunction with a name part `x` and a part `C(…)` matches, `x` is known to be made by `C` where `x` may be used. When a branch pattern `C(…)` of the match `v |> C1 | …` matches the value of the name `v`, and its group has more than one branch or a guard (§4.8 rule 11), `v` is known to be made by `C` inside that branch. A match with one branch and no guard gives only what the binding of its pattern to `v` gives (§6.12). This is used by §6.7.
+Successful matching gives a **branch-local view** of the matched value. A constructor pattern `C(…)` restricts that view to the incoming member made by `C`, with the type arguments established by its pattern. A conjunction that names the whole value gives its name this view. When the subject of a match is a name `v`, that name has the view inside the matching branch, regardless of the number of branches.
+
+The view supplies both the inferred type used for the key bound (§4.8 rule 13) and the known constructor fact used for key visibility (§6.7). It does not constrain or replace the subject's original type scheme outside the branch.
+
+```i
+A = (value = Int)
+B = (other = String)
+f = (v : { A | B }) {
+  v |> (A(value = _)) { v.value }
+     | (B(other = _)) { 0 }
+}
+main = () { f(A(value = 7)) }
+```
+
+Here `v.value` is checked with the `A` view. The parameter of `f` still admits both `A` and `B`.
 
 
 ## 8. Bit arrays
