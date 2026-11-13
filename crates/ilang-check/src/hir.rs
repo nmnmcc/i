@@ -54,6 +54,8 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Stable package identities for semantic ordering in compiler queries.
+    pub(crate) package_identities: Vec<crate::identity::PackageIdentity>,
     /// The top-level names that are the callee of a direct call of a chain
     /// with several shape groups: the call itself names the group.
     pub chain_uses: Vec<DefId>,

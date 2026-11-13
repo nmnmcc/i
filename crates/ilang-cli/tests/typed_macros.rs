@@ -596,3 +596,32 @@ fn contextual_invariant_result_bounds_are_visible_in_frozen_snapshot() {
         "expected result is not Key(Int)",
     );
 }
+
+#[test]
+fn equal_printed_nominal_members_have_the_same_order_in_both_union_spellings() {
+    let macros = include_str!("../../../tests/spec/14.8/mp06_nominal_members/src/macros.is")
+        .replace("/ probe ", "/ app ");
+    let source = include_str!("../../../tests/spec/14.8/mp06_nominal_members/src/main.i")
+        .replace("probe/", "app/");
+    for main in [
+        source.clone(),
+        source.replace("b.Tag | a.Tag", "a.Tag | b.Tag"),
+    ] {
+        let dir = project(&macros, &main);
+        for name in ["a", "b"] {
+            std::fs::write(
+                dir.path().join(format!("src/{name}.i")),
+                "(Tag(..))\nTag = ()\n",
+            )
+            .unwrap();
+        }
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(!ds.iter().any(Diagnostic::is_error), "{ds:?}");
+        let checked = ilang_macro::project::check(&mut graph);
+        assert!(
+            !checked.diags.iter().any(Diagnostic::is_error),
+            "{}",
+            graph.sources.render_all(&checked.diags).join("\n")
+        );
+    }
+}

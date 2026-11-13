@@ -25,7 +25,12 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     let mut r = Resolver {
         graph,
         parsed,
-        p: Program::default(),
+        p: Program {
+            package_identities: (0..graph.packages.len())
+                .map(|id| crate::identity::package_identity(graph, id))
+                .collect(),
+            ..Program::default()
+        },
         diags: Vec::new(),
         generated_values: Vec::new(),
         generated_types: Vec::new(),
