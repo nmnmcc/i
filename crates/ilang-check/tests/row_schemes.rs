@@ -345,3 +345,36 @@ main = () { with(1, read) Nil }";
     );
     types(&source.replace("with(1, read)", "with(\"ok\", read)"));
 }
+
+#[test]
+fn higher_order_entry_keeps_unprovided_service() {
+    let shown = types(
+        "S(N) { S(() -> Nil ! N) }
+use(N) = (s ! S(N)) { S(f) = s f() }
+run(A,N) = (f: () -> A ! N) { f() }
+main(N) = (s ! S(N)) { run(() { use() }) }",
+    );
+    assert!(shown["app/main.main"].contains("S("), "{shown:?}");
+}
+
+#[test]
+fn nested_forwarding_keeps_the_provided_services_own_need() {
+    // §9.2: providing S(Dep) handles S, not the Dep needed by its method.
+    let shown = types(
+        "Dep { Dep(v: Int) }
+get = (d ! Dep) { d.v }
+S(N) { S(f: () -> Int ! N) }
+use(N) = (s ! S(N)) { s.f() }
+run(A,N) = (f: () -> A ! N) { f() }
+fw = () { use() }
+fr = () { run(() { use() }) }
+main = () {
+ ! S(Dep) = S(f: () { get() })
+ h = () { run(fr) }
+ k = () { run(h) + fw() }
+ k()
+ Nil
+}",
+    );
+    assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
+}

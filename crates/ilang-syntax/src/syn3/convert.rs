@@ -181,7 +181,17 @@ pub fn convert(
     if let Some(lexed) = lexed {
         collect_interps(&lexed.tokens, &mut interps);
     }
+    let mut service_fail_name = "Syn3ServiceFail".to_string();
+    while module.items.iter().any(|item| {
+        matches!(&item.kind,
+        o::ItemKind::TypeDef(def) if def.name.name == service_fail_name)
+    }) || imported.contains_key(&service_fail_name)
+    {
+        service_fail_name.push('_');
+    }
     let mut cx = Cx {
+        service_fail_name,
+        service_fail_used: false,
         local,
         local_fns,
         modules,
@@ -247,6 +257,8 @@ enum Lookup {
 }
 
 struct Cx<'a> {
+    service_fail_name: String,
+    service_fail_used: bool,
     /// The constructors and the top-level functions of this module.
     local: HashMap<String, Vec<Labels>>,
     local_fns: HashMap<String, Vec<Labels>>,
@@ -569,6 +581,26 @@ impl Cx<'_> {
         let mut items = Vec::new();
         for item in &m.items {
             self.item(item, &mut items);
+        }
+        if self.service_fail_used {
+            let span = Span::default();
+            items.insert(
+                0,
+                n::Item {
+                    doc: Vec::new(),
+                    attributes: Vec::new(),
+                    span: n::Sp(span),
+                    kind: n::ItemKind::TypeDef(n::TypeDef {
+                        name: n::Ident::new(&self.service_fail_name, span),
+                        head: vec![named("E", Vec::new(), span)],
+                        rhs: n::TypeRhs::Type(named(
+                            "Fail",
+                            vec![named("E", Vec::new(), span)],
+                            span,
+                        )),
+                    }),
+                },
+            );
         }
         n::Module {
             doc: m.doc.clone(),
@@ -1597,6 +1629,18 @@ impl Cx<'_> {
                     if name.name == "Never" && args.is_empty())
                 {
                     // `! Never` disappears.
+                } else if matches!(&m.kind, o::TypeKind::Named { module: None, name, args }
+                    if name.name == "Fail" && args.len() == 1)
+                {
+                    // Bare Fail(E) in transition needs denotes the old ^ E
+                    // channel. A transparent alias keeps an ordinary ! Fail(E)
+                    // in the service row, without changing its type (§4.3).
+                    self.service_fail_used = true;
+                    let o::TypeKind::Named { args, .. } = &m.kind else {
+                        unreachable!()
+                    };
+                    let args = args.iter().map(|a| self.ty(a)).collect();
+                    items.push(n::TItem::Pos(named(&self.service_fail_name, args, m.span)));
                 } else if matches!(m.kind, o::TypeKind::Named { .. }) {
                     items.push(n::TItem::Pos(self.ty(m)));
                 } else {

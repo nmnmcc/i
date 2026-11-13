@@ -1133,3 +1133,15 @@ fn convert_lisp_surface() {
     assert!(diags.is_empty(), "{diags:#?}");
     assert_eq!(read, new);
 }
+
+#[test]
+fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
+    // §4.3 aliases keep nominal identity. The transition syntax reserves
+    // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.
+    let text = converted("Use(E) = () -> Nil ! Fail(E)\n");
+    let (lowered, diags) = syn3::parse_lowered(&text);
+    assert!(diags.is_empty(), "{text}\n{diags:#?}");
+    let shown = ilang_syntax::print::print_module(&lowered);
+    assert!(shown.contains("! Syn3ServiceFail(E)"), "{shown}");
+    assert!(!shown.contains("^ E"), "{shown}");
+}
