@@ -30,7 +30,7 @@ def main():
         for item, tree in zip(before, old):
             f.write(json.dumps(dict(item, result=tree), ensure_ascii=False) + '\n')
     result = subprocess.run([str(args.binary), 'fmt', *paths], cwd=ROOT, text=True, capture_output=True)
-    args.report.with_suffix('.fmt.log').write_text(result.stdout + result.stderr)
+    args.baseline.with_suffix('.fmt.log').write_text(result.stdout + result.stderr)
     after = [dict(item, source=(ROOT / item['path']).read_text()) for item in before]
     new = MIGRATE['parse'](after, args.driver)
     entries = []
@@ -53,7 +53,7 @@ def main():
         print(json.dumps(differences, indent=2))
         raise SystemExit(1)
     if result.returncode not in (0, 1):
-        raise SystemExit(f'i fmt failed unexpectedly: {result.returncode}; see {args.report.with_suffix(".fmt.log")}')
+        raise SystemExit(f'i fmt failed unexpectedly: {result.returncode}; see {args.baseline.with_suffix(".fmt.log")}')
 
 
 if __name__ == '__main__':

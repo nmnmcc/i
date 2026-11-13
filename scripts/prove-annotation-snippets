@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Compare every file/literal tree against a Git revision without checking it out.
+Registry wrappers/substitutions come from the corresponding revision. Includes
+Markdown inline code alongside the normal snippet inventory. Formatting-only
+changes must preserve diagnostics as well as complete trees (spans aside).
+"""
+import argparse
+from collections import defaultdict
+import io
+import json
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import tarfile
+
+ROOT=Path(__file__).resolve().parent.parent
+M=runpy.run_path(str(ROOT/'scripts/migrate-annotations'))
+
+
+def inline(hosts=None):
+    for path in ['README.md', 'docs/spec.md', *sorted(str(p.relative_to(ROOT)) for p in (ROOT/'docs/design').glob('*.md'))]:
+        if hosts is not None and path not in hosts:
+            continue
+        host=hosts[path] if hosts is not None else (ROOT/path).read_text()
+        fences=[m.span() for m in re.finditer(r'(?m)^```[^\n]*\n.*?^```[ \t]*$',host,re.S)]
+        for m in re.finditer(r'(?<!`)`([^`\n]+)`(?!`)',host):
+            if any(a<=m.start()<b for a,b in fences):
+                continue
+            yield dict(path=path,source=m[1],kind='inline',lisp=False,start=m.start(1))
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--before',required=True)
+    p.add_argument('--driver',type=Path,default=ROOT/'target/release/examples/pattern-annotations')
+    p.add_argument('--report',type=Path,required=True)
+    args=p.parse_args()
+    archive=subprocess.check_output(['git','archive',args.before],cwd=ROOT)
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        hosts={m.name:tar.extractfile(m).read().decode() for m in tar if m.isfile() and m.name.endswith(('.i','.is','.rs','.md','.js','.mjs','.py','.json'))}
+    config=json.loads(hosts['scripts/check-snippets.json'])
+    before=list(M['inventory'](hosts,config))+list(inline(hosts))
+    after=list(M['inventory']())+list(inline())
+    grouped=defaultdict(list)
+    for item in after:
+        grouped[(item['path'],item['kind'])].append(item)
+    ordinal=defaultdict(int)
+    paired=[]
+    for item in before:
+        key=(item['path'],item['kind']);i=ordinal[key];ordinal[key]+=1
+        candidates=grouped[key]
+        if i>=len(candidates):raise SystemExit(f'missing literal {key} #{i}')
+        paired.append(candidates[i])
+    old=M['parse'](before,args.driver);new=M['parse'](paired,args.driver)
+    records=[];differences=[]
+    for a,b,x,y in zip(before,paired,old,new):
+        xt=M['tree'](x['tree']);yt=M['tree'](y['tree'])
+        record=dict(path=a['path'],kind=a['kind'],start=a['start'],changed=a['source']!=b['source'],
+                    tree_sha256=M['digest'](xt),equal=xt==yt,diagnostics_equal=x['diagnostics']==y['diagnostics'])
+        records.append(record)
+        if not record['equal'] or not record['diagnostics_equal']:
+            differences.append(dict(record,before=a['source'],after=b['source'],old=x,new=y))
+    args.report.write_text(json.dumps(dict(before=args.before,compared=len(records),changed=sum(i['changed'] for i in records),differences=differences,entries=records),indent=2)+'\n')
+    print(f'{len(records)} file/literal/inline trees compared; {sum(i["changed"] for i in records)} changed; {len(differences)} differences')
+    for d in differences[:30]:
+        print(d['path'],d['kind'],d['start'],d['old']['diagnostics'],d['new']['diagnostics'])
+    if differences:raise SystemExit(1)
+
+
+if __name__=='__main__':main()

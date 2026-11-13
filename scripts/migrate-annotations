@@ -30,13 +30,15 @@ def tree(text):
                   lambda m: '@span' if m[0].startswith('@') else m[0], text)
 
 
-def inventory():
+def inventory(hosts=None, registered=None):
     paths = sorted(set(subprocess.check_output(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--',
          '*.i', '*.is', '*.rs', '*.md', '*.js', '*.mjs', '*.py'], cwd=ROOT, text=True).splitlines()))
-    config = json.loads(CHECK['DATA'].read_text())
+    config = registered if registered is not None else json.loads(CHECK['DATA'].read_text())
     for path in paths:
-        host = (ROOT / path).read_text()
+        if hosts is not None and path not in hosts:
+            continue
+        host = hosts[path] if hosts is not None else (ROOT / path).read_text()
         if path.endswith(('.i', '.is')):
             yield dict(path=path, start=0, end=len(host), source=host,
                        kind='file', lisp=path.endswith('.is'))
@@ -62,10 +64,11 @@ def inventory():
             starts = [0]
             for line in lines:
                 starts.append(starts[-1] + len(line))
+            joined = {id(child) for node in ast.walk(parsed) if isinstance(node, ast.JoinedStr) for child in ast.walk(node)}
             literals = [(starts[n.lineno-1] + n.col_offset,
                          starts[n.end_lineno-1] + n.end_col_offset, n.value)
                         for n in ast.walk(parsed) if isinstance(n, ast.Constant)
-                        and isinstance(n.value, str) and hasattr(n, 'end_lineno')]
+                        and isinstance(n.value, str) and hasattr(n, 'end_lineno') and id(n) not in joined]
             kind = 'python'
         for start, end, source in literals:
             try:

@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Supplement the file/literal migration with Markdown inline type annotations.
+Snapshot with the pinned old parser, rebuild with the new parser, then rewrite
+and compare every inline tree. New spec counter-examples are deliberately kept.
+"""
+import argparse
+import gzip
+import json
+from pathlib import Path
+import runpy
+import subprocess
+
+ROOT=Path(__file__).resolve().parent.parent
+M=runpy.run_path(str(ROOT/'scripts/migrate-annotations'))
+P=runpy.run_path(str(ROOT/'scripts/prove-annotation-snippets'))
+
+
+def exempt(item):
+    source=item['source'].replace('\\|','|')
+    if source in ('(x : Int | y)','(x : Int | x)'):
+        return True
+    if item['path'] in ('docs/spec.md','docs/design/syntax-3.md') and source=='f : (Int) -> Int | String = e':
+        return True
+    return False
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('mode',choices=['snapshot','rewrite'])
+    p.add_argument('--baseline',type=Path,required=True)
+    p.add_argument('--driver',type=Path,default=ROOT/'target/debug/examples/pattern-annotations')
+    p.add_argument('--report',type=Path)
+    args=p.parse_args()
+    if args.mode=='snapshot':
+        items=[]
+        for item in P['inline']():
+            item['raw_source']=item['source'];item['end']=item['start']+len(item['source'])
+            item['source']=item['source'].replace('\\|','|')
+            item['exempt']=exempt(item)
+            items.append(item)
+        results=M['parse'](items,args.driver)
+        with gzip.open(args.baseline,'wt') as f:
+            for item,result in zip(items,results):
+                result['tree']=M['tree'](result['tree']);item['result']=result
+                f.write(json.dumps(item,ensure_ascii=False)+'\n')
+        print(f'saved {len(items)} old inline trees; {sum(len(i["result"]["edits"]) for i in items if not i["exempt"])} brace sites')
+        return
+    items=M['read'](args.baseline);hosts={};records=[];changed=[]
+    for item in sorted(items,key=lambda i:(i['path'],-i['start'])):
+        if item['exempt'] or not item['result']['edits']:continue
+        source=M['rewritten'](item)
+        raw=source.replace('|','\\|') if '\\|' in item['raw_source'] else source
+        path=item['path'];host=hosts.setdefault(path,(ROOT/path).read_text())
+        if host[item['start']:item['end']]!=item['raw_source']:raise SystemExit(f'stale inline baseline: {path}:{item["start"]}')
+        hosts[path]=host[:item['start']]+raw+host[item['end']:]
+        changed.append(item)
+        records.append(dict(item,source=source,result=item['result']))
+    # Use the normal formatter's canonical single-line spelling where it
+    # fits an inline span (notably braces local to a function result).
+    requests=[dict(M['prepared'](i),format=True) for i in records]
+    out=subprocess.check_output([str(args.driver)],input=''.join(json.dumps(i,ensure_ascii=False)+'\n' for i in requests),text=True)
+    formatted=[json.loads(line) for line in out.split('\n') if line]
+    for record,result in zip(records,formatted):
+        text=result.get('formatted')
+        if text is not None and '\n' not in text.rstrip('\n'):
+            record['source']=text.rstrip('\n')
+    hosts={}
+    for before,record in zip(changed,records):
+        path=before['path'];host=hosts.setdefault(path,(ROOT/path).read_text())
+        raw=record['source'].replace('|','\\|') if '\\|' in before['raw_source'] else record['source']
+        hosts[path]=host[:before['start']]+raw+host[before['end']:]
+    actual=M['parse'](records,args.driver);differences=[];entries=[]
+    for before,after,result in zip(changed,records,actual):
+        same=before['result']['tree']==M['tree'](result['tree'])
+        ds=before['result']['diagnostics']==result['diagnostics']
+        entry=dict(path=before['path'],start=before['start'],sites=len(before['result']['edits']),equal=same,diagnostics_equal=ds,tree_sha256=M['digest'](before['result']['tree']))
+        entries.append(entry)
+        if not same or not ds:differences.append(dict(entry,before=before['source'],after=after['source'],old=before['result'],new=result))
+    if args.report:args.report.write_text(json.dumps(dict(inventoried=len(items),compared=len(entries),sites=sum(e['sites'] for e in entries),new_spec_examples=sum(i['exempt'] for i in items),differences=differences,entries=entries),indent=2)+'\n')
+    if differences:
+        for d in differences:print(d['path'],d['before'],d['old']['diagnostics'],d['new']['diagnostics'])
+        raise SystemExit(1)
+    for path,source in hosts.items():(ROOT/path).write_text(source)
+    print(f'{len(items)} inline trees inventoried; {len(changed)} changed snippets; {sum(e["sites"] for e in entries)} brace sites; zero differences')
+
+
+if __name__=='__main__':main()
