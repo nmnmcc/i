@@ -583,7 +583,7 @@
     (local.get $sum))
 
   (@custom "ilang.abi"
-    "{\"version\":4,"
+    "{\"version\":3,"
     "\"entry\":{\"name\":\"app/main.main\",\"async\":false},"
     "\"tests\":["
       "{\"name\":\"app/test.passing\",\"async\":false},"

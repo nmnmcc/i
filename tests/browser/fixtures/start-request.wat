@@ -16,7 +16,7 @@
     (i32.const 0))
 
   (@custom "ilang.abi"
-    "{\"version\":4,"
+    "{\"version\":3,"
     "\"entry\":null,"
     "\"tests\":[],"
     "\"exports\":{},"

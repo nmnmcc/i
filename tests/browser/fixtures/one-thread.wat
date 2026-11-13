@@ -55,7 +55,7 @@
     (if (i32.ne (global.get $answers) (i32.const 3)) (then unreachable)))
 
   (@custom "ilang.abi"
-    "{\"version\":4,"
+    "{\"version\":3,"
     "\"entry\":{\"name\":\"app/main.main\",\"async\":true},"
     "\"tests\":[{\"name\":\"app/test.waits\",\"async\":true}],"
     "\"exports\":{},"
