@@ -1523,6 +1523,13 @@ collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) -> List(A) {
 
 A computation that is dropped is first **unwound**: its final functions are run, from the innermost to the outermost. This takes place when an error or an `escape` goes through it (§9.3, §9.4), and when its continuation is cancelled (§9.4).
 
+A final registration is removed before its callback starts, on both normal
+exit and unwinding. It is invoked at most once. If that invocation suspends
+and raw continuation cancellation discards its remainder, only other installed
+finals are run; the removed registration is not invoked again. Structured task
+cancellation shields an already-running final as §9.9 R4 specifies. That
+shielding is a task rule, not a change to raw `control.cancel`.
+
 The module `i/resource` puts final functions in place. `Scope` is a service of `i/resource`; the platform gives every entry one (§10.2).
 
 | Function | Type | What it does |
