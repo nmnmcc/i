@@ -19,3 +19,7 @@ pnpm-debug.log*
 
 # macOS-specific files
 .DS_Store
+
+# Generated from repository sources
+content/docs/standard/generated/
+content/docs/library/generated/

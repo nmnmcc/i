@@ -6,7 +6,6 @@ import {
   DocsPage,
   DocsTitle,
   MarkdownCopyButton,
-  ViewOptionsPopover,
 } from 'fumadocs-ui/layouts/docs/page';
 import { Provider, type ProviderProps } from '@/components/provider';
 import { baseOptions } from '@/lib/layout.shared';
@@ -17,7 +16,6 @@ export interface DocsProps extends ProviderProps {
   description?: string;
   toc: TOCItemType[];
   markdownUrl: string;
-  githubUrl: string;
 }
 
 /**
@@ -29,7 +27,6 @@ export function Docs({
   description,
   toc,
   markdownUrl,
-  githubUrl,
   children,
   ...props
 }: DocsProps) {
@@ -43,7 +40,6 @@ export function Docs({
           <DocsDescription>{description}</DocsDescription>
           <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
             <MarkdownCopyButton markdownUrl={markdownUrl} />
-            <ViewOptionsPopover markdownUrl={markdownUrl} githubUrl={githubUrl} />
           </div>
           {children}
         </DocsPage>

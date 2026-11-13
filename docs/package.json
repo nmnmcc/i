@@ -9,17 +9,23 @@
     "preview": "astro preview",
     "start": "astro dev",
     "types:check": "astro sync && tsc --noEmit",
-    "astro": "astro"
+    "astro": "astro",
+    "generate": "python3 scripts/generate-standard.py && python3 scripts/generate-library.py",
+    "prebuild": "npm run generate",
+    "predev": "npm run generate",
+    "check:links": "python3 scripts/check-links.py"
   },
   "dependencies": {
     "@astrojs/react": "7.1.7",
     "@fumadocs/astro": "0.3.0",
+    "@fumadocs/satteri": "0.8.0",
     "astro": "7.4.10",
     "fumadocs-core": "16.19.0",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.19.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "sharp": "0.35.5",
+    "shiki": "4.6.0",
     "takumi-js": "2.20.0"
   },
   "devDependencies": {
