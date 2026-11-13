@@ -1218,3 +1218,25 @@ fn converted_bound_fail_remains_a_service_parameter() {
         "the body still has its bound service: {text}"
     );
 }
+
+#[test]
+fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
+    let (module, diags) = syn3::parse_lowered("S(N) = (() <- N -> Nil)\nBad = S(Never)\n");
+    assert!(diags.is_empty(), "{diags:#?}");
+    let definitions: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::TypeDef(def) => Some(def),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(definitions.len(), 2);
+    assert_eq!(definitions[0].name.name, "S");
+    assert_eq!(definitions[0].params[0].name, "N");
+    assert_eq!(definitions[1].name.name, "Bad");
+    assert!(matches!(
+        definitions[1].body,
+        ilang_syntax::ast::TypeBody::Alias(_)
+    ));
+}

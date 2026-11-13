@@ -630,8 +630,8 @@ provider fixture also keeps its original S(A) annotation. Bare legacy ! N
 callback annotations retain Fail(Never), avoiding an unconstrained error
 variable in this transitional lowerer. Four remaining expected strings only
 change to syntax-three type display (unlabelled positions and `<-`). Row
-algebra is supplied through a spread of the parenthesized algebra rather
-than a union of list items. The unused-local variant now actually removes
+algebra is supplied through a named alias spread rather than a union of
+list items. The unused-local variant now actually removes
 the call and asserts that its substitution changes the source.
 
 Two snippet-inventory entries render actual function-header/template
@@ -640,3 +640,22 @@ All 37 row-scheme snippets parse, and the 4,761-snippet inventory has no stale
 entries. The complete compiler-package run and focused correction rerun,
 CLI/spec/std/corpus gates, clippy and final snippet gate remain pending;
 this checkpoint is not a landable result.
+
+The complete syntax, Wasm and LSP packages pass (98 protocol tests). The
+checker package run had only the identified row/coalescing fixture failures.
+The coalescing provider now preserves its original S(Dependency) annotation
+through a local binding, under §7.3's environment-statement conversion and
+spec §9.2's known provider form. The row algebra is named by a transparent
+alias before it is spread: the grammar permits a named spread, not a
+parenthesized algebra expression. Assertions and all three algebra operators
+remain; this changes the representation, not the intended accepted/rejected
+programs. Focused verification is recorded in the command ledger.
+
+The last row-alias failure exposed a lowering bug: adjacent Bad = S(Never)
+was mistaken for a constructor group, absorbing generic S(N) and leaving N
+unbound. Constructor-group absorption now requires the member's arguments
+to match the declaration's parameter names. Specialized aliases retain the
+original constructor and scope, as syntax-3 §2.8 kind 4 requires: "A name is
+a transparent alias, as today." A lowering unit test pins both definitions
+and S's N parameter; that focused lowering regression passes. The final
+checker row-algebra rerun and remaining gates are pending.

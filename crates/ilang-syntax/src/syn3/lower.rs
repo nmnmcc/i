@@ -503,9 +503,16 @@ impl Cx {
                     && match &items[at].kind {
                         n::ItemKind::TypeDef(n::TypeDef {
                             name,
+                            head,
                             rhs: n::TypeRhs::Data(_),
-                            ..
-                        }) => member_name(m) == Some(name.name.as_str()),
+                        }) => {
+                            // A specialized alias such as Bad = S(Never)
+                            // must keep S's own parameter scope (§2.8).
+                            member_name(m) == Some(name.name.as_str())
+                                && matches!(&m.kind, n::TypeKind::Named { args, .. }
+                                    if args.len() == head.len()
+                                        && args.iter().zip(head).all(|(a, b)| member_name(a) == member_name(b)))
+                        },
                         _ => false,
                     }
             });

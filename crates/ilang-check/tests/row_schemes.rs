@@ -6,7 +6,7 @@ fn types(source: &str) -> std::collections::BTreeMap<String, String> {
     let checked = ilang_check::check(&graph);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),
-        "{:?}",
+        "{source}\n{:?}",
         graph.sources.render_all(&checked.diags)
     );
     let p = checked.program.unwrap();
@@ -186,11 +186,11 @@ Alias(N) = T(N)
         for (written, error_row) in [
             (format!("T({row})"), false),
             (format!("Alias({row})"), false),
-            (format!("() <- (Fail(Never), ..({row})) -> Nil"), false),
+            ("() <- (Fail(Never), ..Written) -> Nil".to_string(), false),
             (format!("() <- (Fail({row})) -> Nil"), true),
         ] {
             let source = format!(
-                "{invariant_head}use = (x: {written}) {{ x }}
+                "{invariant_head}Written = {row}\nuse = (x: {written}) {{ x }}
 "
             );
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
@@ -209,7 +209,7 @@ Alias(N) = T(N)
     }
     let alias = "Dep = ()
 S(N) = (() <- N -> Nil)
-Bad = S(Never) | S(Dep)
+Bad = { S(Never) | S(Dep) }
 use = (body: () <- (Bad) -> Nil) { body() }";
     assert_eq!(
         types(alias),

@@ -196,13 +196,16 @@ apply = <N>() {
 	local()
 }
 
-main = () { apply() <- (S(() { read() })) }";
+main = () { provided: S(Dependency) = S(() { read() }) apply() <- (provided) }";
     entry(dependency);
     // An empty `Dependency = ()` is not a keyed service type in syntax three
     // (E0225), so the supplied variant gives it a field.
     let supplied = dependency
         .replace("Dependency = ()", "Dependency = (value = Int)")
-        .replace("apply() <- (S(", "apply() <- (Dependency(value = 1), S(");
+        .replace(
+            "apply() <- (provided)",
+            "apply() <- (Dependency(value = 1), provided)",
+        );
     let (graph, _, _) = common::check_files(&[("src/main.i", &supplied)]);
     let checked = ilang_check::check(&graph);
     assert!(
