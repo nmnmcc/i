@@ -663,6 +663,7 @@ b = constant("s")
 The function-head case is explicitly permitted. The annotation case tests
 how outer written generics are treated, not a premise of rigid checking.
 
+<!-- old-syntax-check: E0101 -->
 ```i
 // 05-rank: attempts the specified polymorphic-parameter behavior
 use = (f: <A>(A) -> A) { (f(1), f("s")) }
