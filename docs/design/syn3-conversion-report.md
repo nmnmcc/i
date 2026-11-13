@@ -829,3 +829,32 @@ Both O0 and O2 stdout are byte-for-byte equal to main again: the same four
 intentional failures and two passing tests, including the corpus startup
 probe. No failure was suppressed and no expectation was changed. The
 before/after execution diff is in target/conv-b15/failure-output-results.json.
+
+Coordinator b15 item 4: each case ran alone three times per build, interleaved
+main/converted, with CPU time from waited child processes. The reference
+was built from exact main 29515fbfa in this worktree under a separate binary
+name; dependency versions and registry identities equal main. Its old-surface
+p1 check rejects E0515. No compiler executable was copied. All samples use
+O2 and the same injected startup test, and all exit 0 with identical stdout.
+
+| Case | Main CPU seconds (three runs) | Converted CPU seconds (three runs) |
+|---|---|---|
+| mutual200 | 10.788, 8.666, 8.767 | 10.584, 10.735, 8.694 |
+| stress-keys-2000 | 11.289, 5.289, 5.355 | 11.447, 5.311, 5.497 |
+
+Both builds exceed the saved ten-CPU-second bound when cold. Thus the gate
+timeout alone is not evidence of a conversion regression. The converted
+mutual200 second run has a checker outlier (8.21 CPU seconds versus roughly
+6.2 in the other paired runs); its default-cache median must not be described
+as steady-state cost. With cache disabled on both sides, three more isolated
+mutual200 pairs use 9.318/9.468/9.439 CPU seconds on main and
+9.690/9.639/9.634 converted: medians 9.439 versus 9.639, about 2.1% apart.
+Median stage deltas are +0.05 expansion, +0.08 checking, +0.04 lowering and
++0.08 Binaryen CPU seconds; runtime execution is 0.03 seconds on both. This
+localizes the small difference to compilation, with transition-front-end
+work in expansion/lowering, rather than a runtime slowdown. The small
+checker/Binaryen differences cannot be separated from machine variation
+with these samples. No large repeatable conversion-specific slowdown was
+found. No case bound or expected observation was changed. Raw per-stage,
+CPU and wall samples are in target/conv-b15/perf-results.json and
+perf-controlled-results.json; the probes run through the heavy wrapper.
