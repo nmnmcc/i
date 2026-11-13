@@ -1330,7 +1330,10 @@ fn lsp_rename_top_level_across_files() {
     );
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    assert!(shapes.contains("(Shape, Circle(..), Rect(..), surface, origin"), "{shapes}");
+    assert!(
+        shapes.contains("(Shape, Circle(..), Rect(..), surface, origin"),
+        "{shapes}"
+    );
     assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
@@ -2698,7 +2701,13 @@ fn lsp_diagnostics_only_affected_packages_are_checked_again() {
     assert!(!c.has_diagnostics(&other_main));
     // A change of `lib`, which `app` uses, checks `app` again.
     let lib = file_uri(&lib_dir.join("src/text.i"));
-    c.open(&lib, &LIB_TEXT.replace("(shout, Tone, Loud(..), Quiet(..))", "(Tone, Loud(..), Quiet(..))"));
+    c.open(
+        &lib,
+        &LIB_TEXT.replace(
+            "(shout, Tone, Loud(..), Quiet(..))",
+            "(Tone, Loud(..), Quiet(..))",
+        ),
+    );
     let diags = c.diagnostics(&ws.main);
     assert!(
         diags

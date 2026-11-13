@@ -331,7 +331,8 @@ impl Query<'_> {
         if let Some(twin) = twin {
             for extra in self.references(&twin, r.owner, &self.own_modules()) {
                 if !refs.iter().any(|x| {
-                    x.location.source == extra.location.source && x.location.span == extra.location.span
+                    x.location.source == extra.location.source
+                        && x.location.span == extra.location.span
                 }) {
                     refs.push(extra);
                 }
