@@ -3018,6 +3018,71 @@ A **macro call** is written in these ways in both surfaces, where `m` is a name,
 
 **Limits.** Each run has a fresh budget of 100,000,000 work units, 2^28 allocation words of eight bytes and 10,000 frame units, and expansions may be nested at most 256 deep. These are counted in units of the language, not of the machine; a package cannot change them. Going over a limit is a compile error at the call that names the macro and the limit. A `SyntaxError` from a macro is a compile error at the span of its `at`; a stop in a macro, also by a failure reported to `Assert`, is a compile error at the call.
 
+**Budget accounting.** Count the following abstract evaluation, before
+optimization, on the expanded core tree (§14.1). It uses the evaluation and
+matching order of §6 and §7. Redundant groups, inferred types, compiler-generated
+calling conventions and machine instructions have no charge of their own.
+The same source operation has the same charge when folded, inlined or shared.
+Work and allocation are cumulative; reclaiming storage does not refund them.
+
+| Event | Work units |
+|---|---|
+| Evaluate an expression node, including a literal, name, call, operator, data/list item, provide or function value | 1 per node entered |
+| Attempt a pattern node, including a failed attempt or an alternative | 1 per node attempted |
+| Call an i function, also a tail call | 1, in addition to evaluating its callee and arguments and its executed body |
+| Fixed-size primitive operation | 1, in addition to expression evaluation |
+| Int addition, subtraction, comparison, bitwise operation or shift | `max(1, a, b, r)`, where `a`, `b`, `r` are the operand and result sizes in 64-bit magnitude limbs; a unary operation has `b = 0` |
+| Int multiplication, division or remainder | `max(1, a) × max(1, b)` |
+| Int conversion to or from text | `max(1, a, r)^2 + n`, where `n` is the number of text bytes |
+| String or bit-array primitive | 1 plus the number of input and output bytes, rounding a partial byte up |
+| Structural equality, comparison, inspection or hashing | 1 per visited value node plus the scalar charges above and the number of emitted text or hash-encoding bytes; visit parts in the order of §11 |
+| Compiler syntax/type service | 1 per input and output datum or type node, plus its text bytes and Int limbs; visit children in written order |
+
+An Int has `max(1, ceil(bit_length(abs(value)) / 64))` magnitude limbs.
+For the table, type nodes are the constructor, argument, variable, binder and
+operator occurrences of the simplified type given to the service; a shared
+part is visited at each occurrence. The cost is for the language service call
+and its exposed input and answer, not for a compiler's internal solver steps.
+An i implementation of a library function is charged by its executed i code;
+only primitive operations use the primitive rows. Charges in different rows
+add when an event includes both, for example a call and its primitive work. A
+failed primitive has result size zero and constructs no result. Boundary copies
+of Syntax use the compiler-service work row as well as their allocation charge.
+
+Allocation words count abstract value construction, regardless of physical
+sharing. A name read or return of an existing value allocates nothing. A newly
+computed Int uses `1 + limbs` words; a Float or codepoint uses 1; a String uses
+`1 + ceil(UTF-8 bytes / 8)`; a BitArray uses `1 + ceil(bits / 64)`. Data uses
+`1 + number of parts`, and a labelled wrapper uses 1 plus its data's words
+when that data is constructed. Each new list cell uses 2 words; construction
+of `[]` uses 1. A function value uses 1 plus the number of captured values
+(§11.9); a newly made identity handle uses 1. Children already constructed are
+not allocated again by a containing value. A newly constructed or boundary-copied
+Syntax node uses 4 words plus its number of children, text bytes rounded up to
+words, and Int magnitude limbs. Count every occurrence in a copied tree,
+including input arguments, service answers and the returned expansion.
+
+A frame unit is one active i function activation. A call adds one before
+entering the callee; return and unwinding remove it. A tail call replaces the
+current activation after its callee and arguments have been evaluated.
+Suspension removes the paused activations from the frame count and charges one
+allocation word per saved activation, besides the continuation handle and its
+captured values. Resumption reinstates those frames above the caller's frames;
+cancellation reinstates them while unwinding. Dropping a continuation refunds
+no allocation and runs no finals (§9.4). Primitive operations and compiler
+services add no i frame. A match adds no frame (§6.12). Limits apply before the
+corresponding event, with work checked first, then allocation, then frames. An overflow of
+a counter exceeds its limit; equality with the limit is allowed.
+
+The run's budget starts before its reachable top-level initializers (§2.5),
+which are evaluated once in that fresh state. Literal values and function
+values constructed there use the same charges as elsewhere. A deferred run
+retried under §14.7 is a new run with a fresh budget, including initialization;
+an implementation cache must reproduce the same charges. Each nested expansion
+has its own budget. Expansion depth counts the outermost call as 1 and adds 1
+for a call in an expansion's result. Caching, compiler retries and optimization
+cannot change whether these logical limits are exceeded.
+
 **Collected bindings.** During an item run the service `Items` of `i/syntax` is provided:
 
 ```i
