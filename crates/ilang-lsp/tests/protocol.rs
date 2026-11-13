@@ -2635,7 +2635,10 @@ fn lsp_folding_workspace_symbols() {
             // `Circle = (…)` is one definition of the type and its
             // constructor (syntax three §2.8), listed once.
             .any(|s| s.name == "Circle"
-                && matches!(s.kind, lsp::SymbolKind::CONSTRUCTOR | lsp::SymbolKind::CLASS))
+                && matches!(
+                    s.kind,
+                    lsp::SymbolKind::CONSTRUCTOR | lsp::SymbolKind::CLASS
+                ))
     );
     // Not the names of dependencies.
     let r = c.request::<lsp::request::WorkspaceSymbolRequest>(json!({ "query": "shout" }));

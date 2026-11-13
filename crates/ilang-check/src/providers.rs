@@ -870,7 +870,9 @@ impl Schema {
                         None
                     } else {
                         let member = match &p.ty(id).body {
-                            hir::TypeBody::Custom(cs) if cs.len() == 1 && cs[0].fields.len() == 1 => {
+                            hir::TypeBody::Custom(cs)
+                                if cs.len() == 1 && cs[0].fields.len() == 1 =>
+                            {
                                 union_has(p, &cs[0].fields[0].ty, resolved.ty, 0)
                             }
                             _ => false,

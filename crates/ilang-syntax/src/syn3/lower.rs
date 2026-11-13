@@ -417,9 +417,7 @@ impl Cx {
         for item in items {
             let attributes = item.attributes.iter().map(|a| self.attribute(a)).collect();
             let kind = match &item.kind {
-                n::ItemKind::TypeDef(def) => {
-                    o::ItemKind::TypeDef(self.type_def(def, item.span.0))
-                }
+                n::ItemKind::TypeDef(def) => o::ItemKind::TypeDef(self.type_def(def, item.span.0)),
                 n::ItemKind::Bind(b) => {
                     let mut bindings = self.bindings(b, true);
                     let last = bindings.pop().unwrap();

@@ -1845,9 +1845,12 @@ impl AliasFold {
     /// Whether every member is a type defined in a program (a labelled
     /// type, not a built-in one).
     pub(crate) fn all_defined(&self) -> bool {
-        self.members
-            .iter()
-            .all(|m| matches!(m.head(), Some(super::Head::Named(crate::hir::TypeRef::Custom(_)))))
+        self.members.iter().all(|m| {
+            matches!(
+                m.head(),
+                Some(super::Head::Named(crate::hir::TypeRef::Custom(_)))
+            )
+        })
     }
 
     /// The members with the alias's parameters replaced by `args`.
