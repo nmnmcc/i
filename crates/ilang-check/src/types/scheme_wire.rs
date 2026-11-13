@@ -937,7 +937,11 @@ fn definite_failure(solver: &Solver) -> bool {
         && solver.failures.iter().all(|f| {
             matches!(
                 f.kind,
-                FailKind::Mismatch | FailKind::Values | FailKind::Invariant | FailKind::EnvForms | FailKind::NeedMeet
+                FailKind::Mismatch
+                    | FailKind::Values
+                    | FailKind::Invariant
+                    | FailKind::EnvForms
+                    | FailKind::NeedMeet
             )
         })
 }
@@ -1273,9 +1277,7 @@ fn project_hidden(
                     .chain(&state.handled)
                     .chain(state.need_meet.iter().flat_map(|(a, b)| [a, b]))
                 {
-                    if variables(ty).contains(&v)
-                        && !matches!(ty, Ty::Var(w) if *w == v)
-                    {
+                    if variables(ty).contains(&v) && !matches!(ty, Ty::Var(w) if *w == v) {
                         return false;
                     }
                 }

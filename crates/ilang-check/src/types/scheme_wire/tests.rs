@@ -415,10 +415,7 @@ fn deferred_need_meets_survive_transfer_and_instantiation() {
     source.has_need_meets = true;
     source.constrain(&meet, &x);
     source.constrain(&meet, &y);
-    let scheme = Scheme {
-        level: 0,
-        ty: meet,
-    };
+    let scheme = Scheme { level: 0, ty: meet };
     let text = encode_test(&source, &scheme, &mut |_| "pkg:Svc".into());
     let mut restored = Solver::new(HashMap::new(), Vec::new());
     let decoded = decode(

@@ -2930,9 +2930,15 @@ mod literal_tests {
         let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
         let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
         let wide_arg = s.union(vec![int.clone(), string]);
-        let form = |arg| Ty::record(vec![("x".into(), Ty::named(
-            TypeRef::Custom(outer), vec![Ty::named(TypeRef::Custom(service), vec![arg])],
-        ))]);
+        let form = |arg| {
+            Ty::record(vec![(
+                "x".into(),
+                Ty::named(
+                    TypeRef::Custom(outer),
+                    vec![Ty::named(TypeRef::Custom(service), vec![arg])],
+                ),
+            )])
+        };
         let (narrow, wide) = (form(int), form(wide_arg));
         let mut forward = s.clone();
         forward.constrain(&narrow, &wide);

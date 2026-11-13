@@ -11,9 +11,7 @@
 )
 
 /// Ends the computation with `error`, through the current `Fail`.
-raise(E) = (error: E, fail ! Fail(E)) -> Never ! Fail(E) {
-	fail.raise(error)
-}
+raise(E) = (error: E, fail ! Fail(E)) -> Never ! Fail(E) { fail.raise(error) }
 
 /// Gives `Ok(value)` when `body` ends with `value`, or `Error(error)` for the
 /// first `error` it raises through `Fail(E)`.

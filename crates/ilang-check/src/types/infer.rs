@@ -1390,7 +1390,9 @@ impl<'a> Checker<'a> {
             ),
             FailKind::NeedMeet => (
                 code::ENV_FORMS,
-                format!("the service requirements `{l}` and `{r}` have an empty intersection and cannot be satisfied (§4.4, §9.2)"),
+                format!(
+                    "the service requirements `{l}` and `{r}` have an empty intersection and cannot be satisfied (§4.4, §9.2)"
+                ),
             ),
             FailKind::EnvForms => (
                 code::ENV_FORMS,
