@@ -1325,8 +1325,22 @@ impl Solver {
                         self.constrain_by(y, x, v, row);
                     }
                     if self.failures.len() > before {
+                        // Argument fitting can determine a deferred meet
+                        // elsewhere in the instantiated scheme. Keep that
+                        // obligation's service pair, rather than disguising
+                        // it as a mismatch of the callback's own need.
+                        let meet = self.failures[before..]
+                            .iter()
+                            .find(|f| f.kind == FailKind::NeedMeet)
+                            .cloned();
                         self.failures.truncate(before);
-                        self.fail(FailKind::EnvForms, &need, &provider);
+                        if let Some(meet) = meet {
+                            let left = self.known_need_form(&meet.lhs);
+                            let right = self.known_need_form(&meet.rhs);
+                            self.fail(FailKind::NeedMeet, &left, &right);
+                        } else {
+                            self.fail(FailKind::EnvForms, &need, &provider);
+                        }
                     }
                     return;
                 }
