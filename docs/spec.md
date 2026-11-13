@@ -2805,7 +2805,7 @@ Diagnostics = (note = (String) -> Nil)
 
 ### 14.6 Names in expanded code
 
-Every `Syntax` value has a scope: a module and a set of **marks**. Code read from a file of module `M`, and a template written in `M`, have the scope `M` with no marks. `make(node, like)` gives the scope of `like`. For each run the compiler makes a new mark; it adds the mark to the arguments and to every answer of `Definitions` or `Types`, runs the macro, and then flips the mark on every part of the result. So code from the arguments is as it was, and code the macro made has the mark.
+Every `Syntax` value has a scope: a module and a set of **marks**. Code read from a file of module `M`, and a template written in `M`, have the scope `M` with no marks. `make(node, like)` gives the scope of `like`. For each run the compiler makes a new mark; it adds the mark to the arguments and to every answer of `Definitions` or `Types`, runs the macro, and then flips the mark on every syntax-bearing part of the successful output transaction: the returned syntax and all recorded `Items.add` and `Items.expose` requests, including their collection, target, name and source-position syntax. The transaction is transformed as one shared syntax graph, so a name shared by a returned binding and a request retains the same scope and identity in both. A failed or postponed run commits none of its requests or diagnostics. So code from the arguments is as it was, and code the macro made has the mark.
 
 A name is looked up in this way:
 

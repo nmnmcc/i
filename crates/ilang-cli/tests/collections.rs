@@ -283,3 +283,25 @@ fn expand_command_prints_both_surfaces_and_macro_trace() {
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("--to is"));
 }
+
+#[test]
+fn generated_private_collection_target_shares_the_output_transaction_scope() {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.6/mp12_collection_transaction");
+    let manifest = ilang_cli::collections(&project, false, true).unwrap();
+    assert_eq!(manifest.entries.len(), 1);
+    assert_eq!(manifest.entries[0].module, "probe/main");
+    for level in [Level::O0, Level::O2] {
+        let built = ilang_cli::build_collection(
+            &project,
+            options(level),
+            &manifest.entries[0].handle,
+            CollectionResult::Nil,
+        )
+        .unwrap();
+        assert!(matches!(
+            built.run_with(built.built.host_options()).unwrap(),
+            Outcome::Ok(_)
+        ));
+    }
+}
