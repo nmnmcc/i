@@ -244,6 +244,7 @@ def main():
         print("\n".join(failed), file=sys.stderr)
         raise SystemExit(1)
     print(f"old-syntax-check: {len(all_snippets)} extracted literals/blocks parsed; exact expected diagnostics match; {sum(bool(i['entry'].get('track')) for i in all_snippets)} future-track entries")
+    subprocess.run([sys.executable, str(ROOT / "scripts/syn3-lisp-check")], check=True)
 
 
 if __name__ == "__main__":

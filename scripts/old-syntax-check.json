@@ -3119,5 +3119,30 @@
       ]
     ],
     "reason": "Render the witness test format template with its actual inferred function header; the other header is parsed separately."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:0ecb095114c269fa": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{invariant_head}",
+        "Dep = ()\nS(N) = (() <- N -> Nil, (N) -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\n"
+      ],
+      [
+        "{row}",
+        "S(Never) | S(Dep)"
+      ],
+      [
+        "{written}",
+        "T(S(Never) | S(Dep))"
+      ]
+    ],
+    "reason": "Render the row-algebra format template using its actual invariant service header and first union/function-type argument; the row-scheme test checks every generated operator and annotation."
   }
 }

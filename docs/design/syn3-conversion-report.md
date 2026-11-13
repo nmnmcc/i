@@ -684,3 +684,37 @@ signatures and functions assembled by macro_run/typed_macros. The existing
 length-prefixed parser driver has a --lisp mode; normal inventory semantics
 are unchanged. New gate and typed-macro rerun are pending behind the shared
 load guard. This remains an unlandable checkpoint until all gates finish.
+
+Typed macros now pass all 36 cases. Connected the companion Lisp inventory
+to the ordinary inventory command, with actual generator substitutions for
+the row-algebra and declared-macro templates. No diagnostics were allowed
+or weakened. Combined inventory passes: 4,762 normal snippets, 34 .is files
+and 89 CLI macro fragments; the eight inventory helper tests also pass.
+Feature-enabled syntax/clippy, requested spec/std and full corpus gates
+remain in progress.
+
+Spec 4.4/ and 4.5/ pass at both optimization levels. The 9/ batch completed
+134/139; all five failures were conversion omissions. Three light-boundary
+fixtures now use the transparent alias for a bound ordinary Fail, and the
+unused wider Fail need in directed_rows uses the same alias. The collect
+examples in control/directed_rows/light_boundary keep callback and provider
+parameter A directly on the literals, as the already-verified spec type
+fixture does; Fail(Never) retains the original empty legacy error channel.
+A manually provided Fail value retains its written Int form and raise label.
+
+Focused reruns pass all six light-boundary cases and control.i and
+directed_rows.i at O0 and O2. Thus all 139 cases are covered by the original
+batch plus targeted source-only corrections; the unchanged long cases were
+not repeated. No compiler code changed. Two stop-fixture headers moved only
+by the inserted alias lines; positions were derived from the same f.raise,
+fail.raise and control.resume call anchors (§11.7), and the exact stop checks
+pass. The fixture format check also passes. Required 11/, release/std and
+full corpus verification remain.
+
+Merged main 46a6d43b6; its benchmark grouping/format correction was already
+present in this lane, so the merge has no tree delta or new old-syntax text.
+Spec 11/ passes all 51 cases at O0/O2, and the fresh release build passes.
+The first std O0 run found the same erased generator callback/provider A
+in std/test/list_test.i. Kept those annotations directly on the literals,
+using the already-verified spec helper pattern. Entry compilation now
+passes and the std O0 suite is executing; O2 and corpus remain pending.
