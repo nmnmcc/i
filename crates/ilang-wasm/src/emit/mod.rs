@@ -860,7 +860,9 @@ impl<'p> Emitter<'p> {
             Op::Ensure => format!("(call $resource_ensure {a} {b} {env})"),
             Op::Boundary => format!("(call $control_boundary {a} {env})"),
             Op::Suspend => format!("(call $control_suspend {a} {b})"),
-            Op::Escape => format!("(call $control_escape {a} {b})"),
+            // The throw is in the frame of the caller, so that it unwinds
+            // one frame less.
+            Op::Escape => format!("(throw $error (call $escape_payload {a} {b}))"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
             Op::KeepEnv => format!("(call $control_keep_env {a} {env})"),

@@ -585,6 +585,15 @@ pub(super) const EFFECTS: &str = r#"
     (then (call $stop_boundary_inactive) (unreachable)))
   (throw $error (struct.new $escaped (local.get $boundary) (local.get $v))))
 
+;; The value of `$error` for `control.escape(b, v)`, thrown by the caller
+;; (`Op::Escape`): stops when `b` is not active.
+(func $escape_payload (param $b eqref) (param $v eqref) (result (ref $escaped))
+  (local $boundary (ref $boundary))
+  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
+  (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
+    (then (call $stop_boundary_inactive) (unreachable)))
+  (struct.new $escaped (local.get $boundary) (local.get $v)))
+
 ;; The continuation `k`, used now: stops when it was already used (rule 5).
 (func $continuation_take (param $k eqref) (result (ref $cont))
   (local $c (ref $cont))
