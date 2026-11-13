@@ -271,7 +271,7 @@ These are not mechanical, and each changes what a macro sees.
 | 1 inventory | done |
 | 2a `i fmt --to` on the new tree | done |
 | 2b datum builder; `needs_row` | done |
-| 2c rows flip | additive preparation merged; `NEW_ROWS = false`, `ROWS3 = false`; workspace check and syntax/macro tests passed; CLI gate pending |
+| 2c rows flip | additive preparation merged; `NEW_ROWS = false`, `ROWS3 = false`; additive prefix GREEN; workspace check, syntax/macro tests and four CLI binaries passed |
 | 2d engine on the new tree | not started; faE readers are beside the old engine, with no production switch-over |
 | 3 resolver | not started; faD is deliberately not merged in this prefix |
 | 4 deletion | not started |
@@ -331,5 +331,11 @@ Stages 9/E6 are outside this prefix.
 Verification of the additive prefix: workspace/all-targets check passed.
 All syntax and macro test binaries passed across the broad diagnostic run
 and the targeted `format`/`spec` rerun after the documented fixture fixes.
-The four requested CLI binaries are pending; no green landing claim is made
-until they pass. Logs are under `target/fa-integration/` in this worktree.
+The four requested CLI binaries passed: `fmt` 6, `lisp` 5,
+`macro_run` 57 and `typed_macros` 35 tests (103 total). The additive prefix
+is green with both row switches off. Logs are under `target/fa-integration/` in this worktree.
+
+Step 2c will be attempted separately on `lane/fa-2c`, based on this green
+prefix. It is not part of `lane/fa` unless the same gate passes with the
+new rows enabled. No production engine migration, resolver migration, or
+old-tree deletion is included.
