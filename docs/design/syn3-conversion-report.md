@@ -762,3 +762,8 @@ an independent source-change/phase audit, including all eight initially
 refused cases. Every source changed; phase exits, diagnostic-code sets and
 runtime stdout equal batch2. The complete corpus is still running, and the
 two p1 correctness blockers remain unresolved. This is not a landing claim.
+
+The complete first 200 K4 observations have now passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only these stable completed observations are committed; recording continues.
+The full corpus and the two known p1 regressions still block landing.
