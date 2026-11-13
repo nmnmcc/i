@@ -750,3 +750,15 @@ literal also retains the original empty legacy error channel with the
 transition Fail(Never) marker. All twelve accept and match the unchanged
 required type fragments. Their parser checks pass. No requirement was
 changed, and their observations remain subject to the batch2 outcome guard.
+
+Merged main 29515fbfa native-test executable-busy retry without changing any
+embedded literal, compiler or runtime code. The requested latest-main std
+O0/O2 suites each pass 2,170 tests; workspace all-feature clippy, both format
+checks and the official normal/Lisp inventories pass. Native verification
+for the incoming test-harness change is queued behind the corpus.
+
+The first 100 complete K4 observations now pass the guarded recording and
+an independent source-change/phase audit, including all eight initially
+refused cases. Every source changed; phase exits, diagnostic-code sets and
+runtime stdout equal batch2. The complete corpus is still running, and the
+two p1 correctness blockers remain unresolved. This is not a landing claim.
