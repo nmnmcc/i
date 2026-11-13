@@ -5,7 +5,9 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-fw = <N>() <- (s: S(N)) -> Int { use() }
+fw: <N>() <- (Fail(Never), S(N), ..N) -> Int = () <- (
+	fail: Fail(Never),
+) -> Int { use() }
 
 main = () {
 	_syn3_0: S(Never) = S(f = () { 1 })
