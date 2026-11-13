@@ -1079,10 +1079,9 @@ catch = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 
 #### 2.10.8 `..env` and `keep`
 
-- In a service pattern, `..env: N` binds the whole environment the function
-  receives as one value of the row type `N` (owner: `<- (..env)` replaces
-  `keep_env`). `g() <- env` provides it again; `<- (..env, fake)` overrides one
-  key of it (rule C).
+- `..env: N` binds the projected row value of spec §6.8 (owner:
+  `<- (..env)` replaces `keep_env`). `g() <- env` provides it again;
+  `<- (..env, fake)` overrides one key of it (rule C).
 - A value whose type is a row variable is not data: it may be bound, captured
   and provided after `<-` (alone or as a spread in provided data); it may not
   be spread into ordinary data, compared, printed or matched.
@@ -1425,8 +1424,8 @@ environment statement `"!" NamedType "=" Expr`, the environment read
 
 - **Function head.** `<-` after `Params` is the **service pattern** (§2.10.3):
   each `SvcItem` binds a name to the service whose key is the written named
-  type; the annotation is required. `..name: N` binds the whole environment
-  the function receives, as one value of the row type `N` (§2.10.8); it is
+  type; the annotation is required. `..name: N` binds the projected row value
+  of spec §6.8 (§2.10.8); it is
   the last item, at most once, and `N` must be a type parameter of the
   function. No other pattern is allowed in a service item, and a service
   pattern has no labels, no guard and no alternatives. `<- ()` is a compile
