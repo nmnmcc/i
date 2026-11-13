@@ -164,6 +164,87 @@ quiet run, std check/build cost and benchmark Wasm size acceptance also
 remain to be verified. See [the step-3 report](design/numeric-step3-report.md)
 for the per-step measurements, fuel counts and surviving allocations.
 
+### Numeric follow-up: list-cell cast reuse
+
+The num4 starting revision, `fd99f9e32`, already includes the step-3 list tag
+change, scalar `to_float`/`truncate` paths and two extra Heap2Local rounds.
+A fresh paired run on 2026-11-13 at 18:19 HKT tested the remaining suggestion:
+retain a successful cell cast and reuse it for later patterns and projections.
+It used the saved starting revision's scalar O2 module as `NUMERIC_BASELINE`,
+and the candidate in the same driver process, Wasmtime build and timer.
+Load average after the run was 18. Times are the medians of five batch
+medians of 1001 samples; allocation counts subtract the 11 wrapper objects.
+
+| Kernel | Before ns | Cast cache ns | Before / cache allocations | Before / cache fuel |
+|---|---:|---:|---|---|
+| fast sine | 3364 | 3345 | 39 / 39 | 6515 / 6515 |
+| Horner | 19 | 21 | 2 / 2 | 1346 / 1346 |
+| dot | 281 | 281 | 2 / 2 | 3228 / 4062 |
+| integer | 340 | 341 | 2 / 2 | 6942 / 6942 |
+| tuples | 10 | 20 | 2 / 2 | 1384 / 1384 |
+| closures (fold) | 380 | 290 | 2 / 2 | 3516 / 3934 |
+
+The candidate used `br_on_cast_fail` to keep a nullable typed cell reference
+for each receiver with one definition per self-tail iteration. The first
+successful test supplied subsequent tests and both projections; null checks
+retained the original casts on untested paths. Every back edge reset the
+caches, and functions with suspension points were excluded. This follows
+numeric-lowering R8's same-receiver-version and proved-shape requirements.
+
+The experiment was removed: dot gained no time and executed 26% more fuel;
+fold executed 12% more fuel. Fold's batch medians were
+`[380, 392, 399, 280, 260]` before and `[421, 391, 251, 241, 290]` with the
+cache, so its median difference does not establish a stable gain. Extra cache
+branches and maintenance offset the avoided exact-cell checks. Horner and
+tuples have identical fuel and allocations, and their differences are near
+the timer's 10 ns resolution. The optimized module grew from 236330 to
+236727 bytes. The candidate passed the wasm tests; it was dropped before
+running the differential corpus. The ignored
+`target/num4-deferred-cell-cache.patch` preserves the experiment, and
+`target/num4-before/` and `target/num4-paired/` hold modules, raw samples,
+batch medians and allocation sites.
+
+The retained change adds 13 differential programs for list loops: failed
+literal patterns, exact and short lists, a non-list union member, unequal
+list lengths, and overflow stops after later matches. Compiler and optimizer
+sources remain at the starting revision. The conversion and Heap2Local
+changes already present need no further rounds for these kernel targets.
+
+The saved 96-statement product-inlining idea was also measured, with a
+read-only eligibility scan in place of the saved patch's body clone. It
+allowed a larger helper only when its returns directly named small products,
+and retained the suspension, recursion, caller-growth and global-growth
+limits. The scalar optimized module was byte-identical to the baseline
+(236330 bytes), with unchanged fuel and allocations in every kernel, so this
+heuristic change was also removed. Its patch and paired artifacts remain in
+`target/num4-deferred-inline.patch` and `target/num4-inline-paired/`.
+
+The final retained-tree pair at 18:31 HKT checked all six expected results
+again. Its scalar module is byte-identical to the starting module (236330
+bytes; SHA-256 `55f56af8f56aa75a25de875effce3d90c23eef837710dd2cbe670c05d23569fc`).
+The following timing differences between identical modules illustrate the
+loaded-machine and timer limits; the retained change claims no speedup.
+Raw samples and all five batch medians are in `target/num4-final/`.
+
+| Kernel | Before ns | Retained ns | Allocations, both | Fuel, both |
+|---|---:|---:|---:|---:|
+| fast sine | 3365 | 3345 | 39 | 6515 |
+| Horner | 20 | 21 | 2 | 1346 |
+| dot | 270 | 271 | 2 | 3228 |
+| integer | 381 | 371 | 2 | 6942 |
+| tuples | 21 | 21 | 2 | 1384 |
+| closures (fold) | 260 | 260 | 2 | 3516 |
+
+Targets still not met:
+
+- Fast sine: 3345 ns and 39 allocations against <=500 ns and <=8 allocations.
+  Its out-of-line record-returning helpers still need the work deferred by R5:
+  “Defer out-of-line multivalue aggregate workers and typed heap layouts.”
+
+The other five kernels meet their thresholds in the retained-tree pair. A quiet
+timing acceptance run, std check/build cost, and benchmark Wasm-size acceptance
+remain unverified; this loaded-machine run does not close those gates.
+
 ## Garbage collection
 
 Wasmtime 50 has three collectors:
