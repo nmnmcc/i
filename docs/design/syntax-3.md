@@ -2168,12 +2168,9 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
 
 #### 5.2.8 §4.8 Typing rules: changed rules
 
-4. **Functions.** Let the parameter group be the data pattern `q`. `q` is
-   fitted to a data type `P` (below). If `Γ` with the names of `q` gives
-   `body : A <- M` (with the names of the service pattern bound to their
-   annotated types), the function has the type `{ P } <- M' -> A`, where `M'` is
-   the merge of `M`, the service pattern's types, and `Assert` when `q` may
-   fail for `P` (§7.3) (§2.10.4). Making the function needs nothing.
+4. **Functions.** Use spec §4.8 rule 4, including its rules for a written
+   result and written type parameters. The whole parameter data uses the
+   notation of spec §4.6.
 5. **Calls.** If `f : {P} <- N -> A` and the argument data `d : D` with
    `D <: P`, then `f(d) : A <- N`.
    **5b. Provide.** `e <- s` as §2.10.4 "Provide".
