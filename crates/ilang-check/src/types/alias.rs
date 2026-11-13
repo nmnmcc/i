@@ -25,8 +25,11 @@ fn has_algebra(t: &Ty) -> bool {
     }
 }
 
+/// Labelled data (closed records, syntax-3 §2.3) is compared semantically in
+/// interfaces, as open records were.
 fn has_record(t: &Ty) -> bool {
     match t {
+        Ty::Con(super::Head::Shape(shape), _, _) if shape.has_labels() => true,
         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
         Ty::Fn(f) => has_record(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_record),
         Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),

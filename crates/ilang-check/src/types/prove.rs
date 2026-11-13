@@ -181,6 +181,10 @@ impl Prover<'_> {
             (Ty::Diff(a, _), _) => self.sub(a, r, mode),
             (_, Ty::Diff(a, hs)) => {
                 let h = l.head();
+                // A variable may have values of the removed members.
+                if h.is_none() {
+                    return Ok(false);
+                }
                 let excluded = hs.iter().any(|m| {
                     let mut ms = Vec::new();
                     flatten(m, true, &mut ms);

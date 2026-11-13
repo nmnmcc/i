@@ -2199,8 +2199,10 @@ mod value_type_interfaces {
     }
     #[test]
     fn open_alias_proofs_report_representation_without_claiming_a_counterexample() {
-        let old = interface("(T)\nT(A) = (..A, -x)");
-        let new = interface("(T)\nT(A) = (..A, -y)");
+        // syntax-3 stage 6: records are closed; the open form `(..A, -x)` is
+        // gone, and its closed-data counterpart is a difference of data.
+        let old = interface("(T)\nT(A) = A - (x: Int)");
+        let new = interface("(T)\nT(A) = A - (y: Int)");
         let same = Diff::new(&old, &old).unwrap();
         assert!(same.changed.is_empty());
         assert!(same.representation.is_empty());

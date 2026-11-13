@@ -67,10 +67,22 @@ impl SchemeArtifact {
     /// not captured by its displayed type alone.
     pub fn needs_semantic_comparison(&self) -> bool {
         let solver = self.catalog.solver.lock().expect("scheme snapshot");
-        let (vars, _, _) = scheme_roots(&solver, &self.scheme);
-        vars.iter().any(|v| {
-            solver.vars[v.0 as usize].difference || !solver.vars[v.0 as usize].handled.is_empty()
-        })
+        let (vars, _, roots) = scheme_roots(&solver, &self.scheme);
+        // Labelled data is compared semantically, as records were: its
+        // shown text puts labels in one order but unions and instantiation
+        // are decided by the prover.
+        let mut labelled = false;
+        for root in &roots {
+            map_types(root, &mut |t| {
+                labelled |= matches!(&t, Ty::Con(Head::Shape(shape), _, _) if shape.has_labels());
+                t
+            });
+        }
+        labelled
+            || vars.iter().any(|v| {
+                solver.vars[v.0 as usize].difference
+                    || !solver.vars[v.0 as usize].handled.is_empty()
+            })
     }
     pub fn text_with(&self, type_name: &mut impl FnMut(TypeRef) -> String) -> String {
         let external_ids = self.catalog.external_ids();
@@ -1059,6 +1071,13 @@ impl SchemeArtifact {
             right_solver.variance.insert(*id, vec![Variance::Co]);
             left_solver.comparison_wrappers.insert(*id);
             right_solver.comparison_wrappers.insert(*id);
+        }
+        // In a closed group, variables shared by several exports
+        // (external, not generalized) say which exports are correlated: a
+        // different number of them is a different interface.
+        let externals = |b: &Bundle| b.variables.iter().filter(|v| v.depth.is_none()).count();
+        if closed_environment && externals(&left_bundle) != externals(&right_bundle) {
+            return Ok(SchemeComparison::Different);
         }
         if left_bundle.variables.len() != right_bundle.variables.len() {
             return Ok(match cover() {
