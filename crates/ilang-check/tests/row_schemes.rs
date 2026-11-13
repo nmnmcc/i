@@ -6,27 +6,14 @@ fn stage_three_provider_diagnostics_match_landed_conversion() {
     // §9.2: a supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
     // Keep every diagnostic from landed tip cc26b8d9, including its source
-    // binding. This includes all fourteen records changed by named-provider
-    // revalidation, not merely the original three stage-three discrepancies.
-    // Pin total errors and E0515 counts independently of the saved messages.
+    // binding. Pin total errors and E0515 counts independently of the saved
+    // messages. The full fourteen-project guard is in CLI providers tests:
+    // two projects need their std dependency and test-macro expansion.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
     for (case, count, provider_count) in [
         ("review-k4/cases/provision_closure_False", 1, 1),
         ("review-k4d/_loose/p/x8", 2, 2),
         ("review-k4d/_loose/p/b1", 5, 5),
-        ("review-k4d/_loose/fuzz/e0505/21_4", 3, 2),
-        ("review-k4d/_loose/p/r6", 3, 3),
-        ("review-k4d/fuzz/m0", 2, 2),
-        ("review-k4d/fuzz/m21", 3, 2),
-        ("review-k4d/fuzz/m32", 9, 8),
-        ("review-k4d/fuzz/w2", 3, 2),
-        ("review-k4d/fuzz/w3", 2, 2),
-        ("review-k4d/fuzz/w4", 11, 4),
-        ("review-k4d/proj/b1", 5, 5),
-        ("review-k4d/proj/r6", 3, 3),
-        ("review-k4s/hidden_conflict_install", 4, 4),
-        ("review-k4s/mixed_install_12", 6, 5),
-        ("review-k4s/mixed_install_6", 7, 6),
     ] {
         let dir = root.join(case);
         let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
@@ -41,7 +28,10 @@ fn stage_three_provider_diagnostics_match_landed_conversion() {
             .collect();
         assert_eq!(expected.len(), count, "landed diagnostic count: {case}");
         assert_eq!(
-            expected.iter().filter(|line| line.contains("error[E0515]")).count(),
+            expected
+                .iter()
+                .filter(|line| line.contains("error[E0515]"))
+                .count(),
             provider_count,
             "landed provider diagnostic count: {case}"
         );

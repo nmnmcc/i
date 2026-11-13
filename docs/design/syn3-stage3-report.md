@@ -395,11 +395,31 @@ alongside the resolved-alias fix already carried by this lane. Independent
 data definitions remain independent; member absorption is not restored.
 
 Read the fourteen observation changes from landed `180e00cf7`. Main now
-records one, two, and five errors for the original three cases. The exact
-diagnostic regression now covers sixteen cases: those three and the other
-thirteen changed records. Each case independently pins its total errors
-and E0515 count, then compares every complete error message and location.
+records one, two, and five errors for the original three cases. The checker
+regression pins those three; a CLI provider regression checks all fourteen
+changed projects, including their real manifests and macro expansion.
+Together they cover sixteen distinct cases. Each independently pins its
+total errors and E0515 count, then compares every complete error message
+and location.
 The fourteen source programs and expected observations are verified
 byte-for-byte identical to the fetched tip. No observation is re-recorded.
 The workspace check and fresh gate matrix are in progress; the old READY
 claim is not reused for this integration.
+
+The workspace all-target check passes at merge checkpoint `b7d8c17a0`.
+The first row suite passes 31 tests; its expanded guard reaches a project
+that imports `std/test`, where the in-memory checker helper has no std
+dependency or macro expansion. It therefore reports E0209/E0234 rather
+than the project's expected provider errors. Move the fourteen-project
+guard to CLI providers tests, retaining every pin and complete diagnostic
+comparison; keep the original three-case checker guard. No expected error
+is changed to accommodate the missing test context. The fresh matrix is
+rerunning this focused coverage before its remaining gates.
+
+Focused verification now passes: all 32 row tests, including both sides'
+unchanged alias/named-helper regressions and the corrected 1/2/5 guard;
+the CLI guard checks all fourteen actual projects and matches every landed
+error message, location, total, and E0515 count. No stage-3 error deficit or
+different diagnostic remains among those projects. No additional checker
+implementation change is needed after importing main's revalidation fix.
+The remaining package/runtime/spec/corpus gates are still in progress.
