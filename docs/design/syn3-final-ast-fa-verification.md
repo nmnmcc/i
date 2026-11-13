@@ -207,3 +207,189 @@ Historical findings and repairs:
 The complete running notes, diagnostic-probe details, queued-command
 cancellation, and restoration checks are retained in
 `target/fa-night/verification.txt`. No active test from another lane was stopped.
+
+
+## Nov14 expanded step-three gate (2026-11-14T06:23:53.425280+08:00)
+
+The native resolver source at `3499484118bc3bca6b127547c9cdbecf7c72f801` completes the requested expanded gate.
+The merge/checkpoint commits preserve faD549, main68b720e9 and convdb743.
+Production resolution, queries, literals, editor analysis and expand read the
+native tree. The remaining old resolver/lowerer are compatibility oracles
+until step four. Native resolver fixes do not edit diagnostic goldens;
+upstream conversion snapshots retain their merge provenance.
+
+The final four-package Rust run reports 752 passed, 0 failed
+and 4 existing ignored tests; only the requested recovery test is
+filtered. All 39 CLI integration binaries plus the CLI library pass (one
+existing ignored benchmark). Both std optimization levels pass 2170/2170,
+including the unchanged schema.null_round assertion; macro examples pass13
+with one existing skip. Spec6 passes80, spec7 passes104, spec9 passes139 and
+spec15.7 passes28, at both optimization levels; existing pending entries
+are retained. The short generation model, Rust/source formatting and strict
+workspace clippy pass. The final Rust repeat includes all restored comment
+APIs and their tests.
+
+Every command below uses the shared wrapper, and commands ran serially.
+The initial resumed workspace check found a misplaced import before inner
+module docs (E0753); moving it after the docs fixed it. The first expanded
+clippy found one needless name borrow; the final-source strict rerun passes.
+Neither repair changes language behavior. Original main comment conversion
+APIs, two original deep tests and the old decoder negative are retained.
+
+- `resume-main-check`: exit 101.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
+```
+
+- `resume-main-check2`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
+```
+
+- `resume-alias-focused`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-check --test row_schemes --test resolve3_differential --locked --no-fail-fast -- --test-threads=2
+```
+
+- `step3-check`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
+```
+
+- `step3-fmt`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo fmt --all -- --check
+```
+
+- `step3-clippy`: exit 101.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings
+```
+
+- `step3-rust`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-lsp --features ilang-syntax/legacy --locked --no-fail-fast -- --skip spec_corpus_reverse_order_and_recovery --test-threads=2
+```
+
+- `restore-check`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
+```
+
+- `restore-syntax`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --features legacy --locked --no-fail-fast -- --test-threads=2
+```
+
+- `restore-fmt`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo fmt --all -- --check
+```
+
+- `restore-clippy`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings
+```
+
+- `step3-cli`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --lib --test big_int --test big_int_performance --test check --test cli_log --test collections --test commands --test compile_cache --test compile_time_tests --test determinism --test echo --test entries --test expansion_sites --test float_text --test fmt --test http --test lisp --test lsp --test macro_budget --test macro_run --test many_tests --test multicore --test native --test numeric_lowering --test package_commands --test providers --test r2_fixtures --test r2_performance --test r2_runtime --test spec_update --test syn3_fixtures --test syntax_runtime --test tls --test typed_macros --test udp --test unused --test value_type_performance --test value_types --test wasi --test wat_dump --locked --no-fail-fast -- --test-threads=2
+```
+
+- `step3-release`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --bin i --locked
+```
+
+- `step3-examples`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy ./target/release/i test --project examples/macro-tests --opt 0
+```
+
+- `step3-std0`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy ./target/release/i test --project std --opt 0
+```
+
+- `step3-std2`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy ./target/release/i test --project std --opt 2
+```
+
+- `step3-spec6`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 6/
+```
+
+- `step3-spec7`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 7/
+```
+
+- `step3-spec9`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 9/
+```
+
+- `step3-spec15.7`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 15.7/
+```
+
+- `step3-generation`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy scripts/test-generation --mode short --binary ./target/release/i
+```
+
+- `step3-source-fmt`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy ./target/release/i fmt --check lib std bench examples
+```
+
+- `step3-rust-final`: exit 0.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-lsp --features ilang-syntax/legacy --locked --no-fail-fast -- --skip spec_corpus_reverse_order_and_recovery --test-threads=2
+```
+
+Additional preparation verification (all pass):
+
+```sh
+PYTHONPYCACHEPREFIX=target/fa-r3/pycache python3 -m py_compile scripts/syn3-delete-*.py scripts/syn3-capture-engine.py
+python3 scripts/syn3-delete-old-tree.py
+git diff --cached --check
+```
+
+The driver dry run changes no production file. Python syntax checks were
+also repeated on the ignored preparation copies after each edit. A read-only
+`git merge-tree --write-tree HEAD refs/heads/lane/s12` preview identifies one
+append-only provider-test conflict; both sets of tests must be retained.
+The short generation report has32 attempts,12 model rejections,64 permutations,
+32 annotation removals,20 accepted cases and no failures. Permitted annotation
+outcomes remain report-only as classified by the model.
+
+The full workspace test run, unfiltered spec/corpus and dev-verify remain
+coordinator gates and were not run. Deletion is still unapplied and step four
+will be recorded separately.

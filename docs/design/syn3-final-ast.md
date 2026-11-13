@@ -273,7 +273,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2b datum builder; `needs_row` | done |
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
-| 3 resolver | IN VERIFICATION: native readers and convdb743; workspace/Rust/CLI39/std2170 at O0/O2/all four spec filters/fmt/clippy pass; generation/source-fmt/final Rust repeat pending |
+| 3 resolver | GREEN: expanded Nov14 gate completes on native source `3499484118`; all requested Rust/CLI/std/spec/generation/fmt/clippy checks pass |
 | 4 deletion | PREPARED ONLY: guarded fa2 driver and eight integration helpers committed; exact green step3 proof and matching five-case engine capture required before applying |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
@@ -775,3 +775,27 @@ step three has passed all runtime/spec checks so far; generation is queued
 since05:10:59 under the shared load guard, followed by source formatting and
 a final four-package Rust repeat. Neither step three nor deletion is claimed
 fully green yet.
+
+
+06:00 coordinator status (2026-11-14T06:00:19.817813+08:00): steps2c/2d remain green at the
+committed prefixbaf2e3b1. Native step3 at compiling checkpoint`3499484118`
+has passed workspace check, all package tests, all39 CLI integration binaries
+and lib, macro examples, std2170 at both O0/O2, spec6/7/9/15.7 at both levels,
+short generation, Rust/source fmt and strict clippy. A final four-package
+Rust repeat on the restored comment-API source is active in its strict
+resolver differential; deep and prepared-quote comparisons already pass.
+No unresolved failure is reported. The green3 commit waits for this final
+confirmation. Step4 remains prepared and unapplied.
+
+
+Nov14 expanded step-three gate completes at 2026-11-14T06:23:53.425280+08:00. Native source `3499484118bc3bca6b127547c9cdbecf7c72f801`
+passes the full coordinator matrix, including all CLI binaries, std2170 at
+O0/O2 (schema.null_round unchanged), filtered spec6/7/9/15.7, short generation,
+formatting and clippy. The final Rust rerun includes restored main comment
+APIs and tests. The strict resolver comparison covers677 original files and
+519 programs with complete HIR/diagnostic equality, including later grouping
+and selection forms. Provider fusion is decided after alias/import expansion,
+and the closed-function generalization boundary is retained. Step four is
+still unapplied; the detailed command/result record is in
+`syn3-final-ast-fa-verification.md`. The historical fa2 null-round failure
+does not reproduce; no guessed backend fix or expectation change is made.
