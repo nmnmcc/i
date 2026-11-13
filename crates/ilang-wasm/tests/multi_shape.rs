@@ -448,6 +448,7 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
         suspends_h,
         body,
         body5,
+        catch_body,
     ];
     p.globals = 9;
     p.start = Some(start);
