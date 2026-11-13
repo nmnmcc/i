@@ -3960,16 +3960,9 @@ scope_call: <A, E, N>(
 	own |>
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (Scheduler(..)) {
-			owner = { retain(request.open_owner()) <- (own.root) }
+			// Keep the opener's services across scheduler suspension.
 			kept = control.keep((_: Nil) {
-				resource.ensure(
-					() {
-						retain(scope_call_body(body, witness, mode, own)) <- (
-							owner,
-						)
-					},
-					() { request.close_owner(owner) },
-				)
+				retain(scope_call_body(body, witness, mode, own))
 			})
 			retain(kept(Nil))
 		}
