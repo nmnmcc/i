@@ -12,6 +12,9 @@ use crate::lisp::{Datum, DatumKind as K, show};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 
+/// Readers of one datum by the positions of `i/syntax` (§6.7).
+pub mod position;
+
 // ---- The tree as Lisp datums ----
 //
 // One builder serves the Lisp printer (`to_lisp` is `show` of each datum),
@@ -614,7 +617,7 @@ fn pattern(p: &Pattern) -> Datum {
         }
     };
     match &p.kind {
-        PatternKind::Quote(d) => (*d.0).clone(),
+        PatternKind::Quote(q) => (*q.datum.0).clone(),
         PatternKind::Var(s) | PatternKind::Discard(s) => atom(s, span),
         PatternKind::Typed { binder: b, ty } => {
             form_in(":", gap(b.span.0, ty.span.0), span, [binder(b), typ(ty)])
@@ -1566,7 +1569,9 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
             name: upper(d)?,
             args: None,
         },
-        K::Quote(_) => PatternKind::Quote(Quoted(Box::new(d.clone()))),
+        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the
+        // quote in the rows before syntax three.
+        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),
         K::Square(parts) => {
             let mut items = Vec::new();
             let mut rest = None;

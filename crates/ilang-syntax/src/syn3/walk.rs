@@ -163,8 +163,12 @@ pub fn expr(e: &mut Expr, v: &mut impl Visitor) {
 pub fn pattern(p: &mut Pattern, v: &mut impl Visitor) {
     v.pattern(p, true);
     match &mut p.kind {
-        PatternKind::Quote(_)
-        | PatternKind::Var(_)
+        PatternKind::Quote(q) => {
+            for (_, capture) in &mut q.captures {
+                pattern(capture, v);
+            }
+        }
+        PatternKind::Var(_)
         | PatternKind::Discard(_)
         | PatternKind::Int { .. }
         | PatternKind::Float { .. }

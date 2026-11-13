@@ -28,7 +28,7 @@ pub fn regroup(module: &mut Module) {
     }
 }
 
-fn group_items(items: &mut [DItem]) {
+pub(crate) fn group_items(items: &mut [DItem]) {
     for item in items {
         match item {
             DItem::Pos(e) | DItem::Label(_, e) | DItem::Spread(e) => group_expr(e),
@@ -36,7 +36,7 @@ fn group_items(items: &mut [DItem]) {
     }
 }
 
-fn group_block(b: &mut Block) {
+pub(crate) fn group_block(b: &mut Block) {
     for s in &mut b.stmts {
         match s {
             Stmt::Bind(b) => {
@@ -48,13 +48,13 @@ fn group_block(b: &mut Block) {
     }
 }
 
-fn group_format(f: &mut Option<Format>) {
+pub(crate) fn group_format(f: &mut Option<Format>) {
     if let Some(arg) = f.as_mut().and_then(|f| f.arg.as_mut()) {
         group_expr(arg);
     }
 }
 
-fn group_pattern(p: &mut Pattern) {
+pub(crate) fn group_pattern(p: &mut Pattern) {
     match &mut p.kind {
         PatternKind::Ctor {
             args: Some(items), ..
@@ -98,7 +98,7 @@ fn at_least(e: &mut Expr, min: i8) {
     }
 }
 
-fn group_expr(e: &mut Expr) {
+pub(crate) fn group_expr(e: &mut Expr) {
     use super::print::{LOWEST, PIPE, POSTFIX};
     match &mut e.kind {
         ExprKind::Quote(_)

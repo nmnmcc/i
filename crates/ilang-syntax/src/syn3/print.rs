@@ -23,6 +23,9 @@ use crate::print::string_literal;
 use crate::span::Span;
 use crate::token::TokenKind as T;
 
+/// Printers of one part of a tree by the positions of `i/syntax` (§6.7).
+pub(crate) mod position;
+
 pub const WIDTH: usize = 80;
 pub const TAB_WIDTH: usize = 4;
 
@@ -1090,7 +1093,7 @@ impl Printer<'_> {
 
     fn pattern(&mut self, p: &Pattern) -> Doc {
         match &p.kind {
-            PatternKind::Quote(d) => t(crate::lisp::show(&d.0)),
+            PatternKind::Quote(q) => t(crate::lisp::show(&q.datum.0)),
             PatternKind::Var(s) | PatternKind::Discard(s) => t(s.clone()),
             PatternKind::Typed { binder, ty } => {
                 cat(vec![t(format!("{}: ", binder.name)), self.ty(ty, 0)])

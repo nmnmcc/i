@@ -214,7 +214,8 @@ pub(in crate::resolve) enum ChainKind {
 }
 
 pub(in crate::resolve) fn chain_kind(fs: &[n::Function]) -> ChainKind {
-    let plain = |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
+    let plain =
+        |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
     if let [f] = fs
         && plain(f)
     {
@@ -345,11 +346,7 @@ pub(in crate::resolve) fn and_plan<'t>(
             None => Inner::Pat(discard.take().expect("a conjunction has a part")),
         },
     };
-    AndPlan {
-        names,
-        inner,
-        span,
-    }
+    AndPlan { names, inner, span }
 }
 
 /// `key = pattern` in a constructor pattern. `fresh` is the name for
@@ -853,7 +850,7 @@ impl Cx {
             n::PatternKind::Quote(q) => {
                 // 2c: the quote rows are still the rows before syntax three.
                 if let Err(d) = ilang_syntax::lisp::parse_pattern(
-                    &ilang_syntax::syn3::lisp::unconvert_quote(&q.0),
+                    &ilang_syntax::syn3::lisp::unconvert_quote(&q.datum.0),
                 ) {
                     self.out.errors.push(d);
                 }

@@ -143,6 +143,9 @@ impl<'a> BodyEngine<'a> {
             })
             .collect()
     }
+    pub(crate) fn hygiene_locals(&self, locals: &[Local], depth: u32) -> Vec<hygiene::Binding<()>> {
+        self.locals(locals, depth)
+    }
     pub(crate) fn resolve(
         &self,
         module: Option<&Ident>,

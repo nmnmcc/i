@@ -119,27 +119,12 @@ fn text(value: &Value) -> Result<&str> {
 fn result(value: std::result::Result<Syntax, ilang_syntax::lisp::syntax::SyntaxError>) -> Value {
     opaque(SyntaxResult(value.map_err(|e| e.message)))
 }
+/// The position of a number of `position_id` (`lib/i/syntax.i`).
 fn position(n: usize) -> Result<Position> {
-    Ok(match n {
-        0 => Position::ImportItem,
-        1 => Position::ExportItem,
-        2 => Position::Item,
-        3 => Position::Attribute,
-        4 => Position::Constructor,
-        5 => Position::Field,
-        6 => Position::Type,
-        7 => Position::FunctionResult,
-        8 => Position::Parameter,
-        9 => Position::Expression,
-        10 => Position::Statement,
-        11 => Position::CallArgument,
-        12 => Position::Clause,
-        13 => Position::ClauseHead,
-        14 => Position::Pattern,
-        15 => Position::Segment,
-        16 => Position::Format,
-        _ => bail!("syntax service received an invalid position"),
-    })
+    match Position::from_id(n) {
+        Some(position) => Ok(position),
+        None => bail!("syntax service received an invalid position"),
+    }
 }
 fn child(syntax: &Syntax, index: usize) -> Result<&Syntax> {
     match syntax.node() {
@@ -1079,7 +1064,15 @@ mod tests {
 
     #[test]
     fn show_as_reports_the_offending_nested_syntax() {
-        let parsed = parse("(f (,))").unwrap();
+        // The empty data `(,)` is not an expression of the rows before
+        // syntax three; in the rows of syntax three it is one, and the empty
+        // Round is not.
+        let (source, offending) = if ilang_syntax::lisp::syntax::ROWS3 {
+            ("(f ())", "()")
+        } else {
+            ("(f (,))", "(,)")
+        };
+        let parsed = parse(source).unwrap();
         let syntax = Syntax::from_datum(
             &parsed[0],
             &Scope {
@@ -1087,13 +1080,44 @@ mod tests {
                 marks: BTreeSet::new(),
             },
         );
-        let result = invoke("show_as", &[opaque(syntax), Value::Int(9.into())]).unwrap();
+        let expression = Value::Int(Position::Expression.id().into());
+        let result = invoke("show_as", &[opaque(syntax), expression]).unwrap();
         assert!(matches!(
             invoke("text_ok", std::slice::from_ref(&result)).unwrap(),
             Value::Bool(false)
         ));
         let at = invoke("text_error_at", &[result]).unwrap();
-        assert!(matches!(invoke("show", &[at]).unwrap(), Value::String(s) if s == "(,)"));
+        assert!(matches!(invoke("show", &[at]).unwrap(), Value::String(s) if s == offending));
+    }
+    #[test]
+    fn show_as_takes_the_numbers_of_the_positions_of_syntax_three() {
+        let parsed = parse("(f x)").unwrap();
+        let syntax = Syntax::from_datum(
+            &parsed[0],
+            &Scope {
+                module: 0,
+                marks: BTreeSet::new(),
+            },
+        );
+        // These read `(f x)` alike in the rows before and of syntax three.
+        for (id, position, expected) in [
+            (4, Position::Type, "f(x)"),
+            (5, Position::TypeItem, "f(x)"),
+            (7, Position::Expression, "f(x)"),
+            (8, Position::ValueItem, "f(x)"),
+            (9, Position::Statement, "f(x)"),
+        ] {
+            assert_eq!(position.id(), id);
+            let result =
+                invoke("show_as", &[opaque(syntax.clone()), Value::Int(id.into())]).unwrap();
+            assert!(matches!(
+                invoke("text_ok", std::slice::from_ref(&result)).unwrap(),
+                Value::Bool(true)
+            ));
+            let text = invoke("text_value", &[result]).unwrap();
+            assert!(matches!(text, Value::String(s) if s == expected));
+        }
+        assert!(invoke("show_as", &[opaque(syntax), Value::Int(14.into())]).is_err());
     }
     #[test]
     fn lisp_datum_cost_matches_constructed_syntax_cost() {

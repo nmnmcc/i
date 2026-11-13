@@ -180,6 +180,10 @@ struct Totals {
 }
 
 fn compare(name: &str, dir: &Path, totals: &mut Totals) {
+    compare_inner(name, dir, totals, false);
+}
+
+fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bool) {
     let options = LoadOptions {
         tests: true,
         ..LoadOptions::from_env()
@@ -189,20 +193,39 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
     let mut direct = Vec::new();
     let mut modules = Vec::new();
     let mut expected = Vec::new();
+    let mut old_templates = Vec::new();
+    let mut new_templates = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
             let source = graph.sources.get(m.source);
             let lisp = source.display.ends_with(".is");
-            let (module, _) = if lisp {
+            let (mut module, _) = if lisp {
                 syn3::lisp::from_lisp(&source.text)
             } else {
                 syn3::parse_module(&source.text)
             };
-            let (ast, errors) = if lisp {
+            let (mut ast, errors) = if lisp {
                 syn3::lower::lower_lisp(&module)
             } else {
                 syn3::lower::lower(&module)
             };
+            if prepare_quotes {
+                assert!(
+                    errors.is_empty(),
+                    "quote fixture lowering errors: {errors:?}"
+                );
+                ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+                    &mut ast,
+                    m.source.0,
+                    &mut old_templates,
+                );
+                let errors = ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+                    &mut module,
+                    m.source.0,
+                    &mut new_templates,
+                );
+                assert!(errors.is_empty(), "native quote preparation: {errors:?}");
+            }
             expected.extend(
                 errors
                     .into_iter()
@@ -222,6 +245,10 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
             direct.push(parsed(Default::default()));
             modules.push(module);
         }
+    }
+    if prepare_quotes {
+        assert!(!old_templates.is_empty());
+        assert_eq!(old_templates.len(), new_templates.len());
     }
     let (old_program, old_diags) = resolve::resolve(&graph, &lowered);
     totals.lowering += expected.len();
@@ -523,6 +550,36 @@ const EXTRA_LISP: &[&str] = &[
 (@ macro (= bad_pattern (-> (, (, a b)) _ a)))
 "#,
 ];
+
+/// Prepared quote templates and captures live on the native tree. Compare
+/// with preparing the lowered tree, including nested and shared captures,
+/// guards, and expression quotes with unquotes and splices.
+#[test]
+fn resolve3_prepared_quotes() {
+    let source = r#"
+(, (= syntax (/ i syntax)))
+(= capture (-> (, `(f ~item)) _ item))
+(= rest (-> (, `(f ~..[first ..rest])) _ first))
+(= nested (-> (, `(f ~`(g ~item))) _ item))
+(= typed (-> (, `(f ~(: item (. syntax Syntax)))) _ item))
+(= both (-> (, `(f ~(= a b))) _ (, a b)))
+(= tuple (-> (, `(f ~(, a b))) _ (, a b)))
+(= choose (-> (, x) _
+  (|> x (| (-> (? (, `(f ~item)) False) _ item)
+             (-> (, (| `(g ~item) `(h ~item))) _ item)
+             (-> (, _) _ x)))))
+(= build (-> (, input rest) _ `(f ~input ~..rest)))
+"#;
+    let (_, errors) = syn3::lisp::from_lisp(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"quotes\"\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::write(dir.path().join("src/main.is"), source).unwrap();
+    let mut totals = Totals::default();
+    compare_inner("prepared quotes", dir.path(), &mut totals, true);
+    assert!(totals.differ.is_empty(), "{:#?}", totals.reports);
+}
 
 /// A tree deeper than a normal stack is resolved (the resolver runs in
 /// `syn3::deep::deep`).

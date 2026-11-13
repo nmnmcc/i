@@ -67,11 +67,9 @@ fn resolve_here(
     let pre = pres(graph, parsed, modules);
     let mut diags = Vec::new();
     for (p, pre) in parsed.iter().zip(&pre) {
-        diags.extend(
-            pre.errors.iter().map(|d| {
-                Diagnostic::error(d.code.as_str(), Some(p.source), d.span, d.message.clone())
-            }),
-        );
+        diags.extend(pre.errors.iter().map(|d| {
+            Diagnostic::error(d.code.as_str(), Some(p.source), d.span, d.message.clone())
+        }));
     }
     let mut r = R3 {
         r: Resolver {
@@ -385,11 +383,12 @@ struct VFn<'x> {
 }
 
 /// The pattern that a quote pattern is in the rows before syntax three.
-/// 2c: when the rows flip, this reads the datum with
-/// `syn3::lisp::pattern_from_datum` and the result is resolved as any other
-/// pattern of the new tree.
-fn quote_pattern(q: &n::Quoted, span: Span) -> Option<o::Pattern> {
-    let old = ilang_syntax::lisp::parse_pattern(&ilang_syntax::syn3::lisp::unconvert_quote(&q.0));
+/// This compatibility reader is used only before a compiler program has
+/// prepared the quote, while the shared Lisp row switches are off. Prepared
+/// quotes carry their native captures and template slot in the new tree.
+fn quote_pattern(q: &n::QuotePattern, span: Span) -> Option<o::Pattern> {
+    let old =
+        ilang_syntax::lisp::parse_pattern(&ilang_syntax::syn3::lisp::unconvert_quote(&q.datum.0));
     old.ok().map(|p| o::Pattern {
         kind: p.kind.clone(),
         span,
@@ -501,10 +500,7 @@ fn definitions(
         }
         let attr = attributes[0];
         if !pre.lisp {
-            errors.push((
-                attr.span.0,
-                "a syntax macro must be defined in a .is file",
-            ));
+            errors.push((attr.span.0, "a syntax macro must be defined in a .is file"));
             continue;
         }
         if attributes.len() != 1 || attr.args.is_some() {
@@ -734,7 +730,8 @@ impl<'a, 't> R3<'a, 't> {
             .map(|(name, _)| name)
             .collect();
         for (index, item) in self.live(m) {
-            let typed_declaration = matches!(&item.kind, n::ItemKind::Decl { name, .. } if typed.contains(&name.name));
+            let typed_declaration =
+                matches!(&item.kind, n::ItemKind::Decl { name, .. } if typed.contains(&name.name));
             if item.attributes.iter().any(is_macro) && !typed_declaration {
                 let mut remaining: Vec<&n::Attribute> =
                     item.attributes.iter().filter(|a| !is_macro(a)).collect();
@@ -747,8 +744,9 @@ impl<'a, 't> R3<'a, 't> {
                         );
                     }
                 }
-                remaining
-                    .retain(|attribute| attribute.module.is_some() || attribute.name.name != "main");
+                remaining.retain(|attribute| {
+                    attribute.module.is_some() || attribute.name.name != "main"
+                });
                 self.attributes(item, &remaining);
                 if let n::ItemKind::Bind(binding) = &item.kind {
                     let mut names = Vec::new();
@@ -838,7 +836,13 @@ impl<'a, 't> R3<'a, 't> {
                                 Ok(ctors.iter().map(|c| id(c.name)).collect())
                             }
                         };
-                        Slot::Type(self.collect_type(m, &id(&def.name), &shape.params, body, &attrs))
+                        Slot::Type(self.collect_type(
+                            m,
+                            &id(&def.name),
+                            &shape.params,
+                            body,
+                            &attrs,
+                        ))
                     }
                 }
                 n::ItemKind::Bind(b) => {
@@ -2212,9 +2216,7 @@ impl<'a, 't> R3<'a, 't> {
                 // `C(..base, f: e)`: a record update.
                 Some((n::DItem::Spread(base), rest)) => {
                     let ctor = match &callee.kind {
-                        E::Name { module, name } => {
-                            self.r.ctor(opt_id(module).as_ref(), &id(name))
-                        }
+                        E::Name { module, name } => self.r.ctor(opt_id(module).as_ref(), &id(name)),
                         _ => {
                             self.error(
                                 code::NOT_A_CONSTRUCTOR,
@@ -2279,15 +2281,13 @@ impl<'a, 't> R3<'a, 't> {
             }
             E::Field { target, name } => {
                 let module = match &target.kind {
-                    E::Name { module: None, name } => {
-                        match self.find(&name.name, name.span.0) {
-                            Some(Found::Entry(Entry::Module(t))) => {
-                                Some(Some((t, self.compiler_reference(&id(name)))))
-                            }
-                            Some(Found::Entry(Entry::Broken)) => Some(None),
-                            _ => None,
+                    E::Name { module: None, name } => match self.find(&name.name, name.span.0) {
+                        Some(Found::Entry(Entry::Module(t))) => {
+                            Some(Some((t, self.compiler_reference(&id(name)))))
                         }
-                    }
+                        Some(Found::Entry(Entry::Broken)) => Some(None),
+                        _ => None,
+                    },
                     _ => None,
                 };
                 match module {
@@ -2447,9 +2447,7 @@ impl<'a, 't> R3<'a, 't> {
                     })
                     .collect();
             }
-            rows.into_iter()
-                .map(|row| VPat::Tuple(row, span))
-                .collect()
+            rows.into_iter().map(|row| VPat::Tuple(row, span)).collect()
         };
         VClause {
             patterns,
@@ -2848,6 +2846,11 @@ impl<'a, 't> R3<'a, 't> {
     fn binders(&self, p: &n::Pattern, out: &mut Vec<(String, Span)>) {
         use n::PatternKind as P;
         match &p.kind {
+            P::Quote(q) if q.template.is_some() => {
+                for (_, capture) in &q.captures {
+                    self.binders(capture, out);
+                }
+            }
             P::Quote(q) => {
                 if let Some(old) = quote_pattern(q, p.span.0) {
                     ast_binders(&old, out);
@@ -2911,7 +2914,6 @@ impl<'a, 't> R3<'a, 't> {
         fn of(p: &n::Pattern) -> Option<String> {
             use n::PatternKind as P;
             match &p.kind {
-                P::Quote(q) => quote_pattern(q, p.span.0).and_then(|old| label_of(&old)),
                 P::Var(n) => Some(n.clone()),
                 P::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
                 P::And(parts) => {
@@ -3008,9 +3010,7 @@ impl<'a, 't> R3<'a, 't> {
                 Inner::Typed { label, .. } => label.name == *name,
                 Inner::Pat(p) => match &p.kind {
                     n::PatternKind::Var(inner) => inner == name,
-                    n::PatternKind::Typed { binder, .. } => {
-                        !binder.discard && binder.name == *name
-                    }
+                    n::PatternKind::Typed { binder, .. } => !binder.discard && binder.name == *name,
                     _ => false,
                 },
             },
@@ -3035,7 +3035,16 @@ impl<'a, 't> R3<'a, 't> {
         use n::PatternKind as P;
         let span = p.span.0;
         let kind = match &p.kind {
-            // 2c: see `quote_pattern`.
+            P::Quote(q) if q.template.is_some() => {
+                let captures = q
+                    .captures
+                    .iter()
+                    .map(|(many, p)| (*many, self.pattern(p, binders, shared)))
+                    .collect();
+                self.r.resolved_quote(q.template, captures, span)
+            }
+            // Before preparation, preserve the current reader's diagnostics
+            // and captures until the shared Lisp rows flip.
             P::Quote(q) => match quote_pattern(q, span) {
                 Some(old) => return self.r.pattern(&old, binders, shared),
                 None => PatternKind::Discard,
@@ -3066,8 +3075,7 @@ impl<'a, 't> R3<'a, 't> {
             } => PatternKind::Prefix {
                 prefix: prefix.clone(),
                 suffix: suffix.clone(),
-                rest: (!rest.discard)
-                    .then(|| self.bind(&rest.name, rest.span.0, binders, shared)),
+                rest: (!rest.discard).then(|| self.bind(&rest.name, rest.span.0, binders, shared)),
             },
             P::Ctor { module, name, args } => {
                 let ctor = self.r.ctor(opt_id(module).as_ref(), &id(name));
@@ -3080,16 +3088,6 @@ impl<'a, 't> R3<'a, 't> {
                                 let plan = and_plan(inner, None, a.span.0);
                                 self.ctor_part(&plan, binders, shared)
                             }
-                            P::Quote(q) => match quote_pattern(q, a.span.0) {
-                                Some(old) => match same_name_part(&old) {
-                                    Some(inner) => Pattern {
-                                        span: old.span,
-                                        ..self.r.pattern(inner, binders, shared)
-                                    },
-                                    None => self.r.pattern(&old, binders, shared),
-                                },
-                                None => self.pattern(a, binders, shared),
-                            },
                             _ => self.pattern(a, binders, shared),
                         }),
                         n::DPItem::Key(l, a) => {
