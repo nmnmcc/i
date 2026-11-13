@@ -2685,9 +2685,6 @@
   "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-check/tests/query.rs:924116554a35a736": {
-    "not_source": "Expected hover text: a shown function type with two row variables, not i source"
-  },
   "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
     "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (§2.8, §3.2), before checker errors.",
     "diagnostics": [
