@@ -836,17 +836,30 @@ impl std::hash::Hasher for Sha256Hasher {
 }
 
 #[cfg(feature = "compiler")]
-/// The identity of this executable (path, size, modification time), part of
-/// every cache key so that a rebuilt compiler never reads code that an older
-/// one stored.
-fn executable_identity() -> &'static str {
-    static IDENTITY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    IDENTITY.get_or_init(|| {
-        let executable = std::env::current_exe()
-            .and_then(|path| Ok((std::fs::metadata(&path)?, path)))
-            .map(|(meta, path)| (path, meta.len(), meta.modified().ok()));
-        format!("{executable:?}")
-    })
+/// Hash the running executable once per process. If it cannot be read,
+/// compiled-code caching is disabled instead of using an ambiguous key.
+fn executable_identity() -> Option<&'static str> {
+    static IDENTITY: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    IDENTITY
+        .get_or_init(|| {
+            use sha2::Digest;
+            let path = if cfg!(target_os = "linux") {
+                std::path::PathBuf::from("/proc/self/exe")
+            } else {
+                std::env::current_exe().ok()?
+            };
+            let mut file = std::fs::File::open(path).ok()?;
+            let mut hasher = sha2::Sha256::new();
+            std::io::copy(&mut file, &mut hasher).ok()?;
+            Some(
+                hasher
+                    .finalize()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect(),
+            )
+        })
+        .as_deref()
 }
 
 #[cfg(feature = "compiler")]
@@ -877,7 +890,9 @@ fn compile_cache_key(engine: &Engine, bytes: &[u8]) -> String {
     let settings = hasher.0.finalize();
     hex_digest(&[
         b"module",
-        executable_identity().as_bytes(),
+        executable_identity()
+            .expect("cache requires executable identity")
+            .as_bytes(),
         &settings,
         bytes,
     ])
@@ -904,15 +919,34 @@ impl wasmtime::CacheStore for FunctionCache {
 #[cfg(feature = "compiler")]
 impl FunctionCache {
     fn key(key: &[u8]) -> String {
-        hex_digest(&[b"function", executable_identity().as_bytes(), key])
+        hex_digest(&[
+            b"function",
+            executable_identity()
+                .expect("cache requires executable identity")
+                .as_bytes(),
+            key,
+        ])
     }
+}
+
+#[cfg(feature = "compiler")]
+/// The largest Wasm module whose whole compiled form is cached:
+/// `I_CACHE_MODULE_MAX_SIZE` (bytes, or with a K/M/G suffix); no limit by
+/// default. A larger module still reuses its per-function entries.
+fn module_cache_limit() -> u64 {
+    std::env::var("I_CACHE_MODULE_MAX_SIZE")
+        .ok()
+        .and_then(|v| store::parse_size(&v))
+        .unwrap_or(u64::MAX)
 }
 
 #[cfg(feature = "compiler")]
 /// Compiles `bytes`, reusing machine code that an earlier process compiled
 /// from the same bytes with the same engine settings and executable.
 fn compiled_module(engine: &Engine, bytes: &[u8]) -> Result<Module> {
-    let Some(store) = compile_store() else {
+    let Some(store) = compile_store()
+        .filter(|_| executable_identity().is_some() && bytes.len() as u64 <= module_cache_limit())
+    else {
         return Ok(Module::new(engine, bytes)?);
     };
     let key = compile_cache_key(engine, bytes);
@@ -1101,7 +1135,7 @@ impl Program {
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-        if let Some(store) = compile_store() {
+        if let Some(store) = compile_store().filter(|_| executable_identity().is_some()) {
             config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(store)))?;
         }
         let engine = Engine::new(&config)?;
