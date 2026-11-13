@@ -94,7 +94,10 @@ fn show_as_reports_the_offending_part() {
 #[test]
 fn show_as_groups_a_binary_operand_under_negation() {
     assert_eq!(shown("(- (+ x y))", Position::Expression), "-{ x + y }");
-    assert_eq!(shown("(* (+ x y) z)", Position::Expression), "{ x + y } * z");
+    assert_eq!(
+        shown("(* (+ x y) z)", Position::Expression),
+        "{ x + y } * z"
+    );
     assert_eq!(shown("((|> a f) x)", Position::Expression), "{ a |> f }(x)");
     assert_eq!(shown("(. 1 f)", Position::Expression), "{ 1 }.f");
 }
@@ -137,12 +140,22 @@ fn show_as_deep_trees_use_bounded_host_stack() {
             let expected = format!("{}x{}", "T(".repeat(10000), ")".repeat(10000));
             assert_eq!(tree.show_as_rows3(Position::Type).unwrap(), expected);
             assert_eq!(tree.show_as_rows3(Position::Pattern).unwrap(), expected);
-            assert_eq!(tree.show_as_rows3(Position::Expression).unwrap(), expected);
-            assert_eq!(tree.show_as_rows3(Position::ValueItem).unwrap(), expected);
-            assert_eq!(tree.show_as_rows3(Position::Statement).unwrap(), expected);
+            // Lists, as an expression, an item of data, a statement and the
+            // value of an item. (A nested call costs the printer the square
+            // of its depth, `call_depth` at every level, so calls are not
+            // the deep case here.)
+            let mut list = like.clone();
+            for _ in 0..10000 {
+                list = Syntax::make(Node::Square(vec![list]), &like).unwrap();
+            }
+            let expected = format!("{}x{}", "[".repeat(10000), "]".repeat(10000));
+            assert_eq!(list.show_as_rows3(Position::Expression).unwrap(), expected);
+            assert_eq!(list.show_as_rows3(Position::ValueItem).unwrap(), expected);
+            assert_eq!(list.show_as_rows3(Position::Statement).unwrap(), expected);
+            assert_eq!(list.show_as_rows3(Position::Pattern).unwrap(), expected);
             let value = Syntax::make(Node::Name("value".into()), &like).unwrap();
             let eq = Syntax::make(Node::Symbol("=".into()), &like).unwrap();
-            let item = Syntax::make(Node::Round(vec![eq, value, tree.clone()]), &like).unwrap();
+            let item = Syntax::make(Node::Round(vec![eq, value, list]), &like).unwrap();
             assert_eq!(
                 item.show_as_rows3(Position::Item).unwrap(),
                 format!("value = {expected}")
@@ -287,7 +300,11 @@ fn show_as_writes_every_row_in_its_position() {
         // Files and items.
         (ImportItem, "(/ std list)", "std/list"),
         (ImportItem, "(= l (/ std list))", "l = std/list"),
-        (ImportItem, "(= (, Map get) (/ std map))", "(Map, get) = std/map"),
+        (
+            ImportItem,
+            "(= (, Map get) (/ std map))",
+            "(Map, get) = std/map",
+        ),
         (
             ImportItem,
             "(= m (, Map get) (/ std map))",
@@ -307,7 +324,11 @@ fn show_as_writes_every_row_in_its_position() {
         (Item, "(= T (| C1 C2))", "T = C1 | C2"),
         (Item, "(: f (-> (, Int) Int))", "f: (Int) -> Int"),
         (Item, "(= x 1)", "x = 1"),
-        (Item, "(test \"name\" (-> (,) _ Nil))", "test(\"name\", () { Nil })"),
+        (
+            Item,
+            "(test \"name\" (-> (,) _ Nil))",
+            "test(\"name\", () { Nil })",
+        ),
         (Item, "((. t test) \"name\")", "t.test(\"name\")"),
         (Item, "{ (= x 1) (= y 2) }", "x = 1\ny = 2"),
         (
@@ -346,9 +367,17 @@ fn show_as_writes_every_row_in_its_position() {
         (Type, "(- A B)", "A - B"),
         (Type, "(-> (, T1 (= x T2)) R)", "(T1, x = T2) -> R"),
         (Type, "(-> (,) R)", "() -> R"),
-        (Type, "(-> (, T) (<- R (, Db Log)))", "(T) <- (Db, Log) -> R"),
+        (
+            Type,
+            "(-> (, T) (<- R (, Db Log)))",
+            "(T) <- (Db, Log) -> R",
+        ),
         (Type, "(-> (, T) (<- R N))", "(T) <- N -> R"),
-        (Type, "(-> (, T) (<- R (, .. N Db)))", "(T) <- (..N, Db) -> R"),
+        (
+            Type,
+            "(-> (, T) (<- R (, .. N Db)))",
+            "(T) <- (..N, Db) -> R",
+        ),
         (Type, "(-> [A] (, A) A)", "<A>(A) -> A"),
         (Type, "(-> [A N] (, A) (<- A N))", "<A, N>(A) <- N -> A"),
         (Type, "(-> (| (, T) (, T T)) R)", "{ (T) | (T, T) } -> R"),
@@ -430,7 +459,11 @@ fn show_as_writes_every_row_in_its_position() {
         (Expression, "(. m C)", "m.C"),
         (Expression, "(. pair 0)", "pair.0"),
         (Expression, "[a b .. rest]", "[a, b, ..rest]"),
-        (Expression, "<<1 (: x (size 8)) (: y utf8)>>", "<<1, x:size(8), y:utf8>>"),
+        (
+            Expression,
+            "<<1 (: x (size 8)) (: y utf8)>>",
+            "<<1, x:size(8), y:utf8>>",
+        ),
         (Expression, "(<> \"a\" b)", "\"a\" <> b"),
         (Expression, "(&& a (|| b c))", "a && { b || c }"),
         (Expression, "(-. x)", "-.x"),
@@ -472,7 +505,11 @@ fn show_as_writes_every_row_in_its_position() {
         (Pattern, "(? (,) ready)", "(? ready)"),
         (PatternItem, "p", "p"),
         (PatternItem, "(= key p)", "key = p"),
-        (PatternItem, "(= size whole (, w h))", "size = whole = (w, h)"),
+        (
+            PatternItem,
+            "(= size whole (, w h))",
+            "size = whole = (w, h)",
+        ),
         (PatternItem, "(= (, a b) args)", "(a, b) = args"),
         (PatternItem, "..", ".."),
         (PatternItem, "(| p1 p2)", "p1 | p2"),
@@ -564,7 +601,12 @@ fn quotes_and_expansion_checks_work_on_the_rows_of_syntax_three() {
     let old = root("`(-> (~..params) ~result ~body)");
     let captures = old.match_quote(&value).unwrap().unwrap();
     assert!(matches!(&captures[0].value, Substitution::Many(items) if items.len() == 3));
-    assert!(root("`(-> () _ ~body)").match_quote(&root("(-> (,) _ x)")).unwrap().is_none());
+    assert!(
+        root("`(-> () _ ~body)")
+            .match_quote(&root("(-> (,) _ x)"))
+            .unwrap()
+            .is_none()
+    );
     assert!(root("`(-> (, ~..ps x) _ ~b)").match_quote(&value).is_err());
 
     let argument = root("(@ (external \"env\" \"f\") (: f (-> (, Int) Int)))");

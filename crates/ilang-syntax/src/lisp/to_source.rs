@@ -126,10 +126,7 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
         ExportItem => Ok(print::export(&read::export_item(d)?)),
         Item => {
             let items = match &d.kind {
-                K::Curly(xs) => xs
-                    .iter()
-                    .map(read::item)
-                    .collect::<Result<Vec<_>>>()?,
+                K::Curly(xs) => xs.iter().map(read::item).collect::<Result<Vec<_>>>()?,
                 _ => vec![read::item(d)?],
             };
             let mut grouped = module(items);
@@ -196,8 +193,8 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
                     let PatternPart::Pattern(pattern) = part else {
                         unreachable!("the part is a pattern")
                     };
-                    let back = crate::syn3::parse_pattern(&text)
-                        .map_err(|_| unreadable("a pattern"))?;
+                    let back =
+                        crate::syn3::parse_pattern(&text).map_err(|_| unreadable("a pattern"))?;
                     if same(&wrap(pattern, unit()), &wrap(back, unit())) {
                         Ok(text)
                     } else {

@@ -115,11 +115,7 @@ pub(crate) fn statement(d: &Datum) -> R<Stmt> {
 /// `..` before the last of them.
 fn services_of(parts: &[Datum]) -> Option<R<Vec<SItem>>> {
     let service = |p: &Datum| matches!(round(p, ":"), Some([b, _]) if matches!(b.kind, K::Name(_)));
-    if parts.is_empty()
-        || !parts
-            .iter()
-            .all(|p| symbol(p) == Some("..") || service(p))
-    {
+    if parts.is_empty() || !parts.iter().all(|p| symbol(p) == Some("..") || service(p)) {
         return None;
     }
     let mut out = Vec::new();

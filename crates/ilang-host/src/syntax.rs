@@ -1108,11 +1108,8 @@ mod tests {
             (9, Position::Statement, "f(x)"),
         ] {
             assert_eq!(position.id(), id);
-            let result = invoke(
-                "show_as",
-                &[opaque(syntax.clone()), Value::Int(id.into())],
-            )
-            .unwrap();
+            let result =
+                invoke("show_as", &[opaque(syntax.clone()), Value::Int(id.into())]).unwrap();
             assert!(matches!(
                 invoke("text_ok", std::slice::from_ref(&result)).unwrap(),
                 Value::Bool(true)
