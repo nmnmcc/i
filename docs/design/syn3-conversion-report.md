@@ -667,3 +667,21 @@ the edited library handler and verified its focused format check. The
 stopped first corpus recording finalized 92 observations (90 was the live
 checkpoint count); all 92 have source changes and batch2-equivalent phase
 exits/error-code sets. The eight refused observations remain unrecorded.
+
+The fresh compiler-package run and workspace all-target check pass. The
+requested CLI command, multicore and syntax-three fixture binaries pass
+(14, 11 and 1 cases). Typed macros exposed old Lisp declaration/function
+fragments reintroduced by a prior main integration: 35 parser failures.
+Restored the earlier reviewed conversion of those exact fragments, converted
+the newer closed-data and determinism fragments, and gave SyntaxError calls
+their written message/at labels. No assertion or expected rejection changed.
+Authority: syntax-3 §6.8 uses `(-> [A] (, A) A)` for polymorphic function
+signatures, `(-> (, value) _ body)` for functions and `|>`/`|` for pipes and
+chains; §7.3 explicitly includes Lisp strings in Rust tests.
+
+The ordinary inventory did not extract these Lisp fragments. A companion
+Lisp check now parses every repository .is file and the complete modules,
+signatures and functions assembled by macro_run/typed_macros. The existing
+length-prefixed parser driver has a --lisp mode; normal inventory semantics
+are unchanged. New gate and typed-macro rerun are pending behind the shared
+load guard. This remains an unlandable checkpoint until all gates finish.
