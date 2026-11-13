@@ -1033,6 +1033,16 @@ impl Solver {
             self.mark_mode(r, env);
         }
 
+        // An input need may carry any service allowed by this upper bound.
+        // Its service arguments are inputs too; an empty lower set does not
+        // prove that a callback can never return or raise a value (§7.4).
+        if env == Mode::Env
+            && let Ty::Var(v) = l
+            && self.var(*v).input
+        {
+            self.mark_need_inputs(r);
+        }
+
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
@@ -2347,6 +2357,26 @@ impl Solver {
     /// in `h` is taken out, and it must be a subtype of that member of `h`.
     pub fn diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
         self.diff_mode(a, h, Mode::Value)
+    }
+
+    fn mark_need_inputs(&mut self, need: &Ty) {
+        let mut pending = super::typed_macro::variables(need);
+        let mut seen = HashSet::default();
+        while let Some(variable) = pending.pop() {
+            if !seen.insert(variable) {
+                continue;
+            }
+            if !self.var(variable).input {
+                self.observe(variable);
+                self.var_mut(variable).input = true;
+                self.rewrites += 1;
+            }
+            if self.var(variable).row == Mode::Env {
+                for upper in self.var(variable).upper.clone() {
+                    pending.extend(super::typed_macro::variables(&upper));
+                }
+            }
+        }
     }
 
     /// Supply an opaque captured row. Named keys excluded from that row
