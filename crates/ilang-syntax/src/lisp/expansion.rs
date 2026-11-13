@@ -43,6 +43,8 @@ pub struct MacroDefinition {
     pub item: usize,
     pub name: String,
     pub parameters: Vec<String>,
+    /// Explicit argument labels; bare names are positional (§6.11).
+    pub labels: Vec<Option<String>>,
     /// Index of the declared runtime signature, for a typed macro.
     pub signature: Option<usize>,
 }
@@ -117,21 +119,41 @@ pub fn definitions(
             continue;
         };
         let mut parameters = Vec::new();
+        let mut labels = Vec::new();
         let mut valid = true;
         for parameter in &function.params {
-            match parameter {
-                Param::Env { .. } => {}
-                Param::Pattern(p) => match &p.kind {
-                    PatternKind::Var(name) => parameters.push(name.clone()),
-                    PatternKind::Typed { binder, .. } if !binder.discard => {
-                        parameters.push(binder.name.clone())
-                    }
-                    _ => {
-                        errors.push(error("a macro parameter must be a name", p.span));
-                        valid = false;
-                    }
-                },
+            let Param::Pattern(p) = parameter else {
+                continue;
+            };
+            let (label, p) = match &p.kind {
+                PatternKind::Named { name, pattern } if name.name.starts_with("%macro_label:") => (
+                    Some(name.name.trim_start_matches("%macro_label:").to_owned()),
+                    pattern.as_ref(),
+                ),
+                _ => (None, p),
+            };
+            match &p.kind {
+                PatternKind::Var(name) => parameters.push(name.clone()),
+                PatternKind::Typed { binder, .. } if !binder.discard => {
+                    parameters.push(binder.name.clone())
+                }
+                _ => {
+                    errors.push(error(
+                        "a macro parameter must be a name, optionally with an explicit label",
+                        p.span,
+                    ));
+                    valid = false;
+                    continue;
+                }
             }
+            if label
+                .as_ref()
+                .is_some_and(|label| labels.contains(&Some(label.clone())))
+            {
+                errors.push(error("a macro parameter label is repeated", p.span));
+                valid = false;
+            }
+            labels.push(label);
         }
         let signature = module.items.iter().position(|other| matches!(&other.kind, ItemKind::Declaration { name: declared, .. } if declared.name == *name));
         if let Some(index) = signature {
@@ -197,6 +219,7 @@ pub fn definitions(
                 item: index,
                 name: name.clone(),
                 parameters,
+                labels,
                 signature,
             });
         }
@@ -238,14 +261,13 @@ impl MacroDefinition {
         if let Some(item) = item {
             slots[expected - 1] = Some(item);
         }
-        let mut positional = 0;
         let mut labeled = false;
         for argument in arguments {
             let index = if let Some(label) = &argument.label {
                 labeled = true;
-                self.parameters
+                self.labels
                     .iter()
-                    .position(|name| name == label)
+                    .position(|name| name.as_ref() == Some(label))
                     .ok_or_else(|| error("a macro argument label does not match a parameter"))?
             } else {
                 if labeled {
@@ -253,9 +275,14 @@ impl MacroDefinition {
                         "positional macro arguments must precede labeled arguments",
                     ));
                 }
-                let index = positional;
-                positional += 1;
-                index
+                self.labels
+                    .iter()
+                    .enumerate()
+                    .find(|(i, label)| label.is_none() && slots[*i].is_none())
+                    .map(|(i, _)| i)
+                    .ok_or_else(|| {
+                        error("a positional macro argument does not match a positional parameter")
+                    })?
             };
             if slots[index].replace(argument.syntax.clone()).is_some() {
                 return Err(error("a macro parameter receives more than one argument"));

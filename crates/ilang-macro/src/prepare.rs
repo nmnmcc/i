@@ -72,6 +72,22 @@ pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, 
             let item = &mut module.ast.items[definition.item];
             item.attributes
                 .retain(|a| !(a.module.is_none() && a.name.name == "macro"));
+            if let ilang_syntax::ast::ItemKind::Binding(binding) = &mut item.kind
+                && let ilang_syntax::ast::ExprKind::Fn(function) = &mut binding.value.kind
+            {
+                for param in &mut function.params {
+                    if let ilang_syntax::ast::Param::Pattern(pattern) = param
+                        && let ilang_syntax::ast::PatternKind::Named {
+                            name,
+                            pattern: inner,
+                        } = &pattern.kind
+                        && name.name.starts_with("%macro_label:")
+                    {
+                        *pattern = inner.as_ref().clone();
+                    }
+                }
+            }
+
             bindings.push(MacroBinding {
                 module: module.path.clone(),
                 name: definition.name,

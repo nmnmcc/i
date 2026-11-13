@@ -284,6 +284,7 @@ fn macro_arguments_match_labels_and_attribute_items() {
         item: 0,
         name: "m".into(),
         parameters: vec!["first".into(), "second".into(), "item".into()],
+        labels: vec![Some("first".into()), Some("second".into()), None],
     };
     let argument = |label: Option<&str>, text: &str| MacroArgument {
         label: label.map(str::to_string),
@@ -1350,4 +1351,21 @@ fn typed_macro_type_answers_share_marked_variable_nodes_across_queries() {
         panic!("application")
     };
     assert!(first[0].identical(&xs[1]));
+}
+
+#[test]
+fn macro_parameter_labels_are_explicit_and_survive_alpha_renaming() {
+    use ilang_syntax::lisp::{expansion::definitions, parse_source};
+    for local in ["value", "renamed"] {
+        let (module, errors) = parse_source(&format!(
+            "(@ macro (= id (-> (, (= label {local})) _ {local})))"
+        ));
+        assert!(errors.is_empty(), "{errors:?}");
+        let defs = definitions(&module, true).unwrap();
+        assert_eq!(defs[0].parameters, [local]);
+        assert_eq!(defs[0].labels, [Some("label".into())]);
+    }
+    let (module, errors) = parse_source("(@ macro (= id (-> (, value) _ value)))");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(definitions(&module, true).unwrap()[0].labels, [None]);
 }

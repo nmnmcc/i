@@ -2763,7 +2763,7 @@ SyntaxError = (message = String, at = Syntax)
 
 ### 14.5 Syntax macros
 
-A **syntax macro** is a top-level binding in a `.is` file with the attribute `@macro` and no declaration of the same name. Its pattern is one name, its value a function expression whose parameter items are names, and the value must have a subtype of `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), Items) -> Syntax`, with one `Syntax` for each parameter. `@macro` in a `.i` file, and an item with `@macro` in the result of an expansion, are compile errors. A macro is exported and imported as a value is. Its name may only be used in the imports, in the exports, and as the macro of a macro call. A macro may not be used in the module that defines it; a call in a template is data, not a use.
+A **syntax macro** is a top-level binding in a `.is` file with the attribute `@macro` and no declaration of the same name. Its pattern is one name, its value a function expression whose parameter items are bare names (positional) or `label = name` (labelled), and the value must have a subtype of `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), Items) -> Syntax`, with one `Syntax` for each parameter. `@macro` in a `.i` file, and an item with `@macro` in the result of an expansion, are compile errors. A macro is exported and imported as a value is. Its name may only be used in the imports, in the exports, and as the macro of a macro call. A macro may not be used in the module that defines it; a call in a template is data, not a use.
 
 ```lisp
 (, unless)
@@ -2782,7 +2782,7 @@ A **macro call** is written in these ways in both surfaces, where `m` is a name,
 | Before an item | `@m Item`, `@m(args) Item` | Expressions, then the item as the last argument | See below |
 | Type | `m(args)` | Types, integer literals and strings, with no labels | A type |
 
-- The parser does not know which names are macros, so arguments are read by the grammar of the position. Arguments are not worked out: the macro gets their `Syntax`. A labelled argument goes to the parameter item with that label. The number of arguments must be the number of parameters.
+- The parser does not know which names are macros, so arguments are read by the grammar of the position. Arguments are not worked out: the macro gets their `Syntax`. A labelled argument goes only to an explicitly labelled parameter item with that label. Bare parameter names are positional and do not create labels; renaming a parameter does not change its call shape. The argument data must have exactly the positional count and explicit labels of the macro parameters, under the ordinary rules of §6.11.
 - No macro call gives a statement or a pattern.
 - Before a type definition, the macro adds its result after the definition, which stays as written. Before a binding or a declaration, the result takes the place of the item. The item goes to the last parameter, with the attributes written after the macro. A built-in attribute may not be written before a macro. With several macros before an item, the first is expanded first.
 - A result may not contain imports, a quote, an unquote or a splice, or a `Curly` of items anywhere but at the top. `@external`, `@js` and `@host` may be in a result only when the whole attribute datum, with its arguments and its item, came unchanged from the caller's source through the arguments of each run, and at most once.

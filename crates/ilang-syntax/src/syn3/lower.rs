@@ -550,6 +550,56 @@ impl Cx {
                     }
                     o::ItemKind::TypeDef(self.type_def(def, sums.remove(&i), item.span.0))
                 }
+                n::ItemKind::Bind(b)
+                    if item
+                        .attributes
+                        .iter()
+                        .any(|a| a.module.is_none() && a.name.name == "macro")
+                        && matches!(&b.value.kind, n::ExprKind::Chain(fs) if fs.len() == 1) =>
+                {
+                    // Preserve the macro's written call shape while lowering its
+                    // implementation as Syntax parameters. Labels are metadata,
+                    // never local binders. prepare removes the transition marker.
+                    let n::ExprKind::Chain(fs) = &b.value.kind else {
+                        unreachable!()
+                    };
+                    let items = canonical(&fs[0]);
+                    let labels = items.iter().map(|p| p.key.clone()).collect::<Vec<_>>();
+                    let mut function = fs[0].clone();
+                    function.params = items
+                        .into_iter()
+                        .map(|p| n::PItem {
+                            key: None,
+                            choices: p.choices.clone(),
+                        })
+                        .collect();
+                    let mut binding = b.clone();
+                    binding.value.kind = n::ExprKind::Chain(vec![function]);
+                    let mut lowered = self.binding(&binding);
+                    if let o::ExprKind::Fn(function) = &mut lowered.value.kind {
+                        for (param, label) in function
+                            .params
+                            .iter_mut()
+                            .filter(|p| matches!(p, o::Param::Pattern(_)))
+                            .zip(labels)
+                        {
+                            if let (o::Param::Pattern(pattern), Some(label)) = (param, label) {
+                                let span = pattern.span;
+                                *pattern = pat(
+                                    o::PatternKind::Named {
+                                        name: ident(
+                                            format!("%macro_label:{}", label.name),
+                                            label.span.0,
+                                        ),
+                                        pattern: Box::new(pattern.clone()),
+                                    },
+                                    span,
+                                );
+                            }
+                        }
+                    }
+                    o::ItemKind::Binding(lowered)
+                }
                 n::ItemKind::Bind(b) => {
                     let mut bindings = self.bindings(b, true);
                     let last = bindings.pop().unwrap();

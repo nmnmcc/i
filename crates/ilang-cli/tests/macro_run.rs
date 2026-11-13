@@ -642,6 +642,7 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
         item: 0,
         name: "keep".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let mut session = Session::default();
     let expanded = session
@@ -718,6 +719,7 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
         item: 0,
         name: "wrap".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let argument = input();
     let templates: Arc<[Syntax]> = prepared.templates.into();
@@ -2691,4 +2693,31 @@ fn portable_macro_hash_matches_the_specification_vectors() {
         "{}",
         graph.sources.render_all(&checked.diags).join("\n")
     );
+}
+
+#[test]
+fn syntax_macro_call_labels_require_explicit_parameter_labels() {
+    for (case, pass) in [("mp10_positional", false), ("mp10_explicit_label", true)] {
+        let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/spec/14.5")
+            .join(case);
+        let (mut graph, ds) = ilang_cli::load(&project, false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        assert_eq!(
+            !checked
+                .diags
+                .iter()
+                .any(ilang_package::Diagnostic::is_error),
+            pass,
+            "{errors}"
+        );
+        if !pass {
+            assert!(errors.contains("label does not match"), "{errors}");
+        }
+    }
 }
