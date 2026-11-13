@@ -925,11 +925,12 @@ impl Cx<'_> {
                     value,
                     span: env_span,
                     spread,
+                    group,
                     ..
                 } => {
-                    // §7.3: consecutive statements whose values are direct
-                    // values are one provide; others nest, because a later
-                    // value may need an earlier service.
+                    // Keep written provide groups distinct (rule C).
+                    // Legacy statements without groups can still gather
+                    // direct values; effectful values remain nested.
                     let mut provided = vec![if *spread {
                         n::DItem::Spread(self.expr(value))
                     } else {
@@ -940,8 +941,10 @@ impl Cx<'_> {
                         && let Some(o::Stmt::Env {
                             value: next,
                             spread,
+                            group: next_group,
                             ..
                         }) = stmts.get(i + 1)
+                        && next_group == group
                         && is_direct(next)
                     {
                         provided.push(if *spread {
