@@ -94,6 +94,9 @@ pub fn references(pattern: &Pattern, value: &Expr) -> Vec<(DefId, bool)> {
                 ExprKind::Field { target, .. }
                 | ExprKind::TupleIndex { target, .. }
                 | ExprKind::Unary { expr: target, .. } => work.push(Node::Expr(target, inside)),
+                ExprKind::Multi(groups) => {
+                    work.extend(groups.iter().rev().map(|g| Node::Expr(&g.value, inside)));
+                }
                 ExprKind::RecordUpdate { base, fields, .. } => {
                     work.extend(fields.iter().rev().map(|(_, e)| Node::Expr(e, inside)));
                     work.push(Node::Expr(base, inside));

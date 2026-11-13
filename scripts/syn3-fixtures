@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Runs the syntax-three fixtures under tests/syn3 with the transition switch
+# (docs/design/syntax-3.md §7.2, stages 8 to 11).
+#
+#   scripts/syn3-fixtures [I]
+#
+# I (default: target/debug/i) is the compiler to run. The library is
+# converted to syntax three into a temporary directory first. A fixture is a
+# package directory with any of:
+#   expected.txt  the lines that `i run` prints
+#   types.txt     lines that `i check --types` prints (others may be there)
+#   errors.txt    `i check` fails, and each line starts a line of its output
+set -euo pipefail
+repo=$(cd "$(dirname "$0")/.." && pwd)
+i=${1:-$repo/target/debug/i}
+root=$(mktemp -d)
+trap 'rm -rf "$root"' EXIT
+cp -r "$repo/lib" "$root/lib"
+env -u I_SYNTAX -u I_SYNTAX3_LIB "$repo/scripts/syn3-convert-all" "$root" > /dev/null
+export I_SYNTAX=3 I_SYNTAX3_LIB=$root/lib
+failed=0
+for dir in "$repo"/tests/syn3/*/; do
+	name=$(basename "$dir")
+	ok=1
+	if [ -f "$dir/errors.txt" ]; then
+		out=$("$i" check --project "$dir" 2>&1) && ok=0
+		while IFS= read -r line; do
+			grep -qF -- "$line" <<< "$out" || { ok=0; echo "$name: missing error: $line"; }
+		done < "$dir/errors.txt"
+	fi
+	if [ -f "$dir/types.txt" ]; then
+		out=$("$i" check --types --project "$dir" 2>&1) || ok=0
+		while IFS= read -r line; do
+			grep -qxF -- "$line" <<< "$out" || { ok=0; echo "$name: missing type: $line"; }
+		done < "$dir/types.txt"
+	fi
+	if [ -f "$dir/expected.txt" ]; then
+		out=$("$i" run --project "$dir" 2> "$root/stderr") || ok=0
+		[ "$out" = "$(cat "$dir/expected.txt")" ] || { ok=0; echo "$name: output differs:"; echo "$out"; cat "$root/stderr"; }
+	fi
+	if [ "$ok" = 1 ]; then echo "ok   $name"; else echo "FAIL $name"; failed=1; fi
+done
+exit "$failed"

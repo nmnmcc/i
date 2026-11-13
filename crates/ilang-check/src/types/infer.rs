@@ -7,6 +7,7 @@
 //! the rest of a block after an environment statement starts a new entry.
 
 use super::display;
+use super::groups;
 use super::known;
 use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
 use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
@@ -143,6 +144,13 @@ pub(crate) struct Checker<'a> {
     group_level: Option<u32>,
     pending_failures: Vec<PendingFailure>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
+    /// The rule-11 cases typed in the binding being checked, by span: what
+    /// a selection table is made from (syntax three §2.6.1).
+    pub(super) case_tables: HashMap<(ModuleId, Span), groups::CaseTable>,
+    /// The selection tables of the names bound to a group function.
+    pub(super) branch_tables: HashMap<ValueRef, std::rc::Rc<groups::BranchTable>>,
+    /// The local names bound by `g = name` (direct aliases, §2.6.7).
+    pub(super) local_aliases: HashMap<VarId, ValueRef>,
     pending_typed: Vec<PendingTyped>,
     checked_holes: HashMap<Span, (Ty, Ty)>,
     expression_known: HashMap<(ModuleId, Span), Ty>,
@@ -206,6 +214,9 @@ impl<'a> Checker<'a> {
             group_level: None,
             pending_failures: Vec::new(),
             shared_fields: HashMap::new(),
+            case_tables: HashMap::new(),
+            branch_tables: HashMap::new(),
+            local_aliases: HashMap::new(),
             pending_typed: Vec::new(),
             checked_holes: HashMap::new(),
             expression_known: HashMap::new(),
@@ -586,6 +597,8 @@ impl<'a> Checker<'a> {
             self.pending_typed.clear();
         }
         self.group_level = None;
+        let holder_types: HashMap<DefId, Ty> =
+            types.iter().map(|(d, _, t, _)| (*d, t.clone())).collect();
         for (d, _, t, span) in types {
             self.set_module(d.module);
             let scheme = if direct {
@@ -599,6 +612,18 @@ impl<'a> Checker<'a> {
             self.defs.insert(d, scheme);
         }
         self.group_defs.clear();
+        for b in group {
+            let top = p.binding(*b);
+            if let ([d], PatternKind::Var(_)) = (top.defs.as_slice(), &top.binding.pattern.kind)
+                && let Some(t) = holder_types.get(d)
+            {
+                self.set_module(b.module);
+                let generalized = direct.then_some(0);
+                let (value, span) = (&top.binding.value, top.binding.span);
+                self.keep_branches(ValueRef::Def(*d), value, t, generalized, span);
+            }
+        }
+        self.case_tables.clear();
         for (b, k) in group.iter().zip(knowns) {
             self.out.generalized.insert(*b, direct);
             let top = p.binding(*b);
@@ -1336,6 +1361,12 @@ impl<'a> Checker<'a> {
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
             ),
+            FailKind::MultiCall => (
+                code::MULTI_VALUE_CALL,
+                format!(
+                    "a multi-shape function value `{l}` can only be called directly by its name until the run time has multi-shape values; here a function `{r}` is wanted"
+                ),
+            ),
             FailKind::Invariant => (
                 code::TYPE_INVARIANT,
                 format!(
@@ -1693,6 +1724,11 @@ impl<'a> Checker<'a> {
             self.effects.push(Effects::default());
         }
         let result = self.infer_k_inner(e, expected);
+        // A name with a selection table, where a function type is expected.
+        let result = match self.select_by_expected(e, expected) {
+            Some(selected) => selected,
+            None => result,
+        };
         if observe {
             let effects = self.pop_effects(e.span);
             self.add_err(effects.0.clone());
@@ -1903,6 +1939,7 @@ impl<'a> Checker<'a> {
             }
             ExprKind::Block(b) => self.block(&b.stmts, b.span, expected),
             ExprKind::Fn(f) => self.function(f, expected),
+            ExprKind::Multi(gs) => self.multi(gs, expected, e.span),
             ExprKind::Case { subject, clauses } => self.case(subject, clauses, e.span, expected),
             ExprKind::Call { callee, args } => self.call(callee, None, args, e.span),
             ExprKind::Field { target, name } => self.field(target, name, e.span),
@@ -2031,7 +2068,17 @@ impl<'a> Checker<'a> {
             _ => None,
         };
         let typed_signature = f.clone();
-        let kfn = known::one_fn(&kf);
+        let kfn = known::one_fn(&kf).filter(|k| !groups::is_multi(k));
+        // Syntax three §2.6.5: a call with labels through a value constrains
+        // the argument data, whose shape is read from the call, against the
+        // member of that shape.
+        if kfn.is_none()
+            && args.iter().any(|a| a.label.is_some())
+            && ilang_syntax::syn3::enabled()
+            && !matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
+        {
+            return self.shaped_call(&f, first, args, span);
+        }
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
         // §6.6: the parameter that each argument goes to.
@@ -2096,7 +2143,7 @@ impl<'a> Checker<'a> {
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
         for later in [false, true] {
             for (i, a) in values.iter().enumerate() {
-                if (params.is_some() && known::open_fn(a)) != later {
+                if (params.is_some() && (known::open_fn(a) || self.selects(a))) != later {
                     continue;
                 }
                 let expected = match &params {
@@ -2138,10 +2185,19 @@ impl<'a> Checker<'a> {
             }
             _ => Ty::Top,
         };
+        // Syntax three §2.6.2: a direct call of a name with a selection
+        // table has the type of the branches that the known types of the
+        // arguments select.
+        let f = if args.iter().all(|a| a.label.is_none()) {
+            let ks: Vec<Ty> = typed.iter().map(|x| x.1.clone()).collect();
+            self.select_at_call(callee, &ks, span).unwrap_or(f)
+        } else {
+            f
+        };
         let typed_argument_types =
             typed_definition.map(|_| placed.iter().map(|(t, _)| t.clone()).collect());
         let t = match &f {
-            Ty::Fn(ft) if ft.arity() == Some(placed.len()) => {
+            Ty::Fn(ft) if !groups::is_multi(ft) && ft.arity() == Some(placed.len()) => {
                 let parts = ft.parts().expect("data parameter").to_vec();
                 for ((t, s), p) in placed.iter().zip(&parts) {
                     self.sub2(t, p, *s, callee.span);
@@ -2154,6 +2210,19 @@ impl<'a> Checker<'a> {
                 // syntax-3 §6.1: the argument data of another shape is a
                 // mismatch of the parameter.
                 let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
+                if groups::is_multi(ft) {
+                    // syn3-stage10: a call through a multi-shape value; the
+                    // run time cannot make it yet. Delete this error when
+                    // it can.
+                    self.error(
+                        code::MULTI_VALUE_CALL,
+                        span,
+                        format!(
+                            "a multi-shape function value `{}` can only be called directly by its name until the run time has multi-shape values",
+                            display::show(&self.s, &f)
+                        ),
+                    );
+                }
                 self.sub2(&data, &ft.param, span, callee.span);
                 self.add_err(ft.err.clone());
                 self.add_env(ft.env.clone());
@@ -2203,6 +2272,110 @@ impl<'a> Checker<'a> {
             });
         }
         (t, known)
+    }
+
+    /// A call through a value with labelled arguments: the argument data
+    /// has the shape that the call writes, with its parts in canonical
+    /// order.
+    fn shaped_call(&mut self, f: &Ty, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+        let mut positions: Vec<Ty> = Vec::new();
+        let mut labelled: Vec<(String, Ty)> = Vec::new();
+        if let Some(first) = first {
+            positions.push(self.infer_k(first, &Ty::Top).0);
+        }
+        for a in args {
+            let t = self.infer_k(&a.value, &Ty::Top).0;
+            match &a.label {
+                None => positions.push(t),
+                Some(l) if labelled.iter().any(|(g, _)| *g == l.name) => {
+                    self.error(
+                        code::CALL_LABELS,
+                        l.span,
+                        format!("the label `{}` is given twice", l.name),
+                    );
+                }
+                Some(l) => labelled.push((l.name.clone(), t)),
+            }
+        }
+        // syn3-stage10: the run time cannot make this call yet. Delete this
+        // error when it can.
+        self.error(
+            code::MULTI_VALUE_CALL,
+            span,
+            "a call with labels through a function value is not possible until the run time has multi-shape values; call the function directly by its name",
+        );
+        labelled.sort_by(|a, b| a.0.cmp(&b.0));
+        let shape = super::ShapeId::new(
+            positions.len() as u32,
+            labelled.iter().map(|(l, _)| l.clone()),
+        );
+        let mut parts = positions;
+        parts.extend(labelled.into_iter().map(|(_, t)| t));
+        let (r, e, n) = (
+            self.s.fresh_input(),
+            self.s.fresh_input(),
+            self.s.fresh_input(),
+        );
+        let want = groups::with_data(
+            groups::group_data(shape, &parts),
+            r.clone(),
+            e.clone(),
+            n.clone(),
+        );
+        self.sub(f, &Ty::Fn(Box::new(want)), span);
+        self.add_err(e);
+        self.add_env(n);
+        (r, Ty::Top)
+    }
+
+    /// A multi-shape function value (syntax three §2.6.4, §2.6.5). With an
+    /// expected type that is one function type whose shape the value has,
+    /// it is the function of that shape group. In every other place it has
+    /// the type `{ B_g1 | … | B_gm } -> R_all` over its groups, and no
+    /// known type.
+    fn multi(&mut self, gs: &[MultiGroup], expected: &Ty, span: Span) -> (Ty, Ty) {
+        if let [Ty::Fn(want)] = known::members(expected).as_slice()
+            && !groups::is_multi(want)
+            && let Some(n) = want.arity()
+        {
+            let shape = super::ShapeId::positional(n as u32);
+            if let Some(i) = gs.iter().position(|g| g.shape == shape) {
+                self.out
+                    .selected_groups
+                    .insert((self.module, span), i as u32);
+                return self.infer_k(&gs[i].value, expected);
+            }
+        }
+        let (ret, err, env) = (self.s.fresh(), self.s.fresh(), self.s.fresh());
+        let mut data = Vec::new();
+        for g in gs {
+            let (t, _) = self.infer_k(&g.value, &Ty::Top);
+            let parts: Vec<Ty> = match &t {
+                Ty::Fn(f) if f.arity() == Some(g.shape.len()) => {
+                    f.parts().expect("data parameter").to_vec()
+                }
+                _ => (0..g.shape.len()).map(|_| self.s.fresh_input()).collect(),
+            };
+            // The results and the needs of every group are those of the
+            // value (the need is shared by all branches, §2.5).
+            let part = FnTy::new(
+                parts.iter().map(|p| (None, p.clone())).collect(),
+                ret.clone(),
+                err.clone(),
+                env.clone(),
+            );
+            data.push(groups::group_data(g.shape, &parts));
+            self.sub(&t, &Ty::Fn(Box::new(part)), g.value.span);
+        }
+        let param = if data.len() == 1 {
+            data.pop().unwrap()
+        } else {
+            Ty::Union(data)
+        };
+        (
+            Ty::Fn(Box::new(groups::with_data(param, ret, err, env))),
+            Ty::Top,
+        )
     }
 
     /// Records a call for the syntax-three label migration (`syn3_facts`).
@@ -3075,9 +3248,27 @@ impl<'a> Checker<'a> {
         }
         self.check_occurs(mark, b.pattern.span);
         self.fit_known(&b.pattern, &k, false);
+        if let (
+            PatternKind::Var(binder),
+            ExprKind::Name(to @ (ValueRef::Def(_) | ValueRef::Local(_))),
+        ) = (&b.pattern.kind, &b.value.kind)
+        {
+            self.local_aliases.insert(binder.var, *to);
+        }
         if direct {
             self.s.level -= 1;
             let level = self.s.level;
+            if let PatternKind::Var(binder) = &b.pattern.kind
+                && let Some(s) = self.locals.get(&binder.var).cloned()
+            {
+                self.keep_branches(
+                    ValueRef::Local(binder.var),
+                    &b.value,
+                    &s.ty,
+                    Some(level),
+                    b.pattern.span,
+                );
+            }
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
                     let ty = self.generalize(&s.ty, level, b.pattern.span);
@@ -3135,7 +3326,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
+    pub(super) fn generalize(&mut self, t: &Ty, level: u32, span: Span) -> Ty {
         if !self.p.typed_macros.is_empty() {
             self.typed_generalized_roots.extend(
                 super::typed_macro::variables(t)
@@ -3489,6 +3680,7 @@ fn has_no_effect(e: &Expr) -> bool {
         | ExprKind::String(_)
         | ExprKind::Name(_)
         | ExprKind::Fn(_) => true,
+        ExprKind::Multi(groups) => groups.iter().all(|g| has_no_effect(&g.value)),
         ExprKind::Tuple(items) => items.iter().all(has_no_effect),
         ExprKind::Record { base, fields } => {
             base.as_deref().is_none_or(has_no_effect)

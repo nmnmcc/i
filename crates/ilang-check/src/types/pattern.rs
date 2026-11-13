@@ -596,6 +596,7 @@ impl Checker<'_> {
         };
         let r = self.s.fresh();
         let mut knowns = Vec::new();
+        let mut rets = Vec::new();
         for c in clauses {
             // Every choice of the clause has `C` at its top.
             let known = subject_var.filter(|_| !fitted).and_then(|x| {
@@ -622,6 +623,7 @@ impl Checker<'_> {
             let (t, k) = self.infer_k(&c.body, expected);
             knowns.push(k);
             self.sub(&t, &r, c.body.span);
+            rets.push(t);
             if let Some((x, old, old_args)) = before {
                 match old {
                     Some(o) => self.known.insert(x, o),
@@ -644,6 +646,19 @@ impl Checker<'_> {
                 .to(clause.patterns.last().unwrap().span);
             self.defer_failure(Pat::Or(rows[0].clone()), a, at);
         } else {
+            if ilang_syntax::syn3::enabled() {
+                // Syntax three §2.6.1: the rows and the branch results, for
+                // the selection table of a function with this body.
+                let table = super::groups::CaseTable {
+                    rows: rows
+                        .iter()
+                        .zip(clauses)
+                        .map(|(choices, c)| (Pat::Or(choices.clone()), c.guard.is_some()))
+                        .collect(),
+                    rets,
+                };
+                self.case_tables.insert((module, span), table);
+            }
             self.cases.push(PendingCase {
                 module,
                 held,

@@ -338,6 +338,7 @@ fn expression_values(e: &Expr) -> usize {
         | ExprKind::Error
         | ExprKind::Fn(_) => 1,
         ExprKind::Tuple(items) => pending_values(items),
+        ExprKind::Multi(groups) => pending_values(groups.iter().map(|g| &g.value)),
         ExprKind::Record { base, fields } => pending_values(
             base.iter()
                 .map(Box::as_ref)
@@ -396,6 +397,7 @@ impl Walk {
             | ExprKind::Name(_)
             | ExprKind::Error => {}
             ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::Record { base, fields } => {
                 if let Some(base) = base {
                     self.expr(base);
@@ -2685,11 +2687,36 @@ impl<'a> Lowerer<'a> {
             ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
             ExprKind::Float(x) => Atom::Float(*x),
             ExprKind::String(s) => Atom::String(s.clone()),
-            ExprKind::Name(r) => self.name(fx, e, *r),
+            ExprKind::Name(r) => {
+                // A chain name that an expected type narrowed to one shape
+                // group stands for that group's function.
+                let r = self
+                    .typed
+                    .selected_names
+                    .get(&(fx.module, e.span))
+                    .copied()
+                    .unwrap_or(*r);
+                self.name(fx, e, r)
+            }
             ExprKind::Tuple(items) => {
                 let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)
             }
+            ExprKind::Multi(groups) => match self.typed.selected_groups.get(&(fx.module, e.span)) {
+                // An expected type chose one shape group: the value is that
+                // group's function.
+                Some(i) => self.expr(fx, out, &groups[*i as usize].value),
+                // syn3-stage10: a multi-shape value. Until the run time has
+                // `$multi`, it is the tuple of its group closures; the
+                // checker lets nothing call it.
+                None => {
+                    let parts = groups
+                        .iter()
+                        .map(|g| self.expr(fx, out, &g.value))
+                        .collect();
+                    let_value(fx, out, Value::Tuple(parts), None)
+                }
+            },
             ExprKind::Record { base, fields } => {
                 // syntax-3 §6.4: the items are worked out in written order,
                 // the spread base first; the data has its parts in canonical

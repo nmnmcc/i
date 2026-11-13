@@ -13,7 +13,7 @@
 use crate::Parsed;
 use crate::code;
 use crate::hir::*;
-use crate::types::{Head, HostType, Ty};
+use crate::types::{Head, HostType, ShapeId, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast;
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
@@ -46,6 +46,8 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
         circular: HashSet::new(),
         pending: Vec::new(),
         reserved: Vec::new(),
+        def_tables: HashMap::new(),
+        local_tables: HashMap::new(),
         checked_inputs: None,
     };
     r.create_modules();
@@ -64,6 +66,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnos
     summarize_aliases(&mut r.p);
     r.alias_circles();
     r.early_types();
+    r.selection_tables();
     for m in 0..parsed.len() {
         r.values(ModuleId(m as u32));
     }
@@ -195,6 +198,47 @@ struct Resolver<'a> {
     pending: Vec<HashSet<NameKey>>,
     reserved: Vec<(usize, HashSet<NameKey>)>,
     checked_inputs: Option<&'a CheckedInputs>,
+    /// The selection tables (syntax three §2.6.1) of the top-level names
+    /// and of the local names in scope: for each shape group, its function.
+    def_tables: HashMap<DefId, Table>,
+    local_tables: HashMap<VarId, Table>,
+}
+
+/// The shape groups of a named chain and the binding of each group.
+type Table = std::rc::Rc<Vec<(ShapeId, ValueRef)>>;
+
+/// The reserved callee of the transition form of a multi-shape value: a
+/// call with one argument per shape group, labelled by the shape.
+const MULTI: &str = "%multi";
+
+/// The groups of the transition form of a multi-shape value.
+fn multi_groups(e: &ast::Expr) -> Option<&[ast::Arg]> {
+    match &e.kind {
+        ast::ExprKind::Call { callee, args } => match &callee.kind {
+            ast::ExprKind::Name { module: None, name } if name.name == MULTI => Some(args),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The shape that a group label of the transition form writes: the number
+/// of positions, then each label after a comma.
+fn shape_of_text(text: &str) -> ShapeId {
+    let mut parts = text.split(',');
+    let positions: u32 = parts
+        .next()
+        .unwrap()
+        .parse()
+        .expect("a shape starts with its positions");
+    ShapeId::new(positions, parts.map(str::to_string))
+}
+
+/// A shape as it is written in a parameter group, for messages.
+fn shape_shown(shape: ShapeId) -> String {
+    let mut parts = vec!["_".to_string(); shape.positions() as usize];
+    parts.extend(shape.labels().iter().map(|l| format!("{l} = _")));
+    format!("({})", parts.join(", "))
 }
 
 fn is_upper(name: &str) -> bool {
@@ -234,6 +278,8 @@ fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
 fn label_of(p: &ast::Pattern) -> Option<String> {
     use ast::PatternKind as P;
     match &p.kind {
+        // A compiler-made parameter has no label.
+        P::Var(n) if n.starts_with('%') => None,
         P::Var(n) => Some(n.clone()),
         P::Typed { binder, .. } if !binder.discard => Some(binder.name.clone()),
         P::Named { name, pattern } => label_of(pattern).or_else(|| Some(name.name.clone())),
@@ -2823,6 +2869,7 @@ impl<'a> Resolver<'a> {
             E::Fn(_) | E::Clauses(_) | E::Int(_) | E::Float(_) | E::String(_) | E::Name { .. } => {
                 true
             }
+            E::Call { .. } if multi_groups(ungroup(e)).is_some() => true,
             E::Unary { expr, .. } => {
                 matches!(ungroup(expr).kind, E::Int(_) | E::Float(_) | E::String(_))
             }
@@ -3334,16 +3381,48 @@ impl<'a> Resolver<'a> {
                 subject: Box::new(self.expr(subject)),
                 clauses: clauses.iter().map(|c| self.clause(c)).collect(),
             },
-            E::Call { callee, args } => ExprKind::Call {
-                callee: Box::new(self.expr(callee)),
-                args: args
-                    .iter()
-                    .map(|a| Arg {
-                        label: a.label.clone(),
+            E::Call { args, .. } if multi_groups(e).is_some() => ExprKind::Multi(
+                args.iter()
+                    .map(|a| MultiGroup {
+                        shape: shape_of_text(
+                            &a.label.as_ref().expect("a group has its shape").name,
+                        ),
                         value: self.expr(&a.value),
                     })
                     .collect(),
-            },
+            ),
+            E::Call { callee, args } => {
+                let callee = self.expr(callee);
+                match self.table_of(&callee) {
+                    Some(table) => self.group_call(&table, &callee, None, args, e.span),
+                    None => ExprKind::Call {
+                        callee: Box::new(callee),
+                        args: args
+                            .iter()
+                            .map(|a| Arg {
+                                label: a.label.clone(),
+                                value: self.expr(&a.value),
+                            })
+                            .collect(),
+                    },
+                }
+            }
+            // `x |> f` and `x |> f(…)` with a named chain `f` are direct
+            // calls (syntax three §2.6.2): `x` is position 0.
+            E::Binary {
+                op: ast::BinOp::Pipe,
+                lhs,
+                rhs,
+            } if self.piped_table(rhs) => {
+                let first = self.expr(lhs);
+                let (callee, args): (&ast::Expr, &[ast::Arg]) = match &rhs.kind {
+                    E::Call { callee, args } => (callee, args),
+                    _ => (rhs, &[]),
+                };
+                let callee = self.expr(callee);
+                let table = self.table_of(&callee).expect("checked by piped_table");
+                self.group_call(&table, &callee, Some(first), args, e.span)
+            }
             E::Field { target, name } => {
                 let module = match &target.kind {
                     E::Name { module: None, name } => match self.find(&name.name, name.span) {
@@ -3417,6 +3496,278 @@ impl<'a> Resolver<'a> {
         Expr { kind, span: e.span }
     }
 
+    // ---- Shape groups (syntax three §2.6) ----
+
+    /// The top-level name that a direct alias `g = f` or `g = m.f` names,
+    /// read quietly in the module `self.cur`.
+    fn alias_target(&self, e: &ast::Expr) -> Option<DefId> {
+        use ast::ExprKind as E;
+        let in_module = |r: &Self, target: ModuleId, name: &ast::Ident| {
+            let index = *r.defs_by_name[target.0 as usize].get(&name.name)?;
+            Some(DefId {
+                module: target,
+                index,
+            })
+        };
+        match &ungroup(e).kind {
+            E::Name { module: None, name } => match self.find(&name.name, name.span)? {
+                Found::Entry(Entry::Def(d)) => Some(d),
+                _ => None,
+            },
+            E::Name {
+                module: Some(m),
+                name,
+            } => match self.find(&m.name, m.span)? {
+                Found::Entry(Entry::Module(t)) => in_module(self, t, name),
+                _ => None,
+            },
+            E::Field { target, name } => match &target.kind {
+                E::Name {
+                    module: None,
+                    name: m,
+                } => match self.find(&m.name, m.span)? {
+                    Found::Entry(Entry::Module(t)) => in_module(self, t, name),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// The selection tables of the top-level names, before any body is
+    /// resolved: a name bound to a multi chain has the table of its hidden
+    /// group bindings, and a direct alias has the table of the name it
+    /// names (§2.6.7).
+    fn selection_tables(&mut self) {
+        let parsed = self.parsed;
+        let mut aliases: Vec<(DefId, DefId)> = Vec::new();
+        for (mi, module) in parsed.iter().enumerate() {
+            let m = ModuleId(mi as u32);
+            self.cur = m;
+            for item in &module.ast.items {
+                let ast::ItemKind::Binding(b) = &item.kind else {
+                    continue;
+                };
+                let ast::PatternKind::Var(name) = &b.pattern.kind else {
+                    continue;
+                };
+                let Some(&index) = self.defs_by_name[mi].get(name) else {
+                    continue;
+                };
+                let def = DefId { module: m, index };
+                if let Some(groups) = multi_groups(&b.value) {
+                    let table: Option<Vec<(ShapeId, ValueRef)>> = groups
+                        .iter()
+                        .map(|g| {
+                            let ast::ExprKind::Name { module: None, name } = &g.value.kind else {
+                                return None;
+                            };
+                            let index = *self.defs_by_name[mi].get(&name.name)?;
+                            let shape = shape_of_text(&g.label.as_ref()?.name);
+                            Some((shape, ValueRef::Def(DefId { module: m, index })))
+                        })
+                        .collect();
+                    if let Some(table) = table {
+                        let groups = table
+                            .iter()
+                            .map(|(shape, g)| match g {
+                                ValueRef::Def(d) => (*shape, *d),
+                                _ => unreachable!(),
+                            })
+                            .collect();
+                        self.p.chain_groups.insert(def, groups);
+                        self.def_tables.insert(def, std::rc::Rc::new(table));
+                    }
+                } else if let Some(target) = self.alias_target(&b.value) {
+                    aliases.push((def, target));
+                }
+            }
+        }
+        // A chain of aliases ends at a chain literal; a circle of aliases
+        // is reported by the order rules and has no table.
+        loop {
+            let before = self.def_tables.len();
+            for (def, target) in &aliases {
+                if !self.def_tables.contains_key(def)
+                    && let Some(table) = self.def_tables.get(target).cloned()
+                {
+                    self.def_tables.insert(*def, table);
+                }
+            }
+            if self.def_tables.len() == before {
+                break;
+            }
+        }
+    }
+
+    /// The selection table of a resolved callee, when it is a name with one.
+    fn table_of(&self, callee: &Expr) -> Option<Table> {
+        match &callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) => self.def_tables.get(d).cloned(),
+            ExprKind::Name(ValueRef::Local(v)) => self.local_tables.get(v).cloned(),
+            _ => None,
+        }
+    }
+
+    /// The right side of a pipe is a name with a table, or a call of one.
+    fn piped_table(&self, rhs: &ast::Expr) -> bool {
+        use ast::ExprKind as E;
+        let callee = match &rhs.kind {
+            E::Call { callee, .. } if multi_groups(rhs).is_none() => callee,
+            _ => rhs,
+        };
+        let quiet = |r: &Self, name: &ast::Ident| match r.find(&name.name, name.span) {
+            Some(Found::Local(v)) => r.local_tables.contains_key(&v),
+            Some(Found::Entry(Entry::Def(d))) => r.def_tables.contains_key(&d),
+            _ => false,
+        };
+        match &callee.kind {
+            E::Name { module: None, name } => quiet(self, name),
+            E::Name { .. } | E::Field { .. } => self
+                .alias_target(callee)
+                .is_some_and(|d| self.def_tables.contains_key(&d)),
+            _ => false,
+        }
+    }
+
+    /// A direct call of a named chain (§2.6.2, steps 1 and 2): the shape of
+    /// the argument data is read from the call, and the call becomes a call
+    /// of that group's function with the arguments in canonical order. The
+    /// arguments are worked out in written order.
+    fn group_call(
+        &mut self,
+        table: &Table,
+        callee: &Expr,
+        first: Option<Expr>,
+        args: &[ast::Arg],
+        span: Span,
+    ) -> ExprKind {
+        let mut labels: Vec<&ast::Ident> = args.iter().filter_map(|a| a.label.as_ref()).collect();
+        labels.sort_by(|a, b| a.name.cmp(&b.name));
+        let mut written: Vec<(Option<&ast::Ident>, Expr)> = Vec::new();
+        if let Some(first) = first {
+            written.push((None, first));
+        }
+        for a in args {
+            written.push((a.label.as_ref(), self.expr(&a.value)));
+        }
+        if let Some(pair) = labels.windows(2).find(|w| w[0].name == w[1].name) {
+            self.error(
+                code::PARAMS_SAME_LABEL,
+                pair[1].span,
+                format!("the label `{}` is given twice", pair[1].name),
+            );
+            return ExprKind::Error;
+        }
+        let positions = written.iter().filter(|(l, _)| l.is_none()).count();
+        let shape = ShapeId::new(positions as u32, labels.iter().map(|l| l.name.clone()));
+        let Some((_, group)) = table.iter().find(|(s, _)| *s == shape) else {
+            let shapes: Vec<String> = table.iter().map(|(s, _)| shape_shown(*s)).collect();
+            self.error(
+                code::NO_SHAPE_GROUP,
+                span,
+                format!(
+                    "no branch of this function takes {}; its shapes are {}",
+                    shape_shown(shape),
+                    shapes.join(", ")
+                ),
+            );
+            return ExprKind::Error;
+        };
+        if let ValueRef::Def(d) = group {
+            self.used_def(*d, callee.span);
+        }
+        if let ExprKind::Name(ValueRef::Def(d)) = &callee.kind {
+            self.p.chain_uses.push(*d);
+        }
+        let callee = Box::new(Expr {
+            kind: ExprKind::Name(*group),
+            span: callee.span,
+        });
+        // The canonical place of each written argument.
+        let place = |label: Option<&ast::Ident>, position: usize| match label {
+            None => position,
+            Some(l) => positions + labels.iter().position(|x| x.name == l.name).unwrap(),
+        };
+        let mut position = 0;
+        let places: Vec<usize> = written
+            .iter()
+            .map(|(l, _)| {
+                let at = place(*l, position);
+                if l.is_none() {
+                    position += 1;
+                }
+                at
+            })
+            .collect();
+        let plain = |value: Expr| Arg { label: None, value };
+        if places.iter().enumerate().all(|(i, at)| i == *at) {
+            return ExprKind::Call {
+                callee,
+                args: written.into_iter().map(|(_, value)| plain(value)).collect(),
+            };
+        }
+        // Written order is not canonical order: the arguments are bound in
+        // written order first.
+        let mut stmts = Vec::new();
+        let mut slots: Vec<Option<Arg>> = (0..written.len()).map(|_| None).collect();
+        for ((_, value), at) in written.into_iter().zip(places) {
+            let var = self.new_var();
+            let at_span = value.span;
+            stmts.push(Stmt::Bind(Binding {
+                pattern: Pattern {
+                    kind: PatternKind::Var(Binder {
+                        var,
+                        name: format!("%item{at}"),
+                        span: at_span,
+                    }),
+                    span: at_span,
+                },
+                value,
+                direct: false,
+                ty_vars: vec![],
+                span: at_span,
+            }));
+            slots[at] = Some(plain(Expr {
+                kind: ExprKind::Name(ValueRef::Local(var)),
+                span: at_span,
+            }));
+        }
+        stmts.push(Stmt::Expr(Expr {
+            kind: ExprKind::Call {
+                callee,
+                args: slots.into_iter().map(|a| a.unwrap()).collect(),
+            },
+            span,
+        }));
+        ExprKind::Block(Block { stmts, span })
+    }
+
+    /// The table that a local binding gives its one name: the binding is
+    /// a multi chain over local group bindings, or a direct alias.
+    fn local_table(&mut self, b: &Binding) {
+        let PatternKind::Var(binder) = &b.pattern.kind else {
+            return;
+        };
+        let table = match &b.value.kind {
+            ExprKind::Multi(groups) => groups
+                .iter()
+                .map(|g| match &g.value.kind {
+                    ExprKind::Name(v @ (ValueRef::Local(_) | ValueRef::Def(_))) => {
+                        Some((g.shape, *v))
+                    }
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()
+                .map(std::rc::Rc::new),
+            _ => self.table_of(&b.value),
+        };
+        if let Some(table) = table {
+            self.local_tables.insert(binder.var, table);
+        }
+    }
+
     fn clause_function(&mut self, clauses: &[ast::Clause], span: Span) -> ExprKind {
         let single =
             clauses.len() == 1 && clauses[0].guard.is_none() && clauses[0].patterns.len() == 1;
@@ -3482,6 +3833,7 @@ impl<'a> Resolver<'a> {
             stmts.push(match s {
                 ast::Stmt::Bind(binding) => {
                     let (binding, binders) = self.binding(binding, false);
+                    self.local_table(&binding);
                     self.locals.push(Frame {
                         names: binders
                             .into_iter()
@@ -4543,6 +4895,10 @@ pub fn typed_output(
         pending: scope.pending.clone(),
         reserved: scope.reserved.clone(),
         checked_inputs: Some(checked),
+        // A re-resolved expansion has no selection tables: a chain name in
+        // it is a multi-shape value.
+        def_tables: HashMap::new(),
+        local_tables: HashMap::new(),
     };
     let result = r.expr(expression);
     if r.p.of_sites.len() != reads {

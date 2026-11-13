@@ -22,6 +22,7 @@ mod alias;
 mod codec;
 mod coverage;
 mod display;
+mod groups;
 mod infer;
 mod known;
 mod lits;
@@ -109,6 +110,13 @@ pub(crate) struct FnTy {
 impl FnTy {
     /// A function type whose parameter is a tuple of these parts.
     pub fn new(params: Vec<(Option<String>, Ty)>, ret: Ty, err: Ty, env: Ty) -> FnTy {
+        // The transition tree writes a multi-shape function type as one
+        // parameter with the reserved label `%data`: its type is the
+        // parameter data type itself.
+        if matches!(params.as_slice(), [(Some(l), _)] if l == groups::DATA) {
+            let param = params.into_iter().next().unwrap().1;
+            return groups::with_data(param, ret, err, env);
+        }
         let (labels, parts): (Vec<_>, Vec<_>) = params.into_iter().unzip();
         FnTy {
             param: Ty::tuple(parts),
@@ -442,6 +450,14 @@ pub struct Typed {
     /// Each data expression `(f: e, …)` or `(..b, f: e, …)` that type checks,
     /// by its span: its shape, and the shape of its spread base.
     pub data_shapes: HashMap<(ModuleId, Span), (ShapeId, Option<ShapeId>)>,
+    /// Each multi-shape function expression that an expected type narrows
+    /// to one of its shape groups, by its span: the index of that group.
+    /// Its value is that group's function alone (syntax three §2.6.4).
+    pub selected_groups: HashMap<(ModuleId, Span), u32>,
+    /// Each use of the name of a chain with several shape groups that an
+    /// expected type narrows to one group, by its span: the binding of
+    /// that group's function, which the use stands for.
+    pub selected_names: HashMap<(ModuleId, Span), crate::hir::ValueRef>,
     /// Diagnostics retained when coalescing could not produce a finite
     /// type. IDEs may use the partial result; lowering must reject it.
     pub(crate) coalescing_errors: Vec<Diagnostic>,

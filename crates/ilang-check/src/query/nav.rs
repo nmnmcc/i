@@ -131,6 +131,7 @@ pub(crate) fn visit_expr<'h>(e: &'h Expr, f: &mut dyn FnMut(Node<'h>)) {
     f(Node::Expr(e));
     match &e.kind {
         ExprKind::Tuple(xs) => xs.iter().for_each(|x| visit_expr(x, f)),
+        ExprKind::Multi(groups) => groups.iter().for_each(|g| visit_expr(&g.value, f)),
         ExprKind::Record { base, fields } => {
             if let Some(b) = base {
                 visit_expr(b, f);

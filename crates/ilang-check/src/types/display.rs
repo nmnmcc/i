@@ -1871,14 +1871,24 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
             // syntax-3 §6.1: a parameter that is not data of one shape is
             // shown as a group: `{ Never } -> A`.
             let (params, group) = match f.parts() {
-                Some(parts) => (
-                    parts
-                        .iter()
-                        .enumerate()
-                        .map(|(i, p)| (f.label(i), tree_with(p, name)))
-                        .collect(),
-                    false,
-                ),
+                Some(parts) => {
+                    // A label of the shape is part of the type; the other
+                    // labels are the written parameter names.
+                    let keys = match &f.param {
+                        Ty::Con(Head::Shape(shape), _, _) if shape.has_labels() => shape.keys(),
+                        _ => vec![None; parts.len()],
+                    };
+                    (
+                        parts
+                            .iter()
+                            .enumerate()
+                            .map(|(i, p)| {
+                                (keys[i].clone().or_else(|| f.label(i)), tree_with(p, name))
+                            })
+                            .collect(),
+                        false,
+                    )
+                }
                 None => (vec![(None, tree_with(&f.param, name))], true),
             };
             let ret = tree_with(&f.ret, name);
