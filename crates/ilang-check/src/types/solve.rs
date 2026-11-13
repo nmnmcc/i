@@ -115,7 +115,7 @@ pub(crate) enum FailKind {
     NeedMeet,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
-    /// Distinct intersection members admit incomparable specializations.
+    /// Distinct intersection members admit different specializations.
     /// The solver cannot choose one as a principal solution (§4.7).
     NonPrincipalIntersection,
 }

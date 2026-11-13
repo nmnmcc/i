@@ -2,12 +2,13 @@
 
 This is an audit of the language in [the spec](../spec.md), especially
 [§4.7](../spec.md#47-type-inference), against checker revision `180e00cf7`.
-It is not a proof that the current compiler finds a principal type for every
-binding. An order-sensitive intersection probe below disproves solution
-preservation by the current solver, even inside the permitted annotation
-fragment. Other extensions have conditional arguments and unproven parts.
-No language or checker change is proposed here; §4.7's principality sentence
-is a compiler requirement.
+It is not a proof that the compiler finds a principal type for every binding.
+The original observations below are against that audit revision. The two
+checker defects in §§1–2 are now fixed: ambiguous intersection specialization
+is rejected under §4.7, and deferred empty service meets retain E0515 through
+generalization. Their correction commits are recorded in those sections.
+Other extensions have conditional arguments and unproven parts; §4.7's
+principality sentence remains a compiler requirement.
 
 For a fixed source program and environment, a principal scheme must be
 admissible and subsume every other admissible typing. Here “subsume” includes
@@ -33,11 +34,13 @@ the universal property.
 
 ## 1. The algebraic base
 
-**Verdict: holds for the cited calculi; not shown for the complete i base,
-and the current solver has a concrete non-principal inference below.
-The finite/cofinite scalar component does hold, because its operations are
-exact and closed.** A transfer argument for i must preserve solutions,
-rather than infer principality merely from being a smaller language.
+**Verdict: the order-dependent inference defect is fixed in `685a1b04c`
+by reporting E0504 when the solver cannot find a principal type (§4.7).
+This is a conservative rejection, not a completeness proof or a general
+representation of relational intersection constraints. The cited calculi
+and the finite/cofinite scalar component retain their separate arguments.**
+A transfer argument for i must preserve solutions, rather than infer
+principality merely from being a smaller language.
 
 ### What the references establish
 
@@ -111,8 +114,8 @@ subtype constraints; decompose by the unique constructor; retain variable
 bounds; generalize only variables absent from the environment. Scalar
 normalization is lossless, as are the prescribed ground constructor merges.
 What is **not shown** is a completeness lemma for *all* reachable open
-constraints in this fragment. In fact `constrain_in` handles a left
-intersection by trying its concrete part and then variable parts, keeping
+constraints in this fragment. At the audit revision, `constrain_in` handled
+a left intersection by trying its concrete part and then variable parts, keeping
 the first successful variable bound. The probe below shows that the
 existing place restriction does not make this choice lossless. A proof for
 this implementation cannot simply assume that invariant; it needs an
@@ -168,6 +171,20 @@ current compiler's principal inference/solution preservation, **not** a
 proof that no principal scheme can exist in a better account of the
 language. Neither annotations nor tests are changed to hide it.
 
+**Correction (`685a1b04c`).** The two operand orders now receive E0504 at
+`x + 1`: the solver cannot infer a principal solution from the different
+successful specializations. It first checks whether an existing bound
+already proves the goal, then tries alternatives in isolated states.
+No failed alternative leaves bounds behind. An ambiguous subproblem is
+not discarded as though it had no solutions. The definition-only probe
+also receives E0504. This intentionally removes the old accepted,
+nonprincipal schemes under §4.7's requirement to report an error where a
+principal type cannot be found. It does not claim the satisfying assignment
+above is invalid. Adding an explicit `Int` member to either intersection
+admits the call without specializing `A` or `B`; both orders have positive
+regressions. The two rejected orders and this positive case are fixtures
+under `tests/spec/4.4/`, with checker coverage in `row_schemes.rs`.
+
 The other base probes check successfully with `id : (A) -> A`,
 `bounded : (A & Int) -> A`, `join : (List(Int | String)) -> List(Int | String)`,
 `except_a : (String - "a") -> String - "a"`, and
@@ -179,7 +196,8 @@ counterexample.
 
 **Verdict: holds for merging fully determined, compatible entries, because
 the merge is their unique prescribed meet; not shown for the full open-row
-system. The compiler misses a required deferred E0515 rejection below.**
+system. The missed deferred E0515 rejection below is fixed in `161d07271`
+and `c9193f54c`; this is a soundness correction.**
 
 [§9.2, “Merging”](../spec.md#92-services) says that merging needs takes their
 intersection. Its next paragraph makes an empty service intersection an
@@ -334,6 +352,20 @@ test `need_meet`. Rebuilding a displayed `A & B` does not recreate the
 deferred meet's metadata. This is a candidate explanation for the observed
 loss, not a traced causal diagnosis. The scalar/ground proof and the
 `freshen` metadata-copying branch do not cover this path.
+
+**Correction (`161d07271`, `c9193f54c`).** The traced loss was at
+generalization: `has_obligations` ignored `need_meet`, so `generalize`
+rebuilt the simplified intersection without its marked variable or service
+forms. It now keeps the bounded scheme when a reachable variable carries
+that obligation. Scheme snapshots also retain `has_need_meets`; copying
+only the marked variables while dropping that flag disabled later checks.
+The existing transfer encoding and freshening already copy the obligation
+and both operands. The callback helper alone remains admissible, as do
+compatible callback instances; the disjoint callback instance reports
+E0515 under §9.2. Fixtures under `tests/spec/9/` and checker tests cover the
+open definition, compatible instances, local and imported disjoint uses,
+retention through a receiving variable, snapshots, transfer and freshening.
+No original golden error line was removed.
 
 ## 3. Value-type reads and fitted patterns
 
@@ -831,8 +863,9 @@ after fitting/occurs checking. `group` uses monomorphic holders during
 mutual inference and generalizes afterwards. `Scheme::mono` and
 `instantiate` retain weak identities. `generalize` keeps unsimplified
 bounds for invariant sharing and recognized hidden difference/handler
-obligations, and rejects hidden handler witnesses. The deferred-meet
-counterexample in §2 shows why this is not a theorem for every obligation.
+obligations, and rejects hidden handler witnesses. The original deferred-meet
+counterexample in §2, now fixed, shows why checking that retention is
+necessary; the correction does not establish a theorem for every obligation.
 [solve.rs](../../crates/ilang-check/src/types/solve.rs),
 `extrude` and `freshen`, enforce levels and preserve row/meet metadata.
 
@@ -968,14 +1001,16 @@ edit is deliberately confined to §4.7.
 
 1. Solution-preserving constraint decomposition for i's restricted open
    union/intersection/difference normal forms and closure under
-   substitution. The concrete left-intersection counterexample must be
-   resolved before the current solver could satisfy such a theorem.
+   substitution. The concrete left-intersection counterexample now receives
+   the required principality error rather than an arbitrary specialization;
+   general relational intersection constraints remain unsupported.
    MLstruct's theorem does not transfer automatically to a negation-free
    implementation.
 2. A principal representation for directed service rows with lacks/handled
    obligations, invariance and deferred meets; rejection of all forbidden
-   empty meets in later instances. The demonstrated accepted `Read(Never)`
-   instance must first be brought into agreement with E0515.
+   empty meets in later instances. The demonstrated `Read(Never)` instance
+   now reports E0515 after the obligation-retention corrections; the finite
+   regressions do not establish the full invariant for every transformation.
 3. Principality relative to read-completion demands, retaining sharing
    through aliases, invariant positions and read batches; unrelated-group
    order independence under the conservative dependency rule. Fitted

@@ -898,11 +898,11 @@ use = () { both(need_int, need_string) }";
         };
         let (graph, _, diags) = common::check_files(&files);
         let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
-        assert_eq!(errors.len(), 1, "{}", graph.sources.render_all(&diags));
+        assert_eq!(errors.len(), 1, "{:?}", graph.sources.render_all(&diags));
         assert_eq!(
             errors[0].code,
             "E0515",
-            "{}",
+            "{:?}",
             graph.sources.render_all(&diags)
         );
     }
@@ -916,7 +916,7 @@ fn intersection_inference_never_selects_a_variable_by_operand_order() {
                 format!("choose = <A, B>(x: {intersection}, a: A, b: B) {{ (x + 1, a, b) }}{call}");
             let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
             let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
-            assert_eq!(errors.len(), 1, "{}", graph.sources.render_all(&diags));
+            assert_eq!(errors.len(), 1, "{:?}", graph.sources.render_all(&diags));
             assert_eq!(errors[0].code, "E0504");
             assert!(errors[0].message.contains("principal type"));
         }
