@@ -447,7 +447,7 @@ fn compiler_definition_service_returns_and_aborts_at_the_query() {
 answer = () -> Nil {
 	{
 		answer = syntax.definition(syntax._template(0))
-		assert(syntax.show(answer) == "(Box {(Box Int)})")
+		assert(syntax.show(answer) == "(= Box (, Int))")
 		Nil
 	} <- (syntax._definitions())
 }
@@ -502,7 +502,7 @@ test("compile_error", () -> Nil {
 "#,
     )
     .unwrap();
-    let parsed = parse("Box Hidden Waiting Missing (Box {(Box Int)})").unwrap();
+    let parsed = parse("Box Hidden Waiting Missing (= Box (, Int))").unwrap();
     let scope = Scope {
         module: 9,
         marks: BTreeSet::new(),
@@ -512,7 +512,7 @@ test("compile_error", () -> Nil {
         .map(|d| Syntax::from_datum(d, &scope))
         .collect::<Vec<_>>()
         .into();
-    assert_eq!(templates[4].show(), "(Box {(Box Int)})");
+    assert_eq!(templates[4].show(), "(= Box (, Int))");
     for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
         let built = build_generated_tests(dir.path(), opt);
         let program = built.host_program().unwrap();

@@ -1,6 +1,8 @@
 //! Expanded syntax must resolve through the ordinary checker without capture.
 mod common;
-use ilang_syntax::ast::{ExprKind, ItemKind, Stmt};
+// The tree that `Parsed.ast` holds: `tree::new` once it is the tree of syntax
+// three (docs/design/syn3-final-ast.md, step 2d).
+use common::tree::old as tree;
 use ilang_syntax::lisp::{
     parse,
     scoped::ScopedSource,
@@ -54,13 +56,7 @@ fn insert_expression(
     let mut scoped = ScopedSource::new(text);
     let call = syntax("x", caller, &[]);
     let expr = scoped.expression(expression, &call).unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!("binding")
-    };
-    let ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!("function")
-    };
-    function.body.stmts[0] = Stmt::Expr(expr);
+    tree::set_statement(&mut module.ast, 0, 0, expr);
     graph
         .sources
         .set_text(module.source, scoped.text().to_owned());
@@ -203,7 +199,7 @@ fn builtin_identity_bypasses_caller_type_shadow() {
         .unwrap()
         .source
         .0;
-    let root = syntax("((-> ((: z Int)) _ z) 1)", caller, &[]);
+    let root = syntax("((-> (, (: z Int)) _ z) 1)", caller, &[]);
     let Node::Round(call) = root.node() else {
         panic!("call")
     };
@@ -213,25 +209,19 @@ fn builtin_identity_bypasses_caller_type_shadow() {
     let Node::Round(params) = fun[1].node() else {
         panic!("parameters")
     };
-    let Node::Round(typed) = params[0].node() else {
+    let Node::Round(typed) = params[1].node() else {
         panic!("typed parameter")
     };
     let builtin = typed[2].with_scope_identity(ScopeIdentity::Builtin { name: "Int".into() });
-    let typed = params[0].replace_children(vec![typed[0].clone(), typed[1].clone(), builtin]);
-    let params = fun[1].replace_children(vec![typed]);
+    let typed = params[1].replace_children(vec![typed[0].clone(), typed[1].clone(), builtin]);
+    let params = fun[1].replace_children(vec![params[0].clone(), typed]);
     let fun =
         call[0].replace_children(vec![fun[0].clone(), params, fun[2].clone(), fun[3].clone()]);
     let root = root.replace_children(vec![fun, call[1].clone()]);
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let expr = scoped.expression(&root, &syntax("f", caller, &[])).unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[1].kind else {
-        panic!("binding")
-    };
-    let ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!("function")
-    };
-    function.body.stmts[0] = Stmt::Expr(expr);
+    tree::set_statement(&mut module.ast, 1, 0, expr);
     graph
         .sources
         .set_text(module.source, scoped.text().to_owned());
@@ -368,13 +358,7 @@ fn an_exported_inferred_type_cannot_leak_a_foreign_private_type() {
     let expr = scoped
         .expression(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
         .unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!("binding")
-    };
-    let ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!("function")
-    };
-    function.body.stmts[0] = Stmt::Expr(expr);
+    tree::set_statement(&mut module.ast, 0, 0, expr);
     graph
         .sources
         .set_text(module.source, scoped.text().to_owned());
@@ -427,27 +411,8 @@ fn unspellable_compiler_alias_can_call_private_member() {
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
     let module = parsed.iter_mut().find(|m| m.path == "app/main").unwrap();
-    let import = &mut module.ast.imports[0];
-    import.alias = Some(ilang_syntax::ast::Ident {
-        name: "\0compiler".into(),
-        span: import.span,
-    });
-    let ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!("binding")
-    };
-    let ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!("function")
-    };
-    let Stmt::Expr(expr) = &mut function.body.stmts[0] else {
-        panic!("expression")
-    };
-    let ExprKind::Field { target, .. } = &mut expr.kind else {
-        panic!("field")
-    };
-    let ExprKind::Name { name, .. } = &mut target.kind else {
-        panic!("module")
-    };
-    name.name = "\0compiler".into();
+    tree::set_import_alias(&mut module.ast, 0, "\0compiler");
+    *tree::field_target_name(tree::expression(&mut module.ast, 0, 0)) = "\0compiler".into();
     let checked = ilang_check::check_parsed(&graph, &parsed);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),
@@ -459,7 +424,7 @@ fn unspellable_compiler_alias_can_call_private_member() {
 #[test]
 fn same_text_in_one_tuple_pattern_binds_distinct_scopes() {
     let (mut graph, mut parsed, caller, template) = setup();
-    let root = syntax("((-> ((, x x)) _ (, x x)) (, 1 \"s\"))", template, &[7]);
+    let root = syntax("((-> (, (, x x)) _ (, x x)) (, 1 \"s\"))", template, &[7]);
     let Node::Round(call) = root.node() else {
         panic!("call")
     };
@@ -469,15 +434,15 @@ fn same_text_in_one_tuple_pattern_binds_distinct_scopes() {
     let Node::Round(params) = fun[1].node() else {
         panic!("parameters")
     };
-    let Node::Round(pattern) = params[0].node() else {
+    let Node::Round(pattern) = params[1].node() else {
         panic!("pattern")
     };
-    let pattern = params[0].replace_children(vec![
+    let pattern = params[1].replace_children(vec![
         pattern[0].clone(),
         pattern[1].clone(),
         syntax("x", caller, &[]),
     ]);
-    let params = fun[1].replace_children(vec![pattern]);
+    let params = fun[1].replace_children(vec![params[0].clone(), pattern]);
     let Node::Round(body) = fun[3].node() else {
         panic!("tuple")
     };
@@ -506,14 +471,18 @@ fn same_text_in_one_tuple_pattern_binds_distinct_scopes() {
 #[test]
 fn parameter_labels_still_compare_written_text() {
     let (mut graph, mut parsed, caller, template) = setup();
-    let root = syntax("(-> (x x) _ x)", template, &[7]);
+    let root = syntax("(-> (, x x) _ x)", template, &[7]);
     let Node::Round(fun) = root.node() else {
         panic!("function")
     };
     let Node::Round(params) = fun[1].node() else {
         panic!("parameters")
     };
-    let params = fun[1].replace_children(vec![params[0].clone(), syntax("x", caller, &[])]);
+    let params = fun[1].replace_children(vec![
+        params[0].clone(),
+        params[1].clone(),
+        syntax("x", caller, &[]),
+    ]);
     let root = root.replace_children(vec![fun[0].clone(), params, fun[2].clone(), fun[3].clone()]);
     insert_expression(&mut graph, &mut parsed, caller, &root);
     let checked = ilang_check::check_parsed(&graph, &parsed);
@@ -647,14 +616,7 @@ fn an_exported_written_type_cannot_leak_a_foreign_private_type() {
     let ty = scoped
         .ty(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
         .unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!("binding")
-    };
-    let ilang_syntax::ast::PatternKind::Typed { ty: written, .. } = &mut binding.pattern.kind
-    else {
-        panic!("typed binding")
-    };
-    *written = ty;
+    *tree::written_type(&mut module.ast, 0) = ty;
     graph
         .sources
         .set_text(module.source, scoped.text().to_owned());
@@ -689,14 +651,7 @@ fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let ty = scoped.ty(&fixed, &syntax("f", caller, &[])).unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[1].kind else {
-        panic!("binding")
-    };
-    let ilang_syntax::ast::PatternKind::Typed { ty: written, .. } = &mut binding.pattern.kind
-    else {
-        panic!("typed binding")
-    };
-    *written = ty;
+    *tree::written_type(&mut module.ast, 1) = ty;
     graph
         .sources
         .set_text(module.source, scoped.text().to_owned());
@@ -731,13 +686,7 @@ fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let expr = scoped.expression(&root, &syntax("f", caller, &[])).unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[1].kind else {
-        panic!("binding")
-    };
-    let ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!("function")
-    };
-    function.body.stmts[0] = Stmt::Expr(expr);
+    tree::set_statement(&mut module.ast, 1, 0, expr);
     graph
         .sources
         .set_text(module.source, scoped.text().to_owned());
@@ -753,7 +702,8 @@ fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
 #[test]
 fn same_text_type_parameters_in_distinct_scopes_are_distinct() {
     let (mut graph, mut parsed, caller, template) = setup();
-    let root = syntax("(= (Box A A) (, A A))", template, &[7]);
+    // A name whose right side is a data type keeps the `{ }` of the item form (§6.8).
+    let root = syntax("(= (Box A A) { (, A A) })", template, &[7]);
     let Node::Round(parts) = root.node() else {
         panic!("definition")
     };
@@ -765,14 +715,18 @@ fn same_text_type_parameters_in_distinct_scopes_are_distinct() {
         head[1].clone(),
         syntax("A", caller, &[]),
     ]);
-    let Node::Round(body) = parts[2].node() else {
+    let Node::Curly(group) = parts[2].node() else {
+        panic!("group")
+    };
+    let Node::Round(body) = group[0].node() else {
         panic!("body")
     };
-    let body = parts[2].replace_children(vec![
+    let body = group[0].replace_children(vec![
         body[0].clone(),
         body[1].clone(),
         syntax("A", caller, &[]),
     ]);
+    let body = parts[2].replace_children(vec![body]);
     let root = root.replace_children(vec![parts[0].clone(), head, body]);
     append_items(&mut graph, &mut parsed, caller, &[root]);
     let checked = ilang_check::check_parsed(&graph, &parsed);

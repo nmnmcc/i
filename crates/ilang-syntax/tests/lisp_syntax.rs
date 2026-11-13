@@ -52,7 +52,9 @@ fn show_as_checks_the_requested_syntactic_position() {
         "1 + 2"
     );
     assert!(root("`(f x)").show_as(Position::Expression).is_err());
-    assert!(root("(,)").show_as(Position::Type).is_err());
+    // The empty Round has no position; the empty data is `(,)` (§6.8).
+    assert!(root("()").show_as(Position::Type).is_err());
+    assert_eq!(root("(,)").show_as(Position::Type).unwrap(), "()");
 }
 
 #[test]
@@ -71,14 +73,16 @@ fn normal_source_encodes_to_syntax_with_original_leaf_spans() {
         },
         source,
     );
-    assert_eq!(syntax.show(), "(-> (x) _ {(+ x 2)})");
+    assert_eq!(syntax.show(), "(-> (, x) _ (+ x 2))");
     let Node::Round(function) = syntax.node() else {
         panic!()
     };
-    let Node::Curly(body) = function[3].node() else {
+    let Node::Round(parameters) = function[1].node() else {
         panic!()
     };
-    let Node::Round(sum) = body[0].node() else {
+    assert!(matches!(parameters[0].node(), Node::Symbol(s) if s == ","));
+    // A body of one expression is that expression, not a block.
+    let Node::Round(sum) = function[3].node() else {
         panic!()
     };
     let x = &sum[1];
@@ -137,7 +141,7 @@ fn made_atoms_are_one_valid_token_and_keep_origin() {
 #[test]
 fn expansion_cannot_create_or_duplicate_foreign_authority() {
     use ilang_syntax::lisp::syntax::{Node, Syntax, validate_expansion};
-    let argument = root("(@ (external \"env\" \"f\") (: f (-> () Int)))");
+    let argument = root("(@ (external \"env\" \"f\") (: f (-> (,) Int)))");
     let marked = argument.flip_mark(7);
     let returned = marked.flip_mark(7);
     assert!(argument.same_origin(&returned));
@@ -356,17 +360,29 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
     use ilang_syntax::lisp::definitions::builtin_definition;
     use ilang_syntax::lisp::syntax::{Node, Position, ScopeIdentity};
     let like = root("x");
-    for name in ["Bool", "Nil", "Result", "Assert", "AssertionFailure"] {
+    // In the rows of §6.8 a member of a sum is a type of its own.
+    for name in [
+        "Bool",
+        "True",
+        "False",
+        "Nil",
+        "Result",
+        "Ok",
+        "Error",
+        "Assert",
+        "AssertionFailure",
+    ] {
         let result = builtin_definition(name, like.scope(), like.span(), 3).unwrap();
         result.show_as(Position::Item).unwrap();
     }
     assert!(builtin_definition("Int", like.scope(), like.span(), 3).is_none());
     let first = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
     let second = builtin_definition("Result", like.scope(), like.span(), 4).unwrap();
+    assert_eq!(first.show(), "(= (Result A E) (| (Ok A) (Error E)))");
     let Node::Round(parts) = first.node() else {
         panic!("item")
     };
-    let Node::Round(head) = parts[0].node() else {
+    let Node::Round(head) = parts[1].node() else {
         panic!("head")
     };
     assert!(
@@ -380,17 +396,18 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
             ..
         })
     ));
-    let Node::Curly(constructors) = parts[1].node() else {
-        panic!("constructors")
+    let Node::Round(members) = parts[2].node() else {
+        panic!("members")
     };
-    let Node::Round(ok) = constructors[0].node() else {
-        panic!("constructor")
+    assert!(matches!(members[0].node(), Node::Symbol(s) if s == "|"));
+    let Node::Round(ok) = members[1].node() else {
+        panic!("member")
     };
     assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
     let Node::Round(parts2) = second.node() else {
         panic!("item")
     };
-    let Node::Round(head2) = parts2[0].node() else {
+    let Node::Round(head2) = parts2[1].node() else {
         panic!("head")
     };
     assert_ne!(head[1].scope_identity(), head2[1].scope_identity());
@@ -405,19 +422,20 @@ fn written_definition_answers_give_parameters_their_own_binder() {
     assert!(errors.is_empty(), "{errors:?}");
     let like = root("x");
     let result = source_definition(&module.items[0], source, like.scope(), 17);
+    assert_eq!(
+        result.show(),
+        "(= (Pair A B) (, (= left A) (= right (List B))))"
+    );
     let Node::Round(parts) = result.node() else {
         panic!("item")
     };
-    let Node::Round(head) = parts[0].node() else {
+    let Node::Round(head) = parts[1].node() else {
         panic!("head")
     };
-    let Node::Curly(body) = parts[1].node() else {
+    let Node::Round(body) = parts[2].node() else {
         panic!("body")
     };
-    let Node::Round(ctor) = body[0].node() else {
-        panic!("constructor")
-    };
-    let Node::Round(field) = ctor[1].node() else {
+    let Node::Round(field) = body[1].node() else {
         panic!("field")
     };
     assert!(matches!(
@@ -429,7 +447,8 @@ fn written_definition_answers_give_parameters_their_own_binder() {
         })
     ));
     assert_eq!(head[1].scope_identity(), field[2].scope_identity());
-    assert!(ctor[0].scope_identity().is_none());
+    // A label is not a use of a parameter.
+    assert!(field[1].scope_identity().is_none());
 }
 
 #[test]
@@ -442,14 +461,14 @@ fn copied_definition_freshens_its_binders_and_uses_together() {
     let Node::Round(parts) = copy.node() else {
         panic!("item")
     };
-    let Node::Round(head) = parts[0].node() else {
+    let Node::Round(head) = parts[1].node() else {
         panic!("head")
     };
-    let Node::Curly(constructors) = parts[1].node() else {
+    let Node::Round(members) = parts[2].node() else {
         panic!("body")
     };
-    let Node::Round(ok) = constructors[0].node() else {
-        panic!("constructor")
+    let Node::Round(ok) = members[1].node() else {
+        panic!("member")
     };
     assert!(matches!(
         head[1].scope_identity(),
@@ -746,7 +765,7 @@ fn definition_table_keeps_scopes_from_expanded_type_items() {
     let Node::Round(parts) = syntax.node() else {
         panic!("item")
     };
-    let Node::Round(head) = parts[0].node() else {
+    let Node::Round(head) = parts[1].node() else {
         panic!("head")
     };
     assert!(head[1].scope().marks.contains(&11));
@@ -764,36 +783,33 @@ fn definition_table_keeps_scopes_from_expanded_type_items() {
 fn expanded_definition_identifies_only_parameters_with_the_same_scope() {
     use ilang_syntax::lisp::definitions::expanded_definition;
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax};
-    let template = root("((Box A) { (Box A) })");
+    let template = root("(= (Box A) (, A))");
     let Node::Round(parts) = template.node() else {
         panic!("type item")
     };
-    let Node::Curly(constructors) = parts[1].node() else {
-        panic!("constructors")
-    };
-    let Node::Round(fields) = constructors[0].node() else {
-        panic!("constructor")
+    let Node::Round(fields) = parts[2].node() else {
+        panic!("data type")
     };
     let other_scope = fields[1].flip_mark(22);
-    let constructor = Syntax::make(
+    let body = Syntax::make(
         Node::Round(vec![fields[0].clone(), other_scope.clone()]),
-        &constructors[0],
+        &parts[2],
     )
     .unwrap();
-    let body = Syntax::make(Node::Curly(vec![constructor]), &parts[1]).unwrap();
-    let item = Syntax::make(Node::Round(vec![parts[0].clone(), body]), &template).unwrap();
+    let item = Syntax::make(
+        Node::Round(vec![parts[0].clone(), parts[1].clone(), body]),
+        &template,
+    )
+    .unwrap();
     let answer = expanded_definition(&item, 41).unwrap();
     let Node::Round(parts) = answer.node() else {
         panic!("item")
     };
-    let Node::Round(head) = parts[0].node() else {
+    let Node::Round(head) = parts[1].node() else {
         panic!("head")
     };
-    let Node::Curly(body) = parts[1].node() else {
-        panic!("body")
-    };
-    let Node::Round(fields) = body[0].node() else {
-        panic!("constructor")
+    let Node::Round(fields) = parts[2].node() else {
+        panic!("data type")
     };
     assert!(matches!(
         head[1].scope_identity(),
@@ -824,14 +840,14 @@ fn template_rebuild_preserves_origin_and_cannot_forge_foreign_attributes() {
         panic!("rebuilt")
     };
     assert!(children[1].identical(&inserted));
-    let attribute = root("(@ (external \"env\" \"f\") (: f (-> () Int)))");
+    let attribute = root("(@ (external \"env\" \"f\") (: f (-> (,) Int)))");
     let Node::Round(parts) = attribute.node() else {
         panic!("attribute")
     };
     let altered = attribute.replace_children(vec![
         parts[0].clone(),
         parts[1].clone(),
-        root("(: g (-> () Int))"),
+        root("(: g (-> (,) Int))"),
     ]);
     assert!(altered.same_origin(&attribute));
     assert!(validate_expansion(&altered, std::slice::from_ref(&attribute)).is_err());
@@ -842,7 +858,7 @@ fn template_rebuild_preserves_origin_and_cannot_forge_foreign_attributes() {
 fn expanded_definition_preserves_attributes_and_parameter_identities() {
     use ilang_syntax::lisp::definitions::expanded_definition;
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
-    let item = root("(@ (deprecated \"old\") ((Box A) { (Box A) }))");
+    let item = root("(@ (deprecated \"old\") (= (Box A) (, A)))");
     let answer = expanded_definition(&item, 90).unwrap();
     let Node::Round(outer) = answer.node() else {
         panic!("attribute")
@@ -851,10 +867,10 @@ fn expanded_definition_preserves_attributes_and_parameter_identities() {
     let Node::Round(core) = outer[2].node() else {
         panic!("definition")
     };
-    let Node::Round(head) = core[0].node() else {
+    let Node::Round(head) = core[1].node() else {
         panic!("head")
     };
-    assert_eq!(core[0].definition_head(), Some(90));
+    assert_eq!(core[1].definition_head(), Some(90));
     assert!(matches!(
         head[1].scope_identity(),
         Some(ScopeIdentity::DefinitionParameter { answer: 90, .. })
@@ -894,9 +910,14 @@ fn deeply_nested_definition_answer_uses_bounded_host_stack() {
 
 #[test]
 fn definition_answer_preserves_a_single_field_record_type() {
-    let definition = root("(= (Box A) ((: x A)))");
+    // A labelled type of one labelled item, and a name of that data type:
+    // the `{ }` of the item form is kept (§6.8), so the two stay apart.
+    let definition = root("(= (Box A) (, (= x A)))");
     let answer = ilang_syntax::lisp::definitions::expanded_definition(&definition, 91).unwrap();
-    assert_eq!(answer.show(), "(= (Box A) ((: x A)))");
+    assert_eq!(answer.show(), "(= (Box A) (, (= x A)))");
+    let name = root("(= (Box A) { (, (= x A)) })");
+    let answer = ilang_syntax::lisp::definitions::expanded_definition(&name, 92).unwrap();
+    assert_eq!(answer.show(), "(= (Box A) {(, (= x A))})");
 }
 
 #[test]
@@ -953,11 +974,11 @@ fn scoped_conversion_separates_repeated_origins_and_keeps_sliceable_text() {
 #[test]
 fn scoped_conversion_reports_the_actual_scoped_bad_node() {
     use ilang_syntax::lisp::scoped::ScopedSource;
-    let bad = root("(f (,))");
+    let bad = root("(f ())");
     let call = root("call");
     let mut source = ScopedSource::new("text".into());
     let error = source.expression(&bad, &call).unwrap_err();
-    assert_eq!(error.origin.syntax.show(), "(,)");
+    assert_eq!(error.origin.syntax.show(), "()");
     assert!(error.origin.call_site.same_code(&call));
 }
 
@@ -1061,14 +1082,14 @@ fn rewriting_a_definition_head_cannot_forge_parameter_binding_authority() {
     let Node::Round(item) = answer.node() else {
         panic!("item")
     };
-    let Node::Round(head) = item[0].node() else {
+    let Node::Round(head) = item[1].node() else {
         panic!("head")
     };
-    assert_eq!(item[0].definition_head(), Some(30));
-    let unchanged = item[0].replace_children(head.clone());
+    assert_eq!(item[1].definition_head(), Some(30));
+    let unchanged = item[1].replace_children(head.clone());
     assert_eq!(unchanged.definition_head(), Some(30));
     let replacement = Syntax::make(Node::Up("A".into()), &head[1]).unwrap();
-    let changed = item[0].replace_children(vec![head[0].clone(), replacement, head[2].clone()]);
+    let changed = item[1].replace_children(vec![head[0].clone(), replacement, head[2].clone()]);
     assert_eq!(changed.definition_head(), None);
 }
 
@@ -1096,16 +1117,16 @@ fn duplicate_definition_heads_are_freshened_with_all_uses() {
         let Node::Round(parts) = item.node() else {
             panic!("item")
         };
-        let Node::Round(head) = parts[0].node() else {
+        let Node::Round(head) = parts[1].node() else {
             panic!("head")
         };
-        let Node::Curly(body) = parts[1].node() else {
-            panic!("body")
+        let Node::Round(members) = parts[2].node() else {
+            panic!("members")
         };
-        let Node::Round(ctor) = body[0].node() else {
-            panic!("ctor")
+        let Node::Round(ctor) = members[1].node() else {
+            panic!("member")
         };
-        assert_eq!(parts[0].definition_head(), Some(id));
+        assert_eq!(parts[1].definition_head(), Some(id));
         assert!(
             matches!(head[1].scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer, parameter: 0, .. }) if *answer == id)
         );
@@ -1167,20 +1188,29 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
 
 #[test]
 fn records_parse_from_lisp_with_fields_spread_and_removal() {
-    use ilang_syntax::ast::{ExprKind, TypeKind};
-    let empty = ilang_syntax::lisp::parse("()").unwrap();
-    let empty = ilang_syntax::lisp::parse_expression(&empty[0]).unwrap();
-    assert!(matches!(&empty.kind, ExprKind::Record { base: None, fields } if fields.is_empty()));
-    let values = ilang_syntax::lisp::parse("(.. r (: x 1) (: \"a b\" 2))").unwrap();
-    let value = ilang_syntax::lisp::parse_expression(&values[0]).unwrap();
+    // Data in the rows of §6.8. A record type with a base or a removed key
+    // has no row any more.
+    use ilang_syntax::syn3::ast::{DItem, ExprKind, TItem, TypeKind};
+    use ilang_syntax::syn3::lisp::{expr_from_datum, type_from_datum};
+    let round = ilang_syntax::lisp::parse("()").unwrap();
+    assert!(expr_from_datum(&round[0]).is_err());
+    let empty = ilang_syntax::lisp::parse("(,)").unwrap();
+    let empty = expr_from_datum(&empty[0]).unwrap();
+    assert!(matches!(&empty.kind, ExprKind::Data(items) if items.is_empty()));
+    let values = ilang_syntax::lisp::parse("(, .. r (= x 1) (= a_b 2))").unwrap();
+    let value = expr_from_datum(&values[0]).unwrap();
     assert!(
-        matches!(&value.kind, ExprKind::Record { base: Some(_), fields } if fields.len() == 2 && fields[1].0.name == "a b")
+        matches!(&value.kind, ExprKind::Data(items) if matches!(items.as_slice(), [DItem::Spread(_), DItem::Label(..), DItem::Label(label, _)] if label.name == "a_b"))
     );
-    let types = ilang_syntax::lisp::parse("(.. R (- old) (: K { Int }))").unwrap();
-    let ty = ilang_syntax::lisp::parse_type(&types[0]).unwrap();
+    let types = ilang_syntax::lisp::parse("(, (= k { Int }) Int)").unwrap();
+    let ty = type_from_datum(&types[0]).unwrap();
     assert!(
-        matches!(&ty.kind, TypeKind::Record { base: Some(_), fields, removed } if fields[0].0.parameter && removed[0].ident.name == "old")
+        matches!(&ty.kind, TypeKind::Data(items) if matches!(items.as_slice(), [TItem::Label(label, _), TItem::Pos(_)] if label.name == "k"))
     );
+    for removed in ["(, .. R (= k Int))", "(, (- old) (= k Int))"] {
+        let types = ilang_syntax::lisp::parse(removed).unwrap();
+        assert!(type_from_datum(&types[0]).is_err(), "{removed}");
+    }
 }
 
 #[test]
@@ -1193,6 +1223,9 @@ fn show_as_groups_a_binary_operand_under_negation() {
 
 #[test]
 fn show_as_distinguishes_postfix_and_standalone_clauses() {
+    // A clause block and a match on it, in the rows before syntax three: the
+    // rows of §6.8 have no clause block, so these stay errors after the rows
+    // flip (the chain and the match of §6.8 are tested in lisp_syntax3.rs).
     assert!(
         root("{ (-> (= a (, x)) (-> (y) Int y)) }")
             .show_as(Position::Expression)
@@ -1227,21 +1260,32 @@ fn show_as_deep_type_and_pattern_use_bounded_host_stack() {
 
 #[test]
 fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
-    let simple = root("(-> () _ { x y })");
-    assert_eq!(simple.show_as(Position::Expression).unwrap(), "() { x y }");
-    let negative = root("(-> () _ { x (- 1) })");
+    // The printer of syntax three writes each statement of a block of
+    // several statements on a line of its own, so `x` and `-1` stay apart;
+    // a body of one expression stays on the line.
+    let simple = root("(-> (,) _ { x y })");
+    assert_eq!(
+        simple.show_as(Position::Expression).unwrap(),
+        "() {\n\tx\n\ty\n}"
+    );
+    let negative = root("(-> (,) _ { x (- 1) })");
     assert_eq!(
         negative.show_as(Position::Expression).unwrap(),
-        "() { x\n-1 }"
+        "() {\n\tx\n\t-1\n}"
+    );
+    assert_eq!(
+        root("(-> (,) _ x)").show_as(Position::Expression).unwrap(),
+        "() { x }"
     );
 }
 
 #[test]
 fn show_as_attribute_item_uses_only_required_line_breaks() {
-    let item = root("(@ custom (= f (-> () _ { Nil })))");
+    let item = root("(@ custom (= f (-> (,) _ Nil)))");
+    // An attribute is on a line of its own in the layout of syntax three.
     assert_eq!(
         item.show_as(Position::Item).unwrap(),
-        "@custom f = () { Nil }"
+        "@custom\nf = () { Nil }"
     );
     let (module, errors) =
         ilang_syntax::parse_module(&format!("{}\n", item.show_as(Position::Item).unwrap()));
@@ -1272,7 +1316,7 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
         "x + y",
         "-{ x + y }",
         "(x) { x }",
-        "x.{ 1 -> 2 _ -> 3 }",
+        "x |> (1) { 2 } | (_) { 3 }",
         "{ x y }",
         "<<1, 2>>",
     ];

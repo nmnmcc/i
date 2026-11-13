@@ -1,16 +1,17 @@
 //! Expanded modules must enter the same resolver and checker as parsed source.
 mod common;
 
+// The tree that `Parsed.ast` holds: `tree::new` once it is the tree of syntax
+// three (docs/design/syn3-final-ast.md, step 2d).
+use common::tree::old as tree;
+
 #[test]
 fn checks_transformed_modules_without_reparsing_the_source() {
     let (graph, _, _) = common::check_files(&[("src/main.i", "(value)\nvalue = 1\n")]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
     let module = parsed.iter_mut().find(|m| m.path == "app/main").unwrap();
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!("fixture must contain a binding");
-    };
-    binding.value.kind = ilang_syntax::ast::ExprKind::String("changed".into());
+    tree::value(&mut module.ast, 0).kind = tree::string("changed");
     let checked = ilang_check::check_parsed(&graph, &parsed);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),
