@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	path = std/path
 	list = std/list
@@ -57,16 +58,16 @@ test("path_parts_examples", () {
 })
 
 test("path_relative_examples", () {
-	assert(path.relative("/a/b", "/a/c") == Ok("../c"))
-	assert(path.relative("../a", "../b") == Ok("../b"))
-	assert(path.relative("..", "../a") == Ok("a"))
-	assert(path.relative("..", ".") == Error(path.UnknownParent))
-	assert(path.relative("a", "/a") == Error(path.DifferentRoots))
-	assert(path.relative("/a", "a") == Error(path.DifferentRoots))
-	assert(path.relative("/a/./", "/a") == Ok("."))
-	assert(path.relative("", "") == Ok("."))
-	assert(path.relative(".", "../é") == Ok("../é"))
-	assert(path.relative("../../a", "../a") == Error(path.UnknownParent))
+	assert(fail.catch(() { path.relative("/a/b", "/a/c") }) == Ok("../c"))
+	assert(fail.catch(() { path.relative("../a", "../b") }) == Ok("../b"))
+	assert(fail.catch(() { path.relative("..", "../a") }) == Ok("a"))
+	assert(fail.catch(() { path.relative("..", ".") }) == Error(path.UnknownParent))
+	assert(fail.catch(() { path.relative("a", "/a") }) == Error(path.DifferentRoots))
+	assert(fail.catch(() { path.relative("/a", "a") }) == Error(path.DifferentRoots))
+	assert(fail.catch(() { path.relative("/a/./", "/a") }) == Ok("."))
+	assert(fail.catch(() { path.relative("", "") }) == Ok("."))
+	assert(fail.catch(() { path.relative(".", "../é") }) == Ok("../é"))
+	assert(fail.catch(() { path.relative("../../a", "../a") }) == Error(path.UnknownParent))
 	Nil
 })
 
@@ -95,7 +96,7 @@ test("path_exhaustive_laws", () {
 	})
 	list.each(short_paths(3), (from) {
 		list.each(short_paths(3), (to) {
-			path.relative(from, to) |>
+			fail.catch(() { path.relative(from, to) }) |>
 				(Error(_)) { Nil }
 				| (Ok(r)) {
 					assert(
@@ -136,6 +137,6 @@ test("path_long_inputs", () {
 	name = string.repeat("é", 100000)
 	assert(path.clean(name) == name)
 	assert(path.split(name) == ("", name))
-	assert(path.relative(long, long) == Ok("."))
+	assert(fail.catch(() { path.relative(long, long) }) == Ok("."))
 	Nil
 })

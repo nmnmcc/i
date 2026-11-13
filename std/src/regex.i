@@ -547,7 +547,7 @@ lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
 
 /// Compiles to an immutable NFA, or an error at a scalar position.
 /// `regex.compile("(?<word>\\w+)")`.
-compile = (pattern: String) -> Result(Regex, RegexError) {
+_compile_result = (pattern: String) -> Result(Regex, RegexError) {
 	fail.catch(() {
 		p = Parser(
 			rest = list.map(core.codepoints(pattern), core.codepoint_to_int),
@@ -933,7 +933,7 @@ slot = (c: Captures, n: Int) -> Offset {
 }
 
 replacement_value = (c: Captures, name: String) -> String {
-	m = int.parse(name) |>
+	m = fail.catch(() { int.parse(name) }) |>
 		(Ok(n)) { group(c, n) }
 		| (Error(_)) { named(c, name) }
 	m |> (Some(v)) { v.text } | (None) { "" }
@@ -1071,7 +1071,12 @@ fold_pairs = table(
 )
 
 table = (hex: String) -> BitArray {
-	bit_array.base16_decode(hex) |>
+	fail.catch(() { bit_array.base16_decode(hex) }) |>
 		(Ok(bytes)) { bytes }
 		| (Error(_)) { panic("regex: Unicode table encoding") }
+}
+
+/// Reports failure through `Fail(RegexError)`.
+compile = (pattern: String) <- (Fail(RegexError)) -> Regex {
+	fail.from_result(_compile_result(pattern))
 }

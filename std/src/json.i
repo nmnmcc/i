@@ -37,7 +37,7 @@ Object = (List((String, Json)))
 Json = Null | Boolean | Integer | Number | Text | Array | Object
 JsonError = (offset = Int, reason = String)
 
-parse = (text: String) -> Result(Json, JsonError) {
+_parse_result = (text: String) -> Result(Json, JsonError) {
 	fail.catch(() {
 		xs = octets(<<text:utf8>>)
 		(value, rest, at) = value(xs, 0)
@@ -166,9 +166,10 @@ read_string = (xs: List(Int), at: Int, acc: List(BitArray)) -> (
 			fail.raise(JsonError(offset = at, reason = "unterminated string"))
 		}
 		| ([34, ..tail]) {
-			bit_array.to_string(
-				bit_array.concat(list.reverse(acc)),
-			) |>
+			{
+e4_call_arg_0 = bit_array.concat(list.reverse(acc))
+fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+} |>
 				(Ok(s)) { (s, tail, at + 1) }
 				| (Error(_)) {
 					fail.raise(JsonError(offset = at, reason = "invalid UTF-8"))
@@ -362,7 +363,7 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) {
 	)
 	parsed = is_float |>
 		(False) {
-			int.parse(num) |>
+			fail.catch(() { int.parse(num) }) |>
 				(Ok(n)) { Integer(n) }
 				| (Error(_)) {
 					fail.raise(
@@ -378,7 +379,7 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) {
 					)
 				}
 				| (False) { num }
-			float.parse(float_text) |>
+			fail.catch(() { float.parse(float_text) }) |>
 				(Ok(n)) { Number(n) }
 				| (Error(_)) {
 					fail.raise(
@@ -409,9 +410,10 @@ octets = (bits: BitArray) -> List(Int) {
 }
 
 text_bytes = (xs: List(Int)) -> String {
-	bit_array.to_string(
-		bit_array.concat(list.map(xs, (x) { <<x>> })),
-	) |>
+	{
+e4_call_arg_0 = bit_array.concat(list.map(xs, (x) { <<x>> }))
+fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+} |>
 		(Ok(s)) { s }
 		| (Error(_)) { panic("json: invalid internal text") }
 }
@@ -552,4 +554,9 @@ quote = (s: String) -> String {
 
 hex_char = (n: Int) -> Int {
 	{ n < 10 } |> (True) { n + 48 } | (False) { n + 87 }
+}
+
+/// Reports failure through `Fail(JsonError)`.
+parse = (text: String) <- (Fail(JsonError)) -> Json {
+	fail.from_result(_parse_result(text))
 }

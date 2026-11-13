@@ -11,6 +11,7 @@
 //// and the environment of that function (`^ E ! N`), so the argument may
 //// itself raise errors or need services.
 (
+	i/fail
 	dict = (Dict) = std/dict
 	option = (Option, Some, None) = std/option
 	order = (Order, Less, Equal, Greater) = std/order
@@ -529,7 +530,7 @@ zip = <A, B>(list: List(A), with: List(B)) -> List((A, B)) {
 }
 
 /// Like `zip`, but `Error(Nil)` when the lists have different lengths.
-strict_zip = <A, B>(list: List(A), with: List(B)) -> Result(List((A, B)), Nil) {
+_strict_zip_result = <A, B>(list: List(A), with: List(B)) -> Result(List((A, B)), Nil) {
 	go = (xs, ys, acc) {
 		(xs, ys) |>
 			(([], [])) { Ok(reverse(acc)) }
@@ -1144,4 +1145,9 @@ min = <A, N>(over: List(A), with: (A, A) <- N -> Order) -> Option(A) {
 				}),
 			)
 		}
+}
+
+/// Reports failure through `Fail(Nil)`.
+strict_zip = <A, B>(list: List(A), with: List(B)) <- (Fail(Nil)) -> List((A, B)) {
+	fail.from_result(_strict_zip_result(list, with))
 }

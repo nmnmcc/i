@@ -5,6 +5,7 @@
 //// `remainder`, `modulo`, and `floor_divide` give `Error(Nil)` for `0`
 //// instead.
 (
+	i/fail
 	i/core
 	order = (Order, Less, Equal, Greater) = std/order
 )
@@ -63,7 +64,7 @@ to_string = (x: Int) -> String { core.inspect(x) }
 /// int.parse("-42")  // Ok(-42)
 /// int.parse("4.2")  // Error(Nil)
 /// ```
-parse = (text: String) -> Result(Int, Nil) { parse_base(text, 10) }
+_parse_result = (text: String) -> Result(Int, Nil) { _parse_base_result(text, 10) }
 
 /// Reads a number in the given base, from 2 to 36: an optional `-` or `+`,
 /// then one or more digits. Digits after `9` are the letters `a` to `z`, in
@@ -73,7 +74,7 @@ parse = (text: String) -> Result(Int, Nil) { parse_base(text, 10) }
 /// ```i
 /// int.parse_base("ff", 16)  // Ok(255)
 /// ```
-parse_base = (text: String, base: Int) -> Result(Int, Nil) {
+_parse_base_result = (text: String, base: Int) -> Result(Int, Nil) {
 	{ base >= 2 && base <= 36 } |>
 		(False) { Error(Nil) }
 		| (True) {
@@ -125,7 +126,7 @@ digit_value = (byte: Int) -> Int {
 /// int.to_base(255, 16)  // Ok("FF")
 /// int.to_base(-5, 2)    // Ok("-101")
 /// ```
-to_base = (x: Int, base: Int) -> Result(String, Nil) {
+_to_base_result = (x: Int, base: Int) -> Result(String, Nil) {
 	{ base >= 2 && base <= 36 } |>
 		(False) { Error(Nil) }
 		| (True) { Ok(base_string(x, base)) }
@@ -217,7 +218,7 @@ is_odd = (x: Int) -> Bool { x % 2 != 0 }
 /// ```i
 /// int.power(2, 10)  // Ok(1024)
 /// ```
-power = (base: Int, of: Int) -> Result(Int, Nil) {
+_power_result = (base: Int, of: Int) -> Result(Int, Nil) {
 	{ of < 0 } |> (True) { Error(Nil) } | (False) { Ok(int_power(base, of, 1)) }
 }
 
@@ -235,7 +236,7 @@ int_power = (base: Int, exponent: Int, acc: Int) -> Int {
 /// ```i
 /// int.square_root(16)  // Ok(4.0)
 /// ```
-square_root = (x: Int) -> Result(Float, Nil) {
+_square_root_result = (x: Int) -> Result(Float, Nil) {
 	{ x < 0 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(core.sqrt(core.to_float(x))) }
@@ -259,7 +260,7 @@ product = (numbers: List(Int)) -> Int {
 /// ```i
 /// int.digits(234, 10)  // Ok([2, 3, 4])
 /// ```
-digits = (x: Int, base: Int) -> Result(List(Int), Nil) {
+_digits_result = (x: Int, base: Int) -> Result(List(Int), Nil) {
 	{ base < 2 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -279,7 +280,7 @@ digits = (x: Int, base: Int) -> Result(List(Int), Nil) {
 /// ```i
 /// int.undigits([2, 3, 4], 10)  // Ok(234)
 /// ```
-undigits = (numbers: List(Int), base: Int) -> Result(Int, Nil) {
+_undigits_result = (numbers: List(Int), base: Int) -> Result(Int, Nil) {
 	{ base < 2 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -297,7 +298,7 @@ undigits = (numbers: List(Int), base: Int) -> Result(Int, Nil) {
 }
 
 /// `a / by`, rounded toward zero, or `Error(Nil)` when `by` is `0`.
-divide = (a: Int, by: Int) -> Result(Int, Nil) {
+_divide_result = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |> (0) { Error(Nil) } | (_) { Ok(a / by) }
 }
 
@@ -307,7 +308,7 @@ divide = (a: Int, by: Int) -> Result(Int, Nil) {
 /// ```i
 /// int.remainder(-13, 3)  // Ok(-1)
 /// ```
-remainder = (a: Int, by: Int) -> Result(Int, Nil) {
+_remainder_result = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |> (0) { Error(Nil) } | (_) { Ok(a % by) }
 }
 
@@ -317,7 +318,7 @@ remainder = (a: Int, by: Int) -> Result(Int, Nil) {
 /// ```i
 /// int.modulo(-13, 3)  // Ok(2)
 /// ```
-modulo = (a: Int, by: Int) -> Result(Int, Nil) {
+_modulo_result = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |>
 		(0) { Error(Nil) }
 		| (_) {
@@ -333,7 +334,7 @@ modulo = (a: Int, by: Int) -> Result(Int, Nil) {
 /// ```i
 /// int.floor_divide(-7, 2)  // Ok(-4)
 /// ```
-floor_divide = (a: Int, by: Int) -> Result(Int, Nil) {
+_floor_divide_result = (a: Int, by: Int) -> Result(Int, Nil) {
 	by |>
 		(0) { Error(Nil) }
 		| (_) {
@@ -388,4 +389,59 @@ range = <Acc, N>(
 		{ i == to } |> (True) { acc } | (False) { go(i + step, run(acc, i)) }
 	}
 	go(from, with)
+}
+
+/// Reports failure through `Fail(Nil)`.
+parse = (text: String) <- (Fail(Nil)) -> Int {
+	fail.from_result(_parse_result(text))
+}
+
+/// Reports failure through `Fail(Nil)`.
+parse_base = (text: String, base: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_parse_base_result(text, base))
+}
+
+/// Reports failure through `Fail(Nil)`.
+to_base = (x: Int, base: Int) <- (Fail(Nil)) -> String {
+	fail.from_result(_to_base_result(x, base))
+}
+
+/// Reports failure through `Fail(Nil)`.
+power = (base: Int, of: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_power_result(base, of))
+}
+
+/// Reports failure through `Fail(Nil)`.
+square_root = (x: Int) <- (Fail(Nil)) -> Float {
+	fail.from_result(_square_root_result(x))
+}
+
+/// Reports failure through `Fail(Nil)`.
+digits = (x: Int, base: Int) <- (Fail(Nil)) -> List(Int) {
+	fail.from_result(_digits_result(x, base))
+}
+
+/// Reports failure through `Fail(Nil)`.
+undigits = (numbers: List(Int), base: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_undigits_result(numbers, base))
+}
+
+/// Reports failure through `Fail(Nil)`.
+divide = (a: Int, by: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_divide_result(a, by))
+}
+
+/// Reports failure through `Fail(Nil)`.
+remainder = (a: Int, by: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_remainder_result(a, by))
+}
+
+/// Reports failure through `Fail(Nil)`.
+modulo = (a: Int, by: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_modulo_result(a, by))
+}
+
+/// Reports failure through `Fail(Nil)`.
+floor_divide = (a: Int, by: Int) <- (Fail(Nil)) -> Int {
+	fail.from_result(_floor_divide_result(a, by))
 }

@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	i/core
 	float = std/float
@@ -11,57 +12,57 @@
 )
 
 test("parse_positive_test", () {
-	assert(float.parse("1.23") == Ok(1.23))
+	assert(fail.catch(() { float.parse("1.23") }) == Ok(1.23))
 	Nil
 })
 
 test("parse_positive_with_plus_test", () {
-	assert(float.parse("+1.23") == Ok(1.23))
+	assert(fail.catch(() { float.parse("+1.23") }) == Ok(1.23))
 	Nil
 })
 
 test("parse_negative_test", () {
-	assert(float.parse("-1.23") == Ok(-.1.23))
+	assert(fail.catch(() { float.parse("-1.23") }) == Ok(-.1.23))
 	Nil
 })
 
 test("parse_whole_test", () {
-	assert(float.parse("5.0") == Ok(5.0))
+	assert(fail.catch(() { float.parse("5.0") }) == Ok(5.0))
 	Nil
 })
 
 test("parse_many_decimal_places_test", () {
-	assert(float.parse("0.123456789") == Ok(0.123456789))
+	assert(fail.catch(() { float.parse("0.123456789") }) == Ok(0.123456789))
 	Nil
 })
 
 test("parse_scientific_test", () {
-	assert(float.parse("1.234e10") == Ok(1.234e10))
+	assert(fail.catch(() { float.parse("1.234e10") }) == Ok(1.234e10))
 	Nil
 })
 
 test("parse_scientific_negative_positive_test", () {
-	assert(float.parse("-1.234e+10") == Ok(-.1.234e10))
+	assert(fail.catch(() { float.parse("-1.234e+10") }) == Ok(-.1.234e10))
 	Nil
 })
 
 test("parse_scientific_negative_exponent_test", () {
-	assert(float.parse("1.234e-10") == Ok(1.234e-10))
+	assert(fail.catch(() { float.parse("1.234e-10") }) == Ok(1.234e-10))
 	Nil
 })
 
 test("parse_empty_test", () {
-	assert(float.parse("") == Error(Nil))
+	assert(fail.catch(() { float.parse("") }) == Error(Nil))
 	Nil
 })
 
 test("parse_invalid_test", () {
-	assert(float.parse("what") == Error(Nil))
+	assert(fail.catch(() { float.parse("what") }) == Error(Nil))
 	Nil
 })
 
 test("parse_integer_test", () {
-	assert(float.parse("1") == Error(Nil))
+	assert(fail.catch(() { float.parse("1") }) == Error(Nil))
 	Nil
 })
 
@@ -495,32 +496,32 @@ test("absolute_value_positive_large_test", () {
 })
 
 test("power_two_squared_test", () {
-	assert(float.real_power(2.0, 2.0) == Ok(4.0))
+	assert(fail.catch(() { float.real_power(2.0, 2.0) }) == Ok(4.0))
 	Nil
 })
 
 test("power_negative_cubed_test", () {
-	assert(float.real_power(-.5.0, 3.0) == Ok(-.125.0))
+	assert(fail.catch(() { float.real_power(-.5.0, 3.0) }) == Ok(-.125.0))
 	Nil
 })
 
 test("power_zero_exponent_test", () {
-	assert(float.real_power(10.5, 0.0) == Ok(1.0))
+	assert(fail.catch(() { float.real_power(10.5, 0.0) }) == Ok(1.0))
 	Nil
 })
 
 test("power_fractional_exponent_test", () {
-	assert(float.real_power(16.0, 0.5) == Ok(4.0))
+	assert(fail.catch(() { float.real_power(16.0, 0.5) }) == Ok(4.0))
 	Nil
 })
 
 test("power_negative_exponent_test", () {
-	assert(float.real_power(2.0, -.1.0) == Ok(0.5))
+	assert(fail.catch(() { float.real_power(2.0, -.1.0) }) == Ok(0.5))
 	Nil
 })
 
 test("power_negative_exponent_2_test", () {
-	assert(float.real_power(2.0, -.1.0) == Ok(0.5))
+	assert(fail.catch(() { float.real_power(2.0, -.1.0) }) == Ok(0.5))
 	Nil
 })
 
@@ -528,47 +529,47 @@ test("power_negative_base_fractional_exponent_error_test", () {
 	// float.real_power(-.1.0, 0.5) is equivalent to float.square_root(-.1.0)
 	// and should return an error as an imaginary number would otherwise
 	// have to be returned
-	assert(float.real_power(-.1.0, 0.5) == Error(Nil))
+	assert(fail.catch(() { float.real_power(-.1.0, 0.5) }) == Error(Nil))
 	Nil
 })
 
 test("power_negative_base_fractional_exponent_error_2_test", () {
 	// Check another case with a negative base and fractional exponent
-	assert(float.real_power(-.1.5, 1.5) == Error(Nil))
+	assert(fail.catch(() { float.real_power(-.1.5, 1.5) }) == Error(Nil))
 	Nil
 })
 
 test("power_zero_base_negative_exponent_error_test", () {
 	// float.real_power(0.0, -.1.0) is equivalent to 1. /. 0 and is expected
 	// to be an error
-	assert(float.real_power(0.0, -.1.0) == Error(Nil))
+	assert(fail.catch(() { float.real_power(0.0, -.1.0) }) == Error(Nil))
 	Nil
 })
 
 test("power_negative_base_negative_exponent_test", () {
 	// Check that a negative base and exponent is fine as long as the
 	// exponent is not fractional
-	assert(float.real_power(-.2.0, -.1.0) == Ok(-.0.5))
+	assert(fail.catch(() { float.real_power(-.2.0, -.1.0) }) == Ok(-.0.5))
 	Nil
 })
 
 test("square_root_four_test", () {
-	assert(float.square_root(4.0) == Ok(2.0))
+	assert(fail.catch(() { float.square_root(4.0) }) == Ok(2.0))
 	Nil
 })
 
 test("square_root_sixteen_test", () {
-	assert(float.square_root(16.0) == Ok(4.0))
+	assert(fail.catch(() { float.square_root(16.0) }) == Ok(4.0))
 	Nil
 })
 
 test("square_root_zero_test", () {
-	assert(float.square_root(0.0) == Ok(0.0))
+	assert(fail.catch(() { float.square_root(0.0) }) == Ok(0.0))
 	Nil
 })
 
 test("square_root_negative_error_test", () {
-	assert(float.square_root(-.4.0) == Error(Nil))
+	assert(fail.catch(() { float.square_root(-.4.0) }) == Error(Nil))
 	Nil
 })
 
@@ -615,13 +616,13 @@ test("product_multiple_test", () {
 })
 
 test("modulo_by_zero_test", () {
-	assert(float.modulo(13.3, 0.0) == Error(Nil))
+	assert(fail.catch(() { float.modulo(13.3, 0.0) }) == Error(Nil))
 	Nil
 })
 
 test("modulo_positive_test", () {
 	assert(
-		float.modulo(13.3, 3.3)
+		fail.catch(() { float.modulo(13.3, 3.3) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(0.1, 0.001),
 	)
@@ -630,7 +631,7 @@ test("modulo_positive_test", () {
 
 test("modulo_negative_dividend_test", () {
 	assert(
-		float.modulo(-.13.3, 3.3)
+		fail.catch(() { float.modulo(-.13.3, 3.3) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(3.2, 0.001),
 	)
@@ -639,7 +640,7 @@ test("modulo_negative_dividend_test", () {
 
 test("modulo_negative_divisor_test", () {
 	assert(
-		float.modulo(13.3, -.3.3)
+		fail.catch(() { float.modulo(13.3, -.3.3) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(-.3.2, 0.001),
 	)
@@ -648,7 +649,7 @@ test("modulo_negative_divisor_test", () {
 
 test("modulo_both_negative_test", () {
 	assert(
-		float.modulo(-.13.3, -.3.3)
+		fail.catch(() { float.modulo(-.13.3, -.3.3) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(-.0.1, 0.001),
 	)
@@ -656,22 +657,22 @@ test("modulo_both_negative_test", () {
 })
 
 test("divide_by_self_test", () {
-	assert(float.divide(1.0, 1.0) == Ok(1.0))
+	assert(fail.catch(() { float.divide(1.0, 1.0) }) == Ok(1.0))
 	Nil
 })
 
 test("divide_by_zero_test", () {
-	assert(float.divide(1.0, 0.0) == Error(Nil))
+	assert(fail.catch(() { float.divide(1.0, 0.0) }) == Error(Nil))
 	Nil
 })
 
 test("divide_zero_by_one_test", () {
-	assert(float.divide(0.0, 1.0) == Ok(0.0))
+	assert(fail.catch(() { float.divide(0.0, 1.0) }) == Ok(0.0))
 	Nil
 })
 
 test("divide_one_by_zero_test", () {
-	assert(float.divide(1.0, 0.0) == Error(Nil))
+	assert(fail.catch(() { float.divide(1.0, 0.0) }) == Error(Nil))
 	Nil
 })
 
@@ -712,7 +713,7 @@ test("subtract_negative_result_test", () {
 
 test("logarithm_one_test", () {
 	assert(
-		float.logarithm(1.0)
+		fail.catch(() { float.logarithm(1.0) })
 			|> result.unwrap(1.0)
 			|> float.loosely_equals(0.0, 0.001),
 	)
@@ -721,7 +722,7 @@ test("logarithm_one_test", () {
 
 test("logarithm_e_test", () {
 	assert(
-		float.logarithm(2.718281828459045)
+		fail.catch(() { float.logarithm(2.718281828459045) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(1.0, 0.001),
 	)
@@ -730,7 +731,7 @@ test("logarithm_e_test", () {
 
 test("logarithm_ten_test", () {
 	assert(
-		float.logarithm(10.0)
+		fail.catch(() { float.logarithm(10.0) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(2.302585092994046, 0.001),
 	)
@@ -739,7 +740,7 @@ test("logarithm_ten_test", () {
 
 test("logarithm_hundred_test", () {
 	assert(
-		float.logarithm(100.0)
+		fail.catch(() { float.logarithm(100.0) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(4.605170185988092, 0.001),
 	)
@@ -748,7 +749,7 @@ test("logarithm_hundred_test", () {
 
 test("logarithm_half_test", () {
 	assert(
-		float.logarithm(0.5)
+		fail.catch(() { float.logarithm(0.5) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(-.0.6931471805599453, 0.001),
 	)
@@ -757,7 +758,7 @@ test("logarithm_half_test", () {
 
 test("logarithm_tenth_test", () {
 	assert(
-		float.logarithm(0.1)
+		fail.catch(() { float.logarithm(0.1) })
 			|> result.unwrap(0.0)
 			|> float.loosely_equals(-.2.3025850929940455, 0.001),
 	)
@@ -765,29 +766,29 @@ test("logarithm_tenth_test", () {
 })
 
 test("logarithm_zero_error_test", () {
-	assert(float.logarithm(0.0) == Error(Nil))
+	assert(fail.catch(() { float.logarithm(0.0) }) == Error(Nil))
 	Nil
 })
 
 test("logarithm_negative_one_error_test", () {
-	assert(float.logarithm(-.1.0) == Error(Nil))
+	assert(fail.catch(() { float.logarithm(-.1.0) }) == Error(Nil))
 	Nil
 })
 
 test("logarithm_negative_hundred_error_test", () {
-	assert(float.logarithm(-.100.0) == Error(Nil))
+	assert(fail.catch(() { float.logarithm(-.100.0) }) == Error(Nil))
 	Nil
 })
 
 test("logarithm_negative_tenth_error_test", () {
-	assert(float.logarithm(-.0.1) == Error(Nil))
+	assert(fail.catch(() { float.logarithm(-.0.1) }) == Error(Nil))
 	Nil
 })
 
 test("exponential_zero_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(0.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(0.0) }), 0.0),
 			1.0,
 			0.001,
 		),
@@ -798,7 +799,7 @@ test("exponential_zero_test", () {
 test("exponential_one_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(1.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(1.0) }), 0.0),
 			2.718281828459045,
 			0.001,
 		),
@@ -809,7 +810,7 @@ test("exponential_one_test", () {
 test("exponential_two_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(2.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(2.0) }), 0.0),
 			7.38905609893065,
 			0.001,
 		),
@@ -820,7 +821,7 @@ test("exponential_two_test", () {
 test("exponential_negative_one_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(-.1.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(-.1.0) }), 0.0),
 			0.36787944117144233,
 			0.001,
 		),
@@ -831,7 +832,7 @@ test("exponential_negative_one_test", () {
 test("exponential_five_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(5.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(5.0) }), 0.0),
 			148.4131591025766,
 			0.001,
 		),
@@ -842,7 +843,7 @@ test("exponential_five_test", () {
 test("exponential_negative_five_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(-.5.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(-.5.0) }), 0.0),
 			0.006737946999085467,
 			0.001,
 		),
@@ -853,7 +854,7 @@ test("exponential_negative_five_test", () {
 test("exponential_small_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(0.000001), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(0.000001) }), 0.0),
 			1.0000010000005,
 			0.001,
 		),
@@ -864,7 +865,7 @@ test("exponential_small_test", () {
 test("exponential_large_negative_test", () {
 	assert(
 		float.loosely_equals(
-			result.unwrap(float.exponential(-.100.0), 0.0),
+			result.unwrap(fail.catch(() { float.exponential(-.100.0) }), 0.0),
 			3.720075976020836e-44,
 			0.001,
 		),
@@ -906,7 +907,7 @@ test("parse_exact_rounding_test", () {
 	]
 	list.each(cases, (c) {
 		(text, bits) = c
-		Ok(value) = float.parse(text)
+		Ok(value) = fail.catch(() { float.parse(text) })
 		assert(core.float_to_bits(value) == bits)
 	})
 })
@@ -933,8 +934,8 @@ test("parse_invalid_forms_test", () {
 		"1.0e99999999999999999999",
 		"0.0e99999999999999999x",
 	]
-	list.each(bad, (text) { assert(float.parse(text) == Error(Nil)) })
-	Ok(negative_zero) = float.parse("-0.0e99999999999999999")
+	list.each(bad, (text) { assert(fail.catch(() { float.parse(text) }) == Error(Nil)) })
+	Ok(negative_zero) = fail.catch(() { float.parse("-0.0e99999999999999999") })
 	assert(float.to_string(negative_zero) == "-0.0")
 })
 
@@ -966,7 +967,10 @@ test("round_trip_test", () {
 					9_223_372_036_854_775_808
 				input = magnitude + sign
 				value = core.float_from_bits(input)
-				Ok(decoded) = float.parse(float.to_string(value))
+				Ok(decoded) = {
+e4_call_arg_0 = float.to_string(value)
+fail.catch(() { float.parse(e4_call_arg_0) })
+}
 				assert(core.float_to_bits(decoded) == input)
 				go(next, count - 1)
 			}
@@ -975,43 +979,43 @@ test("round_trip_test", () {
 })
 
 test("power_int_test", () {
-	assert(float.power(2.0, 10) == Ok(1024.0))
-	assert(float.power(2.0, -1) == Ok(0.5))
-	assert(float.power(-.2.0, 3) == Ok(-.8.0))
-	assert(float.power(-.2.0, -1) == Ok(-.0.5))
-	assert(float.power(0.0, 0) == Ok(1.0))
-	assert(float.power(0.0, 3) == Ok(0.0))
-	assert(float.power(0.0, -1) == Error(Nil))
-	assert(float.power(10.0, 400) == Error(Nil))
-	assert(float.power(10.0, -400) == Ok(0.0))
-	assert(float.power(-.1.0, 1_000_000_000_000_000_000_001) == Ok(-.1.0))
-	assert(float.power(1.1, 2) == Ok(1.2100000000000002))
-	assert(float.power(10.0, 22) == Ok(1.0e22))
+	assert(fail.catch(() { float.power(2.0, 10) }) == Ok(1024.0))
+	assert(fail.catch(() { float.power(2.0, -1) }) == Ok(0.5))
+	assert(fail.catch(() { float.power(-.2.0, 3) }) == Ok(-.8.0))
+	assert(fail.catch(() { float.power(-.2.0, -1) }) == Ok(-.0.5))
+	assert(fail.catch(() { float.power(0.0, 0) }) == Ok(1.0))
+	assert(fail.catch(() { float.power(0.0, 3) }) == Ok(0.0))
+	assert(fail.catch(() { float.power(0.0, -1) }) == Error(Nil))
+	assert(fail.catch(() { float.power(10.0, 400) }) == Error(Nil))
+	assert(fail.catch(() { float.power(10.0, -400) }) == Ok(0.0))
+	assert(fail.catch(() { float.power(-.1.0, 1_000_000_000_000_000_000_001) }) == Ok(-.1.0))
+	assert(fail.catch(() { float.power(1.1, 2) }) == Ok(1.2100000000000002))
+	assert(fail.catch(() { float.power(10.0, 22) }) == Ok(1.0e22))
 })
 
 test("real_power_test", () {
-	assert(float.real_power(16.0, 0.5) == Ok(4.0))
+	assert(fail.catch(() { float.real_power(16.0, 0.5) }) == Ok(4.0))
 	// fdlibm is within one ulp: the correctly rounded result is
 	// 22.627416997969522, one ulp above.
-	assert(float.real_power(8.0, 1.5) == Ok(22.62741699796952))
-	assert(float.real_power(-.8.0, 0.5) == Error(Nil))
-	assert(float.real_power(0.0, -.0.5) == Error(Nil))
-	assert(float.real_power(2.0, 1024.0) == Error(Nil))
-	assert(float.real_power(2.0, -.1074.0) == Ok(5.0e-324))
-	assert(float.real_power(2.0, 0.0) == Ok(1.0))
+	assert(fail.catch(() { float.real_power(8.0, 1.5) }) == Ok(22.62741699796952))
+	assert(fail.catch(() { float.real_power(-.8.0, 0.5) }) == Error(Nil))
+	assert(fail.catch(() { float.real_power(0.0, -.0.5) }) == Error(Nil))
+	assert(fail.catch(() { float.real_power(2.0, 1024.0) }) == Error(Nil))
+	assert(fail.catch(() { float.real_power(2.0, -.1074.0) }) == Ok(5.0e-324))
+	assert(fail.catch(() { float.real_power(2.0, 0.0) }) == Ok(1.0))
 })
 
 test("exponential_logarithm_test", () {
-	assert(float.exponential(0.0) == Ok(1.0))
-	assert(float.exponential(1.0) == Ok(2.718281828459045))
-	assert(float.exponential(710.0) == Error(Nil))
-	assert(float.exponential(-.1000.0) == Ok(0.0))
-	assert(float.logarithm(1.0) == Ok(0.0))
-	assert(float.logarithm(2.718281828459045) == Ok(1.0))
-	assert(float.logarithm(5.0e-324) == Ok(-.744.4400719213812))
-	assert(float.logarithm(-.1.0) == Error(Nil))
-	Ok(x) = float.logarithm(10.0)
-	assert(float.exponential(x) == Ok(10.000000000000002))
+	assert(fail.catch(() { float.exponential(0.0) }) == Ok(1.0))
+	assert(fail.catch(() { float.exponential(1.0) }) == Ok(2.718281828459045))
+	assert(fail.catch(() { float.exponential(710.0) }) == Error(Nil))
+	assert(fail.catch(() { float.exponential(-.1000.0) }) == Ok(0.0))
+	assert(fail.catch(() { float.logarithm(1.0) }) == Ok(0.0))
+	assert(fail.catch(() { float.logarithm(2.718281828459045) }) == Ok(1.0))
+	assert(fail.catch(() { float.logarithm(5.0e-324) }) == Ok(-.744.4400719213812))
+	assert(fail.catch(() { float.logarithm(-.1.0) }) == Error(Nil))
+	Ok(x) = fail.catch(() { float.logarithm(10.0) })
+	assert(fail.catch(() { float.exponential(x) }) == Ok(10.000000000000002))
 })
 
 test("round_more_test", () {
@@ -1082,7 +1086,7 @@ test("trigonometric_constants_and_signs_test", () {
 })
 
 test("asin_reference_0_test", () {
-	Ok(actual) = float.asin(-.1.0)
+	Ok(actual) = fail.catch(() { float.asin(-.1.0) })
 	expected = -.1.5707963267948966
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1090,7 +1094,7 @@ test("asin_reference_0_test", () {
 })
 
 test("asin_reference_1_test", () {
-	Ok(actual) = float.asin(-.0.99)
+	Ok(actual) = fail.catch(() { float.asin(-.0.99) })
 	expected = -.1.4292568534704693
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1098,7 +1102,7 @@ test("asin_reference_1_test", () {
 })
 
 test("asin_reference_2_test", () {
-	Ok(actual) = float.asin(-.0.9)
+	Ok(actual) = fail.catch(() { float.asin(-.0.9) })
 	expected = -.1.1197695149986342
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1106,7 +1110,7 @@ test("asin_reference_2_test", () {
 })
 
 test("asin_reference_3_test", () {
-	Ok(actual) = float.asin(-.0.75)
+	Ok(actual) = fail.catch(() { float.asin(-.0.75) })
 	expected = -.0.848062078981481
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1114,7 +1118,7 @@ test("asin_reference_3_test", () {
 })
 
 test("asin_reference_4_test", () {
-	Ok(actual) = float.asin(-.0.5)
+	Ok(actual) = fail.catch(() { float.asin(-.0.5) })
 	expected = -.0.5235987755982989
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1122,7 +1126,7 @@ test("asin_reference_4_test", () {
 })
 
 test("asin_reference_5_test", () {
-	Ok(actual) = float.asin(-.0.1)
+	Ok(actual) = fail.catch(() { float.asin(-.0.1) })
 	expected = -.0.1001674211615598
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1130,7 +1134,7 @@ test("asin_reference_5_test", () {
 })
 
 test("asin_reference_6_test", () {
-	Ok(actual) = float.asin(0.0)
+	Ok(actual) = fail.catch(() { float.asin(0.0) })
 	expected = 0.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1138,7 +1142,7 @@ test("asin_reference_6_test", () {
 })
 
 test("asin_reference_7_test", () {
-	Ok(actual) = float.asin(0.1)
+	Ok(actual) = fail.catch(() { float.asin(0.1) })
 	expected = 0.1001674211615598
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1146,7 +1150,7 @@ test("asin_reference_7_test", () {
 })
 
 test("asin_reference_8_test", () {
-	Ok(actual) = float.asin(0.5)
+	Ok(actual) = fail.catch(() { float.asin(0.5) })
 	expected = 0.5235987755982989
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1154,7 +1158,7 @@ test("asin_reference_8_test", () {
 })
 
 test("asin_reference_9_test", () {
-	Ok(actual) = float.asin(0.75)
+	Ok(actual) = fail.catch(() { float.asin(0.75) })
 	expected = 0.848062078981481
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1162,7 +1166,7 @@ test("asin_reference_9_test", () {
 })
 
 test("asin_reference_10_test", () {
-	Ok(actual) = float.asin(0.9)
+	Ok(actual) = fail.catch(() { float.asin(0.9) })
 	expected = 1.1197695149986342
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1170,7 +1174,7 @@ test("asin_reference_10_test", () {
 })
 
 test("asin_reference_11_test", () {
-	Ok(actual) = float.asin(0.99)
+	Ok(actual) = fail.catch(() { float.asin(0.99) })
 	expected = 1.4292568534704693
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1178,7 +1182,7 @@ test("asin_reference_11_test", () {
 })
 
 test("asin_reference_12_test", () {
-	Ok(actual) = float.asin(1.0)
+	Ok(actual) = fail.catch(() { float.asin(1.0) })
 	expected = 1.5707963267948966
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1186,7 +1190,7 @@ test("asin_reference_12_test", () {
 })
 
 test("acos_reference_0_test", () {
-	Ok(actual) = float.acos(-.1.0)
+	Ok(actual) = fail.catch(() { float.acos(-.1.0) })
 	expected = 3.141592653589793
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1194,7 +1198,7 @@ test("acos_reference_0_test", () {
 })
 
 test("acos_reference_1_test", () {
-	Ok(actual) = float.acos(-.0.99)
+	Ok(actual) = fail.catch(() { float.acos(-.0.99) })
 	expected = 3.000053180265366
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1202,7 +1206,7 @@ test("acos_reference_1_test", () {
 })
 
 test("acos_reference_2_test", () {
-	Ok(actual) = float.acos(-.0.9)
+	Ok(actual) = fail.catch(() { float.acos(-.0.9) })
 	expected = 2.6905658417935308
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1210,7 +1214,7 @@ test("acos_reference_2_test", () {
 })
 
 test("acos_reference_3_test", () {
-	Ok(actual) = float.acos(-.0.75)
+	Ok(actual) = fail.catch(() { float.acos(-.0.75) })
 	expected = 2.4188584057763776
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1218,7 +1222,7 @@ test("acos_reference_3_test", () {
 })
 
 test("acos_reference_4_test", () {
-	Ok(actual) = float.acos(-.0.5)
+	Ok(actual) = fail.catch(() { float.acos(-.0.5) })
 	expected = 2.0943951023931957
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1226,7 +1230,7 @@ test("acos_reference_4_test", () {
 })
 
 test("acos_reference_5_test", () {
-	Ok(actual) = float.acos(-.0.1)
+	Ok(actual) = fail.catch(() { float.acos(-.0.1) })
 	expected = 1.6709637479564565
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1234,7 +1238,7 @@ test("acos_reference_5_test", () {
 })
 
 test("acos_reference_6_test", () {
-	Ok(actual) = float.acos(0.0)
+	Ok(actual) = fail.catch(() { float.acos(0.0) })
 	expected = 1.5707963267948966
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1242,7 +1246,7 @@ test("acos_reference_6_test", () {
 })
 
 test("acos_reference_7_test", () {
-	Ok(actual) = float.acos(0.1)
+	Ok(actual) = fail.catch(() { float.acos(0.1) })
 	expected = 1.4706289056333368
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1250,7 +1254,7 @@ test("acos_reference_7_test", () {
 })
 
 test("acos_reference_8_test", () {
-	Ok(actual) = float.acos(0.5)
+	Ok(actual) = fail.catch(() { float.acos(0.5) })
 	expected = 1.0471975511965979
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1258,7 +1262,7 @@ test("acos_reference_8_test", () {
 })
 
 test("acos_reference_9_test", () {
-	Ok(actual) = float.acos(0.75)
+	Ok(actual) = fail.catch(() { float.acos(0.75) })
 	expected = 0.7227342478134157
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1266,7 +1270,7 @@ test("acos_reference_9_test", () {
 })
 
 test("acos_reference_10_test", () {
-	Ok(actual) = float.acos(0.9)
+	Ok(actual) = fail.catch(() { float.acos(0.9) })
 	expected = 0.45102681179626236
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1274,7 +1278,7 @@ test("acos_reference_10_test", () {
 })
 
 test("acos_reference_11_test", () {
-	Ok(actual) = float.acos(0.99)
+	Ok(actual) = fail.catch(() { float.acos(0.99) })
 	expected = 0.1415394733244273
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1282,7 +1286,7 @@ test("acos_reference_11_test", () {
 })
 
 test("acos_reference_12_test", () {
-	Ok(actual) = float.acos(1.0)
+	Ok(actual) = fail.catch(() { float.acos(1.0) })
 	expected = 0.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1290,8 +1294,8 @@ test("acos_reference_12_test", () {
 })
 
 test("inverse_trig_domain_test", () {
-	assert(float.asin(1.0000000000000002) == Error(Nil))
-	assert(float.acos(-.1.0000000000000002) == Error(Nil))
+	assert(fail.catch(() { float.asin(1.0000000000000002) }) == Error(Nil))
+	assert(fail.catch(() { float.acos(-.1.0000000000000002) }) == Error(Nil))
 })
 
 test("atan_reference_0_test", () {
@@ -1519,7 +1523,7 @@ test("radians_reference_12_test", () {
 })
 
 test("degrees_reference_0_test", () {
-	Ok(actual) = float.degrees(-.6.0)
+	Ok(actual) = fail.catch(() { float.degrees(-.6.0) })
 	expected = -.343.77467707849394
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1527,7 +1531,7 @@ test("degrees_reference_0_test", () {
 })
 
 test("degrees_reference_1_test", () {
-	Ok(actual) = float.degrees(-.3.0)
+	Ok(actual) = fail.catch(() { float.degrees(-.3.0) })
 	expected = -.171.88733853924697
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1535,7 +1539,7 @@ test("degrees_reference_1_test", () {
 })
 
 test("degrees_reference_2_test", () {
-	Ok(actual) = float.degrees(-.1.0)
+	Ok(actual) = fail.catch(() { float.degrees(-.1.0) })
 	expected = -.57.29577951308232
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1543,7 +1547,7 @@ test("degrees_reference_2_test", () {
 })
 
 test("degrees_reference_3_test", () {
-	Ok(actual) = float.degrees(-.0.75)
+	Ok(actual) = fail.catch(() { float.degrees(-.0.75) })
 	expected = -.42.97183463481174
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1551,7 +1555,7 @@ test("degrees_reference_3_test", () {
 })
 
 test("degrees_reference_4_test", () {
-	Ok(actual) = float.degrees(-.0.5)
+	Ok(actual) = fail.catch(() { float.degrees(-.0.5) })
 	expected = -.28.64788975654116
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1559,7 +1563,7 @@ test("degrees_reference_4_test", () {
 })
 
 test("degrees_reference_5_test", () {
-	Ok(actual) = float.degrees(-.0.1)
+	Ok(actual) = fail.catch(() { float.degrees(-.0.1) })
 	expected = -.5.729577951308233
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1567,7 +1571,7 @@ test("degrees_reference_5_test", () {
 })
 
 test("degrees_reference_6_test", () {
-	Ok(actual) = float.degrees(0.0)
+	Ok(actual) = fail.catch(() { float.degrees(0.0) })
 	expected = 0.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1575,7 +1579,7 @@ test("degrees_reference_6_test", () {
 })
 
 test("degrees_reference_7_test", () {
-	Ok(actual) = float.degrees(0.1)
+	Ok(actual) = fail.catch(() { float.degrees(0.1) })
 	expected = 5.729577951308233
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1583,7 +1587,7 @@ test("degrees_reference_7_test", () {
 })
 
 test("degrees_reference_8_test", () {
-	Ok(actual) = float.degrees(0.5)
+	Ok(actual) = fail.catch(() { float.degrees(0.5) })
 	expected = 28.64788975654116
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1591,7 +1595,7 @@ test("degrees_reference_8_test", () {
 })
 
 test("degrees_reference_9_test", () {
-	Ok(actual) = float.degrees(0.75)
+	Ok(actual) = fail.catch(() { float.degrees(0.75) })
 	expected = 42.97183463481174
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1599,7 +1603,7 @@ test("degrees_reference_9_test", () {
 })
 
 test("degrees_reference_10_test", () {
-	Ok(actual) = float.degrees(1.0)
+	Ok(actual) = fail.catch(() { float.degrees(1.0) })
 	expected = 57.29577951308232
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1607,7 +1611,7 @@ test("degrees_reference_10_test", () {
 })
 
 test("degrees_reference_11_test", () {
-	Ok(actual) = float.degrees(3.0)
+	Ok(actual) = fail.catch(() { float.degrees(3.0) })
 	expected = 171.88733853924697
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1615,7 +1619,7 @@ test("degrees_reference_11_test", () {
 })
 
 test("degrees_reference_12_test", () {
-	Ok(actual) = float.degrees(6.0)
+	Ok(actual) = fail.catch(() { float.degrees(6.0) })
 	expected = 343.77467707849394
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1727,7 +1731,7 @@ test("atan2_reference_12_test", () {
 })
 
 test("hypot_reference_0_test", () {
-	Ok(actual) = float.hypot(0.0, 0.0)
+	Ok(actual) = fail.catch(() { float.hypot(0.0, 0.0) })
 	expected = 0.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1735,7 +1739,7 @@ test("hypot_reference_0_test", () {
 })
 
 test("hypot_reference_1_test", () {
-	Ok(actual) = float.hypot(3.0, 4.0)
+	Ok(actual) = fail.catch(() { float.hypot(3.0, 4.0) })
 	expected = 5.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1743,7 +1747,7 @@ test("hypot_reference_1_test", () {
 })
 
 test("hypot_reference_2_test", () {
-	Ok(actual) = float.hypot(5.0, 12.0)
+	Ok(actual) = fail.catch(() { float.hypot(5.0, 12.0) })
 	expected = 13.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1751,7 +1755,7 @@ test("hypot_reference_2_test", () {
 })
 
 test("hypot_reference_3_test", () {
-	Ok(actual) = float.hypot(1.0, 1.0)
+	Ok(actual) = fail.catch(() { float.hypot(1.0, 1.0) })
 	expected = 1.4142135623730951
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1759,7 +1763,7 @@ test("hypot_reference_3_test", () {
 })
 
 test("hypot_reference_4_test", () {
-	Ok(actual) = float.hypot(-.1.0, 1.0)
+	Ok(actual) = fail.catch(() { float.hypot(-.1.0, 1.0) })
 	expected = 1.4142135623730951
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1767,7 +1771,7 @@ test("hypot_reference_4_test", () {
 })
 
 test("hypot_reference_5_test", () {
-	Ok(actual) = float.hypot(1.0, -.1.0)
+	Ok(actual) = fail.catch(() { float.hypot(1.0, -.1.0) })
 	expected = 1.4142135623730951
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1775,7 +1779,7 @@ test("hypot_reference_5_test", () {
 })
 
 test("hypot_reference_6_test", () {
-	Ok(actual) = float.hypot(0.1, 0.2)
+	Ok(actual) = fail.catch(() { float.hypot(0.1, 0.2) })
 	expected = 0.223606797749979
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1783,7 +1787,7 @@ test("hypot_reference_6_test", () {
 })
 
 test("hypot_reference_7_test", () {
-	Ok(actual) = float.hypot(0.3, 0.4)
+	Ok(actual) = fail.catch(() { float.hypot(0.3, 0.4) })
 	expected = 0.5
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1791,7 +1795,7 @@ test("hypot_reference_7_test", () {
 })
 
 test("hypot_reference_8_test", () {
-	Ok(actual) = float.hypot(1.0, 2.0)
+	Ok(actual) = fail.catch(() { float.hypot(1.0, 2.0) })
 	expected = 2.23606797749979
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1799,7 +1803,7 @@ test("hypot_reference_8_test", () {
 })
 
 test("hypot_reference_9_test", () {
-	Ok(actual) = float.hypot(1.0, 100.0)
+	Ok(actual) = fail.catch(() { float.hypot(1.0, 100.0) })
 	expected = 100.00499987500625
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1807,7 +1811,7 @@ test("hypot_reference_9_test", () {
 })
 
 test("hypot_reference_10_test", () {
-	Ok(actual) = float.hypot(5.0, 7.0)
+	Ok(actual) = fail.catch(() { float.hypot(5.0, 7.0) })
 	expected = 8.602325267042627
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1815,7 +1819,7 @@ test("hypot_reference_10_test", () {
 })
 
 test("hypot_reference_11_test", () {
-	Ok(actual) = float.hypot(10.0, 1.0)
+	Ok(actual) = fail.catch(() { float.hypot(10.0, 1.0) })
 	expected = 10.04987562112089
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1823,7 +1827,7 @@ test("hypot_reference_11_test", () {
 })
 
 test("hypot_reference_12_test", () {
-	Ok(actual) = float.hypot(1.0e-100, 2.0e-100)
+	Ok(actual) = fail.catch(() { float.hypot(1.0e-100, 2.0e-100) })
 	expected = 2.2360679774997898e-100
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -1832,29 +1836,29 @@ test("hypot_reference_12_test", () {
 
 test("inverse_and_norm_special_values_test", () {
 	negative_zero = core.float_from_bits(9223372036854775808)
-	Ok(a) = float.asin(negative_zero)
+	Ok(a) = fail.catch(() { float.asin(negative_zero) })
 	assert(core.float_to_bits(a) == core.float_to_bits(negative_zero))
 	assert(
 		core.float_to_bits(float.atan(negative_zero)) ==
 			core.float_to_bits(negative_zero),
 	)
-	assert(float.acos(1.0) == Ok(0.0))
-	assert(float.acos(-.1.0) == Ok(float.pi))
-	assert(float.hypot(float.max_finite, float.max_finite) == Error(Nil))
-	assert(float.hypot(negative_zero, 0.0) == Ok(0.0))
+	assert(fail.catch(() { float.acos(1.0) }) == Ok(0.0))
+	assert(fail.catch(() { float.acos(-.1.0) }) == Ok(float.pi))
+	assert(fail.catch(() { float.hypot(float.max_finite, float.max_finite) }) == Error(Nil))
+	assert(fail.catch(() { float.hypot(negative_zero, 0.0) }) == Ok(0.0))
 	assert(float.atan2(0.0, negative_zero) == float.pi)
 	assert(float.atan2(negative_zero, negative_zero) == -.float.pi)
 	assert(
 		core.float_to_bits(float.radians(negative_zero)) ==
 			core.float_to_bits(negative_zero),
 	)
-	Ok(d) = float.degrees(negative_zero)
+	Ok(d) = fail.catch(() { float.degrees(negative_zero) })
 	assert(core.float_to_bits(d) == core.float_to_bits(negative_zero))
-	assert(float.degrees(float.max_finite) == Error(Nil))
+	assert(fail.catch(() { float.degrees(float.max_finite) }) == Error(Nil))
 })
 
 test("hypot_symmetry_property", () {
-	Ok(gen) = property.int(-100000, 100000)
+	Ok(gen) = fail.catch(() { property.int(-100000, 100000) })
 	property.test(
 		property.pair(gen, gen),
 		property.Config(
@@ -1868,14 +1872,14 @@ test("hypot_symmetry_property", () {
 			(x, y) = pair
 			a = core.to_float(x) /. 100.0
 			b = core.to_float(y) /. 100.0
-			assert(float.hypot(a, b) == float.hypot(b, a))
+			assert(fail.catch(() { float.hypot(a, b) }) == fail.catch(() { float.hypot(b, a) }))
 		},
 		core.inspect,
 	)
 })
 
 test("atan2_quadrants_property", () {
-	Ok(gen) = property.int(1, 100000)
+	Ok(gen) = fail.catch(() { property.int(1, 100000) })
 	property.test(
 		property.pair(gen, gen),
 		property.Config(
@@ -2320,7 +2324,7 @@ test("cos_reference_16_test", () {
 })
 
 test("tan_reference_0_test", () {
-	Ok(actual) = float.tan(-.1000.0)
+	Ok(actual) = fail.catch(() { float.tan(-.1000.0) })
 	expected = -.1.4703241557027185
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2328,7 +2332,7 @@ test("tan_reference_0_test", () {
 })
 
 test("tan_reference_1_test", () {
-	Ok(actual) = float.tan(-.10.0)
+	Ok(actual) = fail.catch(() { float.tan(-.10.0) })
 	expected = -.0.6483608274590866
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2336,7 +2340,7 @@ test("tan_reference_1_test", () {
 })
 
 test("tan_reference_2_test", () {
-	Ok(actual) = float.tan(-.3.0)
+	Ok(actual) = fail.catch(() { float.tan(-.3.0) })
 	expected = 0.1425465430742778
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2344,7 +2348,7 @@ test("tan_reference_2_test", () {
 })
 
 test("tan_reference_3_test", () {
-	Ok(actual) = float.tan(-.1.0)
+	Ok(actual) = fail.catch(() { float.tan(-.1.0) })
 	expected = -.1.5574077246549023
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2352,7 +2356,7 @@ test("tan_reference_3_test", () {
 })
 
 test("tan_reference_4_test", () {
-	Ok(actual) = float.tan(-.0.75)
+	Ok(actual) = fail.catch(() { float.tan(-.0.75) })
 	expected = -.0.9315964599440725
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2360,7 +2364,7 @@ test("tan_reference_4_test", () {
 })
 
 test("tan_reference_5_test", () {
-	Ok(actual) = float.tan(-.0.5)
+	Ok(actual) = fail.catch(() { float.tan(-.0.5) })
 	expected = -.0.5463024898437905
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2368,7 +2372,7 @@ test("tan_reference_5_test", () {
 })
 
 test("tan_reference_6_test", () {
-	Ok(actual) = float.tan(-.0.1)
+	Ok(actual) = fail.catch(() { float.tan(-.0.1) })
 	expected = -.0.10033467208545055
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2376,7 +2380,7 @@ test("tan_reference_6_test", () {
 })
 
 test("tan_reference_7_test", () {
-	Ok(actual) = float.tan(0.0)
+	Ok(actual) = fail.catch(() { float.tan(0.0) })
 	expected = 0.0
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2384,7 +2388,7 @@ test("tan_reference_7_test", () {
 })
 
 test("tan_reference_8_test", () {
-	Ok(actual) = float.tan(0.1)
+	Ok(actual) = fail.catch(() { float.tan(0.1) })
 	expected = 0.10033467208545055
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2392,7 +2396,7 @@ test("tan_reference_8_test", () {
 })
 
 test("tan_reference_9_test", () {
-	Ok(actual) = float.tan(0.5)
+	Ok(actual) = fail.catch(() { float.tan(0.5) })
 	expected = 0.5463024898437905
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2400,7 +2404,7 @@ test("tan_reference_9_test", () {
 })
 
 test("tan_reference_10_test", () {
-	Ok(actual) = float.tan(0.75)
+	Ok(actual) = fail.catch(() { float.tan(0.75) })
 	expected = 0.9315964599440725
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2408,7 +2412,7 @@ test("tan_reference_10_test", () {
 })
 
 test("tan_reference_11_test", () {
-	Ok(actual) = float.tan(1.0)
+	Ok(actual) = fail.catch(() { float.tan(1.0) })
 	expected = 1.5574077246549023
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2416,7 +2420,7 @@ test("tan_reference_11_test", () {
 })
 
 test("tan_reference_12_test", () {
-	Ok(actual) = float.tan(3.0)
+	Ok(actual) = fail.catch(() { float.tan(3.0) })
 	expected = -.0.1425465430742778
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2424,7 +2428,7 @@ test("tan_reference_12_test", () {
 })
 
 test("tan_reference_13_test", () {
-	Ok(actual) = float.tan(10.0)
+	Ok(actual) = fail.catch(() { float.tan(10.0) })
 	expected = 0.6483608274590866
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2432,7 +2436,7 @@ test("tan_reference_13_test", () {
 })
 
 test("tan_reference_14_test", () {
-	Ok(actual) = float.tan(1000.0)
+	Ok(actual) = fail.catch(() { float.tan(1000.0) })
 	expected = 1.4703241557027185
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2440,7 +2444,7 @@ test("tan_reference_14_test", () {
 })
 
 test("tan_reference_15_test", () {
-	Ok(actual) = float.tan(1.0e22)
+	Ok(actual) = fail.catch(() { float.tan(1.0e22) })
 	expected = -.1.6287782256068988
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2448,7 +2452,7 @@ test("tan_reference_15_test", () {
 })
 
 test("tan_reference_16_test", () {
-	Ok(actual) = float.tan(1.0e300)
+	Ok(actual) = fail.catch(() { float.tan(1.0e300) })
 	expected = 1.4214488238747245
 	a = core.float_to_bits(actual)
 	b = core.float_to_bits(expected)
@@ -2461,15 +2465,15 @@ test("trig_special_values_test", () {
 		core.float_to_bits(float.sin(negative_zero)) == 9223372036854775808,
 	)
 	assert(float.cos(negative_zero) == 1.0)
-	Ok(t) = float.tan(negative_zero)
+	Ok(t) = fail.catch(() { float.tan(negative_zero) })
 	assert(core.float_to_bits(t) == 9223372036854775808)
 	assert(float.sin(float.min_positive) == float.min_positive)
-	assert(float.tan(float.min_positive) == Ok(float.min_positive))
+	assert(fail.catch(() { float.tan(float.min_positive) }) == Ok(float.min_positive))
 	assert(float.cos(float.min_positive) == 1.0)
 })
 
 test("sin_odd_property", () {
-	Ok(gen) = property.int(1, 100000)
+	Ok(gen) = fail.catch(() { property.int(1, 100000) })
 	property.test(
 		gen,
 		property.Config(
@@ -2500,6 +2504,6 @@ test("trig_large_and_near_pole_test", () {
 	assert(
 		core.float_to_bits(float.cos(float.pi /. 2.0)) == 0x3c91a62633145c07,
 	)
-	Ok(t) = float.tan(float.pi /. 2.0)
+	Ok(t) = fail.catch(() { float.tan(float.pi /. 2.0) })
 	assert(core.float_to_bits(t) == 0x434d02967c31cdb5)
 })

@@ -208,14 +208,14 @@ file = (path: String) {
 	make(
 		(_: Level) { True },
 		(entry) {
-			resource.acquire(
-				() { fs.open(path, fs.Append) },
-				(i) { fs.close(i) },
-				(i) {
+			i = fs.open(path, fs.Append)
+			resource.ensure(
+				() {
 					text = format(entry) <> "\n"
 					fs.write(i, <<text:utf8>>)
 					fs.flush(i)
 				},
+				() { fs.close(i) },
 			)
 		},
 	)

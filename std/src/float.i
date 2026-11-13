@@ -6,6 +6,7 @@
 //// that could give a result that is not finite, such as `power`, give
 //// `Error(Nil)` in its place, so they never stop the program.
 (
+	i/fail
 	i/core
 	order = (Order, Less, Equal, Greater) = std/order
 )
@@ -108,7 +109,7 @@ to_string = (x: Float) -> String { core.inspect(x) }
 /// float.parse("-2.0e-3")  // Ok(-0.002)
 /// float.parse("1")        // Error(Nil)
 /// ```
-parse = (text: String) -> Result(Float, Nil) {
+_parse_result = (text: String) -> Result(Float, Nil) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
 		| (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
@@ -468,7 +469,7 @@ to_precision = (x: Float, precision: Int) -> Float {
 /// float.power(2.0, 10)  // Ok(1024.0)
 /// float.power(-.2.0, -1)  // Ok(-.0.5)
 /// ```
-power = (base: Float, of: Int) -> Result(Float, Nil) {
+_power_result = (base: Float, of: Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -495,7 +496,7 @@ power = (base: Float, of: Int) -> Result(Float, Nil) {
 /// float.square_root(4.0)   // Ok(2.0)
 /// float.square_root(-1.0)  // Error(Nil)
 /// ```
-square_root = (x: Float) -> Result(Float, Nil) {
+_square_root_result = (x: Float) -> Result(Float, Nil) {
 	{ x <. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(core.sqrt(x)) }
 }
 
@@ -514,7 +515,7 @@ product = (numbers: List(Float)) -> Float {
 }
 
 /// `a /. by`, or `Error(Nil)` when `by` is `0.0`.
-divide = (a: Float, by: Float) -> Result(Float, Nil) {
+_divide_result = (a: Float, by: Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> (True) { Error(Nil) } | (False) { Ok(a /. by) }
 }
 
@@ -524,7 +525,7 @@ divide = (a: Float, by: Float) -> Result(Float, Nil) {
 /// ```i
 /// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
 /// ```
-modulo = (a: Float, by: Float) -> Result(Float, Nil) {
+_modulo_result = (a: Float, by: Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(a -. core.floor(a /. by) *. by) }
@@ -545,7 +546,7 @@ multiply = (a: Float, b: Float) -> Float { a *. b }
 /// ```i
 /// float.exponential(1.0)  // Ok(2.718281828459045)
 /// ```
-exponential = (x: Float) -> Result(Float, Nil) {
+_exponential_result = (x: Float) -> Result(Float, Nil) {
 	{ x >. 7.09782712893383973096e2 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -566,7 +567,7 @@ exponential = (x: Float) -> Result(Float, Nil) {
 /// float.logarithm(1.0)  // Ok(0.0)
 /// float.logarithm(0.0)  // Error(Nil)
 /// ```
-logarithm = (x: Float) -> Result(Float, Nil) {
+_logarithm_result = (x: Float) -> Result(Float, Nil) {
 	{ x <=. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(log_positive(x)) }
 }
 
@@ -579,7 +580,7 @@ logarithm = (x: Float) -> Result(Float, Nil) {
 /// float.real_power(16.0, 0.5)  // Ok(4.0)
 /// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
 /// ```
-real_power = (base: Float, of: Float) -> Result(Float, Nil) {
+_real_power_result = (base: Float, of: Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
 		(True) { Error(Nil) }
@@ -1011,7 +1012,7 @@ asin_ratio = (z: Float) -> Float {
 }
 
 /// The arcsine in radians; inputs outside [-1, 1] give Error(Nil).
-asin = (x: Float) -> Result(Float, Nil) {
+_asin_result = (x: Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
 		(True) { Error(Nil) }
@@ -1064,7 +1065,7 @@ asin = (x: Float) -> Result(Float, Nil) {
 }
 
 /// The arccosine in radians; inputs outside [-1, 1] give Error(Nil).
-acos = (x: Float) -> Result(Float, Nil) {
+_acos_result = (x: Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
 		(True) { Error(Nil) }
@@ -1275,7 +1276,7 @@ atan2 = (y: Float, x: Float) -> Float {
 radians = (degrees: Float) -> Float { degrees *. 0.017453292519943295 }
 
 /// Convert radians to degrees, returning an error if the result overflows.
-degrees = (radians: Float) -> Result(Float, Nil) {
+_degrees_result = (radians: Float) -> Result(Float, Nil) {
 	{ abs(radians) >. 3.1375664143845866e306 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(radians *. 57.29577951308232) }
@@ -1292,7 +1293,7 @@ hypot_square = (x: Float) -> (Float, Float) {
 }
 
 /// The Euclidean length of (x, y), returning an error on overflow.
-hypot = (x: Float, y: Float) -> Result(Float, Nil) {
+_hypot_result = (x: Float, y: Float) -> Result(Float, Nil) {
 	a = max(abs(x), abs(y))
 	b = min(abs(x), abs(y))
 	ex = core.float_to_bits(a) / mantissa_unit
@@ -1539,7 +1540,7 @@ trig_tan = (input: Float, tail: Float, odd: Bool) -> Float {
 }
 
 /// Tangent of an angle in radians.
-tan = (x: Float) -> Result(Float, Nil) {
+_tan_result = (x: Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a <. 0.7853981633974483 } |>
 		(True) {
@@ -1557,4 +1558,69 @@ tan = (x: Float) -> Result(Float, Nil) {
 					Ok({ sign_bit(x) } |> (True) { -.v } | (False) { v })
 				}
 		}
+}
+
+/// Reports failure through `Fail(Nil)`.
+parse = (text: String) <- (Fail(Nil)) -> Float {
+	fail.from_result(_parse_result(text))
+}
+
+/// Reports failure through `Fail(Nil)`.
+power = (base: Float, of: Int) <- (Fail(Nil)) -> Float {
+	fail.from_result(_power_result(base, of))
+}
+
+/// Reports failure through `Fail(Nil)`.
+square_root = (x: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_square_root_result(x))
+}
+
+/// Reports failure through `Fail(Nil)`.
+divide = (a: Float, by: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_divide_result(a, by))
+}
+
+/// Reports failure through `Fail(Nil)`.
+modulo = (a: Float, by: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_modulo_result(a, by))
+}
+
+/// Reports failure through `Fail(Nil)`.
+exponential = (x: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_exponential_result(x))
+}
+
+/// Reports failure through `Fail(Nil)`.
+logarithm = (x: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_logarithm_result(x))
+}
+
+/// Reports failure through `Fail(Nil)`.
+real_power = (base: Float, of: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_real_power_result(base, of))
+}
+
+/// Reports failure through `Fail(Nil)`.
+asin = (x: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_asin_result(x))
+}
+
+/// Reports failure through `Fail(Nil)`.
+acos = (x: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_acos_result(x))
+}
+
+/// Reports failure through `Fail(Nil)`.
+degrees = (radians: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_degrees_result(radians))
+}
+
+/// Reports failure through `Fail(Nil)`.
+hypot = (x: Float, y: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_hypot_result(x, y))
+}
+
+/// Reports failure through `Fail(Nil)`.
+tan = (x: Float) <- (Fail(Nil)) -> Float {
+	fail.from_result(_tan_result(x))
 }

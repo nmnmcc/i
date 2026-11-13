@@ -40,7 +40,7 @@ defaults = () -> Options { Options(delimiter = 44, fields = 0, crlf = False) }
 /// A single scalar delimiter, expected width (0 infer, negative variable),
 /// and output line ending. Quotes, NUL, CR, LF, U+FFFD are invalid delimiters.
 /// `csv.options(";", -1, True)`.
-options = (delimiter: String, fields: Int, crlf: Bool) -> Result(
+_options_result = (delimiter: String, fields: Int, crlf: Bool) -> Result(
 	Options,
 	CsvError,
 ) {
@@ -367,12 +367,12 @@ rows = <E, N>(
 
 /// Parses comma-separated text, inferring the width from the first row.
 /// `csv.parse("a,b\n1,2\n")` gives `Ok([["a", "b"], ["1", "2"]])`.
-parse = (input: String) -> Result(List(List(String)), CsvError) {
-	parse_with(input, defaults())
+_parse_result = (input: String) -> Result(List(List(String)), CsvError) {
+	_parse_with_result(input, defaults())
 }
 
 /// Parses with an explicit delimiter and row-width policy.
-parse_with = (input: String, config: Options) -> Result(
+_parse_with_result = (input: String, config: Options) -> Result(
 	List(List(String)),
 	CsvError,
 ) {
@@ -451,7 +451,7 @@ records = <E, N>(
 }
 
 /// Header-mode convenience parser: `csv.parse_header("name\ni\n", csv.defaults())`.
-parse_header = (input: String, config: Options) -> Result(
+_parse_header_result = (input: String, config: Options) -> Result(
 	List(dict.Dict(String, String)),
 	CsvError,
 ) {
@@ -467,19 +467,20 @@ parse_header = (input: String, config: Options) -> Result(
 
 /// Decodes a named row as a JSON object of strings using an ordinary schema.
 /// Compose `schema.string` with `schema.map` for domain conversions.
-decode = <A, E>(
+_decode_result = <A, E>(
 	codec: schema.Schema(A, E),
 	row: dict.Dict(String, String)
 ) -> Result(A, E) {
-	schema.decode(
-		codec,
-		json.Object(
+	{
+e4_call_arg_0 = codec
+e4_call_arg_1 = json.Object(
 			list.map(dict.to_list(row), (entry) {
 				(k, v) = entry
 				(k, json.Text(v))
 			}),
-		),
-	)
+		)
+fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+}
 }
 
 quote = (field: String, delimiter: String, single_empty: Bool) -> String {
@@ -514,4 +515,32 @@ print_with = (rows: List(List(String)), config: Options) -> String {
 				ending
 		}),
 	)
+}
+
+/// Reports failure through `Fail(CsvError)`.
+options = (delimiter: String, fields: Int, crlf: Bool) <- (Fail(CsvError)) -> Options {
+	fail.from_result(_options_result(delimiter, fields, crlf))
+}
+
+/// Reports failure through `Fail(CsvError)`.
+parse = (input: String) <- (Fail(CsvError)) -> List(List(String)) {
+	fail.from_result(_parse_result(input))
+}
+
+/// Reports failure through `Fail(CsvError)`.
+parse_with = (input: String, config: Options) <- (Fail(CsvError)) -> List(List(String)) {
+	fail.from_result(_parse_with_result(input, config))
+}
+
+/// Reports failure through `Fail(CsvError)`.
+parse_header = (input: String, config: Options) <- (Fail(CsvError)) -> List(dict.Dict(String, String)) {
+	fail.from_result(_parse_header_result(input, config))
+}
+
+/// Reports failure through `Fail(E)`.
+decode = <A, E>(
+	codec: schema.Schema(A, E),
+	row: dict.Dict(String, String)
+) <- (Fail(E)) -> A {
+	fail.from_result(_decode_result(codec, row))
 }

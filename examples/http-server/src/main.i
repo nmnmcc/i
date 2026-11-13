@@ -1,4 +1,5 @@
 (
+	i/fail
 	i/net
 	i/task
 	i/stdio
@@ -52,9 +53,13 @@ handle = (req: http.Request) {
 			)
 		}
 		| ((http.Method("POST"), "/users")) {
-			bit_array.to_string(req.body) |>
+			fail.catch(() { bit_array.to_string(req.body) }) |>
 				(Ok(text)) {
-					schema.parse(user_schema(), text) |>
+					{
+e4_call_arg_0 = user_schema()
+e4_call_arg_1 = text
+fail.catch(() { schema.parse(e4_call_arg_0, e4_call_arg_1) })
+} |>
 						(Ok(user)) {
 							reply(
 								200,

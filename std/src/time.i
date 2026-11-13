@@ -31,6 +31,7 @@
 //// fixed 86,400 seconds. Operations use O(1) integer operations; bit costs
 //// depend on integer size. Observation functions use i/clock.
 (
+	i/fail
 	i/clock
 	std/int
 	(Order) = std/order
@@ -102,7 +103,7 @@ scale = (duration: Duration, by: Int) -> Duration {
 }
 
 /// Divides toward zero, or returns DivisionByZero for a zero divisor.
-divide = (duration: Duration, by: Int) -> Result(Duration, TimeError) {
+_divide_result = (duration: Duration, by: Int) -> Result(Duration, TimeError) {
 	{ by == 0 } |>
 		(True) { Error(DivisionByZero) }
 		| (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
@@ -145,4 +146,9 @@ measure = (body) {
 	value = body()
 	end = clock.monotonic_ns()
 	(value, Duration(end - start))
+}
+
+/// Reports failure through `Fail(TimeError)`.
+divide = (duration: Duration, by: Int) <- (Fail(TimeError)) -> Duration {
+	fail.from_result(_divide_result(duration, by))
 }
