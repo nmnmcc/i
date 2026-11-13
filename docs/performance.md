@@ -733,27 +733,38 @@ source positions and expansion notes stay at the same indices (§11.7).
 Metered compiler-macro modules retain the original emission so their
 instruction and allocation accounting does not change.
 
-### First verified bounded-metadata result
+### Full std measurements with bounded metadata
 
 On merged main `95b1b500`, with the same wrapper and release profile as
-above, the uncached full test runs give:
+above, the full test runs give:
 
 | Version | Optimization | Peak RSS, KiB | User CPU, s | System CPU, s | Wall | Result |
 |---|---:|---:|---:|---:|---|---|
 | Main emitter | 0 | 11,435,724 | 277.30 | 43.48 | 6:04.88 | 2170 passed |
+| Bounded metadata | 0 | 1,418,108 | 228.18 | 37.16 | 4:58.75 | 2170 passed |
+| Main emitter | 2 | 20,365,148 | 381.52 | 55.06 | 7:07.08 | 2170 passed |
 | Bounded metadata | 2 | 2,149,808 | 270.52 | 37.02 | 4:19.99 | 2170 passed |
 
-Both commands were `ILANG_COMPILE_CACHE=0 $H
-/run/current-system/sw/bin/time -v ./target/release/i test --project std
---opt N`, with stdout and stderr captured separately and no stage tracing
-(which would reset the high-water mark). The fixed O2 stdout is byte for
-byte identical to main O0: all 2170 result lines, in order, and the summary.
-Both exit statuses are zero; neither produces diagnostics on stderr.
-The earlier O2 stage-traced baseline above peaked at approximately 19.8
-GiB, on the earlier source revision stated there. A same-revision main O2
-measurement and the fixed O0 run are still pending at this first green
-checkpoint.
+Each command was:
+
+```sh
+ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project std --opt N
+```
+
+The main-emitter baseline uses the emitter from `95b1b500`; both variants
+use the merged source tree. The Wasmtime compilation cache is disabled.
+Stdout and stderr were captured separately, without stage tracing (which
+would reset the high-water mark). All four complete stdout files are byte
+for byte identical: 2170 result lines, in the same order, and the summary.
+All exit statuses are zero; none produces diagnostics on stderr.
+
+Peak RSS falls from 10.91 to 1.35 GiB at O0 and from 19.42 to 2.05 GiB
+at O2, below the 6 GB target at both levels. Total process CPU (user plus
+system) falls from 320.78 to 265.34 seconds at O0 and from 436.58 to
+307.54 seconds at O2. These are measurements on the shared machine, not a
+promise of the same timing on other machines. The bounded emission was
+first committed at `3bb591db` after the O2 run passed.
 
 The 4097-note metadata regression passes, as does workspace `cargo fmt
---all -- --check`. Broader host, Wasm, CLI and spec verification follows
-this checkpoint.
+--all -- --check`. Broader host, Wasm, CLI and spec verification is running
+at this measurement checkpoint.
