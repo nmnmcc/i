@@ -1009,8 +1009,8 @@ mod tests {
             &mut |_| None,
         )
         .unwrap();
-        // Closed data needs no semantic comparison (syntax-3 stage 6).
-        assert!(!graph.needs_semantic_comparison());
+        // Labelled data is compared semantically, as records were.
+        assert!(graph.needs_semantic_comparison());
         let before = query.graph_bundle();
         query.state.lock().unwrap().fixed.clear();
         assert_ne!(before, query.graph_bundle());
