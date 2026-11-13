@@ -452,3 +452,23 @@ settings can meet it. A source inspection of Wasmtime 50 shows that it
 calls `compiler.release_caches()` after assembling the compilation artifact;
 trimming only after that point could reduce memory retained during tests,
 but cannot recover a peak that has already occurred during compilation.
+
+### Remaining measurements
+
+No 12 GB fix was validated in this lane. A Linux/glibc variant with
+`malloc_trim(0)` after Binaryen and after Wasmtime compilation built
+successfully, but its timed std run waited 8 minutes 37 seconds for the
+shared wrapper's memory slot and was cancelled before the executable
+started, to leave time for verification before the lane deadline.
+There is no RSS or test result for that variant.
+
+A further test-module-only variant was prepared with
+`parallel_compilation(false)`, `generate_address_map(false)` and
+`native_unwind_info(false)` (the last outside Windows). It was not built
+or measured. The host's stop messages are assembled by the guest under
+spec §11.7, but the requested native and spec stop-message checks still
+have to validate any retained configuration change. Both variants,
+including a temporary module-dump diagnostic, were discarded by reversing
+the reviewed experiment patch. Only the optional stage trace and these
+measurements are retained. Allocator trimming and the Wasmtime settings
+remain open experiments, rather than demonstrated failures or fixes.
