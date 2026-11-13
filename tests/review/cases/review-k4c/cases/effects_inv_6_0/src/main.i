@@ -4,7 +4,7 @@ use = <A, E, N>(x: A) <- (s: S(A, E, N)) {
 	f(x)
 }
 run = <A, N>(body: () <- N -> A) { body() }
-wrap = <A, E, N>(x: A) {
+wrap = <A>(x: A) {
 	local = () {
 		inner = () { use(x) }
 		inner()

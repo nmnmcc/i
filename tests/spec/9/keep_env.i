@@ -9,7 +9,7 @@
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Hop, Never, Never))
+Paused = (Continuation(Nil, Hop, Never))
 Done = (String)
 Hop = Paused | Done
 name = () <- (value: Name) { value.text }
@@ -76,4 +76,4 @@ main = () {
 	} <- (Name(text = "kept"))
 }
 
-Extra(A, E, N) = (Boundary(A, E, N))
+Extra(A, N) = (Boundary(A, N))

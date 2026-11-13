@@ -49,7 +49,7 @@ fn constructor_named_like_its_sum() {
 fn matches_and_chains() {
     same(
         "f = (n: Int) -> String {\n\tn |> (0) { \"zero\" } | (1 | 2) { \"few\" } | (x ? x > 9) { \"many\" } | (_) { \"some\" }\n}\n",
-        "f = (n: Int) -> String ^ _ ! _ {\n\tn |> {\n\t\t0 -> \"zero\"\n\t\t1 | 2 -> \"few\"\n\t\tx ? x > 9 -> \"many\"\n\t\t_ -> \"some\"\n\t}\n}\n",
+        "f = (n: Int) -> String ! _ {\n\tn |> {\n\t\t0 -> \"zero\"\n\t\t1 | 2 -> \"few\"\n\t\tx ? x > 9 -> \"many\"\n\t\t_ -> \"some\"\n\t}\n}\n",
     );
     same(
         "name = (Some(u)) { u } | (None) { \"\" }\n",
@@ -69,7 +69,7 @@ fn calls_data_and_patterns() {
 fn services_and_needs() {
     same(
         "find_user = (id: String) <- (db: Db, log: Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb = (find = (String) <- (Fail(NotFound), Log) -> User)\n",
-        "find_user = (id: String, db ! Db, log ! Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb {\n\tDb(find: (String) -> User ^ NotFound ! Log)\n}\n",
+        "find_user = (id: String, db ! Db, log ! Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb {\n\tDb(find: (String) -> User ! Fail(NotFound) | Log)\n}\n",
     );
 }
 
@@ -90,10 +90,10 @@ fn type_parameters_and_row_variables() {
     let text = shown(
         "map = <A, B, N>(xs: List(A), f: (A) <- N -> B) -> List(B) { [] }\n\ncatch: <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E)\n",
     );
-    assert!(text.contains("map(A, B, N, N%E) ="), "{text}");
-    assert!(text.contains("f: (A) -> B ^ N%E ! N"), "{text}");
+    assert!(text.contains("map(A, B, N) ="), "{text}");
+    assert!(text.contains("f: (A) -> B ! N"), "{text}");
     assert!(
-        text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"),
+        text.contains("catch(A, E, N): (() -> A ! N | Fail(E)) -> Result(A, E) ! N"),
         "{text}"
     );
 }
@@ -144,7 +144,7 @@ fn lisp_surface_round_trip() {
 #[test]
 fn literal_result_is_open() {
     let out = shown("f = () -> Int { 1 }\n");
-    assert!(out.contains("-> Int ^ _ ! _"), "{out}");
+    assert!(out.contains("-> Int ! _"), "{out}");
 }
 
 /// The written full type of a binding closes needs and failures.

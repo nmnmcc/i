@@ -12,9 +12,7 @@
 @host("test:async/v1", "async")
 Later = (double = (Int) <- (Fail(String)) -> Int)
 
-Paused = (
-	Continuation(Nil, Step, String, Later | request.Await | request.Owner),
-)
+Paused = (Continuation(Nil, Step, Fail(String) | Later | request.Await | request.Owner))
 Done = (Int)
 Step = Paused | Done
 

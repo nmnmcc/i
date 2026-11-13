@@ -56,7 +56,7 @@
 Address = (task = Int, index = Int)
 
 Portable = ()
-Local = (Boundary(Turn, Never, Never))
+Local = (Boundary(Turn, Never))
 Witness = Portable | Local
 
 ScopeInfo = (run = Key(Nil), id = Keyed, witness = Witness)
@@ -93,7 +93,7 @@ Failed = (Keyed, Keyed)
 Abandoned = ()
 Completion = Succeeded | Failed | Abandoned
 
-Switched = (Int, Command, Continuation(StepAnswer, Turn, Never, Never))
+Switched = (Int, Command, Continuation(StepAnswer, Turn, Never))
 Finished = (Int, Completion)
 Turn = Switched | Finished
 
@@ -149,10 +149,7 @@ ScopeWinner = (Keyed)
 ScopeReply = ScopeOk | ScopeError | ScopeWinner
 
 @external("ilang:control", "finalizing")
-finalizing: <A, R, E, N, B, F, M>(
-	Continuation(A, R, E, N),
-	Boundary(B, F, M),
-) -> Bool
+finalizing: <A, R, N, B, M>(Continuation(A, R, N), Boundary(B, M)) -> Bool
 
 Frame = (
 	scope = Maybe(Address),
@@ -161,7 +158,7 @@ Frame = (
 	relay = (ForeignNotice, Keyed, Bool) -> Keyed,
 	foreign = List(Hop),
 	immune = List(Cause),
-	final = (Continuation(StepAnswer, Turn, Never, Never)) -> Bool,
+	final = (Continuation(StepAnswer, Turn, Never)) -> Bool,
 	finishing = Bool,
 	unwinding = Maybe(Int),
 	deferred = Bool,
@@ -177,14 +174,11 @@ Cancelled = (Cause)
 Outcome = Pending | Success | Failure | Cancelled
 
 Dormant = (Start)
-Runnable = (Continuation(StepAnswer, Turn, Never, Never), StepAnswer)
-WaitingTicket = (Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
-WaitingScope = (Continuation(StepAnswer, Turn, Never, Never), Address)
-WaitingEvent = (
-	Continuation(StepAnswer, Turn, Never, Never),
-	Request(Registration),
-)
-WaitingDrain = (Continuation(StepAnswer, Turn, Never, Never))
+Runnable = (Continuation(StepAnswer, Turn, Never), StepAnswer)
+WaitingTicket = (Continuation(StepAnswer, Turn, Never), List(Ticket))
+WaitingScope = (Continuation(StepAnswer, Turn, Never), Address)
+WaitingEvent = (Continuation(StepAnswer, Turn, Never), Request(Registration))
+WaitingDrain = (Continuation(StepAnswer, Turn, Never))
 Running = ()
 Ended = ()
 Status = Dormant
@@ -326,7 +320,7 @@ Register = (
 	() -> Never,
 	() -> Never,
 	(ForeignNotice, Keyed, Bool) -> Keyed,
-	(Continuation(StepAnswer, Turn, Never, Never)) -> Bool,
+	(Continuation(StepAnswer, Turn, Never)) -> Bool,
 )
 ExternalCancel = ()
 Relay = (ForeignNotice, Keyed, Bool)
@@ -1054,12 +1048,12 @@ guarded = (
 	})
 }
 
-make_start = <A, E, N>(
-	body: () <- (Fail(E), ..N) -> A,
-	result: Key(Result(A, E)),
-	errors: Key(E),
-	check: Bool
-) -> Start {
+make_start: <A, E, N>(
+	() <- (Fail(E), ..N) -> A,
+	Key(Result(A, E)),
+	Key(E),
+	Bool,
+) <- N -> Start = (body, result, errors, check) {
 	{
 		kept = control.keep_env((own: Scheduler) {
 			own |>
@@ -1170,7 +1164,7 @@ run_control = (reply: StepAnswer) {
 }
 
 make_scheduler = (
-	b: Boundary(Turn, Never, Never),
+	b: Boundary(Turn, Never),
 	task_path: List(Int),
 	id: Int,
 	run: Key(Nil),
@@ -1653,7 +1647,7 @@ has_ready = (s: State) { core.not(s.ready == [] && s.ready_back == []) }
 reply = (
 	s: State,
 	task_path: Int,
-	k: Continuation(StepAnswer, Turn, Never, Never),
+	k: Continuation(StepAnswer, Turn, Never),
 	value: StepAnswer,
 	switch: Bool
 ) {
@@ -2055,7 +2049,7 @@ register_leaves = (
 select = (
 	s: State,
 	t: TaskState,
-	k: Continuation(StepAnswer, Turn, Never, Never),
+	k: Continuation(StepAnswer, Turn, Never),
 	leaves: List(Leaf)
 ) {
 	check_leaves(s, t, leaves)
@@ -2343,7 +2337,7 @@ end_frame = (frames: List(Frame), id: Address) -> List(Frame) {
 do_command = (
 	s: State,
 	t: TaskState,
-	k: Continuation(StepAnswer, Turn, Never, Never),
+	k: Continuation(StepAnswer, Turn, Never),
 	command: Command
 ) -> State {
 	command |>
@@ -2707,7 +2701,7 @@ cancellation_reply = (t: TaskState) {
 
 finals_changed = (
 	frames: List(Frame),
-	k: Continuation(StepAnswer, Turn, Never, Never)
+	k: Continuation(StepAnswer, Turn, Never)
 ) -> Bool {
 	frames |>
 		([]) { False }
@@ -2716,7 +2710,7 @@ finals_changed = (
 
 update_finals = (
 	frames: List(Frame),
-	k: Continuation(StepAnswer, Turn, Never, Never)
+	k: Continuation(StepAnswer, Turn, Never)
 ) -> List(Frame) {
 	frames |>
 		([]) { [] }
@@ -2729,7 +2723,7 @@ on_command = (
 	s: State,
 	task_path: Int,
 	command: Command,
-	k: Continuation(StepAnswer, Turn, Never, Never)
+	k: Continuation(StepAnswer, Turn, Never)
 ) {
 	original = find_task(s.tasks, task_path)
 	updated = { finals_changed(original.frames, k) } |>
@@ -3122,12 +3116,12 @@ loop = (state: State) -> RunReply {
 		}
 }
 
-scope_call_body = <A, E, N>(
-	body: (Scope(E)) <- (Fail(E), ..N) -> A,
-	witness: Witness,
-	mode: Mode,
-	own: Scheduler
-) -> ScopeResult(A) {
+scope_call_body: <A, E, N>(
+	(Scope(E)) <- (Fail(E), ..N) -> A,
+	Witness,
+	Mode,
+	Scheduler,
+) <- (Fail(E), ..N) -> ScopeResult(A) = (body, witness, mode, own) {
 	info = read(scope_key, ask(own, NewScope(witness, mode)))
 	errors: Key(E) = key.new()
 	results: Key(Result(A, E)) = key.new()
@@ -3197,7 +3191,10 @@ go_key = <A, E, N>(
 	Task(info = TaskInfo(scope = s.info, id = id), result = result, owner = s)
 }
 
-go = <A, E, N>(s: Scope(E), body: () <- (Fail(E), ..N) -> A) -> Task(A, E) {
+go: <A, E, N>(Scope(E), () <- (Fail(E), ..N) -> A) <- (Scheduler, ..N) -> Task(
+	A,
+	E,
+) = (s, body) {
 	result: Key(Result(A, E)) = key.new()
 	go_key(s, body, result)
 }
@@ -3253,10 +3250,10 @@ choose = <A, E, N>(events: List(Event(A, E, N))) -> Event(A, E, N) {
 	Event(identity = key.new(), branches = branches_of(events))
 }
 
-map = <A, B, E, F, N, M>(
+map = <A, B, E, N, M>(
 	e: Event(A, E, N),
-	f: (A) <- (Fail(F), ..M) -> B
-) -> Event(B, E | F, N | M) {
+	f: (A) <- (Fail(E), ..M) -> B
+) -> Event(B, E, N | M) {
 	Event(
 		identity = key.new(),
 		branches = list_map(e.branches, (branch: Branch(A, E, N)) {
@@ -3349,9 +3346,9 @@ get = <A>(s: Shared(A)) <- (own: Scheduler) -> A {
 	read(s.values, ask(own, GetShare(s.run, s.owner, s.id)))
 }
 
-keep = <S, A, E, N>(f: (S) <- (Fail(E), ..N) -> A) <- (_own: Scheduler) -> (
-	S,
-) <- (Fail(E), Scheduler) -> A {
+keep = <S, A, N>(f: (S) <- N -> A) <- (_own: Scheduler) -> (S) <- (
+	Scheduler,
+) -> A {
 	{
 		kept = control.keep_env((input: (S, Scheduler)) {
 			(value, own) = input
@@ -3421,11 +3418,10 @@ race = <A, E, N>(
 		| (BodyValue(_)) { panic("task: missing race winner") }
 }
 
-spawn_values = <A, B, E, N>(
-	s: Scope(E),
-	xs: List(A),
-	f: (A) <- (Fail(E), ..N) -> B
-) -> List(Task(B, E)) {
+spawn_values: <A, B, E, N>(Scope(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
+	Scheduler,
+	..N,
+) -> List(Task(B, E)) = (s, xs, f) {
 	xs |>
 		([]) { [] }
 		| ([x, ..rest]) {
@@ -3447,12 +3443,12 @@ map_concurrently = <A, B, N>(xs: List(A), f: (A) <- N -> B) -> List(B) {
 	scope((s) { join_values(spawn_values(s, xs, f)) })
 }
 
-execute_body = <A, E, N>(
-	body: () <- (Fail(E), ..N) -> A,
-	runner: Runner,
-	seed: rng.Generator,
-	policy: Policy
-) -> Result(Result(A, E), ScheduleError) {
+execute_body: <A, E, N>(
+	() <- (Fail(E), ..N) -> A,
+	Runner,
+	rng.Generator,
+	Policy,
+) <- N -> Result(Result(A, E), ScheduleError) = (body, runner, seed, policy) {
 	runner |>
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (Runner(..)) {
@@ -3567,10 +3563,10 @@ run = <A, N>(body: () <- N -> A) <- (runner: Runner) -> A {
 		}
 }
 
-test = <A, N>(
+test = <A, E, N>(
 	seed: rng.Generator,
 	choices: List(List(Int)),
-	body: () <- N -> A
+	body: () <- (Fail(E), ..N) -> A
 ) <- (runner: Runner) -> A {
 	execute(body, runner, seed, Script(choices)) |>
 		(Ok(result)) { fail.from_result(result) }
@@ -3581,12 +3577,12 @@ _entry = <A, N>(body: () <- N -> A) <- (root: request.Root) -> A {
 	retain(run(body)) <- (initial(root))
 }
 
-scope_call = <A, E, N>(
-	body: (Scope(E)) <- (Fail(E), ..N) -> A,
-	witness: Witness,
-	mode: Mode,
-	own: Scheduler
-) -> ScopeResult(A) {
+scope_call: <A, E, N>(
+	(Scope(E)) <- (Fail(E), ..N) -> A,
+	Witness,
+	Mode,
+	Scheduler,
+) <- (Fail(E), ..N) -> ScopeResult(A) = (body, witness, mode, own) {
 	own |>
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (Scheduler(..)) {
@@ -3605,12 +3601,12 @@ scope_call = <A, E, N>(
 		}
 }
 
-execute = <A, E, N>(
-	body: () <- (Fail(E), ..N) -> A,
-	runner: Runner,
-	seed: rng.Generator,
-	policy: Policy
-) -> Result(Result(A, E), ScheduleError) {
+execute: <A, E, N>(
+	() <- (Fail(E), ..N) -> A,
+	Runner,
+	rng.Generator,
+	Policy,
+) <- N -> Result(Result(A, E), ScheduleError) = (body, runner, seed, policy) {
 	kept = control.keep_env((_: Nil) {
 		execute_body(body, runner, seed, policy)
 	})
@@ -4096,7 +4092,7 @@ queue_scope_end = (s: State, t: TaskState, scope: ScopeState) -> State {
 finish_scope = (
 	s: State,
 	t: TaskState,
-	k: Continuation(StepAnswer, Turn, Never, Never),
+	k: Continuation(StepAnswer, Turn, Never),
 	info: ScopeInfo
 ) -> State {
 	id = read(address_key, info.id)
@@ -4289,7 +4285,7 @@ pump_messages = (s: State) {
 relay_notice = (
 	s: State,
 	t: TaskState,
-	k: Continuation(StepAnswer, Turn, Never, Never),
+	k: Continuation(StepAnswer, Turn, Never),
 	notice: ForeignNotice,
 	value: Keyed,
 	discard: Bool

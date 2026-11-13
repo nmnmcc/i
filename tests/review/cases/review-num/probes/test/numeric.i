@@ -45,7 +45,7 @@ test("integers", () {
 })
 
 End = (Float, Int, Float)
-More = (Continuation(Float, ResultStep, Never, Never))
+More = (Continuation(Float, ResultStep, Never))
 ResultStep = End | More
 
 work = (b, x: Float, n: Int) -> ResultStep {

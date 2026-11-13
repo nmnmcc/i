@@ -15,7 +15,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-More = (String, Continuation(String, Step, Never, Never))
+More = (String, Continuation(String, Step, Never))
 Done = (String)
 Step = More | Done
 

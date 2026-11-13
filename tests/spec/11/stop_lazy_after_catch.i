@@ -17,7 +17,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused = (Continuation(Nil, Paused, Never, Never))
+Paused = (Continuation(Nil, Paused, Never))
 Done = ()
 Paused = Paused | Done
 

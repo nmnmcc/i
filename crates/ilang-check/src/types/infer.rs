@@ -3461,10 +3461,10 @@ impl<'a> Checker<'a> {
                 self.check_places(t, Pol::Pos, 0);
             }
         }
-        // Syntax three (transition front): `-> R ^ _ ! _` is a written
+        // Syntax three (transition front): `-> R ! _` is a written
         // result whose needs are left to inference.
         let hole = |t: &Option<Type>| matches!(t, Some(t) if matches!(t.kind, TypeKind::Hole));
-        let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.err) && hole(&r.env));
+        let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.env));
         let ret = f.ret.as_ref().map(|r| {
             let value = self.conv(&r.value, &HashMap::new());
             if inferred_needs {

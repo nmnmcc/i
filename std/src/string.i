@@ -710,10 +710,9 @@ replace_n = (in: String, each: String, with: String, up_to: Int) -> String {
 
 /// Calls on once per scalar, left to right. True separates pieces; separator
 /// runs collapse and empty pieces are omitted. Errors stop traversal at once.
-split_when = <E, N>(
-	string: String,
-	on: (UtfCodepoint) <- (Fail(E), ..N) -> Bool
-) -> List(String) {
+split_when = <N>(string: String, on: (UtfCodepoint) <- N -> Bool) -> List(
+	String,
+) {
 	go = (
 		rest: List(UtfCodepoint),
 		piece: List(UtfCodepoint),

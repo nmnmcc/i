@@ -287,7 +287,7 @@ fn same_principal(
             .find(|(_, m)| m.path == "app/main")
             .unwrap();
         let di = m.defs.iter().position(|d| d.name == name).unwrap();
-        c.types.as_ref().unwrap().provider_scheme_artifacts[&DefId {
+        c.types.as_ref().unwrap().scheme_artifacts[&DefId {
             module: ModuleId(mi as u32),
             index: di as u32,
         }]

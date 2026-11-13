@@ -4,54 +4,49 @@
 	testlib = (test) = std/test
 	i/control
 	i/core
-	i/failure
+	i/fail
 )
 
-check = (got: String, want: String) {
-	assert(got == want)
-}
+check = (got: String, want: String) { assert(got == want) }
 
 show = (x) { core.inspect(x) }
 
 // Rule A: a need is met by a form that is a subtype of it as a value, and
 // two forms of one service in a row are one entry.
+need_int = () -> Nil { fail.raise(1) }
+need_string = () -> Nil { fail.raise("s") }
 
-need_int = () -> Nil ! Fail(Int) { failure.raise(1) }
-need_string = () -> Nil ! Fail(String) { failure.raise("s") }
+both = () <- (f: Fail(Int | String)) { need_int() }
 
-both = (f ! Fail(Int | String)) { need_int() }
+either = (n: Int) { n |> (0) { need_int() } | (_) { need_string() } }
 
-either = (n: Int) {
-	n |> {
-		0 -> need_int()
-		_ -> need_string()
-	}
-}
+Yield(A) = (emit = (A) -> Nil)
 
-Yield(A) {
-	Yield(emit: (value: A) -> Nil)
-}
-
-collect(A, N) = (body: () -> Nil ! Yield(A) | N) -> List(A) ! N {
+collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {
-		! Yield(A) = Yield((x) {
-			control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
-		})
-		body()
-		[]
+		{
+			body()
+			[]
+		} <- (
+			Yield(
+				emit = (x) {
+					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+				},
+			),
+		)
 	})
 }
 
-emit(A) = (x: A, y ! Yield(A)) { y.emit(x) }
+emit = <A>(x: A) <- (y: Yield(A)) { y.emit(x) }
 
 test("a wider Fail meets a narrower need", () {
-	r: Result(Nil, Int | String) = failure.catch(() { both() })
+	r: Result(Nil, Int | String) = fail.catch(() { both() })
 	check(show(r), "Error(1)")
 })
 
 test("two needs of Fail are one entry", () {
-	a: Result(Nil, Int | String) = failure.catch(() { either(0) })
-	b: Result(Nil, Int | String) = failure.catch(() { either(1) })
+	a: Result(Nil, Int | String) = fail.catch(() { either(0) })
+	b: Result(Nil, Int | String) = fail.catch(() { either(1) })
 	check(show(a), "Error(1)")
 	check(show(b), "Error(\"s\")")
 })
@@ -65,8 +60,8 @@ test("a generator of two types", () {
 })
 
 test("errors of a nested catch", () {
-	r = failure.catch(() {
-		inner = failure.catch(() { need_int() })
+	r = fail.catch(() {
+		inner = fail.catch(() { need_int() })
 		check(show(inner), "Error(1)")
 		need_string()
 	})

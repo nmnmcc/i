@@ -18,7 +18,7 @@ Name = (text = String)
 
 name = () <- (n: Name) { n.text }
 
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, Paused, Name))
 Done = (String)
 Paused = Paused | Done
 

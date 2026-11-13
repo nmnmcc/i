@@ -373,8 +373,8 @@ const CANCEL_OUT: &str = r#"(
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
 Out = (put = (Inner) -> Nil)
-Inner = (Continuation(Nil, Int, Never, Out))
-Paused = (Continuation(Nil, Outer, Never, Out))
+Inner = (Continuation(Nil, Int, Out))
+Paused = (Continuation(Nil, Outer, Out))
 Done = ()
 Outer = Paused | Done
 Handed = (Inner)
@@ -464,7 +464,7 @@ main = () {
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, Third, Never, Out))
+const THIRD: &str = r#"Third = (Continuation(Nil, Third, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 Third = Third | Over
@@ -517,7 +517,7 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, Paused, Name))
 Done = ()
 Paused = Paused | Done
 
@@ -557,7 +557,7 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, Paused, Name))
 Done = ()
 Paused = Paused | Done
 
@@ -602,7 +602,7 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Never, Io))
+Paused = (Continuation(Nil, Paused, Io))
 Done = ()
 Paused = Paused | Done
 
@@ -650,10 +650,10 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Int, Never))
+Paused = (Continuation(Nil, Paused, Fail(Int)))
 Done = ()
 Paused = Paused | Done
-Held = (Continuation(Nil, Held, Never, Never))
+Held = (Continuation(Nil, Held, Never))
 Over = ()
 Held = Held | Over
 
@@ -1082,7 +1082,7 @@ fn nested_source(depth: u32) -> String {
 	i/control
 )
 Done = ()
-More = (Int, Continuation(Nil, Step, Never, Never))
+More = (Int, Continuation(Nil, Step, Never))
 Step = Done | More
 check = (ok) { ok |> (True) { Nil } | (False) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
@@ -1218,7 +1218,7 @@ fn resume_twice_from_new_places() {
 )
 Name = (text = String)
 Done = (String)
-More = (String, Continuation(Nil, Step, Never, Name))
+More = (String, Continuation(Nil, Step, Name))
 Step = Done | More
 name = () <- (n: Name) { n.text }
 leaf = (b) {
@@ -1273,7 +1273,7 @@ fn counted_frames() {
 	i/resource
 )
 Done = ()
-More = (String, Continuation(Nil, Step, Never, Never))
+More = (String, Continuation(Nil, Step, Never))
 Step = Done | More
 check = (ok) { ok |> (True) { Nil } | (False) { panic("counted frame") } }
 layer = (b, n) {

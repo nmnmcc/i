@@ -15,7 +15,7 @@ Send = (Keyed)
 Receive = ()
 Command = Send | Receive
 
-Step = (Command, Continuation(StepAnswer, Turn, Never, Never))
+Step = (Command, Continuation(StepAnswer, Turn, Never))
 Done = (Keyed)
 Turn = Step | Done
 

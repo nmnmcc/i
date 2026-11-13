@@ -1307,7 +1307,7 @@ native_client = () <- (n: net.Net, t: tls.Tls) {
 			Transport(
 				stream = (req) {
 					{
-						res = provider.send(req)
+						res: Response = provider.send(req)
 						cursor = task.ref(res.body)
 						(
 							head = res,
@@ -1374,7 +1374,10 @@ fetch_error = (code: String) {
 		| (_) { fail.raise(Connect(code)) }
 }
 
-fetch_reply = <A, N>(body: () <- (Fail(String), ..N) -> A) -> A {
+fetch_reply: <A, N>(() <- (Fail(String), ..N) -> A) <- (
+	Fail(HttpError),
+	..N,
+) -> A = (body) {
 	fail.catch(body) |>
 		(Ok(value)) { value }
 		| (Error(code)) { fetch_error(code) }

@@ -214,7 +214,7 @@ fn many_uses_of_a_parameter() {
     let out = output(&graph, true, false);
     let elapsed = start.elapsed();
     assert!(
-        out.contains("f : (b = Boundary(A, B, C), x = Int) -> Int\n") && !out.contains("error"),
+        out.contains("f : (b = Boundary(A, B), x = Int) -> Int\n") && !out.contains("error"),
         "{out}"
     );
     assert!(elapsed.as_secs() < 30, "{elapsed:?}");
