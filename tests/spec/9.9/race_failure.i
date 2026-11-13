@@ -5,22 +5,41 @@
 (
 	i/task
 	i/fail
+	i/random
 )
 
-
 main = () {
-	assert(fail.catch(() {
+	// R5 checks a particular order. task.test's exhausted script uses FIFO
+	// (spec §9.9); a yield alone cannot impose that order across workers.
+	task.test(random.from_seed(7), [], () {
+		assert(fail.catch(() {
+			task.race(() { fail.raise("first") }, () {
+				task.yield()
+				2
+			})
+		}) == Error("first"))
+		assert(fail.catch(() {
+			task.race(() { 1 }, () {
+				task.yield()
+				fail.raise("late")
+			})
+		}) == Ok(1))
+	})
+	// Without a testing policy either completion may be observed first.
+	first = fail.catch(() {
 		task.race(() { fail.raise("first") }, () {
 			task.yield()
 			2
 		})
-	}) == Error("first"))
-	assert(fail.catch(() {
+	})
+	assert(first == Error("first") || first == Ok(2))
+	late = fail.catch(() {
 		task.race(() { 1 }, () {
 			task.yield()
 			fail.raise("late")
 		})
-	}) == Ok(1))
+	})
+	assert(late == Ok(1) || late == Error("late"))
 	assert(task.both(() {
 		task.yield()
 		1
