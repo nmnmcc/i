@@ -1994,8 +1994,11 @@ a turn, take the next script path, if any; it must be runnable, otherwise raise
 `NotRunnable(path = List(Int))`, the one member of `ScheduleError = NotRunnable`, after structured cleanup. When
 the script ends choose FIFO. Do not root-poll or use real clocks. Completed fake
 requests are allowed; reaching a required wait on an unsettled host request stops
-with `panic("task: test needs fake IO")`. Fixed inputs and script give the same
-values, task paths, selected alternatives and trace on every run. Tests for real
+with `panic("task: test needs fake IO")`. A replay record includes the seed, body inputs, script, enclosing Runner
+prefix, and initial state of its shared spawn/run allocator. Equal replay
+records give the same values, full task paths, selected alternatives and trace.
+Two successive tests in one task use different allocator states, so the same
+seed, body and script alone do not promise the same replay. Tests for real
 host overlap use ABI completion gates instead. The testing policy changes only
 which legal runnable step is chosen; it cannot commit an unready event.
 
