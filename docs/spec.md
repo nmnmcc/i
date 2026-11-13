@@ -704,9 +704,9 @@ IntPart    = int_lit | "{" IntPart "}" .
 
 ## 4. Types
 
-### 4.1 Types are sets of values
+### 4.1 Types denote sets of values
 
-Every type is a set of values.
+Every type denotes a set of values. The union of two members of one type constructor is their least upper bound (a join) in the lattice of types ordered by subtyping (§4.5), subject to the merging rules of §4.4. Its set of values can be larger than the exact union of the two sets.
 
 - Values of different type constructors are never the same.
 - Values of different forms of one type constructor, such as `List(Int)` and `List(String)`, may not be told apart at run time (§7.1).
@@ -812,7 +812,7 @@ Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, In
 
 ### 4.4 Union, intersection, and difference
 
-- The values of `A | B` are the values of `A` and the values of `B`. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
+- `A | B` is the least upper bound (join) of `A` and `B` under subtyping (§4.5). It contains every value of either type, and merging members of one type constructor can add values beyond the exact union of their sets. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
 - Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Data of one shape is one type constructor, whose part under each key goes in the same direction as the data. All function types are one type constructor: `(P) <- N -> R | (Q) <- M -> S` is `(P & Q) <- N ∧ M -> R | S`, where `N ∧ M` is the merge of the two needs (§9.2). When `P` and `Q` have no shape in common, `P & Q` is `Never`, and the function cannot be called. So `List(Int) | List(String)` is `List(Int | String)`.
 - The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor. A type variable may be a member.
 - The values of `A & B` are the values that are in both `A` and `B`. `{ A | B } & C` is `A & C | B & C`. When `T` and `U` are not type variables, `T & U` is `Never` when they have different type constructors; when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change. For `Int` and `String`, the value set is the values in both; when there are none, `T & U` is `Never`. So `"a" & String` is `"a"`, and `"a" & "b"` is `Never`. `a & T`, with a type variable `a`, stays as it is.
@@ -825,6 +825,18 @@ Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, In
 - So `{ Int | String | Nil } - String` is `Int | Nil`, `A - A` is `Never`, and `{ Yield(a) | n } - Yield(a)` is `n - Yield(a)`.
 - `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
 - Unions, intersections, and differences may be used in every place where a type may be used. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameter of a function is an input place; its `->` part, the type at the top of a binding pattern, and the data of a type are output places. The parts of data keep the direction of the place of the data. The restrictions on variable members apply to expanded annotations and shown types, including after substitution and completion.
+
+Merging loses correlations between parts of data of one shape and between arguments of one type constructor. Thus `(Int, String) | (String, Int)` is `(Int | String, Int | String)`, which also contains `(1, 2)`. If `Pair(A, B) = (A, B)`, then `Pair(Int, String) | Pair(String, Int)` likewise admits `Pair(1, 2)`. `List(Int) | List(String)` admits `[1, "a"]`, even though neither original list type does.
+
+Keep a correlation by giving each alternative a distinct labelled constructor (§4.3):
+
+```i
+IntString = (Int, String)
+StringInt = (String, Int)
+Correlated = IntString | StringInt
+```
+
+The two members of `Correlated` have different type constructors and do not merge: `IntString(1, "a")` belongs to it, while `IntString(1, 2)` does not.
 
 ### 4.5 Subtypes
 
