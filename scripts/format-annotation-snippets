@@ -54,9 +54,12 @@ def selected(item):
         return False
     if item['kind'] == 'js' and not item['path'].startswith('editors/') and not CHECK['candidate'](source) and not item.get('entry'):
         return False
-    return item.get('source_context',False) or bool(item['kind'] == 'rust' and re.match(r'^[A-Z][A-Za-z0-9]*:\s*(?:\(|[A-Z])', source)) or item['kind'] == 'markdown' or CHECK['candidate'](source) or bool(item.get('entry')) or bool(
+    existing = item.get('source_context',False) or bool(item['kind'] == 'rust' and re.match(r'^[A-Z][A-Za-z0-9]*:\s*(?:\(|[A-Z])', source)) or item['kind'] == 'markdown' or CHECK['candidate'](source) or bool(item.get('entry')) or bool(
         re.search(r'(?m)^\s*[a-z_]\w*\s*:\s*(?:[A-Z_{(<]|"|[0-9])', source)) or bool(
         re.fullmatch(r':\s*[A-Z][A-Za-z0-9(), |&{}<>.-]*', source))
+    item['pattern_fragment'] = (not existing and source.lstrip().startswith(('(', '[', '<<'))
+                                and bool(re.search(r'[a-z_]\w*:\s*[A-Za-z_{]', source)))
+    return existing or item['pattern_fragment']
 
 
 def main():
@@ -108,6 +111,8 @@ def main():
         # A lowercase type name is also common in ABI pseudocode and older
         # surface examples. Only extend the selection to valid i fragments.
         if item.get('valid_inline_only') and result['diagnostics']:
+            continue
+        if item.get('pattern_fragment') and (result['diagnostics'] or 'Typed {' not in result['tree']):
             continue
         if item['kind'] in ('rust', 'js', 'python') and not CHECK['candidate'](source) and not entry and not source.startswith(': ') and not item.get('source_context'):
             if result['diagnostics'] and not re.match(r'^[A-Z][A-Za-z0-9]*:\s*(?:\(|[A-Z])', source):

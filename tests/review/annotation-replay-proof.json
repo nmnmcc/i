@@ -4,9 +4,9 @@
   "source_files": 2949,
   "remaining_rewrite_sites": 0,
   "differences": 0,
-  "baseline_sha256": "c781cb8ea821c05ac29a7e79eeeff2adcc3a002169c5dce02336f57d1c59afa6",
-  "full_report_sha256": "811f23f48d286d01d78db4e6e2fd6bb14b83c9d0c5a77d38b63fff1326065619",
-  "baseline": "/home/agent/Programming/i/.rd/cache/gpt/r2/tyalt-replay-audit.jsonl.gz",
-  "full_report": "/home/agent/Programming/i/.rd/cache/gpt/r2/tyalt-replay-proof-full.json",
+  "baseline_sha256": "c382410acea6a2973f6781a72b4172633e961a8cd85832392bdd25ecba81ca28",
+  "full_report_sha256": "eba06b66294228a007e23f010eb08874da22dbcdbe74731707d0e66b835d2664",
+  "baseline": "/home/agent/Programming/i/.rd/cache/gpt/r2/tyalt-replay-complete-old.jsonl.gz",
+  "full_report": "/home/agent/Programming/i/.rd/cache/gpt/r2/tyalt-replay-complete-proof-full.json",
   "excluded": "Seven new spec fixtures and the two named parser/LSP test blocks intentionally exercise the new rule; registered non-source host literals are also excluded."
 }

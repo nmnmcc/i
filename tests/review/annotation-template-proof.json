@@ -1,6 +1,6 @@
 {
   "old_parser": "078107490",
-  "compared": 10,
+  "compared": 13,
   "differences": [],
   "entries": [
     {
@@ -70,6 +70,27 @@
       "path": "crates/ilang-check/tests/row_schemes.rs",
       "name": "row-T(S(Never) | Dep)",
       "tree_sha256": "f85aec28fbd8f4514f7068ed0ea34d0460529bed20f583f3b1967595fd9f7833",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/src/query/actions.rs",
+      "name": "lisp-type-wrapper-atomic",
+      "tree_sha256": "d6005534d5d6fc0a0382e1789a3b3a5f57ebad548f57d4707649cac13362ac37",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/src/query/actions.rs",
+      "name": "lisp-type-wrapper-union",
+      "tree_sha256": "f5360854a285b70acd1956062c8af24c0989073f50418f56e5f2e02071c47f4d",
+      "equal": true,
+      "diagnostics_equal": true
+    },
+    {
+      "path": "crates/ilang-check/src/query/actions.rs",
+      "name": "lisp-type-wrapper-function-union-result",
+      "tree_sha256": "93d49265cce5e1ca9b6a18785210118d48c0c2763f772ee84c77e3a5891645b7",
       "equal": true,
       "diagnostics_equal": true
     }

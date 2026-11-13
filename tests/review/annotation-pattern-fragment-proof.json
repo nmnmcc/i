@@ -1,0 +1,7 @@
+{
+  "snippets": 1,
+  "hosts": {
+    "crates/ilang-check/tests/literal_types.rs": 1
+  },
+  "differences": []
+}

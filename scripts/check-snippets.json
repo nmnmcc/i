@@ -2988,5 +2988,14 @@
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
     ],
     "reason": "Intentional new Annot boundary counter-example, spec §3 and §7.1; preserve the unbraced pipe."
+  },
+  "crates/ilang-check/src/query/actions.rs:f74082bf6dab9ef6": {
+    "substitutions": [
+      [
+        "{}",
+        "Int"
+      ]
+    ],
+    "reason": "Rust format! template in lisp_type: annotation_text supplies the rendered type; parse its complete generated source with Int in that slot."
   }
 }
