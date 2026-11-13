@@ -794,10 +794,13 @@ impl Coalescer<'_> {
                     .zip(vs)
                     .zip(self.s.rows(*h, args.len()))
                     .map(|((a, v), row)| match v {
-                        _ if env => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1, row != Mode::Value)),
-                            Box::new(self.go(a, false, depth + 1, row != Mode::Value)),
-                        ),
+                        // Rule A: in a need, arguments go the other way
+                        // round from values.
+                        Variance::Co if env => self.go(a, !pos, depth + 1, row != Mode::Value),
+                        Variance::Contra if env => {
+                            self.go(a, pos, depth + 1, row != Mode::Value)
+                        }
+                        Variance::Bi if env => self.go(a, pos, depth + 1, row != Mode::Value),
                         Variance::Co | Variance::Bi => {
                             self.go(a, pos, depth + 1, row != Mode::Value)
                         }
