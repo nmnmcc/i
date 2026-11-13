@@ -882,3 +882,70 @@ All six pass checking and O0/O2 native test compilation/execution. The three
 runtime copies also pass their O0/O2 assertions. These observations were
 read-only; expected.json files remain unchanged. Probe results are saved in
 target/conv-b15/a1-observations.json.
+
+Coordinator b15 supersedes the earlier per-hundred recording and display
+exception discussion above. The coordinator accepts the 1,621 display cases
+and owns all remaining gate recordings. This lane did not audit those display
+cases. The 800 post-841 incremental recordings were removed deliberately;
+all source fixes remain. No observation was re-recorded for this audit.
+
+Coordinator b15 item 6: the 120 same-exit/different-code cases form the
+following groups. Counts are cases, not diagnostics or phases. The initial
+read-only comparison used exact main 29515fbfa and the converted release on
+63 cases: every non-permutation case, plus p0/p36/p9 from the 60 permutations.
+The source contracts were compared in all 60 permutations. Complete old/new
+stderr is saved in target/conv-b15/code-observations.json; the guard's long
+stream/tree lines were truncated and are not a complete diagnostic inventory.
+
+| Cases | Count | Reason for the diagnostic change |
+|---|---:|---|
+| K4 `generic_conflict`; K4d x1/x4/x6/x8/x9, z1/z3/z4, h1 in both `_loose/p` and `proj`; K4d `perm/p0`–`p59` | 79 | Conversion erased written complete needs, as with the earlier forwarders. These are lost constraints, not harmless deduplication. Restore them on binding types under §7.3. In the permutations, the missing error belongs to `bad`, independently of the retained `loop` error; `both` and `uset` also retain their original complete needs. Handler binding types retain the obligation-hiding E0515, and h1 retains its written-service E0501 checks. |
+| K4c `recursive_co_2`; K4s `mixed_install_6`, `mixed_install_12` | 3 | A synthetic provider local was generalized before its provide. Item 1's contract/value fusion restores the original inference point. Fresh checks now have main's multisets: one E0505 for the recursive case; respectively three/two E0515 and one E0501 for the mixed cases. No error code disappeared. |
+| K4d b1 in both copies | 2 | The two distinct main errors remain: an empty same-key service intersection and incompatible provider arguments. The migrated joint provide also reports the reverse-ordered empty intersection at the combined scope. This is an additional report of the same contradiction, not a new rejection condition. §7.3 permits consecutive direct providers to merge into one provide; §4.5 rule 4 / §9.2 still require the incompatible service forms to reject. |
+| A1 mixed_headers 03 in its two copies | 2 | The misplaced header still reports E0115. Its old clause block is now an ordinary computation block (§2.2), invalid on the right of `\|>` (§2.11); E0111 and an arrow-expression E0101 are additional recovery diagnostics. |
+| A1 param_shadow 29 in its two copies | 2 | The old binding-head type parameters are forbidden by §2.16 / §3.2. E0101 now rejects `outer(A) =` before the old parser's end-of-block E0105. The parameter-shadowing body is not reached by either invalid program. |
+| A1 ungrouped_product 48 and tuple_clauses_joined 53, each in two copies | 4 | Removed clause blocks are computation blocks, not chain literals (§2.2 / §2.5). The product still has E0111 and also an invalid expression arrow; the tuple case is E0111/E0102 at the invalid pipe/body instead of the old discard-as-value E0106. The bare old clause form never becomes accepted. |
+| A1 old_guard_lines 56 in its two copies | 2 | `case`, `if`, and the old brace clauses no longer form a match. Under §2.5 / §3.3 the free `\|` must join function literals; recovery also reaches the arrow and `_` in expression positions. E0101 remains, with a further E0106. |
+| A1 capture and its five confirmed/loose copies | 6 | Their intentionally invalid `src/types.i` still contains `export (Box(..))` and `Box { Box(Int) }`. E0101 remains at the old export; §3.2's removal of constructor lists adds a second E0101 at `Box {`. The converted caller is not the rejection's cause. |
+| K4d typediff_41_16 and typediff_46_85 | 2 | Both retain the invalid `/* … */` delimiters. The old diagnostic dump between them is now line-commented, eliminating secondary errors in that dump while preserving the unsupported opening delimiter's E0101. Spec §1.2 defines only `//` comments; no block-comment feature was added, and no original error code was lost. |
+| K4s mut_ord_tmp | 1 | The original illegal typed binding in an expression position is retained as `run(h1: _ = …)`. §2.3 / §3.3 read a call's data items, where `:` cannot introduce a label or a binding. It fails at that item, rather than producing two legacy pattern-recovery E0101 reports. |
+| Native3 alias/direct/external/int_assign/raw_ctor | 5 | The retained old `import(…)` / `export(…)` text now parses as ordinary calls with data arguments (§3.3), not header groups (§7.3). Resolver E0234 rejects those top-level macro-reserved calls; E0201 reports the unbound module/value that the call did not import. The main E0101 is therefore completely replaced by later-phase E0234/E0201; these programs remain rejected. |
+| Native3 field/injection_control/positive; std1 stream/stream-positive | 5 | P0 (§3.5) explicitly makes bare `!` and `^` lexer errors, so retained old service/error syntax adds E0001 before recovery. Main's E0101/E0102 do **not** disappear completely in these cases: the streams have E0101×5/E0102×3 → E0101×11/E0102×5 plus E0001×10 each; field, injection_control and positive retain respectively 2, 7 and 1 E0101, adding 1, 3 and 1 E0001. These are removed-token errors, not generic substitutes for a dropped type error. |
+| Rec loose/probes | 1 | Conversion dropped the illegal type spread `..R`, which incorrectly removed E0541. Restore that syntax so the closed-data rule is tested rather than silently deleting its counterexample. Under §2.3, “A data type has no spread”; syntax three diagnoses it in the parser (E0107), before resolution. Thus E0541 is replaced by the direct no-type-spread error. The original E0210 import rejection is independently pinned by `library::unknown_library_path_is_missing` for `i/record`, and both E0202 lookups by `front_end::closed_data_has_no_record_type_even_without_a_spread_error`; all 15 tests in these two binaries pass. The existing corpus requirement now names E0107 and documents that split, keeping all three original negative-test intents. |
+| Runtime echo-types | 1 | Its old `import(task = …, net = …, i/fail, i/resource)` is read as a call: two positional items follow labels, producing E0110 under §2.3. Its old `case` clauses still have invalid expression arrows (§2.5 / §3.3), while the stub task module has two forbidden lowercase data-definition heads (§3.2). These separately reached syntax errors explain the additional diagnostics; no run phase is enabled. |
+| S6 probe; std1 factory/tree/variance | 4 | Lowercase data-definition heads remain forbidden. §3.2 requires bare UpNames in those heads; the new parser rejects the head as E0101 before resolution. Consequently main's E0232, free lowercase E0201 and consequent arity E0224 disappear together. This is earlier enforcement of the same invalid head, not removal of those resolver checks from valid parsed programs. |
+| T1 assert_group | 1 | The fitted pattern `(\"a\", _)` is impossible for the known first part `\"b\"`. Section 2.12 requires the warning when the known type is disjoint from the fitted pattern. W0505 is the documented behaviour change 1 above; `assertion.catch` still catches the same Assert, and the program remains accepted. |
+
+The counts above sum to 120. The disappeared E0541 and the genuinely replaced
+E0101 in the five native-call cases have distinct causes; they are not
+classified together as display changes. The stream cases retain both of
+their original parser codes, as the full diagnostics show.
+
+After restoring the sources, all 120 check exits equal main, and all 79
+restored-contract diagnostic multisets equal main exactly. The three
+provider-generalization cases also match, so 82 of the 120 original code
+changes are repaired; the remaining 38 are the individually explained
+parser, duplicate-provider and warning groups above. Both main and converted
+positive controls (temporary permutation copies without `bad` or `loop`)
+check successfully with the same two unused-binding warnings. The real
+fixtures retain both negative functions. Raw final checks and controls are
+in target/conv-b15/final-code-observations.json and positive-controls.json.
+No expected.json was re-recorded. The deliberate no-type-spread fixture is
+registered with its exact E0107 in the snippet inventory and the converter's
+unconvertible list, so conversion cannot silently erase it again.
+
+Authority for all restored needs, §7.3: “A written `! N` that is wider than
+what the body needs is kept as a type annotation on the binding
+(`f: (P) <- … -> R = …`), so that the type does not change.” The literals also
+retain their original empty error channel through the transition lowerer's
+`Fail(Never)` marker. The restored type spread follows §2.3: “A data type has
+no spread.” The old removed-library/type checks were split out, not dropped.
+
+Final item-6 verification also passes workspace all-target/all-feature clippy,
+normal snippet inventory (4,766 snippets, five unchanged future-track entries)
+and Lisp inventory (34 files and 89 CLI macro fragments). The inventory first
+exposed an unexpanded Rust format template in the new provider regression;
+literal concatenation now produces the same i programs while exposing valid
+literal snippets to the inventory. Its focused checker regression passes.
+No tests were parked. The coordinator's final whole-corpus recording and
+merged-gate run are outside this read-only anomaly audit.

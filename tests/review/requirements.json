@@ -751,12 +751,13 @@
       "pattern": "^review-rec/_loose/probes$",
       "known_failure": false,
       "outcome": "reject",
-      "finding": "Syntax three stage 6: `i/record`, `Record`, spreads in types and forgetting are removed; the program is rejected at its import of i/record",
-      "source": "docs/design/syntax-3.md §2.3 Closed: \"Data of one shape is never a value of a type of another shape. ... There is no width subtyping, no `Record`, no field addition or removal at run time.\" and §7.2 row 6 (`lib/i/record.i` deleted)",
+      "finding": "Closed data rejects the original type spread; removed i/record and Record lookups are also retained as independent checker tests.",
+      "source": "docs/design/syntax-3.md §2.3: “A data type has no spread.” “There is no width subtyping, no `Record`, no field addition or removal at run time.”",
       "origin": "review-rec/probes.i; original source fingerprint retained as a historical snapshot",
       "diagnostic_codes": [
-        "E0210"
-      ]
+        "E0107"
+      ],
+      "diagnostic_reason": "Main E0541 for ..R was lost when conversion erased the spread. Restored source is rejected earlier as parser E0107. Preserve the prior E0210 import requirement independently in ilang-check/tests/library.rs::unknown_library_path_is_missing (i/record), and both E0202 Record lookups in front_end.rs::closed_data_has_no_record_type_even_without_a_spread_error; a parser error must not erase those negative-test intents."
     },
     {
       "pattern": "^review-rec/_loose/schema-union$",

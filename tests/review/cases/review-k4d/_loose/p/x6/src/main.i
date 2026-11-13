@@ -6,7 +6,10 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = <N>(body: () <- N -> Int, svc: S(Dep)) -> Int {
+wrap: <N>(() <- N -> Int, S(Dep)) <- (Fail(Never), ..N) -> Int = (
+	body,
+	svc
+) <- (fail: Fail(Never)) -> Int {
 	h = () {
 		_syn3_0: S(Dep) = svc
 		body() <- (_syn3_0)

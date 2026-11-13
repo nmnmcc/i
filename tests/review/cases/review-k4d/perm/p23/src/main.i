@@ -2,7 +2,10 @@ get = () <- (d: Dep) { d.v }
 
 fw = () { use() }
 
-uset = <A, N>(x: A) <- (t: T(A, N)) -> A {
+uset: <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x: A) <- (
+	t: T(A, N),
+	fail: Fail(Never),
+) -> A {
 	T(g = g, ..) = t
 	g(x)
 }
@@ -11,14 +14,19 @@ T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
 
 Dep = (v = Int)
 
-both = () -> Int { pong(2) }
+both: <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
+	fail: Fail(Never),
+) -> Int { pong(2) }
 
 use = <N>() <- (s: S(N)) {
 	S(f = f) = s
 	f()
 }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (
+	s: S(N),
+	fail: Fail(Never),
+) -> Int {
 	S(f = f) = s
 	f()
 }

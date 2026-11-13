@@ -623,13 +623,16 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
 #[test]
 fn syntax_three_written_provider_hole_keeps_its_obligation() {
     let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\n";
-    let positive = format!(
-        "{base}wrap = <N>(body, svc: S(N)) {{ body() <- (svc) }}\nmain = () {{ assert(wrap(() {{ use() }}, S(f = () -> Int {{ 1 }})) == 1) }}\n"
-    );
+    let positive = [
+        base,
+        "wrap = <N>(body, svc: S(N)) { body() <- (svc) }\nmain = () { assert(wrap(() { use() }, S(f = () -> Int { 1 })) == 1) }\n",
+    ].concat();
     types(&positive);
-    let negative = format!(
-        "{base}wrap = (body) {{ provided: S(_) = S(f = () -> Int {{ 1 }}) body() <- (provided) }}\n"
-    );
+    let negative = [
+        base,
+        "wrap = (body) { provided: S(_) = S(f = () -> Int { 1 }) body() <- (provided) }\n",
+    ]
+    .concat();
     let (graph, _, _) = common::check_files(&[("src/main.i", &negative)]);
     let checked = ilang_check::check(&graph);
     let codes: std::collections::BTreeSet<_> = checked

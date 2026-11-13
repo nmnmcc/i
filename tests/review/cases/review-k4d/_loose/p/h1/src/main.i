@@ -5,14 +5,21 @@ use = <N>() <- (s: S(N)) {
 	S(f) = s
 	f()
 }
-c1 = () -> Int { use() }
+c1: () <- (Fail(Never), S(Dep)) -> Int = () <- (fail: Fail(Never)) -> Int {
+	use()
+}
 c2: () <- (S(Dep)) -> Int = () { use() }
 c3 = () {
 	cb: () <- (S(Dep)) -> Int = () { use() }
 	cb
 }
-c4 = () -> Int { get() }
-c5 = () <- (s: S(Dep)) -> Int {
+c4: () <- (Fail(Never), S(Dep)) -> Int = () <- (fail: Fail(Never)) -> Int {
+	get()
+}
+c5: () <- (Fail(Never), S(Dep)) -> Int = () <- (
+	s: S(Dep),
+	fail: Fail(Never),
+) -> Int {
 	S(f) = s
 	f()
 }
