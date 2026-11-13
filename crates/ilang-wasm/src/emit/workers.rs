@@ -18,9 +18,9 @@
 //! Format, one marker byte then its operands (little endian):
 //! 0 Nil; 1 small Int (i32); 2 back reference (i32); 3 `$obj` (tag i32,
 //! field 1 i32, field 2 i64, field 3 f64, bytes, limbs, values); 4 closure
-//! (code i32, flags i32, arity i32, captures); 5 non-empty list (count, items);
+//! (code i32, flags i32, shape i64, captures); 5 non-empty list (count, items);
 //! 6 True; 7 False; 8 []. An array is its length (i32, -1 for null) and its
-//! items.
+//! items. Marker 10 carries a multi-shape function: identity, count, shape ids, groups.
 
 /// Imports of the host transport (ABI v3 runtime imports, multicore wave).
 pub(super) const IMPORTS: &str = r#"
@@ -107,6 +107,15 @@ pub(super) const WAT: &str = r#"
   (f64.store (i32.add (global.get $enc_ptr) (global.get $enc_len)) (local.get $v))
   (global.set $enc_len (i32.add (global.get $enc_len) (i32.const 8))))
 
+;; The total number of keys of a function shape.
+(func $shape_arity (param $shape i64) (result i32)
+  (local $set i32) (local $n i32)
+  (local.set $n (i32.wrap_i64 (local.get $shape)))
+  (local.set $set (i32.wrap_i64 (i64.shr_u (local.get $shape) (i64.const 32))))
+  (if (local.get $set) (then
+    (local.set $n (i32.add (local.get $n) (array.len (ref.cast (ref $values)
+      (array.get $values (ref.as_non_null (global.get $shape_labels)) (i32.sub (local.get $set) (i32.const 1)))))))))
+  (local.get $n))
 ;; The id of a function, given the first time it is copied.
 (func $closure_id (param $v eqref) (result i64)
   (local $c (ref $clo))
@@ -210,6 +219,24 @@ pub(super) const WAT: &str = r#"
     (return)))
   (local.set $o (ref.cast (ref $obj) (local.get $v)))
   (local.set $xs (struct.get $obj 5 (local.get $o)))
+  (if (ref.test (ref $multi) (local.get $v)) (then
+    (call $enc_mark (local.get $v) (local.get $tag))
+    (call $enc_u8 (i32.const 10))
+    (call $enc_i64 (call $closure_id (local.get $v)))
+    (local.set $n (array.len (ref.as_non_null (local.get $xs))))
+    (call $enc_i32 (local.get $n))
+    (block $shapes_done (loop $shapes_each
+      (br_if $shapes_done (i32.ge_u (local.get $i) (local.get $n)))
+      (call $enc_i64 (array.get $shapes (struct.get $multi 9 (ref.cast (ref $multi) (local.get $v))) (local.get $i)))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br $shapes_each)))
+    (local.set $i (i32.const 0))
+    (block $groups_done (loop $groups_each
+      (br_if $groups_done (i32.ge_u (local.get $i) (local.get $n)))
+      (call $enc_value (array.get $values (ref.as_non_null (local.get $xs)) (local.get $i)) (i32.add (local.get $depth) (i32.const 1)))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br $groups_each)))
+    (return)))
   (if (i32.eq (local.get $tag) (i32.const 7)) (then
     (local.set $code (i32.trunc_f64_u (struct.get $obj 3 (local.get $o))))
     (if (i32.eqz (local.get $code)) (then (call $enc_token (local.get $v)) (return)))
@@ -219,7 +246,7 @@ pub(super) const WAT: &str = r#"
     ;; Its id: a copy is the same function as its original (D6).
     (call $enc_i64 (call $closure_id (local.get $v)))
     (call $enc_i32 (struct.get $obj 1 (local.get $o)))
-    (call $enc_i32 (i32.wrap_i64 (struct.get $obj 2 (local.get $o))))
+    (call $enc_i64 (struct.get $obj 2 (local.get $o)))
     (if (ref.is_null (local.get $xs)) (then (call $enc_i32 (i32.const -1)) (return)))
     (local.set $n (array.len (local.get $xs)))
     ;; A patched closure keeps its walk stamp after the captures.
@@ -352,7 +379,7 @@ pub(super) const WAT: &str = r#"
 
 (func $dec_value (result eqref)
   (local $m i32) (local $n i32) (local $i i32) (local $index i32) (local $tag i32)
-  (local $f1 i32) (local $f2 i64) (local $f3 f64) (local $code i32) (local $flags i32) (local $arity i32)
+  (local $f1 i32) (local $f2 i64) (local $f3 f64) (local $code i32) (local $flags i32) (local $shape i64) (local $shapes (ref null $shapes))
   (local $xs (ref null $values)) (local $b (ref null $bytes)) (local $l (ref null $limbs))
   (local $v eqref) (local $out eqref)
   (local.set $m (call $dec_u8))
@@ -389,16 +416,36 @@ pub(super) const WAT: &str = r#"
       (br $cons)))
     (array.set $values (ref.as_non_null (global.get $dec_table)) (local.get $index) (local.get $out))
     (return (local.get $out))))
+  (if (i32.eq (local.get $m) (i32.const 10)) (then
+    (local.set $f2 (call $dec_i64))
+    (local.set $n (call $dec_i32))
+    (local.set $xs (array.new_default $values (local.get $n)))
+    (local.set $shapes (array.new_default $shapes (local.get $n)))
+    (block $shapes_done (loop $shapes_each
+      (br_if $shapes_done (i32.ge_u (local.get $i) (local.get $n)))
+      (array.set $shapes (local.get $shapes) (local.get $i) (call $dec_i64))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br $shapes_each)))
+    (local.set $v (struct.new $multi (i32.const 7) (i32.const 0) (i64.const -1) (f64.const 0)
+      (ref.null $bytes) (local.get $xs) (ref.null $limbs) (ref.null $call) (local.get $f2) (ref.as_non_null (local.get $shapes))))
+    (drop (call $dec_register (local.get $v)))
+    (local.set $i (i32.const 0))
+    (block $groups_done (loop $groups_each
+      (br_if $groups_done (i32.ge_u (local.get $i) (local.get $n)))
+      (array.set $values (local.get $xs) (local.get $i) (call $dec_value))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br $groups_each)))
+    (return (local.get $v))))
   (if (i32.eq (local.get $m) (i32.const 4)) (then
     (local.set $code (call $dec_i32))
     (local.set $f2 (call $dec_i64))
     (local.set $flags (call $dec_i32))
-    (local.set $arity (call $dec_i32))
+    (local.set $shape (call $dec_i64))
     (local.set $n (call $dec_i32))
     (if (i32.ge_s (local.get $n) (i32.const 0))
       (then (local.set $xs (array.new_default $values
         (i32.add (local.get $n) (i32.and (local.get $flags) (i32.const 1)))))))
-    (local.set $v (call $codec_make_closure (local.get $arity) (local.get $code) (local.get $flags) (local.get $xs)
+    (local.set $v (call $codec_make_closure (local.get $shape) (local.get $code) (local.get $flags) (local.get $xs)
       (local.get $f2)))
     (drop (call $dec_register (local.get $v)))
     (block $done (loop $each
@@ -641,14 +688,14 @@ pub(super) fn closures(
         names.join(" ")
     );
     out.push_str(
-        "(func $codec_make_closure (param $arity i32) (param $code i32) (param $flags i32) \
+        "(func $codec_make_closure (param $shape i64) (param $code i32) (param $flags i32) \
          (param $caps (ref null $values)) (param $id i64) (result eqref)\n",
     );
     for n in arities {
         let _ = writeln!(
             out,
-            "  (if (i32.eq (local.get $arity) (i32.const {n})) (then (return (struct.new $clo{n} (i32.const 7) \
-             (local.get $flags) (i64.const {n}) (f64.convert_i32_u (local.get $code)) (ref.null $bytes) \
+            "  (if (i32.eq (call $shape_arity (local.get $shape)) (i32.const {n})) (then (return (struct.new $clo{n} (i32.const 7) \
+             (local.get $flags) (local.get $shape) (f64.convert_i32_u (local.get $code)) (ref.null $bytes) \
              (local.get $caps) (ref.null $limbs) (ref.null $call) (local.get $id) \
              (ref.cast (ref $fn{n}) (table.get $codes (local.get $code)))))))"
         );

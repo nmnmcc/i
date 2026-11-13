@@ -1038,6 +1038,28 @@ impl<'a> Lowerer<'a> {
         self.out.shapes = self.shapes.take();
     }
 
+    /// Records that the function of the group closure `value` has a shape
+    /// with labels, so that its closure shows its labels (field 2 of
+    /// `$clo{n}`, syntax-3.md §6.4). The value is a constant closure or the
+    /// closure just made.
+    fn label_shape(&mut self, out: &[Stmt], value: &Atom, id: ShapeId) {
+        let func = match value {
+            Atom::Func(f) => Some(*f),
+            Atom::Local(l) => match out.last() {
+                Some(Stmt::Let {
+                    dst,
+                    value: Value::Closure { func, .. },
+                    ..
+                }) if dst == l => Some(*func),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(f) = func {
+            self.out.func_shapes.insert(f, id);
+        }
+    }
+
     /// The index of the label set of a data shape (`ir::Program::shapes`).
     fn shape_set(&self, shape: ilang_check::types::ShapeId) -> u32 {
         let labels = shape.labels().to_vec();
@@ -2706,15 +2728,26 @@ impl<'a> Lowerer<'a> {
                 // An expected type chose one shape group: the value is that
                 // group's function.
                 Some(i) => self.expr(fx, out, &groups[*i as usize].value),
-                // syn3-stage10: a multi-shape value. Until the run time has
-                // `$multi`, it is the tuple of its group closures; the
-                // checker lets nothing call it.
+                // A multi-shape value (syntax-3.md §6.4): the closure of
+                // each group with the run-time id of its shape.
                 None => {
                     let parts = groups
                         .iter()
-                        .map(|g| self.expr(fx, out, &g.value))
+                        .map(|g| {
+                            let set = if g.shape.has_labels() {
+                                self.shape_set(g.shape)
+                            } else {
+                                0
+                            };
+                            let id = crate::ir::shape_id(g.shape.positions(), set);
+                            let value = self.expr(fx, out, &g.value);
+                            if set != 0 {
+                                self.label_shape(out, &value, id);
+                            }
+                            (id, value)
+                        })
                         .collect();
-                    let_value(fx, out, Value::Tuple(parts), None)
+                    let_value(fx, out, Value::Multi(parts), None)
                 }
             },
             ExprKind::Record { base, fields } => {
@@ -2770,6 +2803,9 @@ impl<'a> Lowerer<'a> {
             ExprKind::Case { subject, clauses } => {
                 let s = self.expr(fx, out, subject);
                 return self.case(fx, out, s, clauses, tail);
+            }
+            ExprKind::Call { callee, args } if args.iter().any(|a| a.label.is_some()) => {
+                return self.labelled_call(fx, out, e.span, callee, None, args, tail);
             }
             ExprKind::Call { callee, args } => {
                 let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
@@ -3007,6 +3043,9 @@ impl<'a> Lowerer<'a> {
         if op == BinOp::Pipe {
             // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)` (§6.9).
             return match &rhs.kind {
+                ExprKind::Call { callee, args } if args.iter().any(|a| a.label.is_some()) => {
+                    self.labelled_call(fx, out, e.span, callee, Some(lhs), args, tail)
+                }
                 ExprKind::Call { callee, args } => {
                     let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
                     self.call(fx, out, e.span, callee, Some(lhs), &args, tail)
@@ -3127,6 +3166,68 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// A call with labelled arguments of a function value (syntax-3.md
+    /// §6.4): the arguments are worked out as written, then passed in the
+    /// canonical order of their shape (positions, then labels in UTF-8
+    /// order), and a multi-shape value dispatches on that shape. Any other
+    /// callee is called as `call` does.
+    #[allow(clippy::too_many_arguments)]
+    fn labelled_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[hir::Arg],
+        tail: bool,
+    ) -> Option<Atom> {
+        if matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_))) {
+            let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
+            return self.call(fx, out, span, callee, first, &args, tail);
+        }
+        let mut positional = Vec::new();
+        let mut labelled: Vec<(String, Atom)> = Vec::new();
+        let mut written = Vec::new();
+        if let Some(a) = first {
+            let v = self.expr(fx, out, a);
+            written.push(v.clone());
+            positional.push(v);
+        }
+        let target = self.target(fx, out, callee);
+        for a in args {
+            let v = self.expr(fx, out, &a.value);
+            written.push(v.clone());
+            match &a.label {
+                Some(l) => labelled.push((l.name.clone(), v)),
+                None => positional.push(v),
+            }
+        }
+        labelled.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+        let labels: Vec<String> = labelled.iter().map(|(l, _)| l.clone()).collect();
+        let shape = ilang_check::types::ShapeId::new(positional.len() as u32, labels);
+        let (target, all) = match target {
+            Target::Callee(Callee::Value(f)) => {
+                let id = crate::ir::shape_id(shape.positions(), self.shape_set(shape));
+                let mut all = positional;
+                all.extend(labelled.into_iter().map(|(_, v)| v));
+                (Target::Callee(Callee::Shaped(f, id)), all)
+            }
+            // A known function takes its arguments in the order the
+            // checker gives (`typed.args`), as `call` does.
+            other => {
+                let all = match self.typed.args.get(&(fx.module, span)) {
+                    Some(order) if order.len() == written.len() => {
+                        order.iter().map(|&i| written[i as usize].clone()).collect()
+                    }
+                    _ => written,
+                };
+                (other, all)
+            }
+        };
+        self.finish_call(fx, out, span, target, all, tail)
+    }
+
     /// A call (§6.6), or `a |> f(…)` with `a` as `first`. The function is
     /// worked out first, then the arguments as they are written (§6.2); for
     /// `|>`, `a` comes before both.
@@ -3155,6 +3256,19 @@ impl<'a> Lowerer<'a> {
             }
             _ => written,
         };
+        self.finish_call(fx, out, span, target, args, tail)
+    }
+
+    /// The call of a worked-out callee with its arguments in order.
+    fn finish_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        target: Target,
+        args: Vec<Atom>,
+        tail: bool,
+    ) -> Option<Atom> {
         match target {
             Target::Ctor(c) => {
                 let info = &self.ctors[&c];

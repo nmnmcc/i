@@ -5,7 +5,6 @@
 //! there. A **multi-shape** function type has a union of data types of
 //! different shapes, or one data type whose shape has labels ([`with_data`]).
 
-use super::solve::{FailKind, Solver};
 use super::{FnTy, Head, ShapeId, Ty};
 
 /// The label of the one parameter of a multi-shape function type in the
@@ -48,19 +47,6 @@ pub(crate) fn group_data(shape: ShapeId, parts: &[Ty]) -> Ty {
         "a group function takes the parts of its shape"
     );
     Ty::data(shape, parts.to_vec())
-}
-
-impl Solver {
-    /// `f <: g` for two function types: before the parameter data of `g`
-    /// goes to `f`, a multi-shape `f` where `g` has one shape is refused.
-    pub(super) fn multi_to_one_shape(&mut self, f: &FnTy, g: &FnTy, l: &Ty, r: &Ty) {
-        if is_multi(f) && !is_multi(g) && matches!(g.param, Ty::Con(..)) {
-            // syn3-stage10: a multi-shape value is called, or goes where a
-            // function of one shape is wanted. The run time cannot call it
-            // yet; delete this failure when it can.
-            self.fail(FailKind::MultiCall, l, r);
-        }
-    }
 }
 
 // ---- Selection of branches (syntax three §2.6.2 to §2.6.7) ----

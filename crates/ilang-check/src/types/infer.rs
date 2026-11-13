@@ -1361,12 +1361,6 @@ impl<'a> Checker<'a> {
                 code::TYPE_MISMATCH,
                 format!("`{l}` is not a subtype of `{r}`"),
             ),
-            FailKind::MultiCall => (
-                code::MULTI_VALUE_CALL,
-                format!(
-                    "a multi-shape function value `{l}` can only be called directly by its name until the run time has multi-shape values; here a function `{r}` is wanted"
-                ),
-            ),
             FailKind::Invariant => (
                 code::TYPE_INVARIANT,
                 format!(
@@ -2210,19 +2204,6 @@ impl<'a> Checker<'a> {
                 // syntax-3 §6.1: the argument data of another shape is a
                 // mismatch of the parameter.
                 let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
-                if groups::is_multi(ft) {
-                    // syn3-stage10: a call through a multi-shape value; the
-                    // run time cannot make it yet. Delete this error when
-                    // it can.
-                    self.error(
-                        code::MULTI_VALUE_CALL,
-                        span,
-                        format!(
-                            "a multi-shape function value `{}` can only be called directly by its name until the run time has multi-shape values",
-                            display::show(&self.s, &f)
-                        ),
-                    );
-                }
                 self.sub2(&data, &ft.param, span, callee.span);
                 self.add_err(ft.err.clone());
                 self.add_env(ft.env.clone());
@@ -2297,13 +2278,6 @@ impl<'a> Checker<'a> {
                 Some(l) => labelled.push((l.name.clone(), t)),
             }
         }
-        // syn3-stage10: the run time cannot make this call yet. Delete this
-        // error when it can.
-        self.error(
-            code::MULTI_VALUE_CALL,
-            span,
-            "a call with labels through a function value is not possible until the run time has multi-shape values; call the function directly by its name",
-        );
         labelled.sort_by(|a, b| a.0.cmp(&b.0));
         let shape = super::ShapeId::new(
             positions.len() as u32,

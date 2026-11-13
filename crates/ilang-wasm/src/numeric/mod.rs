@@ -647,7 +647,7 @@ pub fn run(p: &mut Program) {
             {
                 match callee {
                     Callee::Direct(id) | Callee::Known { func: id, .. } => *id = worker,
-                    Callee::Value(_) => {
+                    Callee::Value(_) | Callee::Shaped(..) => {
                         unreachable!("known calls resolved before worker selection")
                     }
                 }

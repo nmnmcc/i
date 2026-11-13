@@ -18,8 +18,8 @@
 //! `$fn_n = (func (param (ref null $obj) (ref null $env) eqref×n) (result eqref))`.
 //! The first parameter is its closure; its captures are the `$values` array
 //! in field 5 of the closure. The second is the environment (§9.2). A
-//! closure is a `$clo_n`, a subtype of `$obj` with tag 7, the arity in field
-//! 2, and a reference to the code after the eight `$obj` fields.
+//! closure is a `$clo_n`, a subtype of `$clo` with tag 7, its shape in field
+//! 2, a worker identity in field 8, and its code reference in field 9.
 //!
 //! # The environment (§9.2)
 //!
@@ -273,14 +273,51 @@ impl Op {
     }
 }
 
+/// The run-time id of a shape of argument data (syntax-3.md §6.4): `n` for
+/// `n` positions; for a shape with labels, `set << 32 | n`, where `set` is the
+/// index of its label set as data has it ([`Program::shapes`], from 1), so
+/// every such id is at least 2^32. A closure keeps the id of its shape in
+/// field 2 of its `$clo{n}`; a multi-shape value keeps one per group.
+pub type ShapeId = u64;
+
+/// The id of the shape of `positions` positions and the label set `set`
+/// (0 for none).
+pub fn shape_id(positions: u32, set: u32) -> ShapeId {
+    (ShapeId::from(set) << 32) | ShapeId::from(positions)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Callee {
     /// A known function, called with `call`.
     Direct(FuncId),
     /// Known code with the original closure and the current call-site environment.
     Known { func: FuncId, closure: Atom },
-    /// A closure value, called with `call_ref` after a cast to `$clo_n`.
+    /// A function value called with argument data of `n` positions, `n` the
+    /// number of arguments: `call_ref` when it is a `$clo{n}`, else the
+    /// dispatch of a multi-shape value on the shape (syntax-3.md §6.4).
     Value(Atom),
+    /// A function value called with argument data of a shape with labels;
+    /// the arguments are in canonical order.
+    Shaped(Atom, ShapeId),
+}
+
+impl Callee {
+    /// The function value of an indirect call.
+    pub fn value(&self) -> Option<&Atom> {
+        match self {
+            Callee::Direct(_) | Callee::Known { .. } => None,
+            Callee::Value(a) | Callee::Shaped(a, _) => Some(a),
+        }
+    }
+
+    /// The shape id of the argument data of an indirect call with `n`
+    /// arguments.
+    pub fn shape(&self, n: u32) -> ShapeId {
+        match self {
+            Callee::Shaped(_, s) => *s,
+            _ => ShapeId::from(n),
+        }
+    }
 }
 
 /// The right side of a `Let`.
@@ -306,6 +343,10 @@ pub enum Value {
         captures: Vec<Atom>,
         patched: bool,
     },
+    /// A multi-shape function value (syntax-3.md §2.6.5, §6.4): the shape id
+    /// and the closure of each group, in the order of the groups. The
+    /// closures are ordinary function values, each of its own shape.
+    Multi(Vec<(ShapeId, Atom)>),
     Tuple(Vec<Atom>),
     /// Data with labels (syntax-3 §6.4): a tuple whose field 1 is the index
     /// of its label set in [`Program::shapes`], with its parts in canonical
@@ -812,6 +853,9 @@ pub struct Program {
     /// tuples and is not listed here, so set `i` is `shapes[i - 1]`.
     pub shapes: Vec<Vec<String>>,
     pub funcs: Vec<FuncKind>,
+    /// The functions whose parameter data has labels, with their shape. Every
+    /// other function of `n` parameters has the shape of `n` positions.
+    pub func_shapes: std::collections::BTreeMap<FuncId, ShapeId>,
     /// The points of the calls that may suspend (§9.4).
     pub points: Vec<Point>,
     /// The joins of the segments of the points (§9.4).
@@ -844,6 +888,34 @@ pub struct Program {
     /// On the WASI target: the export of the program entry, which `_start`
     /// calls after `ilang_start` (B.7).
     pub entry: Option<String>,
+}
+
+impl Program {
+    /// The id of the shape of `positions` positions and these labels; the
+    /// label set is interned in [`Program::shapes`].
+    pub fn shape(&mut self, positions: u32, labels: &[String]) -> ShapeId {
+        if labels.is_empty() {
+            return ShapeId::from(positions);
+        }
+        let mut labels = labels.to_vec();
+        labels.sort_unstable_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+        let index = match self.shapes.iter().position(|s| *s == labels) {
+            Some(i) => i,
+            None => {
+                self.shapes.push(labels);
+                self.shapes.len() - 1
+            }
+        };
+        shape_id(positions, index as u32 + 1)
+    }
+
+    /// The shape of a function used as a value.
+    pub fn func_shape(&self, f: FuncId) -> ShapeId {
+        self.func_shapes
+            .get(&f)
+            .copied()
+            .unwrap_or_else(|| ShapeId::from(self.funcs[f.0 as usize].arity()))
+    }
 }
 
 #[path = "ir_tree.rs"]

@@ -111,9 +111,6 @@ pub(crate) enum FailKind {
     EnvForms,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
-    /// A multi-shape function value where a function of one shape is
-    /// wanted. Temporary, until the run time has multi-shape values.
-    MultiCall,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1097,7 +1094,6 @@ impl Solver {
             (Ty::Fn(f), Ty::Fn(g)) => {
                 // syntax-3 §6.1: one data parameter; a call of another
                 // shape is a mismatch of the parameter data.
-                self.multi_to_one_shape(f, g, l, r);
                 self.constrain(&g.param, &f.param);
                 self.constrain(&f.ret, &g.ret);
                 self.constrain_row(&f.err, &g.err);

@@ -914,11 +914,7 @@ fn definite_failure(solver: &Solver) -> bool {
         && solver.failures.iter().all(|f| {
             matches!(
                 f.kind,
-                FailKind::Mismatch
-                    | FailKind::Values
-                    | FailKind::MultiCall
-                    | FailKind::Invariant
-                    | FailKind::EnvForms
+                FailKind::Mismatch | FailKind::Values | FailKind::Invariant | FailKind::EnvForms
             )
         })
 }

@@ -248,6 +248,7 @@ pub const TYPES: &str = r#"
  (field (mut i32)) (field i32) (field i64) (field f64)
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
+(type $shapes (array (mut i64)))
 (type $cons (sub final $val (struct (field (mut i32)) (field eqref) (field eqref))))
 ;; A function value: `$obj`, then its id (multicore D6, given when it is first
 ;; copied to another worker; 0 before). Each arity's `$clo{n}` adds its code.
@@ -255,6 +256,12 @@ pub const TYPES: &str = r#"
  (field (mut i32)) (field i32) (field i64) (field f64)
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)) (field (mut i64)))))
+;; A multi-shape function has the same identity header as other functions.
+;; Field 2 is -1, field 5 holds the groups, and field 9 their shape ids.
+(type $multi (sub final $clo (struct
+ (field (mut i32)) (field i32) (field i64) (field f64)
+ (field (ref null $bytes)) (field (ref null $values))
+ (field (ref null $limbs)) (field (ref null $call)) (field (mut i64)) (field (ref $shapes)))))
 (type $hostref (struct (field externref) (field i32) (field i64)))
 (type $sites (array i32))
 (type $frames (array (mut i32)))
