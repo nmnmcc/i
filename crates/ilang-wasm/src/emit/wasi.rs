@@ -164,6 +164,13 @@ const COMMON: &str = r#"
 (func $wa_u32 (param $v eqref) (result i32)
  (i32.wrap_i64 (call $wa_uint (local.get $v) (i64.const 4294967295))))
 (func $wa_u64_load (param $p i32) (result eqref)
+ (local $value i64)
+ (local.set $value (i64.load (local.get $p)))
+ ;; Preview-1 scratch storage is not a host-owned result buffer. Nonzero
+ ;; signed-i32 results use the v5 inline form; larger unsigned values use limbs.
+ (if (i32.and (i64.ne (local.get $value) (i64.const 0))
+             (i64.le_u (local.get $value) (i64.const 2147483647)))
+  (then (return (call $abi_int_in (i32.const 1) (i32.wrap_i64 (local.get $value)) (i32.const 0)))))
  (call $abi_int_in (select (i32.const 1) (i32.const 0) (i64.ne (i64.load (local.get $p)) (i64.const 0)))
   (local.get $p) (select (i32.const 2) (select (i32.const 1) (i32.const 0) (i32.load (local.get $p))) (i32.load offset=4 (local.get $p)))))
 (func $wa_bits (param $p i32) (param $n i32) (result eqref)

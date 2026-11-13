@@ -2899,13 +2899,13 @@ A value of a type that the host can take (§10.3) is passed as zero or more Wasm
 | `Nil` | none |
 | `Bool` | `i32`: 0 is `False`, 1 is `True` |
 | `Float` | `f64` |
-| `Int` | `i32` sign, `i32` address, `i32` count. The sign is −1, 0, or 1. The size of the number is `count` unsigned 32-bit parts at the address, lowest part first, each part little-endian. The last part is not 0. Zero is sign 0 and count 0. |
+| `Int` | `i32` sign, `i32` address or inline value, `i32` count. The sign is −1, 0, or 1. When count is 0 and sign is not 0, the second `i32` is the signed 32-bit value, its sign must match, and there is no buffer. Otherwise the size of the number is `count` unsigned 32-bit parts at the address, lowest part first, each part little-endian. The last part is not 0. Zero is sign 0 and count 0. Values outside the signed 32-bit range use parts; receivers also accept parts for nonzero values inside that range. |
 | `String` | `i32` address, `i32` length: the UTF-8 bytes |
 | `BitArray` | `i32` address, `i32` number of bits. There are ⌈bits / 8⌉ bytes. In each byte the highest bit comes first. Bits after the end in the last byte are 0. |
 | An opaque type | `externref` |
 
 
-The size of the buffer of an `Int` is 4 × count bytes, of a `String` its length, and of a `BitArray` ⌈bits / 8⌉ bytes.
+An inline `Int` has no buffer and its second `i32` is never checked as an address or freed. Senders use the inline form for nonzero signed 32-bit values and `(0, 0, 0)` for zero. In versions 3 and 4 there is no inline form: every nonzero `Int` uses parts. The size of the buffer of a non-inline `Int` is 4 × count bytes, of a `String` its length, and of a `BitArray` ⌈bits / 8⌉ bytes.
 
 
 A function `(P1, …, Pn) <- (Fail(E)) -> A`, or `(P1, …, Pn) -> A` with `E` = `Never`, is passed like this. Services are not passed.
@@ -2964,7 +2964,7 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 
 ```json
 {
-  "version": 3,
+  "version": 5,
   "entry": { "name": "app/main.main", "async": false },
   "tests": [ { "name": "app/math_test.add", "async": false } ],
   "exports": {
@@ -2981,7 +2981,7 @@ The custom section `ilang.abi` is UTF-8 JSON in this form:
 }
 ```
 
-- `version` is 3. A host refuses a module with another version, so a module of an older version must be built again. Version 3 differs from version 2 in these ways: an async function has a request id; status 1 means one or more outstanding requests, not exactly one, and the host may answer them in any order; status 2 and the export `ilang_continue` are new, and `ilang_continue` is a reserved export name; the runtime import `cancel` is new; outstanding requests are dropped when the entry point ends, on a trap, and when the work fails in the host; and an async function may only be called during an async entry point, a resume or `ilang_continue` (§B.4). A runtime import, status or export that a host must handle is added only with a new version.
+- `version` is 5. Hosts read versions 3, 4 and 5 and use the value encoding of the module’s version. A host refuses a newer module with `the module uses i ABI version V, but this host reads version H; update the host`; a module older than version 3 must be built again. Version 5 adds the inline signed 32-bit `Int` form (§B.2). Version 4 added the native multicore worker imports (`mc_*` in `ilang:host/v1`). Version 3 differs from version 2 in these ways: an async function has a request id; status 1 means one or more outstanding requests, not exactly one, and the host may answer them in any order; status 2 and the export `ilang_continue` are new, and `ilang_continue` is a reserved export name; the runtime import `cancel` is new; outstanding requests are dropped when the entry point ends, on a trap, and when the work fails in the host; and an async function may only be called during an async entry point, a resume or `ilang_continue` (§B.4). A runtime import, status or export that a host must handle is added only with a new version.
 - Type names are `nil`, `bool`, `int`, `float`, `string`, `bit_array`, and `externref`. `errors` is in the canonical order (§B.2).
 - `entry` names the selected function by its module path and function name, not its `[entries]` key. It is `null` when there is no selected entry. Only that entry is emitted as the program entry; unselected declarations do not add ABI exports. The JavaScript SDK uses this metadata entry. The ABI version and shape stay unchanged. `tests` is empty unless tests were compiled.
 
@@ -3002,13 +3002,13 @@ declarations inside an expression, implicit Node module variables, or
 compiler-generated user callbacks. Standard Node factories may use their
 own ESM imports. Their source is fixed support code, not user handwritten JS.
 
-Keep the v3 wire for ordinary service/request calls. Put foreign declaration
+Use the module’s ABI version for ordinary service/request calls. Put foreign declaration
 text, stable package/module/name identity, generated import name, nominal type
 identity, source span and availability in a separate versioned target section
 `ilang.js` (initial version 1). A matching generated loader requires that
 section and `target: "js"` or `"nodejs"`; old Appendix B hosts reject the
 non-host target instead of accidentally loading it. This target metadata does not add a v3 runtime export. Mandatory changes to runtime imports, statuses or host-called exports still require a version bump (§B.6).
-The value getters are target imports listed there, not additions to v3's
+The value getters are target imports listed there, not additions to the ABI’s
 `ilang:host/v1`. A digest binds the JS manifest to its Wasm artifact; it is
 not self-authenticating permission for raw IO (trusted declaration grants still apply).
 

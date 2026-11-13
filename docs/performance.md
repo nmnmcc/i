@@ -879,3 +879,94 @@ The full workspace run, unfiltered spec/corpus and CI execution remain
 with the coordinator. No partitioning or per-module linking was needed;
 the collection is still compiled once and every selected test still gets
 its own started instance.
+
+## ABI 5 small Ints and internal representation
+
+ABI 5 keeps the three-i32 signature for Int and adds an inline signed-i32
+value when count is zero and sign is nonzero (Appendix B.2). Zero remains
+`(0, 0, 0)`; larger values still use sign/magnitude limb buffers. A counter
+that calls a host function with a small Int and gets a small Int back removes
+two linear-memory allocations and frees per call. The Rust and JavaScript
+hosts select the encoding from each module's version, retaining limb buffers
+for versions 3 and 4.
+
+The repeatable measurement is `crates/ilang-cli/tests/abi_performance.rs` with
+`tests/performance/abi`, release Rust and `--opt 2` guest code. Run it through
+`cache/heavy` with `cargo test -p ilang-cli --test abi_performance --release
+--locked -- --ignored --nocapture`. It checks each result, warms up once and
+reports the median of five wall-clock samples, excluding compilation and
+instantiation. `counter` makes 1,000,000 synchronous imports, passing the
+previous result to a Rust host that adds one. `read_lengths` makes 1,000,000
+imports with length 8 and an eight-byte BitArray result, isolating the encoding
+cost without filesystem latency. `fs_reads` uses the real standard `fs.read`
+adapter for 10,000 eight-byte reads from `/dev/zero`, opening and closing once
+per sample. That case also includes requests, resource leases, scheduler turns
+and filesystem work. `clock.monotonic_ns` is deliberately excluded because its
+values soon exceed the inline range.
+
+The test writes modules into `target/abi-performance`. Run the JS comparison
+through `cache/heavy` with `node scripts/bench-abi.mjs
+target/abi-performance/v4-O2.wasm target/abi-performance/v5-O2.wasm`; both
+modules run with the same new SDK, which selects their respective encodings.
+
+Internal Int representation was investigated without changing numeric
+lowering. `runtime/bigint.rs` already uses allocation-free `i31ref` values in
+`−2³⁰..2³⁰−1`; wider values use a sign and GC limb array. At O2,
+`numeric/integer.rs` selects guarded small-Int parameters for numeric workers;
+`emit/numeric.rs` can keep them and intermediate results in scalar `i64`
+locals. A failed small-Int guard retains the general arbitrary-precision
+path. The ABI's signed-i32 range is wider than the internal i31 range, so
+values such as `i32::MIN` still need a GC object internally while avoiding a
+host-boundary buffer.
+
+`add` accumulates 456 a million times (result 456,000,000, within i31), and
+`compare` compares the changing loop counter with 456 a million times. The
+`empty` control only decrements the counter and carries a result. These are
+whole-loop timings, including loop and function overhead, not isolated
+instruction latencies.
+
+Disassembly of the baseline O2 artifact confirms this path is used by these
+kernels: the add worker has scalar `i64` parameters and an `i64.add` followed
+by the signed-i31 range check; the compare worker uses `i64.lt_s` on scalar
+parameters. Thus both i31 references and guarded scalar arithmetic already
+exist before ABI 5; the boundary optimization does not introduce either one.
+
+Measured on 2026-11-14, Linux x86-64, shared 16-core machine, release profiles
+with LTO disabled and 16 codegen units (the heavy wrapper's settings).
+The Rust baseline uses compiler/host `180e00cf7` with this same benchmark
+source; the after run uses ABI 5. The JS comparison uses Node 24.21.0 and the same
+ABI-5 SDK for both artifacts, selecting the wire encoding by module version.
+All rows are seconds; each result was checked.
+
+| Host and case | Iterations | ABI 4 | ABI 5 | Less time |
+|---|---:|---:|---:|---:|
+| Rust counter through a host function | 1,000,000 | 0.937546 | 0.586667 | 37% |
+| Rust read length and eight-byte result | 1,000,000 | 1.029945 | 0.834817 | 19% |
+| Rust real `fs.read`, eight bytes from `/dev/zero` | 10,000 | 0.522017 | 0.386503 | 26% |
+| JS counter through a host function | 1,000,000 | 3.482284 | 0.490162 | 86% |
+| JS read length and eight-byte result | 1,000,000 | 2.383987 | 0.784770 | 67% |
+
+The read-length microbenchmark computes the next length from the returned
+BitArray's bit size, so the return value is consumed. The real filesystem
+case is noisy: its five samples ranged from 0.253–0.841 seconds before and
+0.327–0.706 after. Its median is an observation, not an isolated estimate of
+encoding cost. The synchronous microbenchmarks give the clearer boundary
+comparison.
+
+| Internal O2 loop, 1,000,000 iterations | ABI-4 baseline | ABI-5 run |
+|---|---:|---:|
+| Int add, accumulating 456 | 0.003944 | 0.005456 |
+| Int compare, changing counter `< 456` | 0.003843 | 0.004802 |
+| Empty control, decrement and carry | 0.005268 | 0.002811 |
+
+These millisecond-scale internal loops have substantial scheduling noise
+(the baseline empty loop ranged from 0.003443 to 0.016764 seconds). Their
+ordering does not establish an arithmetic speed difference: numeric lowering
+is unchanged and only one call crosses the boundary per loop. The finding is
+that the existing i31/scalar fast paths are exercised, rather than allocating
+a boxed arbitrary-precision Int for every small add or compare. No new internal
+representation or numeric optimization was implemented in this lane.
+
+The original ABI-4 Rust metadata reader and JavaScript SDK were also checked
+against version-5 metadata; both reject it with the existing message:
+`the module uses i ABI version 5, but this host reads version 4; update the host`.

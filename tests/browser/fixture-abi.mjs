@@ -79,6 +79,7 @@ export function compiledImports(GuestError, printed = [], overrides = {}) {
   return {
     ...imports,
     "app:clock/v1": { ...imports["app:clock/v1"], tick: overrides.tick ?? (async (n) => n + 1n) },
+    custom: { echo_int: overrides.echo_int ?? (n => n) },
     ...opaqueImports(overrides.opaque ?? null),
   };
 }
@@ -220,3 +221,44 @@ export const bgLifecycleAbi = {
   },
   externals: {},
 };
+
+/** Exercises v5 imports, exports, async replies and Int errors in both JS hosts. */
+export async function checkIntegers(guest, GuestError) {
+  const values = [0n, 1n, -1n, 1073741823n, 1073741824n, -1073741824n, -1073741825n, -2147483648n, 2147483647n, -2147483649n, 2147483648n, 1n << 4096n, -(1n << 4096n)];
+  for (const n of values) {
+    for (const name of ["echo", "import_echo"]) {
+      if (guest.call(`app/ints.${name}`, [n]) !== n) throw new Error(`Int ${name}: ${n}`);
+    }
+    if (await guest.callAsync("app/ints.async_echo", [n]) !== n) throw new Error(`Int async: ${n}`);
+    try {
+      guest.call("app/ints.fail_echo", [n]);
+      throw new Error("Int error was not raised");
+    } catch (error) {
+      if (!(error instanceof GuestError) || error.value !== n) throw error;
+    }
+  }
+  // Inspect the actual wire, including the first values requiring buffers.
+  for (const n of values) {
+    if (n >= -2147483648n && n <= 2147483647n) {
+      const sign = n < 0n ? -1 : n > 0n ? 1 : 0;
+      const got = guest.exports["app/ints.echo"](sign, Number(n), 0);
+      if (got[0] !== sign || got[1] !== Number(n) || got[2] !== 0) throw new Error(`Int inline wire: ${n}`);
+    }
+  }
+  // Receivers retain the buffered form, including small nonzero values.
+  for (const n of [1n, -1n, -2147483648n, 2147483647n, -2147483649n, 2147483648n]) {
+    const sign = n < 0n ? -1 : 1;
+    const input = guest.exports.ilang_alloc(4);
+    new DataView(guest.exports.memory.buffer).setUint32(input, Number(n < 0n ? -n : n), true);
+    const got = guest.exports["app/ints.echo"](sign, input, 1);
+    guest.exports.ilang_free(input, 4);
+    if (n >= -2147483648n && n <= 2147483647n) {
+      if (got[0] !== sign || got[1] !== Number(n) || got[2] !== 0) throw new Error(`Int buffered input: ${n}`);
+    } else {
+      const magnitude = new DataView(guest.exports.memory.buffer).getUint32(got[1], true);
+      guest.exports.ilang_free(got[1], got[2] * 4);
+      if (got[0] !== sign || got[2] !== 1 || BigInt(magnitude) * BigInt(sign) !== n) throw new Error(`Int buffered output: ${n}`);
+    }
+  }
+  return values.length;
+}

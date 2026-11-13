@@ -45,6 +45,9 @@ fn imports_with(
 ) -> HostImports {
     let mut imports = HostImports::default();
     imports
+        .external("custom", "echo_int", |args| Ok(args[0].clone()))
+        .unwrap();
+    imports
         .service("app:console/v1", "print", move |arguments| {
             let [Value::String(text)] = arguments else {
                 bail!("print takes one String")
@@ -116,14 +119,8 @@ fn stop(outcome: Outcome) -> Stop {
 
 #[test]
 fn metadata_is_read_from_the_custom_section() {
-    // Keep legacy metadata coverage when the shared browser fixture is updated.
-    let text = include_str!("../../../tests/browser/fixtures/host-abi.wat").replacen(
-        r#"{\"version\":4,"#,
-        r#"{\"version\":3,"#,
-        1,
-    );
-    let legacy = wat::parse_str(text).unwrap();
-    let abi = Program::from_bytes(&legacy).unwrap().abi().clone();
+    // Hand-written fixtures deliberately keep the oldest wire encoding.
+    let abi = program().abi().clone();
     assert_eq!(abi.version, ABI_OLDEST);
     assert_eq!(abi.entry, Some(EntryPoint::new("app/main.main")));
     assert_eq!(abi.tests.len(), 6);
@@ -525,7 +522,10 @@ fn engine_features_include_gc_tail_calls_and_exceptions() {
 
 fn custom_abi() -> Abi {
     let unary = |kind: AbiType| Signature::new([kind], kind);
-    let mut abi = Abi::default();
+    let mut abi = Abi {
+        version: ABI_OLDEST,
+        ..Abi::default()
+    };
     let mut externals = BTreeMap::new();
     for (name, kind) in [
         ("echo_string", AbiType::String),
@@ -559,6 +559,10 @@ fn custom_abi() -> Abi {
 }
 
 fn custom() -> Instance {
+    custom_version(ABI_OLDEST)
+}
+
+fn custom_version(version: u32) -> Instance {
     let mut imports = HostImports::default();
     for name in [
         "echo_string",
@@ -593,7 +597,10 @@ fn custom() -> Instance {
         .unwrap();
     Program::from_bytes(CUSTOM)
         .unwrap()
-        .with_abi(custom_abi())
+        .with_abi(Abi {
+            version,
+            ..custom_abi()
+        })
         .unwrap()
         .instantiate(HostOptions::new(imports))
         .unwrap()
@@ -1505,7 +1512,12 @@ fn old_and_new_versions_are_refused() {
             ABI_VERSION + 1
         )
     );
-    assert!(Abi::from_json(json(ABI_VERSION).as_bytes()).is_ok());
+    for version in ABI_OLDEST..=ABI_VERSION {
+        assert_eq!(
+            Abi::from_json(json(version).as_bytes()).unwrap().version,
+            version
+        );
+    }
 }
 
 #[test]
@@ -3049,4 +3061,93 @@ fn bg_review_cleanup_failure_is_reported_without_replacing_a_success() {
     assert_eq!(errors[0].phase, "cancel");
     assert_eq!(errors[0].message, "request destructor failed");
     assert!(guest.unusable().is_none());
+}
+
+#[test]
+fn inline_ints_never_allocate_or_free_the_value_as_an_address() {
+    let module = include_bytes!("../../../tests/browser/fixtures/inline-int.wasm");
+    let p = Program::from_bytes(module).unwrap();
+    let mut imports = HostImports::default();
+    imports
+        .external("custom", "echo_int", |args| Ok(args[0].clone()))
+        .unwrap();
+    let options = HostOptions::new(imports);
+    let mut instance = p.instantiate(options.clone()).unwrap();
+    for n in [
+        0,
+        1,
+        -1,
+        (1 << 30) - 1,
+        1 << 30,
+        -(1 << 30),
+        -(1 << 30) - 1,
+        i32::MIN,
+        i32::MAX,
+    ] {
+        let result = instance.call("echo", &[Value::Int(n.into())]).unwrap();
+        assert!(matches!(result, Outcome::Ok(Value::Int(actual)) if actual == BigInt::from(n)));
+    }
+    for name in ["wrong_sign", "wrong_zero", "wrong_marker"] {
+        let mut instance = p.instantiate(options.clone()).unwrap();
+        let error = instance.call(name, &[]).unwrap_err();
+        assert!(format!("{error:#}").contains("inline Int whose sign does not match"));
+        assert!(instance.unusable().is_some());
+    }
+}
+
+#[test]
+fn compiled_integer_boundaries_include_async_replies_and_errors() {
+    let mut imports = imports(&Log::default());
+    imports
+        .async_service("app:clock/v1", "tick", |args| {
+            let value = args[0].clone();
+            async move { Ok(Ok(value)) }
+        })
+        .unwrap();
+    imports.merge(opaque_imports(Value::NullExternref)).unwrap();
+    let p = Program::from_bytes(COMPILED).unwrap();
+    assert_eq!(p.abi().version, 5);
+    let mut instance = p.instantiate(HostOptions::new(imports)).unwrap();
+    let big: BigInt = BigInt::from(1) << 4096;
+    for n in [
+        0.into(),
+        1.into(),
+        (-1).into(),
+        i32::MIN.into(),
+        i32::MAX.into(),
+        (i64::from(i32::MIN) - 1).into(),
+        (i64::from(i32::MAX) + 1).into(),
+        big.clone(),
+        -big,
+    ] {
+        let args = [Value::Int(n.clone())];
+        for name in ["echo", "import_echo"] {
+            let result = instance.call(&format!("app/ints.{name}"), &args).unwrap();
+            assert!(matches!(result, Outcome::Ok(Value::Int(actual)) if actual == n));
+        }
+        let result = block_on(instance.call_async("app/ints.async_echo", &args)).unwrap();
+        assert!(matches!(result, Outcome::Ok(Value::Int(actual)) if actual == n));
+        let result = instance.call("app/ints.fail_echo", &args).unwrap();
+        assert!(matches!(result, Outcome::Err(GuestError(Value::Int(actual))) if actual == n));
+    }
+}
+
+#[test]
+fn legacy_int_versions_keep_limb_buffers() {
+    for version in [3, 4] {
+        let mut instance = custom_version(version);
+        for n in [
+            0_i64,
+            1,
+            -1,
+            i32::MIN.into(),
+            i32::MAX.into(),
+            -2147483649,
+            2147483648,
+        ] {
+            let result = instance.call("echo_int", &[Value::Int(n.into())]).unwrap();
+            assert!(matches!(result, Outcome::Ok(Value::Int(actual)) if actual == BigInt::from(n)));
+        }
+        assert_eq!(allocations(&mut instance), 0);
+    }
 }

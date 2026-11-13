@@ -1,0 +1,4 @@
+name = "abiperf"
+
+[wasm]
+exports = ["abiperf/main.fs_reads", "abiperf/main.counter", "abiperf/main.read_lengths", "abiperf/main.add", "abiperf/main.compare", "abiperf/main.empty", "abiperf/main.echo"]
