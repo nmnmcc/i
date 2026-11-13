@@ -3548,8 +3548,8 @@
       "pattern": "^review-r2/(?:cancel_(?:choose|error_final|normal_final|send)|choice_commit|dag_[0-9]+(?:_local)?|deep_(?:50|200|1000)|determinism|join_failure|lifetime|local_capture|pure_fake|race_tie|senders_[0-9]+|shield_nested|tasks_[0-9]+)$",
       "known_failure": false,
       "outcome": "accept",
-      "finding": "R2 structured lifetime, protected cleanup, FIFO rendezvous and single commitment; functional assertions are preserved in each independent program. Exact final output is additionally checked by r2_runtime and spec/9.9.",
-      "source": "docs/spec.md §§9.5,9.9; runtime.md §§6.2,6.4–6.5: final functions finish, FIFO partners, one commit and deterministic pure schedules."
+      "finding": "R2 structured lifetime, protected cleanup, rendezvous that delivers every sent value exactly once and single commitment; functional assertions are preserved in each independent program and do not depend on the order of task steps (spec §9.9). Exact final output is additionally checked by r2_runtime and spec/9.9.",
+      "source": "docs/spec.md §§9.5,9.9; runtime.md §§6.2,6.4–6.5: final functions finish, every value is received once, one commit and deterministic pure schedules; spec §9.9 leaves the order of steps to each run and worker count."
     },
     {
       "pattern": "^review-r2/missing_service$",
