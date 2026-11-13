@@ -21,6 +21,9 @@ use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
+mod three;
+pub use three::{lowering_errors, resolve3, typed_output3};
+
 pub fn resolve(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Diagnostic>) {
     let mut r = Resolver {
         graph,
@@ -1262,6 +1265,20 @@ impl<'a> Resolver<'a> {
 
     /// §2.1: modules may not import one another in a circle.
     fn import_circles(&mut self) {
+        let parsed = self.parsed;
+        self.import_circles_of(&|m| {
+            parsed[m]
+                .ast
+                .imports
+                .iter()
+                .map(|i| (i.path.iter().map(|p| p.name.clone()).collect(), i.span))
+                .collect()
+        });
+    }
+
+    /// `imports` gives the written imports of a module: the path and the
+    /// span of each.
+    fn import_circles_of(&mut self, imports: &dyn Fn(usize) -> Vec<(Vec<String>, Span)>) {
         let mut g = petgraph::graph::DiGraph::<u32, ()>::new();
         let nodes: Vec<_> = (0..self.p.modules.len() as u32)
             .map(|i| g.add_node(i))
@@ -1286,13 +1303,13 @@ impl<'a> Resolver<'a> {
                 .map(|&m| self.p.modules[m as usize].path.as_str())
                 .collect();
             let names = names.join(", ");
-            let parsed = self.parsed;
             for &m in &members {
                 self.cur = ModuleId(m);
                 // Report at the first import that goes into the circle.
-                let item = parsed[m as usize].ast.imports.iter().find(|item| {
+                let written = imports(m as usize);
+                let item = written.iter().find(|(path, _)| {
                     let me = self.p.module(ModuleId(m));
-                    let first = &item.path[0].name;
+                    let first = &path[0];
                     let pkg = &self.graph.packages[me.package];
                     let package = if first == "i" {
                         Some(self.graph.library)
@@ -1305,7 +1322,7 @@ impl<'a> Resolver<'a> {
                             .find(|(n, _)| n == first)
                             .and_then(|(_, id)| *id)
                     };
-                    let rest: Vec<&str> = item.path[1..].iter().map(|p| p.name.as_str()).collect();
+                    let rest: Vec<&str> = path[1..].iter().map(|p| p.as_str()).collect();
                     package.is_some_and(|p| {
                         let path = format!("{}/{}", self.graph.packages[p].name, rest.join("/"));
                         self.by_path
@@ -1313,7 +1330,7 @@ impl<'a> Resolver<'a> {
                             .is_some_and(|t| members.contains(&t.0))
                     })
                 });
-                let span = item.map_or(Span::default(), |i| i.span);
+                let span = item.map_or(Span::default(), |i| i.1);
                 self.error(
                     code::IMPORT_CIRCLE,
                     span,
@@ -1417,6 +1434,23 @@ impl<'a> Resolver<'a> {
     }
 
     fn early_types(&mut self) {
+        self.early_type_checks();
+        for (mi, parsed) in self.parsed.iter().enumerate() {
+            self.cur = ModuleId(mi as u32);
+            for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
+                if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
+                    && self.p.ty(id).host.is_some()
+                    && !matches!(&self.p.ty(id).body, TypeBody::Alias(t) if value_dependent(&self.p,t))
+                    && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
+                {
+                    self.host_form(def);
+                }
+            }
+        }
+    }
+
+    /// The part of `early_types` that reads no tree.
+    fn early_type_checks(&mut self) {
         for i in 0..self.p.alias_patterns.len() {
             let pattern = self.p.alias_patterns[i].clone();
             if !self.projectable_pattern(&pattern.pattern, &mut HashSet::new()) {
@@ -1469,18 +1503,6 @@ impl<'a> Resolver<'a> {
         for (m, t) in host_aliases {
             self.cur = m;
             self.reject_value_type(&t, "a host declaration");
-        }
-        for (mi, parsed) in self.parsed.iter().enumerate() {
-            self.cur = ModuleId(mi as u32);
-            for (item, slot) in parsed.ast.items.iter().zip(self.slots[mi].clone()) {
-                if let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot)
-                    && self.p.ty(id).host.is_some()
-                    && !matches!(&self.p.ty(id).body, TypeBody::Alias(t) if value_dependent(&self.p,t))
-                    && !matches!(&self.p.ty(id).body,TypeBody::Custom(cs) if cs.iter().flat_map(|c|&c.fields).any(|f|value_dependent(&self.p,&f.ty)))
-                {
-                    self.host_form(def);
-                }
-            }
         }
     }
 
