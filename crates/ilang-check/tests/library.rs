@@ -476,7 +476,9 @@ fn missing_library_names_are_reported() {
 /// open the whole of `i` to user imports.
 #[test]
 fn unknown_library_path_is_missing() {
-    for path in ["i/nope", "i/tasks", "i/std", "i/fs/file"] {
+    // Syntax-three §2.3 removes i/record. Keep the corpus probe
+    // import rejection independent of its earlier no-type-spread parse error.
+    for path in ["i/nope", "i/tasks", "i/std", "i/fs/file", "i/record"] {
         let main = format!("({path})\n\nx = 1\n");
         assert!(ilang_syntax::parse_module(&main).1.is_empty());
         let (graph, _, diags) = common::check_files(&[("src/main.i", &main)]);

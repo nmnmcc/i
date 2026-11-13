@@ -975,65 +975,6 @@
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:36b001eec0ad49d6": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
-    ]
-  },
-  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:78a3e8315e3cc25b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
-    ]
-  },
-  "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:9a220740438b34de": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
-    ]
-  },
   "tests/review/cases/review-native3/injection_control/.invalid/src/resource.i:681a205b48798d32": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
@@ -1481,186 +1422,6 @@
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0105: a block ends with an expression"
-    ]
-  },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:677bf7e20bf770ff": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `,`, `?` or `)`, found `!`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
-    ]
-  },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:3184611861f533da": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `,`, `?` or `)`, found `!`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found a line break before `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found a line break before `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an expression, found a line break before `!`",
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected `=`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `app`"
     ]
   },
   "tests/review/cases/review-native3/alias/.invalid/src/main.i:29277826a986d622": {
@@ -3144,5 +2905,41 @@
       ]
     ],
     "reason": "Render the row-algebra format template using its actual invariant service header and first union/function-type argument; the row-scheme test checks every generated operator and annotation."
+  },
+  "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:ee6bc6b74c40e304": {
+    "reason": "A typed binding occurs in a call argument, retaining the original statement-in-expression-position counterexample.",
+    "diagnostics": [
+      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
+    ]
+  },
+  "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:dd5c2f037478d5e2": {
+    "reason": "A provide operation has no expression on its left, retaining a service statement where an expression is required.",
+    "diagnostics": [
+      "E0101: expected an expression, found `<-`"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:36554751752e4970": {
+    "reason": "Unsupported block-comment delimiters remain malformed; the diagnostic transcript is line-commented data, not executable old syntax.",
+    "diagnostics": [
+      "E0101: expected an expression, found `*`"
+    ]
+  },
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:a65388b95df1a4ec": {
+    "reason": "Unsupported block-comment delimiters remain malformed; the diagnostic transcript is line-commented data, not executable old syntax.",
+    "diagnostics": [
+      "E0101: expected an expression, found `*`"
+    ]
+  },
+  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:581dc5481bbfc47f": {
+    "reason": "The block ends in a binding containing the original directly invoked outer closure, with no result expression; retains the original BlockEnd counterexample.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
+    ]
+  },
+  "tests/review/cases/review-rec/_loose/probes/src/main.i:0678a9bb74604084": {
+    "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three §2.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
+    "diagnostics": [
+      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
+    ]
   }
 }

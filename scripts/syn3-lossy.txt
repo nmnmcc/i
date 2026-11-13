@@ -46,7 +46,6 @@ tests/review/cases/review-k4c/cases/missing_3_6_1_1/src/main.i two-row-variables
 tests/review/cases/review-k4c/cases/missing_3_6_1_2/src/main.i two-row-variables
 tests/review/cases/review-k4c/cases/two_env/src/main.i two-row-variables
 tests/review/cases/review-k4c/cases/two_run/src/main.i two-row-variables
-tests/review/cases/review-rec/_loose/probes/src/main.i open-record
 tests/review/cases/review-runtime/echo-types/src/task.i need-not-named
 tests/review/cases/review-std1/factory/src/main.i need-not-named
 tests/review/cases/review-std1/tree/src/main.i need-not-named

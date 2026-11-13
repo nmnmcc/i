@@ -6,7 +6,9 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = <A, N>(body: () <- N -> A, svc: S(Dep)) -> A {
+wrap: <A, N>(() <- N -> A, S(Dep)) <- (Fail(Never), ..N) -> A = (body, svc) <- (
+	fail: Fail(Never),
+) -> A {
 	_syn3_0: S(Dep) = svc
 	body() <- (_syn3_0)
 }

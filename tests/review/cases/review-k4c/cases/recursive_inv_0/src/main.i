@@ -4,7 +4,7 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 run = <N>(f: () <- N -> Nil) { f() }
-bad = <N>() <- (s: S(N)) -> Nil {
+bad: <N>() <- (Fail(Never), ..N) -> Nil = () <- (s: S(N)) -> Nil {
 	S(f, _) = s
 	f()
 }

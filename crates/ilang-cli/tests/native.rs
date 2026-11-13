@@ -38,7 +38,19 @@ fn build(project: &Path, dir: &Path, name: &str) -> PathBuf {
 
 /// Run an executable with an empty environment, as on a machine without `i`.
 fn run(exe: &Path, args: &[&str]) -> Output {
-    Command::new(exe).args(args).env_clear().output().unwrap()
+    retry_executable(|| Command::new(exe).args(args).env_clear().output()).unwrap()
+}
+
+fn retry_executable<T>(mut run: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    for _ in 0..20 {
+        match run() {
+            Err(error) if error.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            result => return result,
+        }
+    }
+    run()
 }
 
 fn package(dir: &Path, main: &str) -> PathBuf {
@@ -146,11 +158,13 @@ main = () {
 "#,
     );
     let exe = build(&project, dir.path(), "app_exe");
-    let out = Command::new(&exe)
-        .env_clear()
-        .env("GREETING", "hi")
-        .output()
-        .unwrap();
+    let out = retry_executable(|| {
+        Command::new(&exe)
+            .env_clear()
+            .env("GREETING", "hi")
+            .output()
+    })
+    .unwrap();
     assert_eq!(out.status.code(), Some(1));
     assert_eq!(out.stdout, b"hi\n");
     assert!(String::from_utf8_lossy(&out.stderr).contains("stopped"));
@@ -181,11 +195,13 @@ impl Drop for Server {
 fn echo_server() {
     let dir = tempfile::tempdir().unwrap();
     let exe = build(&example("echo"), dir.path(), "echo");
-    let child = Command::new(&exe)
-        .env_clear()
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
+    let child = retry_executable(|| {
+        Command::new(&exe)
+            .env_clear()
+            .stdout(Stdio::piped())
+            .spawn()
+    })
+    .unwrap();
     let mut server = Server(child);
     let mut line = String::new();
     BufReader::new(server.0.stdout.take().unwrap())
@@ -228,7 +244,11 @@ fn rejected(exe: &Path) -> String {
 }
 
 fn write_executable(path: &Path, bytes: &[u8]) {
-    std::fs::write(path, bytes).unwrap();
+    {
+        let mut file = std::fs::File::create(path).unwrap();
+        file.write_all(bytes).unwrap();
+        file.sync_all().unwrap();
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -403,11 +423,13 @@ fn packages_are_statically_linked() {
     let alone = tempfile::tempdir().unwrap();
     let copy = alone.path().join("hello");
     std::fs::copy(&exe, &copy).unwrap();
-    let out = Command::new(&copy)
-        .current_dir(alone.path())
-        .env_clear()
-        .output()
-        .unwrap();
+    let out = retry_executable(|| {
+        Command::new(&copy)
+            .current_dir(alone.path())
+            .env_clear()
+            .output()
+    })
+    .unwrap();
     assert!(
         out.status.success(),
         "{}",

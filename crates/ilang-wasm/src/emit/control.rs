@@ -1272,8 +1272,9 @@ impl<'p> Emitter<'p> {
 /// the value, `Program::lazy_fields`), that code is called with the
 /// arguments and the boundary, and the value is not made: it would hold a
 /// closure of the same code over the same boundary. Otherwise the value is
-/// made (`$service_force`) and its field is called.
-pub(super) fn lazy_call(n: u32) -> String {
+/// made (`$service_force`) and its field is called as a call with `n`
+/// positions is (`$dispatch{n}`).
+pub(super) fn lazy_call(n: u32, shape: &str) -> String {
     let m = n + 1;
     let params: String = (0..n).map(|i| format!(" (param $a{i} eqref)")).collect();
     let args: String = (0..n).map(|i| format!(" (local.get $a{i})")).collect();
@@ -1296,9 +1297,9 @@ pub(super) fn lazy_call(n: u32) -> String {
                     (then
                       (return_call_ref $fn{m} (ref.cast (ref $clo{m}) (local.get $f)) (local.get $env){args}
                         (local.get $s) (struct.get $clo{m} 9 (ref.cast (ref $clo{m}) (local.get $f))))))))))))))
-  (local.set $f (call $field (call $service_force (local.get $s) (local.get $env)) (local.get $k)))
-  (return_call_ref $fn{n} (ref.cast (ref $clo{n}) (local.get $f)) (local.get $env){args}
-    (struct.get $clo{n} 9 (ref.cast (ref $clo{n}) (local.get $f)))))
+  (return_call $dispatch{n}
+    (call $field (call $service_force (local.get $s) (local.get $env)) (local.get $k))
+    (i64.const {shape}) (local.get $env){args}))
 "
     )
 }

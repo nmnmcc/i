@@ -1,4 +1,7 @@
-uset = <A, N>(x: A) <- (t: T(A, N)) -> A {
+uset: <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x: A) <- (
+	t: T(A, N),
+	fail: Fail(Never),
+) -> A {
 	T(g = g, ..) = t
 	g(x)
 }
@@ -11,7 +14,9 @@ closed = () {
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)
 }
 
-both = () -> Int { pong(2) }
+both: <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
+	fail: Fail(Never),
+) -> Int { pong(2) }
 
 main = () {
 	closed()
@@ -28,7 +33,10 @@ fr = () { run(() { use() }) }
 
 loop = (x) { x(x) }
 
-bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (
+	s: S(N),
+	fail: Fail(Never),
+) -> Int {
 	S(f = f) = s
 	f()
 }

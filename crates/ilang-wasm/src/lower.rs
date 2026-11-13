@@ -472,6 +472,7 @@ impl Walk {
                     self.first_args.push((*d, v, e.span));
                 }
                 if self.depth == 0
+                    && args.iter().all(|a| a.label.is_none())
                     && let ExprKind::Field { target, .. } = &callee.kind
                     && let ExprKind::Name(ValueRef::Local(v)) = target.kind
                 {
