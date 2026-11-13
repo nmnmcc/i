@@ -69,7 +69,7 @@ fn library_names() {
         ("i/fail", &["raise", "catch", "from_result", "map_error"]),
         (
             "i/control",
-            &["boundary", "suspend", "resume", "cancel", "keep_env"],
+            &["boundary", "suspend", "escape", "resume", "cancel", "keep_env"],
         ),
         ("i/key", &["new", "wrap", "unwrap"]),
         (
@@ -369,6 +369,7 @@ fn prelude_types() {
         ("Assert", vec!["Assert"]),
         ("AssertionFailure", vec!["AssertionFailure"]),
         ("Bool", vec!["True", "False"]),
+        ("Fail", vec!["Fail"]),
         ("Nil", vec!["Nil"]),
         ("Result", vec!["Ok", "Error"]),
     ];

@@ -2561,6 +2561,7 @@ impl<'a> Lowerer<'a> {
             "ilang:control" => match function.as_str() {
                 "boundary" => Ok((Op::Boundary, arity)),
                 "suspend" => Ok((Op::Suspend, arity)),
+                "escape" => Ok((Op::Escape, arity)),
                 "resume" => Ok((Op::Resume, arity)),
                 "cancel" => Ok((Op::Cancel, arity)),
                 "keep_env" => Ok((Op::KeepEnv, arity)),
