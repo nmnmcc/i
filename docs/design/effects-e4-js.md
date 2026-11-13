@@ -36,7 +36,9 @@ makes its second HTTP request, slot 10 is empty in the resumed environment.
 The fetch test's `checked` adapter provided Client in a tail call:
 
 ```i
-fail.catch(() { body() <- (http.fetch_client()) })
+with_client = (body) {
+  fail.catch(() { body() <- (http.fetch_client()) })
+}
 ```
 
 Its WAT ended in `return_call_ref`, so the provision had no surviving frame
@@ -45,10 +47,12 @@ explained by `lazy-reentry.md` D16 and §7a. The provider adapter now follows th
 same retained-call pattern as the library adapters:
 
 ```i
-fail.catch(() {
-  value = body() <- (http.fetch_client())
-  value
-})
+with_client = (body) {
+  fail.catch(() {
+    value = body() <- (http.fetch_client())
+    value
+  })
+}
 ```
 
 At O0 and O2 the WAT contains a capture record of kind 1 with the Client delta
@@ -107,4 +111,10 @@ preserved environment and completion path.
   calls after ordinary errors, R2 seeded replays and every runnable R2 law
   body at both optimization levels in each engine.
 - Final std check and both full std runs pass: **2,171/2,171 at O0 and O2**.
-- Remaining spec/HTTP/Clippy gates: in progress.
+- Filtered release spec gates pass at both i levels: **9/ 149/149** and
+  **11/ 48/48**. Native HTTP integration passes **11/11**.
+- New note examples parse as complete module bindings. The two provider
+  fixture manifests are now identical; their TOML-only snippet registrations
+  coalesce under that literal's new identity. Every registered diagnostic
+  expectation is unchanged, and all changed JS files' registrations resolve.
+- Strict Clippy is queued behind other workers.

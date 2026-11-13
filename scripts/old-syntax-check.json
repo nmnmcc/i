@@ -1680,14 +1680,6 @@
     "not_source": true,
     "reason": "i.toml manifest text in a test, not an i module."
   },
-  "bindings/javascript/test/providers.test.mjs:e973fd792f5b2fd6": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
-  "bindings/javascript/test/providers.test.mjs:da44a6505ea7c74e": {
-    "not_source": true,
-    "reason": "TOML provider/entry manifest data or its host format template."
-  },
   "crates/ilang-check/tests/provider_graph.rs:9b34f8167d98a7ed": {
     "not_source": true,
     "reason": "TOML provider/entry manifest data or its host format template."
@@ -2919,5 +2911,9 @@
     "diagnostics": [
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
     ]
+  },
+  "bindings/javascript/test/providers.test.mjs:b89cd1ef46e15e08": {
+    "not_source": true,
+    "reason": "TOML host-export manifest data; services are provided in the i entry."
   }
 }
