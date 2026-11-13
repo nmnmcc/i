@@ -794,6 +794,25 @@ impl Solver {
             self.fail(FailKind::Mismatch, &Ty::Var(v), h);
             return;
         }
+        // Rule B for a service whose parameters all have a direction and
+        // none is a row: a need of the row with that constructor goes to
+        // the handler. Needs written beside the row go to the explicit entry
+        // by routing, so no obligation is kept on the variable: keeping one
+        // would have to be shown in every caller's scheme, and it makes
+        // every later bound of the program check the handlers.
+        if self.var(v).row == Mode::Env
+            && let Ty::Con(hh, _, args) = h
+            && !args.is_empty()
+            && self.variances(*hh, args.len()).all(|x| x != Variance::Inv)
+            && self.rows(*hh, args.len()).all(|m| m != Mode::Env)
+        {
+            for b in self.reach(vec![v], true).1 {
+                if b.head() == h.head() {
+                    self.constrain_in(&b, h, Mode::Env);
+                }
+            }
+            return;
+        }
         self.has_handlers = true;
         for w in self.reach(vec![v], true).0 {
             if (w.0 as usize) < self.rigid_boundary || self.var(w).handled.contains(h) {
