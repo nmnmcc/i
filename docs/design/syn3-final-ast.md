@@ -273,8 +273,8 @@ These are not mechanical, and each changes what a macro sees.
 | 2b datum builder; `needs_row` | done |
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
-| 3 resolver | IN PROGRESS: latest conv a599 integrated; native closed-provider boundary ported; new affected checks pending, earlier gate is historical |
-| 4 deletion | PREPARED: fa2 script adapted outside production; apply only after a committed green step 3 |
+| 3 resolver | IN VERIFICATION: native readers and convdb743; workspace/Rust/CLI39/std2170 at O0/O2/all four spec filters/fmt/clippy pass; generation/source-fmt/final Rust repeat pending |
+| 4 deletion | PREPARED ONLY: guarded fa2 driver and eight integration helpers committed; exact green step3 proof and matching five-case engine capture required before applying |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -762,3 +762,16 @@ found one needless borrow after borrowing virtual statements; corrected
 without changing behavior, with retry pending after the active Rust run.
 The new coordinator instruction permits WIP/compiling milestone commits;
 earlier no-commit-before-full-green notes are historical.
+
+
+Nov14 05:35 preparation milestone: the unused guarded deletion tools are
+retained under `scripts/syn3-delete-*.py`, with the exact five-case capture
+helper and `syn3-final-ast-deletion.md` procedure. All Python syntax checks
+and the driver dry run pass. No production tree or Rust test is changed by
+this milestone. Preparation fixes the macro dev-dependency boundary, retains
+private parse-lowered entry points and native-fact access, and preserves full
+five-case engine output assertions after the old hook is removed. Native
+step three has passed all runtime/spec checks so far; generation is queued
+since05:10:59 under the shared load guard, followed by source formatting and
+a final four-package Rust repeat. Neither step three nor deletion is claimed
+fully green yet.
