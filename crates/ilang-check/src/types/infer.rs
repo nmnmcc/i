@@ -263,6 +263,32 @@ impl<'a> Checker<'a> {
                         module: ModuleId(mi as u32),
                         index: di as u32,
                     };
+                    if let Some(implemented) = p.typed_macro_shapes.get(&id)
+                        && let Ty::Fn(f) = &t
+                    {
+                        let parameter = self
+                            .s
+                            .normalize_mode(f.param.clone(), super::solve::Mode::Value);
+                        let advertised: Option<Vec<_>> = known::members(&parameter)
+                            .iter()
+                            .map(|member| match member {
+                                Ty::Con(Head::Shape(shape), _, _) => Some(*shape),
+                                _ => None,
+                            })
+                            .collect();
+                        if let Some(mut advertised) = advertised {
+                            let mut implemented = implemented.clone();
+                            // ShapeId allocation order is irrelevant to set equality.
+                            advertised.sort_by_key(|s| s.keys());
+                            advertised.dedup();
+                            implemented.sort_by_key(|s| s.keys());
+                            implemented.dedup();
+                            if !advertised.iter().all(|shape| implemented.contains(shape)) {
+                                self.error(code::ATTRIBUTE_PLACE, d.span,
+                                    "a typed macro implementation must have one parameter for each signature parameter in every parameter-data shape, with matching explicit labels");
+                            }
+                        }
+                    }
                     self.defs.insert(id, Scheme { level: 0, ty: t });
                 }
             }
@@ -2144,7 +2170,7 @@ impl<'a> Checker<'a> {
             && args.iter().any(|a| a.label.is_some())
             && !matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
         {
-            return self.shaped_call(&f, first, args, span);
+            return self.shaped_call(&f, first, args, span, typed_definition);
         }
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
@@ -2331,7 +2357,14 @@ impl<'a> Checker<'a> {
     /// A call through a value with labelled arguments: the argument data
     /// has the shape that the call writes, with its parts in canonical
     /// order.
-    fn shaped_call(&mut self, f: &Ty, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+    fn shaped_call(
+        &mut self,
+        f: &Ty,
+        first: Option<&Expr>,
+        args: &[Arg],
+        span: Span,
+        typed_definition: Option<DefId>,
+    ) -> (Ty, Ty) {
         let mut positions: Vec<Ty> = Vec::new();
         let mut labelled: Vec<(String, Ty)> = Vec::new();
         if let Some(first) = first {
@@ -2372,6 +2405,47 @@ impl<'a> Checker<'a> {
         self.sub(f, &Ty::Fn(Box::new(want)), span);
         self.add_err(e);
         self.add_env(n);
+        if let Some(definition) = typed_definition {
+            let values: Vec<_> = first
+                .into_iter()
+                .chain(args.iter().map(|a| &a.value))
+                .collect();
+            let mut input_spans = HashSet::new();
+            for value in &values {
+                let mut expression = (*value).clone();
+                visit_expr_mut(&mut expression, &mut |e| {
+                    input_spans.insert(e.span);
+                    true
+                });
+                for binder in expression_binders(value) {
+                    input_spans.insert(binder.span);
+                }
+            }
+            let mut order: Vec<_> = first
+                .into_iter()
+                .map(|_| None)
+                .chain(
+                    args.iter()
+                        .map(|a| a.label.as_ref().map(|l| l.name.as_str())),
+                )
+                .enumerate()
+                .collect();
+            order.sort_by(|(i, a), (j, b)| a.cmp(b).then(i.cmp(j)));
+            self.out.args.insert(
+                (self.module, span),
+                order.into_iter().map(|(i, _)| i as u32).collect(),
+            );
+            self.pending_typed.push(PendingTyped {
+                definition,
+                module: self.module,
+                span,
+                signature: f.clone(),
+                argument_types: parts,
+                input_spans,
+                locals: self.locals.clone(),
+                known: self.kvars.clone(),
+            });
+        }
         (r, Ty::Top)
     }
 

@@ -1278,7 +1278,12 @@ fn macro_contracts(graph: &PackageGraph, out: &mut Interface) -> Result<()> {
             } else {
                 "syntax"
             };
-            let contract = format!("{kind} {:?} {hash}", definition.labels);
+            let shapes = if definition.variants.is_empty() {
+                vec![definition.labels]
+            } else {
+                definition.variants.into_iter().map(|v| v.labels).collect()
+            };
+            let contract = format!("{kind} {shapes:?} {hash}");
             out.insert(
                 format!("macro {}.{}", inner_path(&parsed.path), definition.name),
                 Entry {

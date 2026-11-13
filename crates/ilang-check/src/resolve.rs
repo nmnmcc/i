@@ -523,23 +523,24 @@ impl<'a> Resolver<'a> {
             }
         }
         let placeholder_var = VarId(u32::MAX);
-        let typed: HashSet<_> = ilang_syntax::lisp::expansion::definitions(ast, lisp)
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|d| d.signature.is_some())
-            .map(|d| d.name)
-            .collect();
+        let typed_definitions: HashMap<_, _> =
+            ilang_syntax::lisp::expansion::definitions(ast, lisp)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|d| d.signature.is_some())
+                .map(|d| (d.name.clone(), d))
+                .collect();
+        let typed: HashSet<_> = typed_definitions.keys().cloned().collect();
         for item in &ast.items {
             let typed_declaration = matches!(&item.kind, ast::ItemKind::Declaration { name, .. } if typed.contains(&name.name));
-            if item
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "macro")
-                && !typed_declaration
+            if item.attributes.iter().any(|a| {
+                a.module.is_none() && matches!(a.name.name.as_str(), "macro" | "%macro_group")
+            }) && !typed_declaration
             {
                 let mut remaining = item.clone();
                 remaining.attributes.retain(|attribute| {
-                    !(attribute.module.is_none() && attribute.name.name == "macro")
+                    !(attribute.module.is_none()
+                        && matches!(attribute.name.name.as_str(), "macro" | "%macro_group"))
                 });
                 for attribute in &remaining.attributes {
                     if attribute.module.is_none() && attribute.name.name == "main" {
@@ -707,10 +708,33 @@ impl<'a> Resolver<'a> {
                     self.add_def(m, &name.name, name.span, kind, &attrs);
                     if self.p.module(m).defs.len() > before {
                         if typed_declaration {
-                            self.p.typed_macros.insert(DefId {
+                            let id = DefId {
                                 module: m,
                                 index: before as u32,
-                            });
+                            };
+                            self.p.typed_macros.insert(id);
+                            let definition = &typed_definitions[&name.name];
+                            let labels = if definition.variants.is_empty() {
+                                vec![definition.labels.clone()]
+                            } else {
+                                definition
+                                    .variants
+                                    .iter()
+                                    .map(|v| v.labels.clone())
+                                    .collect()
+                            };
+                            self.p.typed_macro_shapes.insert(
+                                id,
+                                labels
+                                    .into_iter()
+                                    .map(|labels| {
+                                        crate::types::ShapeId::new(
+                                            labels.iter().filter(|l| l.is_none()).count() as u32,
+                                            labels.into_iter().flatten(),
+                                        )
+                                    })
+                                    .collect(),
+                            );
                         }
                         Slot::Decl(before as u32)
                     } else {

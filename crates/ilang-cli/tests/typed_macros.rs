@@ -641,3 +641,61 @@ fn typed_macro_diagnostics_are_part_of_the_implementation_contract() {
         1
     );
 }
+
+#[test]
+fn typed_macro_implementations_dispatch_every_signature_shape() {
+    let macros = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
+    let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/main.i")
+        .replace("probe/macros", "app/macros");
+    checked(macros, &source).unwrap();
+    reject(
+        include_str!("../../../tests/spec/14.8/mp11_missing_shape/src/macros.is"),
+        &source,
+        "every parameter-data shape",
+    );
+}
+
+#[test]
+fn typed_macro_shape_contracts_resolve_aliases_before_comparing_them() {
+    let macros = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
+    let aliased = macros
+        .replace("(, id)", "(, id)\n(= Parameters (| (, Int) (, Int Int)))")
+        .replace("(-> (| (, Int) (, Int Int)) Int)", "(-> Parameters Int)");
+    let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/main.i")
+        .replace("probe/macros", "app/macros");
+    checked(&aliased, &source).unwrap();
+    let missing = aliased.replace(
+        "(| (-> (, x) _ x) (-> (, x y) _ `(+ ~x ~y)))",
+        "(-> (, x) _ x)",
+    );
+    assert_ne!(missing, aliased);
+    reject(&missing, &source, "every parameter-data shape");
+}
+
+#[test]
+fn uncallable_typed_macro_signatures_do_not_need_an_impossible_empty_implementation() {
+    let macros = declared("m (-> Never Int)", "(-> (, value) _ `0)");
+    checked(&macros, "main = () { Nil }\n").unwrap();
+}
+
+#[test]
+fn typed_macro_shape_branches_keep_labels_within_a_single_group() {
+    let macros = include_str!("../../../tests/spec/14.8/mp11_labelled_branches/src/macros.is");
+    let source = include_str!("../../../tests/spec/14.8/mp11_labelled_branches/src/main.i")
+        .replace("probe/macros", "app/macros");
+    let (_, checked) = checked(macros, &source).unwrap();
+    assert_eq!(checked.types.unwrap().typed_expansions.len(), 2);
+}
+
+#[test]
+fn labelled_typed_calls_check_the_expanded_result_against_the_signature() {
+    let macros = declared(
+        "m (-> (, (= value Int)) String)",
+        "(-> (, (= value x)) _ x)",
+    );
+    reject(
+        &macros,
+        "(m = app/macros)\nmain = () { m.m(value = 1) }\n",
+        "cannot depend on its expansion",
+    );
+}

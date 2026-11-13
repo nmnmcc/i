@@ -639,6 +639,7 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     );
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "keep".into(),
         parameters: vec!["x".into()],
@@ -716,6 +717,7 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "wrap".into(),
         parameters: vec!["x".into()],

@@ -57,3 +57,22 @@ fn compiler_export_cannot_request_a_host_service() {
         graph.sources.render_all(&checked.diags)
     );
 }
+
+#[test]
+fn compiler_initializers_can_retain_compiler_functions_without_granting_target_access() {
+    let (graph, _, ordinary) = common::check_files(&[(
+        "src/main.i",
+        "(syntax = i/syntax)\nhelper = (x: syntax.Syntax) { syntax.node(x) x }\nalias = helper\nidentity = (x: syntax.Syntax) { alias(x) }\nmain = () { Nil }\n",
+    )]);
+    assert!(ordinary.iter().any(|d| {
+        d.code == ilang_check::code::COMPILER_CAPABILITY && d.message.contains("initialization")
+    }));
+    let (parsed, diags) = ilang_check::parse(&graph);
+    assert!(diags.is_empty());
+    let checked = ilang_check::check_compiler_exports(&graph, &parsed, &[("app/main", "identity")]);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}

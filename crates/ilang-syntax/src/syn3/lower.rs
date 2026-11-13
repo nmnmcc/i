@@ -555,7 +555,7 @@ impl Cx {
                         .attributes
                         .iter()
                         .any(|a| a.module.is_none() && a.name.name == "macro")
-                        && matches!(&b.value.kind, n::ExprKind::Chain(fs) if fs.len() == 1) =>
+                        && matches!(&b.value.kind, n::ExprKind::Chain(fs) if fs.len() == 1 && fs[0].guard.is_none() && fs[0].params.iter().all(|p| p.choices.len() == 1)) =>
                 {
                     // Preserve the macro's written call shape while lowering its
                     // implementation as Syntax parameters. Labels are metadata,
@@ -601,12 +601,31 @@ impl Cx {
                     o::ItemKind::Binding(lowered)
                 }
                 n::ItemKind::Bind(b) => {
-                    let mut bindings = self.bindings(b, true);
+                    let macro_groups = item
+                        .attributes
+                        .iter()
+                        .any(|a| a.module.is_none() && a.name.name == "macro");
+                    let mut bindings = self.bindings(b, true, macro_groups);
                     let last = bindings.pop().unwrap();
                     for hidden in bindings {
+                        let attributes = if item
+                            .attributes
+                            .iter()
+                            .any(|a| a.module.is_none() && a.name.name == "macro")
+                        {
+                            vec![o::Attribute {
+                                module: None,
+                                name: ident("%macro_group", hidden.span),
+                                args: Vec::new(),
+                                call: None,
+                                span: hidden.span,
+                            }]
+                        } else {
+                            Vec::new()
+                        };
                         out.push(o::Item {
                             doc: Vec::new(),
-                            attributes: Vec::new(),
+                            attributes,
                             span: hidden.span,
                             kind: o::ItemKind::Binding(hidden),
                         });
@@ -844,9 +863,11 @@ impl Cx {
                     kind: n::ExprKind::Provide { target, services },
                     ..
                 }) if i + 1 == b.stmts.len() => stmts.extend(self.provide(target, services)),
-                n::Stmt::Bind(b) => {
-                    stmts.extend(self.bindings(b, false).into_iter().map(o::Stmt::Bind))
-                }
+                n::Stmt::Bind(b) => stmts.extend(
+                    self.bindings(b, false, false)
+                        .into_iter()
+                        .map(o::Stmt::Bind),
+                ),
                 _ => stmts.push(self.stmt(s)),
             }
         }
@@ -975,12 +996,14 @@ impl Cx {
     /// bound to one name with no written type (§2.6.1) becomes one hidden
     /// binding per shape group and then the name itself, bound to the
     /// multi-shape value of those groups.
-    fn bindings(&mut self, b: &n::Binding, top: bool) -> Vec<o::Binding> {
+    fn bindings(&mut self, b: &n::Binding, top: bool, macro_groups: bool) -> Vec<o::Binding> {
         let (n::PatternKind::Var(name), n::ExprKind::Chain(fs)) = (&b.pattern.kind, &b.value.kind)
         else {
             return vec![self.binding(b)];
         };
-        if !is_multi(fs) {
+        // A macro's branches need shape metadata even when every branch
+        // belongs to one group: ordinary lowering erases its explicit labels.
+        if !macro_groups && !is_multi(fs) {
             return vec![self.binding(b)];
         }
         let span = b.value.span.0;
