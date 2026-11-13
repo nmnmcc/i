@@ -440,8 +440,8 @@ test("stream_error_positions", () {
 			[Ok(1), Error(OuterError)],
 	)
 	runner = (
-		body: () <- (Fail(String)) -> stream.Step(Int, String, Never)
-	) -> stream.Step(Int, String, Never) {
+		body: () <- (Fail(String)) -> stream.Step(Int, String, Fail(String))
+	) -> stream.Step(Int, String, Fail(String)) {
 		body()
 		fail.raise("runner")
 	}
@@ -594,8 +594,8 @@ test("stream_callback_failures", () {
 			[Error("deferred")],
 	)
 	runner = (
-		body: () <- (Fail(String)) -> stream.Step(Int, String, Never)
-	) -> stream.Step(Int, String, Never) {
+		body: () <- (Fail(String)) -> stream.Step(Int, String, Fail(String))
+	) -> stream.Step(Int, String, Fail(String)) {
 		body()
 		fail.raise("runner")
 	}

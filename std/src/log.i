@@ -120,7 +120,9 @@ write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
 	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
 }
 
-lazy = <E, N>(level: Level, message: () <- N -> String) <- (sink: Sink(E, N)) {
+lazy = <E, F, N>(level: Level, message: () <- (Fail(F), ..N) -> String) <- (
+	sink: Sink(E, N),
+) {
 	Sink(accept, send, _) = sink
 	accept(level) |>
 		(True) {
