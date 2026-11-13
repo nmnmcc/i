@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Split the standard into searchable pages. SPEC_PATH is the only relocation point."""
-from pathlib import Path
+from paths import ROOT, SPEC_PATH
 import json
 import re
 
-ROOT = Path(__file__).resolve().parents[2]
-SPEC_PATH = ROOT / 'docs/spec.md'
 OUT = ROOT / 'docs/content/docs/standard/generated'
 text = SPEC_PATH.read_text().replace('(design/runtime.md)', '(https://github.com/nmnmcc/i/blob/main/docs/design/runtime.md)')
 parts = re.split(r'(?m)^(## (?:\d+\.|Appendix [A-Z]\.).*)$', text)
