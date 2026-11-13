@@ -23,7 +23,7 @@ main = () {
 				task.receive(gate)
 				fail.raise("outer")
 			})
-			notify = control.keep_env((_: Nil) { task.send(gate, Nil) })
+			notify = control.keep((_: Nil) { task.send(gate, Nil) })
 			task.run(() {
 				task.scope((inner) {
 					task.go(inner, () {

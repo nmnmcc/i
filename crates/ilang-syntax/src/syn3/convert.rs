@@ -965,21 +965,34 @@ impl Cx<'_> {
                     ty,
                     value,
                     span: env_span,
+                    spread,
+                    group,
+                    ..
                 } => {
-                    // §7.3: consecutive statements whose values are direct
-                    // values are one provide; others nest, because a later
-                    // value may need an earlier service.
-                    let mut provided = vec![self.provided(ty, value, &mut out)];
+                    // Keep written provide groups distinct (rule C), and
+                    // retain explicit legacy provider types during conversion.
+                    let mut provided = vec![if *spread {
+                        n::DItem::Spread(self.expr(value))
+                    } else {
+                        self.provided(ty, value, &mut out)
+                    }];
                     let mut i = i;
                     while is_direct(value)
                         && let Some(o::Stmt::Env {
                             ty: next_ty,
                             value: next,
+                            spread,
+                            group: next_group,
                             ..
                         }) = stmts.get(i + 1)
+                        && next_group == group
                         && is_direct(next)
                     {
-                        provided.push(self.provided(next_ty, next, &mut out));
+                        provided.push(if *spread {
+                            n::DItem::Spread(self.expr(next))
+                        } else {
+                            self.provided(next_ty, next, &mut out)
+                        });
                         i += 1;
                     }
                     let rest_span = Span::new(env_span.end, span.end.max(env_span.end));
@@ -1072,8 +1085,8 @@ impl Cx<'_> {
                     choices: vec![self.pattern(p, true)],
                 }),
                 // §7.3: the service pattern, in parameter order.
-                o::Param::Env { name, ty } => services.push(n::SItem {
-                    rest: false,
+                o::Param::Env { name, ty, rest } => services.push(n::SItem {
+                    rest: *rest,
                     name: id(name),
                     ty: self.service_type(ty),
                 }),

@@ -9,7 +9,9 @@ main = () <- (io: Io) {
 	_syn3_0: Svc(Int) = Svc(f = () { 1 }, m = (_: Int) { Nil })
 	{
 		body = () { ask() + 1 }
-		inner = <N>(b: () <- N -> Int) -> Int {
+		inner: <N>(() <- N -> Int) <- (Fail(Never), ..N) -> Int = (b) <- (
+			fail: Fail(Never),
+		) -> Int {
 			_syn3_1: Svc(String) = Svc(f = () { "s" }, m = (_: String) { Nil })
 			b() <- (_syn3_1)
 		}

@@ -1,6 +1,6 @@
 {
-  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
-  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
+  "compiler": "7e6b5909f8a6eb02bd2b3c16350f0e2e7ea90309",
+  "binary_sha256": "ed285d629efeafead8756068a2c4d4ad41e5b7b1842f0def2e6d86e2b52aa8fb",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.read : () -> A ! State(B & A)\napp/main.outer : (runner: (() -> A ! State(B & A)) -> C ^ E ! N) -> () -> { () -> D ! State(F & D) } ^ E ! N\napp/main.outer2 : (runner: (() -> Int ! State(Int)) -> Int ! State(Int)) -> () -> { () -> A ! State(B & A) } ! State(Int)\napp/main.outer3 : (k: (A) -> B ^ E ! N) -> () -> B ^ E ! N | State(C & A)\napp/main.outer4 : (k: (Int) -> Int) -> Int ! State(A & B & Int & C & D)\n",
+      "stdout": "app/main.read : () <- (State(A)) -> A\napp/main.outer : ((() <- (State(A)) -> A) <- N -> B) -> () <- N -> () <- (State(C)) -> C\napp/main.outer2 : ((() <- (State(Int)) -> Int) <- (State(Int)) -> Int) -> () <- (State(Int)) -> () <- (State(A)) -> A\napp/main.outer3 : ((A) <- N -> B) -> () <- (State(A), ..N) -> B\napp/main.outer4 : ((Int) -> Int) <- (State(Int)) -> Int\n",
       "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `outer` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `outer2` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `outer3` is not used\nsrc/main.i:23:1: warning[W0504]: top-level binding `outer4` is not used\n"
     },
     "test0": {

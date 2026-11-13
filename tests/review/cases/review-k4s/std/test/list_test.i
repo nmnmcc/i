@@ -1866,17 +1866,18 @@ Counter = (step = Int)
 Yield(A) = (emit = (A) -> Nil)
 
 // A generator made with `i/control` (§9.4).
-collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
-		_syn3_0: Yield(A) = Yield(
-			emit = (x) {
-				control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
-			},
-		)
 		{
 			body()
 			[]
-		} <- (_syn3_0)
+		} <- (
+			Yield(
+				emit = (x: A) {
+					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+				},
+			),
+		)
 	})
 }
 

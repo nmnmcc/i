@@ -1084,7 +1084,9 @@ impl<'a> Formatter<'a> {
     fn stmt(&mut self, s: &Stmt) -> Doc {
         match s {
             Stmt::Bind(b) => self.binding(b, false),
-            Stmt::Env { ty, value, span } => cat(vec![
+            Stmt::Env {
+                ty, value, span, ..
+            } => cat(vec![
                 self.leading(span.start),
                 text("! "),
                 self.ty(ty),
@@ -1425,13 +1427,15 @@ impl<'a> Formatter<'a> {
             .iter()
             .map(|p| match p {
                 Param::Pattern(p) => (p.span.start, p.span.end),
-                Param::Env { name, ty } => (name.span.start, ty.span.end),
+                Param::Env { name, ty, .. } => (name.span.start, ty.span.end),
             })
             .collect();
         let params = self.seq("(", ")", open, close, &spans, false, |fm, i| {
             match &f.params[i] {
                 Param::Pattern(p) => fm.pattern(p, false),
-                Param::Env { name, ty } => cat(vec![text(format!("{} ! ", name.name)), fm.ty(ty)]),
+                Param::Env { name, ty, .. } => {
+                    cat(vec![text(format!("{} ! ", name.name)), fm.ty(ty)])
+                }
             }
         });
         let mut out = vec![params];

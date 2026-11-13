@@ -7,7 +7,7 @@ bad_arg : () -> Int
 bad_op : () -> Int
 bad_guard : (A) -> A | 2
 arity : () -> Int
-arity_var : ({ (1) | (1, 2) } <- (Fail(E), ..N) -> A & B) <- (Fail(E), ..N) -> (A, B)
+arity_var : ({ (1) | (1, 2) } <- N -> A & B) <- N -> (A, B)
 ambiguous : (A | B) -> A | B
 use_ambiguous : () -> Never
 field : (A) -> Never
@@ -32,7 +32,7 @@ bad_bits : BitArray
 37:16: error[E0506]: `.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`
 44:25: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
 51:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`
-53:1: error[E0509]: a top-level binding may not give errors (§2.5), but this one has `1`
+53:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Fail(_)`
 55:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Assert`
 60:16: error[E0514]: there is no bit array format `u16` (§8.2)
 60:23: error[E0514]: there is no bit array format `x8` (§8.2)

@@ -5,7 +5,7 @@
 	escape
 	resume
 	cancel
-	keep_env
+	keep
 )
 
 /// Makes a boundary `b` and does `body(b)`.
@@ -32,7 +32,13 @@ resume: <A, R, N>(Continuation(A, R, N), A) <- N -> R
 @external("ilang:control", "cancel")
 cancel: <A, R, N>(Continuation(A, R, N)) <- N -> Nil
 
-/// Keeps every service bound at this call, including services unused by f.
-/// Resume and cancel inside the returned function keep these services too.
-@external("ilang:control", "keep_env")
-keep_env: <S, A, N>((S) <- N -> A) <- N -> (S) -> A
+/// Keeps the rest of the current environment; Fail comes from the later caller.
+keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (
+	Fail(E),
+) -> A {
+	(x) {
+		// runtime.md §6.3, D16: retain a frame across suspended provides.
+		value = f(x) <- env
+		value
+	}
+}

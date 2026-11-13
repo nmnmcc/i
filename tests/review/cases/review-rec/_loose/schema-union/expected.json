@@ -1,6 +1,6 @@
 {
-  "compiler": "d03cc87d1608e3a9646fcaf9a2d70078bfc75c5b",
-  "binary_sha256": "338fee00cda5bfa27c168cbd43f82c731a2db9601a6e250531b96b44e3497ca5",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.make : (c: Bool) -> Schema((a: 1 | \"x\"))\napp/main.schema : Schema((a: 1 | \"x\"))\napp/main.read : (r: (a: 1 | \"x\")) -> Int | String\napp/main.read_inferred : (r: A) -> Never\napp/main.read_written : (r: (a: 1 | \"x\")) -> Int | String\n",
-      "stderr": "src/main.i:13:25: error[E0506]: `.a` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`\n1 error\n"
+      "stdout": "app/main.make : (Bool) -> Schema((a = 1 | \"x\"))\napp/main.schema : Schema((a = 1 | \"x\"))\napp/main.read : ((a = 1 | \"x\")) -> Int | String\napp/main.read_inferred : (A) -> Never\napp/main.read_written : ((a = 1 | \"x\")) -> Int | String\n",
+      "stderr": "src/main.i:12:25: error[E0506]: `.a` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`\n1 error\n"
     }
   }
 }

@@ -17,7 +17,7 @@ Out = (print = (String) -> Nil)
 print = (text: String) <- (out: Out) { out.print(text) }
 
 main = () {
-	kept = control.keep_env((b) {
+	kept = control.keep((b) {
 		control.suspend(b, (k) { Paused(k) })
 		fail.raise("resumed")
 		Done
@@ -30,7 +30,7 @@ main = () {
 			)
 		}
 		| (_) { panic("expected a paused kept call") }
-	with_final = control.keep_env((b) {
+	with_final = control.keep((b) {
 		resource.ensure(
 			() {
 				control.suspend(b, (k) { Paused(k) })
@@ -53,7 +53,7 @@ main = () {
 		}
 		| (_) { panic("expected a paused kept final") }
 	// A handler provided inside the paused part still wins over the resumer.
-	inner_catch = control.keep_env((b) {
+	inner_catch = control.keep((b) {
 		answer = fail.catch(() {
 			control.suspend(b, (k) { Paused(k) })
 			fail.raise("inside")

@@ -129,7 +129,7 @@ test("a later lazy service does not change an already kept environment", () {
 		outer = Raising(raise = outer_fail.raise)
 		{
 			control.boundary((b) {
-				kept = control.keep_env((x: Nil) { the_raising() })
+				kept = control.keep((x: Nil) { the_raising() })
 				{
 					check(
 						show(kept(Nil) == outer),

@@ -233,8 +233,9 @@ pub enum Op {
     Resume,
     /// `control.cancel(k)`.
     Cancel,
-    /// Keeps all currently bound services in a fresh one-argument function.
-    KeepEnv,
+    /// Private host-adapter pinning across capture/re-entry. Source `keep`
+    /// is an ordinary library function using captured service rows.
+    PinEnvironment,
     WaitRequests,
     PollRequests,
 }
@@ -270,7 +271,7 @@ impl Op {
                 | Op::Boundary
                 | Op::Resume
                 | Op::Cancel
-                | Op::KeepEnv
+                | Op::PinEnvironment
                 | Op::WaitRequests
                 | Op::PollRequests
         )
@@ -376,6 +377,10 @@ pub enum Value {
     },
     /// The service with this id in the environment (§9.2).
     Service(Env, u32),
+    /// Opaque row captured by a rest service pattern, excluding the listed keys.
+    Environment(Env, Vec<u32>),
+    /// Read a service from an opaque captured environment.
+    CapturedService(Atom, u32),
     /// The slot of the service with this id in the environment, as it is:
     /// a light boundary that stands for a value is not made into it. Only
     /// a name whose every use is the callee of `Callee::Lazy` has it.

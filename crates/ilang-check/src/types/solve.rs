@@ -726,7 +726,7 @@ impl Solver {
         }
     }
 
-    fn mode(&self, t: &Ty) -> Mode {
+    pub(super) fn mode(&self, t: &Ty) -> Mode {
         match t {
             Ty::Var(v) => self.var(*v).row,
             Ty::Union(ms) | Ty::Inter(ms) => {
@@ -912,8 +912,9 @@ impl Solver {
     }
 
     /// A shown scheme must express every handler restriction. A visible
-    /// difference or a row containing both the variable and the supplied
-    /// constructor expresses it (§2.10.4 rule B). Its arguments may have
+    /// difference with arguments bound outside its erased side, or a row
+    /// containing both the variable and the supplied constructor, expresses
+    /// it (§2.10.4 rule B). Its arguments may have
     /// been coalesced; the original directed constraints stay in the scheme
     /// and are checked at instantiation. A form tied to that variable, as
     /// S(N) in a parameter S(N), also keeps the obligation on that same row.
@@ -921,28 +922,31 @@ impl Solver {
         if !self.has_handlers {
             return Vec::new();
         }
-        fn parts(t: &Ty, out: &mut Vec<Ty>) {
+        fn parts(t: &Ty, out: &mut Vec<Ty>, visible: &mut HashSet<V>, in_handler: bool) {
             out.push(t.clone());
             match t {
+                Ty::Var(v) if !in_handler => {
+                    visible.insert(*v);
+                }
                 Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
                     for x in xs {
-                        parts(x, out);
+                        parts(x, out, visible, in_handler);
                     }
                 }
                 Ty::Fn(f) => {
                     for x in [&f.param, &f.ret, &f.env] {
-                        parts(x, out);
+                        parts(x, out, visible, in_handler);
                     }
                 }
                 Ty::Diff(a, hs) => {
-                    parts(a, out);
+                    parts(a, out, visible, in_handler);
                     for h in hs {
-                        parts(h, out);
+                        parts(h, out, visible, true);
                     }
                 }
                 Ty::Both(a, b) => {
-                    parts(a, out);
-                    parts(b, out);
+                    parts(a, out, visible, in_handler);
+                    parts(b, out, visible, in_handler);
                 }
                 _ => {}
             }
@@ -959,7 +963,8 @@ impl Solver {
                 }
         }
         let mut all = Vec::new();
-        parts(t, &mut all);
+        let mut visible = HashSet::default();
+        parts(t, &mut all, &mut visible, false);
         let mut hidden = Vec::new();
         for v in all
             .iter()
@@ -992,7 +997,27 @@ impl Solver {
                                 && m.head() == h.head())
                     };
                     let witnessed = all.iter().any(|part| match part {
-                        Ty::Diff(a, hs) => row_has(a, &is_var) && hs.iter().any(stated),
+                        Ty::Diff(a, hs) => {
+                            // Difference arguments do not introduce quantified
+                            // variables. A provider hole must also occur in
+                            // the visible scheme to retain its obligation.
+                            row_has(a, &is_var)
+                                && hs.iter().any(|provided| {
+                                    stated(provided)
+                                        && super::typed_macro::variables(provided).iter().all(
+                                            |arg| {
+                                                self.var(*arg).level <= level
+                                                    || visible.contains(arg)
+                                                    || visible.iter().any(|other| {
+                                                        self.same_form(
+                                                            &Ty::Var(*arg),
+                                                            &Ty::Var(*other),
+                                                        )
+                                                    })
+                                            },
+                                        )
+                                })
+                        }
                         Ty::Union(_) | Ty::Inter(_) => {
                             row_has(part, &is_var) && row_has(part, &stated)
                         }
@@ -1031,6 +1056,16 @@ impl Solver {
         if env != Mode::Value {
             self.mark_mode(l, env);
             self.mark_mode(r, env);
+        }
+
+        // An input need may carry any service allowed by this upper bound.
+        // Its service arguments are inputs too; an empty lower set does not
+        // prove that a callback can never return or raise a value (§7.4).
+        if env == Mode::Env
+            && let Ty::Var(v) = l
+            && self.var(*v).input
+        {
+            self.mark_need_inputs(r);
         }
 
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
@@ -2347,6 +2382,117 @@ impl Solver {
     /// in `h` is taken out, and it must be a subtype of that member of `h`.
     pub fn diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
         self.diff_mode(a, h, Mode::Value)
+    }
+
+    fn mark_need_inputs(&mut self, need: &Ty) {
+        let mut pending = super::typed_macro::variables(need);
+        let mut seen = HashSet::default();
+        while let Some(variable) = pending.pop() {
+            if !seen.insert(variable) {
+                continue;
+            }
+            if !self.var(variable).input {
+                self.observe(variable);
+                self.var_mut(variable).input = true;
+                self.rewrites += 1;
+            }
+            if self.var(variable).row == Mode::Env {
+                for upper in self.var(variable).upper.clone() {
+                    pending.extend(super::typed_macro::variables(&upper));
+                }
+            }
+        }
+    }
+
+    /// Supply an opaque captured row. Named keys excluded from that row
+    /// stay at the caller; all other requirements must fit the captured row.
+    pub fn env_without_row(&mut self, need: &Ty, row: &Ty, outside: &[TypeRef]) -> Result<Ty, ()> {
+        fn go(
+            s: &mut Solver,
+            need: &Ty,
+            row: &Ty,
+            outside: &[TypeRef],
+            removed: &[Ty],
+            seen: &mut HashSet<V>,
+        ) -> Result<Ty, ()> {
+            if need == row {
+                return Ok(Ty::Never);
+            }
+            Ok(match need {
+                Ty::Union(ms) => {
+                    let parts = ms
+                        .iter()
+                        .map(|m| go(s, m, row, outside, removed, seen))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    s.env_union(parts)
+                }
+                Ty::Var(v) => {
+                    if outside.is_empty() {
+                        let mut supplied = vec![row.clone()];
+                        supplied.extend_from_slice(removed);
+                        let supplied = s.env_union(supplied);
+                        s.constrain_env(need, &supplied);
+                        return Ok(Ty::Never);
+                    }
+                    if let Ty::Var(r) = row
+                        && s.reach(vec![*v], false).0.contains(r)
+                    {
+                        return Ok(Ty::Never);
+                    }
+                    if !seen.insert(*v) {
+                        return Ok(Ty::Never);
+                    }
+                    let lower = s.var(*v).lower.clone();
+                    if lower.is_empty() {
+                        return Err(());
+                    }
+                    let parts = lower
+                        .iter()
+                        .map(|m| go(s, m, row, outside, removed, seen))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    s.env_union(parts)
+                }
+                Ty::Diff(base, hs) => {
+                    let mut supplied = removed.to_vec();
+                    supplied.extend_from_slice(hs);
+                    go(s, base, row, outside, &supplied, seen)?
+                }
+                Ty::Con(Head::Named(r), ..) => {
+                    if let Some(provider) = removed.iter().find(|h| h.head() == need.head()) {
+                        s.constrain_env(need, provider);
+                        Ty::Never
+                    } else if outside.contains(r) {
+                        need.clone()
+                    } else {
+                        s.constrain_env(need, row);
+                        Ty::Never
+                    }
+                }
+                _ => need.clone(),
+            })
+        }
+        go(self, need, row, outside, &[], &mut HashSet::default())
+    }
+
+    /// Written keys reachable in a need, including through inferred rows.
+    pub fn env_keys(&self, need: &Ty) -> Vec<TypeRef> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::default();
+        let mut todo = vec![need.clone()];
+        while let Some(t) = todo.pop() {
+            match t {
+                Ty::Con(Head::Named(r), ..) => {
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
+                }
+                Ty::Union(ms) => todo.extend(ms),
+                Ty::Var(v) if seen.insert(v) => todo.extend(self.var(v).lower.clone()),
+                Ty::Diff(base, _) => todo.push(*base),
+                _ => {}
+            }
+        }
+        out
     }
 
     /// Remove the services provided by `T` from the need `M`; the provider

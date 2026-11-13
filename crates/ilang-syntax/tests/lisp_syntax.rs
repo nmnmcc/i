@@ -1348,3 +1348,115 @@ fn typed_macro_type_answers_share_marked_variable_nodes_across_queries() {
     };
     assert!(first[0].identical(&xs[1]));
 }
+
+#[test]
+fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
+    use ilang_syntax::{
+        ast::{ExprKind, ItemKind, Param},
+        lisp::{self, scoped::ScopedSource},
+    };
+    let source = "f = <N>() <- (db: Db, ..env: N) { Nil }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let check = |expr: &ilang_syntax::ast::Expr| {
+        let ExprKind::Fn(f) = &expr.kind else {
+            panic!()
+        };
+        assert!(matches!(&f.params[0], Param::Env { rest: false, name, .. } if name.name == "db"));
+        assert!(matches!(&f.params[1], Param::Env { rest: true, name, .. } if name.name == "env"));
+    };
+    let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+    assert_eq!(syntax.show(), "(-> ((! db Db) (! .. env N)) _ {Nil})");
+    let mut expanded = ScopedSource::new(source.into());
+    check(&expanded.expression(&syntax, &syntax).unwrap());
+    let datums = lisp::parse(&syntax.show()).unwrap();
+    let public = ilang_syntax::syn3::lisp::convert_quote(&datums[0]);
+    let internal = ilang_syntax::syn3::lisp::unconvert_quote(&public);
+    check(&lisp::parse_expression(&internal).unwrap());
+    let printed = lisp::print_module(&module);
+    let doc = lisp::parse(&printed).unwrap();
+    let restored = lisp::parse_module(&doc).unwrap();
+    assert!(ilang_syntax::shape::equivalent(&module, &restored));
+}
+
+#[test]
+fn a_captured_rest_row_can_still_be_provided_after_macro_decoding() {
+    use ilang_syntax::{
+        ast::{ExprKind, ItemKind, Param, Stmt},
+        lisp::{self, scoped::ScopedSource},
+    };
+    let source = "f = <N>(body: () <- N -> Nil) <- (..env: N) { body() <- env }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let check = |value: &ilang_syntax::ast::Expr| {
+        let ExprKind::Fn(f) = &value.kind else {
+            panic!()
+        };
+        assert!(matches!(&f.params[1], Param::Env { rest: true, .. }));
+        assert!(matches!(&f.body.stmts[0], Stmt::Env { spread: true, .. }));
+    };
+    let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+    let mut expanded = ScopedSource::new(source.into());
+    check(&expanded.expression(&syntax, &syntax).unwrap());
+    let printed = lisp::print_module(&module);
+    let doc = lisp::parse(&printed).unwrap();
+    let restored = lisp::parse_module(&doc).unwrap();
+    let ItemKind::Binding(binding) = &restored.items[0].kind else {
+        panic!()
+    };
+    check(&binding.value);
+}
+
+#[test]
+fn macro_round_trips_preserve_written_provide_groups() {
+    use ilang_syntax::{
+        ast::ItemKind,
+        lisp::{self, scoped::ScopedSource},
+        walk::{Visitor, Walk},
+    };
+    // The text bridge needs lexical names for lowering's internal
+    // `%service` temporaries. Their spelling does not affect group identity.
+    struct LexicalTemporaries;
+    impl Visitor for LexicalTemporaries {
+        fn string(&mut self, name: &mut String) {
+            if let Some(rest) = name.strip_prefix('%') {
+                *name = format!("bridge_{rest}");
+            }
+        }
+    }
+    for source in [
+        "f = () { read() <- (Db(1), Db(2)) }",
+        "f = () { read() <- (Db(2)) <- (Db(1)) }",
+        "f = <N>(body: () <- (..N, Db) -> Int, db: Db) <- (..env: N) { body() <- (..env, db) }",
+    ] {
+        let (module, errors) = ilang_syntax::parse_module(source);
+        assert!(errors.is_empty(), "{source}: {errors:?}");
+        let ItemKind::Binding(binding) = &module.items[0].kind else {
+            panic!()
+        };
+        let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+        let mut expanded = ScopedSource::new(source.into());
+        let decoded = expanded.expression(&syntax, &syntax).unwrap();
+        assert!(
+            ilang_syntax::shape::equivalent_expression(&binding.value, &decoded),
+            "{source}: {}",
+            syntax.show()
+        );
+        let mut module = module.clone();
+        module.walk(&mut LexicalTemporaries);
+        let printed = lisp::print_module(&module);
+        let doc = lisp::parse(&printed).unwrap();
+        let restored = lisp::parse_module(&doc)
+            .unwrap_or_else(|error| panic!("{source}: {printed}: {error:?}"));
+        assert!(
+            ilang_syntax::shape::equivalent(&module, &restored),
+            "{source}: {printed}"
+        );
+    }
+}

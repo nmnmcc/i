@@ -83,11 +83,11 @@ annotated_call : Int
 68:2: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 72:16: warning[W0503]: the two sides have the known types `(a) -> Box(a)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 74:19: warning[W0503]: the two sides have the known types `Nil` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-78:19: warning[W0503]: the two sides have the known types `(Int) <- (Fail(_), _) -> String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-80:16: warning[W0503]: the two sides have the known types `(Int, _) <- (Fail(_), _) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-87:4: warning[W0503]: the two sides have the known types `(Int) <- (Fail(_), _) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+78:19: warning[W0503]: the two sides have the known types `(Int) <- (_) -> String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+80:16: warning[W0503]: the two sides have the known types `(Int, _) <- (_) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+87:4: warning[W0503]: the two sides have the known types `(Int) <- (_) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 87:4: warning[W0502]: this value is not used, and working it out does nothing
-93:2: warning[W0503]: the two sides have the known types `(_) <- (Fail(_), _) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+93:2: warning[W0503]: the two sides have the known types `(_) <- (_) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 93:2: warning[W0502]: this value is not used, and working it out does nothing
 101:3: warning[W0503]: the two sides have the known types `(Int) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 101:3: warning[W0502]: this value is not used, and working it out does nothing

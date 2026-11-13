@@ -1,6 +1,7 @@
 // Constraints that simplification and generalization must keep.
 
-// §4.5 rule 4: the provider must be a subtype of the needed service.
+// §4.5 rule 4 and §9.2: an environment provider must be a subtype of
+// the needed service, also when the function is generalized.
 Reader(S) = (get = () -> S)
 
 with_int = (body) {

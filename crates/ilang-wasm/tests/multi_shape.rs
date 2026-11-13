@@ -339,9 +339,10 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     f.check(r, int(7));
     checks.push(("catch_ensure", f.done("catch_ensure", None)));
 
-    // A function kept with its environment, around a multi-shape value.
+    // E6 removes the source primitive. Private host-adapter pinning still
+    // retains an environment around a multi-shape value (§9.4).
     let mut f = F::new(0);
-    let k = f.let_(Value::OpEnv(Op::KeepEnv, vec![g(0)], Env::Param));
+    let k = f.let_(Value::OpEnv(Op::PinEnvironment, vec![g(0)], Env::Param));
     let r = f.call(Callee::Value(k), vec![int(5)]);
     f.check(r, int(6));
     checks.push(("keep", f.done("keep", None)));

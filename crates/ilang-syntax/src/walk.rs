@@ -7,6 +7,11 @@ pub trait Visitor {
     fn ty(&mut self, _: &mut TypeExpr) {}
     fn float(&mut self, _: &mut f64) {}
     fn span(&mut self, _: &mut Span) {}
+    fn provide_group(&mut self, group: &mut Option<Span>) {
+        if let Some(span) = group {
+            self.span(span);
+        }
+    }
     fn string(&mut self, _: &mut String) {}
 }
 pub trait Walk {
@@ -137,10 +142,17 @@ impl Walk for Stmt {
         match self {
             Self::Bind(b) => b.walk(v),
             Self::Expr(e) => e.walk(v),
-            Self::Env { ty, value, span } => {
+            Self::Env {
+                ty,
+                value,
+                span,
+                group,
+                ..
+            } => {
                 ty.walk(v);
                 value.walk(v);
                 span.walk(v);
+                v.provide_group(group);
             }
         }
     }
@@ -149,7 +161,7 @@ impl Walk for Param {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
             Self::Pattern(p) => p.walk(v),
-            Self::Env { name, ty } => {
+            Self::Env { name, ty, .. } => {
                 name.walk(v);
                 ty.walk(v);
             }

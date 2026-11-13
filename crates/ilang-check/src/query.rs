@@ -2111,7 +2111,7 @@ impl Walk<'_> {
                 for p in &f.params {
                     match p {
                         Param::Pattern { pattern, .. } => self.pattern(pattern),
-                        Param::Env { var, name, ty } => {
+                        Param::Env { var, name, ty, .. } => {
                             self.binders.entry(*var).or_insert(name.span);
                             self.occ.push((name.span, Target::Local(*var)));
                             self.ty(ty);

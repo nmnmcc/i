@@ -13,9 +13,9 @@ go: <A, E, N>(task.Group(E), () <- (Fail(E), ..N) -> A) <- (
 	..N,
 ) -> task.Task(A, E) = task.go
 
-keep: <S, A, N>((S) <- N -> A) <- (task.Scheduler, ..N) -> (S) <- (
-	task.Scheduler,
-) -> A = task.keep
+keep: <S, A, E, N>(
+	(S) <- (..N, Fail(E), task.Scheduler, task.Runner, request.Await) -> A,
+) <- (task.Scheduler, ..N) -> (S) <- (Fail(E), task.Scheduler) -> A = task.keep
 
 run: <A, N>(() <- N -> A) <- (task.Runner, ..N) -> A = task.run
 

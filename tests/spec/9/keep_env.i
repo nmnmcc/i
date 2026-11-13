@@ -25,17 +25,17 @@ walk = (b, n) {
 
 identity = (value) { value }
 
-make = () { control.keep_env((b) { walk(b, 0) }) }
+make = () { control.keep((b) { walk(b, 0) }) }
 
 main = () {
 	{
 		kept = make()
 		pure = (n: Int) { n + 1 }
-		a = control.keep_env(pure)
-		b = control.keep_env(pure)
+		a = control.keep(pure)
+		b = control.keep(pure)
 		assert(a != b)
 		assert(a(37) == 38)
-		inner = control.keep_env((boundary) {
+		inner = control.keep((boundary) {
 			identity(walk(boundary, 0)) <- (Name(text = "inner"))
 		})
 		{
@@ -48,7 +48,7 @@ main = () {
 			Paused(ki3) = control.resume(ki2, Nil)
 			assert(control.resume(ki3, Nil) == Done("inner"))
 			{
-				with_final = control.keep_env((boundary) {
+				with_final = control.keep((boundary) {
 					resource.ensure(
 						() {
 							control.suspend(boundary, (k) { Paused(k) })
@@ -65,7 +65,7 @@ main = () {
 					control.boundary((boundary) {
 						extra: Extra(Nil, Assert) = Extra(boundary)
 						{
-							f = control.keep_env(pure)
+							f = control.keep(pure)
 							assert(
 								core.not(core.portable(f)),
 							)

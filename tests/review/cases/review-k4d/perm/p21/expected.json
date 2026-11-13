@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.both : () -> Int ! N | S(N) | T(Int, N)\napp/main.main : () -> Nil\napp/main.get : () -> Int ! Dep\napp/main.closed : () -> Int\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.fr : () -> Int ! N | S(N)\napp/main.uset : (x: A) -> A ! N | T(A, N)\napp/main.pong : (n: Int) -> Int ! N | N2 | S(N) | T(A & Int, N2)\napp/main.fw : () -> Int ! N | S(N)\napp/main.ping : (n: Int) -> Int ! N | N2 | S(N) | T(A & Int, N2)\napp/main.use : () -> Int ! N | S(N)\n",
-      "stderr": "src/main.i:37:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:39:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
+      "stdout": "app/main.both : () <- (S(N), T(Int, N), ..N) -> Int\napp/main.main : () -> Nil\napp/main.get : () <- (Dep) -> Int\napp/main.closed : () -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.uset : (A) <- (T(A, N), ..N) -> A\napp/main.pong : (Int) <- (S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.ping : (Int) <- (S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\n",
+      "stderr": "src/main.i:40:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:42:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
     }
   }
 }

@@ -1,6 +1,6 @@
 {
-  "compiler": "cc02dc36481b29de48de9db520056cc950174d3e",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "7e6b5909f8a6eb02bd2b3c16350f0e2e7ea90309",
+  "binary_sha256": "ed285d629efeafead8756068a2c4d4ad41e5b7b1842f0def2e6d86e2b52aa8fb",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.wrap : (body: () -> A ^ E ! N, svc: S(B)) -> A ^ E ! N - S(B)\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- N -> A, S(B)) <- (N - S(B)) -> A\n",
       "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `wrap` is not used\n"
     },
     "test0": {

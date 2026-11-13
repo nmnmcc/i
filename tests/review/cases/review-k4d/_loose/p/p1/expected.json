@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "7e6b5909f8a6eb02bd2b3c16350f0e2e7ea90309",
+  "binary_sha256": "ed285d629efeafead8756068a2c4d4ad41e5b7b1842f0def2e6d86e2b52aa8fb",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.tell : (x: Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.fw1 : () -> Int ! N | S(N)\napp/main.fw1i : () -> Int ! N | S(N)\napp/main.fw2 : () -> Int ! N | S(N)\napp/main.fw2i : () -> Int ! N | S(N)\napp/main.outer : () -> Int ! N | S(N)\napp/main.outeri : () -> Int ! N | S(N)\napp/main.dep3 : () -> Int ! N | Dep | S(N)\napp/main.dep3i : () -> Int ! N | Dep | S(N)\napp/main.spec : () -> Int ! Dep | S(Dep)\napp/main.half : () -> Int ! Dep | S(Dep)\napp/main.wrap : (body: () -> Int ! N | S(N)) -> Int ! N\napp/main.wrapi : (body: () -> A ^ E ! N) -> A ^ E ! N - S(Never)\napp/main.wrapj : (body: () -> A ^ E ! N) -> A ^ E ! N - S(_)\napp/main.main : () -> Nil ! Io\n",
-      "stderr": "src/main.i:42:1: error[E0515]: the type hides the environment statement's obligation for `S(_)`: every instance must use the same service form (§4.8 rule 9, §9.2)\n1 error\n"
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.tell : (Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.fw1 : () <- (S(N), ..N) -> Int\napp/main.fw1i : () <- (S(N), ..N) -> Int\napp/main.fw2 : () <- (S(N), ..N) -> Int\napp/main.fw2i : () <- (S(N), ..N) -> Int\napp/main.outer : () <- (S(N), ..N) -> Int\napp/main.outeri : () <- (S(N), ..N) -> Int\napp/main.dep3 : () <- (Dep, S(N), ..N) -> Int\napp/main.dep3i : () <- (Dep, S(N), ..N) -> Int\napp/main.spec : () <- (S(N), ..N) -> Int\napp/main.half : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- (S(N), ..N) -> Int) <- N -> Int\napp/main.wrapi : (() <- N -> A) <- (N - S(Never)) -> A\napp/main.wrapj : (() <- N -> A) <- (N - S(_)) -> A\napp/main.main : () <- (Io) -> Nil\n",
+      "stderr": "src/main.i:43:1: error[E0515]: the type hides the environment statement's obligation for `S(_)`: every instance must use the same service form (§4.8 rule 9, §9.2)\n1 error\n"
     }
   }
 }

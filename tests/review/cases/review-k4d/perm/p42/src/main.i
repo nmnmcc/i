@@ -3,20 +3,28 @@ main = () {
 	Nil
 }
 
-uset = <A, N>(x: A) <- (t: T(A, N)) -> A {
+uset: <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x: A) <- (
+	t: T(A, N),
+	fail: Fail(Never),
+) -> A {
 	T(g = g, ..) = t
 	g(x)
 }
 
 S(N) = (f = () <- N -> Int)
 
-both = () -> Int { pong(2) }
+both: <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
+	fail: Fail(Never),
+) -> Int { pong(2) }
 
 run = <A, N>(body: () <- N -> A) { body() }
 
 ping = (n: Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (
+	s: S(N),
+	fail: Fail(Never),
+) -> Int {
 	S(f = f) = s
 	f()
 }

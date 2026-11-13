@@ -146,6 +146,7 @@ struct Frame {
 
 #[derive(Clone, Debug)]
 struct TyFrame {
+    fn_depth: u32,
     names: HashMap<NameKey, TyVarId>,
 }
 
@@ -2833,7 +2834,10 @@ impl<'a> Resolver<'a> {
             names.insert(key, var);
             vars.push(var);
         }
-        self.ty_frames.push(TyFrame { names });
+        self.ty_frames.push(TyFrame {
+            names,
+            fn_depth: self.fn_depth,
+        });
         vars
     }
 
@@ -3866,7 +3870,13 @@ impl<'a> Resolver<'a> {
                     });
                     Stmt::Bind(binding)
                 }
-                ast::Stmt::Env { ty, value, span } => {
+                ast::Stmt::Env {
+                    ty,
+                    value,
+                    span,
+                    spread,
+                    group,
+                } => {
                     let ty = self.ty(ty);
                     // `_`: the key is read from the value (syntax three).
                     if !matches!(ty.kind, TypeKind::Hole) {
@@ -3874,6 +3884,8 @@ impl<'a> Resolver<'a> {
                     }
                     let value = self.expr(value);
                     Stmt::Env {
+                        spread: *spread,
+                        group: *group,
                         ty,
                         value,
                         span: *span,
@@ -3930,11 +3942,20 @@ impl<'a> Resolver<'a> {
                     }
                     params.push(Param::Pattern { pattern, label });
                 }
-                ast::Param::Env { name, ty } => {
+                ast::Param::Env { name, ty, rest } => {
                     let ty = self.ty(ty);
                     // §9.2: two environment parameters of one function may
                     // not have the same type constructor.
-                    if let Some(head) = self.env_type(&ty) {
+                    let own_row = matches!(ty.kind, TypeKind::Var(v) if self.ty_frames.last().is_some_and(|frame|
+                        frame.fn_depth == self.fn_depth && frame.names.values().any(|id| *id == v)));
+                    if *rest && !own_row {
+                        self.error(
+                            code::ENV_TYPE,
+                            ty.span,
+                            "a rest service pattern needs a type parameter of the function (§6.8)",
+                        );
+                    }
+                    if !rest && let Some(head) = self.env_type(&ty) {
                         if env_heads.contains(&head) {
                             let tname = self.type_name(head);
                             self.error(
@@ -3958,6 +3979,7 @@ impl<'a> Resolver<'a> {
                         span: name.span,
                     });
                     params.push(Param::Env {
+                        rest: *rest,
                         var,
                         name: name.clone(),
                         ty,

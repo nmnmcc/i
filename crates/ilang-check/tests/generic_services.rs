@@ -134,7 +134,7 @@ boolean = () {
         accepts(
             &source,
             "use",
-            "(A) <- (Fail(E), Outer(A, E, N), ..N) -> A",
+            "(A) <- (Fail(B), Outer(A, B, N), ..N) -> A",
             &["integer", "boolean"],
         );
     }
@@ -296,5 +296,20 @@ forward_0 = () { run(() { use() }) }
         "forward_63",
         "() <- (S(N), ..N) -> Nil",
         &["forward_63"],
+    );
+}
+
+#[test]
+fn catching_an_unknown_callback_keeps_its_error_cases_reachable() {
+    let (_, checked) = check(
+        "(i/fail)\nprobe = (handler) { fail.catch(() { handler() }) |> (Ok(value)) { value } | (Error(_: String)) { 0 } | (Error(_)) { 1 } }",
+    );
+    common::expect_unused(&checked.diags, &["probe"]);
+    let (_, checked) = check(
+        "(i/fail)\npure = () { fail.catch(() { 1 }) |> (Ok(value)) { value } | (Error(_)) { 0 } }",
+    );
+    assert!(
+        checked.diags.iter().any(|d| d.code == "W0501"),
+        "a pure callback's error branch is still unreachable"
     );
 }

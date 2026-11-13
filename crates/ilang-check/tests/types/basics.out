@@ -17,9 +17,9 @@ id : (A) -> A
 const : (A, B) -> A
 add : (Int, Int) -> Int
 inc : (A & Int) -> A
-apply : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B
-compose : ((A) <- (Fail(E), ..N) -> B, (C) <- (Fail(E2), ..N2) -> A) -> (C) <- (Fail(E2 | E), ..N, ..N2) -> B
-twice : ((A | B) <- (Fail(E), ..N) -> B & C, A) <- (Fail(E), ..N) -> C
+apply : ((A) <- N -> B, A) <- N -> B
+compose : ((A) <- N -> B, (C) <- N2 -> A) -> (C) <- (..N, ..N2) -> B
+twice : ((A | B) <- N -> B & C, A) <- N -> C
 ignore : (A) -> 1
 30:8: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
 40:2: warning[W0502]: this value is not used, and working it out does nothing

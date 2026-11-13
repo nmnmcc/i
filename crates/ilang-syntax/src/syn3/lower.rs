@@ -4,8 +4,7 @@
 //!
 //! The checker of this stage is today's, so the forms that only the later
 //! stages can type are compile errors here, each naming its stage: a chain
-//! with several shape groups (stage 9), `..name: N` in a service pattern
-//! (stage E6), a key on a parameter (stage 9), keys in data patterns
+//! with several shape groups (stage 9), a key on a parameter (stage 9), keys in data patterns
 //! (stage 6).
 //!
 //! Two things have no spelling in today's syntax and are passed on as
@@ -46,6 +45,7 @@ fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
     let mut cx = Cx {
         lisp,
         errors: Vec::new(),
+        type_params: Vec::new(),
         fresh: 0,
         group: false,
         hidden: Vec::new(),
@@ -92,6 +92,9 @@ pub fn lower_items(items: &[n::Item]) -> Result<Vec<o::Item>, Diagnostic> {
 struct Cx {
     lisp: bool,
     errors: Vec<Diagnostic>,
+    /// Type parameters in scope, used to recognize open provider contracts.
+    /// Errors remain ordinary need entries; this stores no error-channel state.
+    type_params: Vec<String>,
     fresh: usize,
     /// The module imports nothing under the name `core`, so `core.never`
     /// is the empty match (§2.13).
@@ -298,6 +301,7 @@ impl Cx {
         Cx {
             lisp: false,
             errors: Vec::new(),
+            type_params: Vec::new(),
             fresh: 0,
             core_free: false,
             group: false,
@@ -678,6 +682,9 @@ impl Cx {
                 }
             }
         }
+        let mark = self.type_params.len();
+        self.type_params
+            .extend(generics.iter().map(|g| g.name.clone()));
         let pattern = match (&b.pattern.kind, typed_fn) {
             (n::PatternKind::Typed { binder: bd, ty: t }, Some(f)) => pat(
                 o::PatternKind::Typed {
@@ -692,6 +699,7 @@ impl Cx {
             n::ExprKind::Chain(fs) => self.chain(fs, b.value.span.0, true),
             _ => self.expr(&b.value),
         };
+        self.type_params.truncate(mark);
         let type_params: Vec<o::Ident> = generics.iter().map(|g| id(g)).collect();
         o::Binding {
             pattern,
@@ -717,10 +725,124 @@ impl Cx {
                 _ => stmts.push(self.stmt(s)),
             }
         }
-        o::Block {
+        let mut block = o::Block {
             stmts,
             span: b.span.0,
+        };
+        // A migrated typed service is a single-use local immediately before
+        // its provide. Keep its annotation on the environment statement and
+        // its value there too: a separate let would generalize it too early.
+        // Whole-data and row spreads retain their local value annotation.
+        let candidate = block.stmts.windows(2).any(|ss| {
+            matches!(
+                ss,
+                [
+                    o::Stmt::Bind(o::Binding {
+                        pattern: o::Pattern {
+                            kind: o::PatternKind::Typed { .. },
+                            ..
+                        },
+                        ..
+                    }),
+                    o::Stmt::Env { spread: false, .. }
+                ]
+            )
+        });
+        if candidate {
+            use crate::walk::{Visitor, Walk};
+            #[derive(Default)]
+            struct Uses(HashMap<String, usize>);
+            impl Visitor for Uses {
+                fn expr(&mut self, e: &mut o::Expr, enter: bool) {
+                    if enter && let o::ExprKind::Name { module: None, name } = &e.kind {
+                        *self.0.entry(name.name.clone()).or_default() += 1;
+                    }
+                }
+            }
+            let mut uses = Uses::default();
+            block.walk(&mut uses);
+            let mut i = 0;
+            while i + 1 < block.stmts.len() {
+                let contract = match (&block.stmts[i], &block.stmts[i + 1]) {
+                    (
+                        o::Stmt::Bind(b),
+                        o::Stmt::Env {
+                            value,
+                            spread: false,
+                            ..
+                        },
+                    ) => match (&b.pattern.kind, &value.kind) {
+                        (
+                            o::PatternKind::Typed { binder, ty },
+                            o::ExprKind::Name { module: None, name },
+                        ) if !binder.discard
+                            && binder.name == name.name
+                            && uses.0.get(&binder.name) == Some(&1) =>
+                        {
+                            Some(ty.clone())
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(mut contract) = contract {
+                    // Closed function-valued providers keep their original
+                    // generalization point and its deferred obligations.
+                    // Open contracts still have to reach the provide before
+                    // generalization; scalar providers carry no function scheme.
+                    struct Boundary<'a> {
+                        type_params: &'a [String],
+                        contract: bool,
+                        open: bool,
+                        function: bool,
+                    }
+                    impl Visitor for Boundary<'_> {
+                        fn ty(&mut self, t: &mut o::TypeExpr) {
+                            if self.contract {
+                                self.open |= matches!(&t.kind, o::TypeKind::Hole)
+                                    || matches!(&t.kind, o::TypeKind::Named { module: None, name, args }
+                                        if args.is_empty() && self.type_params.contains(&name.name));
+                            }
+                        }
+                        fn expr(&mut self, e: &mut o::Expr, enter: bool) {
+                            if enter {
+                                self.function |=
+                                    matches!(e.kind, o::ExprKind::Fn(_) | o::ExprKind::Clauses(_));
+                            }
+                        }
+                    }
+                    let mut boundary = Boundary {
+                        type_params: &self.type_params,
+                        contract: true,
+                        open: false,
+                        function: false,
+                    };
+                    contract.walk(&mut boundary);
+                    if !boundary.open {
+                        boundary.contract = false;
+                        let o::Stmt::Bind(binding) = &mut block.stmts[i] else {
+                            unreachable!()
+                        };
+                        binding.value.walk(&mut boundary);
+                        if boundary.function {
+                            i += 1;
+                            continue;
+                        }
+                    }
+                    let o::Stmt::Bind(binding) = block.stmts.remove(i) else {
+                        unreachable!()
+                    };
+                    let o::Stmt::Env { ty, value, .. } = &mut block.stmts[i] else {
+                        unreachable!()
+                    };
+                    *ty = contract;
+                    *value = binding.value;
+                } else {
+                    i += 1;
+                }
+            }
         }
+        block
     }
 
     fn stmt(&mut self, s: &n::Stmt) -> o::Stmt {
@@ -800,54 +922,50 @@ impl Cx {
     fn provide(&mut self, target: &n::Expr, services: &n::Expr) -> Vec<o::Stmt> {
         let mut stmts = Vec::new();
         let mut envs = Vec::new();
-        match &services.kind {
-            n::ExprKind::Data(items) => {
-                let apart = items.len() > 1
-                    && items.iter().any(|i| {
-                        !matches!(i, n::DItem::Pos(n::Expr { kind: n::ExprKind::Name { .. }, .. }))
-                    });
-                for item in items {
-                    match item {
-                        n::DItem::Pos(e) => {
-                            let mut value = self.expr(e);
-                            if apart {
-                                let name = self.fresh("service");
-                                stmts.push(o::Stmt::Bind(o::Binding {
-                                    pattern: pat(o::PatternKind::Var(name.clone()), e.span.0),
-                                    value,
-                                    span: e.span.0,
-                                    type_params: Vec::new(),
-                                }));
-                                value = expr(
-                                    o::ExprKind::Name {
-                                        module: None,
-                                        name: ident(name, e.span.0),
-                                    },
-                                    e.span.0,
-                                );
-                            }
-                            envs.push(o::Stmt::Env {
-                                ty: ty(o::TypeKind::Hole, e.span.0),
-                                value,
-                                span: e.span.0,
-                            });
-                        }
-                        n::DItem::Label(l, _) => self.error(
+        let items: Vec<(&n::Expr, bool)> = match &services.kind {
+            n::ExprKind::Data(items) => items
+                .iter()
+                .filter_map(|item| match item {
+                    n::DItem::Pos(e) => Some((e, false)),
+                    n::DItem::Spread(e) => Some((e, true)),
+                    n::DItem::Label(l, _) => {
+                        self.error(
                             l.span.0,
                             "a provided service has no label: it is keyed by its type (§2.10.2)",
-                        ),
-                        n::DItem::Spread(e) => self.error(
-                            e.span.0,
-                            "providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet",
-                        ),
+                        );
+                        None
                     }
-                }
+                })
+                .collect(),
+            _ => vec![(services, true)],
+        };
+        let apart = items.len() > 1
+            && items
+                .iter()
+                .any(|(e, _)| !matches!(e.kind, n::ExprKind::Name { .. }));
+        for (e, spread) in items {
+            let mut value = self.expr(e);
+            if apart {
+                let name = self.fresh("service");
+                stmts.push(o::Stmt::Bind(o::Binding {
+                    pattern: pat(o::PatternKind::Var(name.clone()), e.span.0),
+                    value,
+                    span: e.span.0,
+                    type_params: Vec::new(),
+                }));
+                value = name_expr(&name, e.span.0);
             }
-            _ => self.error(
-                services.span.0,
-                "providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-            ),
+            envs.push(o::Stmt::Env {
+                spread,
+                group: Some(services.span.0),
+                ty: ty(o::TypeKind::Hole, e.span.0),
+                value,
+                span: e.span.0,
+            });
         }
+        // Work out every value first, in source order, then install the
+        // spreads before explicit keys so an explicit service wins (rule C).
+        envs.sort_by_key(|s| matches!(s, o::Stmt::Env { spread: false, .. }));
         stmts.extend(envs);
         match &target.kind {
             n::ExprKind::Block(b) => stmts.extend(self.block(b).stmts),
@@ -864,22 +982,15 @@ impl Cx {
 
     fn params_of(&mut self, f: &n::Function, params: &mut Vec<o::Param>) {
         for s in f.services.iter().flatten() {
-            if s.rest {
-                self.error(
-                    s.name.span.0,
-                    "`..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
-                );
-                continue;
-            }
             params.push(o::Param::Env {
+                rest: s.rest,
                 name: id(&s.name),
                 ty: self.ty(&s.ty),
             });
         }
     }
 
-    /// The written `-> R`: the needs are left to inference. A `Fail(E)`
-    /// item of the service pattern gives the error part `E`.
+    /// The written `-> R` leaves needs to inference, including `Fail(E)`.
     fn ret(&mut self, f: &n::Function) -> Option<o::RetType> {
         f.ret.as_ref().map(|t| o::RetType {
             value: self.ty(t),

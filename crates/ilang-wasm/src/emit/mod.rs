@@ -83,8 +83,8 @@ const DECLARED: &[&str] = &[
     "$light_reenter",
     "$cancel_reenter",
     "$control_unpend",
-    "$keep_call",
-    "$keep_reenter",
+    "$adapter_pin_call",
+    "$adapter_pin_reenter",
     "$request_handoff",
     "$wait_requests_reenter",
 ];
@@ -1355,8 +1355,8 @@ impl<'p> Emitter<'p> {
             Op::Escape => format!("(throw $error (call $escape_payload {a} {b}))"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
-            Op::KeepEnv => format!(
-                "(call $control_keep_env {a} {env} (i32.const {}))",
+            Op::PinEnvironment => format!(
+                "(call $adapter_pin_env {a} {env} (i32.const {}))",
                 self.p.services.max(1)
             ),
             Op::WaitRequests => format!("(call $request_wait_any {a} {env})"),
@@ -1437,6 +1437,27 @@ impl<'p> Emitter<'p> {
             Value::OpEnv(op, args, env) => {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, &env_text(*env))
+            }
+            // An ordinary tuple wraps the dense row pointer, so captures
+            // can use the existing portability and worker-transfer paths.
+            // Clear written keys outside N: they stay with the later caller
+            // and must not make this row capture a Fail boundary.
+            Value::Environment(env, excluded) => {
+                // Snapshot only service slots, forcing lazy values. Light
+                // boundary metadata is not part of the captured row.
+                let mut captured = format!(
+                    "(call $row_snapshot {} (i32.const {}))",
+                    env_text(*env),
+                    self.p.services.max(1)
+                );
+                for id in excluded {
+                    captured =
+                        format!("(call $env_with {captured} (i32.const {id}) (ref.null eq))");
+                }
+                format!("(call $tuple (ref.as_non_null {captured}))")
+            }
+            Value::CapturedService(value, id) => {
+                format!("(call $field {} (i32.const {id}))", self.atom(value))
             }
             Value::Light { func, args, env } => {
                 // The body runs in a handler that takes an escape to this

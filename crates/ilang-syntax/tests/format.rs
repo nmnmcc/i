@@ -169,6 +169,9 @@ fn format_properties() {
     }
     skipped.sort();
     let skipped = skipped.join("\n") + "\n";
+    // review-rec/_loose/probes deliberately retains an illegal type spread
+    // (syntax-three §2.3: a data type has no spread). Its E0107 is parsed
+    // before resolution, so it belongs in the recorded invalid-source list.
     let skip_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/format_skip.txt");
     if std::env::var_os("UPDATE").is_some() {
         fs::write(&skip_path, &skipped).unwrap();

@@ -32,7 +32,7 @@ twice = (b) {
 	{
 		x = leaf(b)
 		x <> "/" <> name()
-	} <- (Name(text = "a"), Name(text = "twice"))
+	} <- (Name(text = "twice")) <- (Name(text = "a"))
 }
 
 one = (b) {

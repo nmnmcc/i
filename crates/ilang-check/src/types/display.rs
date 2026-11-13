@@ -1095,7 +1095,14 @@ impl Norm<'_> {
                 let ms = if directed { self.meet_forms(ms) } else { ms };
                 self.union_in(ms, true)
             }
-            t => self.norm(t),
+            t => {
+                let t = self.norm(t);
+                if directed && self.s.vacuous(&t) {
+                    Ty::Never
+                } else {
+                    t
+                }
+            }
         }
     }
 
@@ -1593,8 +1600,8 @@ impl Norm<'_> {
     }
 
     /// Invariant arguments count on both sides (§4.5 rules 6 and 7), even
-    /// when normalization has collapsed their equal `Both` forms. In an
-    /// environment, every argument is invariant (§4.5 rule 4).
+    /// when normalization has collapsed their equal `Both` forms. Need
+    /// arguments follow rule A's reverse value direction, as coalescing does.
     fn walk<'a>(
         &self,
         t: &'a Ty,
@@ -1628,9 +1635,15 @@ impl Norm<'_> {
                     let vs = self.s.variances(*h, args.len());
                     for ((a, v), row) in args.iter().zip(vs).zip(self.s.rows(*h, args.len())) {
                         match v {
-                            _ if env || v == Variance::Inv => {
+                            Variance::Inv => {
                                 self.walk(a, true, occ, order, row != Mode::Value);
                                 self.walk(a, false, occ, order, row != Mode::Value);
+                            }
+                            Variance::Co if env => {
+                                self.walk(a, !pos, occ, order, row != Mode::Value)
+                            }
+                            Variance::Contra | Variance::Bi if env => {
+                                self.walk(a, pos, occ, order, row != Mode::Value)
                             }
                             Variance::Contra => self.walk(a, !pos, occ, order, row != Mode::Value),
                             _ => self.walk(a, pos, occ, order, row != Mode::Value),
@@ -2468,5 +2481,52 @@ mod lazy_display_tests {
         assert!(budget.allows(&[(V(1), Ty::Top), (V(2), Ty::Never)]));
         assert!(budget.allows(&[(V(3), Ty::Var(V(4)))]));
         assert!(!budget.allows(&[(V(2), Ty::Top)]));
+    }
+}
+
+#[cfg(test)]
+mod directed_need_simplification_tests {
+    use super::*;
+    use crate::hir::{BuiltinType, TypeId, TypeRef};
+
+    #[test]
+    fn a_single_need_that_becomes_vacuous_is_removed_after_simplification() {
+        let id = TypeId(0);
+        let mut s = Solver::new(Default::default(), vec!["app.Svc".into()]);
+        s.variance.insert(id, vec![Variance::Contra]);
+        let variable = Ty::Var(s.fresh_at(1));
+        let function = |env| Ty::Fn(Box::new(FnTy::new(Vec::new(), Ty::Never, env)));
+        let need = Ty::named(TypeRef::Custom(id), vec![variable]);
+        assert_eq!(
+            shown(&s, &function(need), Opts::default()).unwrap(),
+            function(Ty::Never)
+        );
+    }
+
+    #[test]
+    fn one_sided_need_arguments_follow_the_directed_service_variance() {
+        for variance in [Variance::Contra, Variance::Co] {
+            let id = TypeId(0);
+            let mut s = Solver::new(Default::default(), vec!["app.Svc".into()]);
+            s.variance.insert(id, vec![variance]);
+            let variable = Ty::Var(s.fresh_at(1));
+            let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+            let argument = if variance == Variance::Contra {
+                Ty::Union(vec![variable, int.clone()])
+            } else {
+                Ty::Inter(vec![variable, int.clone()])
+            };
+            let function = |argument| {
+                Ty::Fn(Box::new(FnTy::new(
+                    Vec::new(),
+                    Ty::Never,
+                    Ty::named(TypeRef::Custom(id), vec![argument]),
+                )))
+            };
+            assert_eq!(
+                shown(&s, &function(argument), Opts::default()).unwrap(),
+                function(int)
+            );
+        }
     }
 }

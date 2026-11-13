@@ -47,7 +47,7 @@ receive = (c) <- (scheduler: Scheduler) {
 
 start = (body, result_key) {
 	{
-		kept = control.keep_env((own: Scheduler) {
+		kept = control.keep((own: Scheduler) {
 			identity(
 				Done(key.wrap(result_key, fail.catch(body))),
 			) <- (own)

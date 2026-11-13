@@ -1,1 +1,18 @@
-33:10: error[E0202]: the type `A` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`
+read : (Ref(A)) -> A
+either : (Ref(A), Ref(A), Bool) -> Ref(A)
+make_int : (A & Int) -> Ref(A & Int)
+make_any : (A) -> Ref(A)
+one_side : (Int) -> Int
+errors_only : () <- (Fail(1)) -> Int
+empty_list : () -> List(Never)
+inter_unions : (A & Int) -> A & Int
+rest : (A) -> 0 | 1 | 2 | 3 | A - List(_) - Result(_, _)
+id : (A) -> A
+mono : (1 | "a") -> 1 | "a"
+use_int : () -> 1 | "a"
+use_string : () -> 1 | "a"
+state_int : () <- (State(Int)) -> 1
+state_str : () <- (State(String)) -> 1
+both : () <- (State(Never)) -> 1
+19:4: warning[W0502]: this value is not used, and working it out does nothing
+67:8: error[E0515]: the service requirements `State(Int)` and `State(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2)
