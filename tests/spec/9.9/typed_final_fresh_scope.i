@@ -37,12 +37,16 @@ main = () {
 					local = fail.catch(() {
 						task.run(() {
 							task.scope((fresh) {
+									started: task.Channel(Nil) = task.channel()
 								task.go(fresh, () {
-									task.yield()
+										task.receive(started)
 									fail.raise("fresh")
 								})
 								sibling = task.go(fresh, () {
-									resource.ensure(forever, () {
+										resource.ensure(() {
+											task.send(started, Nil)
+											forever()
+										}, () {
 										task.yield()
 										print("nested-final")
 									})

@@ -537,3 +537,62 @@ fn typed_macro_generic_choice_reports_restriction() {
         "cannot choose by the type inside a binding with type variables",
     );
 }
+
+/// Expansion and the built program are pure functions of the project: the same
+/// input expanded and built twice gives identical expanded modules and identical
+/// Wasm. Several modules expand in order, so the macro index is brought up to
+/// date between them, and a typed macro runs during checking.
+#[test]
+fn expansion_and_wasm_are_deterministic() {
+    let macros = format!(
+        "{}(@ macro (= twice (-> (e) _ `(+ ~e ~e))))\n",
+        ID.replacen("(, identity)", "(, identity twice)", 1)
+    );
+    let dir = project(
+        &macros,
+        "(m = app/macros, mid = app/mid)\nmain = () { assert(mid.f(m.identity(21)) == 84) }\n",
+    );
+    std::fs::write(
+        dir.path().join("src/mid.i"),
+        "(m = app/macros)\n(f)\nf = (x) { m.twice(m.twice(x)) }\n",
+    )
+    .unwrap();
+    let expand = || {
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(!ds.iter().any(Diagnostic::is_error), "{ds:?}");
+        let expanded = match ilang_macro::project::expand(&mut graph) {
+            Ok(expanded) => expanded,
+            Err(ds) => panic!("{}", graph.sources.render_all(&ds).join("\n")),
+        };
+        expanded
+            .parsed
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}\n{}\n{:?}",
+                    p.path,
+                    graph.sources.get(p.source).text,
+                    p.ast
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let first = expand();
+    assert!(first.iter().any(|m| m.contains("app/mid")));
+    assert_eq!(first, expand(), "expansion differs between two runs");
+    let build = || {
+        ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                tests: false,
+                opt: ilang_cli::Level::O0,
+                offline: true,
+                target: ilang_cli::Target::Host,
+            },
+        )
+        .unwrap_or_else(|_| panic!("project builds"))
+        .wasm
+    };
+    let wasm = build();
+    assert!(wasm == build(), "wasm differs between two builds");
+}

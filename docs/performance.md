@@ -100,6 +100,70 @@ script gives instruction counts for the same things from now on.
 The memory of `i test --project std` is the backend (the Wasm module, Binaryen and Wasmtime's
 code generation), not inference, which is why `i check --project std` stays small.
 
+## Numeric lowering
+
+The six kernels in `tests/perf/numeric` isolate arithmetic, known calls,
+short-lived aggregates and list walks. The step-3 paired run compared the
+landing module before these changes with the final module using the same
+Wasmtime build, alternating order over five batches of 1001 samples. These
+are the previous worker's recorded measurements, not a new timing run after
+the reboot. The machine was shared (load average 40 in the final run), and
+the timer resolves about 10 ns. Times are medians of the five batch medians.
+Allocations subtract the 11 nonnumeric entry/root allocations but include
+the input and result Float boxes.
+
+| Kernel | Before ns / allocations | After ns / allocations | Target ns / allocations |
+|---|---|---|---|
+| fast sine | 4116 / 39 | 3305 / 39 | <=500 / <=8 |
+| Horner | 49 / 2 | 10 / 2 | <=40 / <=2 |
+| dot | 1432 / 2 | 261 / 2 | <=300 / <=2 |
+| integer | 1243 / 3 | 330 / 2 | <=500 / <=2, no Int objects |
+| tuples | 40 / 2 | 21 / 2 | <=40 / <=2, no tuple/array objects |
+| closures (fold) | 1433 / 5 | 260 / 2 | <=400 / <=4 |
+
+The recovery run at 12:34 HKT on 2026-11-13 rebuilt the current compiler
+and repeated the driver without the missing historical baseline modules.
+Its scalar O2 results follow. All allocation and fuel counts match the
+recorded final module exactly; the optimized scalar module is 160585 bytes.
+This is a fresh candidate measurement, not a quiet historical comparison.
+The driver also checks the results against its fixed expected values.
+
+| Kernel | Five batch medians, ns | Median ns | Allocations | Fuel |
+|---|---|---:|---:|---:|
+| fast sine | 3337, 3334, 3455, 3364, 3245 | 3337 | 39 | 6444 |
+| Horner | 19, 2, 20, 10, 11 | 11 | 2 | 1335 |
+| dot | 261, 260, 270, 262, 262 | 262 | 2 | 3217 |
+| integer | 322, 330, 321, 321, 321 | 321 | 2 | 6931 |
+| tuples | 20, 20, 10, 20, 22 | 20 | 2 | 1373 |
+| closures (fold) | 260, 260, 261, 261, 260 | 260 | 2 | 3505 |
+
+The ignored `target/num3-measure-current/` contains `samples.csv`,
+`medians.csv`, `allocation-sites.json`, and the optimized and instrumented
+modules. Run the driver through the heavy wrapper:
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo run --release -p ilang-cli --example numeric_measure --locked -- target/num3-measure-current
+```
+
+The changes write shadow-stack actions inline in numeric functions, turn
+self tail calls into loops, delay source-site stores until the stack can be
+read, keep small `to_float`/`truncate` conversions unboxed, run two extra
+Heap2Local rounds, and test list cells before their common value tag.
+The integer regression from N4 is removed; the list test change accounts
+for most of the dot and fold gains. Values, effects and complete logical
+stop traces must still agree at O0/O2/O3.
+
+Fast sine still misses both targets: two helpers return allocated records
+above the inline limit. Out-of-line multivalue aggregate workers remain
+deferred by numeric-lowering R5. The other five kernels are within their
+time and allocation thresholds in this run; a quiet paired comparison is
+still needed for the performance acceptance gate, especially for the short
+Horner and tuple kernels. These measurements do not establish the std/float
+release gates or a full-range worst case. Raw batch medians from a new
+quiet run, std check/build cost and benchmark Wasm size acceptance also
+remain to be verified. See [the step-3 report](design/numeric-step3-report.md)
+for the per-step measurements, fuel counts and surviving allocations.
+
 ## Garbage collection
 
 Wasmtime 50 has three collectors:
@@ -472,3 +536,119 @@ including a temporary module-dump diagnostic, were discarded by reversing
 the reviewed experiment patch. Only the optional stage trace and these
 measurements are retained. Allocator trimming and the Wasmtime settings
 remain open experiments, rather than demonstrated failures or fixes.
+
+## Macro expansion and compiled-code cache
+
+Building the macro registry once per expansion and reusing it for typed
+macros reduced release `i check --project std` from 26.2 to 18.1 CPU seconds
+on the lane machine. The expanded std output was byte-identical.
+
+The global cache retains whole compiled modules as well as individual
+Cranelift functions, subject to the same size and age limits. Set
+`I_CACHE_MODULE_MAX_SIZE=0` to measure function-only reuse. Its compiled-code
+keys include a content hash of the executable, computed once per process.
+Macro compilation itself is not cached across processes: a safe key would need
+all source and macro inputs, compiler and host ABI identities, dependencies,
+configuration, and every observable input to macro execution.
+
+Release `i test --project std --opt 0`, one run per cell, on the shared lane
+machine, with separate initially empty private stores and one Rayon thread:
+
+| Cache entries | Run | CPU (user + system) | Peak RSS | Wall time |
+|---|---|---:|---:|---:|
+| Modules and functions | cold | 353.25 s | 10.99 GiB | 631.98 s |
+| Modules and functions | warm | 250.04 s | 1.00 GiB | 381.58 s |
+| Functions only | cold | 345.72 s | 10.99 GiB | 437.46 s |
+| Functions only | warm | 321.32 s | 11.22 GiB | 379.85 s |
+
+All four passed 2,170 tests with byte-identical stdout and empty stderr. Wall
+times include shared-machine contention and are not directly comparable.
+
+A maintenance measurement used a private 5 GiB sparse fixture with 5,121
+entries and a warm filesystem metadata cache. After a write, the cap check
+walked the entries in 13.9 ms; a due collection took 17.7 ms. These are single
+wall-time observations, not guarantees for other filesystems or cache sizes.
+
+## Large Int arithmetic in i
+
+Beyond the native fast paths, Int comparison, addition, subtraction,
+multiplication, division and remainder are implemented in `lib/i/big.i`.
+Operands are read by index with
+`size` and `limb`, in base 2^30. Each result is written into fresh private
+construction storage; that storage receives no writes after `finish`.
+Arithmetic does not copy operands into lists. Text conversion still uses
+digit lists.
+
+Multiplication uses Karatsuba on ranges of the original operands when both
+ranges exceed 16 digits and their lengths differ by at most a factor of two.
+Small and unbalanced ranges use product scanning. Division normalizes each
+operand once, estimates a quotient digit and fuses its product with remainder
+subtraction. These algorithms, their loops and carry propagation are i code.
+The only arithmetic intrinsics multiply-add one digit with carry (returning
+its low and high parts separately), or divide two digits by one.
+
+Measurements on 2026-11-13, Linux x86-64, on the shared 16-core host, at O2.
+The i arithmetic is commit `5a2420e6`.
+The baseline is the provided WAT executable at
+`.rd/jp/target/release/i` (SHA-256
+`e4da9d35637d98d37b7056bb4ac9615b86a12de0257933a93c6b0552702caefa`).
+The baseline branch was `lane/jp`, with head `93291533`; the executable was
+used directly, without rebuilding or copying it. Both modules run in the
+same current Wasmtime host. Program compilation and Rust operand construction
+are outside the measured interval.
+
+Times are the median of five alternating batches, in microseconds per
+operation, using Linux process CPU time
+(`clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`), including the guest worker thread.
+Batch sizes are calibrated toward 50 ms of CPU time, capped at 1,048,576
+iterations. The CSV also records wall time; scheduling on the shared host made wall-time ratios noisy. Loop and
+amortized host-call overhead are included. Every batch's final result is
+checked against `num-bigint`.
+
+For bit width `n`, the dividend/first operand is `a = 2^n - 129`. The other
+operand is `a - 1`, so comparison walks the whole number and ordinary division
+has a one-digit quotient. `divide_half` instead uses `2^(n/2) + 123` as the
+divisor, to exercise a long quotient.
+
+| Bits | Operation | WAT µs | i µs | i / WAT |
+|---|---|---:|---:|---:|
+| 100 | `add` | 0.207 | 0.977 | 4.72× |
+| 100 | `compare` | 0.067 | 0.355 | 5.31× |
+| 100 | `multiply` | 0.236 | 6.391 | 27.09× |
+| 100 | `divide` | 2.919 | 3.770 | 1.29× |
+| 100 | `divide_half` | 2.701 | 4.370 | 1.62× |
+| 200 | `add` | 0.208 | 1.333 | 6.39× |
+| 200 | `compare` | 0.069 | 0.463 | 6.75× |
+| 200 | `multiply` | 0.401 | 14.363 | 35.81× |
+| 200 | `divide` | 6.177 | 4.903 | 0.79× |
+| 200 | `divide_half` | 6.361 | 9.534 | 1.50× |
+| 300 | `add` | 0.240 | 1.936 | 8.06× |
+| 300 | `compare` | 0.078 | 0.626 | 8.06× |
+| 300 | `multiply` | 0.585 | 26.142 | 44.72× |
+| 300 | `divide` | 12.524 | 4.181 | 0.33× |
+| 300 | `divide_half` | 9.559 | 14.314 | 1.50× |
+| 8500 | `add` | 1.198 | 38.639 | 32.26× |
+| 8500 | `compare` | 0.699 | 12.728 | 18.20× |
+| 8500 | `multiply` | 230.717 | 9115.392 | 39.51× |
+| 8500 | `divide` | 4971.423 | 117.747 | 0.024× |
+| 8500 | `divide_half` | 3622.384 | 2916.085 | 0.81× |
+
+The [recorded CSV](../tests/performance/big-int/results-2026-11-13.csv)
+also preserves batch sizes and wall times.
+
+All algorithms remain in i even where these measurements show a regression
+against WAT. There is no large-Int arithmetic fallback to WAT.
+
+Reproduce from this worktree, using the shared wrapper:
+
+```sh
+H=/home/agent/Programming/i/.rd/cache/heavy
+BIG_INT_BASE=/home/agent/Programming/i/.rd/jp/target/release/i \
+BIG_INT_ARTIFACTS="$PWD/target/big-int-perf" \
+"$H" direnv exec /home/agent/Programming/i \
+  cargo test -p ilang-cli --test big_int_performance --locked -- --ignored --nocapture
+```
+
+The fixture is `tests/performance/big-int`; the ignored Rust integration test
+builds it with both compilers, retains both Wasm artifacts when
+`BIG_INT_ARTIFACTS` is set, and prints the measurements as CSV.

@@ -4,6 +4,53 @@
 //! operations on an explicit stack. Child order remains the source order.
 use super::{Cond, Stmt};
 
+impl Stmt {
+    /// The statement lists directly inside this statement, in order: the
+    /// branches of an `If`, the body of a `Block`. No other statement has any.
+    pub fn bodies(&self) -> impl DoubleEndedIterator<Item = &Vec<Stmt>> {
+        let (a, b) = match self {
+            Stmt::If {
+                then, otherwise, ..
+            } => (Some(then), Some(otherwise)),
+            Stmt::Block { body, .. } => (Some(body), None),
+            _ => (None, None),
+        };
+        a.into_iter().chain(b)
+    }
+
+    /// [`Stmt::bodies`], to change.
+    pub fn bodies_mut(&mut self) -> impl Iterator<Item = &mut Vec<Stmt>> {
+        let (a, b) = match self {
+            Stmt::If {
+                then, otherwise, ..
+            } => (Some(then), Some(otherwise)),
+            Stmt::Block { body, .. } => (Some(body), None),
+            _ => (None, None),
+        };
+        a.into_iter().chain(b)
+    }
+}
+
+/// Every statement of `stmts` and of the bodies inside them, each before the
+/// statements inside it (pre-order, as the source reads).
+pub fn each_stmt(stmts: &[Stmt]) -> impl Iterator<Item = &Stmt> {
+    let mut stack = vec![stmts.iter()];
+    std::iter::from_fn(move || {
+        loop {
+            let s = stack.last_mut()?.next();
+            match s {
+                Some(s) => {
+                    stack.extend(s.bodies().rev().map(|b| b.iter()));
+                    return Some(s);
+                }
+                None => {
+                    stack.pop();
+                }
+            }
+        }
+    })
+}
+
 impl Clone for Cond {
     fn clone(&self) -> Self {
         enum Work<'a> {
@@ -531,18 +578,9 @@ impl PartialEq for Stmt {
 impl Drop for Stmt {
     fn drop(&mut self) {
         fn detach(s: &mut Stmt, pending: &mut Vec<Stmt>) {
-            match s {
-                Stmt::If {
-                    then, otherwise, ..
-                } => {
-                    pending.append(then);
-                    pending.append(otherwise);
-                }
-                Stmt::Block { body, .. } => pending.append(body),
-                _ => {}
-            }
+            s.bodies_mut().for_each(|b| pending.append(b));
         }
-        if !matches!(self, Stmt::If { .. } | Stmt::Block { .. }) {
+        if self.bodies().next().is_none() {
             return;
         }
         let mut pending = Vec::new();

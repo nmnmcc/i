@@ -109,6 +109,13 @@ fn float_locals(
                 Value::Op(
                     Op::FloatAdd | Op::FloatSub | Op::FloatMul | Op::FloatDiv | Op::FloatNeg,
                     _,
+                )
+                | Value::Op(
+                    Op::Runtime {
+                        name: "core_to_float",
+                        ..
+                    },
+                    _,
                 ) => true,
                 Value::Call { callee, .. } => code(callee).is_some_and(|f| results[f.0 as usize]),
                 _ => false,
@@ -647,7 +654,7 @@ pub fn run(p: &mut Program) {
             {
                 match callee {
                     Callee::Direct(id) | Callee::Known { func: id, .. } => *id = worker,
-                    Callee::Value(_) => {
+                    Callee::Value(_) | Callee::Shaped(..) => {
                         unreachable!("known calls resolved before worker selection")
                     }
                 }
@@ -778,21 +785,10 @@ fn inline(
     all_facts: &HashMap<FuncId, HashMap<Local, NumericFact>>,
 ) {
     for stmt in body.iter_mut() {
-        match stmt {
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                inline(
-                    then, caller, facts, funcs, may, recursive, labels, used, limit, all_facts,
-                );
-                inline(
-                    otherwise, caller, facts, funcs, may, recursive, labels, used, limit, all_facts,
-                );
-            }
-            Stmt::Block { body, .. } => inline(
+        for body in stmt.bodies_mut() {
+            inline(
                 body, caller, facts, funcs, may, recursive, labels, used, limit, all_facts,
-            ),
-            _ => {}
+            );
         }
         let Stmt::Let {
             dst,

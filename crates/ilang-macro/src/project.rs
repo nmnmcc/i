@@ -70,18 +70,32 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
     let mut session = Session::default();
     let next_answer = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let mut definition_modules: Vec<_> = parsed.iter().cloned().map(Arc::new).collect();
+    // One registry for the whole expansion. Before each phase it is brought up
+    // to date with the one module the previous phase changed, which yields the
+    // same index as rebuilding it from all of `parsed`.
+    let mut registry: Option<Registry> = None;
+    let mut changed: Option<usize> = None;
     for source in order {
         let index = parsed
             .iter()
             .position(|module| module.source == source)
             .expect("ordered module belongs to project");
-        let registry = match Registry::new(graph, &parsed) {
-            Ok(registry) => registry,
+        let updated = match (registry.as_mut(), changed.take()) {
+            (None, _) => Registry::new(graph, &parsed).map(Some),
+            (Some(registry), Some(changed)) => {
+                registry.update(graph, &parsed, changed).map(|()| None)
+            }
+            (Some(_), None) => Ok(None),
+        };
+        match updated {
+            Ok(Some(built)) => registry = Some(built),
+            Ok(None) => {}
             Err(errors) => {
                 diagnostics.extend(errors);
                 return Err(diagnostics);
             }
-        };
+        }
+        let registry = registry.as_mut().expect("registry was built");
         // Definition queries can name the caller and its transitive imports,
         // including the modules that supplied macro templates. Freeze that
         // existing import closure rather than copying unrelated project ASTs.
@@ -110,7 +124,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         let mut engine = BodyEngine::new(
             graph,
             &parsed,
-            &registry,
+            registry,
             source,
             scoped,
             initial,
@@ -147,13 +161,10 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         graph.sources.set_text(source, scoped.text().to_owned());
         parsed[index].ast = ast;
         parsed[index].scoped = Some(scoped);
-        let registry = match Registry::new(graph, &parsed) {
-            Ok(registry) => registry,
-            Err(errors) => {
-                diagnostics.extend(errors);
-                return Err(diagnostics);
-            }
-        };
+        if let Err(errors) = registry.update(graph, &parsed, index) {
+            diagnostics.extend(errors);
+            return Err(diagnostics);
+        }
         let mut ast = parsed[index].ast.clone();
         let scoped = parsed[index]
             .scoped
@@ -164,7 +175,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         let mut engine = BodyEngine::new(
             graph,
             &parsed,
-            &registry,
+            registry,
             source,
             scoped,
             initial,
@@ -193,6 +204,7 @@ pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         parsed[index].ast = ast;
         parsed[index].scoped = Some(scoped);
         definition_modules[index] = Arc::new(parsed[index].clone());
+        changed = Some(index);
         diagnostics.extend(notes(
             item_transactions.iter().chain(body_transactions.iter()),
         ));

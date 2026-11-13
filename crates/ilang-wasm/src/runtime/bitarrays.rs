@@ -199,87 +199,49 @@ const WAT: &str = r#"
     (i64.sub (i64.sub (i64.add (local.get $base) (local.get $group)) (i64.const 1))
       (i64.sub (local.get $index) (local.get $base))))
 
-  (func $bits_magnitude_bit (param $limbs (ref $limbs)) (param $position i64) (result i32)
-    (local $limb i64)
-    (local.set $limb (i64.shr_u (local.get $position) (i64.const 5)))
-    (if (i64.ge_u (local.get $limb) (i64.extend_i32_u (array.len (local.get $limbs))))
-      (then (return (i32.const 0))))
-    (i32.and
-      (i32.shr_u (array.get $limbs (local.get $limbs) (i32.wrap_i64 (local.get $limb)))
-        (i32.wrap_i64 (i64.and (local.get $position) (i64.const 31))))
-      (i32.const 1)))
-
+;; An integer segment of at most 64 bits (63 when it is read) uses the
+  ;; fixed width primitives here; wider ones are i code (`lib/i/bits.i`).
   (func $bits_from_int (param $value eqref) (param $width i64) (param $little i32) (result eqref)
-    (local $data (ref null $bytes)) (local $limbs (ref null $limbs))
-    (local $negative i32) (local $trail i64) (local $limb i32)
-    (local $i i64) (local $position i64) (local $bit i32)
-    (local.set $data (call $bits_alloc (local.get $width)))
-    (local.set $limbs (call $int_limbs (local.get $value)))
-    (local.set $negative (i32.lt_s (call $int_sign (local.get $value)) (i32.const 0)))
-    (if (local.get $negative) (then
-      (block $found (loop $find
-        (if (i32.ne (array.get $limbs (local.get $limbs) (local.get $limb)) (i32.const 0))
-          (then (br $found)))
-        (local.set $limb (i32.add (local.get $limb) (i32.const 1)))
-        (br $find)))
-      (local.set $trail
-        (i64.add (i64.mul (i64.extend_i32_u (local.get $limb)) (i64.const 32))
-          (i64.extend_i32_u (i32.ctz (array.get $limbs (local.get $limbs) (local.get $limb))))))))
-    (block $done (loop $write
-      (br_if $done (i64.ge_u (local.get $i) (local.get $width)))
-      (local.set $position (call $bits_value_position (local.get $i) (local.get $width) (local.get $little)))
-      (local.set $bit (call $bits_magnitude_bit (ref.as_non_null (local.get $limbs)) (local.get $position)))
-      (if (local.get $negative) (then
-        (if (i64.gt_u (local.get $position) (local.get $trail))
-          (then (local.set $bit (i32.xor (local.get $bit) (i32.const 1)))))))
-      (call $bits_set (ref.as_non_null (local.get $data)) (local.get $i) (local.get $bit))
-      (local.set $i (i64.add (local.get $i) (i64.const 1)))
-      (br $write)))
-    (call $bits_new (ref.as_non_null (local.get $data)) (i32.const 0) (local.get $width)))
+    (local $low (ref $limbs))
+    (if (i64.le_u (local.get $width) (i64.const 64))
+      (then
+        ;; The low 64 bits of the two's complement.
+        (local.set $low (call $int_twos (local.get $value) (i32.const 2)))
+        (return (call $bits_from_u64
+          (i64.or (i64.extend_i32_u (array.get $limbs (local.get $low) (i32.const 0)))
+            (i64.shl (i64.extend_i32_u (array.get $limbs (local.get $low) (i32.const 1))) (i64.const 32)))
+          (local.get $width) (local.get $little)))))
+    (call $bits_from_int_wide (local.get $value) (call $int_from_i64 (local.get $width))
+      (call $bool_new (local.get $little))))
 
   (func $bits_read_int (param $value eqref) (param $start i64) (param $width i64)
       (param $signed i32) (param $little i32) (result eqref)
-    (local $limbs (ref null $limbs)) (local $count i64) (local $index i32)
-    (local $i i64) (local $position i64) (local $negative i32)
-    (local $carry i64) (local $word i64) (local $remainder i32)
+    (local $raw i64)
+    (if (i64.le_u (local.get $width) (i64.const 63))
+      (then
+        (local.set $raw (call $bits_read_u64 (local.get $value) (local.get $start)
+          (local.get $width) (local.get $little)))
+        (if (i32.and (local.get $signed) (i64.ne (local.get $width) (i64.const 0)))
+          (then
+            (if (i64.ne (i64.const 0)
+                  (i64.and (local.get $raw) (i64.shl (i64.const 1) (i64.sub (local.get $width) (i64.const 1)))))
+              (then (local.set $raw (i64.sub (local.get $raw) (i64.shl (i64.const 1) (local.get $width))))))))
+        (return (call $int_from_i64 (local.get $raw)))))
     (if (i32.eqz (call $bits_has (local.get $value) (local.get $start) (local.get $width)))
       (then unreachable))
-    (local.set $count (i64.div_u (i64.add (local.get $width) (i64.const 31)) (i64.const 32)))
-    (if (i64.gt_u (local.get $count) (i64.const 4294967295)) (then unreachable))
-    (local.set $limbs (array.new_default $limbs (i32.wrap_i64 (local.get $count))))
-    (block $done (loop $read
-      (br_if $done (i64.ge_u (local.get $i) (local.get $width)))
-      (local.set $position (call $bits_value_position (local.get $i) (local.get $width) (local.get $little)))
-      (if (call $bits_get (local.get $value) (i64.add (local.get $start) (local.get $i))) (then
-        (local.set $index (i32.wrap_i64 (i64.shr_u (local.get $position) (i64.const 5))))
-        (array.set $limbs (local.get $limbs) (local.get $index)
-          (i32.or (array.get $limbs (local.get $limbs) (local.get $index))
-            (i32.shl (i32.const 1) (i32.wrap_i64 (i64.and (local.get $position) (i64.const 31))))))))
-      (local.set $i (i64.add (local.get $i) (i64.const 1)))
-      (br $read)))
-    (if (i32.and (local.get $signed) (i64.ne (local.get $width) (i64.const 0)))
-      (then (local.set $negative (call $bits_magnitude_bit (ref.as_non_null (local.get $limbs))
-        (i64.sub (local.get $width) (i64.const 1))))))
-    (if (local.get $negative) (then
-      (local.set $index (i32.const 0))
-      (local.set $carry (i64.const 1))
-      (local.set $remainder (i32.wrap_i64 (i64.and (local.get $width) (i64.const 31))))
-      (block $neg_done (loop $negate
-        (br_if $neg_done (i32.ge_u (local.get $index) (array.len (local.get $limbs))))
-        (local.set $word (i64.extend_i32_u
-          (i32.xor (array.get $limbs (local.get $limbs) (local.get $index)) (i32.const -1))))
-        (if (i32.and
-          (i32.eq (local.get $index) (i32.sub (array.len (local.get $limbs)) (i32.const 1)))
-          (i32.ne (local.get $remainder) (i32.const 0)))
-          (then (local.set $word (i64.and (local.get $word)
-            (i64.sub (i64.shl (i64.const 1) (i64.extend_i32_u (local.get $remainder))) (i64.const 1))))))
-        (local.set $word (i64.add (local.get $word) (local.get $carry)))
-        (array.set $limbs (local.get $limbs) (local.get $index) (i32.wrap_i64 (local.get $word)))
-        (local.set $carry (i64.shr_u (local.get $word) (i64.const 32)))
-        (local.set $index (i32.add (local.get $index) (i32.const 1)))
-        (br $negate)))))
-    (call $int_pack (if (result i32) (local.get $negative) (then (i32.const -1)) (else (i32.const 1)))
-      (ref.as_non_null (local.get $limbs))))
+    (call $bits_read_int_wide (local.get $value) (call $int_from_i64 (local.get $start))
+      (call $int_from_i64 (local.get $width)) (call $bool_new (local.get $signed))
+      (call $bool_new (local.get $little))))
+
+  ;; The private primitives of `lib/i/bits.i` ("ilang:bits"): at most 14
+  ;; bits, big endian.
+  (func $bits_read_unsigned (param $value eqref) (param $start eqref) (param $width eqref) (result eqref)
+    (call $int_from_i64 (call $bits_read_u64 (local.get $value) (call $int_to_i64 (local.get $start))
+      (call $int_to_i64 (local.get $width)) (i32.const 0))))
+
+  (func $bits_from_unsigned (param $value eqref) (param $width eqref) (result eqref)
+    (call $bits_from_u64 (call $int_to_i64 (local.get $value)) (call $int_to_i64 (local.get $width))
+      (i32.const 0)))
 
   (func $bits_from_u64 (param $value i64) (param $width i64) (param $little i32) (result eqref)
     (local $data (ref null $bytes)) (local $i i64) (local $position i64)
@@ -978,9 +940,9 @@ mod tests {
     #[test]
     fn integer_segments_preserve_width_endianness_and_sign() {
         let mut corpus = Corpus::default();
-        for width in [
-            0, 1, 7, 8, 13, 16, 20, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 512,
-        ] {
+        // Wider segments are i code (`lib/i/bits.i`), which this module does
+        // not have; crates/ilang-cli/tests/big_int.rs compares them.
+        for width in [0, 1, 7, 8, 13, 16, 20, 31, 32, 33, 62, 63] {
             let boundary: BigInt = BigInt::from(1_u8) << width;
             for value in [
                 BigInt::from(0_u8),
@@ -997,7 +959,7 @@ mod tests {
             }
         }
         for seed in 0_u128..40 {
-            let width = (seed as usize * 37 + 11) % 513;
+            let width = (seed as usize * 37 + 11) % 64;
             let value =
                 BigInt::from(seed.wrapping_mul(0x9e3779b97f4a7c15)) << (seed as usize * 19 % 300);
             for little in [false, true] {

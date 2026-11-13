@@ -18,11 +18,13 @@ print = (text: String, out ! Out) { out.print(text) }
 
 main = () {
 	assert(task.scope((s) {
+		gate: task.Channel(Nil) = task.channel()
 		task.go(s, () {
-			task.yield()
+			task.receive(gate)
 			print("child")
 		})
 		print("body")
+		task.send(gate, Nil)
 		42
 	}) == 42)
 	print("after")

@@ -25,27 +25,7 @@ pub(crate) fn catch_all(p: &Pattern) -> bool {
 
 /// The names a pattern binds.
 pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
-    match &p.kind {
-        PatternKind::Quote { captures, .. } => captures.iter().for_each(|(_, p)| binders(p, out)),
-        PatternKind::Var(b) => out.push(b.var),
-        PatternKind::Typed { binder, .. } => out.extend(binder.as_ref().map(|b| b.var)),
-        PatternKind::Named { binder, pattern } => {
-            out.push(binder.var);
-            binders(pattern, out);
-        }
-        PatternKind::Prefix { rest, .. } => out.extend(rest.as_ref().map(|b| b.var)),
-        PatternKind::Constructor { args: ps, .. }
-        | PatternKind::Tuple(ps)
-        | PatternKind::Error(ps) => ps.iter().for_each(|q| binders(q, out)),
-        PatternKind::List { items, rest } => {
-            items.iter().for_each(|q| binders(q, out));
-            if let Some(Some(b)) = rest {
-                out.push(b.var);
-            }
-        }
-        PatternKind::BitArray(segs) => segs.iter().for_each(|s| binders(&s.value, out)),
-        _ => {}
-    }
+    crate::hir::pattern_binders(p, &mut |b| out.push(b.var));
 }
 
 /// The label of a part of a constructor pattern (§7.1): the last name in

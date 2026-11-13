@@ -44,18 +44,18 @@ grep -q "atob(\"$probe\")" "$sdk" || { echo "could not update the feature probe 
 
 # The module built by the compiler (`I` can point at another `i` executable).
 if [ -n "${I:-}" ]; then
-  "$I" build --project "$fixture_dir/compiled" legacy --out "$fixture_dir/compiled.wasm"
+  "$I" build --target host --project "$fixture_dir/compiled" legacy --out "$fixture_dir/compiled.wasm"
 else
-  cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/compiled" legacy --out "$fixture_dir/compiled.wasm"
+  cargo run --quiet -p ilang-cli -- build --target host --project "$fixture_dir/compiled" legacy --out "$fixture_dir/compiled.wasm"
 fi
 "$wasm_tools" validate "$fixture_dir/compiled.wasm"
 
 # Structured concurrency runs on the identical O0/O2 artifacts in both JS hosts.
 for level in 0 2; do
   if [ -n "${I:-}" ]; then
-    "$I" build --project "$fixture_dir/r2" --opt "$level" --out "$fixture_dir/r2-o$level.wasm"
+    "$I" build --target host --project "$fixture_dir/r2" --opt "$level" --out "$fixture_dir/r2-o$level.wasm"
   else
-    cargo run --quiet -p ilang-cli -- build --project "$fixture_dir/r2" --opt "$level" --out "$fixture_dir/r2-o$level.wasm"
+    cargo run --quiet -p ilang-cli -- build --target host --project "$fixture_dir/r2" --opt "$level" --out "$fixture_dir/r2-o$level.wasm"
   fi
   "$wasm_tools" validate "$fixture_dir/r2-o$level.wasm"
 done
