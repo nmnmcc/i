@@ -1954,9 +1954,9 @@ fn is_var(vars: &[String], t: &o::TypeExpr) -> bool {
     }
 }
 
-fn push_parts(parts: &mut Vec<n::Pattern>, p: n::Pattern) {
-    match p.kind {
-        n::PatternKind::And(inner) => parts.extend(inner),
+fn push_parts(parts: &mut Vec<n::Pattern>, mut p: n::Pattern) {
+    match &mut p.kind {
+        n::PatternKind::And(inner) => parts.append(inner),
         _ => parts.push(p),
     }
 }
