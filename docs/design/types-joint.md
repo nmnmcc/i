@@ -506,7 +506,7 @@ Value 7. Changing the body to `copy = key` then `record.get(r, copy)` is E0541. 
 bad = (r : (a = Int | String)) { r |> (x : (a = Int)) { x.a + 1 } | (_) { 0 } }
 ```
 
-E0501, even with the catch-all: the first test takes all records. The positive version uses `r : Int | ( a : Int )` and `n -> n + 1` as its second clause; it returns the field plus one for a record and the integer plus one otherwise. The second binder is Int. Replacing the record annotation by a completed alias changes neither the test table nor the result. Combine a record clause with `s : String - "a"` and a remaining `"a"` clause; test with an Int rejection where the declared input excludes Int, and with a declared Int branch where it includes it. The string complement must still have its tag guard.
+E0501, even with the catch-all: the first test takes all records. The positive version uses `r : { Int | ( a : Int ) }` and `n -> n + 1` as its second clause; it returns the field plus one for a record and the integer plus one otherwise. The second binder is Int. Replacing the record annotation by a completed alias changes neither the test table nor the result. Combine a record clause with `s : String - "a"` and a remaining `"a"` clause; test with an Int rejection where the declared input excludes Int, and with a declared Int branch where it includes it. The string complement must still have its tag guard.
 
 **T-F: invariant generalization (J7).**
 

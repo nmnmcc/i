@@ -1,0 +1,57 @@
+{
+  "inventoried": 28997,
+  "compared": 6,
+  "sites": 6,
+  "new_spec_examples": 8,
+  "differences": [],
+  "entries": [
+    {
+      "path": "docs/design/records.md",
+      "start": 191787,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "29c72d627664d5785c7d3d0e08f3be00df0ed7f8399fbcdb4e066712ee7138ca"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 165408,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "29c72d627664d5785c7d3d0e08f3be00df0ed7f8399fbcdb4e066712ee7138ca"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 144606,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "29c72d627664d5785c7d3d0e08f3be00df0ed7f8399fbcdb4e066712ee7138ca"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 112428,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "29c72d627664d5785c7d3d0e08f3be00df0ed7f8399fbcdb4e066712ee7138ca"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 106418,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "29c72d627664d5785c7d3d0e08f3be00df0ed7f8399fbcdb4e066712ee7138ca"
+    },
+    {
+      "path": "docs/design/types-joint.md",
+      "start": 67278,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "29c72d627664d5785c7d3d0e08f3be00df0ed7f8399fbcdb4e066712ee7138ca"
+    }
+  ]
+}

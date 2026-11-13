@@ -24,6 +24,22 @@ def exempt(item):
     return False
 
 
+def recovery_rewrite(item):
+    source = M['rewritten'](item)
+    if item['path'] not in ('docs/design/records.md', 'docs/design/types-joint.md'):
+        return source
+    # These historical record proposals fail before the old parser can
+    # construct a Typed node. Keep their union intent AND exact old recovery;
+    # grouping the annotation does not make the removed record syntax valid.
+    for before, after in (
+        ('x : Int | ( a : Int )', 'x : { Int | ( a : Int ) }'),
+        ('r : Int | ( a : Int )', 'r : { Int | ( a : Int ) }'),
+        ('a : X | Y', 'a : { X | Y }'),
+    ):
+        source = source.replace(before, after)
+    return source
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('mode',choices=['snapshot','rewrite'])
@@ -47,8 +63,11 @@ def main():
         return
     items=M['read'](args.baseline);hosts={};records=[];changed=[]
     for item in sorted(items,key=lambda i:(i['path'],-i['start'])):
-        if item['exempt'] or not item['result']['edits']:continue
-        source=M['rewritten'](item)
+        if item['exempt']:continue
+        source=recovery_rewrite(item)
+        if source == item['source']:continue
+        item['migration_sites'] = (len(item['result']['edits']) + source.count('{')
+                                   - M['rewritten'](item).count('{'))
         raw=source.replace('|','\\|') if '\\|' in item['raw_source'] else source
         path=item['path'];host=hosts.setdefault(path,(ROOT/path).read_text())
         if host[item['start']:item['end']]!=item['raw_source']:raise SystemExit(f'stale inline baseline: {path}:{item["start"]}')
@@ -73,7 +92,7 @@ def main():
     for before,after,result in zip(changed,records,actual):
         same=before['result']['tree']==M['tree'](result['tree'])
         ds=before['result']['diagnostics']==result['diagnostics']
-        entry=dict(path=before['path'],start=before['start'],sites=len(before['result']['edits']),equal=same,diagnostics_equal=ds,tree_sha256=M['digest'](before['result']['tree']))
+        entry=dict(path=before['path'],start=before['start'],sites=before['migration_sites'],equal=same,diagnostics_equal=ds,tree_sha256=M['digest'](before['result']['tree']))
         entries.append(entry)
         if not same or not ds:differences.append(dict(entry,before=before['source'],after=after['source'],old=before['result'],new=result))
     if args.report:args.report.write_text(json.dumps(dict(inventoried=len(items),compared=len(entries),sites=sum(e['sites'] for e in entries),new_spec_examples=sum(i['exempt'] for i in items),differences=differences,entries=entries),indent=2)+'\n')
