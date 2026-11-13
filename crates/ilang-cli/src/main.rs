@@ -146,6 +146,10 @@ enum Command {
     },
     #[command(flatten)]
     Package(commands::package::PackageCommand),
+    /// Inspect and trim the global cache (`$I_CACHE_DIR`, else
+    /// `$XDG_CACHE_HOME/i`, else `~/.cache/i`; `I_CACHE=off` turns it off).
+    #[command(subcommand)]
+    Cache(commands::cache::CacheCommand),
     /// Run the language server, on standard input and output.
     Lsp,
     /// Format source files; by default every `.i` and `.is` file in `src/` and `test/`.
@@ -178,7 +182,11 @@ fn main() -> ExitCode {
             offline,
             types,
             target,
-        } => return check(&project, offline, types, target.map(Into::into)),
+        } => {
+            let code = check(&project, offline, types, target.map(Into::into));
+            ilang_host::store::maintain_global();
+            return code;
+        }
         Command::Build {
             project,
             offline,
@@ -252,6 +260,7 @@ fn main() -> ExitCode {
             target.into(),
         ),
         Command::Package(c) => commands::package::run(c),
+        Command::Cache(c) => return finish(commands::cache::run(c)),
         Command::Lsp => commands::lsp::run(),
         Command::Fmt {
             project,
@@ -260,6 +269,13 @@ fn main() -> ExitCode {
             paths,
         } => commands::fmt::run(&project, check, to.as_deref(), &paths),
     };
+    // Collect the cache after the work, when it is due (at most once a day,
+    // or at once when this run pushed it past 120% of its cap).
+    ilang_host::store::maintain_global();
+    finish(result)
+}
+
+fn finish(result: anyhow::Result<ExitCode>) -> ExitCode {
     match result {
         Ok(code) => code,
         Err(e) => {
@@ -344,6 +360,7 @@ fn cmd_build(
     } else {
         &b.name
     };
+    let default_out = out.is_none();
     let out = out.unwrap_or_else(|| {
         project.join("build").join(if native {
             name.to_owned()
@@ -356,6 +373,10 @@ fn cmd_build(
         .filter(|dir| !dir.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
     std::fs::create_dir_all(dir)?;
+    if default_out {
+        // The package's `build/` is generated output: mark it for backup tools.
+        ilang_host::store::write_cachedir_tag(dir);
+    }
     if native {
         let package = match b.native_package(name) {
             Ok(package) => package,
