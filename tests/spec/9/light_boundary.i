@@ -20,18 +20,20 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-the_fail = <E>() <- (f: Fail(E)) { f }
+Syn3ServiceFail(E) = Fail(E)
+
+the_fail = <E>() <- (f: Syn3ServiceFail(E)) { f }
 
 Yield(A) = (emit = (A) -> Nil)
 
-collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
 			[]
 		} <- (
 			Yield(
-				emit = (x) {
+				emit = (x: A) {
 					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 				},
 			),
@@ -129,7 +131,9 @@ test("a later lazy service does not change an already kept environment", () {
 				)
 				failure.raise(4)
 				Ok(0)
-			} <- (Fail((error) { control.escape(b, Error(error)) }))
+			} <- (
+				Fail(raise = (error: Int) { control.escape(b, Error(error)) }),
+			)
 		})
 	})
 	check(show(r), "Ok(Error(4))")

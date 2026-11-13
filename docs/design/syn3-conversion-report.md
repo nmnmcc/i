@@ -693,3 +693,21 @@ or weakened. Combined inventory passes: 4,762 normal snippets, 34 .is files
 and 89 CLI macro fragments; the eight inventory helper tests also pass.
 Feature-enabled syntax/clippy, requested spec/std and full corpus gates
 remain in progress.
+
+Spec 4.4/ and 4.5/ pass at both optimization levels. The 9/ batch completed
+134/139; all five failures were conversion omissions. Three light-boundary
+fixtures now use the transparent alias for a bound ordinary Fail, and the
+unused wider Fail need in directed_rows uses the same alias. The collect
+examples in control/directed_rows/light_boundary keep callback and provider
+parameter A directly on the literals, as the already-verified spec type
+fixture does; Fail(Never) retains the original empty legacy error channel.
+A manually provided Fail value retains its written Int form and raise label.
+
+Focused reruns pass all six light-boundary cases and control.i and
+directed_rows.i at O0 and O2. Thus all 139 cases are covered by the original
+batch plus targeted source-only corrections; the unchanged long cases were
+not repeated. No compiler code changed. Two stop-fixture headers moved only
+by the inserted alias lines; positions were derived from the same f.raise,
+fail.raise and control.resume call anchors (§11.7), and the exact stop checks
+pass. The fixture format check also passes. Required 11/, release/std and
+full corpus verification remain.
