@@ -44,9 +44,19 @@ override_spread = <N>(f: () <- (..N, Db) -> Int, db: Db) <- (..env: N) {
 	() { f() <- (..env, ..(db)) }
 }
 
+capture_inferred = <A, M, N>(f: () <- M -> A) <- (..env: N) {
+	() { f() <- env }
+}
+
+capture_named = <N>() <- (..env: N) { () { name() <- env } }
+
 services = () { (Name(text = "data"), Db(value = 31)) }
 
 main = () {
+	inferred = capture_inferred(name) <- (Name(text = "inferred"))
+	named = capture_named() <- (Name(text = "named"))
+	assert({ inferred() <- (Name(text = "caller")) } == "inferred")
+	assert({ named() <- (Name(text = "caller")) } == "named")
 	kept = capture(name) <- (Name(text = "saved"))
 	assert({ kept() <- (Name(text = "caller")) } == "saved")
 	disjoint = override_spread(read, Db(value = 44))

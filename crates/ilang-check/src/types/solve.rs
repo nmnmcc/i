@@ -2336,42 +2336,74 @@ impl Solver {
         None
     }
 
-    /// Remove an opaque captured row. Unlike a keyed provider this does
-    /// not install a handler obligation: the same row is supplied whole.
-    pub fn env_without_row(&mut self, need: &Ty, row: &Ty) -> Ty {
-        fn go(s: &mut Solver, need: &Ty, row: &Ty, seen: &mut HashSet<V>) -> Ty {
+    /// Supply an opaque captured row. Named keys excluded from that row
+    /// stay at the caller; all other requirements must fit the captured row.
+    pub fn env_without_row(&mut self, need: &Ty, row: &Ty, outside: &[TypeRef]) -> Result<Ty, ()> {
+        fn go(
+            s: &mut Solver,
+            need: &Ty,
+            row: &Ty,
+            outside: &[TypeRef],
+            removed: &[Ty],
+            seen: &mut HashSet<V>,
+        ) -> Result<Ty, ()> {
             if need == row {
-                return Ty::Never;
+                return Ok(Ty::Never);
             }
-            match need {
+            Ok(match need {
                 Ty::Union(ms) => {
-                    let parts = ms.iter().map(|m| go(s, m, row, seen)).collect();
+                    let parts = ms
+                        .iter()
+                        .map(|m| go(s, m, row, outside, removed, seen))
+                        .collect::<Result<Vec<_>, _>>()?;
                     s.env_union(parts)
                 }
                 Ty::Var(v) => {
+                    if outside.is_empty() {
+                        let mut supplied = vec![row.clone()];
+                        supplied.extend_from_slice(removed);
+                        let supplied = s.env_union(supplied);
+                        s.constrain_env(need, &supplied);
+                        return Ok(Ty::Never);
+                    }
                     if let Ty::Var(r) = row
                         && s.reach(vec![*v], false).0.contains(r)
                     {
-                        return Ty::Never;
+                        return Ok(Ty::Never);
                     }
                     if !seen.insert(*v) {
-                        return Ty::Never;
+                        return Ok(Ty::Never);
                     }
                     let lower = s.var(*v).lower.clone();
                     if lower.is_empty() {
-                        return need.clone();
+                        return Err(());
                     }
-                    let parts = lower.iter().map(|m| go(s, m, row, seen)).collect();
+                    let parts = lower
+                        .iter()
+                        .map(|m| go(s, m, row, outside, removed, seen))
+                        .collect::<Result<Vec<_>, _>>()?;
                     s.env_union(parts)
                 }
                 Ty::Diff(base, hs) => {
-                    let base = go(s, base, row, seen);
-                    s.env_diff(base, hs.clone())
+                    let mut supplied = removed.to_vec();
+                    supplied.extend_from_slice(hs);
+                    go(s, base, row, outside, &supplied, seen)?
+                }
+                Ty::Con(Head::Named(r), ..) => {
+                    if let Some(provider) = removed.iter().find(|h| h.head() == need.head()) {
+                        s.constrain_env(need, provider);
+                        Ty::Never
+                    } else if outside.contains(r) {
+                        need.clone()
+                    } else {
+                        s.constrain_env(need, row);
+                        Ty::Never
+                    }
                 }
                 _ => need.clone(),
-            }
+            })
         }
-        go(self, need, row, &mut HashSet::default())
+        go(self, need, row, outside, &[], &mut HashSet::default())
     }
 
     /// Written keys reachable in a need, including through inferred rows.

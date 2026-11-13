@@ -3019,7 +3019,14 @@ impl<'a> Checker<'a> {
                     let a = self.block(&stmts[i + 1..], *span, expected);
                     let env = self.pop_effects(*span);
                     let rest = if self.s.mode(&v) == Mode::Env {
-                        let rest = self.s.env_without_row(&env, &v);
+                        let outside = match &v {
+                            Ty::Var(row) => self.row_lacks.get(row).cloned().unwrap_or_default(),
+                            _ => Vec::new(),
+                        };
+                        let rest = self.s.env_without_row(&env, &v, &outside).unwrap_or_else(|()| {
+                            self.error(code::ENV_TYPE, value.span, "an opaque callback need must use the captured row parameter when other keys are excluded; write that row and its explicit service keys (§9.4)");
+                            env.clone()
+                        });
                         let mut keys = self.s.env_keys(&rest);
                         if let Ty::Var(v) = v {
                             self.row_supplies.insert((self.module, *span), v);
