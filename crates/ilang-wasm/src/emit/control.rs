@@ -800,8 +800,11 @@ pub(super) const EFFECTS: &str = r#"
   (local.set $slots (array.new_default $values (local.get $n)))
   (block $done (loop $copy
     (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
-    (array.set $values (local.get $slots) (local.get $i)
-      (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))
+    ;; Fail stays at the call, so retaining it here would also make a pure
+    ;; kept function non-portable merely because catch's boundary is local.
+    (if (i32.ne (local.get $i) (i32.const 1))
+      (then (array.set $values (local.get $slots) (local.get $i)
+        (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
   (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 1)

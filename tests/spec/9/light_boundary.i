@@ -119,22 +119,34 @@ test("light boundary captures stay non-portable", () {
 	)
 })
 
+// Fail stays at the call under E3; an ordinary raising service is retained.
+Raising(E) = (raise = (E) -> Never)
+the_raising = <E>() <- (value: Raising(E)) -> Raising(E) { value }
+
 test("a later lazy service does not change an already kept environment", () {
 	r: Result(Result(Int, Int), Int) = fail.catch(() {
-		outer: Fail(Int) = the_fail()
-		control.boundary((b) {
-			kept = control.keep_env((x: Nil) { the_fail() })
-			{
-				check(
-					show(kept(Nil) == outer),
-					"True",
+		outer_fail: Fail(Int) = the_fail()
+		outer = Raising(raise = outer_fail.raise)
+		{
+			control.boundary((b) {
+				kept = control.keep_env((x: Nil) { the_raising() })
+				{
+					check(
+						show(kept(Nil) == outer),
+						"True",
+					)
+					inner: Raising(Int) = the_raising()
+					inner.raise(4)
+					Ok(0)
+				} <- (
+					Raising(
+						raise = (error: Int) {
+							control.escape(b, Error(error))
+						},
+					),
 				)
-				fail.raise(4)
-				Ok(0)
-			} <- (
-				Fail(raise = (error: Int) { control.escape(b, Error(error)) }),
-			)
-		})
+			})
+		} <- (outer)
 	})
 	check(show(r), "Ok(Error(4))")
 })
