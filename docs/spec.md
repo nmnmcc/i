@@ -80,7 +80,7 @@ Some forms are macro calls (§14): an attribute that is not built in, such as `@
 ### 1.5 Symbols
 
 ```
-=   :   ,   .   ..   ->   <-   ?   |   @
+=   :   ,   .   ..   ->   <-   ?   |   |>   @
 (   )   [   ]   {   }   <<   >>
 +   -   *   /   %   <   <=   >   >=   ==   !=   &&   ||   <>   &
 +.  -.  *.  /.      <.  <=.  >.  >=.
