@@ -12,10 +12,18 @@ Later {
 	Later(double: (Int) -> Int ^ String, echo: (String) -> String)
 }
 
-
 main = (later ! Later) {
-	assert(
-		task.both(() { later.double(21) }, () { later.echo("answer") }) ==
-			(42, "answer")
-	)
+	task.scope((s) {
+		ready: task.Channel(Nil) = task.channel()
+		// Both children use the async Await route. Order the host log calls
+		// explicitly: workers may otherwise start either call first (§9.9).
+		assert(task.both(() {
+			value = later.double(21)
+			task.send(ready, Nil)
+			value
+		}, () {
+			task.receive(ready)
+			later.echo("answer")
+		}) == (42, "answer"))
+	})
 }

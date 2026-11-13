@@ -713,3 +713,13 @@ FIFO and its fixed inputs to reproduce the same trace. The same cases also run
 unconstrained races/channels, checking every permitted completion order or
 exactly-once delivery. Thus the original ordered assertions remain, alongside
 coverage that permits the step orders of multiple workers.
+
+The repeated runs also exposed expected output that relied on worker timing in
+`async_tasks.i` and setup that could run after cancellation in
+`fresh_cleanup_failure.i`. Async host-log calls are now ordered by a channel;
+both async children and their result assertion remain. The cleanup target
+acknowledges installation of its final before failure is allowed. The related
+`lifetimes.i` body/child log and `failed_sibling_join.i` final/target setup use
+explicit channel ordering too. Existing assertions and output expectations are
+unchanged. This follows the workers paragraph and §9.5's rule that an unstarted
+child has no installed final functions.

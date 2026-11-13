@@ -18,7 +18,6 @@ Out {
 
 print = (text: String, out ! Out) { out.print(text) }
 
-
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
@@ -30,16 +29,21 @@ main = () {
 				}, () {
 					inner = fail.catch(() {
 						task.scope((cleanup) {
+							ready: task.Channel(Nil) = task.channel()
 							target = task.go(cleanup, () {
-								resource.ensure(
-									() { task.sync(task.never()) }
-									() {
-										task.yield()
-										print("cleanup-child-final")
-									}
-								)
+								resource.ensure(() {
+									task.send(ready, Nil)
+									task.sync(task.never())
+								}, () {
+									task.yield()
+									print("cleanup-child-final")
+								})
 							})
-							task.go(cleanup, () { fail.raise("cleanup") })
+							// An unstarted child has no installed final (§9.5).
+							task.go(cleanup, () {
+								task.receive(ready)
+								fail.raise("cleanup")
+							})
 							task.join(target)
 						})
 					})
