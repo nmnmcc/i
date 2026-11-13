@@ -919,27 +919,10 @@ plus at most one row variable. A computation has a value type and a need,
 written `A <- M` in this note (today's `A ^ E ! M` with `E` moved into `M` as
 `Fail(E)`).
 
-- **Merge.** Two entries `C(S1, …)` and `C(T1, …)` merge into one, parameter by
-  parameter, by the direction of the parameter (spec §4.5 rule 6): a
-  parameter that goes in the other direction (the `E` of `Fail(E)`) gives the
-  union `Si | Ti`; a parameter that goes in the same direction gives the
-  intersection `Si & Ti`, and when that is `Never` while neither is `Never` it
-  is a compile error; a parameter that does not change must be equal, else it
-  is a compile error. This is the value-type meet `C(S…) & C(T…)` of spec §4.4.
-  - **Row parameters (design-side ruling, conservative).** When needs are
-    merged, the value parameters of a service type are merged by direction,
-    and a row parameter (a need row, as `N` in
-    `S(N) = (f = () <- N -> Int)`) must be equal. By direction would be sound
-    for rows (`S(Never) | S(Dep)` would merge to `S(Never)`), but it gives the
-    solver intersections of row variables and types that have themselves
-    inside (the E0505 of review case w6) and has no principal type. It can be
-    relaxed later; relaxing only accepts more programs.
-  - **Undetermined arguments (design-side ruling, conservative).** For a value
-    parameter that goes in the same direction, when one side is still an
-    undetermined type variable, it must be equal to the other side; no
-    intersection is taken. This keeps principal types and keeps the
-    `Never`-meet error reported. It can be relaxed later. It does not touch
-    `Fail`: its parameter goes in the other direction and gives the union.
+- **Merge (owner ruling).** A need is the intersection of its services:
+  `<- (Db, Log, Fail(E))` is `Db & Log & Fail(E)`, and `<- (..N, Db)` is
+  the open intersection `N & Db`. The merge of two needs is their
+  intersection (spec §4.4).
 - **Satisfying.** A provided value of type `P` satisfies the need entry `S`
   when `P <: S` as values. Because `Fail` is contravariant,
   `Fail(A | B) <: Fail(A)`.
