@@ -739,3 +739,14 @@ code remain unchanged. The source-only p1 experiments were also discarded.
 Std O0 and O2 now both pass all 2,170 tests. Workspace all-feature clippy and
 the full requested compiler-package rerun pass. Complete K4 recording and
 zero-failure validation remain required; this checkpoint is not landable.
+
+A read-only audit of all required type fragments found twelve forwarder
+fixtures (q25/q30/q35/q40 in three directories) whose written complete needs
+were erased by conversion. Their bindings now retain those needs. The unused direct service read is
+omitted: these functions only forward the need through use(), as §2.10.1
+requires; retaining that redundant read alongside the annotation caused
+false E0505 cycles. The
+literal also retains the original empty legacy error channel with the
+transition Fail(Never) marker. All twelve accept and match the unchanged
+required type fragments. Their parser checks pass. No requirement was
+changed, and their observations remain subject to the batch2 outcome guard.
