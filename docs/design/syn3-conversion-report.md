@@ -382,5 +382,23 @@ The std opt-0 run stopped at `http_network_test`'s existing timeout callback:
 the old `! _` service need (`need-not-named` in the conversion notes), forcing
 its callback to need nothing. Preserve that open need with `<N>` and
 `(Request) <- (Fail(HttpError), ..N) -> Response`. The body and timeout test
-are unchanged. Formatting passes; the complete std retry is queued through
-the wrapper. No passing result is claimed until that run completes.
+are unchanged. Formatting passes. The corrected std retry waited for a memory slot without
+producing compiler/test output; its own process group was stopped before the
+14:00 deadline so lighter crate checks could run. The corrected std run is
+unverified. The pre-main opt-0 run passed 2,169 tests.
+
+
+Final lightweight checks: the macro crate passes all nine tests. The full
+post-main Wasm run passed every target except the opaque-decoder fixture,
+whose `A = Opaque` and `B = Opaque` had also been reread as aliases. Restored
+the original two heads, leaving main's relative growth bound intact. Its
+focused both-target retry passes; all other Wasm targets passed in the full
+run. The JavaScript fetch fixture passes `node --check`, and both conversion
+Python scripts parse. LSP/clippy/final inventory results are in the command
+ledger and final report.
+
+The formatted closed-data spread-order fixture keeps the exact `panic: base`
+stop and both frames. Mapping the same calls from main's source gives
+`panic("base")` 7:33 -> 9:35 and `base()` 10:6 -> 12:5; only those source
+coordinates were changed. This was derived from the original and converted
+source, not from a recorded runtime expectation. Spec chapters have not run.
