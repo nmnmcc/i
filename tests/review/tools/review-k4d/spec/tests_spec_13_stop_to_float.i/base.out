@@ -1,2 +1,0 @@
-spec/stop_to_float.value : () -> Float
-spec/stop_to_float.main : () -> Nil

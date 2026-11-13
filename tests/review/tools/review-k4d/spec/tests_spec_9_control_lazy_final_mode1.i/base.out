@@ -1,3 +1,0 @@
-spec/control_lazy_final_mode1.check : (got: String, want: String) -> Nil
-spec/control_lazy_final_mode1.show : (x: A) -> String
-spec/control_lazy_final_mode1.final_suspends_during_an_error : () -> Nil

@@ -1,6 +1,0 @@
-spec/int_arithmetic.check : (got: String, want: String) -> Nil
-spec/int_arithmetic.show : (x: A) -> String
-spec/int_arithmetic.small : () -> Nil
-spec/int_arithmetic.big : () -> Nil
-spec/int_arithmetic.division : () -> Nil
-spec/int_arithmetic.compare : () -> Nil

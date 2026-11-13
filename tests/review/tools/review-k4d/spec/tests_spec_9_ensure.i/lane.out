@@ -1,5 +1,0 @@
-spec/ensure.check : (got: String, want: String) -> Nil
-spec/ensure.show : (x: A) -> String
-spec/ensure.nothing : () -> Nil
-spec/ensure.values_and_errors_go_through : () -> Nil
-spec/ensure.acquire : () -> Nil

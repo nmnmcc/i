@@ -1,9 +1,0 @@
-spec/closures.check : (got: String, want: String) -> Nil
-spec/closures.show : (x: A) -> String
-spec/closures.adder : (n: Int) -> (x: Int) -> Int
-spec/closures.compose : (f: (A) -> B ? E ! N, g: (B) -> C ? E2 ! N2) -> (x: A) -> C ? E | E2 ! N | N2
-spec/closures.map : (xs: List(A), f: (A) -> B ? E ! N) -> List(B) ? E ! N
-spec/closures.fold : (xs: List(A), acc: B & C, f: (B, A) -> B & C ? E ! N) -> C ? E ! N
-spec/closures.captures : () -> Nil
-spec/closures.higher_order : () -> Nil
-spec/closures.patterns_in_parameters : () -> Nil

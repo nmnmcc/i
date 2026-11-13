@@ -1,1 +1,0 @@
-fn main(){let s="f = () { case (x) -> Int { x }(42) { _ -> 42 } * 10 }\n";let(m,d)=syntax_debug::parse_module_old(s);assert!(d.is_empty());let p=syntax_debug::migrate::plan(&m,&syntax_debug::migrate::Env::new(&m));eprintln!("PLAN {p:?}");println!("{:?}",syntax_debug::migrate::splice(s,&p));}

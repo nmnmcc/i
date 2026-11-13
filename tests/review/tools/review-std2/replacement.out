@@ -1,6 +1,0 @@
-probe/main.use : () -> Nil ? E ! S(E)
-probe/main.first : () -> Nil ? String ! S(String)
-probe/main.second : () -> Nil ? Int ! S(Int)
-probe/main.example : () -> Nil ! Assert
-src/main.i:8:2: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
-1 error

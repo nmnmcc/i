@@ -1,8 +1,0 @@
-import {readFile} from 'node:fs/promises';
-import {instantiate,requestSignal} from '/home/agent/Programming/i/.rd/c/bindings/javascript/ilang.mjs';
-for (const name of ['missing-continue','missing-resume']) {
- const signals=[];
- const g=await instantiate(await readFile(`/tmp/review-c/${name}.wasm`), {imports:{'test:work/v1':{work:()=>{signals.push(requestSignal());return Promise.resolve();}}}});
- try {await g.callAsync('app/run'); console.log(name, 'OK', {unusable:g.unusable,aborted:signals.map(s=>s.aborted)});g.call('app/sync');console.log('sync call accepted');}
- catch(e){console.log(name,'ERROR', e.message);}
-}

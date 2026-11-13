@@ -1,2 +1,0 @@
-check_us=3043 diags=0
-app/main.use : () -> Nil ! N | S(N)

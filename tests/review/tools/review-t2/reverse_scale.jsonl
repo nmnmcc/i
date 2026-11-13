@@ -1,3 +1,0 @@
-{"case": "reversechain128", "expected": "same cost as forward alias chain", "exit": 0, "seconds": 0.094, "output": "review/main.v : Int\nreview/main.x : Int\n"}
-{"case": "reversechain256", "expected": "same cost as forward alias chain", "exit": 0, "seconds": 0.592, "output": "review/main.v : Int\nreview/main.x : Int\n"}
-{"case": "reversechain512", "expected": "same cost as forward alias chain", "exit": 0, "seconds": 4.201, "output": "review/main.v : Int\nreview/main.x : Int\n"}

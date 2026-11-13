@@ -1,4 +1,0 @@
-probe/main.use : () -> Nil ? E ! S(E)
-probe/main.first : () -> Nil ? String ! S(String)
-probe/main.second : () -> Nil ? Int ! S(Int)
-probe/main.example : () -> Nil ! Assert
