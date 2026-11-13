@@ -1,6 +1,6 @@
 {
-  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
-  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
+  "compiler": "beb26bce4bd21d6901d5b01e517cbbf176652948",
+  "binary_sha256": "054a62b4f1dcd6d72877d717f6b84886dc2df10610984a3d343606841a98f2e7",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () -> A ! N | S(A, N)\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(A, N), ..N) -> A\napp/main.main : () -> Nil\n",
       "stderr": ""
     },
     "test0": {

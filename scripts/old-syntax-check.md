@@ -41,3 +41,12 @@ expectation regressions.
 
 The inventory driver also reports an unqualified `@main` attribute as E0301;
 the parser accepts general attribute syntax, and the checker rejects this name.
+
+The normal-surface inventory also runs `python3 scripts/syn3-lisp-check`.
+It can be run separately after the driver has been built.
+It uses the same built driver with `--lisp` to parse every tracked `.is` file
+and the complete Lisp modules, signatures and function fragments assembled
+by the CLI's macro-run and typed-macro tests. Each fragment is put in its
+actual declaration or macro-binding context. This catches old Lisp rows
+that do not resemble normal-surface bindings; the runtime test binaries
+still exercise their typing, expansion and execution.

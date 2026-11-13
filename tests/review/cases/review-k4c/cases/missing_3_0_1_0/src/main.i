@@ -7,4 +7,7 @@ use = <A, B>() <- (s: S(A, B)) {
 	s.g()
 }
 
-main = <A, B>() { use() <- (S(f = () { get() }, g = () { get() })) }
+main = <A, B>() {
+	_syn3_0: S(Dep, Dep) = S(f = () { get() }, g = () { get() })
+	use() <- (_syn3_0)
+}

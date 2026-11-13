@@ -31,7 +31,6 @@ direct : String
 39:19: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 39:19: error[E0507]: the parameter `name` gets more than one argument
 41:11: error[E0501]: `("b")` is not a subtype of `(String, Int)` (the type at 41:11 needs it)
-43:15: error[E0551]: a call with labels through a function value is not possible until the run time has multi-shape values; call the function directly by its name
 46:7: error[E0510]: the constructor has no field with the label `n` (§7.1)
 46:10: error[E0510]: the constructor has no field with the label `a` (§7.1)
 79:46: error[E0506]: `.value` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

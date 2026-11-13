@@ -1,4 +1,4 @@
-with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(_)) -> A
+with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(Int)) -> A
 get_s : () <- (Reader(String)) -> String
 g : () -> String
 k : () -> String

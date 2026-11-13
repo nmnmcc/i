@@ -3,4 +3,9 @@ use = <N>() <- (s: S(N)) {
 	S(f, _) = s
 	f()
 }
-make = <N>() { () { use() <- (S(() { use() }, (_: N) { Nil })) } }
+make = <N>() {
+	() {
+		_syn3_0: S(N) = S(() { use() }, (_: N) { Nil })
+		use() <- (_syn3_0)
+	}
+}

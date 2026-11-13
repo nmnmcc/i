@@ -19,12 +19,14 @@ h0 = () { us() }
 h1 = () { run(h0) + run(() { ut() }) }
 
 main = () {
+	_syn3_0: S(Never) = S(f = () { 1 }, m = (_: Never) { Nil })
+	_syn3_1: T(Dep | S(Dep)) = T(
+		f = () { us() + h0() },
+		m = (_: Dep | S(Dep)) { Nil },
+	)
 	{
 		k = () { h1() }
 		k() + ut()
 		Nil
-	} <- (
-		S(f = () { 1 }, m = (_: Never) { Nil }),
-		T(f = () { us() + h0() }, m = (_: Dep | S(Dep)) { Nil }),
-	)
+	} <- (_syn3_0, _syn3_1)
 }

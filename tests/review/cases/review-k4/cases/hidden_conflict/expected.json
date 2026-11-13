@@ -1,6 +1,6 @@
 {
-  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
-  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
+  "compiler": "beb26bce4bd21d6901d5b01e517cbbf176652948",
+  "binary_sha256": "054a62b4f1dcd6d72877d717f6b84886dc2df10610984a3d343606841a98f2e7",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.join : (f: () -> Int ! N, g: () -> String ! N2) -> (Int, String) ! N | N2\napp/main.bad : () -> (Int, String) ! S(Never)\n",
+      "stdout": "app/main.one : () <- (S(Int)) -> Int\napp/main.two : () <- (S(String)) -> String\napp/main.join : (() <- (Fail(E), ..N) -> Int, () <- (Fail(E2), ..N2) -> String) <- (Fail(E | E2), ..N, ..N2) -> (Int, String)\napp/main.bad : () <- (S(Never)) -> (Int, String)\n",
       "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 5:12 needs it)\n1 error\n"
     },
     "run0": {

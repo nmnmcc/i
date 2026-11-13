@@ -2,9 +2,10 @@
 """At the conversion to syntax three, folds the staged text of docs/spec.md
 (its first comment): each `<!-- syn3-old -->` … `<!-- /syn3-old -->` block is
 deleted with its markers, the `<!-- syn3-new -->` and `<!-- /syn3-new -->`
-marker lines are deleted, and each ```` ```i future-SYN3 ```` fence becomes
-```` ```i ````. The staging comment itself is deleted. Running it again
-changes nothing. Called by scripts/syn3-convert-all.
+marker lines are deleted, and each ```` ```i future-SYN3 ```` fence in a
+staged document becomes ```` ```i ````. The staging comment itself is deleted.
+A document without staging markers keeps its remaining future fences, so
+running it again changes nothing. Called by scripts/syn3-convert-all.
 
     scripts/syn3-spec-fold [FILE...]   (default: docs/spec.md)
 """
@@ -17,10 +18,12 @@ for path in sys.argv[1:] or [str(ROOT / "docs/spec.md")]:
     p = Path(path)
     text = p.read_text()
     old = text
+    staged = re.search(r"(?m)^<!-- syn3-(?:old|new) -->$", text) is not None
     text = re.sub(r"(?m)^<!-- Text between syn3-old markers is.*?-->\n", "", text, flags=re.S)
     text = re.sub(r"(?ms)^<!-- syn3-old -->\n.*?^<!-- /syn3-old -->\n", "", text)
     text = re.sub(r"(?m)^<!-- /?syn3-new -->\n", "", text)
-    text = re.sub(r"(?m)^```i future-SYN3[ \t]*$", "```i", text)
+    if staged:
+        text = re.sub(r"(?m)^```i future-SYN3[ \t]*$", "```i", text)
     if "syn3-old" in text:
         sys.exit(f"syn3-spec-fold: FAILED: {path}: an unmatched syn3-old marker is left")
     if text != old:

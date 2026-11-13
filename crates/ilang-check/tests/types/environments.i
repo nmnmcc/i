@@ -10,16 +10,15 @@ Source(A) = (next = () -> A)
 
 collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {
+		_syn3_0: Yield(A) = Yield(
+			emit = (x) {
+				control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+			},
+		)
 		{
 			body()
 			[]
-		} <- (
-			Yield(
-				emit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
-				},
-			),
-		)
+		} <- (_syn3_0)
 	})
 }
 
@@ -74,6 +73,12 @@ written = () <- (y: Yield(Int), z: Source(Int)) -> Nil { y.emit(z.next()) }
 // to the service it gives.
 emit_any = () <- (y: Yield(Int | String)) { y.emit(1) }
 
-given_narrow = () { emit_any() <- (Yield(emit = (x) { Nil })) }
+given_narrow = () {
+	_syn3_1: Yield(Int) = Yield(emit = (x: Int) { Nil })
+	emit_any() <- (_syn3_1)
+}
 
-given_same = () { emit_any() <- (Yield(emit = (x) { Nil })) }
+given_same = () {
+	_syn3_2: Yield(Int | String) = Yield(emit = (x: Int | String) { Nil })
+	emit_any() <- (_syn3_2)
+}

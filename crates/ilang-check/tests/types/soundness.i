@@ -3,7 +3,10 @@
 // §4.5 rule 4: the provider must be a subtype of the needed service.
 Reader(S) = (get = () -> S)
 
-with_int = (body) { body() <- (Reader(get = () { 1 })) }
+with_int = (body) {
+	_syn3_0: Reader(Int) = Reader(get = () -> Int { 1 })
+	body() <- (_syn3_0)
+}
 
 get_s = () <- (r: Reader(String)) { r.get() }
 

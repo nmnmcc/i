@@ -12,8 +12,9 @@ u2 = () -> Int { use() }
 u3 = () -> Int { use() + get() }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
 	{
 		u1() + u2() + u3()
 		Nil
-	} <- (S(() { get() }))
+	} <- (_syn3_0)
 }

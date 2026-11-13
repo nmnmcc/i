@@ -8,7 +8,10 @@ use = <N>() <- (s: S(N)) {
 run = <A, N>(body: () <- N -> A) { body() }
 
 main = () {
-	g = () { use() <- (S(() { 3 })) }
+	g = () {
+		_syn3_0: S(Never) = S(() { 3 })
+		use() <- (_syn3_0)
+	}
 	g()
 	Nil
 }

@@ -9,17 +9,16 @@ ub = <N>(d: Int) <- (s: B(N)) {
 	f(d)
 }
 bad = () {
-	ua(1) <- (
-		B((d: Int) { ua(d - 1) + 1 }),
-		A((d: Int) {
-			d |>
-				(0) { "str" }
-				| (_) {
-					ub(d)
-					"str"
-				}
-		}),
-	)
+	_syn3_0: B(A(Int, Never)) = B((d: Int) { ua(d - 1) + 1 })
+	_syn3_1: A(String, B(A(Int, Never))) = A((d: Int) {
+		d |>
+			(0) { "str" }
+			| (_) {
+				ub(d)
+				"str"
+			}
+	})
+	ua(1) <- (_syn3_0, _syn3_1)
 }
 
 main = () {

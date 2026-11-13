@@ -5,6 +5,9 @@ use = <N>() <- (s: S(N)) {
 }
 run = <N>(f: () <- N -> Nil) { f() }
 bad = <N>() {
-	local = () { use() <- (S(() { use() })) }
+	local = () {
+		_syn3_0: S(N) = S(() { use() })
+		use() <- (_syn3_0)
+	}
 	local()
 }

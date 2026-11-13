@@ -101,9 +101,7 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
         }
         Ty::Fn(f) => {
             occurrences(s, &f.param, pol.flip(), out);
-            for t in [&f.ret] {
-                occurrences(s, t, pol, out);
-            }
+            occurrences(s, &f.ret, pol, out);
             occurrences_env(s, &f.env, pol, out);
         }
         Ty::Union(xs) | Ty::Inter(xs) => {

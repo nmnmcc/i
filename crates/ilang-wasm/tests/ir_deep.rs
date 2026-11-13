@@ -115,6 +115,7 @@ fn child_order_and_scalar_equality_are_preserved() {
             env: Env::Param,
             service: 2,
             value: Atom::Bool(true),
+            in_place: false,
         },
         Stmt::SetCapture {
             closure: 1,

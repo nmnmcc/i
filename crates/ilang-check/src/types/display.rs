@@ -1484,8 +1484,9 @@ impl Norm<'_> {
         // Graph keys hash their immutable pool identity and node ID.
         #[allow(clippy::mutable_key_type)]
         let mut dropped: HashSet<Ty> = HashSet::default();
-        // The members dropped from each group, by its address.
-        let mut shrunk: HashMap<usize, usize> = HashMap::default();
+        // The positions dropped from each group, by its address. Invariant
+        // traversal may visit the same position more than once.
+        let mut shrunk: HashMap<usize, HashSet<usize>> = HashMap::default();
         for v in &order {
             let Some((v, by)) = self.decide(*v, &occ[v], &dropped) else {
                 continue;
@@ -1499,7 +1500,11 @@ impl Norm<'_> {
             let drop = with.is_some_and(|w| {
                 !w.alone
                     && w.groups.iter().all(|(g, _)| {
-                        g.len() - shrunk.get(&(g.as_ptr() as usize)).copied().unwrap_or(0) > 2
+                        g.len()
+                            - shrunk
+                                .get(&(g.as_ptr() as usize))
+                                .map_or(0, |removed| removed.len())
+                            > 2
                     })
             });
             if !drop {
@@ -1508,8 +1513,8 @@ impl Norm<'_> {
                 }
                 break;
             }
-            for (g, _) in &with.expect("a dropped variable").groups {
-                *shrunk.entry(g.as_ptr() as usize).or_default() += 1;
+            for (g, i) in &with.expect("a dropped variable").groups {
+                shrunk.entry(g.as_ptr() as usize).or_default().insert(*i);
             }
             dropped.insert(Ty::Var(v));
             out.push((v, by));
@@ -2432,6 +2437,29 @@ mod lazy_display_tests {
         let d = Ty::Diff(Box::new(Ty::Var(other)), vec![string]);
         let u = known_union(&s, vec![Ty::Var(vs[0]), d.clone(), Ty::Var(vs[0])]);
         assert_eq!(u, Ty::Union(vec![Ty::Var(vs[0]), d]));
+    }
+
+    #[test]
+    fn repeated_invariant_visits_drop_one_union_member_once() {
+        // Coalescing invariant arguments can retain Both forms. Walking
+        // an outer invariant visits that same positive union repeatedly;
+        // those visits still describe just three members (§4.4, §4.7).
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let vs = vars(&mut s, 3);
+        let id = crate::hir::TypeId(0);
+        s.variance.insert(id, vec![Variance::Inv]);
+        let members = Ty::Union(vs.iter().copied().map(Ty::Var).collect());
+        let both = Ty::Both(Box::new(members), Box::new(Ty::Never));
+        let inner = Ty::named(TypeRef::Custom(id), vec![both]);
+        let ty = Ty::named(TypeRef::Custom(id), vec![inner]);
+        let norm = Norm {
+            s: &s,
+            keep: Some(0),
+            written: false,
+        };
+        // Only the first removal may be batched: the group then has two
+        // members, whose remaining decisions need a new pass.
+        assert_eq!(norm.steps(&ty), vec![(vs[0], Ty::Never)]);
     }
 
     #[test]

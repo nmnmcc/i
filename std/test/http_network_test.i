@@ -59,7 +59,7 @@ test("network_client", () {
 				Nil
 			},
 		)
-	})
+	}) <- (http.native_client())
 	net.close_listener(listener)
 })
 

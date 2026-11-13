@@ -1204,3 +1204,70 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let shown = ilang_syntax::print::print_module(&lowered);
     assert!(!shown.contains(carrier.as_str()), "{shown}");
 }
+
+#[test]
+fn specialized_and_renamed_members_remain_type_aliases() {
+    // §4.3: an RHS naming another type is a transparent alias. Moving
+    // S's fields into Alias would lose N or A's declaration scope.
+    for source in [
+        "S(N) = (() <- N -> Nil)\nAlias = S(Never)\n",
+        "S(A) = (value = A)\nAlias(B) = S(B)\n",
+    ] {
+        let (module, diags) = syn3::parse_lowered(source);
+        assert!(diags.is_empty(), "{source}\n{diags:?}");
+        assert_eq!(module.items.len(), 2, "{module:?}");
+        let ilang_syntax::ast::ItemKind::TypeDef(alias) = &module.items[1].kind else {
+            panic!("expected alias: {module:?}");
+        };
+        assert!(
+            matches!(alias.body, ilang_syntax::ast::TypeBody::Alias(_)),
+            "{alias:?}"
+        );
+    }
+}
+
+#[test]
+fn converted_bound_fail_remains_a_service_parameter() {
+    let text = converted("use(E) = (error: E, handler ! Fail(E)) { handler.raise(error) }\n");
+    let (module, diags) = syn3::parse_lowered(&text);
+    assert!(diags.is_empty(), "{text}\n{diags:#?}");
+    let function = module
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::Binding(binding) => match &binding.value.kind {
+                ilang_syntax::ast::ExprKind::Fn(function) => Some(function),
+                _ => None,
+            },
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        function.params.iter().any(|param| matches!(param,
+            ilang_syntax::ast::Param::Env { name, .. } if name.name == "handler"
+        )),
+        "the body still has its bound service: {text}"
+    );
+}
+
+#[test]
+fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
+    let (module, diags) = syn3::parse_lowered("S(N) = (() <- N -> Nil)\nBad = S(Never)\n");
+    assert!(diags.is_empty(), "{diags:#?}");
+    let definitions: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::TypeDef(def) => Some(def),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(definitions.len(), 2);
+    assert_eq!(definitions[0].name.name, "S");
+    assert_eq!(definitions[0].params[0].name, "N");
+    assert_eq!(definitions[1].name.name, "Bad");
+    assert!(matches!(
+        definitions[1].body,
+        ilang_syntax::ast::TypeBody::Alias(_)
+    ));
+}

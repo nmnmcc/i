@@ -1,17 +1,17 @@
-collect : (() <- (Fail(E), Yield(A), ..N) -> Nil) <- (Fail(E), ..N) -> List(A)
-numbers : () -> List(Int)
-inferred : () -> List("s")
+collect : (() <- (Fail(E), Yield(A), ..N) -> Nil) <- (Fail(E), Yield(A), ..N) -> List(A)
+numbers : () <- (Yield(A)) -> List(A | Int)
+inferred : () <- (Yield(A)) -> List(A | "s")
 run_never : (() <- (Yield(Never)) -> Nil) -> 1
 bad_never : () -> 1
 run_int : (() <- (Yield(Int)) -> Nil) -> 1
 good_int : () -> 1
 emit_int : () <- (Yield(Int)) -> Nil
 emit_string : () <- (Yield(String)) -> Nil
-both_yields : () <- (Yield(Int), Yield(String)) -> Nil
+both_yields : () <- (Yield(Int | String)) -> Nil
 next_int : () <- (Source(Int)) -> Int
 next_string : () <- (Source(String)) -> String
-both_sources : () <- (Source(Int), Source(String)) -> String
-both_fns : List(() <- (Yield(Never)) -> Nil)
+both_sources : () <- (Source(Never)) -> String
+both_fns : List(() <- (Yield(Int | String)) -> Nil)
 written : () <- (Source(Int), Yield(Int)) -> Nil
 emit_any : () <- (Yield(Int | String)) -> Nil
 given_narrow : () -> Nil
