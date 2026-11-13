@@ -2451,7 +2451,7 @@ No value may be changed. The values are integers, floats, strings, codepoints, b
 
 An Int may be of any size. It never overflows.
 
-- `a / b` rounds toward zero. `a % b` has the sign of `a`, and `a == (a / b) * b + a % b`.
+- `a / b` rounds toward zero. `a % b` has the sign of `a`, and `a == (a / b) * b + a % b` when `b` is not 0.
 - When `b` is 0, `a / b` and `a % b` are 0.
 
 ### 11.3 Float
