@@ -150,7 +150,14 @@ One rule does not depend on lines: in the `->` part of a function, after the `)`
 `i fmt` formats `.i` and `.is` source files in their own surface, including
 both extensions by default in `src/`, `test/` and given directories;
 `--check` reports files that would change. Both surfaces use 80 columns. The
-normal surface indents with one tab per level. In the normal surface, the
+normal surface indents with one tab per level. A `:` that introduces a type
+uses exactly the same spacing and layout rule as `=`: one space on each side,
+and the same continuation indentation and line-breaking rule for a long
+right side. Thus `inspect : <A>(A) -> String`, `x : Int = e`, and
+`(deadline) <- (clock : Clock) { … }`. This applies to declarations, pattern
+annotations and service items. Bit-array segments keep their compact
+`value:Format` spelling (§8.1): that colon introduces a format, and has no
+`=` counterpart. In the normal surface, the
 **call depth** of an expression is the number of nested function calls on the
 deepest path through call arguments: a call whose callee is an `UpName`
 constructor and data literals do not count, field access and pipes do not add

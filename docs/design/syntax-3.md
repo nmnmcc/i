@@ -1351,6 +1351,11 @@ Removed: `TupleType`, both copies of `RecordType`, `FPart`, `RPart`, `Label`
 (string and `UpName` labels), `ParamType`, `Record`, the error part `"^" Union`
 and the environment part `"!" Union` of a function type.
 
+- **Annotation layout (owner).** The normal printer uses the same rule for
+  `:` as for `=`: a space on either side and the same continuation layout.
+  Examples: `inspect : <A>(A) -> String`, `(name : String, age : Int)` and
+  `<- (db : Db)`. A segment's compact `value:Format` is unchanged: it has
+  no `=` counterpart and is not a type annotation (spec §8.1).
 - **Annotations.** `Annot = Inter` is the single rule for a type after `:`:
   it ends at any `|` outside brackets (`( )`, `{ }`, `< >`). While reading
   `Annot`, an unbracketed `FnType` reads `Inter` for its result, recursively;
