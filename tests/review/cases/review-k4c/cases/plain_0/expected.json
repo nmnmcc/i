@@ -1,6 +1,6 @@
 {
-  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
-  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
+  "compiler": "dd3e6630642afe1e07e1bacf5e4e6c16566af0de",
+  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.wrap : (() <- (Fail(E), ..N) -> A) -> () <- (Fail(E), ..N) -> A\n",
+      "stdout": "app/main.wrap : (f: () -> A ^ E ! N) -> () -> A ^ E ! N\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `wrap` is not used\n"
     },
     "test0": {
