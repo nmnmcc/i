@@ -17,6 +17,17 @@ pub enum Definition {
         scope: Scope,
         ready: bool,
     },
+    /// A written definition in the tree of syntax three, answered in the
+    /// rows of syntax-3.md §6.8 whatever `NEW_ROWS` says. Made by
+    /// [`Definition::tree`] or [`Definition::tree_with_datum`]; this is the
+    /// form that replaces `Written` when the engine reads the new tree.
+    Tree {
+        item: Box<crate::syn3::ast::Item>,
+        /// The item in the rows of §6.8.
+        datum: Box<super::Datum>,
+        scope: Scope,
+        ready: bool,
+    },
     /// An expanded item keeps the individual scopes of its syntax atoms.
     /// Parameter identities, when present, are freshened on each query.
     Expanded {
@@ -27,6 +38,32 @@ pub enum Definition {
     Builtin {
         name: String,
     },
+}
+
+impl Definition {
+    /// A written type definition of the new tree. Its rows are made by
+    /// `syn3::lisp::item_datum`.
+    pub fn tree(item: crate::syn3::ast::Item, scope: Scope, ready: bool) -> Self {
+        let datum = crate::syn3::lisp::item_datum(&item);
+        Self::tree_with_datum(item, datum, scope, ready)
+    }
+
+    /// A written type definition of the new tree with its rows given: the
+    /// written datum of a Lisp file, or the output of a builder that knows
+    /// the tokens (so that the spans of symbols are those of the source).
+    pub fn tree_with_datum(
+        item: crate::syn3::ast::Item,
+        datum: super::Datum,
+        scope: Scope,
+        ready: bool,
+    ) -> Self {
+        Definition::Tree {
+            item: Box::new(item),
+            datum: Box::new(datum),
+            scope,
+            ready,
+        }
+    }
 }
 
 /// Hygienic lookup decides lexical shadowing, visibility, marks and whether
@@ -87,6 +124,12 @@ impl Entry {
                 "definition table accepts type definitions only"
             );
         }
+        if let Definition::Tree { item, .. } = &definition {
+            assert!(
+                matches!(item.kind, crate::syn3::ast::ItemKind::TypeDef(_)),
+                "definition table accepts type definitions only"
+            );
+        }
         let lisp_document = match &definition {
             Definition::Written { item, source, .. }
                 if source[item.span.start as usize..item.span.end as usize].starts_with('(') =>
@@ -139,6 +182,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .expect("definition identity must be registered");
         match &mut definition.definition {
             Definition::Written { ready: current, .. }
+            | Definition::Tree { ready: current, .. }
             | Definition::Expanded { ready: current, .. } => *current = ready,
             Definition::Builtin { .. } => panic!("builtin definitions are always ready"),
         }
@@ -156,7 +200,9 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
         assert!(
             matches!(
                 definition,
-                Definition::Written { ready: true, .. } | Definition::Expanded { ready: true, .. }
+                Definition::Written { ready: true, .. }
+                    | Definition::Tree { ready: true, .. }
+                    | Definition::Expanded { ready: true, .. }
             ),
             "a finished definition must be ready"
         );
@@ -240,6 +286,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .expect("resolved definition identity must be registered");
         let syntax = match &definition.definition {
             Definition::Written { ready: false, .. }
+            | Definition::Tree { ready: false, .. }
             | Definition::Expanded { ready: false, .. } => {
                 return Ok(QueryResult::Deferred {
                     at: parsed.name.clone(),
@@ -270,6 +317,15 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                     source_definition_from_syntax(item, &encoder.item(item), answer)
                 }
             }
+            Definition::Tree {
+                datum,
+                scope,
+                ready: true,
+                ..
+            } => {
+                preflight(DefinitionCost::Datum(datum))?;
+                super::definitions::tree_definition_from_datum(datum, scope, answer)
+            }
             Definition::Expanded {
                 syntax,
                 parameter_answer,
@@ -287,10 +343,9 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                 .as_answer()
             }
             Definition::Builtin { name } => {
-                if matches!(
-                    name.as_str(),
-                    "Bool" | "Nil" | "Result" | "Assert" | "AssertionFailure"
-                ) {
+                if super::definitions::builtin_definition_names(super::definitions::NEW_ROWS)
+                    .contains(&name.as_str())
+                {
                     preflight(DefinitionCost::Builtin(name))?;
                 }
                 match builtin_definition(name, parsed.name.scope(), parsed.name.span(), answer) {
