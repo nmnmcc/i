@@ -3887,5 +3887,8 @@
     "diagnostics": [
       "E0101: a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet"
     ]
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
+    "not_source": "Position/search substring inside a complete source fixture"
   }
 }

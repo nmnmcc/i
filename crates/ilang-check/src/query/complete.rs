@@ -87,8 +87,13 @@ impl Query<'_> {
         let mut call: Option<&Expr> = None;
         let mut record = false;
         visit_module(p, m, &mut |n| match n {
+            // Not a hole: the lowering of a provide `e <- (v)` gives each
+            // value `v` the type `_` with the span of the value.
             Node::Type(t)
-                if t.span.start <= start && offset <= t.span.end && t.span.start < t.span.end =>
+                if t.span.start <= start
+                    && offset <= t.span.end
+                    && t.span.start < t.span.end
+                    && !matches!(t.kind, TypeKind::Hole) =>
             {
                 in_type = true
             }
