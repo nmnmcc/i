@@ -454,3 +454,9 @@ Updated those five signature strings only; the publication retry passes all
 11 tests. All 27 cases now have passing evidence. Determinism passes three
 tests and multicore passes all ten before proceeding with the remaining CLI
 binaries and filtered spec chapters.
+
+The value-types WAT equality regression initially differed only in $site_data:
+conversion had formatted its executable call sites to different lines and
+columns. Aligned executable source positions while retaining the complete
+WAT equality assertion; all four native/WASI, tests-on/off comparisons pass.
+No compiler behavior or expectation changed.
