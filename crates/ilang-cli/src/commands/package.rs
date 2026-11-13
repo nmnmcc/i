@@ -875,6 +875,29 @@ fn check_clean(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Check the committed package tree, never the destinations of its links.
+fn check_source_links_at(project: &Path, revision: &str) -> Result<()> {
+    let prefix = git_in(project, &["rev-parse", "--show-prefix"])?;
+    let prefix = prefix.trim_end_matches('/');
+    let tree = if prefix.is_empty() {
+        revision.to_owned()
+    } else {
+        format!("{revision}:{prefix}")
+    };
+    let listing = git_in(project, &["ls-tree", "--full-tree", "-r", "-z", &tree])?;
+    let files = listing
+        .split('\0')
+        .filter_map(|entry| entry.split_once('\t'))
+        .filter(|(metadata, _)| metadata.starts_with("120000 "))
+        .map(|(_, path)| ilang_package::lock::PackageFile {
+            path: path.into(),
+            kind: ilang_package::lock::FileKind::Symlink,
+            bytes: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+    ilang_package::git::check_source_links(&files).map_err(|e| anyhow!(e.message))
+}
+
 fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     let version = parse_version(version.strip_prefix('v').unwrap_or(version))
         .ok_or_else(|| anyhow!("`{version}` is not a version `major.minor.patch`"))?;
@@ -887,6 +910,7 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
         .context("the package must be in a git repository with a commit")?;
     check_clean(project)?;
     println!("ok: the git working tree is clean");
+    check_source_links_at(project, "HEAD")?;
 
     // 2. `i check` and `i test` pass.
     check_and_test(project)?;
@@ -1091,6 +1115,11 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
     };
     if git_in(&top, &["cat-file", "-e", &toml]).is_err() {
         return Ok(None);
+    }
+    if let Err(error) = check_source_links_at(project, tag) {
+        // A major release can repair an old invalid package, but comparison
+        // must not read anything outside that old committed tree.
+        return Ok(Some(Err(error)));
     }
     let tmp = tempfile::tempdir().context("a temporary directory could not be made")?;
     let archive = Command::new("git")

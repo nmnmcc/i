@@ -1361,3 +1361,78 @@ fn publish_keeps_literal_alias_values_beyond_hover_limits() {
     assert!(out.contains("a new major version"), "{out}");
     assert!(!out.contains("…"), "{out}");
 }
+
+#[cfg(unix)]
+#[test]
+fn publish_rejects_committed_source_links_before_reading_their_targets() {
+    let w = World::new();
+    let outside = w.project(
+        "outside",
+        &[(
+            "lib.i",
+            include_str!("../../../tests/spec/2.8/mp01_external.i"),
+        )],
+    );
+    let package = w.project(
+        "pub",
+        &[("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n")],
+    );
+    fs::create_dir(package.join("src")).unwrap();
+    std::os::unix::fs::symlink(outside.join("lib.i"), package.join("src/lib.i")).unwrap();
+    git(&package, &["init", "-q"]);
+    commit(&package, "source link");
+    let err = w.fails(&[
+        "publish",
+        "1.0.0",
+        "--dry-run",
+        "--project",
+        package.to_str().unwrap(),
+    ]);
+    assert!(err.contains("symbolic link"), "{err}");
+    assert!(git(&package, &["tag", "--list"]).is_empty());
+}
+
+/// MP01: package commands reject the same source-link attack as compilation.
+#[cfg(unix)]
+#[test]
+fn add_rejects_dependency_with_source_link() {
+    let w = World::new();
+    w.repo("dep", &[]);
+    let outside = w.project(
+        "outside",
+        &[(
+            "lib.i",
+            include_str!("../../../tests/spec/2.8/mp01_external.i"),
+        )],
+    );
+    let work = w.path().join("work/dep");
+    write(&work, &[("i.toml", "name = \"dep\"\n")]);
+    fs::create_dir_all(work.join("src")).unwrap();
+    std::os::unix::fs::symlink(outside.join("lib.i"), work.join("src/lib.i")).unwrap();
+    commit(&work, "source link");
+    git(&work, &["tag", "v1.0.0"]);
+    git(
+        &work,
+        &[
+            "push",
+            "-q",
+            w.path().join("remotes/dep").to_str().unwrap(),
+            "--tags",
+        ],
+    );
+    let manifest = "name = \"app\"\n";
+    let app = w.project(
+        "app",
+        &[("i.toml", manifest), ("src/main.i", "main = () { Nil }\n")],
+    );
+    let err = w.fails(&[
+        "add",
+        "dep",
+        "example.com/dep@1.0.0",
+        "--project",
+        app.to_str().unwrap(),
+    ]);
+    assert!(err.contains("symbolic link"), "{err}");
+    assert_eq!(read(&app.join("i.toml")), manifest);
+    assert!(!app.join("i.lock").exists());
+}

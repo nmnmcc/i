@@ -55,6 +55,25 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+/// Reject committed source links before loading or publishing a located package.
+pub fn check_source_links(files: &[PackageFile]) -> Result<()> {
+    if let Some(file) = files.iter().find(|f| {
+        f.kind == FileKind::Symlink
+            && (matches!(f.path.as_str(), "i.toml" | "src" | "test")
+                || f.path.starts_with("src/")
+                || f.path.starts_with("test/"))
+    }) {
+        return Err(GitError::new(
+            code::PACKAGE_FILES,
+            format!(
+                "symbolic link in a package manifest or source path: `{}`",
+                file.path
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// A problem while getting a package. `code` is one of [`crate::code`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GitError {
@@ -521,14 +540,16 @@ impl Git {
         let base = self.cache.join("pkg").join(escape(place));
         let target = base.join(commit);
         let hash_file = base.join(format!("{commit}.hash"));
+        let files = self.files(repository, commit, dir)?;
+        check_source_links(&files)?;
         if target.is_dir()
             && let Ok(h) = std::fs::read_to_string(&hash_file)
             && h.trim().len() == 71
             && h.starts_with("sha256-")
         {
+            validate_source_paths(&target)?;
             return Ok((target, h.trim().to_string()));
         }
-        let files = self.files(repository, commit, dir)?;
         let hash = crate::lock::hash(&files);
         let cache_err = |e: std::io::Error| {
             GitError::new(
@@ -557,8 +578,40 @@ impl Git {
         let tmp = temp_name(&hash_file);
         std::fs::write(&tmp, format!("{hash}\n")).map_err(cache_err)?;
         std::fs::rename(&tmp, &hash_file).map_err(cache_err)?;
+        validate_source_paths(&target)?;
         Ok((target, hash))
     }
+}
+
+/// Source loading must never follow a symbolic link outside the hashed tree.
+/// Check directories as well as leaves, without traversing any link.
+fn validate_source_paths(dir: &Path) -> Result<()> {
+    fn visit(path: &Path, recurse: bool) -> std::io::Result<()> {
+        let metadata = match std::fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e),
+        };
+        if metadata.file_type().is_symlink() {
+            return Err(std::io::Error::other(format!(
+                "symbolic link in a package manifest or source path: `{}`",
+                path.display()
+            )));
+        }
+        if recurse && metadata.is_dir() {
+            for entry in std::fs::read_dir(path)? {
+                visit(&entry?.path(), true)?;
+            }
+        }
+        Ok(())
+    }
+    let check = || -> std::io::Result<()> {
+        visit(dir, false)?;
+        visit(&dir.join("i.toml"), false)?;
+        visit(&dir.join("src"), true)?;
+        visit(&dir.join("test"), true)
+    };
+    check().map_err(|e| GitError::new(code::PACKAGE_FILES, e.to_string()))
 }
 
 /// A name next to `path` that no other process uses.

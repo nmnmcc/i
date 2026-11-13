@@ -1116,3 +1116,48 @@ fn transitive_problems_say_where_they_come_from() {
     );
     assert!(!app.join("i.lock").exists());
 }
+
+/// MP01: a committed link must not let an unchanged lock read outside bytes.
+#[cfg(unix)]
+#[test]
+fn located_source_links_cannot_escape_the_hashed_tree() {
+    use std::os::unix::fs::symlink;
+    for link in ["src/lib.i", "src", "test", "i.toml"] {
+        let w = World::new();
+        let r = w.repo("dep");
+        write(&r.work, &[("i.toml", "name = \"dep\"\n")]);
+        let outside = w.project(
+            "outside",
+            &[(
+                "lib.i",
+                include_str!("../../../tests/spec/2.8/mp01_external.i"),
+            )],
+        );
+        let target = if link.ends_with(".i") {
+            outside.join("lib.i")
+        } else if link == "i.toml" {
+            write(&outside, &[("i.toml", "name = \"dep\"\n")]);
+            fs::remove_file(r.work.join("i.toml")).unwrap();
+            outside.join("i.toml")
+        } else {
+            outside.clone()
+        };
+        fs::create_dir_all(r.work.join(link).parent().unwrap()).unwrap();
+        symlink(target, r.work.join(link)).unwrap();
+        r.commit_as_is("v1.0.0");
+        let app = w.project(
+            "app",
+            &[
+                (
+                    "i.toml",
+                    "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+                ),
+                ("src/main.i", "main = () { Nil }\n"),
+            ],
+        );
+        let (g, ds) = w.load(&app, false);
+        assert!(!errors(&ds).is_empty(), "link {link} was accepted");
+        assert!(located(&g).is_empty());
+        assert!(!app.join("i.lock").exists());
+    }
+}
