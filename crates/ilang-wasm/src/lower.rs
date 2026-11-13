@@ -181,6 +181,16 @@ struct Fx {
     patches: Vec<(Local, u32, VarId)>,
     /// The environment of the place being lowered (§9.2).
     env: Env,
+    /// In the body of a light boundary: the names of its handle, which is
+    /// local 0; `None` once one environment statement is made lazy.
+    light: Option<HashSet<VarId>>,
+    /// Whether the statements being lowered are the start of a light
+    /// boundary's body, where its environment is still its own.
+    light_start: bool,
+    /// The names of environment parameters that hold the slot of their
+    /// service as it is (`Value::ServiceRaw`): every use is the callee of
+    /// `x.f(…)`, which is lowered as `Callee::Lazy`.
+    lazy_params: HashSet<VarId>,
 }
 
 impl Fx {
@@ -195,6 +205,9 @@ impl Fx {
             pending: None,
             patches: Vec::new(),
             env: Env::Param,
+            light: None,
+            light_start: false,
+            lazy_params: HashSet::new(),
         }
     }
 
@@ -383,6 +396,20 @@ fn expression_values(e: &Expr) -> usize {
 struct Walk {
     used: BTreeSet<VarId>,
     bound: HashSet<VarId>,
+    /// How many times each name is used.
+    uses: HashMap<VarId, u32>,
+    /// The calls of a top-level name whose first written argument (or the
+    /// left side of `|>`) is a local name: the callee, the name, and the
+    /// span of the call, which keys its argument order.
+    first_args: Vec<(DefId, VarId, Span)>,
+    /// How deep in function literals the walk is.
+    depth: u32,
+    /// The calls `x.f(…)` of a local name `x` outside function literals:
+    /// the name and the span of the callee `x.f`.
+    field_calls: Vec<(VarId, Span)>,
+    /// The environment statements whose value is a constructor applied to
+    /// function literals and local names (as `lazy_provide` takes them).
+    lazy_envs: Vec<Span>,
 }
 
 impl Walk {
@@ -390,6 +417,7 @@ impl Walk {
         match &e.kind {
             ExprKind::Name(ValueRef::Local(v)) => {
                 self.used.insert(*v);
+                *self.uses.entry(*v).or_default() += 1;
             }
             ExprKind::Int(_)
             | ExprKind::Float(_)
@@ -419,7 +447,11 @@ impl Walk {
                 }
             }
             ExprKind::Block(b) => self.block(b),
-            ExprKind::Fn(f) => self.function(f),
+            ExprKind::Fn(f) => {
+                self.depth += 1;
+                self.function(f);
+                self.depth -= 1;
+            }
             ExprKind::Case { subject, clauses } => {
                 self.expr(subject);
                 for c in clauses {
@@ -429,6 +461,39 @@ impl Walk {
                 }
             }
             ExprKind::Call { callee, args } => {
+                if let (ExprKind::Name(ValueRef::Def(d)), Some(first)) =
+                    (&callee.kind, args.first())
+                    && let ExprKind::Name(ValueRef::Local(v)) = first.value.kind
+                {
+                    self.first_args.push((*d, v, e.span));
+                }
+                if self.depth == 0
+                    && args.iter().all(|a| a.label.is_none())
+                    && let ExprKind::Field { target, .. } = &callee.kind
+                    && let ExprKind::Name(ValueRef::Local(v)) = target.kind
+                {
+                    self.field_calls.push((v, callee.span));
+                }
+                self.expr(callee);
+                args.iter().for_each(|a| self.expr(&a.value));
+            }
+            ExprKind::Binary {
+                op: BinOp::Pipe,
+                lhs,
+                rhs,
+            } => {
+                // `a |> f(…)` is `f(a, …)` (§6.9): `a` is the first
+                // written argument.
+                let (callee, args) = match &rhs.kind {
+                    ExprKind::Call { callee, args } => (callee.as_ref(), &args[..]),
+                    _ => (rhs.as_ref(), &[][..]),
+                };
+                if let (ExprKind::Name(ValueRef::Def(d)), ExprKind::Name(ValueRef::Local(v))) =
+                    (&callee.kind, &lhs.kind)
+                {
+                    self.first_args.push((*d, *v, e.span));
+                }
+                self.expr(lhs);
                 self.expr(callee);
                 args.iter().for_each(|a| self.expr(&a.value));
             }
@@ -454,7 +519,20 @@ impl Walk {
                     self.pattern(&b.pattern);
                     self.expr(&b.value);
                 }
-                hir::Stmt::Env { value, .. } => self.expr(value),
+                hir::Stmt::Env { value, span, .. } => {
+                    if let ExprKind::Call { callee, args } = &ungroup(value).kind
+                        && let ExprKind::Name(ValueRef::Ctor(_)) = &ungroup(callee).kind
+                        && args.iter().all(|a| {
+                            matches!(
+                                ungroup(&a.value).kind,
+                                ExprKind::Fn(_) | ExprKind::Name(ValueRef::Local(_))
+                            )
+                        })
+                    {
+                        self.lazy_envs.push(*span);
+                    }
+                    self.expr(value)
+                }
                 hir::Stmt::Expr(e) => self.expr(e),
             }
         }
@@ -522,6 +600,23 @@ fn captures_of(f: &Function) -> Vec<VarId> {
         .into_iter()
         .filter(|v| !w.bound.contains(v))
         .collect()
+}
+
+/// The names of a light boundary literal's handle, when its parameter is a
+/// plain name (`b` or `b: T`).
+fn light_names(f: &Function) -> Option<HashSet<VarId>> {
+    let mut patterns = f.params.iter().filter_map(|p| match p {
+        Param::Pattern { pattern, .. } => Some(pattern),
+        Param::Env { .. } => None,
+    });
+    let binder = match &patterns.next()?.kind {
+        PatternKind::Var(b) => b,
+        PatternKind::Typed {
+            binder: Some(b), ..
+        } => b,
+        _ => return None,
+    };
+    Some(HashSet::from([binder.var]))
 }
 
 /// A bit array format (§8.2).
@@ -808,6 +903,10 @@ struct Lowerer<'a> {
     /// once: hashing every source of the package per import was measured at
     /// a twentieth of a test build.
     package_hashes: HashMap<PackageId, String>,
+    /// The services that an environment statement may provide lazily
+    /// (`lazy_provide`), found before lowering: a call `x.f(…)` of an
+    /// environment parameter of one of them is a `Callee::Lazy`.
+    lazy_candidates: HashSet<u32>,
     out: ir::Program,
     diags: Vec<Diagnostic>,
 }
@@ -849,6 +948,7 @@ impl<'a> Lowerer<'a> {
             bindings: Vec::new(),
             external_funcs: HashMap::new(),
             package_hashes: HashMap::new(),
+            lazy_candidates: HashSet::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
         };
@@ -1095,6 +1195,23 @@ impl<'a> Lowerer<'a> {
     }
 
     fn run_all(&mut self) {
+        // The services that an environment statement may provide lazily.
+        for (mi, m) in self.program.modules.iter().enumerate() {
+            let mut w = Walk::default();
+            for b in &m.bindings {
+                w.expr(&b.binding.value);
+            }
+            for span in w.lazy_envs {
+                if let Some(id) = self
+                    .typed
+                    .services
+                    .get(&(ModuleId(mi as u32), span))
+                    .and_then(|t| self.services.get(t))
+                {
+                    self.lazy_candidates.insert(*id);
+                }
+            }
+        }
         // Top-level functions are known functions with one value.
         for (mi, m) in self.program.modules.iter().enumerate() {
             for (bi, b) in m.bindings.iter().enumerate() {
@@ -1771,6 +1888,7 @@ impl<'a> Lowerer<'a> {
                 value: values[position]
                     .clone()
                     .expect("dependency precedes provider"),
+                in_place: false,
             });
             env = Env::Local(dst);
         }
@@ -2399,21 +2517,52 @@ impl<'a> Lowerer<'a> {
         name: String,
         id: FuncId,
     ) -> Func {
+        self.function_code(module, f, captures, name, id, false, false)
+    }
+
+    /// As `function`; when `lifted`, the captures are parameters after the
+    /// function's own, and it has no closure; when `light` too, it is a
+    /// light boundary's body.
+    #[allow(clippy::too_many_arguments)]
+    fn function_code(
+        &mut self,
+        module: ModuleId,
+        f: &Function,
+        captures: &[VarId],
+        name: String,
+        id: FuncId,
+        lifted: bool,
+        light: bool,
+    ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
-        let arity = f
+        let own = f
             .params
             .iter()
             .filter(|p| matches!(p, Param::Pattern { .. }))
             .count() as u32;
+        let arity = if lifted {
+            own + captures.len() as u32
+        } else {
+            own
+        };
         for _ in 0..arity {
             fx.local(LocalType::Value);
         }
+        if light {
+            fx.light = light_names(f);
+        }
+        let mut start = light;
         for (i, &v) in captures.iter().enumerate() {
             let l = fx.var(v);
+            let value = if lifted {
+                Value::Atom(Atom::Local(own + i as u32))
+            } else {
+                Value::Capture(i as u32)
+            };
             out.push(Stmt::Let {
                 dst: l,
-                value: Value::Capture(i as u32),
+                value,
                 site: None,
             });
         }
@@ -2436,14 +2585,26 @@ impl<'a> Lowerer<'a> {
                 Param::Env { var, name, .. } => {
                     let service = self.service(module, name.span);
                     let l = fx.var(*var);
+                    let raw = self.lazy_candidates.contains(&service)
+                        && self.only_field_calls(module, &f.body, *var);
+                    if raw {
+                        fx.lazy_params.insert(*var);
+                    }
                     out.push(Stmt::Let {
                         dst: l,
-                        value: Value::Service(Env::Param, service),
+                        value: if raw {
+                            Value::ServiceRaw(Env::Param, service)
+                        } else {
+                            Value::Service(Env::Param, service)
+                        },
                         site: None,
                     });
                 }
             }
         }
+        // Binding a plain name keeps nothing of the environment.
+        start &= fx.light.is_some();
+        fx.light_start = start;
         self.block(&mut fx, &mut out, &f.body, true);
         let pending = f
             .params
@@ -2962,6 +3123,7 @@ impl<'a> Lowerer<'a> {
         tail: bool,
     ) -> Option<Atom> {
         let last = b.stmts.len().saturating_sub(1);
+        let start = std::mem::replace(&mut fx.light_start, false);
         for (i, s) in b.stmts.iter().enumerate() {
             match s {
                 hir::Stmt::Expr(e) if i == last => return self.lower(fx, out, e, tail),
@@ -2970,6 +3132,9 @@ impl<'a> Lowerer<'a> {
                 }
                 hir::Stmt::Bind(binding) => self.binding(fx, out, binding),
                 hir::Stmt::Env { value, span, .. } => {
+                    if self.lazy_provide(fx, out, value, *span, start && i == 0) {
+                        continue;
+                    }
                     // The value uses the environment from outside the
                     // statement (§4.8 rule 9).
                     let v = self.expr(fx, out, value);
@@ -2980,6 +3145,7 @@ impl<'a> Lowerer<'a> {
                         env: fx.env,
                         service,
                         value: v,
+                        in_place: false,
                     });
                     fx.env = Env::Local(dst);
                 }
@@ -3013,6 +3179,272 @@ impl<'a> Lowerer<'a> {
                 index,
                 value,
             });
+        }
+    }
+
+    /// `control.boundary(f)` where `f` is a function literal whose parameter
+    /// is used only as the first argument of `control.escape`, directly or
+    /// in function literals inside it: a light boundary (syntax-3 §2.10.7,
+    /// O30). The decision is read from the program's shape only. Its handle
+    /// is never suspended on, stored, or given elsewhere, so the boundary
+    /// needs no continuation of its own; `f` is lifted to code that takes
+    /// its captures as parameters, so no closure is made for it. `None` when
+    /// the call is not one.
+    #[allow(clippy::too_many_arguments)]
+    fn light_boundary(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[&Expr],
+        tail: bool,
+    ) -> Option<Option<Atom>> {
+        if self.library_op(callee) != Some(Op::Boundary) {
+            return None;
+        }
+        let arg: &Expr = match (first, args) {
+            (Some(a), []) => a,
+            (None, [a]) => a,
+            _ => return None,
+        };
+        let ExprKind::Fn(f) = &ungroup(arg).kind else {
+            return None;
+        };
+        let mut patterns = f.params.iter().filter_map(|p| match p {
+            Param::Pattern { pattern, .. } => Some(pattern),
+            Param::Env { .. } => None,
+        });
+        let (Some(param), None) = (patterns.next(), patterns.next()) else {
+            return None;
+        };
+        // The names the parameter binds, and every use of them.
+        let mut names = Walk::default();
+        names.pattern(param);
+        let mut body = Walk::default();
+        body.block(&f.body);
+        for &v in &names.bound {
+            let all = body.uses.get(&v).copied().unwrap_or(0);
+            let escapes = body
+                .first_args
+                .iter()
+                .filter(|&&(d, x, call)| {
+                    x == v
+                        && self.def_op(d) == Some(Op::Escape)
+                        && self
+                            .typed
+                            .args
+                            .get(&(fx.module, call))
+                            .is_none_or(|order| order.first() == Some(&0))
+                })
+                .count() as u32;
+            if all != escapes {
+                return None;
+            }
+        }
+        let captures = captures_of(f);
+        if fx
+            .pending
+            .as_ref()
+            .is_some_and(|p| captures.iter().any(|v| p.contains(v)))
+        {
+            return None;
+        }
+        let id = self.new_func();
+        let name = format!("{}:light{}", self.program.module(fx.module).path, id.0);
+        let func = self.function_code(fx.module, f, &captures, name, id, true, true);
+        self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+        // The boundary is the environment of its body (`$light_new`).
+        let b = let_value(
+            fx,
+            out,
+            Value::OpEnv(
+                Op::Runtime {
+                    name: "light_new",
+                    arity: 0,
+                },
+                vec![],
+                fx.env,
+            ),
+            None,
+        );
+        let mut atoms = vec![b];
+        atoms.extend(captures.iter().map(|v| Atom::Local(fx.var(*v))));
+        let site = self.site(fx, span.start);
+        let v = let_value(
+            fx,
+            out,
+            Value::Light {
+                func: id,
+                args: atoms,
+                env: fx.env,
+            },
+            site,
+        );
+        Some(finish(out, tail, v))
+    }
+
+    /// An environment statement in the body of a light boundary whose value
+    /// is a constructor applied to function literals and names that use
+    /// nothing but the boundary's handle: making the value has no effect and
+    /// depends only on the handle, so the handle stands for it in the
+    /// environment, and the value is made at the first read of the service
+    /// (`$service_force`), once. Only the first such statement of a body.
+    /// False when the statement is not one.
+    fn lazy_provide(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        value: &Expr,
+        span: Span,
+        in_place: bool,
+    ) -> bool {
+        let Some(names) = fx.light.as_ref() else {
+            return false;
+        };
+        let e = ungroup(value);
+        let ExprKind::Call { callee, args } = &e.kind else {
+            return false;
+        };
+        let ExprKind::Name(ValueRef::Ctor(c)) = &ungroup(callee).kind else {
+            return false;
+        };
+        if !matches!(
+            self.ctors.get(c).map(|i| &i.repr),
+            Some(CtorRepr::Record { .. })
+        ) {
+            return false;
+        }
+        let simple = args.iter().all(|a| match &ungroup(&a.value).kind {
+            ExprKind::Fn(f) => captures_of(f).iter().all(|v| names.contains(v)),
+            ExprKind::Name(ValueRef::Local(v)) => names.contains(v),
+            _ => false,
+        });
+        if !simple {
+            return false;
+        }
+        let names = fx.light.take().expect("checked above");
+        // The function that makes the value from the handle.
+        let mut inner = Fx::new(fx.module, fx.library);
+        inner.local(LocalType::Value);
+        for v in &names {
+            inner.vars.insert(*v, 0);
+        }
+        let mut body = Vec::new();
+        let made = self.expr(&mut inner, &mut body, value);
+        body.push(Stmt::Return(made));
+        let builder = self.new_func();
+        self.out.funcs[builder.0 as usize] = FuncKind::Code(Func {
+            name: format!("{}:lazy{}", self.program.module(fx.module).path, builder.0),
+            arity: 1,
+            budget_frame: 1 + inner.locals.len() as u32,
+            locals: inner.locals,
+            body,
+            frame: true,
+        });
+        self.constants.insert(builder);
+        // The code of each field that is a function literal, lifted so
+        // that the handle is its last parameter: a call of that field of
+        // the service (`Callee::Lazy`) runs it without making the value.
+        if let [handle] = names.iter().copied().collect::<Vec<_>>()[..] {
+            let written: Vec<Option<FuncId>> = args
+                .iter()
+                .map(|a| match &ungroup(&a.value).kind {
+                    ExprKind::Fn(f) => {
+                        let id = self.new_func();
+                        let name = format!("{}:field{}", self.program.module(fx.module).path, id.0);
+                        let func =
+                            self.function_code(fx.module, f, &[handle], name, id, true, false);
+                        self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+                        Some(id)
+                    }
+                    _ => None,
+                })
+                .collect();
+            let fields: Vec<Option<FuncId>> = match self.typed.args.get(&(fx.module, e.span)) {
+                Some(order) if order.len() == written.len() => {
+                    order.iter().map(|&i| written[i as usize]).collect()
+                }
+                _ => written,
+            };
+            if fields.iter().any(Option::is_some) {
+                self.out.lazy_fields.insert(builder, fields);
+            }
+        }
+        let_value(
+            fx,
+            out,
+            Value::Op(
+                Op::Runtime {
+                    name: "light_lazy",
+                    arity: 2,
+                },
+                vec![Atom::Local(0), Atom::Func(builder)],
+            ),
+            None,
+        );
+        let service = self.service(fx.module, span);
+        self.out.lazy_services.insert(service);
+        let dst = fx.local(LocalType::Env);
+        out.push(Stmt::LetEnv {
+            dst,
+            env: fx.env,
+            service,
+            value: Atom::Local(0),
+            in_place,
+        });
+        fx.env = Env::Local(dst);
+        true
+    }
+
+    /// Whether every use of the name `v` in `body` is the callee `v.f` of
+    /// a call outside function literals, with one field index for `f`.
+    fn only_field_calls(&self, module: ModuleId, body: &Block, v: VarId) -> bool {
+        let mut w = Walk::default();
+        w.block(body);
+        let calls: Vec<Span> = w
+            .field_calls
+            .iter()
+            .filter(|(x, _)| *x == v)
+            .map(|(_, span)| *span)
+            .collect();
+        !calls.is_empty()
+            && w.uses.get(&v).copied() == Some(calls.len() as u32)
+            && calls
+                .iter()
+                .all(|span| self.lazy_field(module, *span).is_some())
+    }
+
+    /// The field index of the callee `x.f` at `span`, when it is the same
+    /// for every constructor.
+    fn lazy_field(&self, module: ModuleId, span: Span) -> Option<u32> {
+        match self.typed.access.get(&(module, span)) {
+            Some(Access::Field(list)) if !list.is_empty() => {
+                let first = list[0].1;
+                list.iter().all(|(_, i)| *i == first).then_some(first)
+            }
+            _ => None,
+        }
+    }
+
+    /// The operation of a callee that names an external function of the
+    /// library, as `target` finds it.
+    fn library_op(&self, callee: &Expr) -> Option<Op> {
+        match &callee.kind {
+            ExprKind::Name(ValueRef::Def(d)) => self.def_op(*d),
+            _ => None,
+        }
+    }
+
+    fn def_op(&self, d: DefId) -> Option<Op> {
+        match self.program.def(d).kind {
+            DefKind::External { ref module, .. }
+                if self.is_library(d.module) && module.starts_with("ilang:") =>
+            {
+                self.external_op(d).ok().map(|(op, _)| op)
+            }
+            _ => None,
         }
     }
 
@@ -3303,11 +3735,32 @@ impl<'a> Lowerer<'a> {
         args: &[&Expr],
         tail: bool,
     ) -> Option<Atom> {
+        if let Some(a) = self.light_boundary(fx, out, span, callee, first, args, tail) {
+            return a;
+        }
         let mut written = Vec::new();
         if let Some(a) = first {
             written.push(self.expr(fx, out, a));
         }
-        let target = self.target(fx, out, callee);
+        let lazy = match &callee.kind {
+            ExprKind::Field { target, .. } => match target.kind {
+                ExprKind::Name(ValueRef::Local(v)) if fx.lazy_params.contains(&v) => {
+                    let field = self
+                        .lazy_field(fx.module, callee.span)
+                        .expect("checked by only_field_calls");
+                    Some(Callee::Lazy {
+                        service: Atom::Local(fx.var(v)),
+                        field,
+                    })
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        let target = match lazy {
+            Some(callee) => Target::Callee(callee),
+            None => self.target(fx, out, callee),
+        };
         for a in args {
             written.push(self.expr(fx, out, a));
         }
