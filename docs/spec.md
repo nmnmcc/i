@@ -1704,7 +1704,7 @@ No public spawn detaches a task. `go` never checks its closure's portability.
 It increments the calling task's spawn/run counter, beginning at 1; the child
 path is the parent's path with that index appended. A nested run takes an index
 from that same counter. `path` and `random` are data reads without a suspend.
-A top seed that was already split or drawn keeps that entire derivation state.
+A task gets its random generator by the Runner rule below; reading it does not draw or split it.
 
 A scope waits for all children even when its body returns without joining them.
 Returning a Task handle does not extend the right to join it. Handles check run
@@ -1951,9 +1951,17 @@ guarantee is made for final functions.
 
 #### Runner, nested runs, and testing
 
-The runtime supplies an initial portable Runner: prefix, full seed generator,
-policy, the enclosing request-context Root, and constant functions implementing
-root wait/poll. run uses that Root while opening its fresh run Root, so its
+The runtime supplies an initial portable Runner: prefix `[]`, seed
+`random.from_seed(0)`, FIFO policy, the enclosing request-context Root, and
+constant functions implementing root wait/poll. For each task,
+`task.random()` is `random.at_path(run_seed, full_task_path)`. Here `run_seed`
+is the complete generator in the Runner when the run begins, including any
+prior draws or splits, and `full_task_path` is the value of `task.path()`,
+including every enclosing run prefix. Children use this same equation, rather
+than deriving from their parent's task generator. Repeated reads give equal
+generators. A nested run uses its supplied Runner's seed and its allocated full
+prefix; `top(seed)` changes the seed of subsequent runs using that Runner,
+not the generator of the task already running. run uses that Root while opening its fresh run Root, so its
 public environment still needs Runner rather than an extra Root argument. `top(seed)` replaces
 only the seed in the current Runner and preserves its path allocator and wait
 route. This is why its scheme needs Runner: rebinding a seed inside a task must
