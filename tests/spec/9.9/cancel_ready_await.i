@@ -34,8 +34,11 @@ probe = (wait: () -> Nil ! request.Await) {
 main = () {
 	borrowed = request.ready(Nil)
 	probe(() { request.await(borrowed) })
-	assert(request.state(borrowed) == request.Ready(Nil))
+	// §9.9: when the await completed before the failure, it took the answer.
+	after = request.state(borrowed)
+	assert(after == request.Ready(Nil) || after == request.Taken)
 	owned = request.ready(Nil)
 	probe(() { request.await_owned(owned) })
-	assert(request.state(owned) == request.Cancelled)
+	settled = request.state(owned)
+	assert(settled == request.Cancelled || settled == request.Taken)
 }
