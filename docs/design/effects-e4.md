@@ -95,7 +95,7 @@ error, and §2.10.6 puts both library and service failures through Fail.
 | `float.hypot` | `(x: Float, y: Float) -> Result(Float, Nil)` | `(x: Float, y: Float) <- (Fail(Nil)) -> Float` | `std/test/float_test.i` |
 | `float.tan` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `std/test/float_test.i` |
 | `http.parse_query` | `(query: String) -> Result(List((String, String)), uri.CodecError)` | `(query: String) <- (Fail(uri.CodecError)) -> List((String, String))` | `std/test/http_test.i` |
-| `http.body_text` | `(res: Response) -> Result(String, Nil)` | `(res: Response) <- (Fail(Nil)) -> String` | `examples/http-get/src/main.i`, `tests/browser/fixtures/http-fetch/src/main.i` (outside this lane; pending) |
+| `http.body_text` | `(res: Response) -> Result(String, Nil)` | `(res: Response) <- (Fail(Nil)) -> String` | `examples/http-get/src/main.i`, `tests/browser/fixtures/http-fetch/src/main.i`, `bindings/javascript/test/fetch.test.mjs` |
 | `http.body_json` | `(res: Response) -> Result(json.Json, BodyError)` | `(res: Response) <- (Fail(BodyError)) -> json.Json` | No external std/example callers |
 | `http.body_decode` | `<A>( res: Response, codec: schema.Schema(A, schema.SchemaError) ) -> Result(A, BodyError)` | `<A>( res: Response, codec: schema.Schema(A, schema.SchemaError) ) <- (Fail(BodyError)) -> A` | No external std/example callers |
 | `int.parse` | `(text: String) -> Result(Int, Nil)` | `(text: String) <- (Fail(Nil)) -> Int` | `std/src/cli.i`, `std/src/http.i`, `std/src/json.i`, `std/src/regex.i`, `std/test/int_test.i` |
@@ -133,11 +133,11 @@ Public documentation follows the new API. The original descriptions moved from
 private helpers to public wrappers; examples that show Result values now use
 `fail.catch`. Existing Result-data combinator examples adapt their callbacks.
 
-One caller outside the owned std/example paths still needs adaptation:
-`tests/browser/fixtures/http-fetch/src/main.i:14` must catch `http.body_text`
-before its existing Ok/Error match. It is listed above for the browser lane.
+The follow-up also adapts the browser HTTP fixture and the JavaScript fetch
+test's embedded i source: both catch `http.body_text` before their existing
+Ok/Error matches and retain their original UTF-8 error behavior.
 
-Validation on 2026-11-13:
+Initial validation at `dc4e5b21` on 2026-11-13:
 
 - Release builds from the merged eff3 bases `ce39db845` and `81c2abf9` pass.
   The first cold build required initializing the missing Binaryen submodule.
@@ -163,3 +163,16 @@ Validation on 2026-11-13:
   blocked. Runtime behavior, including the new exact JSON error fixture, is
   unverified. This lane did not modify `lib/i` or the compiler; those changes
   arrived only through the requested eff3 merges.
+
+
+Revalidation after merging eff3 `6b0377b2a` on 2026-11-13:
+
+- The release rebuild passes; `i check --project std` passes with the same
+  two inherited HTTP unreachable-clause warnings.
+- `i test --project std --opt 0`: **2,171 passed, 0 failed**, including the
+  exact E4 JSON error, entropy service error, and direct-call pipeline tests.
+- `i fmt --check bench std lib examples` and the browser HTTP fixture pass.
+- O2, chapters 9/11, HTTP/CLI integration, host fixture regeneration and Clippy
+  are still in progress. There is no ilang-cli `json` test target in this tree;
+  JSON is covered by the std JSON suite at both requested optimization levels
+  and by the HTTP server integration's schema/JSON success and failure cases.

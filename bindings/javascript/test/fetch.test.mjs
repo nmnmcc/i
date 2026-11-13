@@ -61,7 +61,7 @@ checked = <A, N>(body: () <- N -> A) -> A {
 		| (Error(e)) { fail.raise(core.inspect(e)) }
 }
 text = (res: http.Response) {
-	http.body_text(res) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }
+	fail.catch(() { http.body_text(res) }) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }
 }
 get = (url: String) { checked(() { text(http.get(url)) }) }
 post = (url: String) { checked(() { text(http.post(url, <<"posted":utf8>>)) }) }
