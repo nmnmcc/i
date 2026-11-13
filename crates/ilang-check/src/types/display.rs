@@ -732,6 +732,43 @@ impl Coalescer<'_> {
                     self.hits.push((v, depth));
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
+                if self.s.has_need_meets
+                    && self
+                        .members(v)
+                        .into_iter()
+                        .any(|m| self.s.vars[m.0 as usize].need_meet.is_some())
+                {
+                    // A marked variable denotes its derived meet, not a
+                    // further free parameter: §4.4 keeps `a & T` itself.
+                    if let Some(t) = self.memo.get(&(v, pos, env)) {
+                        return t.clone();
+                    }
+                    if let Some(t) = self.reuse((v, pos, env), depth) {
+                        return t;
+                    }
+                    let generation = self.cycle_generation;
+                    let start = (self.pushed.len(), self.hits.len());
+                    self.stack.insert(v, depth);
+                    self.pushed.push(v);
+                    let upper: Vec<_> = self
+                        .members(v)
+                        .into_iter()
+                        .flat_map(|m| self.s.vars[m.0 as usize].upper.clone())
+                        .collect();
+                    let parts = upper
+                        .iter()
+                        .map(|b| self.go(b, false, depth, env))
+                        .collect();
+                    self.stack.remove(&v);
+                    let t = Ty::Inter(parts);
+                    if self.cycle_generation == generation {
+                        self.memo.insert((v, pos, env), t.clone());
+                    } else {
+                        self.keep_cyclic((v, pos, env), depth, start, &t);
+                    }
+                    self.clear_logs();
+                    return t;
+                }
                 let empty = |m: V| {
                     let st = &self.s.vars[m.0 as usize];
                     if mono {
@@ -1000,12 +1037,10 @@ impl Norm<'_> {
                     values,
                     args.into_iter()
                         .zip(rows)
-                        .map(|(a, row)| {
-                            if row != Mode::Value {
-                                self.env(a)
-                            } else {
-                                self.norm(a)
-                            }
+                        .map(|(a, row)| match row {
+                            Mode::Env => self.services(a),
+                            Mode::Row => self.env(a),
+                            Mode::Value => self.norm(a),
                         })
                         .collect(),
                 )
@@ -1017,7 +1052,7 @@ impl Norm<'_> {
                     labels: f.labels,
                     ret: self.norm(f.ret),
                     err: self.env(f.err),
-                    env: self.env(f.env),
+                    env: self.services(f.env),
                 }))
             }
             Ty::Both(a, b) => {
@@ -1038,18 +1073,55 @@ impl Norm<'_> {
     /// An environment: two forms of one type constructor are not put
     /// together, because their arguments must be equal (§9.2).
     fn env(&self, t: Ty) -> Ty {
+        self.env_in(t, false)
+    }
+
+    /// A service environment: two forms of one constructor whose
+    /// parameters all have a direction are one entry, their value meet
+    /// (rule A).
+    fn services(&self, t: Ty) -> Ty {
+        self.env_in(t, true)
+    }
+
+    fn env_in(&self, t: Ty, directed: bool) -> Ty {
         match t {
             Ty::Both(a, b) => {
-                let a = self.env(*a);
-                let b = self.env(*b);
+                let a = self.env_in(*a, directed);
+                let b = self.env_in(*b, directed);
                 self.norm(Ty::Both(Box::new(a), Box::new(b)))
             }
-            Ty::Diff(a, hs) => {
-                self.diff(self.env(*a), hs.into_iter().map(|h| self.norm(h)).collect())
+            Ty::Diff(a, hs) => self.diff(
+                self.env_in(*a, directed),
+                hs.into_iter().map(|h| self.norm(h)).collect(),
+            ),
+            Ty::Union(ms) => {
+                let mut flat = Vec::new();
+                super::solve::flatten_union(&ms, &mut flat);
+                let ms: Vec<Ty> = flat.into_iter().map(|m| self.norm(m)).collect();
+                let ms = if directed { self.meet_forms(ms) } else { ms };
+                self.union_in(ms, true)
             }
-            Ty::Union(ms) => self.union_in(ms.into_iter().map(|m| self.norm(m)).collect(), true),
             t => self.norm(t),
         }
+    }
+
+    /// Members with one constructor and equal value sets, put together by
+    /// value intersection. The solver has checked invariant arguments.
+    fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
+        let mut out: Vec<Ty> = Vec::new();
+        for m in ms {
+            if m.head().is_some()
+                && let Some(i) = out
+                    .iter()
+                    .position(|o| o.head() == m.head() && o.values() == m.values())
+            {
+                let old = std::mem::replace(&mut out[i], Ty::Never);
+                out[i] = self.merge(old, m, false);
+                continue;
+            }
+            out.push(m);
+        }
+        out
     }
 
     fn union(&self, ms: Vec<Ty>) -> Ty {
@@ -1362,7 +1434,11 @@ impl Norm<'_> {
                     labels,
                     ret: pick(f.ret, g.ret, Variance::Co),
                     err: pick(f.err, g.err, Variance::Co),
-                    env: pick(f.env, g.env, Variance::Co),
+                    env: if union {
+                        self.services(Ty::Union(vec![f.env, g.env]))
+                    } else {
+                        pick(f.env, g.env, Variance::Co)
+                    },
                 }))
             }
             (a, _) => a,

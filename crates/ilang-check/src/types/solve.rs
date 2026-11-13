@@ -81,6 +81,8 @@ pub(crate) struct VarState {
     /// hides the difference from the result type.
     pub difference: bool,
     pub handled: Vec<Ty>,
+    /// A deferred need meet, with the service forms used for E0515.
+    pub need_meet: Option<(Ty, Ty)>,
     pub lower: Vec<Ty>,
     pub upper: Vec<Ty>,
     /// The name written in an annotation (§4.7), kept when it is shown.
@@ -109,6 +111,8 @@ pub(crate) enum FailKind {
     /// Two forms of one type constructor in an environment, with arguments
     /// that cannot be equal (§9.2).
     EnvForms,
+    /// A need meet has incompatible concrete upper bounds (§9.2).
+    NeedMeet,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
 }
@@ -179,6 +183,7 @@ pub(crate) struct Solver {
     /// argument, tagged with a disjoint identity.
     pub(super) comparison_wrappers: HashSet<TypeId>,
     pub(super) has_handlers: bool,
+    pub(super) has_need_meets: bool,
     pub row_params: StdHashMap<TypeId, Vec<Mode>>,
     pub failures: Vec<Failure>,
     /// The names of the custom types, by `TypeId`, to show types.
@@ -426,6 +431,7 @@ impl Solver {
             comparison_wrappers: HashSet::default(),
             row_params: StdHashMap::new(),
             has_handlers: false,
+            has_need_meets: false,
             failures: Vec::new(),
             type_names,
             alias_folds: Default::default(),
@@ -502,6 +508,7 @@ impl Solver {
             row: Mode::Value,
             difference: false,
             handled: Vec::new(),
+            need_meet: None,
             lower: Vec::new(),
             upper: Vec::new(),
             name: None,
@@ -621,8 +628,8 @@ impl Solver {
 
     /// Makes `N` **in** `M` true for two environments (§4.5 rule 4): every
     /// member of `N` is a type variable that is a subtype of `M`, or has a
-    /// member of `M` with the same type constructor and equal arguments,
-    /// whatever the variance of the parameters.
+    /// member of `M` with the same type constructor that satisfies it as
+    /// a value. Needs compare services in reverse (§4.5 rule 4).
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
         self.constrain_in(l, r, Mode::Env);
     }
@@ -776,6 +783,23 @@ impl Solver {
             self.fail(FailKind::Mismatch, &Ty::Var(v), h);
             return;
         }
+        // Rule B for a service whose parameters all have a direction: a need
+        // of the row with that constructor goes to the handler. Needs written beside the row go to the explicit entry
+        // by routing, so no obligation is kept on the variable: keeping one
+        // would have to be shown in every caller's scheme, and it makes
+        // every later bound of the program check the handlers.
+        if self.var(v).row == Mode::Env
+            && let Ty::Con(hh, _, args) = h
+            && !args.is_empty()
+            && self.variances(*hh, args.len()).all(|x| x != Variance::Inv)
+        {
+            for b in self.reach(vec![v], true).1 {
+                if b.head() == h.head() {
+                    self.constrain_in(&b, h, Mode::Env);
+                }
+            }
+            return;
+        }
         self.has_handlers = true;
         for w in self.reach(vec![v], true).0 {
             if (w.0 as usize) < self.rigid_boundary || self.var(w).handled.contains(h) {
@@ -784,6 +808,16 @@ impl Solver {
             self.observe(w);
             self.var_mut(w).difference = true;
             self.var_mut(w).handled.push(h.clone());
+            if self.var(w).row == Mode::Env {
+                // Rule B: a need for `h`'s constructor that reaches the
+                // row goes to the handler `h`, which must provide it.
+                for b in self.reach(vec![w], true).1 {
+                    if b.head() == h.head() {
+                        self.constrain_in(&b, h, Mode::Env);
+                    }
+                }
+                continue;
+            }
             let mut bounds = self.reach(vec![w], true).1;
             bounds.extend(self.reach(vec![w], false).1);
             for b in bounds {
@@ -1037,6 +1071,12 @@ impl Solver {
                     self.constrain_in(l, m, env);
                 }
             }
+            (Ty::Diff(a, h), _) if env == Mode::Env && h.iter().all(|m| self.directed(m)) => {
+                // Route the handled entries before storing a row bound.
+                // Keeping `M - S(N)` as a bound of N would retain S(N)
+                // inside N, although rule B has already handled its key.
+                self.diff_left(a, h, r, env);
+            }
             (Ty::Var(_), Ty::Var(v)) if env != Mode::Value => {
                 // Collect requirements in the receiving row. An upper
                 // bound on its member can lead back through a service's
@@ -1141,8 +1181,25 @@ impl Solver {
                     );
                     return;
                 }
+                if env == Mode::Env {
+                    // Rule A: the need `l` fits in `r` when the form of `r`
+                    // is a subtype of the form of `l` as a value: argument
+                    // constraints go the other way round from values.
+                    let before = self.failures.len();
+                    let vs = self.variances(*h1, a1.len());
+                    for (((x, y), v), row) in
+                        a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len()))
+                    {
+                        self.constrain_by(y, x, v, row);
+                    }
+                    if self.failures.len() > before {
+                        self.failures.truncate(before);
+                        self.fail(FailKind::EnvForms, l, r);
+                    }
+                    return;
+                }
                 if env != Mode::Value {
-                    // §4.5 rule 4: service arguments are equal.
+                    // Error rows: arguments are equal.
                     for (x, y) in a1.iter().zip(a2) {
                         self.equal(x, y, FailKind::EnvForms);
                     }
@@ -1179,9 +1236,9 @@ impl Solver {
 
     /// Adds a bound to a variable. Two bounds with the same type
     /// constructor are one member (§4.4): two upper bounds by intersection,
-    /// two lower bounds by union. So arguments that do not change must be
-    /// equal; in an environment, all arguments must be equal (§9.2); and
-    /// function types must have the same number of parameters. This holds
+    /// two lower bounds by union. Arguments that do not change must be
+    /// equal, needs merge by the value intersection (§9.2), and function
+    /// types must have the same number of parameters. This holds
     /// for every bound that the variable has through other variables, not
     /// only for its own: with `x <: y <: Cell(String)` and `x <: Cell(Int)`,
     /// `x` has both. Two lower bounds also have their parts put together,
@@ -1251,7 +1308,27 @@ impl Solver {
             let level = self.var(v).level;
             // The variables whose bounds now have `t` too, and their bounds.
             let preds = self.reach(vec![v], !lower).0;
+            let marked: Vec<_> = if lower || !self.has_need_meets {
+                Vec::new()
+            } else {
+                preds
+                    .iter()
+                    .filter_map(|w| self.var(*w).need_meet.clone().map(|forms| (*w, forms)))
+                    .collect()
+            };
             let mut others = self.reach(preds, lower).1;
+            for (meet, (left, right)) in marked {
+                let bounds = self.reach(vec![meet], false).1;
+                if new.iter().any(|a| {
+                    bounds.iter().any(|b| {
+                        a.head() != b.head()
+                            || (a.scalar().is_some() && a.values().disjoint(b.values()))
+                    })
+                }) {
+                    self.var_mut(meet).need_meet = None;
+                    self.fail(FailKind::NeedMeet, &left, &right);
+                }
+            }
             if !lower {
                 let mut heads = HashSet::default();
                 others.retain(|b| heads.insert(b.head()));
@@ -1284,7 +1361,15 @@ impl Solver {
             }
             for a in &new {
                 for h in &handlers {
-                    if a.head() == h.head() {
+                    if a.head() != h.head() {
+                        continue;
+                    }
+                    if env == Mode::Env {
+                        // Rule B, as in `handle`.
+                        if lower {
+                            self.constrain_in(a, h, Mode::Env);
+                        }
+                    } else {
                         self.equal(a, h, FailKind::EnvForms);
                     }
                 }
@@ -1379,6 +1464,7 @@ impl Solver {
         // problems at each place.
         let first = !self.compared.contains(&(b.clone(), a.clone(), lower, env))
             && self.compared.insert((a.clone(), b.clone(), lower, env));
+        let is_lower_bound = lower;
         let lower = lower && first;
         match (a, b) {
             (Ty::Fn(f), Ty::Fn(g)) => {
@@ -1391,7 +1477,27 @@ impl Solver {
             (Ty::Con(h, _, xs), Ty::Con(_, _, ys)) if xs.len() == ys.len() => {
                 let vs = self.variances(*h, xs.len());
                 for (((x, y), var), row) in xs.iter().zip(ys).zip(vs).zip(self.rows(*h, xs.len())) {
-                    if env != Mode::Value {
+                    if env == Mode::Env {
+                        // Two needs of one row are one entry: by value
+                        // meet for lower bounds, by value join for upper
+                        // ones (rule A). Only invariant arguments can
+                        // disagree; the rest is checked through the
+                        // bounds that the entries reach.
+                        // The meet of two same-direction arguments (§4.4) is
+                        // an error when it is `Never` and neither is. With
+                        // an argument not known yet, `a & T` stays as it is
+                        // and is checked when the binding is done.
+                        if var == Variance::Inv {
+                            self.equal(x, y, FailKind::EnvForms);
+                        } else if var == Variance::Co
+                            && is_lower_bound
+                            && !matches!(x, Ty::Never)
+                            && !matches!(y, Ty::Never)
+                            && first
+                        {
+                            self.need_meet(x, y, a, b, row, level);
+                        }
+                    } else if env != Mode::Value {
                         self.equal(x, y, FailKind::EnvForms);
                     } else if var == Variance::Inv {
                         self.equal(x, y, FailKind::Invariant);
@@ -1401,6 +1507,115 @@ impl Solver {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// A service form whose parameters all have a direction.
+    fn directed(&self, t: &Ty) -> bool {
+        matches!(t, Ty::Con(h, _, args) if !args.is_empty()
+            && self.variances(*h, args.len()).all(|x| x != Variance::Inv))
+    }
+
+    /// Keep an undetermined intersection as two upper bounds (§4.4).
+    /// A later concrete bound is checked by `add_bound`, also through links.
+    fn need_meet(&mut self, x: &Ty, y: &Ty, a: &Ty, b: &Ty, row: Mode, level: u32) -> Ty {
+        let meet = self.normalize_mode(Ty::Inter(vec![x.clone(), y.clone()]), row);
+        if matches!(meet, Ty::Never) {
+            self.fail(FailKind::NeedMeet, a, b);
+        }
+        if !matches!(meet, Ty::Inter(_)) {
+            return meet;
+        }
+        let v = self.fresh_at(level);
+        self.has_need_meets = true;
+        self.var_mut(v).need_meet = Some((a.clone(), b.clone()));
+        self.constrain_in(&Ty::Var(v), x, row);
+        self.constrain_in(&Ty::Var(v), y, row);
+        Ty::Var(v)
+    }
+
+    /// A value-produced argument is known at completion from its lower
+    /// bounds. Inputs and still-open sources remain undetermined (§4.7).
+    fn known_need_members(&self, t: &Ty) -> Option<Vec<Ty>> {
+        match t {
+            Ty::Never => None,
+            Ty::Var(v) => {
+                let (vars, members) = self.reach(vec![*v], true);
+                if members.is_empty()
+                    || vars.iter().any(|v| {
+                        let state = self.var(*v);
+                        state.need_meet.is_none()
+                            && (state.input || (state.lower.is_empty() && state.from.is_empty()))
+                    })
+                {
+                    None
+                } else {
+                    Some(members)
+                }
+            }
+            Ty::Union(ms) => {
+                let mut out = Vec::new();
+                for m in ms {
+                    out.extend(self.known_need_members(m)?);
+                }
+                Some(out)
+            }
+            t if t.is_headed() => Some(vec![t.clone()]),
+            _ => None,
+        }
+    }
+
+    fn known_need_form(&self, t: &Ty) -> Ty {
+        let Ty::Con(h, values, args) = t else {
+            return t.clone();
+        };
+        let args = args
+            .iter()
+            .map(|arg| match self.known_need_members(arg) {
+                Some(mut ms) if ms.len() == 1 => ms.pop().unwrap(),
+                _ => arg.clone(),
+            })
+            .collect();
+        Ty::Con(*h, values.clone(), args)
+    }
+
+    /// Check deferred meets whose arguments became closed values during
+    /// this binding, as well as the concrete upper bounds checked on insertion.
+    pub fn check_need_meets(&mut self) {
+        if !self.has_need_meets {
+            return;
+        }
+        let meets: Vec<_> = self
+            .vars
+            .iter()
+            .enumerate()
+            .filter_map(|(i, state)| state.need_meet.clone().map(|forms| (V(i as u32), forms)))
+            .collect();
+        for (v, (a, b)) in meets {
+            let parts: Vec<_> = self
+                .var(v)
+                .upper
+                .iter()
+                .filter_map(|t| self.known_need_members(t))
+                .collect();
+            let empty = parts.iter().enumerate().any(|(i, xs)| {
+                parts[..i].iter().any(|ys| {
+                    !xs.iter().any(|x| {
+                        ys.iter().any(|y| {
+                            x.head() == y.head()
+                                && (x.scalar().is_none() || !x.values().disjoint(y.values()))
+                        })
+                    })
+                })
+            });
+            if empty {
+                let a = self.known_need_form(&a);
+                let b = self.known_need_form(&b);
+                // An invalid binding is reported once; no successful scheme
+                // can carry this failed obligation into another binding.
+                self.var_mut(v).need_meet = None;
+                self.fail(FailKind::NeedMeet, &a, &b);
+            }
         }
     }
 
@@ -1514,6 +1729,22 @@ impl Solver {
                 }
                 None => self.constrain_in(a, r, env),
             },
+            Ty::Var(v)
+                if env == Mode::Env
+                    && h.iter().all(|m| self.directed(m))
+                    && !self
+                        .reach(vec![*v], true)
+                        .1
+                        .iter()
+                        .any(|b| h.iter().any(|m| m.head() == b.head())) =>
+            {
+                // Rule B: the needs of `a` with a constructor of `H` go to
+                // `H` (routing and `handle`); the rest of `a` is in `R`. Not
+                // putting `H` into the bound of `a` keeps a handler that
+                // mentions `a`'s own row (`! S(N) = …` for a need
+                // `(..M, S(M))`) from making a type that has itself inside.
+                self.constrain_in(a, r, env);
+            }
             _ => {
                 // `H | R`, flat and with no member twice, so that the same
                 // constraint is not made again in a bigger form.
@@ -1564,6 +1795,11 @@ impl Solver {
                     .map(|h| self.extrude(h, Pol::Both, level, Mode::Value, cache))
                     .collect();
                 self.var_mut(nv).handled = handled;
+                if let Some((a, b)) = self.var(*v).need_meet.clone() {
+                    let a = self.extrude(&a, Pol::Both, level, Mode::Value, cache);
+                    let b = self.extrude(&b, Pol::Both, level, Mode::Value, cache);
+                    self.var_mut(nv).need_meet = Some((a, b));
+                }
                 if pol != Pol::Neg {
                     self.var_mut(*v).upper.push(Ty::Var(nv));
                     self.var_mut(nv).from.push(*v);
@@ -1588,9 +1824,8 @@ impl Solver {
                 Ty::Var(nv)
             }
             Ty::Con(h, values, args) => {
-                // §4.5 rule 4: service arguments stay equal across levels,
-                // independently of their ordinary value variance. Inside
-                // an argument, ordinary type rules apply again.
+                // Keep both bounds across levels for a need comparison;
+                // inside each argument, its definition supplies the mode.
                 Ty::Con(
                     *h,
                     values.clone(),
@@ -1653,6 +1888,11 @@ impl Solver {
                     .map(|h| self.freshen(h, above, map))
                     .collect();
                 self.var_mut(nv).handled = handled;
+                if let Some((a, b)) = self.var(*v).need_meet.clone() {
+                    let a = self.freshen(&a, above, map);
+                    let b = self.freshen(&b, above, map);
+                    self.var_mut(nv).need_meet = Some((a, b));
+                }
                 let (lower, upper) = (self.var(*v).lower.clone(), self.var(*v).upper.clone());
                 let lower = lower.iter().map(|b| self.freshen(b, above, map)).collect();
                 let upper = upper.iter().map(|b| self.freshen(b, above, map)).collect();
@@ -1721,8 +1961,8 @@ impl Solver {
         self.union_mode(ms, Mode::Value)
     }
 
-    /// The union of environments (§9.2): two forms of one type constructor
-    /// must have equal arguments, whatever their variance.
+    /// Merge needs by their value intersection (§9.2, §4.4). The row is
+    /// represented internally by a union of its keyed service entries.
     pub fn env_union(&mut self, ms: Vec<Ty>) -> Ty {
         self.union_mode(ms, Mode::Env)
     }
@@ -1735,7 +1975,7 @@ impl Solver {
             ms
         };
         let before = self.failures.len();
-        let t = self.union_in(ms, mode != Mode::Value);
+        let t = self.union_in(ms, mode);
         if mode != Mode::Value
             && let Ty::Union(ms) = &t
             && self.failures.len() == before
@@ -1766,7 +2006,8 @@ impl Solver {
         t
     }
 
-    fn union_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
+    fn union_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
+        let env = mode != Mode::Value;
         let mut flat = Vec::new();
         flatten_union(&ms, &mut flat);
         if !env {
@@ -1793,14 +2034,14 @@ impl Solver {
                     // (§9.2). When they are not, both stay, as they are.
                     let before = self.failures.len();
                     let old = std::mem::replace(&mut out[i], Ty::Never);
-                    out[i] = self.merge(old, m.clone(), true, env);
+                    out[i] = self.merge(old, m.clone(), true, mode);
                     if self.failures.len() > before {
                         out.push(m);
                     }
                 }
                 Some(i) => {
                     let old = std::mem::replace(&mut out[i], Ty::Never);
-                    out[i] = self.merge(old, m, true, env);
+                    out[i] = self.merge(old, m, true, mode);
                 }
                 None => out.push(m),
             }
@@ -1819,7 +2060,7 @@ impl Solver {
         self.normalize_mode(Ty::Inter(ms), Mode::Value)
     }
 
-    fn inter_in(&mut self, ms: Vec<Ty>, env: bool) -> Ty {
+    fn inter_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
         let mut flat = Vec::new();
         for m in ms {
             match m {
@@ -1843,10 +2084,10 @@ impl Solver {
                 .map(|x| {
                     let mut a = flat.clone();
                     a.push(x);
-                    self.inter_in(a, env)
+                    self.inter_in(a, mode)
                 })
                 .collect();
-            return self.union_in(parts, env);
+            return self.union_in(parts, mode);
         }
         let mut out: Vec<Ty> = Vec::new();
         let mut con: Option<Ty> = None;
@@ -1857,7 +2098,7 @@ impl Solver {
                 Ty::Con(..) | Ty::Fn(_) => {
                     con = Some(match con.take() {
                         None => m,
-                        Some(c) if c.head() == m.head() => self.merge(c, m, false, env),
+                        Some(c) if c.head() == m.head() => self.merge(c, m, false, mode),
                         Some(_) => return Ty::Never,
                     });
                     if matches!(con, Some(Ty::Never)) {
@@ -1877,12 +2118,48 @@ impl Solver {
     }
 
     /// Two members with one type constructor, as one: by union when `union`,
-    /// and by intersection when not. In an environment (`env`), the
-    /// arguments must be equal (§9.2).
-    fn merge(&mut self, a: Ty, b: Ty, union: bool, env: bool) -> Ty {
+    /// and by intersection when not. A union of need entries instead takes
+    /// the value intersection of the services (§9.2).
+    fn merge(&mut self, a: Ty, b: Ty, union: bool, mode: Mode) -> Ty {
         match (a, b) {
+            (Ty::Con(h, values, xs), Ty::Con(_, other, ys))
+                if xs.len() == ys.len() && mode == Mode::Env =>
+            {
+                // Rule A: two forms of a service in a row are one entry,
+                // the value meet for a union of needs and the value join
+                // for an intersection.
+                if values != other {
+                    self.fail(
+                        FailKind::EnvForms,
+                        &Ty::Con(h, values.clone(), xs.clone()),
+                        &Ty::Con(h, other, ys.clone()),
+                    );
+                    return Ty::Con(h, values, xs);
+                }
+                let vs = self.variances(h, xs.len());
+                let rows = self.rows(h, xs.len());
+                let mut args = Vec::with_capacity(xs.len());
+                for (((x, y), v), row) in xs.iter().zip(&ys).zip(vs).zip(rows) {
+                    let empty_before = matches!(x, Ty::Never) || matches!(y, Ty::Never);
+                    let arg = if union && v == Variance::Co && !empty_before {
+                        let level = self.level_of(x).max(self.level_of(y));
+                        self.need_meet(
+                            x,
+                            y,
+                            &Ty::Con(h, values.clone(), xs.clone()),
+                            &Ty::Con(h, values.clone(), ys.clone()),
+                            row,
+                            level,
+                        )
+                    } else {
+                        self.merge_arg(x.clone(), y.clone(), v, !union, row)
+                    };
+                    args.push(arg);
+                }
+                Ty::Con(h, values, args)
+            }
             (Ty::Con(h, values, xs), Ty::Con(_, other, ys)) if xs.len() == ys.len() => {
-                if env {
+                if mode != Mode::Value {
                     if values != other {
                         self.fail(
                             FailKind::EnvForms,
@@ -1982,8 +2259,8 @@ impl Solver {
         None
     }
 
-    /// `M - T` for an environment `M` (§4.8 rule 9): the member of `M` that
-    /// is taken out must be equal to its member of `T` (§9.2).
+    /// Remove the services provided by `T` from the need `M`; the provider
+    /// must satisfy each removed entry as a value (§9.2, §4.5 rule 4).
     pub fn env_diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
         self.diff_mode(a, h, Mode::Env)
     }
@@ -2004,7 +2281,7 @@ impl Solver {
                     .into_iter()
                     .map(|m| self.diff_mode(m, hs.clone(), mode))
                     .collect();
-                self.union_in(parts, env)
+                self.union_in(parts, mode)
             }
             Ty::Con(..) if a.scalar().is_some() && mode != Mode::Env => {
                 let sets: Vec<_> = hs
@@ -2022,7 +2299,10 @@ impl Solver {
             Ty::Con(..) | Ty::Fn(_) => match hs.iter().find(|m| m.head() == a.head()) {
                 Some(m) => {
                     let m = m.clone();
-                    if env {
+                    if mode == Mode::Env {
+                        // The need `a` goes to the handler `m` (rule B).
+                        self.constrain_in(&a, &m, Mode::Env);
+                    } else if env {
                         self.equal(&a, &m, FailKind::EnvForms);
                     } else {
                         self.constrain(&a, &m);
@@ -2083,7 +2363,14 @@ impl Solver {
                     .map(|t| self.normalize_mode(t, mode))
                     .collect();
                 let scalar = ms.iter().any(|t| t.scalar().is_some());
-                self.inter_in(ms, mode != Mode::Value && !(mode == Mode::Row && scalar))
+                self.inter_in(
+                    ms,
+                    if mode == Mode::Row && scalar {
+                        Mode::Value
+                    } else {
+                        mode
+                    },
+                )
             }
             Ty::Diff(t, hs) => {
                 let t = self.normalize_mode(*t, mode);
@@ -2265,6 +2552,7 @@ impl Solver {
     pub fn normalized(&self, t: &Ty) -> Option<Solver> {
         let mut view = Solver::new(self.variance.clone(), self.type_names.clone());
         view.vars = self.vars.clone();
+        view.has_need_meets = self.has_need_meets;
         view.row_params = self.row_params.clone();
         view.normalize_type(t).then_some(view)
     }
@@ -2630,6 +2918,29 @@ mod literal_tests {
         Solver::new(StdHashMap::new(), Vec::new())
     }
 
+    #[test]
+    fn closed_data_preserves_need_direction_inside_nominal_arguments() {
+        // The former record-prover probe now uses closed labelled data.
+        // §4.5 rule 4 compares the provider in reverse as a value.
+        let mut s = solver();
+        let (outer, service) = (TypeId(10), TypeId(11));
+        s.variance.insert(outer, vec![Variance::Co]);
+        s.variance.insert(service, vec![Variance::Co]);
+        s.row_params.insert(outer, vec![Mode::Env]);
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        let wide_arg = s.union(vec![int.clone(), string]);
+        let form = |arg| Ty::record(vec![("x".into(), Ty::named(
+            TypeRef::Custom(outer), vec![Ty::named(TypeRef::Custom(service), vec![arg])],
+        ))]);
+        let (narrow, wide) = (form(int), form(wide_arg));
+        let mut forward = s.clone();
+        forward.constrain(&narrow, &wide);
+        assert!(!forward.failures.is_empty());
+        s.constrain(&wide, &narrow);
+        assert!(s.failures.is_empty());
+    }
+
     fn strings(values: &[&str]) -> Ty {
         ValueSet::only(values.iter().map(|s| Arc::from(*s)))
             .map_or(Ty::Never, |set| Ty::lit(BuiltinType::String, set))
@@ -2827,8 +3138,38 @@ mod literal_tests {
     }
 
     #[test]
-    fn service_equality_does_not_widen_literal_arguments() {
-        // §5.1 rule 1 and §10: service forms are equal, not covariant.
+    fn deferred_need_meet_keeps_both_upper_bounds_and_reports_late_conflicts() {
+        let service = TypeRef::Custom(TypeId(0));
+        let mut s = solver();
+        let (x, y) = (s.fresh(), s.fresh());
+        let a = Ty::named(service, vec![x.clone()]);
+        let b = Ty::named(service, vec![y.clone()]);
+        let meet = s.need_meet(&x, &y, &a, &b, Mode::Value, 0);
+        assert!(s.failures.is_empty());
+        let Ty::Var(v) = meet else {
+            panic!("a deferred meet is a variable")
+        };
+        assert_eq!(s.var(v).upper, [x.clone(), y.clone()]);
+        // The arguments remain independent: the meet does not equate them.
+        assert!(s.var(variable(&x)).upper.is_empty());
+        assert!(s.var(variable(&y)).upper.is_empty());
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        let link = s.fresh();
+        s.constrain(&x, &link);
+        s.constrain(&link, &int);
+        assert!(s.failures.is_empty());
+        s.constrain(&y, &string);
+        assert!(
+            s.failures
+                .iter()
+                .any(|f| f.kind == FailKind::NeedMeet && f.lhs == a && f.rhs == b)
+        );
+    }
+
+    #[test]
+    fn service_providers_do_not_widen_needed_literal_arguments() {
+        // §4.5 rule 4: Counter(Int) is not a subtype of the needed Counter(0).
         let counter = TypeId(0);
         let make = |arg| Ty::named(TypeRef::Custom(counter), vec![arg]);
         let zero = Ty::lit(BuiltinType::Int, ValueSet::only([Arc::from("0")]).unwrap());

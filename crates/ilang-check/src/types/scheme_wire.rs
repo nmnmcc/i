@@ -81,6 +81,7 @@ impl SchemeArtifact {
         labelled
             || vars.iter().any(|v| {
                 solver.vars[v.0 as usize].difference
+                    || solver.vars[v.0 as usize].need_meet.is_some()
                     || !solver.vars[v.0 as usize].handled.is_empty()
             })
     }
@@ -205,6 +206,8 @@ struct Variable {
     lower: usize,
     upper: usize,
     handled: usize,
+    #[serde(default)]
+    need_meet: bool,
     from: Vec<usize>,
     into: Vec<usize>,
 }
@@ -237,7 +240,11 @@ fn scheme_roots(s: &Solver, scheme: &Scheme) -> (Vec<V>, FxHashMap<V, usize>, Ve
             }
             roots.push(Ty::tuple(state.lower.clone()));
             roots.push(Ty::tuple(state.upper.clone()));
-            roots.push(Ty::tuple(state.handled.clone()));
+            let mut obligations = state.handled.clone();
+            if let Some((a, b)) = &state.need_meet {
+                obligations.extend([a.clone(), b.clone()]);
+            }
+            roots.push(Ty::tuple(obligations));
         }
     }
     (vars, index, roots)
@@ -265,6 +272,7 @@ pub(super) fn encode(
             lower: st.lower.len(),
             upper: st.upper.len(),
             handled: st.handled.len(),
+            need_meet: st.need_meet.is_some(),
             from: st.from.iter().map(|v| index[v]).collect(),
             into: st.into.iter().map(|v| index[v]).collect(),
         });
@@ -412,9 +420,13 @@ pub(super) fn decode(
     let mut bounds = Vec::with_capacity(vars.len());
     for (i, meta) in bundle.variables.iter().enumerate() {
         let mut parts = Vec::new();
-        for (j, count) in [meta.lower, meta.upper, meta.handled]
-            .into_iter()
-            .enumerate()
+        for (j, count) in [
+            meta.lower,
+            meta.upper,
+            meta.handled + if meta.need_meet { 2 } else { 0 },
+        ]
+        .into_iter()
+        .enumerate()
         {
             let Ty::Con(Head::Shape(_), values, items) = &roots[1 + i * 3 + j] else {
                 return Err("scheme bounds are not a tuple".into());
@@ -442,7 +454,13 @@ pub(super) fn decode(
         st.input = meta.input;
         st.lower = bounds[i][0].clone();
         st.upper = bounds[i][1].clone();
-        st.handled = bounds[i][2].clone();
+        st.handled = bounds[i][2][..meta.handled].to_vec();
+        st.need_meet = meta.need_meet.then(|| {
+            (
+                bounds[i][2][meta.handled].clone(),
+                bounds[i][2][meta.handled + 1].clone(),
+            )
+        });
         st.from = from;
         st.into = into;
         if meta.external.is_some()
@@ -453,6 +471,9 @@ pub(super) fn decode(
         }
         if !st.handled.is_empty() {
             s.has_handlers = true;
+        }
+        if st.need_meet.is_some() {
+            s.has_need_meets = true;
         }
     }
     let ty = roots[0].clone();
@@ -719,6 +740,7 @@ fn tag_scheme_solver(
             .iter_mut()
             .chain(&mut state.upper)
             .chain(&mut state.handled)
+            .chain(state.need_meet.iter_mut().flat_map(|(a, b)| [a, b]))
         {
             *ty = tag_scheme_type(ty, tags, next);
         }
@@ -759,6 +781,7 @@ fn entails_mapped(
         let actual = &subject.vars[mapping[i]];
         if actual.row != wanted.row
             || actual.difference != wanted.difference
+            || actual.need_meet.is_some() != wanted.need_meet.is_some()
             || actual.input != wanted.input
         {
             return Ok(false);
@@ -914,7 +937,7 @@ fn definite_failure(solver: &Solver) -> bool {
         && solver.failures.iter().all(|f| {
             matches!(
                 f.kind,
-                FailKind::Mismatch | FailKind::Values | FailKind::Invariant | FailKind::EnvForms
+                FailKind::Mismatch | FailKind::Values | FailKind::Invariant | FailKind::EnvForms | FailKind::NeedMeet
             )
         })
 }
@@ -1091,6 +1114,7 @@ impl SchemeArtifact {
                     && a.external.is_some() == b.external.is_some()
                     && a.mode == b.mode
                     && a.difference == b.difference
+                    && a.need_meet == b.need_meet
                     && a.input == b.input
                 {
                     matches.push(i);
@@ -1236,13 +1260,22 @@ fn project_hidden(
                 || st.input
                 || st.row != Mode::Value
                 || st.difference
+                || st.need_meet.is_some()
                 || !st.handled.is_empty()
             {
                 return false;
             }
             for state in &solver.vars {
-                for ty in state.lower.iter().chain(&state.upper).chain(&state.handled) {
-                    if variables(ty).contains(&v) && !matches!(ty, Ty::Var(w) if *w == v) {
+                for ty in state
+                    .lower
+                    .iter()
+                    .chain(&state.upper)
+                    .chain(&state.handled)
+                    .chain(state.need_meet.iter().flat_map(|(a, b)| [a, b]))
+                {
+                    if variables(ty).contains(&v)
+                        && !matches!(ty, Ty::Var(w) if *w == v)
+                    {
                         return false;
                     }
                 }
@@ -1310,6 +1343,7 @@ fn project_hidden(
                 .iter_mut()
                 .chain(&mut state.upper)
                 .chain(&mut state.handled)
+                .chain(state.need_meet.iter_mut().flat_map(|(a, b)| [a, b]))
             {
                 *ty = super::alias::map_vars(ty, &mut remap.clone());
             }
@@ -1492,6 +1526,7 @@ fn collapse_equal_variables(
             state.lower.clear();
             state.upper.clear();
             state.handled.clear();
+            state.need_meet = None;
             state.from.clear();
             state.into.clear();
             state.input = false;
@@ -1504,6 +1539,12 @@ fn collapse_equal_variables(
         let out = &mut merged[index];
         out.input |= state.input;
         out.difference |= state.difference;
+        if let Some((a, b)) = &state.need_meet {
+            out.need_meet = Some((
+                super::alias::map_vars(a, &mut remap.clone()),
+                super::alias::map_vars(b, &mut remap.clone()),
+            ));
+        }
         for ty in &state.lower {
             let ty = super::alias::map_vars(ty, &mut remap.clone());
             if ty != Ty::Var(V(index as u32)) && !out.lower.contains(&ty) {

@@ -6,6 +6,7 @@ use crate::{ModuleKind, ModuleSource, Package, PackageGraph};
 /// The module paths and sources of the library modules, and of the prelude.
 pub const MODULES: &[(&str, &str)] = &[
     ("i/fail", include_str!("../../../lib/i/fail.i")),
+    ("i/failure", include_str!("../../../lib/i/failure.i")),
     ("i/control", include_str!("../../../lib/i/control.i")),
     ("i/resource", include_str!("../../../lib/i/resource.i")),
     ("i/assertion", include_str!("../../../lib/i/assertion.i")),

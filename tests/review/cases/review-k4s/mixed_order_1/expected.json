@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "32b10aba775aa3d675d49c37f1cb07220e7452b0",
+  "binary_sha256": "8e1d33b0608793d56a36457c6a6130c250239af3d598944dc0fb4e44c14bc6d9",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int ! S(Int) | S(Int)\n",
-      "stderr": "src/main.i:5:30: error[E0515]: `_` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 5:12 needs it)\n1 error\n"
+      "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int ! S(Int & A)\n",
+      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:5:30: error[E0515]: `_` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 5:12 needs it)\n1 error\n"
+      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:5:30: error[E0515]: `_` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 5:12 needs it)\n1 error\n"
+      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
     }
   }
 }

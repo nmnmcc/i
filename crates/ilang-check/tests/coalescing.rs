@@ -138,7 +138,7 @@ main(N) = () { local: () -> Nil ! N = () { use() } local() }";
             graph.sources.render_all(&checked.diags)
         );
     }
-    // §9.2 compares service arguments equally even when S is covariant.
+    // §9.2 fits the provided service by ordinary value subtyping.
     // Supplying S(Dependency) does not supply its callback's Dependency.
     let dependency = "S(N) { S(() -> Nil ! N) }
 Dependency { Dependency }
