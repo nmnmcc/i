@@ -106,4 +106,5 @@ preserved environment and completion path.
   Firefox and WebKit. This includes all fetch cases at O0/O2, compiled host
   calls after ordinary errors, R2 seeded replays and every runnable R2 law
   body at both optimization levels in each engine.
-- Remaining std/spec/HTTP/Clippy gates: in progress.
+- Final std check and both full std runs pass: **2,171/2,171 at O0 and O2**.
+- Remaining spec/HTTP/Clippy gates: in progress.
