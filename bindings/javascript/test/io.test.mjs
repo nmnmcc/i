@@ -10,14 +10,21 @@ const cli = resolve(root, 'target/debug/i');
 const runner = resolve(root, 'bindings/javascript/run.mjs');
 function build(name) {
   const project = resolve(root, 'examples', name);
-  execFileSync(cli, ['build', '--target', 'host', '--project', project], { cwd: root, stdio: 'pipe' });
+  execFileSync(cli, ['build', '--target', 'nodejs', '--project', project], { cwd: root, stdio: 'pipe' });
   return resolve(project, 'build', name.replaceAll('-', '_') + '.wasm');
 }
 for (const name of ['io-clock', 'io-fs', 'io-net', 'io-udp', 'io-process', 'io-tls']) {
-  test(name, { timeout: 120000 }, () => {
+  test(name, { timeout: 120000 }, async () => {
     const wasm = build(name);
-    const output = execFileSync(process.execPath, [runner, wasm, ...(name === 'io-process' ? ['--', 'alpha', 'beta'] : [])], { cwd: root, encoding: 'utf8', timeout: 100000 });
-    assert.equal(output.trimEnd().split('\n').at(-1), name.slice(3) + ' ok');
+    // An unrelated run's child must not make the scope-cleanup check fail.
+    const unrelated = name === 'io-process' ? spawn('sleep', ['30'], { stdio: 'ignore' }) : null;
+    try {
+      if (unrelated) await once(unrelated, 'spawn');
+      const output = execFileSync(process.execPath, [runner, wasm, ...(name === 'io-process' ? ['--', 'alpha', 'beta'] : [])], { cwd: root, encoding: 'utf8', timeout: 100000 });
+      assert.equal(output.trimEnd().split('\n').at(-1), name.slice(3) + ' ok');
+    } finally {
+      if (unrelated) { unrelated.kill(); await once(unrelated, 'close'); }
+    }
   });
 }
 test('echo handles two simultaneous clients', { timeout: 120000 }, async () => {
