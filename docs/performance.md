@@ -371,3 +371,35 @@ times faster at 1, but takes under a second on `std` either way, while
 every rebuild after an edit takes up to 2.7 times longer. For work on the
 type checker with large inputs, `CARGO_PROFILE_DEV_OPT_LEVEL=1` (or a
 release build) gives the fast checker without changing the default.
+
+## Macro expansion and compiled-code cache
+
+Building the macro registry once per expansion and reusing it for typed
+macros reduced release `i check --project std` from 26.2 to 18.1 CPU seconds
+on the lane machine. The expanded std output was byte-identical.
+
+The global cache retains whole compiled modules as well as individual
+Cranelift functions, subject to the same size and age limits. Set
+`I_CACHE_MODULE_MAX_SIZE=0` to measure function-only reuse. Its compiled-code
+keys include a content hash of the executable, computed once per process.
+Macro compilation itself is not cached across processes: a safe key would need
+all source and macro inputs, compiler and host ABI identities, dependencies,
+configuration, and every observable input to macro execution.
+
+Release `i test --project std --opt 0`, one run per cell, on the shared lane
+machine, with separate initially empty private stores and one Rayon thread:
+
+| Cache entries | Run | CPU (user + system) | Peak RSS | Wall time |
+|---|---|---:|---:|---:|
+| Modules and functions | cold | 353.25 s | 10.99 GiB | 631.98 s |
+| Modules and functions | warm | 250.04 s | 1.00 GiB | 381.58 s |
+| Functions only | cold | 345.72 s | 10.99 GiB | 437.46 s |
+| Functions only | warm | 321.32 s | 11.22 GiB | 379.85 s |
+
+All four passed 2,170 tests with byte-identical stdout and empty stderr. Wall
+times include shared-machine contention and are not directly comparable.
+
+A maintenance measurement used a private 5 GiB sparse fixture with 5,121
+entries and a warm filesystem metadata cache. After a write, the cap check
+walked the entries in 13.9 ms; a due collection took 17.7 ms. These are single
+wall-time observations, not guarantees for other filesystems or cache sizes.

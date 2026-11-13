@@ -510,7 +510,10 @@ fn expand_items_inner(
         };
         let items: Vec<_> = slots.iter().map(|s| s.item.clone()).collect();
         let ready: Vec<_> = slots.iter().map(|s| s.ready).collect();
-        let scoped = engine.scoped.clone();
+        // One copy of the source map serves both this attempt's frozen
+        // definition view and the rollback of a deferred or failed attempt.
+        let frozen = Arc::new(engine.scoped.clone());
+        let scoped = frozen.clone();
         let source = engine.source.0;
         let other_runs = !pending.is_empty();
         let snapshot_epoch = epoch;
@@ -530,7 +533,7 @@ fn expand_items_inner(
                 let snapshot = Snapshot {
                     module,
                     ready: ready.clone(),
-                    scoped: scoped.clone(),
+                    scoped: scoped.as_ref().clone(),
                     source,
                     other_runs,
                     active: Some(index),
@@ -558,7 +561,7 @@ fn expand_items_inner(
             call: slots[index].root,
             path: slots[index].path.clone(),
         };
-        let old_scoped = engine.scoped.clone();
+        let old_scoped = frozen;
         let old_transactions = engine.transactions.len();
         let old_overrides = engine.item_overrides.clone();
         let old_replacements = engine.item_replacements.clone();
@@ -665,7 +668,7 @@ fn expand_items_inner(
                 failure: crate::session::Failure::Aborted(DefinitionAbort::Deferred { at }),
                 ..
             }) => {
-                engine.scoped = old_scoped;
+                engine.scoped = Arc::unwrap_or_clone(old_scoped);
                 engine.item_overrides = old_overrides;
                 engine.item_replacements = old_replacements;
                 engine.transactions.truncate(old_transactions);
@@ -696,7 +699,7 @@ fn expand_items_inner(
             }
             Err(error) => {
                 engine.save_failure_source();
-                engine.scoped = old_scoped;
+                engine.scoped = Arc::unwrap_or_clone(old_scoped);
                 engine.item_overrides = old_overrides;
                 engine.item_replacements = old_replacements;
                 engine.transactions.truncate(old_transactions);
