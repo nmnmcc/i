@@ -215,3 +215,9 @@ Fixture decisions:
   "Lines and columns count from 1; a column counts Unicode scalar values. The
   position of an expression is the position of its first token." The tests
   still require the complete exact stop message, including its position.
+
+
+The 2026-11-14 follow-up merges main-integrated E3/E5/E6 and resolves both
+reported JavaScript traps in focused checks. See
+[the WAT investigation and validation record](effects-e4-js.md). The preceding
+verification section is the 2026-11-13 checkpoint, not the final JS outcome.
