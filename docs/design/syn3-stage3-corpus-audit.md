@@ -382,3 +382,39 @@ The complete expected/actual snapshot is in the shared coordinator cache
 as `s3-r3-corpus-outcomes.json`; the per-case machine classification and
 unified diffs are `s3-r3-corpus-diff.json` and `s3-r3-corpus-diff.txt`.
 The runner log is `s3-r3-corpus.log`.
+
+### Final post-format verification
+
+At `810df51bf`, after formatting the two stage-3 library lines and fixing
+the snippet search-needle context, the release rebuild passes with the
+same binary SHA-256. A second complete shard run again checks 198 cases,
+with 138 accepted / 60 rejected, the same registered censored observation
+and existing XFAIL, and unchanged checker diagnostics. It has seven
+full-output differences: the five above, plus O2 `test2` timeouts in
+`review-r2/cancel_choose` and `review-r2/deadlock`. Both print exactly the
+saved `qa_startup` pass and `1 passed, 0 failed` summary before the timeout.
+`cancel_choose` also fails its accept requirement in that bounded run.
+These are classified as **two outcome differences**, not silently treated
+as successful terminations. No language rule is used to permit them.
+
+The two-case retry keeps each recorded bound of 10 seconds and `--jobs 2`.
+It exits 0 with no observation or requirement differences. Both `test2`
+exits are again 0. `deadlock`'s run phases intentionally exit 1, as saved;
+those exits and messages remain unchanged. No bound, requirement, source,
+or expectation is edited. The full first run, the first post-format run,
+and both retry observations remain available for review.
+
+After that retry, every one of the 198 complete observations is verified
+identical to the first full run, not merely equal in checker acceptance.
+The final classification remains **three shown type, two message only,
+zero outcome**. No new diagnostic coordinate difference appears. The
+three original provider cases match main completely in both runs.
+
+The shared coordinator cache contains `s3-r3-corpus-final.log`,
+`s3-r3-corpus-final-first-outcomes.json`, and
+`s3-r3-corpus-final-first-diff.json` / `.txt` for the raw bounded run.
+`s3-r3-runtime-retry.log` records the unchanged-bound retry. The reconciled
+snapshot and classification are `s3-r3-corpus-final-outcomes.json` and
+`s3-r3-corpus-final-diff.json` / `.txt`; `s3-r3-final-audit.json` records the
+198-case equality check. No observation was re-recorded to obtain this
+result.

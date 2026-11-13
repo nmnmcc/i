@@ -1,5 +1,12 @@
 # Syntax three, stage 3: report
 
+Current landing status, 2026-11-14: **READY for the requested gates**.
+Main and the latest READY conversion fix are merged, the three provider
+observations match main, and the final shard has five explained display
+differences after unchanged-bound retries. The follow-up section below
+supersedes earlier interim blockers. The inherited record-field solver
+limitation remains documented separately.
+
 Stage 3 of `syntax-3.md` §7.2: in today's syntax every type with two or more
 constructors became one-constructor types and an alias; a definition with two
 or more constructors is now E0238.
@@ -351,3 +358,24 @@ wrapped cargo build, avoiding a redundant outer build wrapper.
 
 A fresh release rebuild and another shard run are in progress after this
 cosmetic source cleanup, to confirm the final observation coordinates.
+
+The fresh release rebuild passes and has the same SHA-256. The post-format
+shard completes all 198 cases with the same 138 accepted / 60 rejected
+checks. Besides the original five display differences, its first pass has
+two O2 test budget timeouts, `cancel_choose` and `deadlock`, both after the
+exact passing stdout. The unchanged-bound (10 seconds), two-job retry
+passes both complete observations with no differences or requirement
+failures. `deadlock` retains its expected run exit 1; its test exits are 0.
+No observation, requirement, or bound is changed.
+
+All 198 reconciled complete observations are verified identical to the
+first full run. Final remaining classifications are three shown types,
+two messages, and zero outcomes. The final audit preserves the failed
+bounded observations as well as the successful retries. All requested
+gates are complete; the exact command/result ledger and final hash are in
+`gpt/r2/report-s3-r3.md` in the coordinator cache. The recovery test was
+skipped as requested; four existing checker ignores, the existing spec
+pending list, and the registered stress runtime limit remain. The inherited
+record-field union solver bug is not fixed by this follow-up; the earlier
+report defers it to stage 6's record-graph deletion. Coordinator-owned
+unfiltered gates and main landing remain outside this lane's commands.
