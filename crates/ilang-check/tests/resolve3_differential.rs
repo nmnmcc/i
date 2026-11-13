@@ -24,14 +24,22 @@ fn texts(
     graph: &PackageGraph,
     program: &Program,
     diags: &[Diagnostic],
+    pretty: bool,
 ) -> BTreeMap<String, String> {
+    let show = |d: &dyn std::fmt::Debug| {
+        if pretty {
+            format!("{d:#?}\n")
+        } else {
+            format!("{d:?}\n")
+        }
+    };
     let mut out = BTreeMap::new();
     for (i, module) in program.modules.iter().enumerate() {
         let id = ModuleId(i as u32);
-        let mut text = format!("{module:#?}\n");
+        let mut text = show(module);
         for t in &program.types {
             if t.module == id {
-                text.push_str(&format!("{t:#?}\n"));
+                text.push_str(&show(t));
             }
         }
         for d in diags {
@@ -126,7 +134,7 @@ fn first_difference(a: &str, b: &str) -> String {
 struct Totals {
     files: BTreeSet<String>,
     differ: BTreeSet<String>,
-    reports: Vec<String>,
+    reports: Vec<(String, String)>,
 }
 
 fn compare(name: &str, dir: &Path, totals: &mut Totals) {
@@ -174,8 +182,20 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
     let (old_program, old_diags) = resolve::resolve(&graph, &lowered);
     expected.extend(old_diags);
     let (new_program, new_diags) = resolve::resolve3(&graph, &direct, &modules);
-    let old = texts(&graph, &old_program, &expected);
-    let new = texts(&graph, &new_program, &new_diags);
+    let old = texts(&graph, &old_program, &expected, false);
+    let new = texts(&graph, &new_program, &new_diags, false);
+    if old == new {
+        totals.files.extend(old.into_keys().map(|file| {
+            if file == "<program>" {
+                format!("<program of {name}>")
+            } else {
+                file
+            }
+        }));
+        return;
+    }
+    let old = texts(&graph, &old_program, &expected, true);
+    let new = texts(&graph, &new_program, &new_diags, true);
     for (file, text) in &old {
         let key = if file == "<program>" {
             format!("<program of {name}>")
@@ -185,9 +205,8 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
         totals.files.insert(key.clone());
         let other = new.get(file).map_or("", |t| t.as_str());
         if text != other && totals.differ.insert(key.clone()) {
-            totals
-                .reports
-                .push(format!("{key} (in {name}): {}", first_difference(text, other)));
+            let report = format!("{key} (in {name}): {}", first_difference(text, other));
+            totals.reports.push((key, report));
         }
     }
 }
@@ -206,14 +225,16 @@ fn resolve3_differential() {
     let root = root();
     let only = std::env::var("RESOLVE3_ONLY").ok();
     let wanted = |name: &str| only.as_ref().is_none_or(|o| name.contains(o.as_str()));
-    let mut totals = Totals::default();
+    // The packages: a name, a directory, and the directory to keep for a
+    // lone file.
+    let mut jobs: Vec<(String, PathBuf, Option<tempfile::TempDir>)> = Vec::new();
     if wanted("std") {
-        compare("std", &root.join("std"), &mut totals);
+        jobs.push(("std".into(), root.join("std"), None));
     }
     for dir in subdirs(&root.join("examples")) {
         let name = format!("examples/{}", dir.file_name().unwrap().to_string_lossy());
         if dir.join("i.toml").exists() && wanted(&name) {
-            compare(&name, &dir, &mut totals);
+            jobs.push((name, dir, None));
         }
     }
     for section in subdirs(&root.join("tests/spec")) {
@@ -231,7 +252,7 @@ fn resolve3_differential() {
             }
             if case.is_dir() {
                 if case.join("i.toml").exists() {
-                    compare(&name, &case, &mut totals);
+                    jobs.push((name, case, None));
                 }
             } else if case.extension().is_some_and(|e| e == "i") {
                 // A lone file is `src/main.i` of a package, as in the spec
@@ -249,16 +270,37 @@ fn resolve3_differential() {
                 std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
                 std::fs::create_dir_all(dir.path().join("src")).unwrap();
                 std::fs::write(dir.path().join("src/main.i"), &text).unwrap();
-                // The file is named by its place in the suite.
-                let before = totals.reports.len();
-                compare(&name, dir.path(), &mut totals);
-                for report in &mut totals.reports[before..] {
-                    *report = report.replace(&dir.path().to_string_lossy().into_owned(), &name);
-                }
+                jobs.push((name, dir.path().to_path_buf(), Some(dir)));
             }
         }
     }
-    for report in &totals.reports {
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let all = std::sync::Mutex::new(Totals::default());
+    let workers = std::thread::available_parallelism().map_or(4, |n| n.get().min(8));
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let Some((name, dir, _)) = jobs.get(i) else {
+                        break;
+                    };
+                    let mut totals = Totals::default();
+                    compare(name, dir, &mut totals);
+                    let mut all = all.lock().unwrap();
+                    all.files.extend(totals.files);
+                    for (file, report) in totals.reports {
+                        if all.differ.insert(file.clone()) {
+                            all.reports.push((file, report));
+                        }
+                    }
+                }
+            });
+        }
+    });
+    let mut totals = all.into_inner().unwrap();
+    totals.reports.sort();
+    for (_, report) in &totals.reports {
         eprintln!("DIFFERENT {report}\n");
     }
     let equal = totals.files.len() - totals.differ.len();
