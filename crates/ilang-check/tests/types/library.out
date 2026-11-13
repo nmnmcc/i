@@ -1,20 +1,18 @@
 i/prelude.panic : (String) -> Never
 i/prelude.assert : (Bool) <- (Assert) -> Nil
 i/fail.raise : (A) <- (Fail(A)) -> Never
-i/fail.catch : (() <- (Fail(E), ..N) -> A) <- N -> Result(A, E)
+i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
-i/fail.map_error : (() <- (Fail(E), ..N) -> A, (E) <- N -> B) <- (Fail(B), ..N) -> A
-i/failure.raise : (A) <- (Fail(A)) -> Never
-i/failure.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
-i/control.boundary : ((Boundary(A, B, C)) <- (Fail(B), ..C) -> A) <- (Fail(B), ..C) -> A
-i/control.suspend : (Boundary(A, B, C), (Continuation(D, A, B, C)) <- (Fail(B), ..C) -> A) -> D
-i/control.escape : (Boundary(A, B, C), A) -> Never
-i/control.resume : (Continuation(A, B, C, D), A) <- (Fail(C), ..D) -> B
-i/control.cancel : (Continuation(A, B, C, D)) <- D -> Nil
-i/control.keep : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B
-i/resource.ensure : (() <- (Fail(E), ..N) -> A, () <- N -> Nil) <- (Fail(E), ..N) -> A
-i/resource.acquire : (() <- (Fail(E), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
-i/assertion.catch : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Assert) -> Result(A, AssertionFailure)
+i/fail.map_error : (() <- (Fail(B), ..N) -> A, (B) <- N -> C) <- (Fail(C), ..N) -> A
+i/control.boundary : ((Boundary(A, B)) <- B -> A) <- B -> A
+i/control.suspend : (Boundary(A, B), (Continuation(C, A, B)) <- B -> A) -> C
+i/control.escape : (Boundary(A, B), A) -> Never
+i/control.resume : (Continuation(A, B, C), A) <- C -> B
+i/control.cancel : (Continuation(A, B, C)) <- C -> Nil
+i/control.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
+i/resource.ensure : (() <- (Fail(B), ..N) -> A, () <- (N - Fail(Never)) -> Nil) <- (Fail(B), ..N) -> A
+i/resource.acquire : (() <- (Fail(B), N & { Fail(B) | N2 } & { Fail(Never) | N2 - Fail(Never) }) -> A, (A) <- ({ N & { Fail(B) | N2 } & { Fail(Never) | N2 - Fail(Never) } } - Fail(Never)) -> Nil, (A) <- (Fail(B), N & { Fail(B) | N2 } & { Fail(Never) | N2 - Fail(Never) }) -> C) <- (Fail(B), ..N, ..N2) -> C
+i/assertion.catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
 i/request.new_root : (Key(Nil)) -> Key(Nil)
 i/request.end_root : (Key(Nil)) -> Nil
 i/request.new_owner : (Key(Nil)) -> Key(Nil)
@@ -36,7 +34,7 @@ i/request.settled_root : (Root) -> Bool
 i/request.cancel_all : (Owner) -> Nil
 i/request.cancel_all_root : (Root) -> Nil
 i/request.retain : (A) -> A
-i/request.within : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Owner, Root) -> A
+i/request.within : (() <- (Fail(B), Owner, ..N) -> A) <- (Fail(B), Root, ..N) -> A
 i/request.wait_none : (Owner) <- (Await) -> Nil
 i/request.wait_none_root : (Root) <- (Await) -> Nil
 i/request.ready : (A) -> Request(A)
@@ -52,7 +50,7 @@ i/request.wait_any : (List(Ticket)) -> Nil
 i/request.poll : () -> Nil
 i/request.entry_root : () -> Key(Nil)
 i/request.entry_end : () -> Nil
-i/request._entry : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Await - Owner - Root) -> A
+i/request._entry : (() <- (Await, Fail(B), Owner, Root, ..N) -> A) <- (Fail(B), ..N) -> A
 i/request._provider_root : (List(Root), Key(Nil)) -> Root
 i/request._provider_owner : (List(Owner)) <- (Root) -> Owner
 i/request._provider_await : (List(Await)) -> Await
@@ -173,7 +171,7 @@ i/bits.write_big : (Int, Int, List(BitArray)) -> List(BitArray)
 i/bits.write_little : (Int, Int, List(BitArray)) -> List(BitArray)
 i/bits.reverse : (List(BitArray), List(BitArray)) -> List(BitArray)
 i/bits.min : (Int, Int) -> Int
-i/task.finalizing : (Continuation(A, B, C, D), Boundary(F, G, H)) -> Bool
+i/task.finalizing : (Continuation(A, B, C), Boundary(D, F)) -> Bool
 i/task.no_waiters : WaitQueue
 i/task.address_key : Key(Address)
 i/task.path_key : Key(List(Int))
@@ -227,14 +225,14 @@ i/task.set_task : (State, TaskState) -> State
 i/task.add_task : (State, TaskState) -> State
 i/task.set_scope : (State, ScopeState) -> State
 i/task.guarded : (Scheduler, Maybe(Address), () -> Completion) -> Completion
-i/task.complete : (() <- (Fail(E), ..N) -> A, Key(Result(A, E)), Key(E), Bool) <- N -> Completion
-i/task.make_start : (() <- (Fail(E), ..N) -> A, Key(Result(A, E)), Key(E), Bool) <- (N - request.Await - Runner - Scheduler) -> Start
+i/task.complete : (() <- (Fail(B), ..N) -> A, Key(Result(A, B)), Key(B), Bool) <- N -> Completion
+i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }) -> A, Key(Result(A, B)), Key(B), Bool) <- (N2 - request.Await - Runner - Scheduler, ..N) -> Start
 i/task.worker_enabled : () -> Bool
 i/task.worker_publish : (Job) -> Int
 i/task.worker_claim : (Int) -> Bool
 i/task.worker_adopt : (Int, Int) -> Nil
-i/task.worker_placeholder : () -> Continuation(StepAnswer, Turn, Never, Never)
-i/task.worker_away : (Continuation(StepAnswer, Turn, Never, Never)) -> Bool
+i/task.worker_placeholder : () -> Continuation(StepAnswer, Turn, Never)
+i/task.worker_away : (Continuation(StepAnswer, Turn, Never)) -> Bool
 i/task.worker_send : (Int, Resume) -> Nil
 i/task.worker_inbox : () -> Int
 i/task.worker_message : () -> Remote
@@ -244,11 +242,11 @@ i/task.worker_share_put : (Key(Nil), Address, Keyed) -> Nil
 i/task.worker_share_get : (Key(Nil), Address) -> List(Keyed)
 i/task.worker_share_drop : (Key(Nil), Address) -> Nil
 i/task.drop_shares : (State, List(Address)) -> Nil
-i/task.remote_turn : (Turn, List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool), Key(Nil)) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
-i/task.remote_begin : (Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
-i/task.remote_resume : ((Continuation(StepAnswer, Turn, Never, Never), Resume)) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+i/task.remote_turn : (Turn, List((Continuation(StepAnswer, Turn, Never)) -> Bool), Key(Nil)) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
+i/task.remote_begin : (Job) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
+i/task.remote_resume : ((Continuation(StepAnswer, Turn, Never), Resume)) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
 i/task.publish : (State, List(Int), Start) -> Start
-i/task.frame_finals : (List(Frame)) -> List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool)
+i/task.frame_finals : (List(Frame)) -> List((Continuation(StepAnswer, Turn, Never)) -> Bool)
 i/task.split_flags : (List(Frame), List(Bool)) -> (List(Bool), List(Bool))
 i/task.apply_finals : (List(Frame), List(Bool)) -> List(Frame)
 i/task.pull : (State) -> State
@@ -264,7 +262,7 @@ i/task.root_forget : (Key(Nil)) -> Nil
 i/task.root_allocate : () -> List(Int)
 i/task.initial : (request.Root) -> Runner
 i/task.run_control : (StepAnswer) -> RunControl
-i/task.make_scheduler : (Boundary(Turn, Never, Never), List(Int), Int, Key(Nil), request.Root, Runner) -> Scheduler
+i/task.make_scheduler : (Boundary(Turn, Never), List(Int), Int, Key(Nil), request.Root, Runner) -> Scheduler
 i/task.list_map : (List(A), (A) -> B) -> List(B)
 i/task.any : (List(A), (A) -> Bool) -> Bool
 i/task.filter : (List(A), (A) -> Bool) -> List(A)
@@ -285,7 +283,7 @@ i/task.compact_sources : (State, List(Leaf)) -> State
 i/task.set_channel : (State, ChannelState) -> State
 i/task.queue : (State, Int) -> State
 i/task.has_ready : (State) -> Bool
-i/task.reply : (State, Int, Continuation(StepAnswer, Turn, Never, Never), StepAnswer, Bool) -> State
+i/task.reply : (State, Int, Continuation(StepAnswer, Turn, Never), StepAnswer, Bool) -> State
 i/task.accept_cancel : (State, TaskState, Cause) -> State
 i/task.propagate_tasks : (State, List(ActiveTask)) -> State
 i/task.propagate : (State) -> State
@@ -304,7 +302,7 @@ i/task.commit_partner : (State, Waiter, Keyed) -> State
 i/task.probe_leaf : (State, Leaf, Int, Maybe(Request(Registration))) -> Commit
 i/task.probe : (State, List(Leaf), Int, Maybe(Request(Registration))) -> Commit
 i/task.register_leaves : (State, Request(Registration), List(Leaf), Int) -> State
-i/task.select : (State, TaskState, Continuation(StepAnswer, Turn, Never, Never), List(Leaf)) -> State
+i/task.select : (State, TaskState, Continuation(StepAnswer, Turn, Never), List(Leaf)) -> State
 i/task.wake_source_waiters : (State, List(Waiter)) -> State
 i/task.wake_source_rows : (State, List(Int)) -> State
 i/task.wake_sources : (State) -> State
@@ -324,11 +322,11 @@ i/task.find_share : (TaskStore(ShareState), Address) -> Keyed
 i/task.prevalidate : (State, TaskState, Command) -> Nil
 i/task.add_forward : (List(Forward), Key(Nil), List(Ticket)) -> List(Forward)
 i/task.end_frame : (List(Frame), Address) -> List(Frame)
-i/task.do_command : (State, TaskState, Continuation(StepAnswer, Turn, Never, Never), Command) -> State
+i/task.do_command : (State, TaskState, Continuation(StepAnswer, Turn, Never), Command) -> State
 i/task.cancellation_reply : (TaskState) -> Bool
-i/task.finals_changed : (List(Frame), Continuation(StepAnswer, Turn, Never, Never)) -> Bool
-i/task.update_finals : (List(Frame), Continuation(StepAnswer, Turn, Never, Never)) -> List(Frame)
-i/task.on_command : (State, Int, Command, Continuation(StepAnswer, Turn, Never, Never), Maybe(List(Bool))) -> State
+i/task.finals_changed : (List(Frame), Continuation(StepAnswer, Turn, Never)) -> Bool
+i/task.update_finals : (List(Frame), Continuation(StepAnswer, Turn, Never)) -> List(Frame)
+i/task.on_command : (State, Int, Command, Continuation(StepAnswer, Turn, Never), Maybe(List(Bool))) -> State
 i/task.observe_completion : (State, TaskState, Completion) -> State
 i/task.turn : (State, TaskState) -> Turn
 i/task.interests_tasks : (State, List(Int)) -> List(Ticket)
@@ -341,43 +339,43 @@ i/task.script_rows : (State, List(ActiveTask), List(Int)) -> Maybe(TaskState)
 i/task.script_task : (State, List(Int)) -> Maybe(TaskState)
 i/task.choose_turn : (State) -> State
 i/task.loop : (State) -> RunReply
-i/task.scope_call_body : ((Scope(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
-i/task.scope : ((Scope(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), N - request.Owner, Scheduler) -> B
-i/task.local_scope : ((Scope(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), N - request.Owner, Scheduler) -> B
-i/task.go_key : (Scope(A), () <- (Fail(A), ..N) -> B, Key(Result(B, A))) <- (N - request.Await - Runner - Scheduler, Scheduler) -> Task(B, A)
-i/task.go : (Scope(A), () <- (Fail(A), ..N) -> B) <- (N - request.Await - Runner - Scheduler, Scheduler) -> Task(B, A)
+i/task.scope_call_body : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
+i/task.scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), Scheduler, ..N) -> B
+i/task.local_scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), Scheduler, ..N) -> B
+i/task.go_key : (Group(A), () <- (Fail(A), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }) -> B, Key(Result(B, A))) <- (N2 - request.Await - Runner - Scheduler, Scheduler, ..N) -> Task(B, A)
+i/task.go : (Group(A), () <- (Fail(A), N & { Fail(A) | { Fail(Never) | request.Await | Runner | Scheduler | N } & { Scheduler | N } }) -> B) <- (Scheduler, ..N) -> Task(B, A)
 i/task.branch_at : (List(Branch(A, B, C)), Int) -> Branch(A, B, C)
 i/task.sync_body : (Event(A, B, C), Scheduler) <- (Fail(B), ..C) -> A
 i/task.always : (A) -> Event(A, Never, Never)
 i/task.never : () -> Event(Never, Never, Never)
 i/task.branches_of : (List(Event(A, B, C))) -> List(Branch(A, B, C))
 i/task.choose : (List(Event(A, B, C))) -> Event(A, B, C)
-i/task.map : (Event(A, B, C), (A) <- (Fail(E), ..N) -> D) -> Event(D, B | E, C | N)
+i/task.map : (Event(A, B, C), (A) <- (Fail(B), ..N) -> D) -> Event(D, B, C | N)
 i/task.join_event : (Task(A, B)) -> Event(A, B, Never)
-i/task.join : (Task(A, B)) <- (Fail(B), Scheduler) -> A
+i/task.join : (Task(A, B & C)) <- (Fail(C), Scheduler) -> A
 i/task.channel : () <- (Scheduler) -> Channel(A)
 i/task.local_channel : () <- (Scheduler) -> Channel(A)
 i/task.send_event : (Channel(A), A) -> Event(Nil, Never, Never)
 i/task.receive_event : (Channel(A)) -> Event(A, Never, Never)
 i/task.send : (Channel(A), A) <- (Scheduler) -> Nil
 i/task.receive : (Channel(A)) <- (Scheduler) -> A
-i/task.share : (Scope(A), B) <- (Scheduler) -> Shared(B)
+i/task.share : (Group(A), B) <- (Scheduler) -> Shared(B)
 i/task.get : (Shared(A)) <- (Scheduler) -> A
-i/task.keep : ((A) <- (Fail(E), ..N) -> B) <- (N - request.Await - Runner - Scheduler, Scheduler) -> (A) <- (Fail(E), Scheduler) -> B
+i/task.keep : ((A) <- (Fail(C), Runner, Scheduler, request.Await, ..N) -> B) <- (Scheduler, ..N) -> (A) <- (Fail(C), Scheduler) -> B
 i/task.ref : (A) <- (Scheduler) -> Ref(A)
 i/task.update : (Ref(A), (A) -> (A, B)) <- (Scheduler) -> B
-i/task.both : (() <- (Fail(E), ..N) -> A, () <- (Fail(E), ..N) -> B) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner, Scheduler) -> (A, B)
-i/task.race : (() <- (Fail(E), ..N) -> A, () <- (Fail(E), ..N) -> A) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner, Scheduler) -> A
-i/task.spawn_values : (Scope(A), List(B), (B) <- (Fail(A), ..N) -> C) <- (N - request.Await - Runner - Scheduler, Scheduler) -> List(Task(C, A))
-i/task.join_values : (List(Task(A, B))) <- (Fail(B), Scheduler) -> List(A)
-i/task.map_concurrently : (List(A), (A) <- (Fail(E), ..N) -> B) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner, Scheduler) -> List(B)
-i/task.execute_body : (() <- (Fail(E), ..N) -> A, Runner, rng.Generator, Policy) <- (N - request.Await - Runner - Scheduler - request.Owner - request.Root) -> Result(Result(A, E), ScheduleError)
-i/task.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner - request.Root, Runner) -> A
-i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(E), ..N) -> A) <- (Fail(E | ScheduleError), N - request.Await - Runner - Scheduler - request.Owner - request.Root, Runner) -> A
-i/task._entry : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner - request.Root, request.Root) -> A
-i/task.scope_call : ((Scope(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), N - request.Owner) -> ScopeResult(B)
-i/task.execute : (() <- (Fail(E), ..N) -> A, Runner, rng.Generator, Policy) <- (N - request.Await - Runner - Scheduler - request.Owner - request.Root) -> Result(Result(A, E), ScheduleError)
-i/task.sync : (Event(A, B, C)) <- (Fail(B), Scheduler, ..C) -> A
+i/task.both : (() <- (Fail(B), ..N) -> A, () <- (Fail(B), ..N) -> C) <- (Fail(B), Scheduler, ..N) -> (A, C)
+i/task.race : (() <- (Fail(B), { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A, () <- (Fail(B), { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A) <- (Fail(B), Scheduler, ..N) -> A
+i/task.spawn_values : (Group(A), List(B), (B) <- (Fail(A), ..N) -> C) <- (Scheduler, ..N) -> List(Task(C, A))
+i/task.join_values : (List(Task(A, B & C))) <- (Fail(C), Scheduler) -> List(A)
+i/task.map_concurrently : (List(A), (A) <- (Fail(C), ..N) -> B) <- (Fail(C), Scheduler, ..N) -> List(B)
+i/task.execute_body : (() <- (Fail(B), N & { Fail(B) | N2 & { Fail(Never) | request.Await | Runner | Scheduler | N3 } }) -> A, Runner, rng.Generator, Policy) <- (N2 - request.Owner - request.Root, N3 - request.Await - Runner - Scheduler - request.Owner - request.Root, ..N) -> Result(Result(A, B), ScheduleError)
+i/task.run : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(B) } } & { N2 | Fail(B) } }) -> A) <- (Fail(B), Runner, ..N, ..N2) -> A
+i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(B) } } & { N2 | Fail(B) } }) -> A) <- (Fail(B | ScheduleError), Runner, ..N, ..N2) -> A
+i/task._entry : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(B) } } & { N2 | Fail(B) } }) -> A) <- (Fail(B), N - Runner, N2 - Runner, request.Root) -> A
+i/task.scope_call : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
+i/task.execute : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(C & B) } } & { N2 | Fail(C & B) } }) -> A, Runner, rng.Generator, Policy) <- (Fail(C), ..N, ..N2) -> Result(Result(A, B), ScheduleError)
+i/task.sync : (Event(A, B, C | Fail(B))) <- (Fail(B), Scheduler, ..C) -> A
 i/task.root_active : (Key(Nil), Active) -> RunControl
 i/task.cause_allowed : (State, TaskState, Cause) -> Bool
 i/task.frame_abort : (List(Frame)) -> Maybe(() -> Never)
@@ -403,7 +401,7 @@ i/task.current_relay : (TaskState) -> (ForeignNotice, Keyed, Bool) -> Keyed
 i/task.forward_response : (State, TaskState, ForeignNotice) -> State
 i/task.scope_end_reply : (State, TaskState, ScopeState) -> StepAnswer
 i/task.queue_scope_end : (State, TaskState, ScopeState) -> State
-i/task.finish_scope : (State, TaskState, Continuation(StepAnswer, Turn, Never, Never), ScopeInfo) -> State
+i/task.finish_scope : (State, TaskState, Continuation(StepAnswer, Turn, Never), ScopeInfo) -> State
 i/task.anchor_epoch : (List(Frame), Maybe(Address)) -> Maybe(Maybe(Cause))
 i/task.unwinding_above : (List(Frame), Maybe(Address)) -> Bool
 i/task.notice_ready : (TaskState, Hop) -> Bool
@@ -413,7 +411,7 @@ i/task.apply_notice : (State, TaskState, ForeignNotice) -> State
 i/task.pump_task_messages : (State, Int) -> State
 i/task.pump_rows : (State, List(ActiveTask)) -> State
 i/task.pump_messages : (State) -> State
-i/task.relay_notice : (State, TaskState, Continuation(StepAnswer, Turn, Never, Never), ForeignNotice, Keyed, Bool) -> State
+i/task.relay_notice : (State, TaskState, Continuation(StepAnswer, Turn, Never), ForeignNotice, Keyed, Bool) -> State
 i/task.notice_hops : (ForeignNotice) -> List(Hop)
 i/task._provider_runner : (List(Runner)) <- (request.Root) -> Runner
 i/task._provider_scheduler : (List(Scheduler)) -> Scheduler
@@ -594,7 +592,7 @@ i/tls.raise : (String) <- (Fail(TlsError)) -> Never
 i/tls.finish : (Request(Result(Int, String))) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
 i/tls.connect : (net.Stream, String, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
 i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError | net.NetError), Tls, net.Net, request.Await, request.Owner) -> Stream
+i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(net.NetError | TlsError), Tls, net.Net, request.Await, request.Owner) -> Stream
 i/tls.alpn : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> String
 i/tls.read : (Stream, Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray
 i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil
