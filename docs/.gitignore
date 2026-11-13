@@ -23,3 +23,4 @@ pnpm-debug.log*
 # Generated from repository sources
 content/docs/standard/generated/
 content/docs/library/generated/
+content/docs/contributing/generated/

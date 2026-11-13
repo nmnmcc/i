@@ -10,7 +10,7 @@
     "start": "astro dev",
     "types:check": "astro sync && tsc --noEmit",
     "astro": "astro",
-    "generate": "python3 scripts/generate-standard.py && python3 scripts/generate-library.py",
+    "generate": "python3 scripts/generate-standard.py && python3 scripts/generate-library.py && python3 scripts/generate-design-index.py",
     "prebuild": "npm run generate",
     "predev": "npm run generate",
     "check:links": "python3 scripts/check-links.py"
