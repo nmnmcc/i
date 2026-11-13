@@ -5,7 +5,6 @@ use crate::{Diagnostic, span::Span};
 use std::collections::{HashMap, HashSet};
 pub mod groups;
 pub mod pre;
-pub mod providers;
 
 #[derive(Clone, Debug, Default)]
 pub struct Transition {

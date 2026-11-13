@@ -338,7 +338,7 @@ main = () {
 }
 
 #[test]
-fn a_single_use_provider_keeps_its_contract_before_generalization() {
+fn a_single_use_provider_keeps_its_contract_for_resolution() {
     let source = "S(N) = (f = () <- N -> Int)\nwrap = (body) { provided: S(_) = S(f = () { 1 }) body() <- (provided) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
@@ -348,17 +348,29 @@ fn a_single_use_provider_keeps_its_contract_before_generalization() {
     let ilang_syntax::ast::ExprKind::Fn(function) = &binding.value.kind else {
         panic!()
     };
-    assert_eq!(function.body.stmts.len(), 2);
-    let ilang_syntax::ast::Stmt::Env { ty, value, .. } = &function.body.stmts[0] else {
+    // Aliases are resolved before deciding whether this temporary can be
+    // fused. Lowering must retain its full written contract and original value.
+    assert_eq!(function.body.stmts.len(), 3);
+    let ilang_syntax::ast::Stmt::Bind(provider) = &function.body.stmts[0] else {
+        panic!()
+    };
+    let ilang_syntax::ast::PatternKind::Typed { ty, .. } = &provider.pattern.kind else {
         panic!()
     };
     assert!(
         matches!(&ty.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "S")
     );
     assert!(matches!(
-        &value.kind,
+        &provider.value.kind,
         ilang_syntax::ast::ExprKind::Call { .. }
     ));
+    let ilang_syntax::ast::Stmt::Env { ty, value, .. } = &function.body.stmts[1] else {
+        panic!()
+    };
+    assert!(matches!(ty.kind, ilang_syntax::ast::TypeKind::Hole));
+    assert!(
+        matches!(&value.kind, ilang_syntax::ast::ExprKind::Name { name, .. } if name.name == "provided")
+    );
 
     let used = source.replace("body() <-", "body(provided) <-");
     let (module, errors) = ilang_syntax::parse_module(&used);
@@ -381,7 +393,7 @@ fn a_closed_function_provider_keeps_its_generalization_boundary() {
 
     // §4.7/§4.8: preserve the closed function value's scheme and the
     // actual-provider checks deferred through it. Open contracts are
-    // independently pinned by a_single_use_provider_keeps_its_contract_before_generalization.
+    // independently pinned by a_single_use_provider_keeps_its_contract_for_resolution.
     let source = "Reader(A) = (get = () -> A)\nwith_int = (body) { provided: Reader(Int) = Reader(get = () -> Int { 1 }) body() <- (provided) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");

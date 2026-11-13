@@ -5,7 +5,6 @@
 use super::ast::*;
 
 pub trait Visitor {
-    fn binding(&mut self, _b: &mut Binding, _enter: bool) {}
     fn expr(&mut self, _e: &mut Expr, _enter: bool) {}
     fn pattern(&mut self, _p: &mut Pattern, _enter: bool) {}
     fn ty(&mut self, _t: &mut Type, _enter: bool) {}
@@ -42,10 +41,8 @@ pub fn item(i: &mut Item, v: &mut impl Visitor) {
 }
 
 fn binding(b: &mut Binding, v: &mut impl Visitor) {
-    v.binding(b, true);
     pattern(&mut b.pattern, v);
     expr(&mut b.value, v);
-    v.binding(b, false);
 }
 
 fn ditems(items: &mut [DItem], v: &mut impl Visitor) {

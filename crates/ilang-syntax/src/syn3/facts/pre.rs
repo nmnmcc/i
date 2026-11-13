@@ -82,7 +82,7 @@ pub fn chain_return(fs: &[n::Function]) -> Option<Return<'_>> {
 #[derive(Default)]
 pub struct Pre {
     pub errors: Vec<Diagnostic>,
-    pub providers: HashSet<super::providers::Key>,
+    pub functions: HashSet<Span>,
     /// By the address of the first function of a chain: its fresh
     /// parameters.
     pub args: HashMap<usize, Vec<String>>,
@@ -527,7 +527,6 @@ pub fn pre_with(
         out: Pre {
             lisp,
             core_free: core_free(m),
-            providers: super::providers::module_with(m, lisp, generated_from, transition),
             ..Pre::default()
         },
         rows: Vec::new(),
@@ -547,10 +546,7 @@ pub fn pre_expr_with(e: &n::Expr, transition: &Transition) -> Pre {
         transition: transition.clone(),
         fragment: None,
         generated_from: None,
-        out: Pre {
-            providers: super::providers::expression_with(e, transition),
-            ..Pre::default()
-        },
+        out: Pre { ..Pre::default() },
         rows: Vec::new(),
         fresh: 0,
     };
@@ -585,6 +581,7 @@ impl Cx {
         self.out.type_params.extend(cx.out.type_params);
         self.out.matches.extend(cx.out.matches);
         self.out.never.extend(cx.out.never);
+        self.out.functions.extend(cx.out.functions);
     }
     fn error(&mut self, span: Span, message: impl Into<String>) {
         self.out
@@ -863,6 +860,7 @@ impl Cx {
     }
 
     fn chain(&mut self, fs: &[n::Function], span: Span, bound: bool) {
+        self.out.functions.insert(span);
         for f in fs {
             self.keys(f);
             if !bound && !f.generics.is_empty() {
@@ -1029,6 +1027,7 @@ impl Cx {
             n::ExprKind::Provide { target, services } => self.provide(target, services),
             n::ExprKind::Field { .. } if is_core_never(self.out.core_free, e) => {
                 self.out.never.insert(addr(e));
+                self.out.functions.insert(span);
             }
             n::ExprKind::Field { target, .. } | n::ExprKind::Index { target, .. } => {
                 self.expr(target)
@@ -1308,10 +1307,7 @@ pub fn pre_pattern(pattern: &n::Pattern) -> Pre {
         transition: Default::default(),
         fragment: None,
         generated_from: None,
-        out: Pre {
-            providers: super::providers::pattern(pattern),
-            ..Pre::default()
-        },
+        out: Pre { ..Pre::default() },
         rows: Vec::new(),
         fresh: 0,
     };

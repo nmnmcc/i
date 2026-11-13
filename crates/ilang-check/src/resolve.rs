@@ -3911,11 +3911,113 @@ impl<'a> Resolver<'a> {
         })
     }
 
+    /// Provider contracts are classified after aliases and imports resolve.
+    /// A syntactically bare alias can still hide an inference hole.
+    fn open_provider_contract(&self, t: &Type) -> bool {
+        let mut pending = vec![t.clone()];
+        while let Some(t) = pending.pop() {
+            if let Some(expanded) = self.expand_alias(&t) {
+                pending.push(expanded);
+                continue;
+            }
+            match t.kind {
+                TypeKind::Hole | TypeKind::Var(_) | TypeKind::Of { .. } | TypeKind::Error => {
+                    return true;
+                }
+                TypeKind::Named {
+                    ty: TypeRef::Custom(id),
+                    ..
+                } if self.circular.contains(&id) => return true,
+                TypeKind::Named { args, .. }
+                | TypeKind::Tuple(args)
+                | TypeKind::Union(args)
+                | TypeKind::Inter(args)
+                | TypeKind::Diff(args) => pending.extend(args),
+                TypeKind::Record { fields } => pending.extend(fields.into_iter().map(|(_, t)| t)),
+                TypeKind::Fn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                } => {
+                    pending.extend(params.into_iter().map(|p| p.ty));
+                    pending.push(*ret);
+                    pending.extend(err.into_iter().map(|t| *t));
+                    pending.extend(env.into_iter().map(|t| *t));
+                }
+                TypeKind::Lit(_) => {}
+            }
+        }
+        false
+    }
+
     fn block(&mut self, b: &ast::Block) -> Block {
         let mark = self.locals.len();
         let mut stmts = Vec::new();
-        for s in &b.stmts {
-            stmts.push(match s {
+        use ilang_syntax::walk::{Visitor, Walk};
+        #[derive(Default)]
+        struct Uses(HashMap<String, usize>);
+        impl Visitor for Uses {
+            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
+                if enter && let ast::ExprKind::Name { module: None, name } = &e.kind {
+                    *self.0.entry(name.name.clone()).or_default() += 1;
+                }
+            }
+        }
+        #[derive(Default)]
+        struct Functions(bool);
+        impl Visitor for Functions {
+            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
+                if enter {
+                    self.0 |= matches!(e.kind, ast::ExprKind::Fn(_) | ast::ExprKind::Clauses(_));
+                }
+            }
+        }
+        let mut uses = Uses::default();
+        if b.stmts.windows(2).any(|ss| matches!(ss,
+            [ast::Stmt::Bind(ast::Binding { pattern: ast::Pattern { kind: ast::PatternKind::Typed { .. }, .. }, .. }),
+             ast::Stmt::Env { ty, .. }] if matches!(ty.kind, ast::TypeKind::Hole))) {
+            b.clone().walk(&mut uses);
+        }
+        let mut i = 0;
+        while i < b.stmts.len() {
+            if let (
+                ast::Stmt::Bind(binding),
+                Some(ast::Stmt::Env {
+                    ty: key,
+                    value,
+                    span,
+                }),
+            ) = (&b.stmts[i], b.stmts.get(i + 1))
+                && matches!(key.kind, ast::TypeKind::Hole)
+                && binding.type_params.is_empty()
+                && let ast::PatternKind::Typed { binder, ty } = &binding.pattern.kind
+                && !binder.discard
+                && matches!(&value.kind, ast::ExprKind::Name { module: None, name } if name.name == binder.name)
+                && uses.0.get(&binder.name) == Some(&1)
+            {
+                let contract = self.ty(ty);
+                let open = self.open_provider_contract(&contract);
+                let mut functions = Functions::default();
+                if !open {
+                    binding.value.clone().walk(&mut functions);
+                }
+                // An open contract must survive before local generalization.
+                // A closed function value keeps its existing scheme boundary
+                // and the actual-provider checks deferred through that scheme.
+                if open || !functions.0 {
+                    self.env_type(&contract);
+                    let value = self.expr(&binding.value);
+                    stmts.push(Stmt::Env {
+                        ty: contract,
+                        value,
+                        span: *span,
+                    });
+                    i += 2;
+                    continue;
+                }
+            }
+            stmts.push(match &b.stmts[i] {
                 ast::Stmt::Bind(binding) => {
                     let (binding, binders) = self.binding(binding, false);
                     self.local_table(&binding);
@@ -3943,6 +4045,7 @@ impl<'a> Resolver<'a> {
                 }
                 ast::Stmt::Expr(e) => Stmt::Expr(self.expr(e)),
             });
+            i += 1;
         }
         self.locals.truncate(mark);
         Block {

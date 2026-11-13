@@ -26,6 +26,7 @@ mod pre;
 use super::*;
 use ilang_syntax::ast as o;
 use ilang_syntax::syn3::ast as n;
+use ilang_syntax::syn3::walk as nwalk;
 use pre::{
     AndPlan, ChainKind, Inner, Pre, addr, and_plan, attribute_call, attribute_strings, chain_kind,
     head_params, id, is_core_never, is_match, keyed_plan, provide_apart,
@@ -385,7 +386,6 @@ enum VStmt<'x> {
     /// The environment statement of the service `e`, whose value is `e` or
     /// the fresh local that holds it.
     Env(Option<String>, &'x n::Expr),
-    TypedEnv(&'x n::Type, &'x n::Expr, Span),
 }
 
 enum VSubject<'x> {
@@ -2608,31 +2608,6 @@ impl<'a, 't> R3<'a, 't> {
                 n::Stmt::Expr(e) => local.push(VStmt::Expr(e)),
             }
         }
-        let mut i = 0;
-        while i + 1 < local.len() {
-            let contract = match (&local[i], &local[i + 1]) {
-                (VStmt::Bind(binding), VStmt::Env(None, name))
-                    if self.pre().providers.contains(&(
-                        binding.span.0,
-                        binding.pattern.span.0,
-                        name.span.0,
-                    )) =>
-                {
-                    let binding = *binding;
-                    let n::PatternKind::Typed { ty, .. } = &binding.pattern.kind else {
-                        unreachable!()
-                    };
-                    Some((ty, &binding.value, name.span.0))
-                }
-                _ => None,
-            };
-            if let Some((ty, value, span)) = contract {
-                local.remove(i);
-                local[i] = VStmt::TypedEnv(ty, value, span);
-            } else {
-                i += 1;
-            }
-        }
         out.extend(local);
     }
 
@@ -2690,21 +2665,76 @@ impl<'a, 't> R3<'a, 't> {
     fn stmts(&mut self, list: Vec<VStmt>) -> Vec<Stmt> {
         let mark = self.locals.len();
         let mut stmts = Vec::new();
-        for s in list {
+        struct Uses(HashMap<String, usize>);
+        impl nwalk::Visitor for Uses {
+            fn expr(&mut self, e: &mut n::Expr, enter: bool) {
+                if enter && let n::ExprKind::Name { module: None, name } = &e.kind {
+                    *self.0.entry(name.name.clone()).or_default() += 1;
+                }
+            }
+        }
+        let mut uses = Uses(HashMap::new());
+        for s in &list {
+            match s {
+                VStmt::Bind(b) => {
+                    nwalk::pattern(&mut b.pattern.clone(), &mut uses);
+                    nwalk::expr(&mut b.value.clone(), &mut uses);
+                }
+                VStmt::Expr(e) | VStmt::Service(_, e) | VStmt::Env(_, e) => {
+                    nwalk::expr(&mut (*e).clone(), &mut uses)
+                }
+            }
+        }
+        let mut i = 0;
+        while i < list.len() {
+            if let (VStmt::Bind(binding), Some(VStmt::Env(None, value))) =
+                (&list[i], list.get(i + 1))
+                && self
+                    .pre()
+                    .type_params
+                    .get(&addr(*binding))
+                    .is_none_or(Vec::is_empty)
+                && let n::PatternKind::Typed { binder, ty } = &binding.pattern.kind
+                && !binder.discard
+                && matches!(&value.kind, n::ExprKind::Name { module: None, name } if name.name == binder.name)
+                && uses.0.get(&binder.name) == Some(&1)
+            {
+                let contract = self.ty(ty);
+                let open = self.open_provider_contract(&contract);
+                struct Functions<'a>(&'a HashSet<Span>, bool);
+                impl nwalk::Visitor for Functions<'_> {
+                    fn expr(&mut self, e: &mut n::Expr, enter: bool) {
+                        if enter {
+                            self.1 |= self.0.contains(&e.span.0);
+                        }
+                    }
+                }
+                let mut functions = Functions(&self.pre().functions, false);
+                if !open {
+                    nwalk::expr(&mut binding.value.clone(), &mut functions);
+                }
+                if open || !functions.1 {
+                    self.env_type(&contract);
+                    let result = self.expr(&binding.value);
+                    stmts.push(Stmt::Env {
+                        ty: contract,
+                        value: result,
+                        span: value.span.0,
+                    });
+                    i += 2;
+                    continue;
+                }
+            }
+            let s = &list[i];
             let bound = match s {
                 VStmt::Bind(binding) => Some(self.binding(binding, false)),
-                VStmt::Service(name, e) => {
-                    Some(self.binding_of(&VPat::Fresh(name, e.span.0), e, e.span.0, &[], false))
-                }
-                VStmt::TypedEnv(ty, value, span) => {
-                    let ty = self.ty(ty);
-                    if !matches!(ty.kind, TypeKind::Hole) {
-                        self.env_type(&ty);
-                    }
-                    let value = self.expr(value);
-                    stmts.push(Stmt::Env { ty, value, span });
-                    None
-                }
+                VStmt::Service(name, e) => Some(self.binding_of(
+                    &VPat::Fresh(name.clone(), e.span.0),
+                    e,
+                    e.span.0,
+                    &[],
+                    false,
+                )),
                 VStmt::Env(name, e) => {
                     // The key of the service is read from the type of its
                     // value: the type of the statement is `_`.
@@ -2740,6 +2770,7 @@ impl<'a, 't> R3<'a, 't> {
                 self.local_table(&binding);
                 stmts.push(Stmt::Bind(binding));
             }
+            i += 1;
         }
         self.locals.truncate(mark);
         stmts
