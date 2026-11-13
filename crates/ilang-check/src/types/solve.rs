@@ -744,25 +744,36 @@ impl Solver {
     /// Hidden difference and need-meet constraints cannot be thrown away by
     /// rebuilding only the visible type. Keep the bounded scheme in this case.
     pub fn has_obligations(&self, t: &Ty) -> bool {
-        if !self.has_handlers && !self.has_need_meets {
+        self.retained_obligations(t, true)
+    }
+
+    fn retained_obligations(&self, t: &Ty, handlers: bool) -> bool {
+        if !(handlers && self.has_handlers) && !self.has_need_meets {
             return false;
         }
         let mut edges = Vec::new();
         bound_vars(self, t, true, false, &mut edges);
-        let mut todo: Vec<_> = edges.drain(..).map(|e| e.0).collect();
+        let mut todo: Vec<_> = edges.drain(..).map(|e| (e.0, handlers)).collect();
         let mut seen = HashSet::default();
-        while let Some(v) = todo.pop() {
-            if !seen.insert(v) {
+        while let Some((v, handlers)) = todo.pop() {
+            if !seen.insert((v, handlers)) {
                 continue;
             }
             let st = self.var(v);
-            if st.difference || st.need_meet.is_some() {
+            if (handlers && st.difference) || st.need_meet.is_some() {
                 return true;
             }
             for b in st.lower.iter().chain(&st.upper) {
                 bound_vars(self, b, true, false, &mut edges);
             }
-            todo.extend(edges.drain(..).map(|e| e.0));
+            todo.extend(edges.drain(..).map(|e| (e.0, handlers)));
+            if self.has_need_meets {
+                // A meet may reach a wider variable through an inclusion
+                // stored only at the predecessor. Its admissibility still
+                // constrains the instance. Handler discovery keeps its
+                // existing directed traversal.
+                todo.extend(st.from.iter().chain(&st.into).map(|v| (*v, false)));
+            }
         }
         false
     }
@@ -1204,8 +1215,8 @@ impl Solver {
                 }
                 // A bound that already proves the goal needs no choice,
                 // even if another member could be specialized to prove it.
-                let mut demand = super::prove::Demand::new(super::prove::Demand::LIMIT);
                 if tries.iter().any(|t| {
+                    let mut demand = super::prove::Demand::new(super::prove::Demand::LIMIT);
                     super::prove::prove_mode(self, t, r, env, &mut demand)
                         == super::prove::Verdict::Proven
                 }) {
@@ -2020,6 +2031,11 @@ impl Solver {
     /// Instantiates a type scheme: copies the variables deeper than `above`
     /// to new variables at the current level, with their bounds.
     pub fn freshen(&mut self, t: &Ty, above: u32, map: &mut StdHashMap<V, V>) -> Ty {
+        let reverse = self.level_of(t) > above && self.retained_obligations(t, false);
+        self.freshen_in(t, above, map, reverse)
+    }
+
+    fn freshen_in(&mut self, t: &Ty, above: u32, map: &mut StdHashMap<V, V>, reverse: bool) -> Ty {
         if self.level_of(t) <= above {
             return t.clone();
         }
@@ -2035,19 +2051,41 @@ impl Solver {
                 let handled = self.var(*v).handled.clone();
                 let handled = handled
                     .iter()
-                    .map(|h| self.freshen(h, above, map))
+                    .map(|h| self.freshen_in(h, above, map, reverse))
                     .collect();
                 self.var_mut(nv).handled = handled;
                 if let Some((a, b)) = self.var(*v).need_meet.clone() {
-                    let a = self.freshen(&a, above, map);
-                    let b = self.freshen(&b, above, map);
+                    let a = self.freshen_in(&a, above, map, reverse);
+                    let b = self.freshen_in(&b, above, map, reverse);
                     self.var_mut(nv).need_meet = Some((a, b));
                 }
                 let (lower, upper) = (self.var(*v).lower.clone(), self.var(*v).upper.clone());
-                let lower = lower.iter().map(|b| self.freshen(b, above, map)).collect();
-                let upper = upper.iter().map(|b| self.freshen(b, above, map)).collect();
+                let lower = lower
+                    .iter()
+                    .map(|b| self.freshen_in(b, above, map, reverse))
+                    .collect();
+                let upper = upper
+                    .iter()
+                    .map(|b| self.freshen_in(b, above, map, reverse))
+                    .collect();
                 self.set_lower(nv, lower);
                 self.set_upper(nv, upper);
+                if reverse {
+                    // The scheme's admissibility may live at a meet that
+                    // flows to this variable. Copy its connected quantified
+                    // bounds with this same map; do not attach the meet's
+                    // upper bounds to the wider receiver itself.
+                    let edges: Vec<_> = self
+                        .var(*v)
+                        .from
+                        .iter()
+                        .chain(&self.var(*v).into)
+                        .copied()
+                        .collect();
+                    for w in edges {
+                        self.freshen_in(&Ty::Var(w), above, map, true);
+                    }
+                }
                 Ty::Var(nv)
             }
             Ty::Union(ms) if self.is_row(t) => {
@@ -2055,10 +2093,15 @@ impl Solver {
                 // Otherwise generalization can leave its only receiver
                 // behind, losing comparisons of forms instantiated later.
                 let mode = self.mode(t);
-                let ms = ms.iter().map(|m| self.freshen(m, above, map)).collect();
+                let ms = ms
+                    .iter()
+                    .map(|m| self.freshen_in(m, above, map, reverse))
+                    .collect();
                 self.union_mode(ms, mode)
             }
-            _ => self.map_children(t, Pol::Pos, &mut |s, x, _| s.freshen(x, above, map)),
+            _ => self.map_children(t, Pol::Pos, &mut |s, x, _| {
+                s.freshen_in(x, above, map, reverse)
+            }),
         }
     }
 
@@ -3534,6 +3577,38 @@ mod literal_tests {
     }
 
     #[test]
+    fn deferred_need_meet_predecessors_are_instantiated_with_the_receiver() {
+        let mut s = solver();
+        s.level = 1;
+        let (x, y) = (s.fresh(), s.fresh());
+        let service = TypeRef::Custom(TypeId(0));
+        let a = Ty::named(service, vec![x.clone()]);
+        let b = Ty::named(service, vec![y.clone()]);
+        let meet = s.need_meet(&x, &y, &a, &b, Mode::Value, 1);
+        let receiver = s.fresh();
+        s.constrain(&meet, &receiver);
+        assert!(s.has_obligations(&receiver));
+        s.level = 2;
+        let mut map = StdHashMap::new();
+        let instance = s.freshen(&receiver, 0, &mut map);
+        assert!(s.has_obligations(&instance));
+        assert!(map.contains_key(&variable(&meet)));
+        s.constrain(
+            &Ty::Var(map[&variable(&x)]),
+            &Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
+        );
+        assert!(s.failures.is_empty());
+        s.constrain(
+            &Ty::Var(map[&variable(&y)]),
+            &Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]),
+        );
+        assert!(s.failures.iter().any(|f| f.kind == FailKind::NeedMeet));
+        assert!(s.var(variable(&meet)).need_meet.is_some());
+        assert!(s.var(variable(&x)).upper.is_empty());
+        assert!(s.var(variable(&y)).upper.is_empty());
+    }
+
+    #[test]
     fn deferred_need_meet_keeps_both_upper_bounds_and_reports_late_conflicts() {
         let service = TypeRef::Custom(TypeId(0));
         let mut s = solver();
@@ -3544,9 +3619,10 @@ mod literal_tests {
         assert!(s.failures.is_empty());
         assert!(s.has_obligations(&meet));
         assert!(!s.has_obligations(&Ty::Never));
-        let receiver = s.fresh();
-        s.constrain(&meet, &receiver);
-        assert!(s.has_obligations(&receiver));
+        let mut receiving = s.clone();
+        let receiver = receiving.fresh();
+        receiving.constrain(&meet, &receiver);
+        assert!(receiving.has_obligations(&receiver));
         let Ty::Var(v) = meet else {
             panic!("a deferred meet is a variable")
         };

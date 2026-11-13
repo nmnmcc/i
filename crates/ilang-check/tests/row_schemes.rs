@@ -905,6 +905,11 @@ use = () { both(need_int, need_string) }";
             "{:?}",
             graph.sources.render_all(&diags)
         );
+        assert!(
+            errors[0].message.contains("empty intersection"),
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
     }
 }
 
