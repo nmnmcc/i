@@ -331,3 +331,23 @@ The exact verification commands, exits, and log paths are recorded in the
 coordinator cache's `gpt/r2/report-s3-r3.md` and JSON command ledgers.
 All heavy commands are serial and wrapped. Formatting, clippy, and snippet
 checks are queued for a shared slot; this checkpoint awaits those gates.
+
+All static gates now pass: Rust formatting, full-root i formatting,
+workspace/all-target/all-feature clippy with warnings denied, 4,776 normal
+snippet sources, 34 Lisp files and 89 macro fragments, and eight snippet
+helper tests. The first i format check listed `std/src/http.i` and
+`std/src/test.is`; applying the existing formatter wraps the longer stage-3
+names and adds an optional trailing comma to the HTTP result tuple. The
+diff changes no body or string. Repository formatter property tests had
+already checked canonical-tree preservation and idempotence.
+
+The first snippet run found `"\nwith_int"`, the READY alias regression's
+replacement search needle. Its new inventory entry supplies the exact
+`Reader` prefix and `with_int` tail from `types/soundness.i`; the assembled
+snippet is verified to be that file's prefix. It is parsed normally, with
+no exemption or diagnostic recording. The checker regression still pins
+all four Reader E0515 errors. The retry uses the snippet script's own
+wrapped cargo build, avoiding a redundant outer build wrapper.
+
+A fresh release rebuild and another shard run are in progress after this
+cosmetic source cleanup, to confirm the final observation coordinates.

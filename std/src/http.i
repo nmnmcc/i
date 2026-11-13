@@ -482,7 +482,11 @@ validate_framing = (hs: AnyHeaders) -> Nil {
 	Nil
 }
 
-read_body = (hs: AnyHeaders, xs: List(Int)) -> (BitArray, AnyHeaders, List(Int)) {
+read_body = (hs: AnyHeaders, xs: List(Int)) -> (
+	BitArray,
+	AnyHeaders,
+	List(Int),
+) {
 	validate_framing(hs)
 	lengths = list.concat(
 		list.map(headers(hs, "content-length"), (value) {
