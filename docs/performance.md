@@ -765,6 +765,36 @@ system) falls from 320.78 to 265.34 seconds at O0 and from 436.58 to
 promise of the same timing on other machines. The bounded emission was
 first committed at `3bb591db` after the O2 run passed.
 
-The 4097-note metadata regression passes, as does workspace `cargo fmt
---all -- --check`. Broader host, Wasm, CLI and spec verification is running
-at this measurement checkpoint.
+The 4097-note metadata regression passes. Final compatibility verification
+also passes. Every heavy command below ran through `$H`; Cargo commands
+used `direnv exec /home/agent/Programming/i`, and standard Rust test
+harnesses used `RUST_TEST_THREADS=2`.
+
+| Verification | Result |
+|---|---|
+| `cargo test --release -p ilang-host -p ilang-wasm --locked` | 165 passed |
+| `cargo test --release -p ilang-cli --test many_tests --test compile_time_tests --test native --test compile_cache --test determinism --test commands --test macro_budget --locked` | 48 passed |
+| `cargo test --release -p ilang-cli --test spec --locked -- FILTER` for `9/`, `10/`, `11/`, `9.7/`, `9.8/`, `10.` | 127, 6, 51, 17, 4, 14 cases passed respectively; 219 distinct cases, each at O0 and O2 |
+| `i test --project examples/hello` | 2 passed |
+| `i test --project bench` | 15 passed |
+| `i test --project examples/macro-tests` | 9 passed, 1 skipped, as configured |
+| `i test --project std http` | 66 passed; complete output matches the baseline result lines selected by the same name substring, in the same order, plus the summary |
+| `cargo clippy --release -p ilang-host -p ilang-wasm --all-targets --locked -- -D warnings` | passed |
+| `cargo fmt --all -- --check` and `git diff --check` | passed |
+
+The slash spec filters also match dotted sections ending with the same
+number: for example, `11/` includes `9.11/`. The extra filters cover the
+remaining subsections, including the test-entry cases in `10.2/`.
+
+The first host/Wasm command exposed one pre-existing fixture mismatch:
+main `95b1b500` changed the shared browser fixture to ABI 4, while the
+legacy metadata unit test still explicitly asserted ABI 3. Commit
+`399a7c3e` constructs that test's intended ABI 3 fixture from its WAT and
+retains every assertion; other tests keep using the shared current
+fixture. The complete host/Wasm rerun passes. No production ABI code or
+language rules changed.
+
+The full workspace run, unfiltered spec/corpus and CI execution remain
+with the coordinator. No partitioning or per-module linking was needed;
+the collection is still compiled once and every selected test still gets
+its own started instance.
