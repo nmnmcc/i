@@ -232,12 +232,6 @@ pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
     parse3(source)
 }
 
-/// Read all datums with the rows before syntax three (the migrator).
-#[cfg(feature = "legacy")]
-pub fn parse_legacy(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    parse_lexed(crate::lexer::lex_lisp(source))
-}
-
 /// Read all datums of a syntax-three Lisp file, where `<-` is one symbol.
 pub fn parse3(source: &str) -> Result<Document, Vec<Diagnostic>> {
     parse_lexed(crate::lexer::lex3_lisp(source))
@@ -273,16 +267,6 @@ fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> 
 /// Parse a Lisp-surface source file into the common core tree.
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
     crate::syn3::parse_lisp_lowered(source)
-}
-
-/// Parses a Lisp-surface file with the rows before syntax three (the
-/// migrator).
-#[cfg(feature = "legacy")]
-pub fn parse_source_legacy(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
-    match parse_legacy(source).and_then(|d| parse_module(&d).map_err(|e| vec![e])) {
-        Ok(module) => (module, Vec::new()),
-        Err(diags) => (crate::ast::Module::default(), diags),
-    }
 }
 
 /// Format a Lisp module without discarding its ordinary comments.

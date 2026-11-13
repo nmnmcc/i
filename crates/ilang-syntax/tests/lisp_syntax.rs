@@ -128,11 +128,14 @@ fn made_atoms_are_one_valid_token_and_keep_origin() {
         Node::Name("a b".into()),
         Node::Discard("x".into()),
         Node::Symbol("//".into()),
+        Node::Symbol("< -".into()),
         Node::Float(-0.0),
         Node::Float(f64::INFINITY),
     ] {
         assert!(Syntax::make(node, &like).is_err());
     }
+    // Spec §1.5 cuts `<-` as one token on both surfaces (§14.1).
+    assert!(Syntax::make(Node::Symbol("<-".into()), &like).is_ok());
     assert!(Syntax::make(Node::Symbol("^".into()), &like).is_ok());
     let from_answer = like.as_answer();
     let made = Syntax::make(Node::Name("x".into()), &from_answer).unwrap();

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Parse repository Lisp files and generated CLI macro fragments with syntax three.
-Run scripts/old-syntax-check first to build the shared parser driver.
+Run scripts/check-snippets first to build the shared parser driver.
 """
 import os
 from pathlib import Path
@@ -10,7 +10,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 os.chdir(ROOT)
-check = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
+check = runpy.run_path(str(ROOT / 'scripts/check-snippets'))
 files = subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.is'], cwd=ROOT, text=True).splitlines()
 files = sorted(set(files))
 sources = [(name, (ROOT / name).read_text()) for name in files]
@@ -33,7 +33,7 @@ for name in ['crates/ilang-cli/tests/macro_run.rs', 'crates/ilang-cli/tests/type
             sources.append((name + ':' + str(host[:start].count('\n') + 1), source))
 tool = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/parse-snippets'
 if not tool.is_file():
-    raise SystemExit('run scripts/old-syntax-check first to build the parser driver')
+    raise SystemExit('run scripts/check-snippets first to build the parser driver')
 data = b''.join(str(len(source.encode())).encode() + b'\n' + source.encode() for _, source in sources)
 result = subprocess.check_output([str(tool), '--lisp'], input=data).decode().splitlines()
 output = iter(result)

@@ -393,3 +393,14 @@ outcomes remain report-only as classified by the model.
 The full workspace test run, unfiltered spec/corpus and dev-verify remain
 coordinator gates and were not run. Deletion is still unapplied and step four
 will be recorded separately.
+
+
+## Step-four stage12 integration, 06:26
+
+On `lane/fa-delete`, merging stage12 preserves all row-test functions from
+both parents. No soundness golden is edited. The exact command below passes
+(exit0; log target/fa-r3/s12-check.log). Deletion is still unapplied.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
+```

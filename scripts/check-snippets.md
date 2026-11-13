@@ -1,4 +1,4 @@
-Run `scripts/old-syntax-check` in the development shell. It builds the small
+Run `scripts/check-snippets` in the development shell. It builds the small
 `ilang-syntax` parser driver, using the shared heavy-job slot when run in a
 redesign lane. It invokes only the new parser. It never scans whole Rust,
 JavaScript or Markdown files for keyword words.
@@ -7,7 +7,7 @@ The extractor reads every tracked `.i` file and every fenced `i` block in
 Markdown. Its Rust lexer decodes ordinary and raw string literals, skipping
 comments and character literals. Its JavaScript lexer decodes strings and
 templates, skipping comments. Source-shaped decoded literals are candidates;
-`scripts/old-syntax-check.json` records reviewed ambiguous literals, templates
+`scripts/check-snippets.json` records reviewed ambiguous literals, templates
 and assembly fragments. Non-i literals such as TOML manifests, ABI messages
 and source-position search strings have explicit reasons. They are also sent
 to the parser, but their parser result is not an i-source assertion. A changed
@@ -27,7 +27,7 @@ inside an unterminated literal. The compiler and normal test suites still read
 the original files, including the comments.
 
 Later-track examples in accepted design notes have a single entry here, in
-`scripts/old-syntax-check.json`, with `track`, `reason` and the current exact
+`scripts/check-snippets.json`, with `track`, `reason` and the current exact
 diagnostics. They are always parsed. A successful parse or changed diagnostic
 fails the check. Their owning track must remove the entry when its
 syntax lands. There is no blanket exemption for any design note or crate.
@@ -36,7 +36,7 @@ Templates use explicit substitutions from the actual generator; assembly
 fragments state their surrounding source. Normal runtime tests continue to
 exercise the full generators. `--inventory` prints the extracted sources and
 parser results for review; it does not update expectations or make a failing
-check pass. Run `python3 -I scripts/old-syntax-check-test` for the extraction and
+check pass. Run `python3 -I scripts/check-snippets-test` for the extraction and
 expectation regressions.
 
 The inventory driver also reports an unqualified `@main` attribute as E0301;

@@ -804,12 +804,15 @@ impl Solver {
         }
         self.has_handlers = true;
         for w in self.reach(vec![v], true).0 {
-            if (w.0 as usize) < self.rigid_boundary || self.var(w).handled.contains(h) {
+            let installed = self.var(w).handled.contains(h);
+            if (w.0 as usize) < self.rigid_boundary || installed && self.var(w).row != Mode::Env {
                 continue;
             }
-            self.observe(w);
-            self.var_mut(w).difference = true;
-            self.var_mut(w).handled.push(h.clone());
+            if !installed {
+                self.observe(w);
+                self.var_mut(w).difference = true;
+                self.var_mut(w).handled.push(h.clone());
+            }
             if self.var(w).row == Mode::Env {
                 // Rule B: a need for `h`'s constructor that reaches the
                 // row goes to the handler `h`, which must provide it.
@@ -2051,6 +2054,13 @@ impl Solver {
         }
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
+            if mode == Mode::Env
+                && let Ty::Diff(a, hs) = &m
+            {
+                // A cached handler installation is not a diagnostic check of
+                // this use. Validate its current needs when forming the row.
+                self.diff_bound_mode(a, hs, mode);
+            }
             if matches!(m, Ty::Never) || out.contains(&m) {
                 continue;
             }
@@ -3222,6 +3232,33 @@ mod literal_tests {
         s.constrain_env(&strings(&["a"]), &v);
         assert_eq!(s.failures.len(), 1);
         assert_eq!(s.failures[0].kind, FailKind::EnvForms);
+    }
+    #[test]
+    fn environment_difference_checks_each_use_without_reversing_provider_direction() {
+        // §9.2: P must be a subtype of S. A cached handler installation
+        // must not suppress the conflict when the row is used again.
+        let reader = TypeId(0);
+        let make = |arg| Ty::named(TypeRef::Custom(reader), vec![arg]);
+        let need = make(Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new()));
+        let bad = make(Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new()));
+        let good = make(Ty::lit(
+            BuiltinType::String,
+            ValueSet::only([Arc::from("ok")]).unwrap(),
+        ));
+        for (provider, valid) in [(bad, false), (good, true)] {
+            let mut s = solver();
+            s.variance.insert(reader, vec![Variance::Co]);
+            let row = s.fresh();
+            let rest = s.env_diff(row.clone(), vec![provider]);
+            s.constrain_env(&need, &row);
+            assert_eq!(s.failures.is_empty(), valid);
+            for _ in 0..2 {
+                s.failures.clear();
+                s.env_union(vec![rest.clone()]);
+                assert_eq!(s.failures.is_empty(), valid);
+                assert!(s.failures.iter().all(|f| f.kind == FailKind::EnvForms));
+            }
+        }
     }
 }
 

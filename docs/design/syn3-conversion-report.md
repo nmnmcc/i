@@ -18,8 +18,17 @@ lane runs; the lists it names are the authority.
   a labelled type after. Before this rule (fixed in 7405234b) the re-run
   9fd733b4 read hand-written `Box(A) = (A)` snippets again as the old syntax
   and turned them into names `Box(A) = { (A) }`; those were restored.
-- The syntax-three parser is the default; the old parser stays behind the
-  cargo feature `legacy` of `ilang-syntax`, for the migrators only.
+- Syntax three is unconditional. Stage 12 removes the production legacy
+  parser and formatter and the `legacy` Cargo feature. Historical migration
+  inputs use the frozen private readers under
+  `crates/ilang-syntax/examples/support/legacy/`, shared with the conversion
+  regression tests. The compiler cannot select those readers.
+- `scripts/check-snippets` is the exact-diagnostic embedded-source gate used
+  by the conversion lane, renamed from `old-syntax-check`. Its JSON retains
+  every source expectation; only the obsolete `_syn2_old_forms` description
+  is removed. Negative-fixture comments retain their existing marker spelling
+  so source bytes and diagnostic positions remain unchanged. The conversion
+  tools remain available because their regression inputs still use old text.
 
 ## What is not converted, or converted with a loss
 

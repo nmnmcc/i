@@ -1,11 +1,4 @@
 {
-  "_syn2_old_forms": [
-    "error types written with ?",
-    "record values and types written in braces",
-    "labelled or empty tuple forms",
-    "empty record value {..} and all-record type {..}",
-    "@main entry annotation"
-  ],
   "crates/ilang-binaryen/build.rs:b32ae27c34fddd40": {
     "not_source": "Cargo build instruction"
   },

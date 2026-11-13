@@ -36,7 +36,7 @@ fi
 export SYN3_EMBEDDED_SINCE="$since"
 bin=${SYN3_MIGRATE:-}
 if [ -z "$bin" ]; then
-	cargo build --release --locked -p ilang-syntax --features legacy --example migrate-syntax3
+	cargo build --release --locked -p ilang-syntax --example migrate-syntax3
 	bin=$repo/target/release/examples/migrate-syntax3
 fi
 out=$repo/target/syn3

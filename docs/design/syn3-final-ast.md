@@ -274,7 +274,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
 | 3 resolver | GREEN: expanded Nov14 gate completes on native source `3499484118`; all requested Rust/CLI/std/spec/generation/fmt/clippy checks pass |
-| 4 deletion | PREPARED ONLY: guarded fa2 driver and eight integration helpers committed; exact green step3 proof and matching five-case engine capture required before applying |
+| 4 deletion | IN PROGRESS on lane/fa-delete: stage12 merged and workspace all-targets check passes; original engine answers still to capture; production old tree not yet deleted |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -799,3 +799,13 @@ and the closed-function generalization boundary is retained. Step four is
 still unapplied; the detailed command/result record is in
 `syn3-final-ast-fa-verification.md`. The historical fa2 null-round failure
 does not reproduce; no guessed backend fix or expectation change is made.
+
+
+06:26: stage12 `58a35636` merges after green native prefix`6de9a39b6`.
+The append-only row-test conflict retains every test from both parents,
+including two incoming regressions and both alias-aware provider cases.
+Alias-aware provider resolution and cached handler-row validation both remain.
+Wrapped workspace all-targets check passes; this is a compiling integration
+milestone, not the full deletion gate. Next capture the five matching
+engine answers, then apply the guarded deletion. The unchanged null-round
+assertion passed both2170-test std runs before this merge.
