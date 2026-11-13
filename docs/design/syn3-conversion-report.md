@@ -685,3 +685,11 @@ signatures and functions assembled by macro_run/typed_macros. The existing
 length-prefixed parser driver has a --lisp mode; normal inventory semantics
 are unchanged. New gate and typed-macro rerun are pending behind the shared
 load guard. This remains an unlandable checkpoint until all gates finish.
+
+Typed macros now pass all 36 cases. Connected the companion Lisp inventory
+to the ordinary inventory command, with actual generator substitutions for
+the row-algebra and declared-macro templates. No diagnostics were allowed
+or weakened. Combined inventory passes: 4,762 normal snippets, 34 .is files
+and 89 CLI macro fragments; the eight inventory helper tests also pass.
+Feature-enabled syntax/clippy, requested spec/std and full corpus gates
+remain in progress.
