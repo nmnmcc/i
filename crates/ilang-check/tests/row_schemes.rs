@@ -932,3 +932,10 @@ fn intersection_inference_never_selects_a_variable_by_operand_order() {
         ));
     }
 }
+
+#[test]
+fn flexible_value_bounds_do_not_close_deferred_need_arguments() {
+    let source = include_str!("../../../tests/spec/9/need_meet_deferred_values.i");
+    types(source);
+    types(&source.replace("read(x) read(y)", "read(y) read(x)"));
+}

@@ -1205,7 +1205,8 @@ impl Solver {
                 // that accepted a bound, losing other valid solutions.
                 let (conc, vars): (Vec<Ty>, Vec<Ty>) = ms.iter().cloned().partition(Ty::is_headed);
                 let mut tries = Vec::new();
-                if !conc.is_empty() {
+                let has_concrete = !conc.is_empty();
+                if has_concrete {
                     tries.push(self.normalize_mode(Ty::Inter(conc), env));
                 }
                 tries.extend(vars);
@@ -1225,7 +1226,35 @@ impl Solver {
                 let before = self.failures.len();
                 let mut solution: Option<Self> = None;
                 let mut unresolved = false;
-                for t in &tries {
+                let start = if has_concrete {
+                    // A concrete constructor supplies the structural proof
+                    // independently of the variable members (§4.4). Keep
+                    // that existing inference path before choosing among
+                    // residual variables, including fresh pattern holes.
+                    let mut trial = self.clone();
+                    trial.constrain_in(&tries[0], r, env);
+                    if trial.failures.len() == before {
+                        *self = trial;
+                        return;
+                    }
+                    unresolved = trial.failures[before..].iter().any(|f| {
+                        matches!(
+                            f.kind,
+                            FailKind::Ambiguous | FailKind::NonPrincipalIntersection
+                        )
+                    });
+                    if tries.len() == 2 && !unresolved {
+                        // There is only one remaining constraint, so apply
+                        // it directly, retaining its ordinary diagnostic and
+                        // recovery state rather than an invented root error.
+                        self.constrain_in(&tries[1], r, env);
+                        return;
+                    }
+                    1
+                } else {
+                    0
+                };
+                for t in &tries[start..] {
                     let mut trial = self.clone();
                     trial.constrain_in(t, r, env);
                     if trial.failures.len() != before {
@@ -1709,6 +1738,11 @@ impl Solver {
             Ty::Never => None,
             Ty::Var(v) => {
                 let (vars, members) = self.reach(vec![*v], true);
+                // Even an input is determined when equal concrete lower
+                // and upper bounds fix it. Lower bounds alone may widen.
+                if members.len() == 1 && self.reach(vec![*v], false).1.contains(&members[0]) {
+                    return Some(members);
+                }
                 if members.is_empty()
                     || vars.iter().any(|v| {
                         let state = self.var(*v);
@@ -2062,6 +2096,16 @@ impl Solver {
                 map.insert(*v, nv);
                 self.var_mut(nv).row = self.var(*v).row;
                 self.var_mut(nv).difference = self.var(*v).difference;
+                if reverse
+                    && self.var(*v).row == Mode::Value
+                    && self.var(*v).input
+                    && self.retained_obligations(&Ty::Var(*v), false)
+                {
+                    // An instantiated input may acquire only lower bounds
+                    // from ordinary arguments. Do not mistake those for a
+                    // closed meet operand. Row closure keeps its own policy.
+                    self.var_mut(nv).input = true;
+                }
                 let handled = self.var(*v).handled.clone();
                 let handled = handled
                     .iter()
@@ -3537,6 +3581,42 @@ mod literal_tests {
         s.constrain(&w, &strings(&["a"]));
         s.constrain(&v, &w);
         assert!(!s.failures.is_empty());
+    }
+
+    #[test]
+    fn intersection_constructor_proofs_and_unique_failures_keep_their_behavior() {
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        let other = Ty::tuple(vec![]);
+        let boxed = |arg| Ty::named(TypeRef::Custom(TypeId(0)), vec![arg]);
+        for reverse in [false, true] {
+            let mut s = solver();
+            s.variance.insert(TypeId(0), vec![Variance::Co]);
+            let (a, result) = (s.fresh(), s.fresh());
+            let mut parts = vec![a.clone(), boxed(int.clone())];
+            if reverse {
+                parts.reverse();
+            }
+            s.constrain(
+                &Ty::Inter(parts),
+                &Ty::Union(vec![boxed(result.clone()), other.clone()]),
+            );
+            assert!(s.failures.is_empty());
+            assert!(s.var(variable(&a)).upper.is_empty());
+            assert_eq!(s.var(variable(&result)).lower, [int.clone()]);
+
+            let mut s = solver();
+            let a = s.fresh();
+            s.constrain(&int, &a);
+            let mut parts = vec![a, int.clone()];
+            if reverse {
+                parts.reverse();
+            }
+            s.constrain(&Ty::Inter(parts), &string);
+            assert_eq!(s.failures.len(), 1);
+            assert_eq!(s.failures[0].lhs, int);
+            assert_eq!(s.failures[0].rhs, string);
+        }
     }
 
     #[test]
