@@ -14,8 +14,8 @@ mismatches and two additional requirement failures (`proj/q35` and
 `cancel_choose`). There were no checker crashes or checker timeouts.
 One observation was censored and one known failure remained XFAIL.
 
-No expected observation, requirement, bound, or source fixture was changed
-by this audit. The subsequent merge `62bc17079` changes only the captured-row
+The first-run audit changed no expected observation, requirement, bound, or
+source fixture. The subsequent merge `62bc17079` changes only the captured-row
 CLI fixture and a lowering test; its compiler is the same binary.
 
 The classifications below are deliberately strict: changing a diagnostic
@@ -26,6 +26,12 @@ tests at both optimization levels; its changed failure sites do not change
 its runtime outcome.
 
 Initial classifications: **11 message only, 144 shown type, 15 outcome**. The other 28 cases match.
+
+The unchanged-bound two-case retry completed with all phase exits and runtime
+outputs matching the saved observations. Its only remaining differences are
+check type notation. After that retry the classification is **11 message
+only, 146 shown type, 13 outcome**, plus the unchanged 28 cases. The initial
+timeouts remain preserved in the first-run artifacts.
 
 ## Reading the classifications
 
@@ -95,11 +101,44 @@ result, but not the complete written need `N`. Its E0505 disappears while
 `loop = (x) { x(x) }` still fails. These fixtures must regain the original
 binding contract under spec §4.7; the two-error observations remain intact.
 
-**O8 — two resource observations, unresolved in the first run.**
+**O8 — two resource observations, resolved by unchanged-bound retry.**
 `cancel_choose.test2` and `deadlock.test2` time out after printing their
 complete passing summaries. Check, O0 tests, and O0/O2 program runs retain
-the expected results. An unchanged-bound, two-case retry is recorded
-separately. No timeout is approved as a language-outcome change.
+the expected results. The two-case retry used the original bounds and both
+O2 tests completed successfully. Every program/test phase then matched the
+baseline exactly (including the expected deadlock panic); only type notation
+differs. The retry command still exits 1 for those two display differences,
+with no requirement failures. No bound or observation was changed.
+
+## Contract restorations after the first audit
+
+Commit `022f42dc1` restores complete written needs in all 60 permutation
+fixtures, takes conversion's exact corrections for `missing_3_4_0_1` and
+`mutual_recursive`, and adopts its exact `proj/q35` forwarder. The old
+`bad(N) ... -> Int ! N` head was independently checked against main in all
+60 permutation files. The 63-case retry preserves every saved phase exit,
+error-code count, and runtime stdout; every existing semantic requirement
+passes, including the principal scheme in `q35`. The command still exits 1
+for legacy type notation and source-coordinate differences. No observation,
+requirement or bound changes.
+
+The missing/mutual acceptance changes and all six sampled permutation
+error losses (O5/O6/O7) are therefore fixed by source-contract restoration,
+not by changing the compiler or approving weaker expectations. The other
+11 forwarder backports were reviewed and deferred to conversion after their
+optional verification waited 20 minutes without starting; those uncommitted
+copies were deliberately discarded. The verified, committed `q35` remains.
+
+Two isolated attempts to close callback error channels did not restore O3's
+hidden E0515. Two isolated provider-nesting variants for O4 produced four
+and three E0515s rather than the expected two. Neither experiment was
+applied to the corpus; these investigations stopped after two unsuccessful
+variants. O3/O4 remain bugs with no established language authority.
+
+The final shard rerun is in progress on the restored fixture inputs, using
+the same release compiler and unchanged budgets. Its results will be appended
+below. CLI check passes 10/10 after the fixture merge, and the feature-enabled
+lowering suite passes 19/19.
 
 ## Every differing case
 
@@ -247,8 +286,8 @@ source-coordinate or wording changes; those are included in the same row.
 | `review-k4s/wide_128` | shown type | T; no observation recorded. |
 | `review-native/fake` | shown type | T; no observation recorded. |
 | `review-native3/field` | outcome | O2: removed ! service syntax in preserved invalid input (§2.10). |
-| `review-r2/cancel_choose` | outcome | O8: O2 test timed out after passing stdout; unchanged-bound retry pending. |
-| `review-r2/deadlock` | outcome | O8: O2 test timed out after passing stdout; unchanged-bound retry pending. |
+| `review-r2/cancel_choose` | shown type | Initial O8 resolved: unchanged-bound retry matches all runtime phases; type notation only. |
+| `review-r2/deadlock` | shown type | Initial O8 resolved: unchanged-bound retry matches all runtime phases; type notation only. |
 | `review-r2/never_yields` | shown type | T; no observation recorded. |
 | `review-r2/senders_256` | shown type | T; no observation recorded. |
 | `review-std2/client_nil_error` | shown type | T; no observation recorded. |

@@ -217,3 +217,36 @@ lowering comparison, changing no compiler code or expected result. Its
 own CLI/lowering verification on this branch is pending. The newer
 conversion head remains unlandable because of its reported `p1` correctness
 blocker and has not been merged.
+
+## Checkpoint after restoring source contracts
+
+`022f42dc1` restores the original complete written needs in all 60
+permutation cases, takes conversion's exact missing/mutual corrections,
+and adopts its exact `proj/q35` forwarder. A 63-case retry preserves every
+saved phase exit, diagnostic-code count, and runtime stdout, with all
+semantic requirements passing. An independent audit also checks that both
+original failing bindings remain: `bad` and `loop` in every permutation,
+`first` and `second` in the recursive case. No observation, requirement or
+bound is re-recorded. Spec §4.7's annotation paragraph is quoted in the
+source-restoration commit.
+
+After merging the isolated captured-row correction, this branch's CLI
+`check` passes 10/10 and `syn3_lower` with `legacy` passes 19/19. Production
+Rust, `lib/`, and `std/` are unchanged from the tested release compiler,
+whose SHA-256 remains
+`e0db61d40034648d64429b6361a70e324954999557b861d8263a1a8404cba719`.
+The earlier Wasm, macro and std O2 results therefore apply to that compiler.
+
+The two unchanged-bound resource retries pass every test/program phase;
+only type notation differs. The optional all-forwarder verification was
+stopped before starting after 20 minutes in the shared queue. Its 11
+additional uncommitted backports were read and deliberately discarded;
+the verified `q35` stays. They remain available on the conversion branch.
+
+Two closed-callback probes did not restore the lost hidden E0515s; two
+provider-nesting variants did not restore `b1`'s expected two E0515s. No
+experimental change was applied, and those investigations stopped after
+two unsuccessful variants. The two missing hidden errors and the extra
+`b1` error remain unexplained blockers. The final shard is now queued on
+the restored fixture inputs. The conversion head still reports its `p1`
+blockers and is not marked landable, so its compiler changes remain unmerged.
