@@ -443,7 +443,7 @@ paused = () {
 		{
 			control.cancel(k)
 			Lost
-		} <- (Out(print = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
+		} <- (Out(put = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
 	})
 	handed |>
 		(Handed(Inner(k2))) { k2 }
@@ -460,7 +460,7 @@ main = () {
 	{
 		control.resume(paused(), Nil)
 		Nil
-	} <- (Out(print = (k2) { Nil }))
+	} <- (Out(put = (k2) { Nil }))
 }
 "#;
 
@@ -506,7 +506,7 @@ main = () {
 			| (Over) { panic("not paused") }
 		control.resume(k3, Nil)
 		Nil
-	} <- (Out(print = (k2) { Nil }))
+	} <- (Out(put = (k2) { Nil }))
 }
 "#;
 
@@ -709,37 +709,37 @@ fn eager(name: &str) -> (String, &'static str, &'static str, i32) {
         "cancel_out_trace" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:13:7\napp/main:55:3\n",
+            "control: boundary is not active\napp/main:20:7\napp/main:61:3\n",
             1,
         ),
         "cancel_out_trace_catch" => (
             [CANCEL_OUT, G_CATCH, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:14:5\napp/main:13:7\napp/main:59:3\n",
+            "control: boundary is not active\napp/main:21:3\napp/main:20:6\napp/main:62:3\n",
             1,
         ),
         "cancel_out_two_trampolines" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_PLAIN, MAIN_THIRD].concat(),
             "",
-            "control: boundary is not active\napp/main:13:7\napp/main:60:16\napp/main:64:3\napp/main:69:22\napp/main:82:3\n",
+            "control: boundary is not active\napp/main:20:7\napp/main:64:16\napp/main:68:2\napp/main:72:22\napp/main:83:3\n",
             1,
         ),
         "cancel_out_restores_before_mode2" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_ENSURE, MAIN_THIRD].concat(),
             "",
-            "panic: final\napp/main:69:61\napp/main:69:22\napp/main:82:3\n",
+            "panic: final\napp/main:72:61\napp/main:72:22\napp/main:83:3\n",
             1,
         ),
         "env_tail_call_resume" => (
             ENV_TAIL_RESUME.to_string(),
             "",
-            "panic: resumer\napp/main:10:3\napp/main:24:5\napp/main:31:3\n",
+            "panic: resumer\napp/main:14:2\napp/main:25:5\napp/main:32:4\n",
             1,
         ),
         "env_tail_call_cancel" => (
             ENV_TAIL_CANCEL.to_string(),
             "",
-            "panic: resumer\napp/main:11:10\napp/main:26:5\napp/main:33:3\n",
+            "panic: resumer\napp/main:19:8\napp/main:31:5\napp/main:38:4\n",
             1,
         ),
         "cancel_suspends_to_inner_boundary" => (
