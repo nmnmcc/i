@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "5dda78bad9683aa09eb2c66eb0ba1b9237ea2b04",
+  "binary_sha256": "949ad211006493843ce0f2384caa9ff3fe9f0e5d2c37fb624bf1d1db875b57cc",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.ask : () -> A ! Svc(A)\napp/main.askc : () -> A ! Cov(B & A)\napp/main.call : (c: Cb(A)) -> Int ! A\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.twice : (body: () -> Int ! N) -> Int ! N\napp/main.with_int : (body: () -> A ^ E ! N) -> A ^ E ! N - Svc(Int)\napp/main.with_dep : (body: () -> A ^ E ! N) -> A ^ E ! N - Dep\napp/main.with_cov : (body: () -> A ^ E ! N, v: B) -> A ^ E ! N - Cov(B)\napp/main.pick : (a: A, b: A) -> List(A)\napp/main.h0 : () -> A ! Cov(B & A)\napp/main.h1 : () -> Int\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:34:20: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 34:16 needs it)\nsrc/main.i:35:20: error[E0501]: `Dep` is not a subtype of `Never` (the type at 35:16 needs it)\n2 errors\n"
+      "stderr": "src/main.i:34:23: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 34:16 needs it)\nsrc/main.i:35:23: error[E0501]: `Dep` is not a subtype of `Never` (the type at 35:16 needs it)\n2 errors\n"
     }
   }
 }

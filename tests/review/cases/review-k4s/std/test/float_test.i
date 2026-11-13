@@ -140,22 +140,22 @@ test("to_string_scientific_small_negative_2_test", () {
 })
 
 test("clamp_within_range_test", () {
-	assert(float.clamp(1.4, min: 1.3, max: 1.5) == 1.4)
+	assert(float.clamp(1.4, 1.3, 1.5) == 1.4)
 	Nil
 })
 
 test("clamp_below_min_test", () {
-	assert(float.clamp(1.2, min: 1.3, max: 1.5) == 1.3)
+	assert(float.clamp(1.2, 1.3, 1.5) == 1.3)
 	Nil
 })
 
 test("clamp_above_max_test", () {
-	assert(float.clamp(1.6, min: 1.3, max: 1.5) == 1.5)
+	assert(float.clamp(1.6, 1.3, 1.5) == 1.5)
 	Nil
 })
 
 test("clamp_inverted_range_test", () {
-	assert(float.clamp(1.2, min: 1.4, max: 0.6) == 1.2)
+	assert(float.clamp(1.2, 1.4, 0.6) == 1.2)
 	Nil
 })
 
@@ -190,13 +190,13 @@ test("compare_negative_gt_test", () {
 })
 
 test("loosely_compare_lt_no_tolerance_test", () {
-	assert(float.loosely_compare(10.2, 10.5, tolerating: 0.0) == order.Less)
+	assert(float.loosely_compare(10.2, 10.5, 0.0) == order.Less)
 	Nil
 })
 
 test("loosely_compare_eq_with_tolerance_test", () {
 	assert(
-		float.loosely_compare(10.2, with: 10.5, tolerating: 0.31) == order.Equal
+		float.loosely_compare(10.2, 10.5, 0.31) == order.Equal
 	)
 	Nil
 })
@@ -222,12 +222,12 @@ test("loosely_compare_negative_eq_test", () {
 })
 
 test("loosely_equals_no_tolerance_test", () {
-	assert(core.not(float.loosely_equals(10.2, 10.5, tolerating: 0.0)))
+	assert(core.not(float.loosely_equals(10.2, 10.5, 0.0)))
 	Nil
 })
 
 test("loosely_equals_with_tolerance_test", () {
-	assert(float.loosely_equals(10.2, with: 10.5, tolerating: 0.31))
+	assert(float.loosely_equals(10.2, 10.5, 0.31))
 	Nil
 })
 
@@ -608,42 +608,42 @@ test("product_multiple_test", () {
 })
 
 test("modulo_by_zero_test", () {
-	assert(float.modulo(13.3, by: 0.0) == Error(Nil))
+	assert(float.modulo(13.3, 0.0) == Error(Nil))
 	Nil
 })
 
 test("modulo_positive_test", () {
 	assert(
-		float.modulo(13.3, by: 3.3)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: 0.1, tolerating: 0.001)
+		float.modulo(13.3, 3.3)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(0.1, 0.001)
 	)
 	Nil
 })
 
 test("modulo_negative_dividend_test", () {
 	assert(
-		float.modulo(-.13.3, by: 3.3)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: 3.2, tolerating: 0.001)
+		float.modulo(-.13.3, 3.3)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(3.2, 0.001)
 	)
 	Nil
 })
 
 test("modulo_negative_divisor_test", () {
 	assert(
-		float.modulo(13.3, by: -.3.3)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: -.3.2, tolerating: 0.001)
+		float.modulo(13.3, -.3.3)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(-.3.2, 0.001)
 	)
 	Nil
 })
 
 test("modulo_both_negative_test", () {
 	assert(
-		float.modulo(-.13.3, by: -.3.3)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: -.0.1, tolerating: 0.001)
+		float.modulo(-.13.3, -.3.3)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(-.0.1, 0.001)
 	)
 	Nil
 })
@@ -659,12 +659,12 @@ test("divide_by_zero_test", () {
 })
 
 test("divide_zero_by_one_test", () {
-	assert(float.divide(0.0, by: 1.0) == Ok(0.0))
+	assert(float.divide(0.0, 1.0) == Ok(0.0))
 	Nil
 })
 
 test("divide_one_by_zero_test", () {
-	assert(float.divide(1.0, by: 0.0) == Error(Nil))
+	assert(float.divide(1.0, 0.0) == Error(Nil))
 	Nil
 })
 
@@ -706,8 +706,8 @@ test("subtract_negative_result_test", () {
 test("logarithm_one_test", () {
 	assert(
 		float.logarithm(1.0)
-			|> result.unwrap(or: 1.0)
-			|> float.loosely_equals(with: 0.0, tolerating: 0.001)
+			|> result.unwrap(1.0)
+			|> float.loosely_equals(0.0, 0.001)
 	)
 	Nil
 })
@@ -715,8 +715,8 @@ test("logarithm_one_test", () {
 test("logarithm_e_test", () {
 	assert(
 		float.logarithm(2.718281828459045)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: 1.0, tolerating: 0.001)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(1.0, 0.001)
 	)
 	Nil
 })
@@ -724,8 +724,8 @@ test("logarithm_e_test", () {
 test("logarithm_ten_test", () {
 	assert(
 		float.logarithm(10.0)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: 2.302585092994046, tolerating: 0.001)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(2.302585092994046, 0.001)
 	)
 	Nil
 })
@@ -733,8 +733,8 @@ test("logarithm_ten_test", () {
 test("logarithm_hundred_test", () {
 	assert(
 		float.logarithm(100.0)
-			|> result.unwrap(or: 0.0)
-			|> float.loosely_equals(with: 4.605170185988092, tolerating: 0.001)
+			|> result.unwrap(0.0)
+			|> float.loosely_equals(4.605170185988092, 0.001)
 	)
 	Nil
 })
@@ -742,10 +742,10 @@ test("logarithm_hundred_test", () {
 test("logarithm_half_test", () {
 	assert(
 		float.logarithm(0.5)
-			|> result.unwrap(or: 0.0)
+			|> result.unwrap(0.0)
 			|> float.loosely_equals(
-				with:       -.0.6931471805599453
-				tolerating: 0.001
+				-.0.6931471805599453
+				0.001
 			)
 	)
 	Nil
@@ -754,10 +754,10 @@ test("logarithm_half_test", () {
 test("logarithm_tenth_test", () {
 	assert(
 		float.logarithm(0.1)
-			|> result.unwrap(or: 0.0)
+			|> result.unwrap(0.0)
 			|> float.loosely_equals(
-				with:       -.2.3025850929940455
-				tolerating: 0.001
+				-.2.3025850929940455
+				0.001
 			)
 	)
 	Nil
@@ -787,8 +787,8 @@ test("exponential_zero_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(0.0), 0.0)
-			with:       1.0
-			tolerating: 0.001
+			1.0
+			0.001
 		)
 	)
 	Nil
@@ -798,8 +798,8 @@ test("exponential_one_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(1.0), 0.0)
-			with:       2.718281828459045
-			tolerating: 0.001
+			2.718281828459045
+			0.001
 		)
 	)
 	Nil
@@ -809,8 +809,8 @@ test("exponential_two_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(2.0), 0.0)
-			with:       7.38905609893065
-			tolerating: 0.001
+			7.38905609893065
+			0.001
 		)
 	)
 	Nil
@@ -820,8 +820,8 @@ test("exponential_negative_one_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(-.1.0), 0.0)
-			with:       0.36787944117144233
-			tolerating: 0.001
+			0.36787944117144233
+			0.001
 		)
 	)
 	Nil
@@ -831,8 +831,8 @@ test("exponential_five_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(5.0), 0.0)
-			with:       148.4131591025766
-			tolerating: 0.001
+			148.4131591025766
+			0.001
 		)
 	)
 	Nil
@@ -842,8 +842,8 @@ test("exponential_negative_five_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(-.5.0), 0.0)
-			with:       0.006737946999085467
-			tolerating: 0.001
+			0.006737946999085467
+			0.001
 		)
 	)
 	Nil
@@ -853,8 +853,8 @@ test("exponential_small_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(0.000001), 0.0)
-			with:       1.0000010000005
-			tolerating: 0.001
+			1.0000010000005
+			0.001
 		)
 	)
 	Nil
@@ -864,8 +864,8 @@ test("exponential_large_negative_test", () {
 	assert(
 		float.loosely_equals(
 			result.unwrap(float.exponential(-.100.0), 0.0)
-			with:       3.720075976020836e-44
-			tolerating: 0.001
+			3.720075976020836e-44
+			0.001
 		)
 	)
 	Nil
@@ -976,30 +976,30 @@ test("round_trip_test", () {
 })
 
 test("power_int_test", () {
-	assert(float.power(2.0, of: 10) == Ok(1024.0))
-	assert(float.power(2.0, of: -1) == Ok(0.5))
-	assert(float.power(-.2.0, of: 3) == Ok(-.8.0))
-	assert(float.power(-.2.0, of: -1) == Ok(-.0.5))
-	assert(float.power(0.0, of: 0) == Ok(1.0))
-	assert(float.power(0.0, of: 3) == Ok(0.0))
-	assert(float.power(0.0, of: -1) == Error(Nil))
-	assert(float.power(10.0, of: 400) == Error(Nil))
-	assert(float.power(10.0, of: -400) == Ok(0.0))
-	assert(float.power(-.1.0, of: 1_000_000_000_000_000_000_001) == Ok(-.1.0))
-	assert(float.power(1.1, of: 2) == Ok(1.2100000000000002))
-	assert(float.power(10.0, of: 22) == Ok(1.0e22))
+	assert(float.power(2.0, 10) == Ok(1024.0))
+	assert(float.power(2.0, -1) == Ok(0.5))
+	assert(float.power(-.2.0, 3) == Ok(-.8.0))
+	assert(float.power(-.2.0, -1) == Ok(-.0.5))
+	assert(float.power(0.0, 0) == Ok(1.0))
+	assert(float.power(0.0, 3) == Ok(0.0))
+	assert(float.power(0.0, -1) == Error(Nil))
+	assert(float.power(10.0, 400) == Error(Nil))
+	assert(float.power(10.0, -400) == Ok(0.0))
+	assert(float.power(-.1.0, 1_000_000_000_000_000_000_001) == Ok(-.1.0))
+	assert(float.power(1.1, 2) == Ok(1.2100000000000002))
+	assert(float.power(10.0, 22) == Ok(1.0e22))
 })
 
 test("real_power_test", () {
-	assert(float.real_power(16.0, of: 0.5) == Ok(4.0))
+	assert(float.real_power(16.0, 0.5) == Ok(4.0))
 	// fdlibm is within one ulp: the correctly rounded result is
 	// 22.627416997969522, one ulp above.
-	assert(float.real_power(8.0, of: 1.5) == Ok(22.62741699796952))
-	assert(float.real_power(-.8.0, of: 0.5) == Error(Nil))
-	assert(float.real_power(0.0, of: -.0.5) == Error(Nil))
-	assert(float.real_power(2.0, of: 1024.0) == Error(Nil))
-	assert(float.real_power(2.0, of: -.1074.0) == Ok(5.0e-324))
-	assert(float.real_power(2.0, of: 0.0) == Ok(1.0))
+	assert(float.real_power(8.0, 1.5) == Ok(22.62741699796952))
+	assert(float.real_power(-.8.0, 0.5) == Error(Nil))
+	assert(float.real_power(0.0, -.0.5) == Error(Nil))
+	assert(float.real_power(2.0, 1024.0) == Error(Nil))
+	assert(float.real_power(2.0, -.1074.0) == Ok(5.0e-324))
+	assert(float.real_power(2.0, 0.0) == Ok(1.0))
 })
 
 test("exponential_logarithm_test", () {
@@ -1029,7 +1029,7 @@ test("compare_zero_test", () {
 	assert(float.compare(0.0, -.0.0) == Equal)
 	assert(float.min(1.0, 2.0) == 1.0)
 	assert(float.max(1.0, 2.0) == 2.0)
-	assert(float.clamp(5.0, min: 1.0, max: 3.0) == 3.0)
+	assert(float.clamp(5.0, 1.0, 3.0) == 3.0)
 })
 
 test("loosely_huge_test", () {
@@ -1038,16 +1038,16 @@ test("loosely_huge_test", () {
 		core.not(
 			float.loosely_equals(
 				float.max_finite
-				with:       -.float.max_finite
-				tolerating: 1.0
+				-.float.max_finite
+				1.0
 			)
 		)
 	)
 	assert(
 		float.loosely_compare(
 			float.max_finite
-			with:       -.float.max_finite
-			tolerating: 1.0
+			-.float.max_finite
+			1.0
 		) ==
 			Greater
 	)

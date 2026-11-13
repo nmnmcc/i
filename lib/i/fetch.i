@@ -22,16 +22,13 @@ Response {
 @host("i:fetch/v1", "request")
 Fetch {
 	Fetch(
-		start: (
-			method:  String
-			url:     String
-			headers: String
-			body:    BitArray
-		) -> Request(Result(Int, String))
-		status:  (id: Int) -> Request(Result(Int, String))
-		headers: (id: Int) -> Request(Result(String, String))
-		read:    (id: Int, max: Int) -> Request(Result(BitArray, String))
-		close:   (id: Int) -> Request(Nil)
+		start: (String, String, String, BitArray) -> Request(
+			Result(Int, String)
+		)
+		status:  (Int) -> Request(Result(Int, String))
+		headers: (Int) -> Request(Result(String, String))
+		read:    (Int, Int) -> Request(Result(BitArray, String))
+		close:   (Int) -> Request(Nil)
 	)
 }
 

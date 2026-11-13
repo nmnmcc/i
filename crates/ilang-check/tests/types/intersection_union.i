@@ -17,7 +17,7 @@ field = (x: { Box(Int) | Nil } & Box(Int)) { x.item }
 
 with_var(A) = (x: A & { Box(Int) | Nil }) {
 	x |> {
-		Box(item) -> item
+		Box(item = item) -> item
 		Nil       -> 0
 	}
 }

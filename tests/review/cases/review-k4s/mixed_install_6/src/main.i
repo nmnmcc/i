@@ -11,8 +11,8 @@ one = (s ! S(Int)) { s.value + 1 }
 run(N) = (f: () -> Int ! N, x: N) { f() }
 
 bad = () {
-	! S(String) = S("bad")
-	run(() { one() }, S("hi"))
+	! S(String) = S(value: "bad")
+	run(() { one() }, S(value: "hi"))
 }
 
 test("example", () {

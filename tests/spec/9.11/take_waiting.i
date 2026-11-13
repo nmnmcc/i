@@ -3,6 +3,6 @@
 // runtime.md 5.1: take on Waiting stops before the host has a progress turn.
 (i/request)
 @host("test:async/v1", "request")
-Later { Later(echo: (text: String) -> Request(String)) }
+Later { Later(echo: (String) -> Request(String)) }
 
 main = (later ! Later) { request.take(later.echo("pending")) }

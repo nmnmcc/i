@@ -116,7 +116,7 @@ group_a = (n: Int) -> Int {
 group_b = (m) { group_a(m) }
 
 own_local = () {
-	f: (n: Int) -> _ = (n) {
+	f: (Int) -> _ = (n) {
 		f == 1
 		n
 	}
@@ -128,7 +128,7 @@ call = () { id(1) == "a" }
 
 call_unknown = (x) { id(x) == "a" }
 
-call_ctor = () { Box(1) == 1 }
+call_ctor = () { Box(value: 1) == 1 }
 
 // Matching a union: the type variable gets what the other members do not
 // take. `_` matches nothing.
@@ -192,7 +192,7 @@ pattern_tuple = (p: (Int, String)) {
 }
 
 pattern_ctor = (b: Box(String)) {
-	Box(value) = b
+	Box(value = value) = b
 	value == 1
 }
 
@@ -215,7 +215,7 @@ pattern_list = (xs: List(String)) {
 
 pattern_case_part = (b: Box(Int | String)) {
 	b |> {
-		Box(value) ? True -> value == 1.0
+		Box(value = value) ? True -> value == 1.0
 		_                 -> panic("unreachable")
 	}
 }
@@ -254,6 +254,6 @@ option_name = (opt: Option(User)) {
 }
 
 // An annotation label wins over the label of the value.
-annotated: (x: Int) -> Int = (y) { y }
+annotated: (Int) -> Int = (y) { y }
 
-annotated_call = annotated(x: 1)
+annotated_call = annotated(1)

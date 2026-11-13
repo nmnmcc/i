@@ -4,7 +4,7 @@
 User { User(name: String) }
 
 main = () {
-  a = (user: User("Ada"))
+  a = (user: User(name: "Ada"))
   b = (..a, age: 36)
   assert(b.user.name == "Ada")
   Nil

@@ -92,8 +92,8 @@ reverse(A) = (list: List(A)) -> List(A) {
 /// the bit array.
 ///
 /// ```i
-/// bit_array.slice(<<1, 2, 3, 4>>, at: 1, take: 2)   // Ok(<<2, 3>>)
-/// bit_array.slice(<<1, 2, 3, 4>>, at: 3, take: -2)  // Ok(<<2, 3>>)
+/// bit_array.slice(<<1, 2, 3, 4>>, 1, 2)   // Ok(<<2, 3>>)
+/// bit_array.slice(<<1, 2, 3, 4>>, 3, -2)  // Ok(<<2, 3>>)
 /// ```
 slice = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
 	(start, length) = { take < 0 } |> {

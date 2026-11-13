@@ -176,14 +176,23 @@ test("parse_bom", () {
 })
 
 test("error_bare_quote", () {
-	assert(csv.parse("a\"b") == Error(csv.CsvError(1, 2, "bare quote")))
+	assert(
+		csv.parse("a\"b") ==
+			Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))
+	)
 	Nil
 })
 
 test("error_after_quote", () {
 	assert(
 		csv.parse("\"a\"b") ==
-			Error(csv.CsvError(1, 4, "data after closing quote"))
+			Error(
+				csv.CsvError(
+					line:   1
+					column: 4
+					reason: "data after closing quote"
+				)
+			)
 	)
 	Nil
 })
@@ -191,7 +200,13 @@ test("error_after_quote", () {
 test("error_space_after_quote", () {
 	assert(
 		csv.parse("\"a\" ") ==
-			Error(csv.CsvError(1, 4, "data after closing quote"))
+			Error(
+				csv.CsvError(
+					line:   1
+					column: 4
+					reason: "data after closing quote"
+				)
+			)
 	)
 	Nil
 })
@@ -199,7 +214,13 @@ test("error_space_after_quote", () {
 test("error_missing_quote", () {
 	assert(
 		csv.parse("\"a") ==
-			Error(csv.CsvError(1, 3, "unterminated quoted field"))
+			Error(
+				csv.CsvError(
+					line:   1
+					column: 3
+					reason: "unterminated quoted field"
+				)
+			)
 	)
 	Nil
 })
@@ -207,13 +228,22 @@ test("error_missing_quote", () {
 test("error_multiline_quote", () {
 	assert(
 		csv.parse("\"a\nb") ==
-			Error(csv.CsvError(2, 2, "unterminated quoted field"))
+			Error(
+				csv.CsvError(
+					line:   2
+					column: 2
+					reason: "unterminated quoted field"
+				)
+			)
 	)
 	Nil
 })
 
 test("error_unicode_position", () {
-	assert(csv.parse("é\"") == Error(csv.CsvError(1, 2, "bare quote")))
+	assert(
+		csv.parse("é\"") ==
+			Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))
+	)
 	Nil
 })
 
@@ -296,7 +326,7 @@ test("delimiter_tab", () {
 
 test("width_infer_error", () {
 	csv.parse("a,b\nc") |> {
-		Error(csv.CsvError(reason, ..)) -> assert(
+		Error(csv.CsvError(reason = reason, ..)) -> assert(
 			reason == "wrong number of fields"
 		)
 		Ok(_) -> panic("width")
@@ -859,7 +889,7 @@ test("stream_stops_on_error", () {
 		stream.to_list(
 			csv.rows(stream.from_list(["a\"\nb\n"]), csv.defaults())
 		) ==
-			[Error(csv.CsvError(1, 2, "bare quote"))]
+			[Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))]
 	)
 	Nil
 })
@@ -912,7 +942,7 @@ test("header_only", () {
 test("header_duplicate", () {
 	assert(
 		csv.parse_header("a,a\n1,2", csv.defaults()) ==
-			Error(csv.CsvError(1, 1, "duplicate header"))
+			Error(csv.CsvError(line: 1, column: 1, reason: "duplicate header"))
 	)
 	Nil
 })
@@ -968,7 +998,13 @@ test("large_roundtrip", () {
 test("width_error_record_line", () {
 	assert(
 		csv.parse("a,b\n\nc\n") ==
-			Error(csv.CsvError(3, 1, "wrong number of fields"))
+			Error(
+				csv.CsvError(
+					line:   3
+					column: 1
+					reason: "wrong number of fields"
+				)
+			)
 	)
 	Nil
 })
@@ -976,7 +1012,13 @@ test("width_error_record_line", () {
 test("header_width_error_line", () {
 	assert(
 		csv.parse_header("a,b\n\n1\n", config(",", -1, False)) ==
-			Error(csv.CsvError(3, 1, "header width differs from row"))
+			Error(
+				csv.CsvError(
+					line:   3
+					column: 1
+					reason: "header width differs from row"
+				)
+			)
 	)
 	Nil
 })
@@ -984,14 +1026,14 @@ test("header_width_error_line", () {
 test("duplicate_header_error_line", () {
 	assert(
 		csv.parse_header("\n\na,a\n", csv.defaults()) ==
-			Error(csv.CsvError(3, 1, "duplicate header"))
+			Error(csv.CsvError(line: 3, column: 1, reason: "duplicate header"))
 	)
 	Nil
 })
 
 test("bare_cr_lookahead_pulls_once", () -> Nil ! Assert {
 	events = control.boundary((boundary) {
-		! PullProbe = PullProbe(() {
+		! PullProbe = PullProbe(note: () {
 			control.suspend(boundary, (continuation) {
 				[1, ..control.resume(continuation, Nil)]
 			})
@@ -1014,7 +1056,7 @@ test("bare_cr_lookahead_pulls_once", () -> Nil ! Assert {
 
 test("bare_cr_eof_pulls_once", () -> Nil ! Assert {
 	events = control.boundary((boundary) {
-		! PullProbe = PullProbe(() {
+		! PullProbe = PullProbe(note: () {
 			control.suspend(boundary, (continuation) {
 				[1, ..control.resume(continuation, Nil)]
 			})

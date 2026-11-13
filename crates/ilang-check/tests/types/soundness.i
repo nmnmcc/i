@@ -7,7 +7,7 @@ Reader(S) {
 }
 
 with_int = (body) {
-	! Reader(Int) = Reader(() { 1 })
+	! Reader(Int) = Reader(get: () { 1 })
 	body()
 }
 
@@ -55,8 +55,8 @@ use_state_int = (st ! State(Int)) { 1 }
 use_state_str = (st ! State(String)) { 1 }
 
 nested = [
-	Cell(() { () { use_state_int() } }, (f) { Nil })
-	Cell(() { () { use_state_str() } }, (f) { Nil })
+	Cell(get: () { () { use_state_int() } }, set: (f) { Nil })
+	Cell(get: () { () { use_state_str() } }, set: (f) { Nil })
 ]
 
 // Rule 11: a type test takes every value of its type constructor.

@@ -321,8 +321,9 @@ fn library_names() {
     }
 }
 
-/// The labels of the parameters in the spec tables, for example
-/// `control.suspend: (b: …, f: (k: …) -> …) -> A`.
+/// The parameters of the external functions in the spec tables have no
+/// labels (syntax three, stage 4), for example
+/// `control.suspend: (Boundary(…), (Continuation(…)) -> …) -> A`.
 #[test]
 fn library_labels() {
     let (_, program, _) = common::check_files(&[]);
@@ -339,13 +340,13 @@ fn library_labels() {
             .map(|p| p.label.as_ref().map_or("_".into(), |l| l.name.clone()))
             .collect()
     };
-    assert_eq!(labels("i/control", "suspend"), ["b", "f"]);
-    assert_eq!(labels("i/control", "resume"), ["k", "value"]);
-    assert_eq!(labels("i/fail", "catch"), ["body"]);
-    assert_eq!(labels("i/resource", "ensure"), ["body", "with"]);
-    assert_eq!(labels("i/core", "byte_slice"), ["_", "start", "length"]);
-    assert_eq!(labels("i/core", "index_of"), ["in", "find", "from"]);
-    assert_eq!(labels("i/prelude", "panic"), ["message"]);
+    assert_eq!(labels("i/control", "suspend"), ["_", "_"]);
+    assert_eq!(labels("i/control", "resume"), ["_", "_"]);
+    assert_eq!(labels("i/fail", "catch"), ["_"]);
+    assert_eq!(labels("i/resource", "ensure"), ["_", "_"]);
+    assert_eq!(labels("i/core", "byte_slice"), ["_", "_", "_"]);
+    assert_eq!(labels("i/core", "index_of"), ["_", "_", "_"]);
+    assert_eq!(labels("i/prelude", "panic"), ["_"]);
 }
 
 /// The built-in custom types of §4.2 and §9.6 are in the prelude.

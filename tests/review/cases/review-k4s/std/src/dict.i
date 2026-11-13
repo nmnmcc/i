@@ -325,7 +325,7 @@ remove_entry(K, V) = (
 ///
 /// ```i
 /// increment = (x) { x |> { Some(n) -> n + 1  None -> 0 } }
-/// dict.upsert(counts, in: "a", with: increment)
+/// dict.upsert(counts, "a", increment)
 /// ```
 upsert(K, V, E, N) = (
 	dict: Dict(K, V)
@@ -538,7 +538,7 @@ combine(K, V, E, N) = (
 /// keeps the values in the order of the list.
 ///
 /// ```i
-/// dict.group([1, 2, 3, 4], by: (x) { x % 2 })  // {1 -> [1, 3], 0 -> [2, 4]}
+/// dict.group([1, 2, 3, 4], (x) { x % 2 })  // {1 -> [1, 3], 0 -> [2, 4]}
 /// ```
 group(V, K, E, N) = (
 	list: List(V)

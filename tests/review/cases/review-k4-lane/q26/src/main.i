@@ -3,7 +3,7 @@ S(N) {
 }
 
 use(N) = (s ! S(N)) {
-	S(f) = s
+	S(f = f) = s
 	f()
 }
 
@@ -11,6 +11,6 @@ fw(N) = () -> Int ! N | S(N) { use() }
 
 
 main = () {
-	! S(Never) = S(() { 1 })
+	! S(Never) = S(f: () { 1 })
 	assert(fw() == 1)
 }

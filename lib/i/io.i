@@ -10,5 +10,5 @@
 /// any other host gives it like any host service.
 @host("i:io/v1")
 Io {
-	Io(print: (text: String) -> Nil)
+	Io(print: (String) -> Nil)
 }
