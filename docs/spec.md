@@ -1329,7 +1329,7 @@ The format names are fixed words of the bit array syntax. They are not names of 
 
 - A segment with no format is `u8`.
 - `u` is unsigned and `i` is signed (two's complement). `be` is big-endian and `le` is little-endian. An integer format with no ending puts the highest bit first, so `u(16)` is the same as `u16be`.
-- The expression in brackets has the type Int and may be any expression.
+- The expression in brackets has the type Int and may be any expression. A dynamic width is nonnegative; zero is allowed for `u(n)`, `i(n)`, `bits(n)` and `bytes(n)`. An integer segment of width zero encodes no bits and decodes as integer zero, for both signed and unsigned formats. No sign bit is read in that case.
 - Any other format name is a compile error.
 
 ### 8.3 Making bit arrays
@@ -1344,7 +1344,7 @@ The format names are fixed words of the bit array syntax. They are not names of 
 
 ### 8.4 Matching bit arrays
 
-A bit array pattern matches the segments in order from the start. It matches only when all the bits are used.
+A bit array pattern matches the segments in order from the start. It matches only when all the bits are used. A negative length or too few remaining bits makes that pattern fail; it does not stop the program. Zero lengths use the format rule of §8.2 and consume no bits. An error or stop while computing a length propagates normally; it is not a failed match. Construction has the separate failure rule of §8.3.
 
 - An integer segment reads N bits, signed or unsigned, and matches them with its pattern.
 - A float segment reads its bits. It matches only when they are a finite number.
