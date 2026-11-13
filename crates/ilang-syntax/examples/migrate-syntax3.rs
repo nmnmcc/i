@@ -24,9 +24,12 @@
 //!     Prints the counts and the files that failed; exits 1 when one failed.
 //! ```
 
+#[path = "support/legacy/mod.rs"]
+mod legacy;
+
 use ilang_syntax::Diagnostic;
-use ilang_syntax::lexer::lex;
 use ilang_syntax::syn3::{self, ast::Module, convert};
+use legacy::lexer::lex;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -58,9 +61,9 @@ fn sources(dir: &Path, out: &mut Vec<PathBuf>) {
 
 fn parse_old(path: &Path, source: &str) -> (ilang_syntax::ast::Module, Vec<Diagnostic>) {
     if is_lisp(path) {
-        ilang_syntax::lisp::parse_source_legacy(source)
+        legacy::lisp::parse_source_legacy(source)
     } else {
-        ilang_syntax::legacy::parser::parse_module_legacy(source)
+        legacy::parser::parse_module_legacy(source)
     }
 }
 

@@ -61,7 +61,7 @@ def main():
             heavy, shell = ROOT / '.rd/cache/heavy', ROOT
         subprocess.run([str(heavy), 'direnv', 'exec', str(shell),
                         'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked'], cwd=ROOT, check=True)
-    extract = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
+    extract = runpy.run_path(str(ROOT / 'scripts/check-snippets'))
     allowed = {'.i', '.is'} | ({'.rs', '.js', '.mjs', '.md', '.txt'} if args.embedded else set())
     files = sorted({f for p in args.paths for f in (p.rglob('*') if p.is_dir() else [p])
                     if f.suffix in allowed and f.is_file()
@@ -92,7 +92,7 @@ def main():
     results = [json.loads(line) for line in process.stdout.splitlines()]
     assert len(results) == len(snippets), 'parser result count mismatch'
     failures, packages, count, changes = [], {}, 0, {}
-    classifications = ROOT / 'scripts/old-syntax-check.json'
+    classifications = ROOT / 'scripts/check-snippets.json'
     config = json.loads(classifications.read_text())
     for (path, host, start, end, source, kind, formatted, indent), result in zip(snippets, results):
         label = f'{path}:{host[:start].count(chr(10)) + 1}'

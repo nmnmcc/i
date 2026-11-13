@@ -674,8 +674,8 @@ impl<'p> Emitter<'p> {
             }
             code.push('\n');
             match t {
-                AbiType::Int => frees.push(k + 1),
-                AbiType::String | AbiType::BitArray => frees.push(k),
+                AbiType::Int => frees.push((k + 1, Some(k))),
+                AbiType::String | AbiType::BitArray => frees.push((k, None)),
                 _ => {}
             }
             k += n;
@@ -689,8 +689,16 @@ impl<'p> Emitter<'p> {
                 let _ = write!(code, " (global.set $hr{i}_{j})");
             }
         }
-        for j in frees {
-            let _ = write!(code, "\n(call $free (global.get $hp{i}_{j}) (i32.const 0))");
+        for (j, sign) in frees {
+            if let Some(sign) = sign {
+                let count = j + 1;
+                let _ = write!(
+                    code,
+                    "\n(call $abi_int_free (global.get $hp{i}_{sign}) (global.get $hp{i}_{j}) (global.get $hp{i}_{count}))"
+                );
+            } else {
+                let _ = write!(code, "\n(call $free (global.get $hp{i}_{j}) (i32.const 0))");
+            }
         }
         code
     }
@@ -793,7 +801,15 @@ impl<'p> Emitter<'p> {
                 _ => None,
             };
             if let Some(j) = address {
-                let _ = writeln!(out, "(call $free (global.get $hr{i}_{j}) (i32.const 0))");
+                if t == AbiType::Int {
+                    let count = j + 1;
+                    let _ = writeln!(
+                        out,
+                        "(call $abi_int_free (global.get $hr{i}_{k}) (global.get $hr{i}_{j}) (global.get $hr{i}_{count}))"
+                    );
+                } else {
+                    let _ = writeln!(out, "(call $free (global.get $hr{i}_{j}) (i32.const 0))");
+                }
             }
         }
         for (j, t) in import_results(&x.abi).iter().enumerate() {

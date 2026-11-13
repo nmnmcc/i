@@ -5,13 +5,28 @@ mod common;
 fn stage_three_provider_diagnostics_match_landed_conversion() {
     // §9.2: a supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
-    // Keep each landed diagnostic, including its source binding, rather than
-    // accepting a matching rejection with a lost or additional E0515.
+    // Keep every diagnostic from landed tip cc26b8d9, including its source
+    // binding. This includes all fourteen records changed by named-provider
+    // revalidation, not merely the original three stage-three discrepancies.
+    // Pin total errors and E0515 counts independently of the saved messages.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
-    for (case, count) in [
-        ("review-k4/cases/provision_closure_False", 1),
-        ("review-k4d/_loose/p/x8", 2),
-        ("review-k4d/_loose/p/b1", 3),
+    for (case, count, provider_count) in [
+        ("review-k4/cases/provision_closure_False", 1, 1),
+        ("review-k4d/_loose/p/x8", 2, 2),
+        ("review-k4d/_loose/p/b1", 5, 5),
+        ("review-k4d/_loose/fuzz/e0505/21_4", 3, 2),
+        ("review-k4d/_loose/p/r6", 3, 3),
+        ("review-k4d/fuzz/m0", 2, 2),
+        ("review-k4d/fuzz/m21", 3, 2),
+        ("review-k4d/fuzz/m32", 9, 8),
+        ("review-k4d/fuzz/w2", 3, 2),
+        ("review-k4d/fuzz/w3", 2, 2),
+        ("review-k4d/fuzz/w4", 11, 4),
+        ("review-k4d/proj/b1", 5, 5),
+        ("review-k4d/proj/r6", 3, 3),
+        ("review-k4s/hidden_conflict_install", 4, 4),
+        ("review-k4s/mixed_install_12", 6, 5),
+        ("review-k4s/mixed_install_6", 7, 6),
     ] {
         let dir = root.join(case);
         let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
@@ -25,6 +40,11 @@ fn stage_three_provider_diagnostics_match_landed_conversion() {
             .filter(|line| line.contains("error["))
             .collect();
         assert_eq!(expected.len(), count, "landed diagnostic count: {case}");
+        assert_eq!(
+            expected.iter().filter(|line| line.contains("error[E0515]")).count(),
+            provider_count,
+            "landed provider diagnostic count: {case}"
+        );
         let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
         let checked = ilang_check::check(&graph);
         let mut actual: Vec<_> = checked
@@ -708,6 +728,31 @@ fn converted_p1_keeps_the_uniform_provider_error() {
 }
 
 #[test]
+fn provider_conflicts_keep_call_and_binding_diagnostics() {
+    // Spec §9.2: a provided P satisfies a need S only when P <: S.
+    // Both the call obligation and the enclosing binding must retain the
+    // Reader(String)/Reader(Int) conflict; keeping only the call loses reports.
+    let source = include_str!("types/soundness.i");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let mut sites: Vec<_> = diags
+        .iter()
+        .filter(|d| {
+            d.code == "E0515"
+                && d.message.contains("Reader(String)")
+                && d.message.contains("Reader(Int)")
+        })
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect();
+    sites.sort();
+    assert_eq!(
+        sites,
+        [(14, 5), (14, 19), (16, 5), (16, 29)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
 fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
     // Keep every original Reader obligation, including the two checked
     // when generalizing g and k, without changing the soundness golden.
@@ -788,6 +833,36 @@ fn a_closed_provider_alias_retains_all_reader_diagnostics() {
     assert_eq!(
         actual,
         [(15, 19), (15, 5), (17, 29), (17, 5)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn named_function_provider_keeps_call_and_binding_diagnostics() {
+    // §9.2: changing an inline provider function to a named helper must
+    // retain the same call and binding obligations. The lowering boundary
+    // fix sees inline function expressions; this case also needs cached-row
+    // validation when the closed provider contains only a function name.
+    let source = include_str!("types/soundness.i")
+        .replace("Reader(get = () -> Int { 1 })", "Reader(get = get_i)")
+        + "\nget_i = () -> Int { 1 }\n";
+    assert!(source.contains("Reader(get = get_i)"));
+    let source = source.as_str();
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let mut sites: Vec<_> = diags
+        .iter()
+        .filter(|d| {
+            d.code == "E0515"
+                && d.message.contains("Reader(String)")
+                && d.message.contains("Reader(Int)")
+        })
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect();
+    sites.sort();
+    assert_eq!(
+        sites,
+        [(14, 5), (14, 19), (16, 5), (16, 29)],
         "{:?}",
         graph.sources.render_all(&diags)
     );

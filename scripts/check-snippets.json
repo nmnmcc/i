@@ -1,11 +1,4 @@
 {
-  "_syn2_old_forms": [
-    "error types written with ?",
-    "record values and types written in braces",
-    "labelled or empty tuple forms",
-    "empty record value {..} and all-record type {..}",
-    "@main entry annotation"
-  ],
   "crates/ilang-binaryen/build.rs:b32ae27c34fddd40": {
     "not_source": "Cargo build instruction"
   },
@@ -2946,5 +2939,11 @@
     "diagnostics": [
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
     ]
+  },
+  "docs/design/principality.md:de3b81c6d91392fb": {
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "A probe of the principality note: a written polymorphic parameter type is not supported yet, and the note records the diagnostic."
   }
 }

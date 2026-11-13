@@ -224,6 +224,25 @@ fn kept_form_messages_are_independent_checks() {
 }
 
 #[test]
+fn labelled_calls_through_function_values_keep_the_data_shape() {
+    // Spec §6.6: "Every function is called in this way, whatever expression
+    // gives it." Stage 10 lifts stage 9's temporary indirect-call error.
+    let (_, c) = checked(
+        "invoke = (f: (x = Int) -> Int) -> Int { f(x = 1) }\nanswer = invoke((x = n: Int) -> Int { n })\n",
+        &["answer"],
+    );
+    let program = c.program.as_ref().unwrap();
+    let module = common::module(program, "app/main");
+    let lines = c.types.as_ref().unwrap().lines(program, module);
+    assert!(lines.iter().any(|line| line == "app/main.answer : Int"));
+    assert!(
+        lines
+            .iter()
+            .any(|line| line == "app/main.invoke : ((x = Int) -> Int) -> Int")
+    );
+}
+
+#[test]
 fn closed_data_has_no_record_type_even_without_a_spread_error() {
     // Syntax-three §2.3: "There is no width subtyping, no `Record`, no
     // field addition or removal at run time." Keep both Record lookups of

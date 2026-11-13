@@ -2,6 +2,9 @@
 //! amendment): each production and each rule P1 to P13, the examples of the
 //! note, and the examples of the services proposal.
 
+#[path = "../examples/support/legacy/mod.rs"]
+mod legacy;
+
 use ilang_syntax::syn3::ast::*;
 use ilang_syntax::syn3::{self, convert, lisp};
 
@@ -747,8 +750,15 @@ fn lexer() {
     assert!(!kinds("x < -1").contains(&T::LArrow));
     // `<<` is taken first, so bit arrays are unchanged.
     assert!(!kinds("<<-1>>").contains(&T::LArrow));
-    // The current lexer is unchanged.
-    assert!(lex("x<-1").tokens.iter().all(|t| t.kind != T::LArrow));
+    // Spec §1.5: "`x<-1` is `x`, `<-` and `1`". The public lexer now
+    // follows the same rule; only the private migration reader retains `< -`.
+    assert!(lex("x<-1").tokens.iter().any(|t| t.kind == T::LArrow));
+    assert!(
+        legacy::lexer::lex("x<-1")
+            .tokens
+            .iter()
+            .all(|t| t.kind != T::LArrow)
+    );
 }
 
 // ---- §6.5 Printer and formatter ----
@@ -908,9 +918,9 @@ fn lisp_errors() {
 // ---- §7.3 The converter ----
 
 fn converted(old: &str) -> String {
-    let (module, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
+    let (module, diags) = legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{old}\n{diags:#?}");
-    let lexed = ilang_syntax::lexer::lex(old);
+    let lexed = legacy::lexer::lex(old);
     let (new, _) = convert::convert(&module, Some(&lexed), &convert::Signatures::default());
     let text = syn3::print_with_comments(&new, old, &lexed.comments);
     let (read, diags) = syn3::parse_module(&text);
@@ -1103,14 +1113,14 @@ fn convert_labelled_calls() {
     // A function that the text does not show keeps its labels.
     assert_eq!(converted("x = m.f(1, to: 2)\n"), "x = m.f(1, to = 2)\n");
     // The functions and constructors of an imported module.
-    let (lib, _) = ilang_syntax::legacy::parser::parse_module_legacy(
+    let (lib, _) = legacy::parser::parse_module_legacy(
         "User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n",
     );
     let mut signatures = convert::Signatures::default();
     convert::collect(&lib, "users", &mut signatures);
     let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to: 9, from: 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";
-    let (module, _) = ilang_syntax::legacy::parser::parse_module_legacy(old);
-    let (new, notes) = convert::convert(&module, Some(&ilang_syntax::lexer::lex(old)), &signatures);
+    let (module, _) = legacy::parser::parse_module_legacy(old);
+    let (new, notes) = convert::convert(&module, Some(&legacy::lexer::lex(old)), &signatures);
     assert!(notes.is_empty(), "{notes:#?}");
     assert_eq!(
         syn3::print_module(&new),
@@ -1121,7 +1131,7 @@ fn convert_labelled_calls() {
 #[test]
 fn convert_lisp_surface() {
     let old = "(= append (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))\n";
-    let (module, diags) = ilang_syntax::lisp::parse_source_legacy(old);
+    let (module, diags) = legacy::lisp::parse_source_legacy(old);
     assert!(diags.is_empty(), "{diags:#?}");
     let (new, _) = convert::convert(&module, None, &convert::Signatures::default());
     let text = lisp::to_lisp(&new);

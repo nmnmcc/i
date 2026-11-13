@@ -1,7 +1,7 @@
 //// Syntax three, stage 10 (docs/design/syntax-3.md §2.6.5, §6.4): a
 //// multi-shape function is a value. It is kept in a list, taken out of it,
 //// called with each of its shapes, passed, returned, compared and shown.
-//// Read with `I_SYNTAX=3`; `i run` prints the lines of `expected.txt`.
+//// `i run` prints the lines of `expected.txt`.
 (
 	(Io) = i/io
 	core = i/core

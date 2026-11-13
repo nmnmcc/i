@@ -3,7 +3,7 @@
 # the syntax before syntax three; each line is the path and the first message of
 # the old parser. A file that fails and is not here stops the conversion.
 # Lines `path:hash reason` name snippets in strings (the key of
-# scripts/old-syntax-check.json) that are not i or not complete.
+# scripts/check-snippets.json) that are not i or not complete.
 crates/ilang-check/tests/projects/package_deps/lib/test/broken.i expected an item: a type definition, or a binding `pattern = value`, found `this`
 crates/ilang-check/tests/projects/syntax_error/src/main.i `(` is not closed
 crates/ilang-syntax/tests/golden/err_arg_order.i an argument by position may not come after an argument by label

@@ -1,6 +1,10 @@
 # Syntax three, stage 3: report
 
-Current landing status, 2026-11-14: **READY for the requested gates**.
+Current integration status, 2026-11-14: **verification in progress against
+fetched `origin/main` at `cc26b8d9`**. The READY result below applies to the
+previous `ab8178ab4` base, not yet to this new integration.
+
+Previous base landing status, 2026-11-14: **READY for the requested gates**.
 Main and the latest READY conversion fix are merged, the three provider
 observations match main, and the final shard has five explained display
 differences after unchanged-bound retries. The follow-up section below
@@ -379,3 +383,23 @@ pending list, and the registered stress runtime limit remain. The inherited
 record-field union solver bug is not fixed by this follow-up; the earlier
 report defers it to stage 6's record-graph deletion. Coordinator-owned
 unfiltered gates and main landing remain outside this lane's commands.
+
+## Integration with the landed tip, 2026-11-14
+
+Fetched origin before merging `refs/remotes/origin/main` at `cc26b8d9`;
+the owner's `refs/heads/main` is not used. The single merge conflict is in
+`row_schemes.rs`: preserve both alias-provider tests and the named-function
+provider test as complete functions. Main's cached-handler revalidation
+(`26b605121`) and named-helper regression (`58a356366`) remain intact,
+alongside the resolved-alias fix already carried by this lane. Independent
+data definitions remain independent; member absorption is not restored.
+
+Read the fourteen observation changes from landed `180e00cf7`. Main now
+records one, two, and five errors for the original three cases. The exact
+diagnostic regression now covers sixteen cases: those three and the other
+thirteen changed records. Each case independently pins its total errors
+and E0515 count, then compares every complete error message and location.
+The fourteen source programs and expected observations are verified
+byte-for-byte identical to the fetched tip. No observation is re-recorded.
+The workspace check and fresh gate matrix are in progress; the old READY
+claim is not reused for this integration.
