@@ -316,6 +316,36 @@ impl Checker<'_> {
         Ty::Union(members)
     }
 
+    /// `p` with, for each member that is a labelled type of a declared
+    /// union (see `family`), the members of that union that `p` lacks.
+    fn with_families(&mut self, p: Ty, span: Span) -> Ty {
+        let mut members = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
+        let mut heads: Vec<Head> = members.iter().filter_map(Ty::head).collect();
+        let mut extra = Vec::new();
+        for m in &members {
+            let Some(Head::Named(TypeRef::Custom(id))) = m.head() else {
+                continue;
+            };
+            let mut family = Vec::new();
+            let whole = self.family(m.clone(), id, span);
+            super::solve::flatten_union(std::slice::from_ref(&whole), &mut family);
+            for f in family {
+                if let Some(h) = f.head()
+                    && !heads.contains(&h)
+                {
+                    heads.push(h);
+                    extra.push(f);
+                }
+            }
+        }
+        if extra.is_empty() {
+            return p;
+        }
+        members.extend(extra);
+        Ty::Union(members)
+    }
+
     /// The pattern types of literals, prefixes, and bit arrays, with their
     /// names bound.
     fn leaf(&mut self, q: &Pattern, in_case: bool, literal: bool) -> Ty {
@@ -604,6 +634,16 @@ impl Checker<'_> {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
             let pats = std::mem::take(&mut places[i].pats);
             let p = self.union(pats, span);
+            // A member of a declared union of labelled types (a former
+            // constructor) stands for that union, as the type of the whole
+            // family did before stage 3 (§5.2.8 rule 11, "the coverage
+            // error in a match is unchanged"): the members no pattern takes
+            // are added, so they are reported by §7.4, not as a type error.
+            let p = if slack[i] {
+                p
+            } else {
+                self.with_families(p, span)
+            };
             let want = if slack[i] {
                 let mut members = Vec::new();
                 super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
