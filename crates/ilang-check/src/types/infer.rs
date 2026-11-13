@@ -325,7 +325,13 @@ impl<'a> Checker<'a> {
                 };
                 // A partial result may omit a recursive scheme only after
                 // the failure has been diagnosed.
-                if let Ok(shown) = display::scheme(&self.s, &scheme.ty, opts) {
+                // The shown scheme is simplified once, for its text and for
+                // the check of the types that it uses.
+                let simplified = display::shown_and_scheme(&self.s, &scheme.ty, opts);
+                let checked = self
+                    .exported_type_needed(d)
+                    .then(|| simplified.as_ref().map(|(t, _)| t.clone()).map_err(|_| ()));
+                if let Ok((_, shown)) = simplified {
                     if let super::ShownType::Fn(f) = &shown
                         && f.params.is_empty()
                         && f.ret == super::ShownType::Named(self.b.nil, Vec::new())
@@ -361,7 +367,9 @@ impl<'a> Checker<'a> {
                 } else {
                     self.report_coalescing(d.span);
                 }
-                self.exported_type(d, &scheme.ty, opts);
+                if let Some(checked) = checked {
+                    self.exported_type(d, checked);
+                }
             }
         }
         if !self.recovery && !self.diags.iter().any(Diagnostic::is_error) {
@@ -1108,19 +1116,14 @@ impl<'a> Checker<'a> {
     /// §2.4: the inferred type of an exported binding may not use a type
     /// of its module that is not exported. A written type at the top of
     /// its pattern is checked by name resolution.
-    fn exported_type(&mut self, d: &Def, t: &Ty, opts: display::Opts) {
-        let DefKind::Binding { var, .. } = d.kind else {
-            return;
-        };
-        if !d.exported
-            || self
-                .written
-                .get(&var)
-                .is_some_and(|t| !value_dependent(self.p, t))
-        {
-            return;
-        }
-        let Ok(shown) = display::shown(&self.s, t, opts) else {
+    ///
+    /// `shown` is the shown type of `d` (`display::shown`), when
+    /// [`Self::exported_type_needed`]: it is simplified once for the text of
+    /// the scheme too.
+    fn exported_type(&mut self, d: &Def, shown: Result<Ty, ()>) {
+        let Ok(shown) = shown else {
+            // As simplifying it again would: the failure is noted again.
+            self.s.coalescing_failed.set(true);
             self.report_coalescing(d.span);
             return;
         };
@@ -1141,6 +1144,19 @@ impl<'a> Checker<'a> {
                 format!("`{}` is exported, but its inferred type uses the type `{name}`{location}, which is not exported (§2.4)", d.name),
             );
         }
+    }
+
+    /// Whether [`Self::exported_type`] checks `d`: an exported binding
+    /// without a written type that fixes it.
+    fn exported_type_needed(&self, d: &Def) -> bool {
+        let DefKind::Binding { var, .. } = d.kind else {
+            return false;
+        };
+        d.exported
+            && !self
+                .written
+                .get(&var)
+                .is_some_and(|t| !value_dependent(self.p, t))
     }
 
     /// §4.4: in a written type, a union with two or more type variables as

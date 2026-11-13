@@ -190,6 +190,67 @@ pub(crate) struct Solver {
     /// that may silently make a program pass. The checker drains this at
     /// binding and artifact boundaries, including known-type conversions.
     pub coalescing_failed: std::cell::Cell<bool>,
+    /// Scratch marks of `reach`; not part of the solver's state.
+    reach_marks: ReachMarks,
+}
+
+/// The variables that one `reach` has visited: a mark per variable, which
+/// is the number of that `reach`, so no set is made or cleared per call.
+/// Not part of the solver's state: equal, cloned and shown as empty.
+#[derive(Default)]
+struct ReachMarks(std::cell::RefCell<(u32, Vec<u32>)>);
+
+impl ReachMarks {
+    /// Starts a new walk over `n` variables.
+    fn start(&self, n: usize) -> Visited<'_> {
+        let mut marks = self.0.borrow_mut();
+        let (stamp, ms) = &mut *marks;
+        if *stamp == u32::MAX {
+            *stamp = 0;
+            ms.iter_mut().for_each(|m| *m = 0);
+        }
+        *stamp += 1;
+        if ms.len() < n {
+            ms.resize(n, 0);
+        }
+        Visited(marks)
+    }
+}
+
+struct Visited<'a>(std::cell::RefMut<'a, (u32, Vec<u32>)>);
+
+impl Visited<'_> {
+    /// Marks `v`; false when it was marked already in this walk.
+    fn insert(&mut self, v: V) -> bool {
+        let (stamp, ms) = &mut *self.0;
+        let i = v.0 as usize;
+        if i >= ms.len() {
+            ms.resize(i + 1, 0);
+        }
+        let new = ms[i] != *stamp;
+        ms[i] = *stamp;
+        new
+    }
+}
+
+impl Clone for ReachMarks {
+    fn clone(&self) -> Self {
+        ReachMarks::default()
+    }
+}
+
+impl PartialEq for ReachMarks {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for ReachMarks {}
+
+impl std::fmt::Debug for ReachMarks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ReachMarks")
+    }
 }
 
 /// One member per scalar head, joined before the ordinary union loop.
@@ -368,6 +429,7 @@ impl Solver {
             failures: Vec::new(),
             type_names,
             alias_folds: Default::default(),
+            reach_marks: ReachMarks::default(),
         }
     }
 
@@ -1278,7 +1340,7 @@ impl Solver {
     /// and the bounds of those variables that are not variables.
     fn reach(&self, starts: Vec<V>, lower: bool) -> (Vec<V>, Vec<Ty>) {
         let mut seen: Vec<V> = Vec::new();
-        let mut visited: HashSet<V> = HashSet::default();
+        let mut visited = self.reach_marks.start(self.vars.len());
         // Graph keys hash their immutable pool identity and node ID.
         #[allow(clippy::mutable_key_type)]
         let mut found: HashSet<&Ty> = HashSet::default();
@@ -2927,5 +2989,83 @@ mod handler_proof_tests {
         assert!(!s.same_form(&a, &list(b)));
         let Ty::Var(v) = a else { unreachable!() };
         assert!(s.occurs(vec![v]));
+    }
+}
+
+#[cfg(test)]
+mod reach_marks_tests {
+    use super::*;
+
+    #[test]
+    fn each_walk_starts_unmarked_also_after_the_stamp_wraps() {
+        let marks = ReachMarks::default();
+        {
+            let mut w = marks.start(4);
+            assert!(w.insert(V(1)));
+            assert!(!w.insert(V(1)));
+            assert!(w.insert(V(9)));
+            assert!(w.insert(V(2)));
+        }
+        {
+            let mut w = marks.start(4);
+            assert!(w.insert(V(1)));
+            assert!(w.insert(V(9)));
+        }
+        marks.0.borrow_mut().0 = u32::MAX;
+        let mut w = marks.start(4);
+        assert!(w.insert(V(1)));
+        assert!(!w.insert(V(1)));
+        assert!(w.insert(V(2)));
+    }
+
+    #[test]
+    fn reach_marks_are_not_solver_state() {
+        let mut a = Solver::new(Default::default(), Vec::new());
+        let v = a.fresh_at(0);
+        let b = a.clone();
+        let _ = a.reach(vec![v], true);
+        assert_eq!(a, b);
+        let c = a.clone();
+        assert!(c.reach_marks.0.borrow().1.is_empty());
+        assert_eq!(c.reach(vec![v], true), a.reach(vec![v], true));
+        assert_eq!(a, c);
+    }
+
+    #[test]
+    fn reach_preserves_order_observations_and_changed_bounds() {
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let [a, b, c, d] = std::array::from_fn(|_| s.fresh_at(0));
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), Vec::new());
+        s.var_mut(a).lower = vec![Ty::Var(b), int.clone(), int.clone()];
+        s.var_mut(a).from = vec![c];
+        s.var_mut(b).lower = vec![Ty::Var(a), string.clone()];
+        s.var_mut(c).lower = vec![Ty::Var(b), int.clone()];
+        s.var_mut(a).upper = vec![Ty::Var(d), string.clone()];
+        s.var_mut(a).into = vec![b];
+        s.var_mut(b).upper = vec![Ty::Var(a), int.clone()];
+        s.var_mut(d).upper = vec![Ty::Var(a), string.clone()];
+        s.observation = Some((s.vars.len(), HashSet::from_iter([c]), Default::default()));
+
+        assert_eq!(
+            s.reach(vec![b, a, a], true),
+            (vec![a, c, b], vec![int.clone(), string.clone()])
+        );
+        assert_eq!(
+            s.reach(vec![a], false),
+            (vec![a, b, d], vec![string.clone(), int.clone()])
+        );
+        assert_eq!(
+            *s.observation.as_ref().unwrap().2.borrow(),
+            HashSet::from_iter([a, b, d])
+        );
+
+        s.var_mut(a).lower = vec![int.clone()];
+        s.var_mut(a).from.clear();
+        assert_eq!(s.reach(vec![a], true), (vec![a], vec![int.clone()]));
+        let e = s.fresh_at(0);
+        s.var_mut(a).from.push(e);
+        s.var_mut(e).lower = vec![string.clone()];
+        assert_eq!(s.reach(vec![a], true), (vec![a, e], vec![int, string]));
     }
 }
