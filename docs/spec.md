@@ -3,7 +3,7 @@
 
 This document is the definition of the i programming language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
-This document is complete in itself. It defines:
+This document is complete in itself, except that the principality argument (§4.7), the contract of `resource.ensure`'s final callback (§9.5), and the contracts of the library operations in §9.12 are still being completed; this qualification is to be removed when all three are complete. It defines:
 
 - the source language (§1 to §8);
 - effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, `i/request`, `i/clock`, `i/fs`, `i/process`, `i/net`, `i/tls`, and `i/stdio` (§9);
