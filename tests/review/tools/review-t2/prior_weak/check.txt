@@ -1,5 +1,0 @@
-review/main.id : (x: A) -> A
-review/main.a : Int
-review/main.b : Int
-src/main.i:4:3: error[E0534]: the type of review/main.b is still open after source completion; define and export a closed alias next to the source, or write a fully closed source annotation
-1 error

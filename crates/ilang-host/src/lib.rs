@@ -78,7 +78,10 @@ pub mod native;
 mod requests;
 pub mod resources;
 mod run;
+mod workers;
+pub use workers::worker_count;
 pub mod services;
+pub mod store;
 pub mod syntax;
 #[cfg(test)]
 mod tests;
@@ -104,7 +107,11 @@ use wasmtime::{
     Instance as WasmInstance, Linker, Memory, Module, RootScope, Store, Val, ValType,
 };
 
-pub const ABI_VERSION: u32 = 3;
+pub const ABI_VERSION: u32 = 4;
+/// The oldest ABI version this host reads: version 4 only adds the runtime
+/// imports of multicore workers (`ilang:host/v1` `mc_*`, native.md N3), which a
+/// version 3 module never has.
+pub const ABI_OLDEST: u32 = 3;
 pub const HOST_MODULE: &str = "ilang:host/v1";
 /// The stop reason for a value from the host that is not correct.
 pub const HOST_VALUE_REASON: &str = "host: value is not correct";
@@ -282,7 +289,7 @@ impl Abi {
 
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.version >= ABI_VERSION,
+            self.version >= ABI_OLDEST,
             "the module uses i ABI version {}; build it again with this version of i",
             self.version
         );
@@ -774,6 +781,24 @@ struct State {
     failure: Option<anyhow::Error>,
     /// The requests of async host functions that are outstanding.
     requests: Requests,
+    /// The other workers of a multicore entry (multicore D8, native N7).
+    workers: Option<Arc<workers::Pool>>,
+}
+
+impl State {
+    /// The state of a remote worker instance: no host services at all.
+    fn worker() -> Self {
+        Self {
+            resources: HostImports::default().resource_host.context(),
+            macro_budget: None,
+            references: BTreeMap::new(),
+            next_reference: 1,
+            stop_message: None,
+            failure: None,
+            requests: Requests::default(),
+            workers: None,
+        }
+    }
 }
 
 /// Service identities attached to required host fields by the compiler. They
@@ -797,16 +822,32 @@ pub struct Program {
     binding_plan: Option<bindings::BindingPlan>,
     provider_registrations: Vec<ProviderRegistration>,
     macro_static_cost: Option<(u64, u64)>,
+    /// Workers of an entry run ([`worker_count`]); more than one needs
+    /// epoch-instrumented code (native N12).
+    workers: usize,
+    /// The engine is epoch-instrumented, so every store needs a deadline.
+    epochs: bool,
 }
 
+/// The store kind of a whole compiled module (Wasmtime's serialized form).
+pub const COMPILED_MODULE_KIND: &str = "wasmtime-module";
+/// The store kind of one function compiled by Cranelift's incremental cache.
+pub const COMPILED_FUNCTION_KIND: &str = "cranelift-function";
+
 #[cfg(feature = "compiler")]
-/// Where compiled machine code is kept between processes: the directory
-/// named by `ILANG_COMPILE_CACHE`. Unset, empty or `0`, there is no cache.
-/// Nothing removes old entries; the caller owns the directory.
-fn compile_cache_dir() -> Option<std::path::PathBuf> {
-    std::env::var_os("ILANG_COMPILE_CACHE")
-        .filter(|value| !value.is_empty() && value != "0")
-        .map(Into::into)
+/// Where compiled machine code is kept between processes: the global cache
+/// store ([`store`]), unless `I_CACHE=off`. `ILANG_COMPILE_CACHE`, the older
+/// switch, still works: empty or `0` turns this cache off, and a directory
+/// puts a store of the same format there instead.
+fn compile_store() -> Option<store::Store> {
+    if store::disabled() {
+        return None;
+    }
+    match std::env::var_os("ILANG_COMPILE_CACHE") {
+        Some(value) if value.is_empty() || value == "0" => None,
+        Some(dir) => Some(store::Store::at(dir, store::Limits::from_env())),
+        None => store::Store::global(),
+    }
 }
 
 #[cfg(feature = "compiler")]
@@ -824,17 +865,30 @@ impl std::hash::Hasher for Sha256Hasher {
 }
 
 #[cfg(feature = "compiler")]
-/// The identity of this executable (path, size, modification time), part of
-/// every cache key so that a rebuilt compiler never reads code that an older
-/// one stored.
-fn executable_identity() -> &'static str {
-    static IDENTITY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    IDENTITY.get_or_init(|| {
-        let executable = std::env::current_exe()
-            .and_then(|path| Ok((std::fs::metadata(&path)?, path)))
-            .map(|(meta, path)| (path, meta.len(), meta.modified().ok()));
-        format!("{executable:?}")
-    })
+/// Hash the running executable once per process. If it cannot be read,
+/// compiled-code caching is disabled instead of using an ambiguous key.
+fn executable_identity() -> Option<&'static str> {
+    static IDENTITY: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    IDENTITY
+        .get_or_init(|| {
+            use sha2::Digest;
+            let path = if cfg!(target_os = "linux") {
+                std::path::PathBuf::from("/proc/self/exe")
+            } else {
+                std::env::current_exe().ok()?
+            };
+            let mut file = std::fs::File::open(path).ok()?;
+            let mut hasher = sha2::Sha256::new();
+            std::io::copy(&mut file, &mut hasher).ok()?;
+            Some(
+                hasher
+                    .finalize()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect(),
+            )
+        })
+        .as_deref()
 }
 
 #[cfg(feature = "compiler")]
@@ -865,7 +919,9 @@ fn compile_cache_key(engine: &Engine, bytes: &[u8]) -> String {
     let settings = hasher.0.finalize();
     hex_digest(&[
         b"module",
-        executable_identity().as_bytes(),
+        executable_identity()
+            .expect("cache requires executable identity")
+            .as_bytes(),
         &settings,
         bytes,
     ])
@@ -873,74 +929,67 @@ fn compile_cache_key(engine: &Engine, bytes: &[u8]) -> String {
 
 #[cfg(feature = "compiler")]
 /// Cranelift's per-function cache (its key covers the function's IR and the
-/// compiler flags), kept as one file per function in the cache directory.
+/// compiler flags), one store entry per function.
 #[derive(Debug)]
-struct FunctionCache(std::path::PathBuf);
+struct FunctionCache(store::Store);
 
 #[cfg(feature = "compiler")]
 impl wasmtime::CacheStore for FunctionCache {
     fn get(&self, key: &[u8]) -> Option<std::borrow::Cow<'_, [u8]>> {
-        std::fs::read(self.path(key)).ok().map(Into::into)
+        self.0
+            .get(COMPILED_FUNCTION_KIND, &Self::key(key))
+            .map(Into::into)
     }
     fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
-        store_atomically(&self.path(key), &value)
+        self.0.put(COMPILED_FUNCTION_KIND, &Self::key(key), &value)
     }
 }
 
 #[cfg(feature = "compiler")]
 impl FunctionCache {
-    fn path(&self, key: &[u8]) -> std::path::PathBuf {
-        self.0.join(hex_digest(&[
+    fn key(key: &[u8]) -> String {
+        hex_digest(&[
             b"function",
-            executable_identity().as_bytes(),
+            executable_identity()
+                .expect("cache requires executable identity")
+                .as_bytes(),
             key,
-        ]))
+        ])
     }
 }
 
 #[cfg(feature = "compiler")]
-/// Writes `bytes` to `path` through a temporary file and a rename, so that a
-/// reader never sees a partial entry. Failure leaves the entry unwritten.
-fn store_atomically(path: &std::path::Path, bytes: &[u8]) -> bool {
-    let Some(dir) = path.parent() else {
-        return false;
-    };
-    if std::fs::create_dir_all(dir).is_err() {
-        return false;
-    }
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let temporary = dir.join(format!(
-        ".tmp.{}.{}",
-        std::process::id(),
-        COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-    ));
-    let stored =
-        std::fs::write(&temporary, bytes).is_ok() && std::fs::rename(&temporary, path).is_ok();
-    if !stored {
-        let _ = std::fs::remove_file(&temporary);
-    }
-    stored
+/// The largest Wasm module whose whole compiled form is cached:
+/// `I_CACHE_MODULE_MAX_SIZE` (bytes, or with a K/M/G suffix); no limit by
+/// default. A larger module still reuses its per-function entries.
+fn module_cache_limit() -> u64 {
+    std::env::var("I_CACHE_MODULE_MAX_SIZE")
+        .ok()
+        .and_then(|v| store::parse_size(&v))
+        .unwrap_or(u64::MAX)
 }
 
 #[cfg(feature = "compiler")]
 /// Compiles `bytes`, reusing machine code that an earlier process compiled
 /// from the same bytes with the same engine settings and executable.
 fn compiled_module(engine: &Engine, bytes: &[u8]) -> Result<Module> {
-    let Some(dir) = compile_cache_dir() else {
+    let Some(store) = compile_store()
+        .filter(|_| executable_identity().is_some() && bytes.len() as u64 <= module_cache_limit())
+    else {
         return Ok(Module::new(engine, bytes)?);
     };
-    let path = dir.join(compile_cache_key(engine, bytes));
-    if path.is_file() {
-        // SAFETY: the file was written by `Module::serialize` of this same
-        // executable (its identity is part of the name) for these exact bytes
-        // and engine settings; Wasmtime checks its own version and settings
-        // again while loading it.
-        if let Ok(module) = unsafe { Module::deserialize_file(engine, &path) } {
+    let key = compile_cache_key(engine, bytes);
+    if let Some(serialized) = store.get(COMPILED_MODULE_KIND, &key) {
+        // SAFETY: the entry's content digest matched, and it was written by
+        // `Module::serialize` of this same executable (its identity is part
+        // of the key) for these exact bytes and engine settings; Wasmtime
+        // checks its own version and settings again while loading it.
+        if let Ok(module) = unsafe { Module::deserialize(engine, &serialized) } {
             return Ok(module);
         }
     }
     let module = Module::new(engine, bytes)?;
-    store_atomically(&path, &module.serialize()?);
+    store.put(COMPILED_MODULE_KIND, &key, &module.serialize()?);
     Ok(module)
 }
 
@@ -1115,15 +1164,22 @@ impl Program {
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-        if let Some(dir) = compile_cache_dir() {
-            config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(
-                dir.join("functions"),
-            )))?;
+        let workers = if metadata.macro_static_cost.is_some() {
+            1
+        } else {
+            worker_count()
+        };
+        config.epoch_interruption(workers > 1);
+        if let Some(store) = compile_store().filter(|_| executable_identity().is_some()) {
+            config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(store)))?;
         }
         let engine = Engine::new(&config)?;
         let module =
             compiled_module(&engine, bytes).context("compiling the i WebAssembly module")?;
-        Self::from_parts(engine, module, metadata)
+        let mut program = Self::from_parts(engine, module, metadata)?;
+        program.workers = workers;
+        program.epochs = workers > 1;
+        Ok(program)
     }
 
     fn from_parts(engine: Engine, module: Module, metadata: Metadata) -> Result<Self> {
@@ -1143,7 +1199,28 @@ impl Program {
             binding_plan: None,
             provider_registrations: metadata.provider_registrations,
             macro_static_cost: metadata.macro_static_cost,
+            workers: 1,
+            epochs: false,
         })
+    }
+
+    /// The engine of this program is epoch-instrumented: entries may use
+    /// `workers` workers.
+    pub(crate) fn with_epochs(mut self, workers: usize) -> Self {
+        self.epochs = true;
+        self.workers = if self.macro_static_cost.is_some() {
+            1
+        } else {
+            workers.max(1)
+        };
+        self
+    }
+
+    /// Runs entries on at most `workers` workers (multicore D12: the host's
+    /// choice). One worker keeps the FIFO fast path (native N10).
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.workers = if self.epochs { workers.max(1) } else { 1 };
+        self
     }
 
     /// Gives the metadata of a module that has no `ilang.abi` section.
@@ -1176,6 +1253,7 @@ impl Program {
     /// Makes an instance and calls `ilang_start`. When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
+        let pool_options = options.clone();
         if let Some((work, allocation)) = self.macro_static_cost {
             let budget = options
                 .imports
@@ -1193,6 +1271,7 @@ impl Program {
         )?;
         let mut linker = Linker::new(&self.engine);
         define_builtins(&mut linker)?;
+        workers::define_home(&mut linker)?;
         for (kind, modules) in [(true, &self.abi.services), (false, &self.abi.externals)] {
             for (module, functions) in modules {
                 for (name, signature) in functions {
@@ -1231,8 +1310,13 @@ impl Program {
                 stop_message: None,
                 failure: None,
                 requests: Requests::default(),
+                workers: None,
             },
         );
+        if self.epochs {
+            // Only remote workers are ever interrupted (native N12).
+            store.set_epoch_deadline(1 << 62);
+        }
         let instance = {
             let mut scope = RootScope::new(&mut store);
             linker
@@ -1253,11 +1337,32 @@ impl Program {
             .get_func(&mut instance.store, "ilang_start")
             .context("the module does not export ilang_start")?;
         match instance.invoke(start, &[], &mut [])? {
-            None => Ok(instance),
+            None => {}
             Some(stop) => {
-                Err(anyhow::Error::new(stop).context("the program stopped in ilang_start"))
+                return Err(anyhow::Error::new(stop).context("the program stopped in ilang_start"));
             }
         }
+        // A module whose `i/task` can publish records gets the other
+        // workers; they start when the first record is published.
+        if self.workers > 1
+            && options.imports.macro_budget.is_none()
+            && let Ok(setup) = instance
+                .instance
+                .get_typed_func::<i64, ()>(&mut instance.store, "ilang_mc_setup")
+        {
+            setup
+                .call(&mut instance.store, workers::id_prefix(0, 0))
+                .map_err(anyhow::Error::from)
+                .context("ilang_mc_setup")?;
+            instance.store.data_mut().workers = Some(workers::Pool::new(
+                self.engine.clone(),
+                self.module.clone(),
+                self.workers,
+                self.abi.clone(),
+                pool_options,
+            ));
+        }
+        Ok(instance)
     }
 
     /// Runs the program entry in a new instance, on one `ilang` thread
@@ -1367,6 +1472,9 @@ impl Instance {
 
     /// Stops admission and releases host work/resources without invoking i code.
     pub fn dispose(&mut self) {
+        if let Some(pool) = self.store.data_mut().workers.take() {
+            pool.shutdown();
+        }
         self.store.data().resources.teardown();
         self.store.data_mut().requests.drop_all();
         self.unusable
@@ -1932,6 +2040,9 @@ fn invoke_in(
 /// than replaced with the trap that carried it out of Wasm.
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
     let mut context = context.as_context_mut();
+    if std::env::var_os("I_WORKERS_TRACE").is_some() {
+        eprintln!("i: trap: {:?} {error:?}", context.data().stop_message);
+    }
     let state = context.data_mut();
     state.resources.teardown();
     state.requests.drop_all();

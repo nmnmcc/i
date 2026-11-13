@@ -1,5 +1,0 @@
-spec/equality_externals.add : (a: Int, b: Int) -> Int
-spec/equality_externals.plus : (a: Int, b: Int) -> Int
-spec/equality_externals.check : (c: Bool, what: String) -> Nil
-spec/equality_externals.same : (f: (Int, Int) -> Int, g: (Int, Int) -> Int) -> Bool
-spec/equality_externals.declarations_are_values : () -> Nil

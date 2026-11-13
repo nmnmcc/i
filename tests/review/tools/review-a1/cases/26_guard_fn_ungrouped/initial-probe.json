@@ -1,1 +1,0 @@
-{"check":["E0202: the type `True` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`"],"parse":[],"roundtrip":true,"wat":false}

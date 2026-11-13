@@ -61,7 +61,7 @@ pub fn module(
         .iter()
         .map(|(path, name)| (path.as_str(), name.as_str()))
         .collect::<Vec<_>>();
-    match run::compile(&graph, &selected, &refs) {
+    match run::compile_owned(graph, &selected, &refs) {
         Ok(_) => Ok(()),
         Err(CompileError::Internal(message)) => Err(vec![Diagnostic::error(
             ilang_check::code::MACRO_RESERVED,

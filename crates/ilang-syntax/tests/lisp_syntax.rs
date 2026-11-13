@@ -666,7 +666,7 @@ fn definition_table_distinguishes_waits_catchable_and_compile_errors() {
     use ilang_syntax::lisp::definition_schedule::Mode;
     use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
     let mut table = DefinitionTable::default();
-    let source = "Box(A) = (A)";
+    let source = "Box(A) = { (A) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty());
     let of = root("Box");
@@ -1120,7 +1120,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         Definition, DefinitionCost, DefinitionTable, Lookup,
     };
     let of = root("Box");
-    let source = "Box(A) = (A)";
+    let source = "Box(A) = { (A) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty());
     let mut table = DefinitionTable::default();
@@ -1170,7 +1170,9 @@ fn records_parse_from_lisp_with_fields_spread_and_removal() {
     use ilang_syntax::ast::{ExprKind, TypeKind};
     let empty = ilang_syntax::lisp::parse("()").unwrap();
     let empty = ilang_syntax::lisp::parse_expression(&empty[0]).unwrap();
-    assert!(matches!(&empty.kind, ExprKind::Record { base: None, fields } if fields.is_empty()));
+    // The transitional AST adapter keeps empty data as an empty tuple.
+    // The source reader requires `(,)` (spec §14.3).
+    assert!(matches!(&empty.kind, ExprKind::Tuple(items) if items.is_empty()));
     let values = ilang_syntax::lisp::parse("(.. r (: x 1) (: \"a b\" 2))").unwrap();
     let value = ilang_syntax::lisp::parse_expression(&values[0]).unwrap();
     assert!(

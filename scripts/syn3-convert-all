@@ -32,6 +32,8 @@ elif [ "${1:-}" = --all ]; then
 	since=
 	shift
 fi
+# Embedded snippets use the same pre-merge baseline as whole files.
+export SYN3_EMBEDDED_SINCE="$since"
 bin=${SYN3_MIGRATE:-}
 if [ -z "$bin" ]; then
 	cargo build --release --locked -p ilang-syntax --features legacy --example migrate-syntax3
@@ -71,7 +73,7 @@ fi
 [ "$status" = 0 ] || [ -s "$out/failed.txt" ] || exit "$status"
 # Forms the migrator converts with a loss (its notes of these kinds) are
 # accepted only for the files of scripts/syn3-lossy.txt.
-lossy='open-record|string-label|two-row-variables|need-not-named|row-difference|type-params|constructor-name-clash|labelled-call|empty-match'
+lossy='open-record|string-label|two-row-variables|need-not-named|row-difference|type-params|constructor-name-clash|labelled-call|empty-match|lowercase-type-param'
 grep -E "^[^:]+:[0-9]+: ($lossy): " "$out/notes.txt" | cut -d: -f1 | sort -u > "$out/lossy.txt" || true
 grep -v '^#' "$repo/scripts/syn3-lossy.txt" | sed 's/ .*//' | sort -u > "$out/lossy-expected.txt"
 unexpected=$(comm -23 "$out/lossy.txt" "$out/lossy-expected.txt")

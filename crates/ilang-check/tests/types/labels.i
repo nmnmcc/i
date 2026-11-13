@@ -1,5 +1,5 @@
-// §4.6 and §6.6: labels put arguments in order; they have no effect on
-// types.
+// §6.6: migrated function heads take positional arguments; constructor
+// data keeps explicit labels (syntax three §2.3, §2.4).
 User = (name = String, age = Int)
 
 make = (name: String, age: Int) { User(name = name, age = age) }
@@ -14,7 +14,7 @@ annotated: (Int) -> Int = (y) { y }
 
 call_annotated = annotated(1)
 
-// Labels have no effect on subtyping.
+// The written positional function type is preserved by subtyping.
 relabel: (Int) -> Int = annotated
 
 local = () {
@@ -47,8 +47,8 @@ bad_pattern = (u) {
 	n
 }
 
-// Labels come from known function types (§4.8).
-// A name that is not generalized gets its labels from its value.
+// Positional calls use known function types (§4.8).
+// A name that is not generalized gets its type from its value.
 id = (x) { x }
 
 through = () {
@@ -56,7 +56,7 @@ through = () {
 	g("x", 1)
 }
 
-// A `_` part is fine: only the labels are needed.
+// A `_` part leaves the positional parameter type to inference.
 holes = (f: (_) -> Int) { f(1) }
 
 // Positional arguments first, also with `|>`.
@@ -84,7 +84,7 @@ ping = (n: Int) { pong(n) }
 
 pong = (m: Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }
 
-// An annotation label wins over the labels of the value.
+// A written positional signature determines the call interface (§6.6).
 wins: (Int) -> Int = (y) { y }
 
 wins_ok = wins(1)

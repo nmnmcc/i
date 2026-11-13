@@ -1,2 +1,0 @@
-spec/stop_tail_assert.positive : (n: Int) -> Nil ! Assert
-spec/stop_tail_assert.main : () -> Nil ! Assert

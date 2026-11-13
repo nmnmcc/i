@@ -1,2 +1,0 @@
-spec/host_error_main.lookup : (key: String) -> String ? String ! Kv
-spec/host_error_main.main : () -> Nil ? String ! Kv

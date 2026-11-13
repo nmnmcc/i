@@ -1,3 +1,0 @@
-spec/deep_recursion.check : (got: String, want: String) -> Nil
-spec/deep_recursion.depth : (n: Int) -> Int
-spec/deep_recursion.deep : () -> Nil

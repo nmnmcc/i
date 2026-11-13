@@ -1,6 +1,0 @@
-{
-  "code": 0,
-  "out": "app/main.ints : () -> Int\napp/main.texts : () -> String\napp/main.use : (x: A) -> A ! N | S(A, N)\napp/main.wrap : (x: A & B) -> B ! N | S(C & B, N)\napp/main.run : (body: () -> A ! N) -> A ! N\n",
-  "err": "",
-  "seconds": 0.030076131923124194
-}

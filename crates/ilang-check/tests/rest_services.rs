@@ -2,7 +2,10 @@
 mod common;
 
 fn checked(source: &str) -> (Vec<String>, Vec<String>) {
-    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let (mut graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    // These are checker unit tests, independent of the task/effects port.
+    // Fail is an ordinary service declared by the prelude.
+    graph.packages[graph.library].modules.retain(|m| m.path == "i/prelude");
     let checked = ilang_check::check(&graph);
     let errors = checked.diags.iter().filter(|d| d.is_error())
         .map(|d| graph.sources.render(d)).collect();
@@ -17,8 +20,8 @@ fn checked(source: &str) -> (Vec<String>, Vec<String>) {
 fn keep_captures_the_rest_and_leaves_fail_at_the_call() {
     let (types, errors) = checked("keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A { (x) { f(x) <- env } }");
     assert!(errors.is_empty(), "{errors:#?}");
-    let ty = types.iter().find(|s| s.starts_with("keep :")).unwrap();
-    assert_eq!(ty, "keep : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B");
+    let ty = types.iter().find(|s| s.starts_with("app/main.keep :")).unwrap();
+    assert_eq!(ty, "app/main.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B");
 }
 
 #[test]

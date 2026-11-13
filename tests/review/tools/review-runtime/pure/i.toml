@@ -1,3 +1,0 @@
-name = "app"
-[wasm]
-exports = ["app/main.cmp"]

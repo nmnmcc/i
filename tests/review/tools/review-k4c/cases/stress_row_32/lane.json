@@ -1,6 +1,0 @@
-{
-  "code": 0,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.f_0 : () -> Nil ! N | S(N)\napp/main.f_1 : () -> Nil ! N | S(N)\napp/main.f_2 : () -> Nil ! N | S(N)\napp/main.f_3 : () -> Nil ! N | S(N)\napp/main.f_4 : () -> Nil ! N | S(N)\napp/main.f_5 : () -> Nil ! N | S(N)\napp/main.f_6 : () -> Nil ! N | S(N)\napp/main.f_7 : () -> Nil ! N | S(N)\napp/main.f_8 : () -> Nil ! N | S(N)\napp/main.f_9 : () -> Nil ! N | S(N)\napp/main.f_10 : () -> Nil ! N | S(N)\napp/main.f_11 : () -> Nil ! N | S(N)\napp/main.f_12 : () -> Nil ! N | S(N)\napp/main.f_13 : () -> Nil ! N | S(N)\napp/main.f_14 : () -> Nil ! N | S(N)\napp/main.f_15 : () -> Nil ! N | S(N)\napp/main.f_16 : () -> Nil ! N | S(N)\napp/main.f_17 : () -> Nil ! N | S(N)\napp/main.f_18 : () -> Nil ! N | S(N)\napp/main.f_19 : () -> Nil ! N | S(N)\napp/main.f_20 : () -> Nil ! N | S(N)\napp/main.f_21 : () -> Nil ! N | S(N)\napp/main.f_22 : () -> Nil ! N | S(N)\napp/main.f_23 : () -> Nil ! N | S(N)\napp/main.f_24 : () -> Nil ! N | S(N)\napp/main.f_25 : () -> Nil ! N | S(N)\napp/main.f_26 : () -> Nil ! N | S(N)\napp/main.f_27 : () -> Nil ! N | S(N)\napp/main.f_28 : () -> Nil ! N | S(N)\napp/main.f_29 : () -> Nil ! N | S(N)\napp/main.f_30 : () -> Nil ! N | S(N)\napp/main.f_31 : () -> Nil ! N | S(N)\n",
-  "err": "",
-  "seconds": 0.025859052781015635
-}

@@ -492,7 +492,7 @@
     "substitutions": [
       [
         "{MAIN}",
-        "User { User(name: String, age: Int) }\n"
+        "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n"
       ],
       [
         "{{",
@@ -1339,10 +1339,6 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-cli/tests/r2_runtime.rs:db459d917142bf8d": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
   "crates/ilang-cli/tests/tls.rs:783069f71ba1cc71": {
     "substitutions": [
       [
@@ -1758,57 +1754,6 @@
   "crates/ilang-cli/tests/http.rs:8e812e356e161441": {
     "not_source": true,
     "reason": "Rust format string generates a TOML manifest."
-  },
-  "crates/ilang-cli/tests/http.rs:97e31cf541bb26e9": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-cli/tests/http.rs:146cf9901a2b99ba": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-cli/tests/http.rs:5475c0aa0e2f0c43": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
   },
   "tests/spec/3/syn2_old_empty_record_type.i:8e197a393e555c9d": {
     "reason": "Intentional legacy migration or rejection fixture.",
@@ -2655,9 +2600,6 @@
     ],
     "reason": "Render the source template of the Lisp-branch helper"
   },
-  "crates/ilang-check/src/types/records/codec.rs:217fe1a139ac8e12": {
-    "not_source": "a format string that builds a type name or an attribute head, not i source"
-  },
   "crates/ilang-check/src/types/shown.rs:ccfaa87f19759eaf": {
     "not_source": "a format string that builds a type name or an attribute head, not i source"
   },
@@ -2687,1173 +2629,22 @@
     ],
     "reason": "Render the source template; the test still exercises the generator"
   },
-  "crates/ilang-lsp/tests/protocol.rs:75d37f7acc0cfed5": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-syntax/tests/parse.rs:926d5ba87661e6fa": {
-    "not_source": "Printer output prefix assertion"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:8d36c5f7f3bb9c2a": {
-    "substitutions": [
-      [
-        "{ty}",
-        "Int"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:324fd4156599e8eb": {
-    "substitutions": [
-      [
-        "{ty}",
-        "Int"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-syntax/tests/golden/err_arg_order.i:93680fe2e84a3b6c": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0110: an argument by position may not come after an argument by label",
-      "E0110: an argument by position may not come after an argument by label"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_attr_same_line.i:ba368ee323f45dc2": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_attribute_line.i:9483c10d4ca6f3c0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_bang_line.i:dd1938c197d21bc0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `!`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_block_end.i:6c38c9db4df2ec93": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0105: a block ends with an expression",
-      "E0105: a block ends with an expression"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_body_next_line.i:5db9dbfe97b69389": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0102: expected the function body, a `{` on the same line, found `{`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_brackets.i:507cb1b768566c5f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0010: `(` is not closed",
-      "E0009: `]` does not close `(`",
-      "E0101: expected `,` or `)`, found `]`",
-      "E0010: `[` is not closed",
-      "E0101: expected `,` or `]`, found the end of the file"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_clause_tuple_note.i:154a0f55b382a61f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`",
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_clause_tuple_type.i:a69e2e3ad4d5098a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_discard.i:ff3954a6a2381ebc": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_form_feed.i:69969675eefc17f6": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0001: unexpected character U+000C"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_guard_word.i:d9ca0efb02727105": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected `->`, found `if`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `v`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_header_empty.i:bc7cf48d1732417b": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_header_order.i:162b4fae374453a8": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_import_late.i:b6fadc29ba4279c1": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_list.i:ca87955470970801": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an expression, found `,`",
-      "E0107: `..rest` comes after the parts of a list",
-      "E0101: expected `]`, found `2`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_pattern.i:744689f5c04c6278": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal",
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_pipe_group.i:b21ad312873fd189": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`",
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_pipe_target.i:f211c96492c6d0ca": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block",
-      "E0111: the right side of `|>` must be a name, a call, a function, or a clause block"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_record.i:fb0701e8893b9a62": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`",
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_recover.i:d6cdf02d84cb49fc": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an expression, found `=`",
-      "E0101: expected an expression, found `*`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_segment_type.i:6f40cce0b0d3184f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a name, found `Int`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_spread.i:35e981cd82014d7b": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0107: `..rest` comes after the parts of a list"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_toplevel.i:f129fa05d8f322be": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `1`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_trailing.i:59909053e90d2f0e": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a type, found `,`",
-      "E0101: expected a type, found `,`",
-      "E0101: expected a part, found `)`"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/err_type_group_break.i:8e5c19981e03ffda": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0112: a line break directly inside a `{ }` that groups a type is a compile error",
-      "E0112: a line break directly inside a `{ }` that groups a type is a compile error"
-    ]
-  },
-  "crates/ilang-syntax/tests/golden/literal_errors.i:70aae17e0ddfb0c0": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0005: `_` may only be between two digits",
-      "E0005: `_` may only be between two digits",
-      "E0006: expected digits",
-      "E0005: `_` may only be between two digits",
-      "E0006: `2` is not a digit of base 2",
-      "E0007: this float literal is not a finite binary64 number",
-      "E0003: unknown escape",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0004: `\\u{…}` needs 1 to 6 hex digits that make a Unicode scalar value",
-      "E0006: `12px` is not a number",
-      "E0008: `fooBar` is not a name, a discard, or an UpName",
-      "E0008: `Foo_bar` is not a name, a discard, or an UpName",
-      "E0008: `_1` is not a name, a discard, or an UpName",
-      "E0006: `1.0E5` is not a number",
-      "E0006: `G` is not a digit of base 16",
-      "E0006: `1.0e` is not a number",
-      "E0003: unknown escape",
-      "E0001: unexpected character `$`",
-      "E0002: this string is not closed"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:61e1e25bf9a2a4dc": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:e79adbe2811820c8": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:8babff013ab10019": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected a name, found `Int`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:5214d3f67359d688": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:3330b7891521d6fc": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0101: expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:62eabf4bc4d2293e": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:763c28c907fd0507": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a file has at most one imports group and one exports group"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:bd69aee627dca9be": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:be23c4ff74c9f73f": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0115: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:04e24b46baf5040e": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:3ce334bfd693e428": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:b6a4ae21a4ba6902": {
-    "reason": "Existing deliberately invalid syntax fixture",
-    "diagnostics": [
-      "E0111: `|>` is the weakest operator, so what comes after the clause block is part of the right side of the match; put the match in a group: `{ e |> { … } } * 10`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:6ff9c37b544076f6": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{word}",
-        "if"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:d942f64886578d87": {
-    "prefix": "x = ",
-    "reason": "An ordinary name used by the lexical and naming regression"
-  },
-  "crates/ilang-syntax/tests/parse.rs:d46aee08cc49f6d1": {
-    "prefix": "x = ",
-    "reason": "An ordinary name used by the lexical and naming regression"
-  },
-  "crates/ilang-syntax/tests/parse.rs:bbfcd4160a1e8674": {
-    "prefix": "x = ",
-    "reason": "An ordinary name used by the lexical and naming regression"
-  },
-  "crates/ilang-syntax/tests/parse.rs:79d44e974dbc8474": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:96422ef1f554e5e2": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `{`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:180492297ecd3956": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `case`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found a line break before `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:c1f607c4a9dd9c9d": {
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `n`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-syntax/tests/parse.rs:b8cc3731431cdb8c": {
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ],
-    "reason": "Deliberately malformed token-probe or parser-recovery input"
-  },
-  "crates/ilang-check/tests/types.rs:ce1f7bfbe647f15b": {
-    "prefix": "f = (b, x) {\n  a0 = x\n",
-    "suffix": "  a1\n}\n",
-    "substitutions": [
-      [
-        "{i}",
-        "1"
-      ],
-      [
-        "{p}",
-        "0"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
-  },
-  "crates/ilang-wasm/tests/codegen.rs:ce1f7bfbe647f15b": {
-    "prefix": "f = (b, x) {\n  a0 = x\n",
-    "suffix": "  a1\n}\n",
-    "substitutions": [
-      [
-        "{i}",
-        "1"
-      ],
-      [
-        "{p}",
-        "0"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
-  },
-  "crates/ilang-check/tests/literal_types.rs:bf0979699c1ddd46": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{need}",
-        "String"
-      ],
-      [
-        "{annotation}",
-        "String"
-      ],
-      [
-        "{pattern}",
-        "\"a\""
-      ],
-      [
-        "{catch}",
-        "t"
-      ]
-    ],
-    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
-  },
-  "crates/ilang-check/tests/literal_types.rs:bdd9ba51653f2a19": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{ty}",
-        "String"
-      ]
-    ],
-    "reason": "Host-service declaration template; scalar instances are checked by the interpretation test."
-  },
-  "crates/ilang-syntax/tests/parse.rs:3518e3031dffcd42": {
-    "diagnostics": [
-      "E0101: Float has no literal types"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:b75557568ec562c8": {
-    "diagnostics": [
-      "E0101: Float has no literal types"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:8f873166378c94ef": {
-    "diagnostics": [
-      "E0101: Float has no literal types"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:cd6c009a54a14c8c": {
-    "diagnostics": [
-      "E0101: expected an integer literal after `-` in a type, found `x`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:c6eca6b04e22224f": {
-    "diagnostics": [
-      "E0101: expected an integer literal after `-` in a type, found `(`"
-    ]
-  },
-  "crates/ilang-syntax/tests/parse.rs:dcd481589ffd28e9": {
-    "diagnostics": [
-      "E0101: expected an integer literal after `-` in a type, found `-`"
-    ]
-  },
-  "crates/ilang-cli/tests/wasi.rs:853ccab837669e73": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:2c63fcbf8e502a36": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:1d250e2cb1aa2c23": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:a2d39b7f18996a7f": {
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:882f2779164e0247": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-cli/tests/wasi.rs:b6f06d4f92a45093": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
-  },
-  "crates/ilang-cli/tests/package_commands.rs:63b8eb2dbb020e7c": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
-  "crates/ilang-cli/tests/tls.rs:020da3c5bde29e24": {
-    "substitutions": [
-      [
-        "{server:?}",
-        "\"server\""
-      ],
-      [
-        "{key:?}",
-        "\"key\""
-      ],
-      [
-        "{ca:?}",
-        "\"ca\""
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Materialize the Rust format template before parsing its i program."
-  },
-  "crates/ilang-syntax/tests/syn2.rs:a8f52cf6f8aec263": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a field name or a decimal after `.`, found `{`"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:f34407eab7e7e309": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:9ae72ee3455756b6": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:8acdab015f1921c9": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: tuples have positional parts only and records have labelled fields only; positions and labels cannot mix"
-    ]
-  },
-  "crates/ilang-syntax/tests/syn2.rs:df058adca6eccda0": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a name, found `2`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:3be21bd923ed7025": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:f48e6269c5294ec8": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:f48e6269c5294ec8": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected a pattern, found `{`"
-    ]
-  },
-  "tests/review/cases/review-native3/alias/.invalid/src/main.i:f71902283bf0e419": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/direct/.invalid/src/main.i:54a84c4e326b9f0a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/external/.invalid/src/main.i:cf77c54bb0020029": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:8cc5e6ebb1e74381": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:58efcc7552f5fa83": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
-    ]
-  },
-  "tests/spec/1.7/a1_same_line_tuple.i:ad30ee59732b5c6a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0106: a discard binds nothing, so it may not be used as a value"
-    ]
-  },
-  "tests/spec/6/a1_wrong_pattern.i:b85b9d281734af03": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
-    ]
-  },
-  "tests/spec/6/syn2_empty_tuple_type.i:4dfd264ad80b24c8": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "crates/ilang-cli/tests/http.rs:81cdcb5c5b4e27d6": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-cli/tests/http.rs:53c514ae54f0dcfe": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-cli/tests/http.rs:86571961a0f21442": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-syntax/tests/golden/err_arrow_tail.i:ea7d0a6657401659": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `!`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`",
-      "E0109: the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`"
-    ]
-  },
-  "tests/spec/7/syn2_old_empty_tuple_pattern.i:e2dca65404826320": {
-    "reason": "Intentional legacy migration or rejection fixture.",
-    "diagnostics": [
-      "E0108: the empty tuple pattern is removed; use `Nil` for a unit pattern, or a binder/discard for a record"
-    ]
-  },
-  "crates/ilang-cli/tests/macro_budget.rs:0e972437a34e4ebb": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{parameters}",
-        "_: Int"
-      ],
-      [
-        "{arguments}",
-        "n"
-      ]
-    ]
-  },
-  "crates/ilang-macro/src/prepare.rs:cd20ee4ea6d72c1a": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{}",
-        "app/macros"
-      ],
-      [
-        "{parameters}",
-        "arg0: syntax.Syntax"
-      ],
-      [
-        "{item_service}",
-        ""
-      ],
-      [
-        "{item_row}",
-        ""
-      ],
-      [
-        "target.app/macros",
-        "target.expand"
-      ],
-      [
-        "{arguments}",
-        "arg0"
-      ]
-    ]
-  },
-  "crates/ilang-cli/src/commands/package.rs:f3b00c7d58e41220": {
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:d8f95b5fb6532cf4": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:46feaf394748b272": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:cc4dd6b69b368079": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:cbd9f653790dabf1": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is not allowed in patterns"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:d2e4ebd2c9e65f33": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is not allowed in attribute arguments"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:f7892fa942823195": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns"
-    ]
-  },
-  "crates/ilang-syntax/tests/string_forms.rs:e2bc8a6c691e2917": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
-    ]
-  },
-  "tests/spec/6/interpolation_attribute.i:c48412aaddaa5301": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0101: string interpolation is not allowed in attribute arguments"
-    ]
-  },
-  "tests/spec/7/suffix_two_binders.i:09f5fa9e575099c6": {
-    "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
-    "diagnostics": [
-      "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
-    ]
-  },
-  "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
-    "not_source": "Rust format template with a clause placeholder, not a complete i source"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:6108f6cf17bc9fe1": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:1418cff66c7679a7": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "docs/spec.md:a12d9a52fd631114": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "docs/spec.md:f644ea0d31f307b2": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:2f5b05034fc1229f": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
-  "docs/spec.md:e7d9c651ae0ffea8": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
-      "E0101: expected `,` or `)`, found `?`"
-    ]
-  },
-  "docs/spec.md:912892ff09b080d5": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:6e7bc6c384edd950": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:f30f07d66d50ef70": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
   "docs/spec.md:8cd36264ae24baa3": {
     "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "reason": "Mixed data awaits stage 6; providing a value not written as data and spreading a whole environment await stage E6. These examples now reach the corresponding lowering requirements.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected a name, found `..`",
-      "E0101: expected `:`, found `)`"
-    ]
-  },
-  "docs/spec.md:5aae9c9a5ac4e3f9": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:fa26cd87534cb894": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`",
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:d457fbb1e446a369": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `|`"
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet"
     ]
   },
   "docs/spec.md:9dd6b392676320e8": {
     "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "reason": "Capturing a whole environment and providing it as one value await stage E6. The syntax-three parser now reaches those lowering requirements.",
     "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:5a03b853ff51115c": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:d6fdfeb8cc43c346": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:3f075e37e918dad7": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `|`"
-    ]
-  },
-  "docs/spec.md:31ad23aa280e3999": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:8826291ef2e8a1ab": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:bedb60a148643970": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "docs/spec.md:f1593542964fc4e8": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "docs/spec.md:e90707beeb178a90": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:a3d2992aab5bde34": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:8793f6c04245c85f": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:5db078f812d3d664": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:9305a9d9ed7d77fe": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "crates/ilang-check/tests/alias_unions.rs:1176f1053a24405c": {
-    "not_source": "Rust format template fragment of a generated i program"
-  },
-  "crates/ilang-check/tests/alias_unions.rs:3bb2195cc9c09f06": {
-    "not_source": "Rust format template fragment of a generated i program"
-  },
-  "crates/ilang-check/tests/alias_unions.rs:beaaa485d82b9360": {
-    "not_source": "Rust format template fragment of a generated i program"
-  },
-  "editors/vscode/test/sample.i:c502997562f7493a": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0003: unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`",
-      "E0106: a discard binds nothing, so it may not be used as a value; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`"
+      "E0101: `..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet"
     ]
   },
   "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
@@ -3878,5 +2669,407 @@
   "crates/ilang-cli/build.rs:18f1e7e7ee554c11": {
     "not_source": true,
     "reason": "Cargo build-script directive, not an i module."
+  },
+  "crates/ilang-lsp/tests/protocol.rs:e5b90e5833108100": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:0e58de37207aac87": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:361065f87a85de06": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:0f1c00c95cc031e0": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-check/tests/query.rs:924116554a35a736": {
+    "not_source": "Expected hover text: a shown function type with two row variables, not i source"
+  },
+  "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
+    "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (§2.8, §3.2), before checker errors.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "crates/ilang-cli/build.rs:4e548071870d2506": {
+    "not_source": "Cargo build-script directive with a Rust format placeholder, not an i module."
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:79cf32e4a6929fa2": {
+    "prefix": "f = (x: Float) ",
+    "reason": "The actual body block of a numeric differential fixture; its generator supplies the function head. Parse the body in that same syntactic context."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:984911d0c3ae6707": {
+    "not_source": "Position/search substring locating Frame in a complete library source fixture."
+  },
+  "crates/ilang-syntax/tests/lisp_format.rs:b893e17cd23fac3e": {
+    "not_source": "Rust progress-log format string, not an i type definition."
+  },
+  "crates/ilang-syntax/tests/lisp_format.rs:b9a563448a1f88bb": {
+    "not_source": "Rust progress-log format string, not an i type definition."
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:68d70a8fa472acc8": {
+    "reason": "Interpolation is forbidden in patterns (spec §1.6); the migrated one-branch syntax still rejects the same negative case.",
+    "diagnostics": [
+      "E0101: string interpolation is not allowed in patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:f791f2429f546a31": {
+    "reason": "String patterns have exactly one binder (spec §7.1). The syntax-three parameter-item parser rejects the second <> part; the two-binder negative intent is retained.",
+    "diagnostics": [
+      "E0101: expected `,`, `?` or `)`, found `<>`"
+    ]
+  },
+  "tests/review/cases/review-runtime/echo-types/src/task.i:2905e07d4029594b": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-s6/probe/src/main.i:70c3b6101c991c5f": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/factory/src/main.i:6af88000cc971bba": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/tree/src/main.i:317793d710d99a2d": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/variance/src/main.i:2d326cd3da5ff46c": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "crates/ilang-cli/tests/multicore.rs:32586dd5d3cd919b": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:8a7d445a9741b557": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b3d7af2754f74d3d": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:8e2a1c1281f9894b": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:220a24ce91164a08": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:87b5d1cf07b6351c": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/http.rs:af5cd8e64db33bfe": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:0cef4a65c4bff658": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:72601bfd90ecbc03": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:9800d04a16e9b3b0": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:4b11ef07a2bf54d9": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:f7eff0a37bf28534": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:0284547aae203ebc": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:5108534ec7f720fb": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{first_port}",
+        "1234"
+      ],
+      [
+        "{second_port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/multicore.rs:68026936c073b50a": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b5e1cb94b1632476": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:dce9f9ef401d7b83": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:a61d3c1293ef6e72": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-wasm/tests/codegen.rs:fc3b7cf6d9e48c43": {
+    "not_source": "module path of a generated metadata test, not an i source"
+  },
+  "crates/ilang-cli/tests/big_int.rs:16b691ee8beb299b": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-cli/tests/float_text.rs:cca1ac99a7986d4f": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-wasm/tests/multi_shape.rs:4414029af964b61f": {
+    "not_source": "Wasmtime preload argument, not i source."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b8adf43384a85784": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |> {\n\t\tTrue  -> x\n\t\tFalse -> spin(n - 1, { x * 75 + 74 } % 65537)\n\t}\n}\n"
+      ]
+    ],
+    "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
   }
 }

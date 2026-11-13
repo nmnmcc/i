@@ -1,6 +1,0 @@
-review/main.v : Box(Int, (x: A) -> A)
-review/main.error : Int
-src/main.i:3:15: error[E0534]: the type of review/main.v is still open after source completion; define and export a closed alias next to the source, or write a fully closed source annotation
-src/main.i:4:14: error[E0533]: a permanent alias cannot contain a generalized variable or an unknown type
-src/main.i:5:1: error[E0501]: `String` is not a subtype of `Int`
-3 errors

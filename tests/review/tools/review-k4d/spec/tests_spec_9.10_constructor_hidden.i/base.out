@@ -1,2 +1,0 @@
-test/constructor_hidden.i:9:16: error[E0204]: `Generator` is not exported from `i/random`
-1 error

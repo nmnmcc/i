@@ -46,6 +46,7 @@ fn binding_type_visitor_preserves_order_across_mixed_nodes() {
             body: Block {
                 stmts: vec![Stmt::Env {
                     spread: false,
+                    group: None,
                     ty: t(TypeKind::Hole, 5),
                     value: e(ExprKind::Error, 6),
                     span: Span::default(),

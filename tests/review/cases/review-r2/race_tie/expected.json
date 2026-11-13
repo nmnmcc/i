@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.main : () -> Nil ! Io | task.Scheduler\n",
+      "stdout": "app/main.main : () -> Nil ^ task.ScheduleError ! Io | task.Runner\n",
       "stderr": ""
     },
     "test0": {

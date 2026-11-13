@@ -1,10 +1,10 @@
 {
-  "artifact_digest": "sha256-5df27644bc4110fe8373269a134c50405473f8bdcf9133614dc86b7b1fd3ad86",
+  "artifact_digest": "sha256-5586def3c3e316efcc5e2d5e046175e6d6c734da108979f54584dd5b54fd7839",
   "declarations": [
     {
-      "package": "sha256-16e2b1380d4785f6ec9ab35e0042317af36535e1abe765c386b75b75f80555a3",
+      "package": "sha256-751e5c226ef0d858511cfa03266d9e649bb73cb104ff9f7c1868c3d6629bc8fb",
       "module": "app/r2",
-      "module_digest": "sha256-e02f421f7bf5ef1a71f8d225c219408964ffdcbb8ea120a5a8c723feac87d738",
+      "module_digest": "sha256-a0621a0640b1d81301b42c3017351bf070938c96b9bfbdd64e097f4697cbf7f4",
       "declaration": "Gates.wait",
       "namespace": "r2:gates/v1",
       "name": "wait",
@@ -19,9 +19,9 @@
       }
     },
     {
-      "package": "sha256-16e2b1380d4785f6ec9ab35e0042317af36535e1abe765c386b75b75f80555a3",
+      "package": "sha256-751e5c226ef0d858511cfa03266d9e649bb73cb104ff9f7c1868c3d6629bc8fb",
       "module": "app/r2",
-      "module_digest": "sha256-e02f421f7bf5ef1a71f8d225c219408964ffdcbb8ea120a5a8c723feac87d738",
+      "module_digest": "sha256-a0621a0640b1d81301b42c3017351bf070938c96b9bfbdd64e097f4697cbf7f4",
       "declaration": "Control.release",
       "namespace": "r2:control/v1",
       "name": "release",
@@ -36,9 +36,9 @@
       }
     },
     {
-      "package": "sha256-16e2b1380d4785f6ec9ab35e0042317af36535e1abe765c386b75b75f80555a3",
+      "package": "sha256-751e5c226ef0d858511cfa03266d9e649bb73cb104ff9f7c1868c3d6629bc8fb",
       "module": "app/r2",
-      "module_digest": "sha256-e02f421f7bf5ef1a71f8d225c219408964ffdcbb8ea120a5a8c723feac87d738",
+      "module_digest": "sha256-a0621a0640b1d81301b42c3017351bf070938c96b9bfbdd64e097f4697cbf7f4",
       "declaration": "Control.check",
       "namespace": "r2:control/v1",
       "name": "check",

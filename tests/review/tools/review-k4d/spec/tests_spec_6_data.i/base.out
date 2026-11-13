@@ -1,9 +1,0 @@
-spec/data.check : (got: String, want: String) -> Nil
-spec/data.show : (x: A) -> String
-spec/data.tuples : () -> Nil
-spec/data.lists : () -> Nil
-spec/data.custom : () -> Nil
-spec/data.fields_on_unions : () -> Nil
-spec/data.sizes : (xs: List(Sized)) -> List(Int)
-spec/data.fields_by_constructor : () -> Nil
-spec/data.known_constructor : () -> Nil

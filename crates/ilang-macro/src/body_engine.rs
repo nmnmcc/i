@@ -239,29 +239,32 @@ impl<'a> BodyEngine<'a> {
             let (path, name) = prepare::add_wrapper(&mut graph, &mut parsed, binding, position);
             let wrapper_source = parsed.last().expect("wrapper module was added").source;
             let definition_span = module.ast.items[mac.definition.item].span;
-            let program = run::compile(&graph, &parsed, &[(&path, &name)]).map_err(|error| {
-                let mut diagnostics = match error {
-                    run::CompileError::Program(diagnostics) => diagnostics,
-                    run::CompileError::Internal(message) => vec![ilang_package::Diagnostic::error(
-                        ilang_check::code::MACRO_RESERVED,
-                        Some(mac.source),
-                        definition_span,
-                        format!(
-                            "compiler error while compiling macro `{}`: {message}",
-                            mac.definition.name
-                        ),
-                    )],
-                };
-                for diagnostic in &mut diagnostics {
-                    if diagnostic.source == Some(wrapper_source) {
-                        diagnostic.source = Some(mac.source);
-                        diagnostic.span = definition_span;
-                        diagnostic.message =
-                            format!("macro `{}`: {}", mac.definition.name, diagnostic.message);
+            let program =
+                run::compile_owned(graph, &parsed, &[(&path, &name)]).map_err(|error| {
+                    let mut diagnostics = match error {
+                        run::CompileError::Program(diagnostics) => diagnostics,
+                        run::CompileError::Internal(message) => {
+                            vec![ilang_package::Diagnostic::error(
+                                ilang_check::code::MACRO_RESERVED,
+                                Some(mac.source),
+                                definition_span,
+                                format!(
+                                    "compiler error while compiling macro `{}`: {message}",
+                                    mac.definition.name
+                                ),
+                            )]
+                        }
+                    };
+                    for diagnostic in &mut diagnostics {
+                        if diagnostic.source == Some(wrapper_source) {
+                            diagnostic.source = Some(mac.source);
+                            diagnostic.span = definition_span;
+                            diagnostic.message =
+                                format!("macro `{}`: {}", mac.definition.name, diagnostic.message);
+                        }
                     }
-                }
-                Error::Compile(diagnostics)
-            })?;
+                    Error::Compile(diagnostics)
+                })?;
             self.session.compiled.insert(
                 key.clone(),
                 Arc::new(Compiled {

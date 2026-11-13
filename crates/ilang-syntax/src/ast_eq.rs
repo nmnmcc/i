@@ -67,12 +67,14 @@ fn block<'a>(a: &'a Block, b: &'a Block, q: &mut Vec<Pair<'a>>) -> bool {
         (
             Stmt::Env {
                 spread: aspread,
+                group: agroup,
                 ty: a,
                 value: av,
                 span: aspan,
             },
             Stmt::Env {
                 spread: bspread,
+                group: bgroup,
                 ty: b,
                 value: bv,
                 span: bspan,
@@ -80,7 +82,7 @@ fn block<'a>(a: &'a Block, b: &'a Block, q: &mut Vec<Pair<'a>>) -> bool {
         ) => {
             q.push(Pair::Type(a, b));
             q.push(Pair::Expr(av, bv));
-            aspan == bspan && aspread == bspread
+            aspan == bspan && aspread == bspread && agroup == bgroup
         }
         _ => false,
     })

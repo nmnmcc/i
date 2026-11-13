@@ -1,7 +1,0 @@
-spec/control_lazy_ensure.check : (got: String, want: String) -> Nil
-spec/control_lazy_ensure.show : (x: A) -> String
-spec/control_lazy_ensure.note : (log: Boundary(String, A, B), text: String) -> Nil
-spec/control_lazy_ensure.wait : (n: Int, f: () -> Int ? E ! N) -> Int ? E ! N
-spec/control_lazy_ensure.layer : (log: Boundary(String, A, B), n: Int, last: () -> Int ? E ! N) -> Int ? E ! N
-spec/control_lazy_ensure.error_runs_finals_innermost_first : () -> Nil
-spec/control_lazy_ensure.cancel_runs_finals_innermost_first : () -> Nil

@@ -947,7 +947,7 @@ impl Parser<'_> {
             self.expect(&T::Eq)?;
             let value = self.expr()?;
             let span = self.span_from(start);
-            return Ok(Stmt::Env { ty, value, span, spread: false });
+            return Ok(Stmt::Env { ty, value, span, spread: false, group: None });
         }
         if self.at_type_params() {
             let (name, type_params, ty) = self.declared_head()?;
@@ -1359,9 +1359,14 @@ impl Parser<'_> {
     }
 
     fn type_datum(&mut self) -> PResult<TypeKind> {
+        // syntax-3 §2.3: `()` is the empty data type.
         if self.at(&T::RParen) {
-            return self
-                .error("`Record` for all records, or `Nil` for a unit type; `()` is not a type");
+            self.bump();
+            return Ok(TypeKind::Record {
+                base: None,
+                fields: Vec::new(),
+                removed: Vec::new(),
+            });
         }
         Ok(TypeKind::Tuple(self.seq(T::RParen, false, |p| {
             if p.label_start() {

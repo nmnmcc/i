@@ -1,2 +1,0 @@
-review/main.v : Box(Int, (x: A) -> A)
-review/main.x : Int

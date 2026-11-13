@@ -1,4 +1,0 @@
-review/main.id : (x: A) -> A
-review/main.v : (x: Never) -> Never
-src/main.i:3:8: error[E0534]: the type of review/main.v is still open after source completion; define and export a closed alias next to the source, or write a fully closed source annotation
-1 error

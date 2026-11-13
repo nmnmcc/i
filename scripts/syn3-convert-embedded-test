@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""A conversion rerun must not reinterpret existing syntax-three nominals."""
+import importlib.machinery
+import importlib.util
+import os
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+loader = importlib.machinery.SourceFileLoader("embedded", str(Path(__file__).with_name("syn3-convert-embedded")))
+spec = importlib.util.spec_from_loader("embedded", loader)
+embedded = importlib.util.module_from_spec(spec)
+loader.exec_module(embedded)
+
+class ConversionBaseline(unittest.TestCase):
+    def test_explicit_premerge_base_keeps_an_existing_nominal(self):
+        literal = 'r#"Box(A) = (A)"#'
+        with patch.dict(os.environ, {"SYN3_EMBEDDED_SINCE": "premerge"}, clear=True), patch.object(embedded, "last_conversion", return_value="older"):
+            base = embedded.conversion_base()
+            self.assertEqual(base, "premerge")
+            self.assertTrue(embedded.converted_before(base, {"test.rs": literal}, "test.rs", literal))
+
+    def test_default_keeps_the_recorded_conversion_base(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(embedded, "last_conversion", return_value="recorded"):
+            self.assertEqual(embedded.conversion_base(), "recorded")
+
+    def test_explicit_all_still_reads_every_snippet(self):
+        with patch.dict(os.environ, {"SYN3_EMBEDDED_SINCE": "premerge", "SYN3_EMBEDDED_ALL": "1"}, clear=True):
+            self.assertIsNone(embedded.conversion_base())
+
+if __name__ == "__main__":
+    unittest.main()

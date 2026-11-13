@@ -173,7 +173,7 @@ def main():
               'instruction_counter': 'not collected; unavailable in this harness',
               'measurement': 'end-to-end i check --types through GNU time; parse/load/check/display/process startup and measurement wrapper included',
               'quiet_window': 'caller must acquire cache/quiet; load averages recorded, not proof of isolation',
-              'deferred': [{'workload': 'record-growth', 'reason': 'T3 held; tests/review/tools/record-models preserves reference models'}],
+              'deferred': [{'workload': 'record-growth', 'reason': 'T3 held; tests/t3-*.py are the reference models'}],
               'catalogue': [], 'samples': []}
     work = CORPUS / '.work'
     work.mkdir(exist_ok=True)

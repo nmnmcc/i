@@ -1,9 +1,0 @@
-[package]
-name = "review-native-wasmtime"
-version = "0.0.0"
-edition = "2024"
-[workspace]
-[features]
-compiler = ["wasmtime/cranelift", "wasmtime/wat"]
-[dependencies]
-wasmtime = { version = "=50.0.0", default-features = false, features = ["anyhow", "runtime", "std", "gc", "gc-copying"] }

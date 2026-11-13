@@ -1,7 +1,0 @@
-[package]
-name = "std2-review-checker"
-version = "0.0.0"
-edition = "2024"
-[dependencies]
-ilang-check = { path = "/home/agent/Programming/i/.rd/note-std2/crates/ilang-check" }
-ilang-package = { path = "/home/agent/Programming/i/.rd/note-std2/crates/ilang-package" }

@@ -1,4 +1,0 @@
-spec/a1_no_subject_constructor.bad : (s: Shape) -> Never ! Assert
-spec/a1_no_subject_constructor.main : () -> Nil ! Assert
-test/a1_no_subject_constructor.i:5:43: error[E0512]: not every constructor of `Shape` has a field with the label `r` (§4.8 rule 13)
-1 error

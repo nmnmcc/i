@@ -1,6 +1,0 @@
-{
-  "name": "extra_pure_helper",
-  "code": 0,
-  "time": 0.01801886293105781,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\n"
-}

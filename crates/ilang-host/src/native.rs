@@ -89,7 +89,7 @@ pub fn triple() -> String {
 /// payload whose contract is not its own.
 pub fn contract(target: &str, collector: Collector, gc_heap: u64) -> String {
     format!(
-        "ilang-host {}; abi {}; wasmtime {WASMTIME}; target {}; cpu {BASELINE}; collector {}; gc heap {gc_heap}; wasm stack {}; thread stack {}; epochs off; fuel off",
+        "ilang-host {}; abi {}; wasmtime {WASMTIME}; target {}; cpu {BASELINE}; collector {}; gc heap {gc_heap}; wasm stack {}; thread stack {}; epochs on; fuel off",
         env!("CARGO_PKG_VERSION"),
         crate::ABI_VERSION,
         target,
@@ -121,6 +121,8 @@ fn collector_of(name: &str) -> Result<Collector> {
 /// compiler adds only settings of the compiler to it.
 fn config(target: &str, collector: Collector, gc_heap: u64) -> Result<Config> {
     let mut config = runtime_config(collector, gc_heap);
+    // Packages run on several workers, which stop through epochs (N12).
+    config.epoch_interruption(true);
     // An explicit target: Wasmtime then infers no CPU features of this
     // machine, so the baseline below is all the code uses.
     config.target(target)?;
@@ -399,6 +401,7 @@ pub fn load(file: &[u8]) -> Result<(Program, Manifest)> {
         .map_err(anyhow::Error::from)
         .context("loading the compiled program")?;
     let program = Program::from_parts(engine, module, metadata)?
+        .with_epochs(crate::worker_count())
         .with_binding_plan(manifest.binding_plan.clone())?;
     Ok((program, manifest))
 }

@@ -33,9 +33,15 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
         }
         for b in &m.bindings {
-            references.binding(&b.binding);
+            // A chain name does not use its own shape groups: the name
+            // and its groups are used together (below).
+            let chain = b.defs.iter().any(|d| p.chain_groups.contains_key(d));
+            if !chain {
+                references.binding(&b.binding);
+            }
         }
     }
+    references.pending.extend(&p.chain_uses);
     references.pending.extend(&p.host_exports);
     references.pending.extend(&p.declared_entries);
     // Exempt definitions still use values through written types (§4.3).
@@ -49,7 +55,15 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             }
         }
     }
-    let used: HashSet<_> = references.pending.into_iter().collect();
+    let mut used: HashSet<_> = references.pending.into_iter().collect();
+    // A direct call of a chain is a call of one of its shape groups; a use
+    // of any of them, or of the name, is a use of the whole chain.
+    for (chain, groups) in &p.chain_groups {
+        if used.contains(chain) || groups.iter().any(|(_, g)| used.contains(g)) {
+            used.insert(*chain);
+            used.extend(groups.iter().map(|(_, g)| *g));
+        }
+    }
     let mut diags = Vec::new();
     for (mi, m) in p.modules.iter().enumerate() {
         for (di, d) in m.defs.iter().enumerate() {
@@ -59,6 +73,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
             };
             if !matches!(d.kind, DefKind::Binding { .. })
                 || d.name.starts_with('_')
+                || d.name.contains('%')
                 || used.contains(&id)
             {
                 continue;
@@ -96,113 +111,7 @@ impl References<'_> {
 
     fn binding(&mut self, b: &Binding) {
         binding_types(b, &mut |t| self.ty(t));
-        self.pattern(&b.pattern);
-        self.expr(&b.value);
-    }
-
-    fn block(&mut self, b: &Block) {
-        for s in &b.stmts {
-            match s {
-                Stmt::Bind(b) => {
-                    self.pattern(&b.pattern);
-                    self.expr(&b.value);
-                }
-                Stmt::Env { value, .. } | Stmt::Expr(value) => self.expr(value),
-            }
-        }
-    }
-
-    fn format(&mut self, f: Option<&Format>) {
-        if let Some(arg) = f.and_then(|f| f.arg.as_ref()) {
-            self.expr(arg);
-        }
-    }
-
-    fn pattern(&mut self, p: &Pattern) {
-        match &p.kind {
-            PatternKind::Quote {
-                functions,
-                captures,
-                ..
-            } => {
-                self.pending.extend(functions);
-                captures.iter().for_each(|(_, p)| self.pattern(p));
-            }
-            PatternKind::Named { pattern, .. } => self.pattern(pattern),
-            PatternKind::Constructor { args, .. }
-            | PatternKind::Tuple(args)
-            | PatternKind::Error(args) => args.iter().for_each(|p| self.pattern(p)),
-            PatternKind::List { items, .. } => items.iter().for_each(|p| self.pattern(p)),
-            PatternKind::BitArray(segs) => {
-                for s in segs {
-                    self.pattern(&s.value);
-                    self.format(s.format.as_ref());
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn expr(&mut self, e: &Expr) {
-        match &e.kind {
-            ExprKind::Name(ValueRef::Def(d)) => self.pending.push(*d),
-            ExprKind::Tuple(items) => items.iter().for_each(|e| self.expr(e)),
-            ExprKind::Record { base, fields } => {
-                if let Some(base) = base {
-                    self.expr(base);
-                }
-                fields.iter().for_each(|(_, value)| self.expr(value));
-            }
-            ExprKind::List { items, rest } => {
-                items
-                    .iter()
-                    .chain(rest.as_deref())
-                    .for_each(|e| self.expr(e));
-            }
-            ExprKind::BitArray(segs) => {
-                for s in segs {
-                    self.expr(&s.value);
-                    self.format(s.format.as_ref());
-                }
-            }
-            ExprKind::Block(b) => self.block(b),
-            ExprKind::Fn(f) => {
-                for p in &f.params {
-                    if let Param::Pattern { pattern, .. } = p {
-                        self.pattern(pattern);
-                    }
-                }
-                self.block(&f.body);
-            }
-            ExprKind::Case { subject, clauses } => {
-                self.expr(subject);
-                for c in clauses {
-                    c.patterns.iter().for_each(|p| self.pattern(p));
-                    c.guard.iter().for_each(|g| self.expr(g));
-                    self.expr(&c.body);
-                }
-            }
-            ExprKind::Call { callee, args } => {
-                self.expr(callee);
-                args.iter().for_each(|a| self.expr(&a.value));
-            }
-            ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
-                self.expr(target)
-            }
-            ExprKind::RecordUpdate { base, fields, .. } => {
-                self.expr(base);
-                fields.iter().for_each(|(_, e)| self.expr(e));
-            }
-            ExprKind::Unary { expr, .. } => self.expr(expr),
-            ExprKind::Binary { lhs, rhs, .. } => {
-                self.expr(lhs);
-                self.expr(rhs);
-            }
-            ExprKind::Int(_)
-            | ExprKind::Float(_)
-            | ExprKind::String(_)
-            | ExprKind::Name(_)
-            | ExprKind::Error => {}
-        }
+        let references = crate::order::references(&b.pattern, &b.value);
+        self.pending.extend(references.into_iter().map(|(d, _)| d));
     }
 }

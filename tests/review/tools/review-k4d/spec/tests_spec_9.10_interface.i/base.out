@@ -1,9 +1,0 @@
-spec/interface.from_seed : (seed: Int) -> random.Generator
-spec/interface.word : (g: random.Generator) -> (Int, random.Generator)
-spec/interface.int : (g: random.Generator, below: Int) -> (Int, random.Generator) ? random.RandomError
-spec/interface.float : (g: random.Generator) -> (Float, random.Generator)
-spec/interface.split : (g: random.Generator) -> (random.Generator, random.Generator)
-spec/interface.at_path : (g: random.Generator, path: List(Int)) -> random.Generator ? random.RandomError
-spec/interface.initial : random.Generator
-spec/interface.first : (Int, random.Generator)
-spec/interface.public_api : () -> Nil ? random.RandomError ! Assert

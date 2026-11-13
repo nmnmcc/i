@@ -560,6 +560,8 @@ impl Printer {
                 self.w(&name.name);
             }
             ExprKind::Tuple(items) => {
+                // `()` is the empty data (syntax three §7.1 row 7), which
+                // lowers to the empty tuple.
                 self.w("(");
                 self.list(items, |p, e| p.expr(e, 0));
                 self.w(")");

@@ -1,3 +1,0 @@
-spec/unused_value.two_statements : () -> Nil
-test/unused_value.i:8:2: warning[W0502]: this value is not used, and working it out does nothing
-test/unused_value.i:9:2: warning[W0502]: this value is not used, and working it out does nothing

@@ -1,6 +1,0 @@
-{
-  "code": 1,
-  "out": "app/main.get : () -> Nil ! Dep\napp/main.run : (body: () -> Nil ? E ! N) -> Nil ? E ! N\napp/main.use : () -> Nil ! N | N2 | S(A & N, B & N2)\napp/main.main : () -> Nil\n",
-  "err": "src/main.i:7:18: error[E0504]: a value of `S(_, _)` could go to more than one type variable of `_ | _` (\u00a74.4)\n1 error\n",
-  "seconds": 0.019685216946527362
-}

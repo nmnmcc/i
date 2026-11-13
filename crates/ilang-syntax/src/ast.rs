@@ -142,6 +142,8 @@ pub enum Stmt {
     Env {
         /// Supply a whole data value or an opaque environment row.
         spread: bool,
+        /// The syntax-three provide this item belongs to.
+        group: Option<Span>,
         ty: TypeExpr,
         value: Expr,
         span: Span,

@@ -1,2 +1,0 @@
-test/a1_same_line_negative.i:5:32: error[E0101]: expected a pattern, found `->`
-1 error

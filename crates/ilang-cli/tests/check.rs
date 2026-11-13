@@ -29,7 +29,7 @@ fn check_types() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        "app/main.id : (x: A) -> A\napp/main.elapsed : (start: Int) -> Int ! Clock\n"
+        "app/main.id : (A) -> A\napp/main.elapsed : (Int) <- (Clock) -> Int\n"
     );
 }
 
@@ -328,6 +328,11 @@ fn old_forms_have_helpful_errors_without_reserving_names() {
         .unwrap();
     assert!(
         out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("if this is old"),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );

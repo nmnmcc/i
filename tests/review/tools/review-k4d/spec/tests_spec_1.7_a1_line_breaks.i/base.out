@@ -1,4 +1,0 @@
-spec/a1_line_breaks.int_match : (A) -> Int
-spec/a1_line_breaks.float_match : (A) -> Int
-spec/a1_line_breaks.pair_match : ((A, A)) -> A
-spec/a1_line_breaks.main : () -> Nil ! Assert

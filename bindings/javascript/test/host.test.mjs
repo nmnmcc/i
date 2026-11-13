@@ -255,10 +255,11 @@ test("GC, tail calls and exceptions remain available through the adapter", async
 
 test("metadata that is not correct fails before instantiation", async () => {
   const module = await WebAssembly.compile(customFixture);
-  const base = { version: 3, entry: null, tests: [], exports: {}, services: {}, externals: {} };
+  const base = { version: 4, entry: null, tests: [], exports: {}, services: {}, externals: {} };
   assert.equal(readAbi(module, base).entry, null);
-  assert.equal(readAbi(module, base).version, 3);
-  for (const old of [1, base.version - 1]) {
+  assert.equal(readAbi(module, base).version, 4);
+  assert.equal(readAbi(module, { ...base, version: 3 }).version, 4);
+  for (const old of [1, 2]) {
     assert.throws(() => readAbi(module, { ...base, version: old }), { message: `the module uses i ABI version ${old}; build it again with this version of i` });
   }
   assert.throws(() => readAbi(module, { ...base, version: base.version + 1 }), { message: `the module uses i ABI version ${base.version + 1}, but this host reads version ${base.version}; update the host` });

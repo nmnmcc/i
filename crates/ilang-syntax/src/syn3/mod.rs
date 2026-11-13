@@ -12,8 +12,11 @@ pub use print::{
     print_with_comments,
 };
 pub mod convert;
+pub mod group;
 pub mod lisp;
 pub mod lower;
+pub mod surface;
+pub mod walk;
 
 /// Reads a normal-surface file of syntax three into the current tree.
 pub fn parse_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic>) {

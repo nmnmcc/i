@@ -37,6 +37,12 @@ fn main() -> anyhow::Result<()> {
     config.collector(wasmtime::Collector::Copying);
     config.gc_heap_initial_size(256 << 20);
     let engine = Engine::new(&config)?;
+    // The instrumented module also runs on a fuel-metering engine: Wasmtime
+    // charges one unit per executed Wasm operator, a count that does not
+    // depend on machine load (perf `instructions:u` is not available here).
+    config.consume_fuel(true);
+    let fuel_engine = Engine::new(&config)?;
+    let only = std::env::var("NUMERIC_KERNELS").ok();
     let mut variants = Vec::new();
     for (name, numeric) in [
         ("baseline", Numeric::Reference),
@@ -54,6 +60,9 @@ fn main() -> anyhow::Result<()> {
                 Some(path) => std::fs::read(path)?,
                 None => ilang_cli::optimize(&bytes, ilang_cli::Level::O2)?,
             }
+        } else if let (true, Some(path)) = (name == "n1", std::env::var_os("NUMERIC_CANDIDATE")) {
+            // Compare two saved modules, e.g. the Wasm of two earlier stages.
+            std::fs::read(path)?
         } else {
             ilang_cli::optimize(&bytes, ilang_cli::Level::O2)?
         };
@@ -119,18 +128,24 @@ fn main() -> anyhow::Result<()> {
                 .success()
         );
         let mut runs = Vec::new();
-        for module in [
+        for (counting, module) in [
             Module::new(&engine, &bytes)?,
-            Module::from_file(&engine, &counted)?,
-        ] {
-            let mut linker = Linker::<()>::new(&engine);
+            Module::from_file(&fuel_engine, &counted)?,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut linker = Linker::<()>::new(module.engine());
             for import in module.imports() {
                 let ty = import.ty().func().expect("function import").clone();
                 linker.func_new(import.module(), import.name(), ty, |_, _, _| {
                     wasmtime::bail!("unexpected benchmark host call")
                 })?;
             }
-            let mut store = Store::new(&engine, ());
+            let mut store = Store::new(module.engine(), ());
+            if counting == 1 {
+                store.set_fuel(u64::MAX / 2)?;
+            }
             let instance = linker.instantiate(&mut store, &module)?;
             instance
                 .get_typed_func::<(), ()>(&mut store, "ilang_start")?
@@ -142,7 +157,8 @@ fn main() -> anyhow::Result<()> {
     let mut site_observations = Vec::new();
     let mut csv =
         String::from("variant,kernel,batch,sample,net_ns,allocations,result_bits,module_bytes\n");
-    let mut summary = String::from("variant,kernel,batch,median_ns,allocations,module_bytes\n");
+    let mut summary =
+        String::from("variant,kernel,batch,median_ns,allocations,fuel,module_bytes\n");
     for (kernel, expected) in [
         ("identity", 0.5_f64),
         ("fast", 0.479425538604203_f64),
@@ -152,6 +168,12 @@ fn main() -> anyhow::Result<()> {
         ("tuples", 2.875),
         ("closures", 9.0),
     ] {
+        if only
+            .as_ref()
+            .is_some_and(|only| !only.split(',').any(|k| k == kernel))
+        {
+            continue;
+        }
         for batch in 0..5 {
             let order = if batch % 2 == 0 { [0, 1, 2] } else { [2, 1, 0] };
             for index in order {
@@ -184,7 +206,9 @@ fn main() -> anyhow::Result<()> {
                     .results()
                     .map(|ty| Val::default_for_ty(&ty).unwrap())
                     .collect::<Vec<_>>();
+                let fuel_before = store.get_fuel()?;
                 function.call(&mut *store, &[Val::F64(0.5_f64.to_bits())], &mut result)?;
+                let fuel = fuel_before - store.get_fuel()?;
                 assert!(
                     result
                         .iter()
@@ -236,9 +260,12 @@ fn main() -> anyhow::Result<()> {
                     )?;
                 }
                 let med = median(&mut samples);
-                writeln!(summary, "{variant},{kernel},{batch},{med},{count},{size}")?;
+                writeln!(
+                    summary,
+                    "{variant},{kernel},{batch},{med},{count},{fuel},{size}"
+                )?;
                 println!(
-                    "{variant} {kernel} batch {batch}: {med} ns, {count} allocations, {size} bytes"
+                    "{variant} {kernel} batch {batch}: {med} ns, {count} allocations, {fuel} fuel, {size} bytes"
                 );
             }
         }

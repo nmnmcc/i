@@ -1,2 +1,0 @@
-spec/parameter_fails.second : ((Int, A)) -> A ! Assert
-spec/parameter_fails.main : () -> Nil ! Assert

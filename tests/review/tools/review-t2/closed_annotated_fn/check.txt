@@ -1,3 +1,0 @@
-review/main.f : (n: Int) -> Int
-review/main.g : (n: Int) -> Int
-review/main.v : Int

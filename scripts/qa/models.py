@@ -7,7 +7,11 @@ import subprocess
 import sys
 import tempfile
 
-from corpus import CORPUS, sha
+from corpus import CORPUS, ROOT, sha
+
+MODELS = Path(__file__).resolve().parent / 'models'
+# The record models are the ones under tests/ (tools/record-models held byte-identical copies).
+RECORD_MODELS = ['t3-forgetting-conflict.py', 't3-record-bdd.py', 't3-record-demand.py', 't3-record-substitution.py']
 
 
 def run_models(mpfr_python=None, timeout=120, selected_filter=''):
@@ -16,13 +20,13 @@ def run_models(mpfr_python=None, timeout=120, selected_filter=''):
     results = []
     with tempfile.TemporaryDirectory(prefix='models-', dir=work) as temp:
         root = Path(temp)
-        selected = [(p, sys.executable) for p in sorted((CORPUS / 'tools/record-models').glob('*.py'))]
-        selected.append((CORPUS / 'tools/review-std1/uri_model.py', sys.executable))
+        selected = [(ROOT / 'tests' / name, sys.executable) for name in RECORD_MODELS]
+        selected.append((MODELS / 'uri_model.py', sys.executable))
         math_dir = root / 'math'
         math_dir.mkdir()
         if mpfr_python:
             for name in ['math_review.py', 'extra_math.py', 'hypot_ties.py', 'underflow_review.py']:
-                original = CORPUS / 'tools/review-std3' / name
+                original = MODELS / name
                 # Original review paths identify output/import locations, not algorithms.
                 target = math_dir / name
                 target.write_text(original.read_text().replace('/tmp/review-std3', str(math_dir)))
@@ -31,7 +35,8 @@ def run_models(mpfr_python=None, timeout=120, selected_filter=''):
         if not choices:
             raise ValueError('no models selected')
         for source, python in choices:
-            executed = math_dir / source.name if source.parent.name == 'review-std3' else source
+            mpfr = source.parent == MODELS and source.name != 'uri_model.py'
+            executed = math_dir / source.name if mpfr else source
             env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
             with subprocess.Popen([python, str(executed)], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True) as child:
                 try:
@@ -41,10 +46,10 @@ def run_models(mpfr_python=None, timeout=120, selected_filter=''):
                     os.killpg(child.pid, signal.SIGKILL)
                     stdout, stderr = child.communicate()
                     code = 'timeout'
-            result = {'model': str(source.relative_to(CORPUS)), 'source_sha256': sha(source.read_bytes()),
+            result = {'model': str(source.relative_to(ROOT)), 'source_sha256': sha(source.read_bytes()),
                       'python': python, 'exit': code, 'stdout': stdout.decode(errors='replace'), 'stderr': stderr.decode(errors='replace'),
                       'classification': 'independent model; not compiler implementation validation'}
-            if source.parent.name == 'review-std3':
+            if mpfr:
                 result['outputs'] = {p.name: json.loads(p.read_text()) for p in sorted(math_dir.glob('*.json'))}
             if source.name == 't3-forgetting-conflict.py':
                 result['expected_exit'] = 1

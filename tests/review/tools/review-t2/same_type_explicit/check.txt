@@ -1,5 +1,0 @@
-review/main.left : Int
-review/main.right : Int
-review/main.v : Box(Int)
-src/main.i:5:13: error[E0535]: the source type does not match the alias pattern head or constant part
-1 error

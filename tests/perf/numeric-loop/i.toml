@@ -1,0 +1,19 @@
+name = "numeric_loop"
+
+# Runs each kernel of ../numeric a million times. Used by scripts/bench-instructions, which
+# reads the instruction count of `i run` for each entry; `base` is the loop with no kernel,
+# to subtract.
+
+[dependencies]
+std = { path = "../../../std" }
+numeric = { path = "../numeric" }
+
+[entries]
+base = "main.base"
+identity = "main.identity"
+fast = "main.fast"
+horner = "main.horner"
+integer = "main.integer"
+dot = "main.dot"
+tuples = "main.tuples"
+closures = "main.closures"

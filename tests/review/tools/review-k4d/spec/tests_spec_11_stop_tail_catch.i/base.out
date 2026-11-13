@@ -1,2 +1,0 @@
-spec/stop_tail_catch.safe : () -> Result(Int, Never)
-spec/stop_tail_catch.main : () -> Nil

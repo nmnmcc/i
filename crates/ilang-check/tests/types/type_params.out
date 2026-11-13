@@ -1,1 +1,7 @@
-9:1: error[E0101]: the head of a data type or an opaque type has only type parameters
+7:5: error[E0231]: a type parameter may not have the name of a type
+8:9: error[E0202]: the type `Undeclared` is not defined; to use a type parameter, declare it in the head, as in `Box(A) { … }`
+2:12: error[E0226]: the type variable `A` is declared more than once here
+3:10: error[E0231]: a type variable may not have the name of a type
+4:15: error[E0230]: a type variable takes no arguments
+5:15: error[E0202]: the type `Missing` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`
+6:22: error[E0201]: `b` is not defined

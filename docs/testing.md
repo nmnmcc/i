@@ -85,11 +85,14 @@ observations complete, their full outputs must still match.
 Regeneration is explicit and belongs in the final `Regenerate derived files`
 commit. `UPDATE=1 scripts/review-corpus import` reimports review sources;
 `UPDATE=1 scripts/review-corpus run` captures current outputs. Review semantic
-requirements independently before accepting a new output. Historical tools
-are preserved unchanged and are not executed: some refer to other lanes or
-compiler mutations. Reimporting is a recovery tool, not part of normal CI.
-`UPDATE=1 scripts/review-corpus integrity` verifies every preserved source/tool
+requirements independently before accepting a new output. Import keeps only
+the review programs; review drivers, logs and compiler snapshots stay in git
+history. Reimporting is a recovery tool, not part of normal CI.
+`UPDATE=1 scripts/review-corpus integrity` verifies every preserved source
 fingerprint and every link to the recorded maintained revision without `/tmp`.
+After a deliberate rewrite of the case files (a syntax conversion), `--refresh`
+records the new fingerprint of each rewritten file; it fails if a program no
+longer has its file.
 
 Measure checker workloads separately from the runtime `scripts/bench`:
 
@@ -110,7 +113,7 @@ after exec, avoiding the Python parent's inherited memory high-water mark.
 Wall time includes the measurement wrapper; raw GNU time CPU counters have
 0.01-second resolution. Hardware instruction counts
 are unavailable and recorded as null. No numeric gate is installed. Record
-families are deferred until T3, with its models retained as tools.
+families are deferred until T3; its models are `tests/t3-*.py`.
 
 Prior art read before implementation (paths under `.rd/ref`):
 
