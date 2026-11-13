@@ -687,3 +687,70 @@ fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn aliased_open_provider_contracts_are_not_generalized_away() {
+    let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\n";
+    for alias in [
+        "Alias = S(_)\n",
+        "Hidden = S(_)\nAlias = Hidden\n",
+        "Hidden(A) = S(A | _)\nAlias = Hidden(Never)\n",
+    ] {
+        let source = [
+            base,
+            alias,
+            "wrap = (body) { provided: Alias = S(f = () -> Int { 1 }) body() <- (provided) }",
+        ]
+        .concat();
+        let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
+        assert_eq!(
+            diags
+                .iter()
+                .filter(|d| d.is_error())
+                .map(|d| d.code)
+                .collect::<Vec<_>>(),
+            ["E0515"],
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
+    }
+    let (graph, _, diags) = common::check_files(&[
+        (
+            "src/svc.i",
+            "(S(..), Alias)\nS(N) = (f = () <- N -> Int)\nAlias = S(_)\ntouch = <N>(s: S(N)) { s }",
+        ),
+        (
+            "src/main.i",
+            "(svc = app/svc)\nwrap = (body) { provided: svc.Alias = svc.S(f = () -> Int { 1 }) body() <- (provided) }",
+        ),
+    ]);
+    assert_eq!(
+        diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| d.code)
+            .collect::<Vec<_>>(),
+        ["E0515"],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn a_closed_provider_alias_retains_all_reader_diagnostics() {
+    let source = include_str!("types/soundness.i")
+        .replacen("\nwith_int", "\nIntReader = Reader(Int)\nwith_int", 1)
+        .replace("_syn3_0: Reader(Int)", "_syn3_0: IntReader");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
+    let actual = diags
+        .iter()
+        .filter(|d| d.code == "E0515" && d.message.contains("`Reader(String)` and `Reader(Int)`"))
+        .map(|d| ilang_syntax::span::LineIndex::new(&source).line_col(d.span.start))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [(15, 19), (15, 5), (17, 29), (17, 5)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
