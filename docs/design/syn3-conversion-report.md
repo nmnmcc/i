@@ -588,3 +588,29 @@ retain their written wider error types as binding annotations, preserving
 the original non-host-passable error checks. Guarded corpus observation and
 full checker verification are pending; no observation with a changed phase
 exit or error-code set may be recorded.
+
+E1 provider inference correction: syntax-three provision had selected the
+needed service form from the rest, or invented fresh arguments, then
+subtracted that form. It now subtracts the actual provided form, as the
+legacy explicit-provider path already does. Spec §9.2 requires P <: S for
+the provider P, and Rule B retains the directed obligation on the remaining
+row. The focused regression passes: a concrete Read(Int) handler is not
+falsely hidden, and Read(String) reports E0515 without an extra E0501.
+
+The first guarded K4 pass was stopped at a checkpoint (about 100 cases):
+90 matching observations were recorded and eight outcome changes refused.
+No refused expectation was changed. Retained an anonymous closure's written
+need through a typed binding and kept literal callback result annotations.
+The new checker regressions pin all eight batch2 checker code sets. Seven
+golden outputs were translated after reviewing types and source positions;
+their diagnostic-code sets exactly equal batch2. Library/spec outputs still
+await fresh verification. Exact post-fix full gates and corpus run are pending.
+
+Keep handler callback types directly on function literals, rather than
+erasing them behind an outer binding annotation: the former shares the
+callback/provider parameters during body inference. The i/failure checker
+reproducer now shows catch with only N and a caller with no Fail need.
+The inline typed raise callback retains the light-boundary optimization.
+Row-scheme replacement fragments were also translated: every permutation
+or hole test now changes actual syntax-three text, and the value- and
+error-row branches remain distinct.

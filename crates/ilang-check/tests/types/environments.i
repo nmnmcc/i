@@ -74,11 +74,11 @@ written = () <- (y: Yield(Int), z: Source(Int)) -> Nil { y.emit(z.next()) }
 emit_any = () <- (y: Yield(Int | String)) { y.emit(1) }
 
 given_narrow = () {
-	_syn3_1: Yield(Int) = Yield(emit = (x) { Nil })
+	_syn3_1: Yield(Int) = Yield(emit = (x: Int) { Nil })
 	emit_any() <- (_syn3_1)
 }
 
 given_same = () {
-	_syn3_2: Yield(Int | String) = Yield(emit = (x) { Nil })
+	_syn3_2: Yield(Int | String) = Yield(emit = (x: Int | String) { Nil })
 	emit_any() <- (_syn3_2)
 }

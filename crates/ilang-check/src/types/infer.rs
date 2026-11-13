@@ -3007,11 +3007,11 @@ impl<'a> Checker<'a> {
                     // Syntax three, `r <- (e1)` (§2.10.2): the key is the
                     // type constructor of the known type of `e1`.
                     let (v, k) = self.infer_k(value, &Ty::Top);
-                    let head = [&v, &k].into_iter().find_map(|t| match t {
-                        Ty::Con(super::Head::Named(r), _, args) => Some((*r, args.len())),
+                    let provider = [&v, &k].into_iter().find_map(|t| match t {
+                        Ty::Con(super::Head::Named(r), ..) => Some((*r, t.clone())),
                         _ => None,
                     });
-                    let Some((r, args)) = head else {
+                    let Some((r, provided)) = provider else {
                         self.error(
                             code::ENV_TYPE,
                             value.span,
@@ -3024,17 +3024,12 @@ impl<'a> Checker<'a> {
                     let a = self.block(&stmts[i + 1..], *span, expected);
                     let (err, env) = self.pop_effects(*span);
                     self.add_err(err);
-                    // The service type is the need of the rest for this
-                    // key, when the rest writes one; else its arguments are
-                    // left open, and the value and the rest fix them.
-                    let t = self
-                        .s
-                        .env_need(&env, super::Head::Named(r))
-                        .unwrap_or_else(|| {
-                            Ty::named(r, (0..args).map(|_| self.s.fresh()).collect())
-                        });
-                    self.sub2(&v, &t, value.span, value.span);
-                    let rest = self.s.env_diff(env, vec![t]);
+                    // E1, §9.2: remove this provider's form, retaining its
+                    // directed obligation on the remaining row. Replacing it
+                    // with the needed form loses that obligation and can hide
+                    // a generic handler or report a value error at the call.
+                    self.sub2(&v, &provided, value.span, value.span);
+                    let rest = self.s.env_diff(env, vec![provided]);
                     self.flush(*span, None);
                     self.add_env(rest);
                     return a;

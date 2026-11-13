@@ -5,7 +5,7 @@
 Reader(S) = (get = () -> S)
 
 with_int = (body) {
-	_syn3_0: Reader(Int) = Reader(get = () { 1 })
+	_syn3_0: Reader(Int) = Reader(get = () -> Int { 1 })
 	body() <- (_syn3_0)
 }
 

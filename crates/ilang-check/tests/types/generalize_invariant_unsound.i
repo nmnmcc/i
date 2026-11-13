@@ -2,7 +2,7 @@
 // ordinary parameter goes in the other direction under rule 6.
 Sink(A) = (put = (A) -> Nil)
 
-needs_int = () <- (s: Sink(Int)) { s.put(1) }
+needs_int: () <- (Sink(Int)) -> Nil = () <- (s: Sink(Int)) { s.put(1) }
 
 // Generalization must not turn the required Sink(Int) into Sink(Never).
 unsound = () {

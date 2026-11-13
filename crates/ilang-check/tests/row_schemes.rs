@@ -103,9 +103,14 @@ Svc(R) = (() <- R -> Nil)
 wrap: <N>(
 	() <- (Svc(Extra | Dep), ..N) -> Nil,
 	Svc(Dep | Extra),
-) <- N -> Nil = (body, svc) { body() <- (svc) }";
+) <- N -> Nil = (body, svc) {
+    provided: Svc(Extra | Dep) = svc
+    body() <- (provided)
+}";
     let before = types(base);
-    let after = types(&base.replace("! Svc(Extra | Dep) = svc", "! Svc(Dep | Extra) = svc"));
+    let reordered = base.replace("provided: Svc(Extra | Dep)", "provided: Svc(Dep | Extra)");
+    assert_ne!(base, reordered);
+    let after = types(&reordered);
     assert_eq!(before, after);
     assert!(before["app/main.wrap"].contains("Svc(Dep | Extra)"));
 }
@@ -115,15 +120,15 @@ fn row_kind_survives_an_alias_without_algebra() {
     // F2 requires N to remain a row even when a function alias is copied
     // without normalization. Its value positions must compare Svc's
     // arguments equally before generalization can combine the forms.
-    for mode in ["!", "^"] {
+    for need in ["(Fail(Never), ..N)", "(Fail(N))"] {
         let source = "Svc(A) = (() -> A)
-Row(N) = () <- N -> Nil
+Row(N) = () <- NEED -> Nil
 bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	first: N = one
 	second: N = two
 	second
 }"
-        .replace("! N", &format!("{mode} N"));
+        .replace("NEED", need);
         let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
         let checked = ilang_check::check(&graph);
         assert!(
@@ -136,22 +141,17 @@ bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 
 #[test]
 fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
-    // §4.5: L <: v <: U proves v = T when L = T = U. A hole in a
-    // handler fixed to Int must prove the same witness as writing Int.
-    let source = "Svc(A) = (f = () -> A)
-wrap: <N>(() <- (Svc(Int), ..N) -> Int, Svc(Int)) <- N -> Int = (body, svc) {
-	body() <- (svc)
-}";
+    // §4.5: both bounds fix the handler hole to the same form.
     for inferred in [false, true] {
-        let source = if inferred {
-            source.replace(") -> Int ! N {", ") {")
+        let head = if inferred {
+            "wrap = <N>(body: () <- (Fail(Never), Svc(Int), ..N) -> Int, svc: Svc(Int))"
         } else {
-            source.to_string()
+            "wrap: <N>(() <- (Fail(Never), Svc(Int), ..N) -> Int, Svc(Int)) <- (Fail(Never), ..N) -> Int = (body, svc)"
         };
-        assert_eq!(
-            types(&source),
-            types(&source.replace("! Svc(Int) = svc", "! Svc(_) = svc"))
-        );
+        let source = format!("Svc(A) = (f = () -> A)\n{head} {{\n provided: Svc(Int) = svc\n body() <- (provided)\n}}\n");
+        let with_hole = source.replace("provided: Svc(Int)", "provided: Svc(_)");
+        assert_ne!(source, with_hole);
+        assert_eq!(types(&source), types(&with_hole));
     }
     // Never has an implicit lower bound, so v <: Never also fixes v.
     let never = "S(N) = (() <- N -> Nil)
@@ -175,14 +175,14 @@ S(N) = (() <- N -> Nil)
 T(N) = (() <- N -> Nil)
 Alias(N) = T(N)
 ";
-    let invariant_head = head.replace("S(() -> Nil ! N)", "S(() -> Nil ! N, (N) -> Nil)");
+    let invariant_head = head.replace("S(N) = (() <- N -> Nil)", "S(N) = (() <- N -> Nil, (N) -> Nil)");
     for op in ["|", "&", "-"] {
         let row = ["S(Never)", op, "S(Dep)"].join(" ");
-        for written in [
-            format!("T({row})"),
-            format!("Alias({row})"),
-            format!("() -> Nil ! {row}"),
-            format!("() -> Nil ^ {row}"),
+        for (written, error_row) in [
+            (format!("T({row})"), false),
+            (format!("Alias({row})"), false),
+            (format!("() <- ({row}) -> Nil"), false),
+            (format!("() <- (Fail({row})) -> Nil"), true),
         ] {
             let source = format!(
                 "{invariant_head}use = (x: {written}) {{ x }}
@@ -190,7 +190,7 @@ Alias(N) = T(N)
             );
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
             let checked = ilang_check::check(&graph);
-            let expected = if op == "-" || written.contains('^') {
+            let expected = if op == "-" || error_row {
                 "E0515"
             } else {
                 "E0503"
@@ -464,4 +464,56 @@ bad = () { run(() { one() }, S(value = \"hi\")) <- (S(value = 1)) }";
             )
             .replace("\"hi\"", "2"),
     );
+}
+
+#[test]
+fn syntax_three_provision_retains_the_actual_provider_form() {
+    let source = "Read(A) = (get = () -> A)\nwith_int = (body) { service: Read(Int) = Read(get = () -> Int { 1 }) body() <- (service) }\nmain = () { with_int(() <- (r: Read(Int)) { r.get() }) }\n";
+    let shown = types(source);
+    assert!(!shown["app/main.main"].contains("Read"), "{shown:?}");
+    let bad = source.replace("() <- (r: Read(Int)) { r.get() }", "() <- (r: Read(String)) { r.get() }");
+    let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
+    let checked = ilang_check::check(&graph);
+    assert!(checked.diags.iter().any(|d| d.code == "E0515"), "{:?}", graph.sources.render_all(&checked.diags));
+    assert!(!checked.diags.iter().any(|d| d.code == "E0501"), "{:?}", graph.sources.render_all(&checked.diags));
+}
+
+#[test]
+fn converted_e1_provider_cases_keep_batch2_check_outcomes() {
+    let cases: &[(&str, &[&str], &str)] = &[
+        ("review-k4/cases/closure_inner_annotation", &["E0515"], include_str!("../../../tests/review/cases/review-k4/cases/closure_inner_annotation/src/main.i")),
+        ("review-k4/cases/local_instances_annotated", &["E0515"], include_str!("../../../tests/review/cases/review-k4/cases/local_instances_annotated/src/main.i")),
+        ("review-k4/cases/provision_closure_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_closure_True/src/main.i")),
+        ("review-k4/cases/provision_direct_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_direct_True/src/main.i")),
+        ("review-k4/cases/provision_helper_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_helper_True/src/main.i")),
+        ("review-k4/cases/provision_inferred_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_inferred_True/src/main.i")),
+        ("review-k4/cases/recursive_env_cov", &["E0505"], include_str!("../../../tests/review/cases/review-k4/cases/recursive_env_cov/src/main.i")),
+        ("review-k4/cases/recursive_env_mutual", &["E0505"], include_str!("../../../tests/review/cases/review-k4/cases/recursive_env_mutual/src/main.i")),
+    ];
+    for (name, expected, source) in cases {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        let actual: std::collections::BTreeSet<_> = checked.diags.iter().filter(|d| d.is_error()).map(|d| d.code.as_str()).collect();
+        let expected: std::collections::BTreeSet<_> = expected.iter().copied().collect();
+        assert_eq!(actual, expected, "{name}: {:?}", graph.sources.render_all(&checked.diags));
+    }
+}
+
+#[test]
+fn syntax_three_library_handler_has_no_unhandled_service() {
+    let (graph, _, _) = common::check_files(&[("src/main.i", "(i/failure)\nmain = () { failure.catch(() { failure.raise(1) }) }\n")]);
+    let checked = ilang_check::check(&graph);
+    let p = checked.program.as_ref().unwrap();
+    let typed = checked.types.as_ref().unwrap();
+    for (mi, module) in p.modules.iter().enumerate() {
+        if module.path != "i/failure" { continue; }
+        for (di, def) in module.defs.iter().enumerate() {
+            if def.name != "catch" { continue; }
+            let id = ilang_check::hir::DefId { module: ilang_check::hir::ModuleId(mi as u32), index: di as u32 };
+            let shown = &typed.scheme_types[&id];
+            let ilang_check::types::ShownType::Fn(function) = shown else { panic!("{shown:#?}"); };
+            assert!(function.err.is_none(), "{shown:#?}");
+            assert!(matches!(function.env.as_ref(), Some(ilang_check::types::ShownType::Var(_))), "{shown:#?}");
+        }
+    }
 }

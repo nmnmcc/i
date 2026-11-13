@@ -1,21 +1,21 @@
-collect : (body: () -> Nil ! N | Yield(A)) -> List(A) ! N
-numbers : () -> List(Int)
-inferred : () -> List("s")
-run_never : (body: () -> Nil ! Yield(Never)) -> 1
+collect : (() <- (Fail(E), Yield(A), ..N) -> Nil) <- (Fail(E), Yield(A), ..N) -> List(A)
+numbers : () <- (Yield(A)) -> List(A | Int)
+inferred : () <- (Yield(A)) -> List(A | "s")
+run_never : (() <- (Yield(Never)) -> Nil) -> 1
 bad_never : () -> 1
-run_int : (body: () -> Nil ! Yield(Int)) -> 1
+run_int : (() <- (Yield(Int)) -> Nil) -> 1
 good_int : () -> 1
-emit_int : () -> Nil ! Yield(Int)
-emit_string : () -> Nil ! Yield(String)
-both_yields : () -> Nil ! Yield(Int | String)
-next_int : () -> Int ! Source(Int)
-next_string : () -> String ! Source(String)
-both_sources : () -> String ! Source(Never)
-both_fns : List(() -> Nil ! Yield(Int | String))
-written : () -> Nil ! Source(Int) | Yield(Int)
-emit_any : () -> Nil ! Yield(Int | String)
+emit_int : () <- (Yield(Int)) -> Nil
+emit_string : () <- (Yield(String)) -> Nil
+both_yields : () <- (Yield(Int | String)) -> Nil
+next_int : () <- (Source(Int)) -> Int
+next_string : () <- (Source(String)) -> String
+both_sources : () <- (Source(Never)) -> String
+both_fns : List(() <- (Yield(Int | String)) -> Nil)
+written : () <- (Source(Int), Yield(Int)) -> Nil
+emit_any : () <- (Yield(Int | String)) -> Nil
 given_narrow : () -> Nil
 given_same : () -> Nil
 39:28: error[E0515]: `Yield(Int)` and `Yield(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 39:18 needs it)
 61:16: error[E0515]: the service requirements `Source(Int)` and `Source(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2)
-79:2: error[E0515]: `Yield(Int | String)` and `Yield(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)
+78:17: error[E0515]: `Yield(Int | String)` and `Yield(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)

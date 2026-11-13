@@ -1,31 +1,31 @@
-app/main.add : (a: Int, b: Int) -> Int
-app/main.opaque : (h: Handle, flag: Bool) -> Handle
-app/main.errors : (x: Int) -> Nil ^ Int | String
-app/main.never : (s: String) -> Never
-app/main.never_param : (x: Never) -> Int
-app/main.bad_param : (xs: List(Int)) -> 1
+app/main.add : (Int, Int) -> Int
+app/main.opaque : (Handle, Bool) -> Handle
+app/main.errors : (Int) <- (Fail(1 | "one")) -> Nil
+app/main.never : (String) -> Never
+app/main.never_param : (Never) -> Int
+app/main.bad_param : (List(Int)) -> 1
 app/main.bad_value : () -> (1, 2)
-app/main.generic : (x: A) -> A
-app/main.bad_errors : () -> Int ^ (Int, Int)
-app/main.twice_error : () -> Int ^ Handle
+app/main.generic : (A) -> A
+app/main.bad_errors : () <- (Fail((Int, Int))) -> Int
+app/main.twice_error : () <- (Fail(Handle)) -> Int
 app/main.number : 1
-app/main.with_host : () -> 1 ! Assert | Storage
-app/main.with_clock : () -> Int ! Clock
-app/main.main : () -> Nil ! Clock | Storage
-app/main.core_text : (n: Int) -> "x"
-app/main_test.passes : () -> Nil ! Assert
-app/main_test.host : () -> Nil ! Assert | Storage
+app/main.with_host : () <- (Assert, Storage) -> 1
+app/main.with_clock : () <- (Clock) -> Int
+app/main.main : () <- (Clock, Storage) -> Nil
+app/main.core_text : (Int) -> "x"
+app/main_test.passes : () <- (Assert) -> Nil
+app/main_test.host : () <- (Assert, Storage) -> Nil
 app/main_test.gives_int : () -> 1
-app/main_test.needs_clock : () -> Nil ! Assert | Clock
+app/main_test.needs_clock : () <- (Assert, Clock) -> Nil
 app/main_test.never : () -> Never
-src/main.i:65:37: error[E0515]: `1` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 65:26 needs it)
-src/main.i:55:1: error[E0521]: `never` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `Never`
-src/main.i:57:1: error[E0521]: `never_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `Never`
-src/main.i:59:1: error[E0521]: `bad_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `List(Int)`
-src/main.i:61:1: error[E0521]: `bad_value` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `(1, 2)`
-src/main.i:63:1: error[E0521]: `generic` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `a`
-src/main.i:63:1: error[E0521]: `generic` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `a`
-src/main.i:65:1: error[E0521]: `bad_errors` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `(Int, Int)`
-src/main.i:67:1: error[E0521]: `twice_error` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `Handle`
-src/main.i:70:1: error[E0521]: `number` is a host export, so it is a function (§10.2), but its type is `1`
+src/main.i:52:1: error[E0515]: `1` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)
+src/main.i:42:1: error[E0521]: `never` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `Never`
+src/main.i:44:1: error[E0521]: `never_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `Never`
+src/main.i:46:1: error[E0521]: `bad_param` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `List(Int)`
+src/main.i:48:1: error[E0521]: `bad_value` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `(1, 2)`
+src/main.i:50:1: error[E0521]: `generic` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `a`
+src/main.i:50:1: error[E0521]: `generic` is a host export, so the value must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `a`
+src/main.i:52:1: error[E0521]: `bad_errors` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `(Int, Int)`
+src/main.i:54:1: error[E0521]: `twice_error` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `Handle`
+src/main.i:57:1: error[E0521]: `number` is a host export, so it is a function (§10.2), but its type is `1`
 test/main_test.i:11:1: error[E0521]: the selected entry `gives_int` must give `Nil` for this consumer, but it gives `1`
