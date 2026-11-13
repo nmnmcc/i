@@ -193,6 +193,13 @@ to the next line), and at most one existing blank line separates top-level
 items. A single indivisible atom, string or comment may exceed the width.
 `i fmt --to is` uses that same layout.
 
+Formatting is idempotent: formatting its output again gives identical text.
+It preserves the same code as defined by §14.1, including definition kind.
+A successful conversion between surfaces preserves that same code; conversion
+there and back may change layout and literal spelling, but not the parsed
+program. If the destination surface cannot represent the program, conversion
+reports an error and leaves the source unchanged.
+
 ## 2. Modules
 
 ### 2.1 Packages and modules
@@ -2759,7 +2766,7 @@ These are normal functions: they are called, given, and compared like any other 
 
 i has one **core tree** and two ways to write it. The **normal surface** is the syntax of §1 to §8, in files whose names end in `.i`. The **Lisp surface** writes the same core tree with brackets, in files whose names end in `.is`. A file uses one surface, chosen by the end of its name. A module path leaves out the extension; a module with both a `.i` and a `.is` file is a compile error. Imports, exports, dependencies and visibility mean the same in both surfaces, and a module written in one surface is used from the other with no difference.
 
-Two trees are **the same code** when they are equal after every group is removed. A `.is` file can be written as a `.i` file only when the normal surface can write its core tree; a quote and a macro definition have no normal spelling.
+Two trees are **the same code** when their parsed core trees are equal after removing only redundant groups. Type-definition kind is part of that tree: braces that distinguish an alias from a labelled definition (§4.3) are not redundant and are preserved. A `.is` file can be written as a `.i` file only when the normal surface can write its core tree; a quote and a macro definition have no normal spelling.
 
 A **macro** is an i function that runs in the compiler. It takes code as data and gives code as data. Macros are defined only in `.is` files and are used from both surfaces. A macro has no host services: it cannot read files, use the network or read the time, and it gives the same result for the same input on every machine.
 
@@ -2887,7 +2894,7 @@ SyntaxError = (message = String, at = Syntax)
 
 - A `Syntax` value is one datum with its span in a source file and its **scope** (§14.6). `Syntax` has no constructors: only the compiler, a quote and `make` give `Syntax` values. `TypeHandle` is a checked type that a typed macro query gives (§14.8); it is valid only in the position of a type.
 - The `Syntax` of a piece of code is the datum that the Lisp surface writes for it, also for code from a `.i` file. So the node of the argument `n > 0` is `Node(Round(…))` whose parts have the nodes `Node(Symbol(">"))`, `Node(Name("n"))` and `Node(0)`. `Int` and `Float` atoms are the built-in types in the union of `Node`.
-- A macro never sees a group: the compiler removes every group from the code it gives to a macro.
+- A macro receives code with only redundant groups removed, preserving the definition kinds required by §14.1.
 - An atom is one token of its kind. A negative number is the `Round` `(- 1)`. `make` gives a `SyntaxError` for any other atom.
 - `==` on two `Syntax` values is `True` only for the same value; `same_code` compares code.
 
