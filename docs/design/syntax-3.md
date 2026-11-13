@@ -1098,11 +1098,10 @@ keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail
 - `Fail` stays at the call of the kept function, so an error raised inside it
   goes to the caller's `catch`, as with today's `control.keep_env`. This is
   sound only under rule B.
-- **Implementation.** `N` is erased at run time, so the closure stores the
-  `$env` pointer it received. `f(x) <- env` compiles to that pointer overlaid
-  with the current values of the keys the callee needs outside `N` (here
-  `Fail`); that set is known at compile time. Restoring the whole pointer
-  would also restore the captured `Fail`, which is wrong.
+- **Implementation.** Capture uses spec §9.4: retain only the services in
+  the inferred residual need. A stored environment must not retain unrelated
+  services through its backing pointer. `f(x) <- env` overlays the retained
+  services with the caller's `Fail`. Task substitutions are in spec §9.9.
 - **`keep_env` stays a primitive** with the type of §2.10.7 until stage E6,
   where it is deleted only if `tests/spec/9/keep_env.i` and a
   `task.keep` error-propagation fixture pass on the library `keep`. The seven

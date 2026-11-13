@@ -1470,7 +1470,7 @@ The module `i/control` pauses a computation and goes on with it later:
 
 A structured task cancel resumes its scheduling continuation with a cancel answer; i code then cancels an inner continuation (§9.9). It does not change rule 4's rule that the boundary of the cancelled continuation is not active during unwinding.
 
-**Keeping services.** In a service pattern, `..env: N` binds the whole set of services that the function receives as one value of the row type `N` (§6.8). A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` makes a function that, wherever it is called, calls `f` with the services of the place where `keep` was called, but with the caller's `Fail`:
+**Keeping services.** In a service pattern, `..env: N` binds the whole set of services that the function receives as one value of the row type `N` (§6.8). A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` captures exactly the services in `f`'s inferred residual need, after removing `Fail`. It does not capture other services merely because they are available. Wherever the kept function is called, it calls `f` with those captured services and the caller's `Fail`. This is also the capture rule for `task.keep` and `task.go`, with the scheduler substitutions of §9.9:
 
 ```i future-SYN3
 keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
@@ -1698,7 +1698,7 @@ and needs. No union of invariant Task(Int,E) and Task(String,E) is required:
 are exported in v1. Local callers write a local_scope explicitly.
 
 
-`go`, `keep` and the combinators provide `Scheduler`, `Runner` and `Await` to their bodies themselves, so their callers need only the rest of the bodies' needs and `Scheduler`. `Owner` and `Root` are not provided there. `run` and `test` provide a fresh `Root` and a default `Owner`; `test` still needs the calling `Runner` for its nested path and wait route. Host fields add fixed service types to needs, never a constraint that depends on a type. Keys are invariant and obey the value restriction; `Request` and `Event` add no qualified types.
+`go`, `keep` and the combinators provide `Scheduler`, `Runner` and `Await` to their bodies themselves, so their callers need only the rest of the bodies' needs and `Scheduler`. They capture the residual need by §9.4. The captured record substitutes portable detached placeholders for these three services; the running task supplies its own values when it calls the body. `Owner` and `Root` are not provided there. `run` and `test` provide a fresh `Root` and a default `Owner`; `test` still needs the calling `Runner` for its nested path and wait route. Host fields add fixed service types to needs, never a constraint that depends on a type. Keys are invariant and obey the value restriction; `Request` and `Event` add no qualified types.
 
 No public spawn detaches a task. `go` never checks its closure's portability.
 It increments the calling task's spawn/run counter, beginning at 1; the child
@@ -2583,7 +2583,7 @@ The text form of a function, a key or a keyed value never depends on which worke
 A program may run on one or more **workers** at the same time. Which worker does which part of the work cannot be seen. Tasks that run at the same time take their steps (sends and receives, joins, host calls, failures and stops) one after another, in an order that the program does not fix; this order may differ from run to run and with the number of workers. Every run gives a result that some order of the steps gives, and each step does what it would do if the steps were taken one at a time in that order. The number of workers only changes which order happens. So anything that depends on the order of steps may change, for example which sender a receive pairs with, which event of a `choose` commits, whether a step comes before or after the end of a scope, which tasks fail before a cancel reaches them, which of two stops is first, and the order of output. A program whose results do not depend on the order of its steps gives one result. Running out of memory or stack (§11.7) is not covered by this rule. The host chooses the number of workers.
 
 
-The **captures** of a function made by a function expression are the local names that its body uses and that are bound outside it, after macro expansion; a name counts when it is written in the body, also in a part that never runs. Top-level names are not captures. A function made by `keep` (§9.4) has the captures of its argument and the services it keeps. Other functions have no captures.
+The **captures** of a function made by a function expression are the local names that its body uses and that are bound outside it, after macro expansion; a name counts when it is written in the body, also in a part that never runs. Top-level names are not captures. A function made by `keep` has the captures of its argument and the services selected by §9.4; task captures use the substitutions of §9.9. Other functions have no captures.
 
 
 
