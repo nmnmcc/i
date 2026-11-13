@@ -1,5 +1,9 @@
 # Syntax-three stage 3: shard 1/10 landing audit
 
+The November 14 follow-up at the end of this file supersedes the historical
+blockers below: main's conversion repairs and the READY provider-alias fix
+leave five explained display differences and no outcome differences.
+
 The exact command was:
 
 ```sh
@@ -340,3 +344,41 @@ as `s3-corpus-final-outcomes.json`, `s3-corpus-final-diff.json`, and
 `s3-corpus-final-diff.txt`; the final runner log is
 `s3-corpus-final-1of10.log`. Every final difference is classified in the table
 above. The three unexplained diagnostic changes remain blockers.
+
+## Follow-up against landed conversion, 2026-11-14
+
+The same wrapped shard command ran on `45ef0ced6`, after main `68b720e9`
+and READY conversion fix `db743d5e` were merged. The fresh release binary's
+SHA-256 was `9178624f3dcf58a20a78df3365242fad3c26dff5341b5688b186abc54fbc67d1`.
+All 198 cases completed: 138 checks accepted, 60 rejected, one observation
+censored as already registered, and one existing XFAIL. There were no new
+requirement failures, crashes, or checker timeouts. The raw runner exits 1
+for precisely these five full-output differences:
+
+| Case | Classification | Complete difference and authority |
+| --- | --- | --- |
+| `review-a1/cases/32_call_constructor_boundary` | shown type | `f : () -> Token` becomes `() -> Stop`. Syntax-three §2.8: “A labelled type with data `D` has the constructor function `(D) -> T(…)`”; sums are union aliases. `Stop` is the constructor's own type. |
+| `review-a1/runtime-new/32` | shown type | The same `Token` → `Stop` result; runtime phases and outputs are unchanged. Same §2.8 paragraph. |
+| `review-r2/never_yields` | shown type | `Fail(task.ScheduleError)` becomes `Fail(task.NotRunnable)` in `main`'s need. `lib/i/task.i` defines `ScheduleError = NotRunnable`; this names the same type. §2.8: “A name is a transparent alias, as today.” All phase exits and runtime output match. |
+| `review-t1/fuzz-111` | message only | E0516's uncovered witness becomes `("", True)` instead of `("", _)`. |
+| `review-t1/fuzz-22` | message only | E0516's uncovered witness becomes `("b", True)` instead of `("b", _)`. |
+
+Both witnesses are uncovered values of the original subject type; each case
+still has exactly one E0516 at the same location. `coverage.rs::show_pat`
+prints the single constructor of a labelled type, so the now independent
+`True` type supplies a concrete witness. Syntax-three §2.8 says, “When `D`
+is `()`, the constructor is a value: `None`, `Nil`, `True`”. These changes
+do not change coverage or the errors reported.
+
+The classification is **three shown type, two message only, zero outcome**;
+the other 193 observations match, including the registered censored case.
+No expectation, requirement, source, or bound was changed by this audit.
+In particular, `provision_closure_False`, `_loose/p/x8`, and `_loose/p/b1`
+match main's complete observations, with one, two, and three E0515 errors.
+The historical O3/O4 blockers above are resolved against the landed main
+baseline, also pinned by the new checker diagnostic regression.
+
+The complete expected/actual snapshot is in the shared coordinator cache
+as `s3-r3-corpus-outcomes.json`; the per-case machine classification and
+unified diffs are `s3-r3-corpus-diff.json` and `s3-r3-corpus-diff.txt`.
+The runner log is `s3-r3-corpus.log`.

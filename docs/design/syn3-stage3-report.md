@@ -308,3 +308,12 @@ recovery test skipped), syntax 190, LSP 106 including all 98 protocol tests,
 Wasm 65, macro 9. The new three-case regression passes separately after
 compilation. Final workspace/release/runtime/static gates are in progress;
 this checkpoint does not yet claim landability.
+
+Both fresh std runs pass 2,170 tests at O0 and O2. The new shard 1/10 run
+completes all 198 cases with no changed outcomes or requirement failures:
+three shown types and two coverage-message witnesses are the only
+differences. Every difference is explained in the November 14 section of
+[the corpus audit](syn3-stage3-corpus-audit.md), including the exact alias
+behind `ScheduleError` → `NotRunnable`. No expectation, requirement, source,
+or timeout bound was changed. Main's exact three provider observations
+match. CLI, chapter, generation, and static gates remain in progress.
