@@ -3572,7 +3572,7 @@
       "known_failure": false,
       "censored": true,
       "outcome": "diverge",
-      "finding": "The intentionally divergent body never yields, so the child must not run during the bounded observation.",
+      "finding": "In a scripted single-worker run, the intentionally divergent body never yields, so the child must not run during the bounded observation.",
       "source": "runtime.md §6.4: cooperative M:1 does not preempt non-yielding work; docs/testing.md: observation budgets are resource caps, not performance promises."
     }
   ],

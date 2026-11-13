@@ -7,11 +7,13 @@ task.scope((outer) {
  b: task.Channel(Int) = task.channel()
  c: task.Channel(Int) = task.channel()
  r = fail.catch(() { task.scope((s) {
-   task.go(s, () { resource.ensure(() { task.sync(task.choose([
+   armed: task.Channel(Nil) = task.channel()
+   task.go(s, () { resource.ensure(() { task.send(armed, Nil)
+     task.sync(task.choose([
      task.send_event(a, 1), task.send_event(b, 2), task.send_event(c, 3)
    ])) }, () { task.yield()
  io.print("withdrawn") }) })
-   task.go(s, () { task.yield()
+   task.go(s, () { task.receive(armed)
  fail.raise("boom") })
    task.sync(task.never())
  }) })
