@@ -1,0 +1,5 @@
+# ilang-check tests that use forms a later stage of syntax three removes or
+# replaces (docs/design/syntax-3.md §7.2). Each test named here returns early
+# until that stage lands; the stage then deletes its line and either rewrites
+# the test or removes it. One `file::test` per line, then the stage and reason.
+record_schemes::exported_label_scheme_round_trips_with_cross_module_caller stage 6: label parameters and i/record (open records)

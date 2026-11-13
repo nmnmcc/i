@@ -117,13 +117,18 @@ fn new_match_is_a_non_generalized_binding_at_the_pattern() {
 
 #[test]
 fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
-    // §3.9(c): no label on the artificial parameter, zero-width at `{`,
-    // and the Case covers clauses only. One clause keeps label_of(p).
-    // Spec §4.8 rule 11 permits values outside Int through the catch-all.
-    let (_, c) = checked(
-        "one = (n) { n }\nmany = (0) { 1 } | (_) { 2 }\nstring_argument = () { many(\"s\") }",
-        &["one", "string_argument"],
-    );
+    // §3.9(c): no label on the artificial parameter, zero-width at the
+    // start of the function, and the Case covers the clauses only. One
+    // clause keeps label_of(p). Spec §4.8 rule 11 permits values outside
+    // Int through the catch-all. Syntax three writes the clauses as a chain
+    // (syntax-3 §2.5) with no `{` around them, so the function starts at
+    // its first branch and the Case runs from the first branch to the end of
+    // the last one.
+    let src = "one = (n) { n }\nmany = (0) { 1 } | (_) { 2 }\nstring_argument = () { many(\"s\") }";
+    let chain = "(0) { 1 } | (_) { 2 }";
+    let chain_start = src.find(chain).unwrap();
+    let chain_end = chain_start + chain.len();
+    let (_, c) = checked(src, &["one", "string_argument"]);
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
     for (index, label) in [(0, Some("n")), (1, None)] {
@@ -141,12 +146,24 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
         };
         assert_eq!(actual.as_deref(), label);
         if index == 1 {
+            assert_eq!(f.span.start as usize, chain_start);
             assert_eq!(pattern.span.start, f.span.start);
             assert_eq!(pattern.span.start, pattern.span.end);
             let Stmt::Expr(case) = &f.body.stmts[0] else {
                 panic!()
             };
-            assert!(case.span.start > f.span.start && case.span.end < f.span.end);
+            let ExprKind::Case { subject, .. } = &case.kind else {
+                panic!()
+            };
+            assert_eq!(
+                (subject.span.start, subject.span.end),
+                (f.span.start, f.span.start)
+            );
+            assert_eq!(
+                (case.span.start as usize, case.span.end as usize),
+                (chain_start, chain_end)
+            );
+            assert!(case.span.start >= f.span.start && case.span.end <= f.span.end);
         }
     }
     let lines = c

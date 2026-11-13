@@ -309,15 +309,66 @@ impl Cx {
 
     /// The items, and the names of the one-constructor types that became
     /// constructors of a sum.
+    ///
+    /// A definition `T = C` or `T(A) = C(A)` with one member is a sum of
+    /// one constructor only while `C` is not written as a type elsewhere
+    /// in the module; otherwise it is the alias it reads as (§2.8, kind 4)
+    /// and `C` keeps its type. (A union `C1 | … | Ck` is still read as one
+    /// type with those constructors, so a member written as a type is not
+    /// defined: the final tree of lane/fa removes this.)
     fn items(&mut self, items: &[n::Item]) -> (Vec<o::Item>, HashSet<String>) {
+        struct Used(HashSet<String>);
+        impl crate::walk::Visitor for Used {
+            fn ty(&mut self, t: &mut o::TypeExpr) {
+                if let o::TypeKind::Named {
+                    module: None, name, ..
+                } = &t.kind
+                {
+                    self.0.insert(name.name.clone());
+                }
+            }
+        }
+        let (errors, fresh) = (self.errors.len(), self.fresh);
+        let mut plain = HashSet::new();
+        loop {
+            let (mut out, absorbed, single) = self.items_once(items, &plain);
+            let mut used = Used(HashSet::new());
+            crate::walk::Walk::walk(&mut out, &mut used);
+            let aliases: Vec<usize> = single
+                .into_iter()
+                .filter(|(_, member)| used.0.contains(member))
+                .map(|(i, _)| i)
+                .collect();
+            if aliases.is_empty() {
+                return (out, absorbed);
+            }
+            plain.extend(aliases);
+            self.errors.truncate(errors);
+            self.fresh = fresh;
+        }
+    }
+
+    /// The items, with the definitions at `plain` read as aliases; the
+    /// names of the absorbed types; and the one-member sums with the name
+    /// of their member.
+    #[allow(clippy::type_complexity)]
+    fn items_once(
+        &mut self,
+        items: &[n::Item],
+        plain: &HashSet<usize>,
+    ) -> (Vec<o::Item>, HashSet<String>, Vec<(usize, String)>) {
         // The sums: a definition `T = C1 | … | Ck` whose `k` members are
         // the data definitions just before it, in order.
         let mut member_of: HashMap<usize, usize> = HashMap::new();
         let mut absorbed = HashSet::new();
+        let mut single = Vec::new();
         for (i, item) in items.iter().enumerate() {
             let n::ItemKind::TypeDef(def) = &item.kind else {
                 continue;
             };
+            if plain.contains(&i) {
+                continue;
+            }
             let n::TypeRhs::Type(rhs) = &def.rhs else {
                 continue;
             };
@@ -349,6 +400,12 @@ impl Cx {
                     };
                     if member.name.name != def.name.name {
                         absorbed.insert(member.name.name.clone());
+                        // Only a one-member right side: a union keeps today's
+                        // reading (its members are constructors), as the
+                        // exports of i/syntax and std rely on it.
+                        if k == 1 && !matches!(rhs.kind, n::TypeKind::Union(_)) {
+                            single.push((i, member.name.name.clone()));
+                        }
                     }
                 }
             }
@@ -398,7 +455,7 @@ impl Cx {
                 span: item.span.0,
             });
         }
-        (out, absorbed)
+        (out, absorbed, single)
     }
 
     fn attribute(&mut self, a: &n::Attribute) -> o::Attribute {
@@ -687,7 +744,19 @@ impl Cx {
     // ---- Functions ----
 
     fn params_of(&mut self, f: &n::Function, params: &mut Vec<o::Param>) {
+        let mut fails = 0;
         for s in f.services.iter().flatten() {
+            // `name: Fail(E)` is today's error part (`ret`).
+            if fail_of(s).is_some() {
+                fails += 1;
+                if fails == 2 {
+                    self.error(
+                        s.ty.span.0,
+                        "a need has one `Fail` entry: write `Fail(A | B)`",
+                    );
+                }
+                continue;
+            }
             if s.rest {
                 self.error(
                     s.name.span.0,
@@ -702,12 +771,20 @@ impl Cx {
         }
     }
 
-    /// The written `-> R`: the needs are left to inference.
+    /// The written `-> R`: the needs are left to inference. A `Fail(E)`
+    /// item of the service pattern gives the error part `E`.
     fn ret(&mut self, f: &n::Function) -> Option<o::RetType> {
-        f.ret.as_ref().map(|t| o::RetType {
-            value: self.ty(t),
-            err: Some(ty(o::TypeKind::Hole, t.span.0)),
-            env: Some(ty(o::TypeKind::Hole, t.span.0)),
+        let fail = f.services.iter().flatten().find_map(fail_of);
+        let at = match (&f.ret, fail) {
+            (Some(t), _) => t.span.0,
+            (None, Some(e)) => e.span.0,
+            (None, None) => return None,
+        };
+        let hole = || ty(o::TypeKind::Hole, at);
+        Some(o::RetType {
+            value: f.ret.as_ref().map_or_else(hole, |t| self.ty(t)),
+            err: Some(fail.map_or_else(hole, |e| self.ty(e))),
+            env: Some(hole()),
         })
     }
 
@@ -808,7 +885,7 @@ impl Cx {
         }
         let ret = fs
             .iter()
-            .find(|f| f.ret.is_some())
+            .find(|f| f.ret.is_some() || f.services.iter().flatten().any(|s| fail_of(s).is_some()))
             .and_then(|f| self.ret(f));
         let subject = if count == 1 {
             name_expr(&names[0].0, names[0].1)
@@ -1427,5 +1504,17 @@ impl Cx {
             }
         };
         ty(kind, span)
+    }
+}
+
+/// The `E` of a service item `name: Fail(E)`.
+fn fail_of(s: &n::SItem) -> Option<&n::Type> {
+    match &s.ty.kind {
+        n::TypeKind::Named {
+            module: None,
+            name,
+            args,
+        } if !s.rest && name.name == "Fail" && args.len() == 1 => Some(&args[0]),
+        _ => None,
     }
 }

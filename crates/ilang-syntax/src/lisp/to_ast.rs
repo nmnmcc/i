@@ -557,10 +557,9 @@ async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
         K::Curly(_) => ExprKind::Block(block_inner(s, d).await?),
         K::Round(xs) if record_start(xs) => record_expression(s, d, xs).await?,
         K::Round(xs) => match xs.as_slice() {
-            [] => ExprKind::Record {
-                base: None,
-                fields: Vec::new(),
-            },
+            // `()` is the empty data, as the normal surface lowers it
+            // (syntax three §7.1 row 7): the empty tuple.
+            [] => ExprKind::Tuple(Vec::new()),
             [h, es @ ..] if symbol(h, ",") && !es.is_empty() => {
                 ExprKind::Tuple(expressions(s, es).await?)
             }

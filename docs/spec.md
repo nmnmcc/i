@@ -1127,7 +1127,7 @@ A function's parameter group is a data pattern (§7). When the function is calle
 
 A **chain** `F1 | … | Fn` of function expressions, with `n ≥ 1`, is one function value. Each branch may write its own type parameters, which are in scope in that branch only. The branches are grouped by shape: a **shape group** has the branches whose parameter groups have one shape, in the order written. When the chain is called with data, the group with the shape of the data is used, and in it the first branch whose parameter group matches the data and whose guard, if it has one, is `True` is taken; the value of its body is the value of the call. A guard is any expression of type `Bool`. It is worked out only after its parameter group matched, and it may use the names of the group and of the service pattern. Alternatives in an item are tried in order.
 
-```i
+```i future-SYN3
 gcd = (a: Int, 0) -> Int { a } | (a: Int, b: Int) -> Int { gcd(b, a % b) }
 
 area = (r: Float) -> Float { 3.14159 *. r *. r } | (w: Float, h: Float) -> Float { w *. h }
@@ -1293,7 +1293,7 @@ i has no special effect definitions. Effects are made from normal things: functi
 
 A function with no parameters, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
-```i
+```i future-SYN3
 retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) <- (..N, Fail(E)) -> A {
   fail.catch(body) |> (Ok(value)) { value }
     | (Error(error) ? times > 1) { retry(times - 1, body) }
@@ -1345,7 +1345,7 @@ example = () {
 
 **Layers.** There is no layer concept. A function that returns several services returns ordinary data, which may be provided whole or spread:
 
-```i
+```i future-SYN3
 base = () <- (io: Io) -> (Config, Log) {
   (Config(url = "https://example.com"), Log(write = (s) { io.print(s) }))
 }
@@ -1434,7 +1434,7 @@ A structured task cancel resumes its scheduling continuation with a cancel answe
 
 **Keeping services.** In a service pattern, `..env: N` binds the whole set of services that the function receives as one value of the row type `N` (§6.8). A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` makes a function that, wherever it is called, calls `f` with the services of the place where `keep` was called, but with the caller's `Fail`:
 
-```i
+```i future-SYN3
 keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
   (x) { f(x) <- env }
 }
@@ -1444,7 +1444,7 @@ An error raised inside the kept function goes to the `catch` of its caller.
 
 Generators, async code, and schedulers are libraries made from services and these operations. For example, a generator:
 
-```i
+```i future-SYN3
 Yield(A) = (emit = (A) -> Nil)
 
 collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) <- N -> List(A) {
@@ -1493,7 +1493,7 @@ A binding whose pattern may fail also reports to `Assert` (§6.10).
 
 At an entry point (§10.2), the platform gives an `Assert` whose `fail` stops the program; in a test, the test fails. Any code may provide its own `Assert`. The module `i/assertion` has one function that does this:
 
-```i
+```i future-SYN3
 catch = <A, N>(body: () <- (..N, Assert) -> A) <- N -> Result(A, AssertionFailure) {
   control.boundary((b) {
     Ok(body() <- (Assert(fail = (failure) { control.escape(b, Error(failure)) })))

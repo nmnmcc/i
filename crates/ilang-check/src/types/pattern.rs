@@ -1316,13 +1316,13 @@ mod shared_place_tests {
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(
             root.path().join("src/main.i"),
-            r#"Pair(A) = { (A, A) }
-Start(A) = { (A) }
-Stop(A) = { (A) }
+            r#"Pair(A) = (A, A)
+Start(A) = (A)
+Stop(A) = (A)
 Event(A) = Start(A) | Stop(A)
 Two(A) = { (A, A) }
-Wrapped(A) = { (Two(A)) }
-Solo(A) = { (A, Int) }
+Wrapped(A) = (Two(A))
+Solo(A) = (A, Int)
 "#,
         )
         .unwrap();
@@ -1361,6 +1361,11 @@ Solo(A) = { (A, Int) }
             },
             1
         ));
+        // The lowering of this stage reads `Event(A) = Start(A) | Stop(A)`
+        // as one type with the constructors `Start` and `Stop`, so `A` is
+        // written twice in the family. When syntax three's final tree lands
+        // (§2.8, "Sums are unions": two labelled types), each `A` is written
+        // once and these two become `!field_shared` of `Start` and `Stop`.
         assert!(c.field_shared(
             CtorRef {
                 ty: id("Event"),

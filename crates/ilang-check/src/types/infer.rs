@@ -687,15 +687,16 @@ impl<'a> Checker<'a> {
             self.set_module(pending.module);
             let fails = self
                 .useful(
-                    &[vec![pending.row]],
+                    &[vec![pending.row.clone()]],
                     &[super::coverage::Pat::Wild(None)],
-                    &[super::coverage::Col::of(pending.ty)],
+                    &[super::coverage::Col::of(pending.ty.clone())],
                 )
                 .is_some();
             self.out
                 .may_fail
                 .insert((pending.module, pending.span), fails);
             if fails {
+                self.warn_never_matches(&pending.row, &pending.ty, pending.span);
                 self.s
                     .constrain(&Ty::named(self.b.assert, Vec::new()), &pending.env);
                 if let Some(f) = std::mem::take(&mut self.s.failures).into_iter().next() {
@@ -3669,15 +3670,48 @@ impl<'a> Checker<'a> {
         } else {
             let fails = self
                 .useful(
-                    &[vec![row]],
+                    &[vec![row.clone()]],
                     &[super::coverage::Pat::Wild(None)],
-                    &[super::coverage::Col::of(ty)],
+                    &[super::coverage::Col::of(ty.clone())],
                 )
                 .is_some();
             self.out.may_fail.insert((self.module, span), fails);
             if fails {
+                self.warn_never_matches(&row, &ty, span);
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
+        }
+    }
+
+    /// A fitted pattern that no value of the known type `ty` matches can
+    /// never match (spec §4.8 fitting, §6.12 "a branch that can never be
+    /// used gives a compile warning"; syntax three §2.12 and D4): the
+    /// warning W0505. A constructor pattern is warned about once, when it is
+    /// fitted (`fit`).
+    fn warn_never_matches(&mut self, row: &super::coverage::Pat, ty: &Ty, span: Span) {
+        let matches_some = self
+            .useful(
+                &[],
+                std::slice::from_ref(row),
+                &[super::coverage::Col::of(ty.clone())],
+            )
+            .is_some();
+        if matches_some {
+            return;
+        }
+        let source = self.p.module(self.module).source;
+        let warned = self.diags.iter().any(|d| {
+            d.code == code::PATTERN_DISJOINT
+                && d.source == Some(source)
+                && d.span.start < span.end.max(span.start + 1)
+                && span.start < d.span.end.max(d.span.start + 1)
+        });
+        if !warned {
+            self.warning(
+                code::PATTERN_DISJOINT,
+                span,
+                "this pattern never matches: no value of the known type of what it is fitted to matches it (§4.8)",
+            );
         }
     }
 

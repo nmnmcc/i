@@ -161,3 +161,40 @@ fn repeated_type_parameter_kept() {
     let out = shown("pair = <A, A>(x: A) { (x, x) }\n");
     assert!(out.contains("pair(A, A)"), "{out}");
 }
+
+#[test]
+fn one_member_alias_keeps_a_type_written_as_a_type() {
+    // `Alias(N) = T(N)` is an alias (§2.8, kind 4) when `T` is written as
+    // a type; it does not take `T` in as its one constructor.
+    same(
+        "Dep = ()\nT(N) = (N)\nAlias(N) = T(N)\nf = (x: T(Dep)) { x }\n",
+        "Dep { Dep }\nT(N) { T(N) }\nAlias(N) = T(N)\nf = (x: T(Dep)) { x }\n",
+    );
+    same(
+        "T(N) = (N)\nAlias(N) = T(N)\ng = (x: Alias(Int)) { x }\ny: T(Int) = T(1)\n",
+        "T(N) { T(N) }\nAlias(N) = T(N)\ng = (x: Alias(Int)) { x }\ny: T(Int) = T(1)\n",
+    );
+    // Not written as a type, the member is still the one constructor.
+    same(
+        "DivisionByZero = ()\nTimeError = DivisionByZero\n",
+        "TimeError { DivisionByZero }\n",
+    );
+    same("A = (Int)\nB = ()\nAB = A | B\n", "AB { A(Int) B }\n");
+}
+
+#[test]
+fn fail_in_a_function_head_is_its_error_part() {
+    // `name: Fail(E)` in a head is the error part `^ E`, as in a need of a
+    // function type (§2.10.6): no service parameter `Fail`.
+    let text = shown(
+        "load = (id: String) <- (clock: Clock, fail: Fail(String)) -> Int { 1 }\n\nkeep = () <- (fail: Fail(Int)) { 1 }\n\nboth = (0) <- (fail: Fail(Int)) { 1 } | (n: Int) -> Int { n }\n",
+    );
+    assert!(text.contains("clock ! Clock"), "{text}");
+    assert!(!text.contains("Fail"), "{text}");
+    assert!(text.contains("-> Int ^ String"), "{text}");
+    assert!(text.contains("^ Int"), "{text}");
+    bad(
+        "f = () <- (a: Fail(Int), b: Fail(String)) { 1 }\n",
+        "a need has one `Fail` entry",
+    );
+}
