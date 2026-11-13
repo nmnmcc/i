@@ -1718,9 +1718,21 @@ are kept under Keyed fields whose text is //keyed, not exposed as plain fields. 
 
 #### Scopes, errors, and cancellation
 
-R1. A task's chain is its active scope bodies, inner first, followed by its
-starting scope's chain. A scope's chain is itself plus its opener's chain at
-opening. `go` and join require the relevant scope in this chain. Run-key mismatch
+R1. A task's chain is the scope bodies in its running continuation, inner
+first, followed by its starting scope's chain. A scope records itself plus the
+opener's chain when it opens; a child starts with that recorded chain.
+
+The scope-body part of a chain travels with a continuation (§9.4). Suspension
+removes the captured scope bodies from the running chain. Resumption restores
+them ahead of the resuming task's chain for as long as that continuation runs.
+This also holds when another task in the same run resumes it. Cancellation
+restores them while unwinding, then removes them as their bodies end. Run
+identities never change. An abandoned continuation runs no finals (§9.4 rule 7);
+its scopes remain unfinished, but are not in the running task's chain. A run
+still waits for those scopes, and stops with `task: deadlock` if no task or
+request can make progress.
+
+`go` and join require the relevant scope in the running chain. Run-key mismatch
 stops with `task: handle of another run`; failed membership stops with
 `task: go outside its scope` or `task: join outside its scope`. These messages
 are passed to panic, so the stop prefix is `panic: `.
