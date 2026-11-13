@@ -95,7 +95,7 @@ error, and §2.10.6 puts both library and service failures through Fail.
 | `float.hypot` | `(x: Float, y: Float) -> Result(Float, Nil)` | `(x: Float, y: Float) <- (Fail(Nil)) -> Float` | `std/test/float_test.i` |
 | `float.tan` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `std/test/float_test.i` |
 | `http.parse_query` | `(query: String) -> Result(List((String, String)), uri.CodecError)` | `(query: String) <- (Fail(uri.CodecError)) -> List((String, String))` | `std/test/http_test.i` |
-| `http.body_text` | `(res: Response) -> Result(String, Nil)` | `(res: Response) <- (Fail(Nil)) -> String` | `examples/http-get/src/main.i` |
+| `http.body_text` | `(res: Response) -> Result(String, Nil)` | `(res: Response) <- (Fail(Nil)) -> String` | `examples/http-get/src/main.i`, `tests/browser/fixtures/http-fetch/src/main.i` (outside this lane; pending) |
 | `http.body_json` | `(res: Response) -> Result(json.Json, BodyError)` | `(res: Response) <- (Fail(BodyError)) -> json.Json` | No external std/example callers |
 | `http.body_decode` | `<A>( res: Response, codec: schema.Schema(A, schema.SchemaError) ) -> Result(A, BodyError)` | `<A>( res: Response, codec: schema.Schema(A, schema.SchemaError) ) <- (Fail(BodyError)) -> A` | No external std/example callers |
 | `int.parse` | `(text: String) -> Result(Int, Nil)` | `(text: String) <- (Fail(Nil)) -> Int` | `std/src/cli.i`, `std/src/http.i`, `std/src/json.i`, `std/src/regex.i`, `std/test/int_test.i` |
@@ -132,3 +132,34 @@ error, and §2.10.6 puts both library and service failures through Fail.
 Public documentation follows the new API. The original descriptions moved from
 private helpers to public wrappers; examples that show Result values now use
 `fail.catch`. Existing Result-data combinator examples adapt their callbacks.
+
+One caller outside the owned std/example paths still needs adaptation:
+`tests/browser/fixtures/http-fetch/src/main.i:14` must catch `http.body_text`
+before its existing Ok/Error match. It is listed above for the browser lane.
+
+Validation on 2026-11-13:
+
+- Release builds from the merged eff3 bases `ce39db845` and `81c2abf9` pass.
+  The first cold build required initializing the missing Binaryen submodule.
+- `i fmt --check std` and formatting checks on the changed HTTP examples pass.
+  Initial generated heads incorrectly wrote a need type as a service pattern;
+  wrappers now infer the need through their calls, per §2.10.1 above.
+- Migration audit: all 75 original helper signatures and public exports remain;
+  wrappers directly unwrap the same Result. All 2,170 original named tests and
+  3,103 assertions remain; the added JSON test brings the totals to 2,171 and
+  3,105. No expectation was re-recorded.
+- The required wrapped `i check --project std` with the latest release from
+  `81c2abf9` stops at `<i>/fail.i:19:1`, E0515: the type hides the environment
+  statement's obligation for `Fail(_)`. This is the library implementation of
+  `fail.catch`; std's migrated modules have not been typechecked successfully.
+- With the earlier `ce39db845` binary, the required std check stopped at 12
+  E0322/E0521 errors in `std/src/test.is`. Temporary source-only packages under
+  `target/` (no std test macros) exposed 33 errors after E4 versus 19 for the
+  unmodified eff3 std sources. The 14 additional diagnostics concern unhandled
+  `Fail(Nil)` in added catches (JSON/URI/schema/HTTP and regex constants). They
+  remain unresolved; the comparison predates the latest catch/E1 merge and
+  is not evidence of a successful typecheck.
+- `i test --project std --opt 0` has not run because the required typecheck is
+  blocked. Runtime behavior, including the new exact JSON error fixture, is
+  unverified. This lane did not modify `lib/i` or the compiler; those changes
+  arrived only through the requested eff3 merges.
