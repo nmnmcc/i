@@ -519,7 +519,7 @@ but cannot recover a peak that has already occurred during compilation.
 
 ### Remaining measurements
 
-No 12 GB fix was validated in this lane. A Linux/glibc variant with
+At the end of the first investigation, no 12 GB fix had been validated. A Linux/glibc variant with
 `malloc_trim(0)` after Binaryen and after Wasmtime compilation built
 successfully, but its timed std run waited 8 minutes 37 seconds for the
 shared wrapper's memory slot and was cancelled before the executable
@@ -652,3 +652,83 @@ BIG_INT_ARTIFACTS="$PWD/target/big-int-perf" \
 The fixture is `tests/performance/big-int`; the ignored Rust integration test
 builds it with both compilers, retains both Wasm artifacts when
 `BIG_INT_ARTIFACTS` is set, and prints the measurements as CSV.
+
+### Metadata initialization diagnosis
+
+The second investigation first measured the preserved `b2/std-O0.wasm`
+probe artifact (6,475,874 bytes), independently of the i frontend. The
+`ilang-host` examples `module_stats` and `compile_probe` retain the
+measurement tools. The function names below are those in the Wasm name
+section; `fNNN` names identify generated functions, not source bindings.
+
+```text
+types: 206, GC array/struct types: 37, tables: 0, element segments: 1
+code bytes: 3490626
+  123145 bytes      0 locals f39983: ilang_start
+   16608 bytes   1120 locals f14437: f14008
+    4652 bytes    174 locals f12134: f11705
+    4474 bytes    158 locals f15713: f15284
+    4426 bytes    229 locals f39982: start
+    4352 bytes    146 locals f15718: f15289
+    3925 bytes    131 locals f12407: f11978
+    3813 bytes    192 locals f14387: f13958
+    3789 bytes    147 locals f13058: f12629
+    3715 bytes    127 locals f12374: f11945
+    3629 bytes    267 locals f14398: f13969
+    3350 bytes    112 locals f15703: f15274
+    3166 bytes    128 locals f11509: f11080
+    3165 bytes    129 locals f15846: f15417
+    3082 bytes     92 locals f15660: f15231
+    2982 bytes     82 locals f12150: f11721
+    2954 bytes    172 locals f11511: f11082
+    2896 bytes    104 locals f15777: f15348
+    2783 bytes    103 locals f14328: f13899
+    2678 bytes    109 locals f14621: f14192
+    2621 bytes     86 locals f13104: f12675
+    2604 bytes    117 locals f11459: f11030
+    2531 bytes    160 locals f12486: f12057
+    2512 bytes    142 locals f14517: f14088
+    2465 bytes     56 locals f11969: f11540
+    2462 bytes     91 locals f13097: f12668
+    2441 bytes     56 locals f13145: f12716
+    2411 bytes     78 locals f11495: f11066
+    2407 bytes     55 locals f13117: f12688
+    2407 bytes    111 locals f14649: f14220
+functions: 29 imported, 42154 defined
+declared in element segments: 26897
+exported: 2202
+named by ref.func: 19196
+escaping defined functions (trampolines now): 29099
+escaping if only ref.func targets were declared: 21398
+```
+
+The 42,154 defined functions contain 3,490,626 bytes of code (83 bytes
+on average). Only two bodies exceed 10,000 bytes. The largest is the
+exported `ilang_start`, which installs runtime metadata; it is distinct
+from `start`, which executes source initializers. In particular, expanded
+programs have a source-note string for every site. One giant
+`array.new_fixed` evaluates all allocating string expressions before
+constructing its array. Every earlier GC reference stays live across the
+later allocations, making the compilation disproportionately expensive.
+
+Both compile-only measurements used `RAYON_NUM_THREADS=1`, no compile
+cache, and the shared heavy wrapper with `/run/current-system/sw/bin/time
+-v`. For the second measurement only the body of function 39983
+(`ilang_start`) was replaced with an empty body; the module was compiled,
+never executed. All remaining functions, types and element declarations
+were retained.
+
+| Compile-only input | Peak RSS, KiB | User CPU, s | System CPU, s | Wall, s |
+|---|---:|---:|---:|---:|
+| Original O0 module | 11,037,164 | 80.75 | 9.02 | 91.02 |
+| Only `ilang_start` stubbed | 600,112 | 18.18 | 0.66 | 19.11 |
+
+This identifies generated metadata initialization as the dominant cost;
+partitioning the test collection is unnecessary. Build large metadata
+arrays by storing each value immediately, in the original order, with
+64 stores per generated helper. User initializers still run in their
+original order after metadata installation. The collection, provider
+plans and fresh started instance per test stay the same (§10.2), and the
+source positions and expansion notes stay at the same indices (§11.7).
+Metered compiler-macro modules retain the original emission so their
+instruction and allocation accounting does not change.
