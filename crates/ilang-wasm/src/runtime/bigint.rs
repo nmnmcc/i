@@ -250,7 +250,7 @@ const BASE_WAT: &str = r#"
     (else (call $big_remainder (local.get $a) (local.get $b)))))
 
 ;; The private primitives of `lib/i/big.i` ("ilang:big"): the sign, and the
-;; magnitude as base 2^14 digits, least significant first, as a List(Int).
+;; magnitude as base 2^30 digits, least significant first, as a List(Int).
 (func $big_sign (param $v eqref) (result eqref)
   (ref.i31 (call $int_sign (local.get $v))))
 
@@ -265,12 +265,12 @@ const BASE_WAT: &str = r#"
     (i64.sub (i64.mul (i64.extend_i32_u (local.get $n)) (i64.const 32))
       (i64.extend_i32_u
         (i32.clz (array.get $limbs (local.get $a) (i32.sub (local.get $n) (i32.const 1)))))))
-  (local.set $k (i64.div_u (i64.add (local.get $bits) (i64.const 13)) (i64.const 14)))
+  (local.set $k (i64.div_u (i64.add (local.get $bits) (i64.const 29)) (i64.const 30)))
   (block $done
     (loop $digit
       (br_if $done (i64.eqz (local.get $k)))
       (local.set $k (i64.sub (local.get $k) (i64.const 1)))
-      (local.set $position (i64.mul (local.get $k) (i64.const 14)))
+      (local.set $position (i64.mul (local.get $k) (i64.const 30)))
       (local.set $word (i32.wrap_i64 (i64.shr_u (local.get $position) (i64.const 5))))
       (local.set $window
         (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $word))))
@@ -287,7 +287,7 @@ const BASE_WAT: &str = r#"
           (ref.i31 (i32.wrap_i64
             (i64.and
               (i64.shr_u (local.get $window) (i64.and (local.get $position) (i64.const 31)))
-              (i64.const 16383))))
+              (i64.const 1073741823))))
           (local.get $out)))
       (br $digit)))
   (local.get $out))
@@ -304,7 +304,7 @@ const BASE_WAT: &str = r#"
       (br $count_digits)))
   (local.set $a
     (array.new_default $limbs
-      (i32.add (i32.div_u (i32.mul (local.get $count) (i32.const 14)) (i32.const 32)) (i32.const 2))))
+      (i32.add (i32.div_u (i32.mul (local.get $count) (i32.const 30)) (i32.const 32)) (i32.const 2))))
   (local.set $cursor (local.get $digits))
   (block $done
     (loop $digit
@@ -319,7 +319,7 @@ const BASE_WAT: &str = r#"
       (array.set $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1))
         (i32.or (array.get $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1)))
           (i32.wrap_i64 (i64.shr_u (local.get $value) (i64.const 32)))))
-      (local.set $position (i32.add (local.get $position) (i32.const 14)))
+      (local.set $position (i32.add (local.get $position) (i32.const 30)))
       (local.set $cursor (call $list_tail (local.get $cursor)))
       (br $digit)))
   (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign))) (local.get $a)))

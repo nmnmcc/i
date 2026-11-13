@@ -2,10 +2,11 @@
 //// runtime adds, subtracts, multiplies, divides, compares and writes small
 //// Ints itself, and calls these functions when an operand is large.
 ////
-//// A magnitude here is a list of digits in base 2^14, least significant
+//// A magnitude here is a list of digits in base 2^30, least significant
 //// first, with no zero digit at the end. Every number this code computes
-//// with is below 2^30, so it never makes a large Int itself and never calls
-//// itself through the runtime: a digit product is below 2^28.
+//// with is below 2^62, where the runtime does the arithmetic in 64 bits
+//// itself, so this code never calls itself through the runtime: a digit
+//// product with a carry is below 2^61.
 ////
 //// The three private primitives convert between an Int and its sign and
 //// digits. They are not part of the language (§13).
@@ -28,7 +29,7 @@
 @external("ilang:big", "sign")
 sign: (Int) -> Int
 
-/// The digits of the magnitude, in base 2^14, least significant first.
+/// The digits of the magnitude, in base 2^30, least significant first.
 @external("ilang:big", "digits")
 digits: (Int) -> List(Int)
 
@@ -212,8 +213,8 @@ magnitude_add = (x: List(Int), y: List(Int), carry: Int, acc: List(Int)) -> List
 }
 
 add_digit = (sum: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int) {
-	{ sum >= 16384 } |> {
-		True  -> magnitude_add(x, y, 1, [sum - 16384, ..acc])
+	{ sum >= 1073741824 } |> {
+		True  -> magnitude_add(x, y, 1, [sum - 1073741824, ..acc])
 		False -> magnitude_add(x, y, 0, [sum, ..acc])
 	}
 }
@@ -229,7 +230,7 @@ magnitude_subtract = (x: List(Int), y: List(Int), borrow: Int, acc: List(Int)) -
 
 subtract_digit = (difference: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int) {
 	{ difference < 0 } |> {
-		True  -> magnitude_subtract(x, y, 1, [difference + 16384, ..acc])
+		True  -> magnitude_subtract(x, y, 1, [difference + 1073741824, ..acc])
 		False -> magnitude_subtract(x, y, 0, [difference, ..acc])
 	}
 }
@@ -240,7 +241,7 @@ multiply_digit = (x: List(Int), d: Int, carry: Int, acc: List(Int)) -> List(Int)
 		[] -> reverse([carry, ..acc], [])
 		[a, ..xs] -> {
 			p = a * d + carry
-			multiply_digit(xs, d, p / 16384, [p % 16384, ..acc])
+			multiply_digit(xs, d, p / 1073741824, [p % 1073741824, ..acc])
 		}
 	}
 }
@@ -310,30 +311,30 @@ split_top = (top: List(Int), n: Int, acc: List(Int)) -> (List(Int), List(Int)) {
 }
 
 normal_shift = (top: Int, s: Int) -> Int {
-	{ top >= 8192 } |> {
+	{ top >= 536870912 } |> {
 		True  -> s
 		False -> normal_shift(top * 2, s + 1)
 	}
 }
 
-// `x × 2^s`, for `s` below 14.
+// `x × 2^s`, for `s` below 30.
 shift_left = (x: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int) {
 	x |> {
 		[] -> trim(reverse([carry, ..acc], []))
 		[d, ..ds] -> {
 			v = d * power_of_two(s, 1) + carry
-			shift_left(ds, s, v / 16384, [v % 16384, ..acc])
+			shift_left(ds, s, v / 1073741824, [v % 1073741824, ..acc])
 		}
 	}
 }
 
-// `x / 2^s`, for `s` below 14, from the most significant digit `top`.
+// `x / 2^s`, for `s` below 30, from the most significant digit `top`.
 shift_right = (top: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int) {
 	top |> {
 		[] -> trim(acc)
 		[d, ..ds] -> {
 			p = power_of_two(s, 1)
-			v = carry * 16384 + d
+			v = carry * 1073741824 + d
 			shift_right(ds, s, v % p, [v / p, ..acc])
 		}
 	}
@@ -352,7 +353,7 @@ short_divide = (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), I
 	top |> {
 		[] -> (trim(acc), r)
 		[a, ..rest] -> {
-			v = r * 16384 + a
+			v = r * 1073741824 + a
 			short_divide(rest, d, v % d, [v / d, ..acc])
 		}
 	}
@@ -377,7 +378,7 @@ long_divide = (
 				True  -> []
 				False -> [a, ..r]
 			}
-			estimate = { at(shifted, m) * 16384 + at(shifted, m - 1) } / divisor_top
+			estimate = { at(shifted, m) * 1073741824 + at(shifted, m - 1) } / divisor_top
 			reduced = { estimate == 0 } |> {
 				True  -> shifted
 				False -> magnitude_subtract(shifted, trim(multiply_digit(y, estimate, 0, [])), 0, [])
@@ -397,10 +398,10 @@ correct = (r: List(Int), y: List(Int), digit: Int) -> (Int, List(Int)) {
 
 // ---- Text ----
 
-// The largest power of `radix` that is at most 2^16, and its exponent.
+// The largest power of `radix` that is below 2^30, and its exponent.
 chunk_of = (radix: Int, chunk: Int, width: Int) -> (Int, Int) {
 	next = chunk * radix
-	{ next > 65536 } |> {
+	{ next >= 1073741824 } |> {
 		True  -> (chunk, width)
 		False -> chunk_of(radix, next, width + 1)
 	}
