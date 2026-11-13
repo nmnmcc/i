@@ -460,3 +460,8 @@ conversion had formatted its executable call sites to different lines and
 columns. Aligned executable source positions while retaining the complete
 WAT equality assertion; all four native/WASI, tests-on/off comparisons pass.
 No compiler behavior or expectation changed.
+
+WASI passed 16/17 before finding the stop fixture's same-name constructor
+converted as a transparent alias. Main's `Bad { Bad(Int) }` needs `Bad = (Int)`
+by syntax-3 §2.8 rule 3. Restored that nominal declaration; the focused test
+passes at every optimization level with unchanged messages and exit codes.
