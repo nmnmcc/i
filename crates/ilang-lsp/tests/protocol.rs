@@ -3194,3 +3194,31 @@ fn core_builtin_type_hover_and_definition() {
     let _ = c.request::<lsp::request::GotoDefinition>(position_params(&main, 1, 14));
     c.shutdown();
 }
+
+#[test]
+fn hover_and_completion_in_braced_union_and_typed_alternatives() {
+    let dir = tempfile::tempdir().unwrap();
+    let text =
+        "(choose, union)\nchoose = (x : Int | x) { x }\nunion = (x : { Int | String }) { x }\n";
+    package(dir.path(), &[("src/main.i", text)]);
+    let main = file_uri(&dir.path().join("src/main.i"));
+    let mut c = Client::start();
+    c.open(&main, text);
+    let diags = c.diagnostics(&main);
+    assert!(
+        !diags
+            .iter()
+            .any(|d| d.severity == Some(lsp::DiagnosticSeverity::ERROR)),
+        "{diags:?}"
+    );
+    for (needle, nth) in [("{ x }", 0), ("{ x }", 1)] {
+        let hover = hover_text(&mut c, pos(&main, text, needle, nth, 2));
+        assert!(hover.contains("x :"), "{hover}");
+        let items = c.request::<lsp::request::Completion>(pos(&main, text, needle, nth, 2));
+        assert!(
+            items.as_array().unwrap().iter().any(|i| i["label"] == "x"),
+            "{items}"
+        );
+    }
+    c.shutdown();
+}

@@ -528,7 +528,8 @@ fn parameters_alternatives_guards() {
     let f = value("f = (Sat | Sun, x) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     assert_eq!(chain(&f)[0].params.len(), 2);
-    // G21, P8: after a `:` type, `|` continues the union.
+    // G21, P8: keep the former union reading explicit; ungrouped choices
+    // are checked separately by one_annotation_boundary_for_declarations_patterns_and_function_results.
     let f = value("f = (x: { Int | y }) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 1);
     let f = value("f = (True | _: Int) { 1 }");
@@ -1249,4 +1250,48 @@ fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
         definitions[1].body,
         ilang_syntax::ast::TypeBody::Alias(_)
     ));
+}
+
+#[test]
+fn one_annotation_boundary_for_declarations_patterns_and_function_results() {
+    let f = value("f = (x : Int | y) { 1 }");
+    let choices = &chain(&f)[0].params[0].choices;
+    assert_eq!(choices.len(), 2);
+    assert!(matches!(choices[0].kind, PatternKind::Typed { .. }));
+    assert!(matches!(&choices[1].kind, PatternKind::Var(name) if name == "y"));
+    for source in [
+        "v : { Int | String } = 1",
+        "f : (Int) -> { Int | String } = (x) { x }",
+        "inspect : <A>(A) -> { Int | String }",
+        "f = (Box(value = x : { Int | String })) { x }",
+        "f = (x : Int & String - 1) { x }",
+        "f = () <- (clock : Clock(Int | String)) { clock }",
+        "F = (Int) -> Int | String",
+        "F = List((Int) -> Int | String)",
+        "F = (x = Int | String)",
+        "f : ((Int) -> Int | String) -> Int = (x) { 1 }",
+        "f : (Int) -> (Int) -> { Int | String } = (x) { (y) { y } }",
+        "f = (x : { (Int) -> Int | String }) { x }",
+    ] {
+        ok(source);
+    }
+    for source in [
+        "v : Int | String = 1",
+        "f : (Int) -> Int | String = (x) { x }",
+        "f : (Int) -> Int | String",
+        "f = (Box(value = x : Int | String)) { x }",
+        "f = () <- (clock : Clock | Other) { clock }",
+    ] {
+        bad(source, "expected");
+    }
+    assert_eq!(ok("x: Int = 1"), ok("x : Int = 1"));
+    let (rows, diags) = lisp::from_lisp("(: f (-> (, Int) (| Int String)))");
+    assert!(diags.is_empty(), "{diags:?}");
+    let printed = syn3::print_module(&rows);
+    assert_eq!(printed, "f : (Int) -> { Int | String }\n");
+    assert_eq!(ok(&printed), rows);
+    assert_eq!(
+        syn3::format("x: (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive) = e").unwrap(),
+        syn3::format("x = (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive)").unwrap().replace("x =", "x :").trim_end().to_string() + " = e\n"
+    );
 }
