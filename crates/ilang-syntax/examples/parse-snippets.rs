@@ -1,4 +1,4 @@
-//! A length-prefixed parser protocol for scripts/old-syntax-check.
+//! A length-prefixed parser protocol for scripts/check-snippets.
 use std::io::{self, BufRead, Read, Write};
 
 fn main() {
