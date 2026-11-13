@@ -270,6 +270,28 @@ fn member_name(t: &n::Type) -> Option<&str> {
     }
 }
 
+// Absorbing a constructor into the transition sum copies its fields.
+// That is valid only for an identity forwarding of its parameters: a
+// specialization or renaming must remain an alias (§4.3), otherwise the
+// copied field types would refer to the member's out-of-scope binders.
+fn forwards_member_params(t: &n::Type, member: &n::TypeDef, target: &n::TypeDef) -> bool {
+    let n::TypeKind::Named { args, .. } = &t.kind else {
+        return false;
+    };
+    let (Some(params), Some(args), Some(target)) = (
+        head_params(&member.head),
+        head_params(args),
+        head_params(&target.head),
+    ) else {
+        return false;
+    };
+    params.len() == args.len()
+        && params.iter().zip(&args).all(|(p, a)| p.name == a.name)
+        && params
+            .iter()
+            .all(|p| target.iter().any(|t| p.name == t.name))
+}
+
 impl Cx {
     fn plain() -> Cx {
         Cx {
@@ -425,11 +447,16 @@ impl Cx {
                 let at = i - k + j;
                 !member_of.contains_key(&at)
                     && match &items[at].kind {
-                        n::ItemKind::TypeDef(n::TypeDef {
-                            name,
-                            rhs: n::TypeRhs::Data(_),
-                            ..
-                        }) => member_name(m) == Some(name.name.as_str()),
+                        n::ItemKind::TypeDef(
+                            member @ n::TypeDef {
+                                name,
+                                rhs: n::TypeRhs::Data(_),
+                                ..
+                            },
+                        ) => {
+                            member_name(m) == Some(name.name.as_str())
+                                && forwards_member_params(m, member, def)
+                        }
                         _ => false,
                     }
             });

@@ -1204,3 +1204,24 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let shown = ilang_syntax::print::print_module(&lowered);
     assert!(!shown.contains(carrier.as_str()), "{shown}");
 }
+
+#[test]
+fn specialized_and_renamed_members_remain_type_aliases() {
+    // §4.3: an RHS naming another type is a transparent alias. Moving
+    // S's fields into Alias would lose N or A's declaration scope.
+    for source in [
+        "S(N) = (() <- N -> Nil)\nAlias = S(Never)\n",
+        "S(A) = (value = A)\nAlias(B) = S(B)\n",
+    ] {
+        let (module, diags) = syn3::parse_lowered(source);
+        assert!(diags.is_empty(), "{source}\n{diags:?}");
+        assert_eq!(module.items.len(), 2, "{module:?}");
+        let ilang_syntax::ast::ItemKind::TypeDef(alias) = &module.items[1].kind else {
+            panic!("expected alias: {module:?}");
+        };
+        assert!(
+            matches!(alias.body, ilang_syntax::ast::TypeBody::Alias(_)),
+            "{alias:?}"
+        );
+    }
+}
