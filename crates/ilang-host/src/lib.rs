@@ -776,11 +776,20 @@ struct State {
     failure: Option<anyhow::Error>,
     /// The requests of async host functions that are outstanding.
     requests: Requests,
-    /// The other workers of a multicore entry (multicore D8, native N7).
+    /// The pool of a multicore entry (multicore D8, native N7).
     workers: Option<Arc<workers::Pool>>,
 }
 
 impl State {
+    /// Publish the first stop before any invocation teardown can be observed.
+    fn record_stop(&mut self, message: String) {
+        let message = match &self.workers {
+            Some(pool) => pool.stopped(message),
+            None => message,
+        };
+        self.stop_message.get_or_insert(message);
+    }
+
     /// The state of a remote worker instance: no host services at all.
     fn worker() -> Self {
         Self {
@@ -1542,6 +1551,18 @@ impl Instance {
     /// A trap makes the instance unusable. It gives `Some(stop)`, or the
     /// failure of a host function as an error.
     fn settle(&mut self, invoked: Invoked) -> Result<Option<Stop>> {
+        // Teardown on another worker can make this call fail its live-context
+        // check. That failure is fallout from the already published stop.
+        let invoked = match self.worker_stop() {
+            Some(first) => match invoked {
+                Invoked::Stopped(mut stop) => {
+                    stop.message = first.message;
+                    Invoked::Stopped(stop)
+                }
+                _ => Invoked::Stopped(first),
+            },
+            None => invoked,
+        };
         match invoked {
             Invoked::Done => Ok(None),
             Invoked::Stopped(stop) => {
@@ -1553,6 +1574,14 @@ impl Instance {
                 Err(error)
             }
         }
+    }
+
+    fn worker_stop(&self) -> Option<Stop> {
+        let message = self.store.data().workers.as_ref()?.stop_message()?;
+        Some(Stop {
+            message: Some(message),
+            trap: "a task on a worker stopped".into(),
+        })
     }
 
     fn host_value_stop(&mut self) -> Outcome {
@@ -1744,6 +1773,10 @@ impl Instance {
             armed: true,
         };
         let outcome = guard.instance.wait_inner(name, status).await;
+        let outcome = match guard.instance.worker_stop() {
+            Some(stop) => guard.instance.settle(Invoked::Stopped(stop)),
+            None => outcome,
+        };
         guard.finish();
         outcome
     }
@@ -1963,6 +1996,9 @@ fn gc_settings() -> Result<(wasmtime::Collector, u64)> {
 pub const THREAD_STACK: usize = WASM_STACK + (16 << 20);
 
 fn live_context(context: &impl AsContext<Data = State>) -> Result<()> {
+    if let Some(pool) = &context.as_context().data().workers {
+        ensure!(pool.stop_message().is_none(), "the run has stopped");
+    }
     ensure!(
         context.as_context().data().resources.is_live(),
         "the resource context has ended"
@@ -2266,7 +2302,7 @@ fn define_builtins(linker: &mut Linker<State>) -> Result<()> {
                     Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
                     Err(error) => format!("(the stop message is outside memory: {error})"),
                 };
-                caller.data_mut().stop_message.get_or_insert(message);
+                caller.data_mut().record_stop(message);
                 caller.data().resources.teardown();
             })
         },
@@ -2350,11 +2386,8 @@ fn define_import(
     linker.func_new(module, name, ty, move |mut caller, parameters, results| {
         guarded(&mut caller, |caller, admitted| {
             let resources = caller.data().resources.clone();
-            if !resources.is_live() {
-                return Err(host_failure(
-                    caller,
-                    anyhow!("the resource context has ended"),
-                ));
+            if let Err(error) = live_context(caller) {
+                return Err(host_failure(caller, error));
             }
             let mut offset = 0;
             // The request id is checked before the service runs.

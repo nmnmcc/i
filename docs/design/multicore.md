@@ -640,8 +640,9 @@ MC-I. These are fixed semantics, not choices left to that prototype.
 - **Workers.** One module, N instances: the entry's instance is worker 0; workers
   1..N-1 each have their own `Store`, host services and OS thread
   (`crates/ilang-host/src/workers.rs`), started as records are published. N is 1
-  by default; `I_WORKERS=<n>` or `I_WORKERS=auto` (cores, at most one per GiB of
-  available memory) or `Program::with_workers` opt in. Macro programs, WASI and
+  when requested; the default and `I_WORKERS=auto` use the available cores, at
+  most one per GiB of available memory. `I_WORKERS=<n>` or
+  `Program::with_workers` can choose a count. Macro programs, WASI and
   JS run one worker. More than one worker turns on epoch instrumentation (N12).
 - **Publication (D8/P1, N7).** At `go` in the entry run, `i/task` encodes the
   complete record (start function with kept services, path, run, root, runner)
@@ -663,12 +664,43 @@ MC-I. These are fixed semantics, not choices left to that prototype.
   task's request groups, waited for there and settled through `ilang_settle:*`
   exports; worker 0 sees a cancellable wait that a `Woken` message ends.
 - **Stops (N12).** A stop on a worker stops the run with its message.
-- **Open: scheduling order with several workers.** With N > 1, outcomes that
-  depend on the order of steps can differ from the one-worker FIFO schedule
-  (e.g. spec 9.9/tasks.i's race winner, 9.9/final_cancel_phases.i's first child
-  cancelled before it starts). Whether D1 permits these is an owner question;
-  hence the default of one worker.
+- **Scheduling order with several workers.** Outcomes that depend on the order
+  of steps can differ from the one-worker FIFO schedule. The spec's workers
+  paragraph and §9.9 permit these differences; tests must avoid depending on
+  one order or list the allowed outcomes.
 - **Not done.** Function ids for `==` across copies (a copied closure is not
   `==` its original); D7's top-level portability walk; worker-local Root/Owner
   counts are not shared with worker 0; worker token tables are never freed;
   browser workers (N11); the packaged runner runs one worker.
+
+## 20. Cancelled joins and shared stop publication (lane mcbug)
+
+The `9.9/cancelled_join_cycle` trap comes from the host invocation context,
+not from the lexical lifetime of `resource.ensure`. All worker stores share
+one `ResourceContext`. Previously the panic import saved its message only in
+its own store and immediately tore down that shared context. A remote worker
+published its message to `PoolState.stop` only after Wasm returned to
+`Pool::fail`. In that interval worker 0 could fail an invocation or async-wait
+live-context check and return “the resource context has ended”, without the
+stop message. A final joining a cancelled task makes this race visible.
+
+The invariant is: **the first run-wide stop is published before shared resource
+teardown becomes visible, and the entry reports that stop before any resulting
+context/admission failure.** Every worker's panic import records the message
+under the pool lock before teardown, retaining the first message. Worker stores
+have the same pool reference for this purpose. Ordinary call settlement and the
+async-wait exit both recover that shared message, including when teardown was
+noticed outside Wasm. Host imports check the shared stop gate before starting a
+host action; resource teardown remains immediate. This preserves native N12's
+admission and first-stop rules rather than delaying teardown.
+
+The Rust `cancelled_join_cycle_stress` fixture runs the exact spec program and
+an eight-pair variant 200 times each with `I_WORKERS=4`, checking the cancelled
+join panic on every run. It compiles each variant once but creates fresh stores,
+worker threads and invocation resources for every run. A subprocess owns the
+environment settings, so other Rust tests cannot race a process-wide env edit.
+
+Before the fix, the exact-program fixture failed at iteration 13 with a stop
+whose message was absent and whose trap was “the resource context has ended”.
+After the fix all 400 four-worker runs passed. The default is again `auto`;
+explicit worker counts and the one-worker fast path are unchanged.
