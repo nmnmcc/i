@@ -1129,12 +1129,14 @@ fn lsp_references_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
     let refs = references(&mut c, &ws.main, &ws.main_text, "Circle(radius", 0, 0, true);
+    // The constructor's definition and pattern are after the export and the
+    // type `Circle { … }` (syntax three §2.8).
     assert!(
-        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))),
+        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 3))),
         "{refs:?}"
     );
     assert!(
-        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 1))),
+        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 4))),
         "{refs:?}"
     );
     assert!(
@@ -1328,7 +1330,7 @@ fn lsp_rename_top_level_across_files() {
     );
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    assert!(shapes.contains("(Shape(..), surface, origin"), "{shapes}");
+    assert!(shapes.contains("(Shape, Circle(..), Rect(..), surface, origin"), "{shapes}");
     assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
@@ -1376,9 +1378,10 @@ fn lsp_rename_constructor_and_type() {
     assert!(apply(APP_TEST, &edit, &ws.test).contains("shapes.Disk(radius: 1)"));
     let edit = rename(&mut c, &ws.main, &ws.main_text, "Shape) ->", 0, 0, "Figure").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
+    // `Shape` is a name for the union of `Circle` and `Rect` (syntax three).
     assert!(
-        shapes.contains("(Figure(..), area")
-            && shapes.contains("Figure {")
+        shapes.contains("(Figure, Circle(..), Rect(..), area")
+            && shapes.contains("Figure = Circle | Rect")
             && shapes.contains("(s: Figure)"),
         "{shapes}"
     );
@@ -1606,8 +1609,10 @@ fn lsp_definition_type_of_a_local() {
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "c)", 0, 0));
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))]
     );
+    // `c = Circle(…)` and the constructor have the type `Circle` (syntax
+    // three §2.8: a constructor's type is its own).
     // Of a constructor: its type.
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(
         &ws.main,
@@ -1618,7 +1623,7 @@ fn lsp_definition_type_of_a_local() {
     ));
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))]
     );
     c.shutdown();
 }
@@ -1637,8 +1642,8 @@ fn lsp_definition_implementation_of_a_type() {
     assert_eq!(
         locations(&r),
         vec![
-            (ws.shapes.clone(), range_of(SHAPES, "Circle", 0)),
-            (ws.shapes.clone(), range_of(SHAPES, "Rect", 0)),
+            (ws.shapes.clone(), range_of(SHAPES, "Circle", 3)),
+            (ws.shapes.clone(), range_of(SHAPES, "Rect", 3)),
         ]
     );
     c.shutdown();
@@ -1741,9 +1746,10 @@ fn lsp_definition_lisp_surface() {
     );
     let r =
         c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "size c", 0, 5));
+    // `c` is a `Circle` (syntax three §2.8).
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))]
     );
     c.shutdown();
 }
@@ -2025,7 +2031,8 @@ fn lsp_signature_of_a_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
     let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius: 2", 0, 8));
-    assert_eq!(s.signatures[0].label, "Circle(radius: Int) -> Shape");
+    // A constructor's type is its own (syntax three §2.8).
+    assert_eq!(s.signatures[0].label, "Circle(radius: Int) -> Circle");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
 }
@@ -2053,7 +2060,9 @@ fn lsp_hover_type_and_documentation() {
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
     assert!(
-        h.contains("Circle: (radius: Int) -> Shape") && h.contains("A shape in the plane."),
+        // The constructor makes a `Circle`, a type without a comment of its
+        // own; the comment is on the union `Shape` (syntax three §2.8).
+        h.contains("Circle: (radius: Int) -> Circle"),
         "{h}"
     );
     c.shutdown();
@@ -2449,11 +2458,12 @@ fn lsp_folding_ranges() {
         json!({ "textDocument": { "uri": ws.shapes } }),
     );
     let ranges: Vec<lsp::FoldingRange> = serde_json::from_value(r).unwrap();
-    let (shape, _) = find(SHAPES, "Shape {", 0);
+    // A type definition folds (one constructor per type, syntax three).
+    let (shape, _) = find(SHAPES, "Rect {", 0);
     assert!(
         ranges
             .iter()
-            .any(|f| f.start_line == shape && f.end_line == shape + 3),
+            .any(|f| f.start_line == shape && f.end_line == shape + 2),
         "{ranges:?}"
     );
     let (area, _) = find(SHAPES, "area = ", 0);
@@ -2688,7 +2698,7 @@ fn lsp_diagnostics_only_affected_packages_are_checked_again() {
     assert!(!c.has_diagnostics(&other_main));
     // A change of `lib`, which `app` uses, checks `app` again.
     let lib = file_uri(&lib_dir.join("src/text.i"));
-    c.open(&lib, &LIB_TEXT.replace("(shout, Tone(..))", "(Tone(..))"));
+    c.open(&lib, &LIB_TEXT.replace("(shout, Tone, Loud(..), Quiet(..))", "(Tone, Loud(..), Quiet(..))"));
     let diags = c.diagnostics(&ws.main);
     assert!(
         diags

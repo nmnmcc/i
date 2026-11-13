@@ -289,16 +289,22 @@ impl Query<'_> {
         };
         let p = self.program;
         let mut out = Vec::new();
-        if let TypeBody::Custom(cs) = &p.ty(t).body {
-            for (i, _) in cs.iter().enumerate() {
-                if let Some(l) = self.definition(
-                    owner,
-                    &Target::Ctor(CtorRef {
-                        ty: t,
-                        index: i as u32,
-                    }),
-                ) {
-                    out.push(l);
+        // A name for a union (syntax three §2.8): the constructors of its
+        // members, in the order written.
+        let mut types = Vec::new();
+        union_members(p, t, &mut types);
+        for ty in types {
+            if let TypeBody::Custom(cs) = &p.ty(ty).body {
+                for (i, _) in cs.iter().enumerate() {
+                    if let Some(l) = self.definition(
+                        owner,
+                        &Target::Ctor(CtorRef {
+                            ty,
+                            index: i as u32,
+                        }),
+                    ) {
+                        out.push(l);
+                    }
                 }
             }
         }
@@ -690,5 +696,32 @@ fn ast_block(b: &ast::Block, f: &mut dyn FnMut(&ast::Expr)) {
             ast::Stmt::Env { value, .. } => ast_exprs(value, f),
             ast::Stmt::Expr(e) => ast_exprs(e, f),
         }
+    }
+}
+
+/// `t` itself, or the custom types that the alias `t` names as the members
+/// of its union, through other aliases.
+fn union_members(p: &Program, t: TypeId, out: &mut Vec<TypeId>) {
+    fn walk(p: &Program, ty: &Type, out: &mut Vec<TypeId>, depth: usize) {
+        match &ty.kind {
+            TypeKind::Union(ts) => {
+                for x in ts {
+                    walk(p, x, out, depth);
+                }
+            }
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } => match &p.ty(*id).body {
+                TypeBody::Alias(inner) if depth < 16 => walk(p, inner, out, depth + 1),
+                TypeBody::Custom(_) if !out.contains(id) => out.push(*id),
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+    match &p.ty(t).body {
+        TypeBody::Alias(inner) => walk(p, inner, out, 0),
+        TypeBody::Custom(_) => out.push(t),
     }
 }
