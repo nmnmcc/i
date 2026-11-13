@@ -859,12 +859,22 @@ fn incomplete_syntax_three_branch_keeps_constructor_completion() {
     let m = f.module("app/main");
     let at = f.at("app/main", "() { 2", 0, 1);
     let context = q.completion_context(m, at);
-    assert!(matches!(context, CompletionContext::Pattern { .. }), "{context:?}");
+    assert!(
+        matches!(context, CompletionContext::Pattern { .. }),
+        "{context:?}"
+    );
     let completions = q.completions_at(m, at);
-    for (label, insertion) in [("Circle", "Circle(${1:_})"), ("Rect", "Rect(..)"), ("Dot", "Dot")] {
+    for (label, insertion) in [
+        ("Circle", "Circle(${1:_})"),
+        ("Rect", "Rect(..)"),
+        ("Dot", "Dot"),
+    ] {
         let item = completions.iter().find(|item| item.label == label).unwrap();
         assert_eq!(item.insert.as_deref(), Some(insertion));
     }
     let body = f.at("app/main", "() { 2", 0, 5);
-    assert!(!matches!(q.completion_context(m, body), CompletionContext::Pattern { .. }));
+    assert!(!matches!(
+        q.completion_context(m, body),
+        CompletionContext::Pattern { .. }
+    ));
 }

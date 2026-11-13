@@ -2685,9 +2685,6 @@
   "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-check/tests/query.rs:924116554a35a736": {
-    "not_source": "Expected hover text: a shown function type with two row variables, not i source"
-  },
   "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
     "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (§2.8, §3.2), before checker errors.",
     "diagnostics": [
@@ -3067,9 +3064,12 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |> {\n\t\tTrue  -> x\n\t\tFalse -> spin(n - 1, { x * 75 + 74 } % 65537)\n\t}\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
+  },
+  "crates/ilang-wasm/tests/multi_shape.rs:6c0e82244f1f33bc": {
+    "not_source": "Wasmtime --preload command argument guest={} rendered with a Wasm file path; not i source."
   }
 }

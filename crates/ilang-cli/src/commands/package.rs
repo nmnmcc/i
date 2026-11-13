@@ -2231,7 +2231,12 @@ mod value_type_interfaces {
         // independent product also contains (Int, String) and (String, Int).
         let independent = interface("(T)\nT = { (a = Int | String, b = Int | String) }");
         let correlated = interface("(T)\nT = (a = Int, b = Int) | (a = String, b = String)");
-        assert!(!Diff::new(&independent, &correlated).unwrap().changed.is_empty());
+        assert!(
+            !Diff::new(&independent, &correlated)
+                .unwrap()
+                .changed
+                .is_empty()
+        );
     }
 
     #[test]
@@ -2325,8 +2330,14 @@ mod value_type_interfaces {
         );
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         let diff = Diff::new(&a, &changed).unwrap();
-        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
-        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+        assert!(
+            diff.changed.is_empty(),
+            "no semantic counterexample was proved"
+        );
         assert_eq!(diff.representation.len(), 1);
     }
 
@@ -2339,8 +2350,14 @@ mod value_type_interfaces {
         let generic = interface("(f)\nf = (r: (a = _)) { r.a }");
         let concrete = interface("(\n\tf\n)\nf = (r: (a = Int)) { r.a }");
         let diff = Diff::new(&generic, &concrete).unwrap();
-        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
-        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+        assert!(
+            diff.changed.is_empty(),
+            "no semantic counterexample was proved"
+        );
         assert_eq!(diff.representation.len(), 1);
         let annotated = interface("(\n\tf\n)\nf = <A>(r: (a = A)) -> A { r.a }");
         assert!(Diff::new(&generic, &annotated).unwrap().changed.is_empty());
@@ -2356,8 +2373,14 @@ mod value_type_interfaces {
         let generic = interface("(f)\nf = <K, V>(r: (item = V), key: K) -> V { r.item }");
         let concrete = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
         let diff = Diff::new(&generic, &concrete).unwrap();
-        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
-        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+        assert!(
+            diff.changed.is_empty(),
+            "no semantic counterexample was proved"
+        );
         assert_eq!(diff.representation.len(), 1);
         let renamed = interface(
             "(f)\nf = <LabelName, Item>(r: (item = Item), key: LabelName) -> Item { r.item }",
@@ -2396,8 +2419,14 @@ mod value_type_interfaces {
         let override_field =
             interface("(\n\tf\n)\nf = <K>(r: (fixed = String), key: K) -> Int { 1 }");
         let diff = Diff::new(&both, &override_field).unwrap();
-        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
-        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+        assert!(
+            diff.changed.is_empty(),
+            "no semantic counterexample was proved"
+        );
         assert_eq!(diff.representation.len(), 1);
     }
 
@@ -2413,8 +2442,14 @@ mod value_type_interfaces {
         let override_field =
             interface("(\n\tf\n)\nf = <K, J>(r: (j = String), k: K, j: J) -> Int { 1 }");
         let diff = Diff::new(&both, &override_field).unwrap();
-        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
-        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(
+            diff.version_step(),
+            (Step::Major, "an interface representation changed")
+        );
+        assert!(
+            diff.changed.is_empty(),
+            "no semantic counterexample was proved"
+        );
         assert_eq!(diff.representation.len(), 1);
     }
 

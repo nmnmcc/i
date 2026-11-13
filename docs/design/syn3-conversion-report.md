@@ -481,3 +481,61 @@ empty-data annotation needs a transparent alias `Unit = { () }`, not the
 new nominal declaration `Unit = ()` (syntax-3 §2.8 rules 3/4). The 6/ retry
 passes 78/78 active cases at O0/O2; 30 removed open-record cases stay parked
 with their written §2.3 reasons.
+
+The 9/ filter passed 126/127 at O0/O2. keep_env lost main's explicit
+`Extra(Nil, Never, Assert)` service annotation, creating a recursive inferred
+environment. Kept that exact annotation in a typed local before providing it;
+the focused keep_env retry now passes both levels with every freshness,
+resumption, cancellation and portability assertion intact. A guarded edit
+initially did not apply, and its premature retry repeated the original error;
+that unsuccessful command is recorded in the ledger.
+
+A source-position audit also mapped own_assert's same panic call 8:32 ->
+7:40, and the async/sync host-error main definitions 15:1 -> 12:1 and 14:1 ->
+11:1. These exact frame assertions pass in the 9/ and 7/ filters respectively.
+
+Repeated conversion had promoted the two remaining E6 future-SYN3 fences
+after their staging markers were already gone. The spec-fold helper now
+only promotes such fences when it is folding a staged document. Checked
+initial old/new staging on a temporary document and byte-for-byte idempotence
+on the current spec. Restored the two future fence tags without changing
+their source or registered diagnostics. Removed one confirmed dead inventory
+identity for the formerly shown hover type with two row variables. Final
+formatter and exact-diagnostic inventory gates will verify this sweep.
+
+Reviewed all parked spec reasons and re-enabled two cases whose intent is
+already closed-data compatible: written item evaluation order and rejection
+of data at the host boundary. The evaluation-order panic anchor moves from
+main's 7:7 to 9:7 after its export header is formatted. Their expected stop
+and E0320 outcomes stay unchanged. The 6/ run now passes 80/80 at O0/O2.
+The remaining 29 parked cases each have an individual reason: 28 rely on
+removed dynamic labels, open Record, record operations or width subtyping;
+one pins a former record-graph TypeView error which is now unreachable.
+Std passes all 2,170 tests at both O0 and O2 after main's memory fix.
+
+### Evening final gates
+
+All requested active checks now have passing evidence after main fd99f9e3.
+All remaining CLI binaries ran; all 28 spec filters ran, with passing
+retries for every corrected case (458 unique active cases at O0/O2).
+Std passes 2,170/2,170 at both O0 and O2. Numeric lowering's four tests
+pass, including O0/O2/O3 agreement; the bigint benchmark's default invocation
+compiles and reports one intentionally ignored benchmark, not a measurement.
+
+Workspace rustfmt and its check pass. Workspace clippy with all targets and
+-D warnings passes. The release source-format check of std/lib/examples
+passes. The source formatter regression passes both tests. The exact syntax
+inventory passes 4,723 extracted literals/blocks with five future-track
+entries. Its first evening run exposed an imported template entry still
+substituting the old SPIN constant and a Wasmtime preload argument parsed
+as i. The entry now substitutes the actual converted constant; guest={}
+is correctly classified as the Wasmtime command argument at its call site.
+No expected diagnostic was regenerated. Reviewed rustfmt's four-file diff;
+only Rust formatting changed. Main's marker still names fd99f9e3.
+
+The detailed command/result ledger, including unsuccessful commands and
+their retries, is in the coordinator cache report-conv.txt. The 29 retained
+legacy spec cases each have their own written reason. Checker and CLI
+pending lists are empty. Whole-workspace tests, unfiltered spec/corpus and
+dev-verify remain coordinator-only. R2 opt-in measurements and the bigint
+baseline benchmark were not enabled.
