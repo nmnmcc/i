@@ -472,3 +472,12 @@ stop_tail_service: a.fail 12:12 -> 10:34, f(x) 16:19 -> 13:19, apply 20:2 ->
 16:2; stop_tail_async_service: later.nan 26:2 -> 22:2, take 37:2 -> 32:2.
 All five frames and exact stop messages/outputs remain asserted. The 11/
 retry passes all 51 cases at O0/O2, including the matching 9.11/ paths.
+
+Chapter 6's two failures were source conversion mistakes, with the original
+expected outcomes retained. The stage-4 negative labelled call had been
+normalized into a valid positional call; restored labels with `=` so it
+still tests rejection by a positional function shape (spec §6.6). Unit's
+empty-data annotation needs a transparent alias `Unit = { () }`, not the
+new nominal declaration `Unit = ()` (syntax-3 §2.8 rules 3/4). The 6/ retry
+passes 78/78 active cases at O0/O2; 30 removed open-record cases stay parked
+with their written §2.3 reasons.
