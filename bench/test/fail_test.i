@@ -69,12 +69,16 @@ builtin_passed = (i: Int, acc: Int) -> Int {
 	}
 }
 
-total = rounds * (rounds + 1) / 2 + rounds
+total = rounds * { rounds + 1 } / 2 + rounds
 
 test("fail_caught", () { check(caught(rounds, 0) == total, "fail_caught") })
 
 test("fail_passed", () { check(passed(rounds, 0) == total, "fail_passed") })
 
-test("fail_builtin_caught", () { check(builtin_caught(rounds, 0) == total, "fail_builtin_caught") })
+test("fail_builtin_caught", () {
+	check(builtin_caught(rounds, 0) == total, "fail_builtin_caught")
+})
 
-test("fail_builtin_passed", () { check(builtin_passed(rounds, 0) == total, "fail_builtin_passed") })
+test("fail_builtin_passed", () {
+	check(builtin_passed(rounds, 0) == total, "fail_builtin_passed")
+})
