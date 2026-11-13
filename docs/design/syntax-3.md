@@ -367,7 +367,7 @@ rule 11 (§5.2.8) with the keys of its parameter data as its places, and must
 cover its parameter type (spec §7.4). `x: T` in it is a type test.
 
 **The value of a chain.** A chain whose branches all have one shape has the
-function type `(B) <- N -> R`, where `B` is the group's parameter data
+function type `{ B } <- N -> R`, where `B` is the group's parameter data
 type and `R` the union of its branch results. A chain with several groups has
 the multi-shape type of §2.6.5. The need `N` (errors included, as `Fail(E)`)
 is shared by all branches of a chain ([R4] Q15, R6).
@@ -540,7 +540,7 @@ and `f(3.0, 4.0)` both have the type `Float`. For `show`,
 `Some(g) = list.first([show])` gives `g(1) : String | Int | Bool | Conn`.
 
 Function types follow the lattice rules of spec §4.4 with one data parameter:
-`(P) -> R | (Q) -> S` is `(P & Q) -> R | S`, and for different shapes `P & Q`
+`{ P } -> R | { Q } -> S` is `{ P & Q } -> R | S`, and for different shapes `P & Q`
 is `Never`, so `[area, show]` is legal and its elements cannot be called. A
 single-shape function is not a subtype of a multi-shape type (its parameter
 type is smaller), and a multi-shape type is a subtype of each of its shapes,
@@ -688,7 +688,7 @@ invariant (§1.3). Other parameters of labelled types get their variance from
 the data by spec §4.5 rule 6.
 
 - **Constructors.** A labelled type with data `D` has the constructor
-  function `(D) -> T(…)`: `Some : (A) -> Some(A)`,
+  function `{ D } -> T(…)` (spec §4.6): `Some : (A) -> Some(A)`,
   `User : (name = String, age = Int) -> User`. When `D` is `()`, the
   constructor is a value: `None`, `Nil`, `True` (D5); `None()` is a compile
   error, in expressions and in patterns.
@@ -2007,7 +2007,7 @@ Grammar as §3.2. Then:
   take apart its values; they come from the host (§10).
 - `T = ( … )`, where the whole right side is one data type not in a group,
   defines a new **labelled type** with that data, and its **constructor** `T`.
-  The constructor is the function `(D) -> T(P1, …)` where `D` is the data
+  The constructor is the function `{ D } -> T(P1, …)` where `D` is the data
   type, or, when `D` is `()`, the value `T`. Two labelled definitions are
   different types even with the same data.
 - Any other right side defines a **name**, a transparent alias. A name may not
@@ -2079,7 +2079,8 @@ in the other direction and `R` and `N` in the same direction.
 
 #### 5.2.5 §4.6 Function types
 
-The function type `(D) <- N -> A` has one parameter, a data type `D`, a need
+The function type `{ D } <- N -> A` uses the complete-data notation of
+spec §4.6: `D` is the whole argument data type. It has a need
 `N` written after `<-` (what it takes from outside, §9.2) and a value `A`
 after `->`. Errors are the need entry `Fail(E)`, so `Effect<A, E, R>` of
 Effect-TS is `() <- (..R, Fail(E)) -> A`. A missing `<-` part means "needs
@@ -2170,7 +2171,7 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
 4. **Functions.** Let the parameter group be the data pattern `q`. `q` is
    fitted to a data type `P` (below). If `Γ` with the names of `q` gives
    `body : A <- M` (with the names of the service pattern bound to their
-   annotated types), the function has the type `(P) <- M' -> A`, where `M'` is
+   annotated types), the function has the type `{ P } <- M' -> A`, where `M'` is
    the merge of `M`, the service pattern's types, and `Assert` when `q` may
    fail for `P` (§7.3) (§2.10.4). Making the function needs nothing.
 5. **Calls.** If `f : {P} <- N -> A` and the argument data `d : D` with
