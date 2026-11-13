@@ -481,3 +481,15 @@ empty-data annotation needs a transparent alias `Unit = { () }`, not the
 new nominal declaration `Unit = ()` (syntax-3 §2.8 rules 3/4). The 6/ retry
 passes 78/78 active cases at O0/O2; 30 removed open-record cases stay parked
 with their written §2.3 reasons.
+
+The 9/ filter passed 126/127 at O0/O2. keep_env lost main's explicit
+`Extra(Nil, Never, Assert)` service annotation, creating a recursive inferred
+environment. Kept that exact annotation in a typed local before providing it;
+the focused keep_env retry now passes both levels with every freshness,
+resumption, cancellation and portability assertion intact. A guarded edit
+initially did not apply, and its premature retry repeated the original error;
+that unsuccessful command is recorded in the ledger.
+
+A source-position audit also mapped own_assert's same panic call 8:32 ->
+7:40, and the async/sync host-error main definitions 15:1 -> 12:1 and 14:1 ->
+11:1. These exact frame assertions pass in the 9/ and 7/ filters respectively.
