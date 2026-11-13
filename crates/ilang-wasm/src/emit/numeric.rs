@@ -177,7 +177,13 @@ impl Plan {
                         _,
                     )
                     | Value::Finite(_, _)
-                    | Value::Op(Op::Runtime { name: "core_to_float", .. }, _)
+                    | Value::Op(
+                        Op::Runtime {
+                            name: "core_to_float",
+                            ..
+                        },
+                        _,
+                    )
                     | Value::Atom(Atom::Float(_)) => Some(Repr::Float),
                     Value::Op(
                         Op::IntAdd | Op::IntSub | Op::IntMul | Op::IntDiv | Op::IntRem | Op::IntNeg,
@@ -444,7 +450,13 @@ impl Emitter<'_> {
                     // An i31 converts exactly and is always finite; any other
                     // Int goes through the runtime, which stops when the result
                     // is not finite, and gives a box.
-                    Value::Op(Op::Runtime { name: "core_to_float", .. }, args) => {
+                    Value::Op(
+                        Op::Runtime {
+                            name: "core_to_float",
+                            ..
+                        },
+                        args,
+                    ) => {
                         let (small, raw) = self.small_int(&args[0]);
                         let boxed = self.atom(&args[0]);
                         format!(

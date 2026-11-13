@@ -110,7 +110,13 @@ fn float_locals(
                     Op::FloatAdd | Op::FloatSub | Op::FloatMul | Op::FloatDiv | Op::FloatNeg,
                     _,
                 )
-                | Value::Op(Op::Runtime { name: "core_to_float", .. }, _) => true,
+                | Value::Op(
+                    Op::Runtime {
+                        name: "core_to_float",
+                        ..
+                    },
+                    _,
+                ) => true,
                 Value::Call { callee, .. } => code(callee).is_some_and(|f| results[f.0 as usize]),
                 _ => false,
             }) {

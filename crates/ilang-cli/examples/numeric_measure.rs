@@ -157,7 +157,8 @@ fn main() -> anyhow::Result<()> {
     let mut site_observations = Vec::new();
     let mut csv =
         String::from("variant,kernel,batch,sample,net_ns,allocations,result_bits,module_bytes\n");
-    let mut summary = String::from("variant,kernel,batch,median_ns,allocations,fuel,module_bytes\n");
+    let mut summary =
+        String::from("variant,kernel,batch,median_ns,allocations,fuel,module_bytes\n");
     for (kernel, expected) in [
         ("identity", 0.5_f64),
         ("fast", 0.479425538604203_f64),
@@ -167,7 +168,10 @@ fn main() -> anyhow::Result<()> {
         ("tuples", 2.875),
         ("closures", 9.0),
     ] {
-        if only.as_ref().is_some_and(|only| !only.split(',').any(|k| k == kernel)) {
+        if only
+            .as_ref()
+            .is_some_and(|only| !only.split(',').any(|k| k == kernel))
+        {
             continue;
         }
         for batch in 0..5 {
@@ -256,7 +260,10 @@ fn main() -> anyhow::Result<()> {
                     )?;
                 }
                 let med = median(&mut samples);
-                writeln!(summary, "{variant},{kernel},{batch},{med},{count},{fuel},{size}")?;
+                writeln!(
+                    summary,
+                    "{variant},{kernel},{batch},{med},{count},{fuel},{size}"
+                )?;
                 println!(
                     "{variant} {kernel} batch {batch}: {med} ns, {count} allocations, {fuel} fuel, {size} bytes"
                 );

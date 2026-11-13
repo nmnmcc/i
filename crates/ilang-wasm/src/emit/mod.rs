@@ -623,7 +623,10 @@ impl<'p> Emitter<'p> {
                     self.deferred_stmt(out, stmt, frame);
                     self.dead = matches!(
                         stmt,
-                        Stmt::Break(_) | Stmt::Return(_) | Stmt::TailCall { .. } | Stmt::Unreachable
+                        Stmt::Break(_)
+                            | Stmt::Return(_)
+                            | Stmt::TailCall { .. }
+                            | Stmt::Unreachable
                     );
                 }
             }
@@ -950,7 +953,8 @@ impl<'p> Emitter<'p> {
                 let mut text = String::new();
                 self.stmt(&mut text, s, frame);
                 self.deferring = false;
-                let quiet = text.matches("call").count() == text.matches("(call $stop_float)").count()
+                let quiet = text.matches("call").count()
+                    == text.matches("(call $stop_float)").count()
                     && !text.contains("throw")
                     && !text.contains("return");
                 if quiet {
@@ -990,7 +994,13 @@ impl<'p> Emitter<'p> {
     /// frame's slot and `$tail` at -1; the back edge does exactly that. The
     /// arguments are all worked out before any parameter is set, and the other
     /// locals get their entry values again.
-    fn self_tail(&mut self, callee: &Callee, args: &[Atom], env: &str, site: Option<Site>) -> String {
+    fn self_tail(
+        &mut self,
+        callee: &Callee,
+        args: &[Atom],
+        env: &str,
+        site: Option<Site>,
+    ) -> String {
         let worker = self.worker.clone();
         let closure = match callee {
             Callee::Known { closure, .. } => {
@@ -1249,8 +1259,13 @@ impl<'p> Emitter<'p> {
                         &numeric::float_op(*op, &args).expect("float operation"),
                     );
                 }
-                if let (Op::Runtime { name: "core_truncate", .. }, [Atom::Local(l)]) =
-                    (op, args.as_slice())
+                if let (
+                    Op::Runtime {
+                        name: "core_truncate",
+                        ..
+                    },
+                    [Atom::Local(l)],
+                ) = (op, args.as_slice())
                     && self.numeric_plan.locals.get(l) == Some(&numeric::Repr::Float)
                 {
                     // A scalar Float below 2^30 in magnitude truncates to an
@@ -1914,7 +1929,10 @@ fn leave_tail(site: Option<Site>) -> String {
 
 /// Waiting stores without the frames past the last one that waits.
 fn normal(pending: &[Option<Site>]) -> Vec<Option<Site>> {
-    let n = pending.iter().rposition(Option::is_some).map_or(0, |i| i + 1);
+    let n = pending
+        .iter()
+        .rposition(Option::is_some)
+        .map_or(0, |i| i + 1);
     pending[..n].to_vec()
 }
 
