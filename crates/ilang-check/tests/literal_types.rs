@@ -112,7 +112,7 @@ fn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {
     assert!(
         lines
             .iter()
-            .any(|l| l.ends_with("kind : (\"a\" | \"b\") -> 1 | 2")),
+            .any(|l| l.ends_with("kind : { (\"a\" | \"b\") -> 1 | 2 }")),
         "{lines:?}"
     );
     assert!(
@@ -274,7 +274,7 @@ fn nested_missing_values_are_one_coverage_error() {
             "f = (r: Result(Int, Nil)) { r |> (Ok(0)) { 1 } | (Error(_)) { 2 } }",
             "Ok(1)",
         ),
-        ("f = (n: Int | Nil) { n |> (0) { 1 } | (Nil) { 2 } }", "1"),
+        ("f = (n: { Int | Nil }) { n |> (0) { 1 } | (Nil) { 2 } }", "1"),
     ] {
         let (ds, _) = check(source);
         assert_eq!(ds.len(), 1, "{ds:?}");
@@ -321,7 +321,7 @@ fn typed_complements_keep_the_head_and_cover_cross_columns() {
             Some("(\"a\", False)"),
         ),
         (
-            "f = (m: \"a\" | \"b\" | \"c\") { m |> (\"a\") { 0 } | (x: String - \"a\") { 1 } }",
+            "f = (m: { \"a\" | \"b\" | \"c\" }) { m |> (\"a\") { 0 } | (x: String - \"a\") { 1 } }",
             None,
         ),
     ];
@@ -528,7 +528,7 @@ fn literal_values_use_numeric_and_decoded_scalar_identity() {
         assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     }
     let (ds, _) =
-        check("f = (m: \"\\u{0}\" | \"a\" | \"b\") { m |> (\"a\") { 1 } | (\"b\") { 2 } }\n");
+        check("f = (m: { \"\\u{0}\" | \"a\" | \"b\" }) { m |> (\"a\") { 1 } | (\"b\") { 2 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert!(ds[0].1.contains("matches `\"\\u{0000}\"`"), "{ds:?}");
 }
@@ -557,7 +557,7 @@ State(A) = (get = () -> A)
 g = (s: String - "a") { 1 }
 p = (g, 0).1
 read = (c: Cell("a")) { c.get() }
-s = Sink(put = (m: "GET" | "POST") { Nil })
+s = Sink(put = (m: { "GET" | "POST" }) { Nil })
 use = () { s.put("GET") }
 stored = () <- (st: State("a")) { st.get() }
 e = (stored, 0).1
@@ -588,7 +588,7 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
     assert!(ds.iter().any(|d| d.0 == "E0512"), "{ds:?}");
     // §4.8 / §6.12: opaque tests still constrain all values of that head.
     let (ds, _) = check(
-        "Box(A) = (A)\nf = (r: Box(Int | String) | Int) { r |> (0 | _: Box(Int)) { Nil } }\n",
+        "Box(A) = (A)\nf = (r: { Box(Int | String) | Int }) { r |> (0 | _: Box(Int)) { Nil } }\n",
     );
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     // §6.12: fitting binds a monotype, without the binding's generalization.
@@ -674,7 +674,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "W0503");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : (1) -> 0 | 1")),
+        lines.iter().any(|l| l.ends_with("f : { (1) -> 0 | 1 }")),
         "{lines:?}"
     );
     // The impossible guard does not let an invalid body escape checking.

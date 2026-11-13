@@ -13,4 +13,4 @@ fit = (f: Narrow) -> Wide { f }
 
 need_int = () <- (y: Yield(Int)) { y.emit(1) }
 
-main = () { fit(need_int)() <- (Yield(emit = (x: Int | String) { Nil })) }
+main = () { fit(need_int)() <- (Yield(emit = (x: { Int | String }) { Nil })) }

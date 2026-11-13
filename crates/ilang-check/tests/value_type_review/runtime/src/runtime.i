@@ -17,7 +17,7 @@ Pair(Number, Text) = parts
 
 id = (x) { x }
 
-match_alias = (v: Int | String) { v |> (n: Port) { n + 1 } | (_) { 0 } }
+match_alias = (v: { Int | String }) { v |> (n: Port) { n + 1 } | (_) { 0 } }
 
 alias_tests = () {
 	assert(match_alias(2) == 3)

@@ -26,7 +26,7 @@ test("literal_fields_from_a_value", () {
 	assert(same == value)
 })
 
-accepts = (s: Int | String) { s |> (_: api.Methods) { True } | (_) { False } }
+accepts = (s: { Int | String }) { s |> (_: api.Methods) { True } | (_) { False } }
 
 test("literal_alias_runtime_tests", () {
 	assert(accepts("GET"))

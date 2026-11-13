@@ -17,7 +17,7 @@ missing_nested = (r: Result(Bool, Nil)) {
 	r |> (Ok(True)) { 1 } | (Error(_)) { 2 }
 }
 
-missing_member = (v: Int | String) {
+missing_member = (v: { Int | String }) {
 	v |> (_: Int ? True) { 1 } | (_: String) { 2 }
 }
 

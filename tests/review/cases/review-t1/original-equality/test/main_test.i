@@ -63,7 +63,7 @@ test("structures", () {
 	yes(Nil == Nil)
 })
 
-mixed = (x: Int | String | Nil) { x == Nil }
+mixed = (x: { Int | String | Nil }) { x == Nil }
 
 test("different_types", () {
 	yes(mixed(Nil))

@@ -7,7 +7,7 @@ g = (s: String) {
 			2
 		}
 }
-h = (n: Int | String) {
+h = (n: { Int | String }) {
 	n |> (_: String - "a") { 1 } | ("a") { 2 } | (_: Int - 0) { 3 } | (0) { 4 }
 }
 

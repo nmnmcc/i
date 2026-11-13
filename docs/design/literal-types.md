@@ -49,7 +49,7 @@ codes = [
 kind = ("a") { 1 } | ("b") { 2 } // kind : ("a" | "b") -> 1 | 2
 size = (s: String) { s |> ("") { 0 } | (rest) { string.length(rest) } }
 // rest : String - ""
-send = (m: "GET" | "POST") { m |> ("GET") { 1 } | ("POST") { 2 } }
+send = (m: { "GET" | "POST" }) { m |> ("GET") { 1 } | ("POST") { 2 } }
 // covered, no `_` needed
 unequal = "a" == "b" // W0503: never equal
 matches = (s: String) { s == "a" } // correct
@@ -551,7 +551,7 @@ Add this example:
 
 ```i
 @external("app", "mode")
-mode: () -> "on" | "off" // compile error: the host gives the value
+mode: { () -> "on" | "off" } // compile error: the host gives the value
 @external("app", "log")
 log: ("info" | "warn") -> Nil // correct: i code gives the value
 ```

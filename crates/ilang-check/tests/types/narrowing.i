@@ -40,12 +40,12 @@ safe = (id) {
 // inferred: (id: String) -> User ? HttpError ! Http
 
 // At the top place.
-rest = (v: Int | String | Nil) {
+rest = (v: { Int | String | Nil }) {
 	v |> (_: Int) { "int" } | (Nil) { "nil" } | (other) { other }
 }
 
 // Every constructor of `Result` before: `Result` is taken.
-whole = (v: Result(Int, Int) | String) {
+whole = (v: { Result(Int, Int) | String }) {
 	v |> (Ok(_)) { "ok" } | (Error(_)) { "error" } | (s) { s }
 }
 
@@ -72,11 +72,11 @@ deep = (r: Result(Result(Int, String) | Nil, Nil)) {
 
 // Not taken: a guard, a literal, or a part that does not match every
 // value.
-guarded = (v: Int | String) { v |> (_: Int ? True) { "int" } | (x) { x } }
+guarded = (v: { Int | String }) { v |> (_: Int ? True) { "int" } | (x) { x } }
 
-literal = (v: Int | String) { v |> (1) { "one" } | (x) { x } }
+literal = (v: { Int | String }) { v |> (1) { "one" } | (x) { x } }
 
-partial = (v: Result(Int, String) | Nil) {
+partial = (v: { Result(Int, String) | Nil }) {
 	v |> (Ok(1)) { Nil } | (Error(_)) { Nil } | (other) { other }
 }
 

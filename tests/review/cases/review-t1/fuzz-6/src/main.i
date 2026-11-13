@@ -5,5 +5,5 @@ f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
 		| ((_: String - "ab" - "b", True)) { 2 }
 		| (("b", _)) { 3 }
 		| ((_, True)) { 4 }
-		| ((_: "a" | "b", True) ? False) { 5 }
+		| ((_: { "a" | "b" }, True) ? False) { 5 }
 }

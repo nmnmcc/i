@@ -5,7 +5,7 @@ either = (r: Result(Int, String)) { r |> (Ok(v)) { v } | (Error(v)) { v } }
 
 small = (n) { n |> (1 | 2 | 3) { "small" } | (_) { "big" } }
 
-mixed = (v: Int | String | Nil) {
+mixed = (v: { Int | String | Nil }) {
 	v |> (1 | _: String) { "one or text" } | (_) { "other" }
 }
 

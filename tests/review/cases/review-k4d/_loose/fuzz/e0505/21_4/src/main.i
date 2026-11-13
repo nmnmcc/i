@@ -22,7 +22,7 @@ main = () {
 	w = () {
 		_syn3_0: S(Dep | T(Dep)) = S(
 			f = () { ut() + get() },
-			m = (_: Dep | T(Dep)) { Nil },
+			m = (_: { Dep | T(Dep) }) { Nil },
 		)
 		run(() { run(() { usa() }) }) + h0() + run(() { ut() + get() }) <- (
 			Dep(v = 1),

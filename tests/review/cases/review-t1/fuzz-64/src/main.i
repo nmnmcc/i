@@ -1,7 +1,7 @@
 f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
 		((_: String - "a", True)) { 0 }
-		| ((_: "a" | "b", False)) { 1 }
+		| ((_: { "a" | "b" }, False)) { 1 }
 		| (("a" <> _, False)) { 2 }
 		| ((_: String - "ab" - "b", False)) { 3 }
 		| ((_: String - "a", False)) { 4 }

@@ -13,7 +13,7 @@ from corpus import ROOT, CORPUS, dump, git, invoke, sha
 
 VALUES = ['a', 'ab', 'b', 'c', '']
 # T1 review fuzz.py's finite domain and eight string predicates, represented as data.
-PATTERNS = ['"a"', '"ab"', '"b"', '_: String - "a"', '_: String - "ab" - "b"', '"a" <> _', '_', '_: "a" | "b"']
+PATTERNS = ['"a"', '"ab"', '"b"', '_: String - "a"', '_: String - "ab" - "b"', '"a" <> _', '_', "_: { \"a\" | \"b\" }"]
 BOOLS = ['True', 'False', '_']
 RULES = {
     'coverage': 'docs/spec.md §7.4: A clause with a guard is not counted.',

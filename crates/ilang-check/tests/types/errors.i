@@ -27,7 +27,7 @@ arity = () { add(1, 2) }
 arity_var = (f) { (f(1), f(1, 2)) }
 
 // E0504: a value that could go to two type variables.
-ambiguous = <A, B>(x: A | B) { x }
+ambiguous = <A, B>(x: { A | B }) { x }
 
 use_ambiguous = () { ambiguous(1) }
 

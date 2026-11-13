@@ -69,8 +69,8 @@ direct_aa = (a: A, b: A) { a == b }
 // Section 6.9 rejects equality of known disjoint types. Widen the local
 // known types so this direct operator reaches runtime equality.
 direct_ab = (a: A, b: B) {
-	left: A | B = a
-	right: A | B = b
+	left: { A | B } = a
+	right: { A | B } = b
 	left == right
 }
 

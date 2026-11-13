@@ -21,7 +21,7 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 
-literal = (x: Int | String) {
+literal = (x: { Int | String }) {
 	x |>
 		(0) { "zero" }
 		| (-1) { "minus one" }
@@ -126,7 +126,7 @@ test("named_and_tuples", () {
 	(Nil, (1)) |> ((Nil, (x))) { check(show(x), "1") }
 })
 
-kind = (v: Int | String | List(Int) | (Int, Int) | Nil | Bool | Float) {
+kind = (v: { Int | String | List(Int) | (Int, Int) | Nil | Bool | Float }) {
 	v |>
 		(i: Int) { "int " <> show(i) }
 		| (s: String) { "string " <> s }

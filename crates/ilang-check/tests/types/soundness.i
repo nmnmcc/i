@@ -68,7 +68,7 @@ test_then_ctor = (v: Box(Int | String)) {
 
 lists = (l: List(Int | String)) { l |> (x: List(Int)) { x } | ([]) { [] } }
 
-test_ok = (v: Box(Int) | String) {
+test_ok = (v: { Box(Int) | String }) {
 	v |> (x: Box(Int)) { unbox(x) } | (s: String) { 0 }
 }
 

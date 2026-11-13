@@ -24,9 +24,9 @@ list = (xs: List(String)) {
 
 except = (s: String) { s |> (x: String - "a") { 0 } | (t) { h(t) } }
 
-finite = (m: "a" | "b") { m |> ("a") { 1 } | ("b") { 2 } }
+finite = (m: { "a" | "b" }) { m |> ("a") { 1 } | ("b") { 2 } }
 
-prefix = (m: "ab" | "b") { m |> ("a" <> _) { 1 } | ("b") { 2 } }
+prefix = (m: { "ab" | "b" }) { m |> ("a" <> _) { 1 } | ("b") { 2 } }
 
 non_empty = (s: String) {
 	s |>

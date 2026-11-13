@@ -18,7 +18,7 @@ fn private_fields_cannot_be_selected_through_other_names_or_values() {
         "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.read() }\n",
         "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.read }\n",
         "(app/secret)\nf = (v: secret.Choice) { v.value }\n",
-        "(app/secret)\nf = (v: secret.Secret(Int) | secret.Open) { v.value }\n",
+        "(app/secret)\nf = (v: { secret.Secret(Int) | secret.Open }) { v.value }\n",
         "(\n\tapp/secret\n)\nAlias(A) = secret.Secret(A)\nf = <A>(v: Alias(A)) { v.value }\n",
         "(\n\tapp/secret\n)\n\n(\n\tAlias(..)\n)\nAlias(A) = secret.Secret(A)\nf = <A>(v: Alias(A)) { v.value }\n",
         "(\n\t(Secret) = app/secret\n)\nf = <A>(v: Secret(A)) { v.value }\n",

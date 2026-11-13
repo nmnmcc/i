@@ -26,12 +26,12 @@ Dog = (name = String)
 Clock = (now = () -> Int)
 Watch = Clock
 
-name = (p: Cat | Dog) { p.name }
+name = (p: { Cat | Dog }) { p.name }
 second = (t: (Int, String)) { t.1 }
 minus = (a: Int, b: Int) { a - b }
 by_label = Cat(name = "a", lives = 9)
 piped = 5 |> minus(1)
-tests = (x) { x |> (_: Int | String) { 1 } | (_: (Int, Int)) { 2 } | (_) { 3 } }
+tests = (x) { x |> (_: { Int | String }) { 1 } | (_: (Int, Int)) { 2 } | (_) { 3 } }
 env = () <- (c: Watch) { c.now() <- (c) }
 mono = minus(1, 2)
 age = (Cat(name = name, lives = l)) { l }
@@ -106,7 +106,7 @@ fn codegen_data() {
     let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
     let string = Head::Named(TypeRef::Builtin(BuiltinType::String));
     assert_eq!(
-        by_text(&typed.type_tests, m, "_: Int | String"),
+        by_text(&typed.type_tests, m, "_: { Int | String }"),
         &vec![
             TestMember {
                 head: int,

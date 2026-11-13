@@ -10,10 +10,10 @@ Window = Opaque
 
 Socket = Opaque
 
-kind = (h: Window | Int) { h |> (_: Window) { "window" } | (_) { "other" } }
+kind = (h: { Window | Int }) { h |> (_: Window) { "window" } | (_) { "other" } }
 
-both = (h: Window | Socket | Int) {
-	h |> (_: Window | Socket) { "host" } | (_) { "other" }
+both = (h: { Window | Socket | Int }) {
+	h |> (_: { Window | Socket }) { "host" } | (_) { "other" }
 }
 
 test("t", () {

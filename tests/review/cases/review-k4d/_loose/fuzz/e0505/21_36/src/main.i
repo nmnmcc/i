@@ -24,7 +24,7 @@ main = () {
 		run(() { ut() + get() }) <- (_syn3_0)
 	}
 	a = h1()
-	_syn3_1: T(Dep | S(Dep)) = T(f = () { h0() }, m = (_: Dep | S(Dep)) { Nil })
+	_syn3_1: T(Dep | S(Dep)) = T(f = () { h0() }, m = (_: { Dep | S(Dep) }) { Nil })
 	{
 		a + ut() + run(() { ut() }) + w()
 		Nil

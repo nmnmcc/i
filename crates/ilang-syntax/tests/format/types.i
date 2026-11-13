@@ -7,6 +7,6 @@ Handler = { (Int) -> Int } | (String) -> String
 @external("env", "log")
 log: (String) -> Nil
 
-apply = (f: (Int) <- (Fail(E), N) -> Int, x: Int | Float - Nil & Any) -> Int {
+apply = (f: (Int) <- (Fail(E), N) -> Int, x: { Int | Float - Nil & Any }) -> Int {
 	f(x)
 }

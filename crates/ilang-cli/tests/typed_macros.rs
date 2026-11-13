@@ -437,7 +437,7 @@ fn typed_macro_members_give_each_closed_data_member_once() {
     );
     checked(
         &m,
-        "(\n\tm = app/macros\n)\nf = (x: (a = Int) | (b = String)) { m.m(x) }\nmain = () { f((a = 42)) }",
+        "(\n\tm = app/macros\n)\nf = (x: { (a = Int) | (b = String) }) { m.m(x) }\nmain = () { f((a = 42)) }",
     )
     .unwrap();
 }

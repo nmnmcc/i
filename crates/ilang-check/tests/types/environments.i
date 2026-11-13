@@ -79,6 +79,6 @@ given_narrow = () {
 }
 
 given_same = () {
-	_syn3_2: Yield(Int | String) = Yield(emit = (x: Int | String) { Nil })
+	_syn3_2: Yield(Int | String) = Yield(emit = (x: { Int | String }) { Nil })
 	emit_any() <- (_syn3_2)
 }

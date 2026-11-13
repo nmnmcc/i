@@ -51,7 +51,7 @@ test("nested", () {
 	_syn3_1: Inner(Dependency) = Inner(() { get() }, (_: Dependency) { Nil })
 	_syn3_2: Outer(Dependency | Inner(Dependency)) = Outer(
 		() { read() },
-		(_: Dependency | Inner(Dependency)) { Nil },
+		(_: { Dependency | Inner(Dependency) }) { Nil },
 	)
 	{
 		assert(run(() { read_outer() }) == 7)

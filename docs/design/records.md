@@ -1448,7 +1448,7 @@ not graph identity or one spelling's distribution, defines closed acceptance.
 These two previously rejected closed annotations now pass:
 
 ```i
-wrap_union = (x: Int | String) -> (a = Int) | (a = String) { (a = x) }
+wrap_union = (x: { Int | String }) -> (a = Int) | (a = String) { (a = x) }
 pair = () -> (data = (Int, Int)) | (error = String) { (data = (1, 2)) }
 ```
 

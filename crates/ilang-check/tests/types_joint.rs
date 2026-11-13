@@ -82,7 +82,7 @@ fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
         "apply = <A, B>(x: A, f: (A) -> B) { f(x) }\nf = () {\n\tapply(\"a\", (x) {\n\t\ty: x = \"b\"\n\t\ty\n\t})\n}",
     );
     bad(
-        "Sink(A) = (put = (A) -> Nil)\nsink: Sink(\"GET\" | \"POST\") = Sink(put = (x: \"GET\" | \"POST\") { Nil })\nbad = () { sink.put(\"DELETE\") }",
+        "Sink(A) = (put = (A) -> Nil)\nsink: Sink(\"GET\" | \"POST\") = Sink(put = (x: { \"GET\" | \"POST\" }) { Nil })\nbad = () { sink.put(\"DELETE\") }",
         code::TYPE_MISMATCH,
     );
 }
@@ -137,7 +137,7 @@ fn j4_literal_fixation_orders_completion_and_rejects_later_widening() {
 
 #[test]
 fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
-    let source = "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Int|String){ x |> (m: Methods) { 1 } | (_) { 0 } }";
+    let source = "source:{ \"GET\"|\"POST\" }=\"GET\"\nMethods=source\nf=(x:{ Int|String }){ x |> (m: Methods) { 1 } | (_) { 0 } }";
     let (_, c) = good(source);
     let p = c.program.as_ref().unwrap();
     let module = common::module(p, "app/main");
@@ -161,7 +161,7 @@ fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
         ])
     );
     bad(
-        "source:\"GET\"|\"POST\"=\"GET\"\nMethods=source\nf=(x:Methods){ x |> (\"GET\" ? True) { 1 } }",
+        "source:{ \"GET\"|\"POST\" }=\"GET\"\nMethods=source\nf=(x:Methods){ x |> (\"GET\" ? True) { 1 } }",
         code::CASE_NOT_COVERED,
     );
 }

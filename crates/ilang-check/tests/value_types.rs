@@ -838,7 +838,7 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
     assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
     // P4 cannot discard the Nil alternative to find a convenient named head.
     bad(
-        "Box(A) = (A)\nv: Box(Int) | Nil = Box(1)\nBox(_) = v",
+        "Box(A) = (A)\nv: { Box(Int) | Nil } = Box(1)\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     // A constant part introduced by a head alias compares after closing.

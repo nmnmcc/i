@@ -18,26 +18,26 @@ Shape = Circle | Square
 Box(A) = (value = A)
 
 // Every member has the field: the type is the union of the field types.
-name = (p: Cat | Dog) { p.name }
+name = (p: { Cat | Dog }) { p.name }
 
-value = (v: Num | Text) { v.value }
+value = (v: { Num | Text }) { v.value }
 
-label = (p: Shape | Cat) { p |> (Cat(..)) { p.name } | (_) { p.label } }
+label = (p: { Shape | Cat }) { p |> (Cat(..)) { p.name } | (_) { p.label } }
 
-generic = (b: Box(Int) | Num) { b.value }
+generic = (b: { Box(Int) | Num }) { b.value }
 
 // The field may be in any position.
 Pair = (first = Int, name = String)
 
-position = (p: Pair | Cat) { p.name }
+position = (p: { Pair | Cat }) { p.name }
 
 // A member without the field, a member that is not a custom type, and a
 // type with no constructors.
 Opaque = Opaque
 
-missing = (p: Cat | Rock) { p.name }
+missing = (p: { Cat | Rock }) { p.name }
 
-not_custom = (p: Cat | Int) { p.name }
+not_custom = (p: { Cat | Int }) { p.name }
 
 opaque = (o: Opaque) { o.name }
 
@@ -49,7 +49,7 @@ known_ctor = (s: Shape) {
 }
 
 // Narrowing of the known type of a catch-all (rule 12).
-narrowed = (x: Cat | Rock) { x |> (_: Rock) { "" } | (other) { other.name } }
+narrowed = (x: { Cat | Rock }) { x |> (_: Rock) { "" } | (other) { other.name } }
 
 // A value with no written type, whose known type comes from a call.
 make = (n: Int) { Cat(name = "tom", lives = n) }
@@ -59,13 +59,13 @@ from_call = () { make(9).lives }
 from_update = (c: Cat) { Cat(..c, name = "x").lives }
 
 // A local function, generalized: matching gives its result a known type.
-local_call = (c: Cat | Dog) {
+local_call = (c: { Cat | Dog }) {
 	same = <A>(x: A) -> A { x }
 	same(c).name
 }
 
 // A call of a function with no known type has none.
-apply = (f, c: Cat | Dog) { f(c).name }
+apply = (f, c: { Cat | Dog }) { f(c).name }
 
 // The type of `v` must be a subtype of its known type: a function
 // expression whose parameter is known from an expected type.
@@ -79,8 +79,8 @@ wrong = (rocks: List(Rock)) {
 }
 
 // `.k` on a union of tuples, with more than k parts each.
-part = (t: (Int, String) | (Float, Bool, Int)) { t.1 }
+part = (t: { (Int, String) | (Float, Bool, Int) }) { t.1 }
 
-short = (t: (Int) | (Int, Int)) { t.1 }
+short = (t: { (Int) | (Int, Int) }) { t.1 }
 
-not_tuple = (t: (Int, Int) | Nil) { t.0 }
+not_tuple = (t: { (Int, Int) | Nil }) { t.0 }

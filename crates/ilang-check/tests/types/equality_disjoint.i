@@ -8,7 +8,7 @@ literals = 1 == "a"
 typed = (s: String) { s == 1 }
 
 // The examples of the spec: correct.
-with_nil = (x: Int | Nil) { x == Nil }
+with_nil = (x: { Int | Nil }) { x == Nil }
 
 lists = [1] == []
 
@@ -22,9 +22,9 @@ untyped = (s) { s == 1 }
 not_equal = 1 != "a"
 
 // Unions that share a member, and unions that do not.
-shared = (x: Int | String, y: String | Nil) { x == y }
+shared = (x: { Int | String }, y: { String | Nil }) { x == y }
 
-apart = (x: Int | String, y: Float | Nil) { x != y }
+apart = (x: { Int | String }, y: { Float | Nil }) { x != y }
 
 // Tuples of different sizes are different type constructors.
 sizes = (1, 2) == (1, 2, 3)

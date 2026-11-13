@@ -6,7 +6,7 @@
 	i/core
 )
 
-pair = (x: (Int, Int) | (a = Int, b = Int)) { x }
+pair = (x: { (Int, Int) | (a = Int, b = Int) }) { x }
 
 test("labelled data equality", () {
 	assert((a = 1) == (a = 1))

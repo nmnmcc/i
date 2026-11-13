@@ -4,7 +4,7 @@ f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
 		| (("b", True)) { 1 }
 		| (("a", True)) { 2 }
 		| ((_: String - "a", False)) { 3 }
-		| ((_: "a" | "b", False)) { 4 }
+		| ((_: { "a" | "b" }, False)) { 4 }
 }
 
 main = () {

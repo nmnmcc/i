@@ -4,7 +4,7 @@
 	testlib = (test) = std/test
 )
 
-f = (n: 0 | 1) -> 2 { n |> (0 | 1) { 2 } }
+f = (n: { 0 | 1 }) -> 2 { n |> (0 | 1) { 2 } }
 
 test("finite_fitting_is_total", () {
 	assert(f(0) == 2)

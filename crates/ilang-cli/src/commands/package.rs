@@ -2184,7 +2184,7 @@ mod value_type_interfaces {
             canonical("(A)\nv=\"a\"\nA=v")
         );
         // This is deliberately beyond the limited hover's first ten members.
-        let source = "(A)\nv: 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19=0\nA=v";
+        let source = "(A)\nv: { 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19 }=0\nA=v";
         let a = canonical(source);
         assert_ne!(a, canonical(&source.replace("18|19=0", "18|20=0")));
         assert!(!a["type api.A"].contains('…'));
@@ -2403,7 +2403,7 @@ mod value_type_interfaces {
     #[test]
     fn record_scheme_comparison_is_independent_of_distributed_graph_shape() {
         let joined = interface("(\n\tf\n)\nf = (r: (a = Int | String)) { r }");
-        let split = interface("(\n\tf\n)\nf = (r: (a = Int) | (a = String)) { r }");
+        let split = interface("(\n\tf\n)\nf = (r: { (a = Int) | (a = String) }) { r }");
         assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
     }
 

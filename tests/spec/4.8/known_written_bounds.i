@@ -19,7 +19,7 @@ read = (c: Cell("a")) { c.get() }
 stored = () <- (st: State("a")) { st.get() }
 
 test("noncovariant", () {
-	s = Sink(put = (m: "GET" | "POST") { Nil })
+	s = Sink(put = (m: { "GET" | "POST" }) { Nil })
 	s.put("GET")
 	c = Cell(get = () { "a" }, set = (x: "a") { Nil })
 	assert(read(c) == "a")

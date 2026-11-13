@@ -20,7 +20,7 @@ h1 = () { h0() <- (Dep(v = 2)) }
 
 main = () {
 	a = h1()
-	_syn3_0: T(Dep | S(Dep)) = T(f = () { h0() }, m = (_: Dep | S(Dep)) { Nil })
+	_syn3_0: T(Dep | S(Dep)) = T(f = () { h0() }, m = (_: { Dep | S(Dep) }) { Nil })
 	{
 		a + ut() + run(() { ut() })
 		Nil

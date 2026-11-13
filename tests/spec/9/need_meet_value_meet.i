@@ -22,7 +22,7 @@ both = () -> Nil {
 meet = (x: S(Never) & S(Dep)) -> S(Never) { x }
 
 // As a value union the same-direction argument gives the row union Dep.
-join = (x: S(Never) | S(Dep)) -> S(Dep) { x }
+join = (x: { S(Never) | S(Dep) }) -> S(Dep) { x }
 
 main = () {
 	_syn3_0: S(Never) = S(f = () { Nil })

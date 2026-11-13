@@ -145,26 +145,7 @@ fn nonempty_stored_environment() {
     // §9.2: a callback takes its dependency at the call site; rule 9
     // removes each installed service, including a service nested in N.
     accepts(
-        "Dependency = (value = Int)
-get = () <- (d: Dependency) { d.value }
-Inner(N) = (() <- N -> Int, (N) -> Nil)
-read = <N>() <- (s: Inner(N)) {
-	Inner(f, _) = s
-	f()
-}
-Outer(N) = (() <- N -> Int, (N) -> Nil)
-use = <N>() <- (s: Outer(N)) -> Int {
-	Outer(f, _) = s
-	f()
-}
-run = <A, N>(body: () <- N -> A) { body() }
-example = () {
-	run(() { use() }) <- (
-		Dependency(value = 7),
-		Inner(() { get() }, (_: Dependency) { Nil }),
-		Outer(() { read() }, (_: Dependency | Inner(Dependency)) { Nil }),
-	)
-}",
+        "Dependency = (value = Int)\nget = () <- (d: Dependency) { d.value }\nInner(N) = (() <- N -> Int, (N) -> Nil)\nread = <N>() <- (s: Inner(N)) {\n\tInner(f, _) = s\n\tf()\n}\nOuter(N) = (() <- N -> Int, (N) -> Nil)\nuse = <N>() <- (s: Outer(N)) -> Int {\n\tOuter(f, _) = s\n\tf()\n}\nrun = <A, N>(body: () <- N -> A) { body() }\nexample = () {\n\trun(() { use() }) <- (\n\t\tDependency(value = 7),\n\t\tInner(() { get() }, (_: Dependency) { Nil }),\n\t\tOuter(() { read() }, (_: { Dependency | Inner(Dependency) }) { Nil }),\n\t)\n}",
         "example",
         "() -> Int",
         &["example"],

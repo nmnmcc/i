@@ -2415,7 +2415,7 @@ Where i code gives a value to the host, an `Int` or `String` member counts as `I
 
 ```i
 @external("app", "mode")
-mode: () -> "on" | "off"            // compile error: the host gives the value
+mode: { () -> "on" | "off" }            // compile error: the host gives the value
 @external("app", "log")
 log: ("info" | "warn") -> Nil       // correct: i code gives the value
 ```

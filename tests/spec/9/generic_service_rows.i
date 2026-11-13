@@ -52,7 +52,7 @@ test("nested", () {
 		assert(run(() { read_outer() }) == 11) <- (Dependency(value = 11))
 	} <- (
 		Inner(() { get() }, (_: Dependency) { Nil }),
-		Outer(() { read() }, (_: Dependency | Inner(Dependency)) { Nil }),
+		Outer(() { read() }, (_: { Dependency | Inner(Dependency) }) { Nil }),
 		Dependency(value = 7),
 	)
 })

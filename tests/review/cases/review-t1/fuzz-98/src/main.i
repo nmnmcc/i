@@ -1,6 +1,6 @@
 f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
-		((_: "a" | "b", False)) { 0 }
+		((_: { "a" | "b" }, False)) { 0 }
 		| ((_: String - "a", False) ? False) { 1 }
 		| (("ab", True) ? False) { 2 }
 		| ((_, False)) { 3 }

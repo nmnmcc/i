@@ -5,6 +5,6 @@ f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
 		| ((_: String - "a", False)) { 2 }
 		| ((_: String - "ab" - "b", True)) { 3 }
 		| (("a" <> _, False)) { 4 }
-		| ((_: "a" | "b", _)) { 5 }
+		| ((_: { "a" | "b" }, _)) { 5 }
 		| ((_: String - "a", False)) { 6 }
 }

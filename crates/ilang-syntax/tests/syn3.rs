@@ -464,7 +464,7 @@ fn patterns() {
         "_",
         "_rest",
         "x: Int",
-        "_: Int | String",
+        "_: { Int | String }",
         "1",
         "-1",
         "-.1.5",
@@ -529,7 +529,7 @@ fn parameters_alternatives_guards() {
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     assert_eq!(chain(&f)[0].params.len(), 2);
     // G21, P8: after a `:` type, `|` continues the union.
-    let f = value("f = (x: Int | y) { 1 }");
+    let f = value("f = (x: { Int | y }) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 1);
     let f = value("f = (True | _: Int) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);

@@ -25,9 +25,9 @@ gcd = (a: Int, 0) -> Int { a } | (a: Int, b: Int) -> Int { gcd(b, a % b) }
 /// `None` as the constructors of `Option(A)`, which a group must cover.
 f = (Some(0)) { "zero" } | (Some(n)) { n } | (None) { "none" }
 
-first = (x: Int) { "a" } | (x: Int | String) { 1 }
+first = (x: Int) { "a" } | (x: { Int | String }) { 1 }
 
-guarded = (x: Int ? x > 0) { "a" } | (x: Int | String) { 1 }
+guarded = (x: Int ? x > 0) { "a" } | (x: { Int | String }) { 1 }
 
 /// One branch with a type parameter: each shape group is generalized by
 /// itself.
@@ -52,7 +52,7 @@ d: Int = gcd(12, 18)
 
 e: Int = gcd(5, 0)
 
-x: String | Int = f(Some(5))
+x: { String | Int } = f(Some(5))
 
 a1: String = first(1)
 

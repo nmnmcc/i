@@ -2,5 +2,5 @@
 (
 	m = spec/macros
 )
-f = (x: (a = Int) | (b = String)) { m.m(x) }
+f = (x: { (a = Int) | (b = String) }) { m.m(x) }
 main = () { f((a = 42)) }

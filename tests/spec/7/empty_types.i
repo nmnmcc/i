@@ -10,7 +10,7 @@ Window = Opaque
 
 Socket = Opaque
 
-kind = (h: Window | Socket) {
+kind = (h: { Window | Socket }) {
 	h |> (_: Window) { "window" } | (_: Socket) { "socket" }
 }
 

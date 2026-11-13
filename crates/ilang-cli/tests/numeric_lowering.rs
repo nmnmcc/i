@@ -677,7 +677,7 @@ list_match = (xs: List(Float), x: Float) -> Float {
 		| ([]) { x }
 		| ([a, ..rest]) { list_match(rest, a *. x) }
 }
-list_or_float = (v: List(Float) | Float, x: Float) -> Float {
+list_or_float = (v: { List(Float) | Float }, x: Float) -> Float {
 	v |>
 		([]) { x }
 		| ([a, ..rest]) { list_or_float(rest, a +. x) }
