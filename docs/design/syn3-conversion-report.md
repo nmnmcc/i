@@ -67,14 +67,13 @@ lane runs; the lists it names are the authority.
    (`Checker::warn_never_matches`, `types/infer.rs`). Test:
    `literal_types::fitted_choices_keep_the_deferred_binding_error`.
    In short: an error became a warning plus an `Assert` need.
-2. **Still to come: sums are unions, not families of constructors** (§2.8).
-   The lowering of this stage still reads `Event(A) = Start(A) | Stop(A)` with
-   its members just before it as one type with two constructors (today's tree),
-   so facts "across every constructor of the family" (literal-types §5.3) are
-   unchanged, and a member of such a union written as a type elsewhere
-   (`f = (x: Start(Int))`) is not defined (E0202). Lane/fa's final tree makes
-   each member its own labelled type. Test that will change then:
-   `types::pattern::shared_place_tests`.
+2. **Sums are unions, not families of constructors** (§2.8; landed with
+   stage 3, lane/s3). The lowering no longer absorbs the data definitions
+   before `Event(A) = Start(A) | Stop(A)` into one multi-constructor type:
+   each member is its own labelled type and the sum is the alias of their
+   union, so `f = (x: Start(Int))` is defined, and
+   `types::pattern::shared_place_tests` asserts that `Start` and `Stop` no
+   longer share their fields. See `docs/design/syn3-stage3-report.md`.
 3. **`()` as a value is the empty data** of type `()` (§7.1 row 7): `f = (()) { 1 }`
    is called as `f(())` (fixture `tests/spec/7/syn3_empty_data_argument.i`).
    The Lisp source surface writes this as `(,)` (§14.3); `()` has no source

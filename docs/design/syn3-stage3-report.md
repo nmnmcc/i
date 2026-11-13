@@ -119,3 +119,32 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
 ## Not solved
 
 - The record-field solver bug above (stage 6 deletes records).
+
+## After the conversion (merge of lane/conv, 2026-11-13)
+
+The conversion landed first, so stage 3 now applies to syntax-three text:
+the migrator `types` and its old-syntax output were dropped, and
+`syn3/lower.rs` lowers each data definition to a one-constructor type and a
+sum to the alias of the union of its members.
+
+- `A(..)` of a sum exports the name and each labelled member with its
+  constructor (§5.2.1), in the resolver.
+- Sums with a member of their own name (§7.3 manual list) were renamed by
+  hand: i/task's `Scheduler` and `Runner` services are
+  `Scheduler = (state = SchedulerState)` with `AttachedScheduler` (likewise
+  Runner); i/process's sum is `DirectoryMode`; std/http's sum is
+  `AnyHeaders`; i/syntax's `Node` is the labelled type of one union item, as
+  §2.8's text has it, and its users wrap values in `Node(…)`; test fixtures
+  with `X = X | Y` name the sum `XSum`.
+- The pattern type of a fitted `C(…)` is the smallest declared union of
+  labelled types that contains `C` (§2.12, D4, "as today with the
+  multi-constructor `Result`"): `first = (r) { Ok(v) = r  v }` is
+  `(Result(A, B)) <- (Assert) -> A` again (types/effects.i, with the closed
+  case `closed: (Result(Int, String)) -> Int = (Ok(v)) { v }`, E0501).
+- A match reports a member of the subject's sum that no pattern takes with
+  E0516 alone (§5.2.8 rule 11), also for a pipe into a clause-block
+  literal, which is now a match (the Lisp surface's match).
+- A discriminant service wraps the union of its targets' values
+  (`Bundle = (value = BundleKind)`); the provider plan wraps the selected
+  member (`ConstructionStep::wrap`).
+- The known types of W0503 messages fold declared aliases (`Bool`).
