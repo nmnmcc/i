@@ -713,7 +713,9 @@ fn query_rename_checks_kind_and_scope() {
     // A constructor, in both modules.
     let at = f.at("app/main", "Circle(radius: 2)", 0, 0);
     let edits = q.rename(m, at, "Disk").unwrap();
-    assert_eq!(edits.len(), 5, "{edits:?}");
+    // The type `Circle` has the constructor's name, so it is renamed too:
+    // its definition, its place in `Shape`, the export and the import.
+    assert_eq!(edits.len(), 8, "{edits:?}");
     // Refused for the library.
     let text = "main = () { panic(\"x\") }\n";
     let g = Fixture::new(&[("src/main.i", text)]);
@@ -764,7 +766,7 @@ fn query_type_definition_signature_and_hints() {
     assert_eq!(s.active, Some(0));
     let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
     assert_eq!(hints.len(), 1, "{hints:?}");
-    assert_eq!(hints[0].label, ": Shape");
+    assert_eq!(hints[0].label, ": Circle");
 }
 
 #[test]
