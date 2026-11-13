@@ -142,8 +142,10 @@ main = <N>() {
 
 #[test]
 fn a_captured_service_row_keeps_callback_dependencies() {
-    // §4.5 rule 4 keeps S's argument equal across levels; §4.8 rule 9
-    // removes the supplied S(Dependency), leaving Dependency itself.
+    // §9.2 checks the supplied S(Dependency) by directed subtyping;
+    // §4.8 rule 5b removes S, leaving the callback's Dependency need.
+    // Keep the old fixture's explicit provider contract: `! S(Dependency)
+    // = S(...)` migrates to a typed local before the provide (syntax-3 §7.3).
     let source = "S(N) = (() <- N -> Nil)
 Dependency = ()
 read = () <- (d: Dependency) { Nil }
@@ -156,12 +158,15 @@ apply = <N>() {
 	local()
 }
 
-main = () { apply() <- (S(() { read() })) }";
+main = () {
+	provided: S(Dependency) = S(() { read() })
+	apply() <- (provided)
+}";
     for supplied in [false, true] {
         let source = if supplied {
             // `Dependency = ()` makes the value `Dependency` (syntax-3.md
             // §5.2.3: "when `D` is `()`, the value `T`").
-            source.replace("apply() <- (S(", "apply() <- (Dependency, S(")
+            source.replace("apply() <- (provided)", "apply() <- (Dependency, provided)")
         } else {
             source.to_string()
         };

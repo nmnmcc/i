@@ -1,6 +1,6 @@
 {
-  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
-  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
+  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
+  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.wrap : (body: () -> A ^ E ! N & N2, svc: S(Dep)) -> A ^ E ! N | N2 - S(Dep)\napp/main.main : () -> Nil ! Dep\n",
-      "stderr": "src/main.i:16:3: error[E0515]: `S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n1 error\n"
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- (Fail(E), N & N2) -> A, S(Dep)) <- (Fail(E), N2 - S(Dep), ..N) -> A\napp/main.main : () <- (Dep) -> Nil\n",
+      "stderr": "src/main.i:20:8: error[E0515]: `S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n1 error\n"
     }
   }
 }

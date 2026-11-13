@@ -750,3 +750,50 @@ literal also retains the original empty legacy error channel with the
 transition Fail(Never) marker. All twelve accept and match the unchanged
 required type fragments. Their parser checks pass. No requirement was
 changed, and their observations remain subject to the batch2 outcome guard.
+
+Merged main 29515fbfa native-test executable-busy retry without changing any
+embedded literal, compiler or runtime code. The requested latest-main std
+O0/O2 suites each pass 2,170 tests; workspace all-feature clippy, both format
+checks and the official normal/Lisp inventories pass. Native verification
+for the incoming test-harness change is queued behind the corpus.
+
+The first 100 complete K4 observations now pass the guarded recording and
+an independent source-change/phase audit, including all eight initially
+refused cases. Every source changed; phase exits, diagnostic-code sets and
+runtime stdout equal batch2. The complete corpus is still running, and the
+two p1 correctness blockers remain unresolved. This is not a landing claim.
+
+The complete first 200 K4 observations have now passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only these stable completed observations are committed; recording continues.
+The full corpus and the two known p1 regressions still block landing.
+
+The complete first 400 K4 observations have now passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only these stable completed observations are committed; recording continues.
+The full corpus and the two known p1 regressions still block landing.
+
+A total of 600 completed K4 observations have passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only eligible completed observations are committed; refused cases remain
+untouched and recording continues.
+The full corpus, two known p1 regressions and pending phase refusals still block landing.
+
+The ongoing recorder refused multi_run: test0 printed its passing result but
+hit the unchanged ten CPU-second bound; its other phases match. A guarded
+retry with the same bound is pending. The first p1 copy has also been refused
+as predicted; its original expectation is untouched.
+
+Six source-unchanged programs need only type-display translations in their
+current observations: stress_plain_1024/128/32/512, finite_never and
+recursive_never. A proposed patch changes six check.stdout fields; all 1,698
+type lines are exact notation translations and every other JSON field is
+byte-preserved. Because the brief permits re-recording only source-changed
+cases, an explicit exception was requested. The patch remains unapplied
+pending the user's answer. No source was changed merely to permit recording.
+
+A total of 800 completed K4 observations have passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only eligible completed observations are committed; refused cases remain
+untouched and recording continues.
+The full corpus, two known p1 regressions and pending phase refusals still block landing.

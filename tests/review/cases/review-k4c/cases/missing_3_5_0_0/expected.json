@@ -1,6 +1,6 @@
 {
-  "compiler": "ff34d142d2390e50609923ff88f807310a49d9c4",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
+  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () -> Nil ! Dep\napp/main.run : (body: () -> Nil ^ E ! N) -> Nil ^ E ! N\napp/main.use : () -> Nil ! N | N2 | S(N, N2)\napp/main.main : () -> Nil ! N | N2 | S(N, N2)\n",
+      "stdout": "app/main.get : () <- (Dep) -> Nil\napp/main.run : (() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.main : () <- (S(N, N2), ..N, ..N2) -> Nil\n",
       "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test0": {
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never, Never); needs app/main.S(Never, Never)\n1 error\n"
     }
   }
 }
