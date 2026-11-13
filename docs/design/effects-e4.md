@@ -166,8 +166,8 @@ Verification checkpoints (2026-11-13):
 - Release builds pass through the final merged eff3 `d5d8e9042` base.
 - `i check --project std --types` passes on that base with two inherited HTTP
   unreachable-clause warnings.
-- On the preceding eff3 `6b0377b2a` base, std O0 and O2 each pass **2,171/2,171**.
-  Final repetitions on the latest base are pending.
+- Final std O0 and O2 on the latest merged base each pass **2,171/2,171**.
+  The earlier runs on eff3 `6b0377b2a` also pass at both optimization levels.
 - `i fmt --check bench std lib examples` and the browser fixture pass; the
   Rust HTTP test fixture and JavaScript source pass their format/syntax checks.
 - Native integration tests pass: **HTTP 11/11**, **CLI/log 2/2**. The first HTTP
@@ -187,5 +187,31 @@ Verification checkpoints (2026-11-13):
   **140/140**, and `11/` is **48/48**. Both runs use a two-CPU affinity limit;
   chapter 9 completes in the Rust debug test profile and chapter 11 in the
   Rust release test profile. No spec expectation is changed.
-- Fixture regeneration, final std repetitions and strict Clippy remain in
-  progress. No test or assertion has been removed or weakened.
+- Strict workspace Clippy, including every target, passes with `-D warnings`.
+- `scripts/build-abi-fixture.sh` completes, including the R2 conformance fixture
+  generator and Wasm validation. The regenerated binding plans have unchanged
+  contracts; only generated identity metadata changes.
+- The regenerated JavaScript R2 tests pass **3/3**, including 200 seeded replays
+  at O0/O2 and every runnable R2 law body at both levels.
+- Regenerated JavaScript compiled-fixture tests pass **7/8**. The ordinary
+  `hypot(3, 4)` import call still traps `unreachable`, with its expected `5`
+  unchanged. An explicit existing Float return contract does not fix the trap.
+  After two attempts this additional runtime issue is stopped per the brief.
+  Wrong host replies, exact stop positions, and reply validation all pass.
+- Browser engine tests were not run. No test or assertion has been removed or
+  weakened. The two additional JavaScript runtime failures above remain open.
+
+Fixture decisions:
+
+- Pure R2 task probes constrain their otherwise open error type through
+  `NoFail(N) = N - Fail(Never)`. The helper calls the original body unchanged;
+  it does not catch errors or remove other service needs or assertions.
+  Spec §4.4: "`A - B` takes out of `A` every member whose type constructor is
+  the type constructor of a member of `B`." Spec §9.2: "An entry that every
+  value of its type constructor satisfies, as `Fail(Never)`, is removed."
+- The compiled fixture writes the existing Float result contract of `distance`
+  explicitly. Stop-position assertions now name the actual call tokens in the
+  converted source: `clock.later` at 45:2 and `hypot` at 41:44. Spec §13 says:
+  "Lines and columns count from 1; a column counts Unicode scalar values. The
+  position of an expression is the position of its first token." The tests
+  still require the complete exact stop message, including its position.
