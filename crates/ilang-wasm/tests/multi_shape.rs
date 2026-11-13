@@ -570,7 +570,10 @@ fn closure_calls_test_the_closure_once() {
 fn worker_codec_preserves_multi_shape_values() {
     let mut p = build(ilang_wasm::Numeric::Reference).program;
     p.funcs.push(FuncKind::Runtime {
-        op: Op::Runtime { name: "worker_enabled", arity: 0 },
+        op: Op::Runtime {
+            name: "worker_enabled",
+            arity: 0,
+        },
         arity: 0,
     });
     let mut text = emit::wat(&p);
@@ -600,5 +603,9 @@ fn worker_codec_preserves_multi_shape_values() {
     let wasm = wat::parse_str(&text).unwrap();
     ilang_wasm::validate(&wasm).unwrap();
     let out = run(&wasm, "codec_roundtrip");
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
