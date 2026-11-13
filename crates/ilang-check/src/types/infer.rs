@@ -1427,6 +1427,12 @@ impl<'a> Checker<'a> {
                 code::TYPE_AMBIGUOUS,
                 format!("a value of `{l}` could go to more than one type variable of `{r}` (§4.4)"),
             ),
+            FailKind::NonPrincipalIntersection => (
+                code::TYPE_AMBIGUOUS,
+                format!(
+                    "cannot infer a principal type for `{l} <: {r}`: different intersection members admit different bounds (§4.4, §4.7)"
+                ),
+            ),
         };
         if let Some(o) = other {
             message.push_str(&format!(" (the type at {} needs it)", self.position(o)));

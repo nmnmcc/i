@@ -115,6 +115,9 @@ pub(crate) enum FailKind {
     NeedMeet,
     /// A value could go to more than one type variable of a union (§4.4).
     Ambiguous,
+    /// Distinct intersection members admit incomparable specializations.
+    /// The solver cannot choose one as a principal solution (§4.7).
+    NonPrincipalIntersection,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1186,27 +1189,67 @@ impl Solver {
                 self.constrain_in(&l2, r, env);
             }
             (Ty::Inter(ms), _) => {
-                // `a & T <: R` is true when `T <: R` or when `a <: R`
-                // (§4.5 rule 2). The members that are not type variables
-                // are tried first; when they fail, each variable is tried.
-                // Only the members with a type constructor are put together
-                // into one: the others (variables, differences, unions that
-                // stay) are tried one by one, so that the type tried is
-                // always smaller than `l`.
+                // §4.4: an intersection's order has no meaning. Trying its
+                // members in place used to specialize the first variable
+                // that accepted a bound, losing other valid solutions.
                 let (conc, vars): (Vec<Ty>, Vec<Ty>) = ms.iter().cloned().partition(Ty::is_headed);
                 let mut tries = Vec::new();
                 if !conc.is_empty() {
                     tries.push(self.normalize_mode(Ty::Inter(conc), env));
                 }
                 tries.extend(vars);
+                if tries.len() == 1 {
+                    self.constrain_in(&tries[0], r, env);
+                    return;
+                }
+                // A bound that already proves the goal needs no choice,
+                // even if another member could be specialized to prove it.
+                let mut demand = super::prove::Demand::new(super::prove::Demand::LIMIT);
+                if tries.iter().any(|t| {
+                    super::prove::prove_mode(self, t, r, env, &mut demand)
+                        == super::prove::Verdict::Proven
+                }) {
+                    return;
+                }
                 let before = self.failures.len();
-                let last = tries.len().saturating_sub(1);
-                for (i, t) in tries.iter().enumerate() {
-                    self.constrain_in(t, r, env);
-                    if self.failures.len() == before || i == last {
-                        break;
+                let mut solution: Option<Self> = None;
+                let mut unresolved = false;
+                for t in &tries {
+                    let mut trial = self.clone();
+                    trial.constrain_in(t, r, env);
+                    if trial.failures.len() != before {
+                        // An unsupported choice is not evidence that this
+                        // alternative has no solution. Do not discard it in
+                        // favor of a different specialization either.
+                        unresolved |= trial.failures[before..].iter().any(|f| {
+                            matches!(
+                                f.kind,
+                                FailKind::Ambiguous | FailKind::NonPrincipalIntersection
+                            )
+                        });
+                        continue;
                     }
-                    self.failures.truncate(before);
+                    if let Some(previous) = &solution {
+                        if previous.vars != trial.vars {
+                            // Our bounds cannot express this disjunction of
+                            // solutions. §4.7 requires an error here, rather
+                            // than publishing an arbitrary nonprincipal type.
+                            self.fail(FailKind::NonPrincipalIntersection, l, r);
+                            return;
+                        }
+                    } else {
+                        solution = Some(trial);
+                    }
+                }
+                if unresolved {
+                    self.fail(FailKind::NonPrincipalIntersection, l, r);
+                } else if let Some(solution) = solution {
+                    *self = solution;
+                } else {
+                    // No failed alternative may leave bounds in the solver.
+                    // Report the complete goal rather than an arbitrary last
+                    // member, so operand order cannot select the diagnostic.
+                    self.fail(FailKind::Mismatch, l, r);
                 }
             }
             (Ty::Diff(a, h), _) => self.diff_left(a, h, r, env),
@@ -3437,6 +3480,57 @@ mod literal_tests {
         s.constrain(&w, &strings(&["a"]));
         s.constrain(&v, &w);
         assert!(!s.failures.is_empty());
+    }
+
+    #[test]
+    fn intersection_alternatives_do_not_choose_or_leak_bounds() {
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        for reverse in [false, true] {
+            let mut s = solver();
+            let (a, b) = (s.fresh(), s.fresh());
+            let mut operands = vec![a.clone(), b.clone()];
+            if reverse {
+                operands.reverse();
+            }
+            let lhs = Ty::Inter(operands);
+            s.constrain(&lhs, &int);
+            assert_eq!(s.failures.len(), 1);
+            assert_eq!(s.failures[0].kind, FailKind::NonPrincipalIntersection);
+            assert!(s.var(variable(&a)).upper.is_empty());
+            assert!(s.var(variable(&b)).upper.is_empty());
+
+            // A prior bound proves the goal in either order; nothing new
+            // should be imposed on the other variable.
+            s.failures.clear();
+            s.constrain(&b, &int);
+            s.constrain(&lhs, &int);
+            assert!(s.failures.is_empty());
+            assert!(s.var(variable(&a)).upper.is_empty());
+
+            let mut s = solver();
+            let (a, b) = (s.fresh(), s.fresh());
+            let mut operands = vec![
+                Ty::tuple(vec![a.clone(), int.clone()]),
+                Ty::tuple(vec![string.clone(), b.clone()]),
+            ];
+            // Keep these as separate alternatives: normalized same-head
+            // constructors instead use §4.4's prescribed argument merge.
+            if reverse {
+                operands.reverse();
+            }
+            // A union alternative first constrains a, then fails at the
+            // second tuple part. That failed trial must leave a untouched.
+            let first = Ty::Union(vec![operands[0].clone(), operands[1].clone()]);
+            let second = Ty::Union(vec![operands[1].clone(), operands[0].clone()]);
+            s.constrain(
+                &Ty::Inter(vec![first, second]),
+                &Ty::tuple(vec![int.clone(), string.clone()]),
+            );
+            assert_eq!(s.failures.len(), 1);
+            assert!(s.var(variable(&a)).upper.is_empty());
+            assert!(s.var(variable(&b)).upper.is_empty());
+        }
     }
 
     #[test]

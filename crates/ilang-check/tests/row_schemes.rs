@@ -907,3 +907,23 @@ use = () { both(need_int, need_string) }";
         );
     }
 }
+
+#[test]
+fn intersection_inference_never_selects_a_variable_by_operand_order() {
+    for intersection in ["A & B", "B & A"] {
+        for call in ["", "\nuse = () { choose(1, \"s\", 1) }"] {
+            let source =
+                format!("choose = <A, B>(x: {intersection}, a: A, b: B) {{ (x + 1, a, b) }}{call}");
+            let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
+            let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+            assert_eq!(errors.len(), 1, "{}", graph.sources.render_all(&diags));
+            assert_eq!(errors[0].code, "E0504");
+            assert!(errors[0].message.contains("principal type"));
+        }
+        // A stated Int member proves the constraint without specializing
+        // either generic component. §4.4 makes both spellings identical.
+        types(&format!(
+            "choose = <A, B>(x: {intersection} & Int, a: A, b: B) {{ (x + 1, a, b) }}\nuse = () {{ choose(1, \"s\", 1) }}"
+        ));
+    }
+}
