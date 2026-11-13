@@ -30,6 +30,28 @@ def tree(text):
                   lambda m: '@span' if m[0].startswith('@') else m[0], text)
 
 
+def new_rule_fixture(path, start, host):
+    if path in {
+        'tests/spec/1.7/annotation_pipe_declaration_error.i',
+        'tests/spec/1.7/annotation_union_declaration.i',
+        'tests/spec/7/annotation_pipe_binding_error.i',
+        'tests/spec/7/annotation_pipe_boundary.i',
+        'tests/spec/7/annotation_pipe_data_error.i',
+        'tests/spec/7/annotation_pipe_names_error.i',
+        'tests/spec/7/annotation_pipe_result_error.i',
+    }:
+        return True
+    tests = {
+        'crates/ilang-syntax/tests/syn3.rs': 'one_annotation_boundary_for_declarations_patterns_and_function_results',
+        'crates/ilang-lsp/tests/protocol.rs': 'hover_and_completion_in_braced_union_and_typed_alternatives',
+    }
+    if path not in tests:
+        return False
+    begin = host.find('fn ' + tests[path] + '(')
+    end = host.find('\n#[test]', begin + 1) if begin >= 0 else -1
+    return begin >= 0 and begin < start and (end < 0 or start < end)
+
+
 def inventory(hosts=None, registered=None):
     paths = sorted(set(subprocess.check_output(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--',
@@ -41,7 +63,8 @@ def inventory(hosts=None, registered=None):
         host = hosts[path] if hosts is not None else (ROOT / path).read_text()
         if path.endswith(('.i', '.is')):
             yield dict(path=path, start=0, end=len(host), source=host,
-                       kind='file', lisp=path.endswith('.is'))
+                       kind='file', lisp=path.endswith('.is'),
+                       new_rule_fixture=new_rule_fixture(path, 0, host))
             continue
         if path.endswith('.md'):
             literals = [(m.start(1), m.end(1), m[1]) for m in
@@ -84,7 +107,8 @@ def inventory(hosts=None, registered=None):
             # examples. Registry wrappers/substitutions preserve their context.
             entry = config.get(CHECK['identity'](path, source), {})
             yield dict(path=path, start=start, end=end, source=source,
-                       kind=kind, lisp=False, entry=entry)
+                       kind=kind, lisp=False, entry=entry,
+                       new_rule_fixture=new_rule_fixture(path, start, host))
 
 
 def prepared(item):
@@ -179,7 +203,8 @@ def main():
     if args.mode == 'snapshot':
         # Host IDs, messages and inferred-scheme displays are bytes, not i
         # programs. Keep the registry's explicit classification on replay.
-        items = [i for i in inventory() if not i.get('entry', {}).get('not_source')]
+        items = [i for i in inventory() if not i.get('entry', {}).get('not_source')
+                 and not i.get('new_rule_fixture')]
         results = parse(items, args.binary)
         assert len(items) == len(results)
         with gzip.open(args.baseline, 'wt') as f:
