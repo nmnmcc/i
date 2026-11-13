@@ -583,3 +583,16 @@ fn expansion_and_wasm_are_deterministic() {
     let wasm = build();
     assert!(wasm == build(), "wasm differs between two builds");
 }
+
+#[test]
+fn contextual_invariant_result_bounds_are_visible_in_frozen_snapshot() {
+    let macros = include_str!("../../../tests/spec/14.8/mp04_contextual_invariant/src/macros.is");
+    let main = include_str!("../../../tests/spec/14.8/mp04_contextual_invariant/src/main.i")
+        .replace("probe/macros", "app/macros");
+    checked(macros, &main).unwrap();
+    reject(
+        macros,
+        &main.replace("Key(Int)", "Key(String)"),
+        "expected result is not Key(Int)",
+    );
+}
