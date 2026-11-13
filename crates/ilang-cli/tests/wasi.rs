@@ -755,7 +755,7 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Fail(Int)))
+Paused = (Continuation(Nil, Paused, Never))
 Done = ()
 Paused = Paused | Done
 Held = (Continuation(Nil, Held, Never))
@@ -764,7 +764,7 @@ Held = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).
-paused = () {
+paused = () <- (handler: Fail(Int)) {
 	{
 		control.boundary((outer) {
 			control.boundary((inner) {
@@ -776,7 +776,7 @@ paused = () {
 					() { control.suspend(inner, (k2) { Nil }) },
 				)
 			})
-			fail.raise(7)
+			handler.raise(7)
 			Done
 		})
 	} |>
@@ -784,16 +784,17 @@ paused = () {
 		| (Done) { panic("not paused") }
 }
 
-// `cancel` has no errors in its type. Here it runs the ordinary code
-// after `inner`, whose error passes through this final function's record.
+// The continuation captures the active catch's handler, so its need is Never.
+// Cancelling it runs ordinary code after `inner`; that captured handler's
+// error passes through this final function's pending record.
 with = (hold, k) {
 	control.suspend(hold, (k2) { Held(k2) })
 	control.cancel(k)
 }
 
 main = () <- (io: Io) {
-	k = paused()
 	r = fail.catch(() {
+		k = paused()
 		held = control.boundary((hold) {
 			resource.ensure(() { 99 }, () { with(hold, k) })
 			Over
