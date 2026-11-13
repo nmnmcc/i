@@ -48,12 +48,15 @@ struct TestHook {
 impl Hook for TestHook {
     type Error = &'static str;
     fn is_macro(&mut self, e: &Expr, locals: &[Local], depth: u32) -> Result<bool, Self::Error> {
-        let ExprKind::Call { callee, .. } = &e.kind else {
+        let ExprKind::Call { callee, args } = &e.kind else {
             return Ok(false);
         };
         let ExprKind::Name { module: None, name } = &callee.kind else {
             return Ok(false);
         };
+        if call3::is_update(args) {
+            return Ok(false);
+        }
         if locals
             .iter()
             .rev()
@@ -385,7 +388,7 @@ fn a_match_binds_per_branch_at_the_same_function_depth() {
 fn a_clause_block_binds_the_first_choice_of_each_branch() {
     assert_eq!(calls("f = (m) { m(1) } | (_) { m(2) }"), ["m"]);
     assert_eq!(calls("f = (m, 0) { m(1) } | (_, _) { m(2) }"), ["m"]);
-    assert_eq!(calls("f = (m) ? m(0) { 1 } | (_) ? m(1) { 2 }"), ["m"]);
+    assert_eq!(calls("f = (m ? m(0)) { 1 } | (_ ? m(1)) { 2 }"), ["m"]);
 }
 
 #[test]
@@ -425,13 +428,14 @@ fn interpolation_parts_are_visited() {
 #[test]
 fn a_record_update_is_not_a_macro_call() {
     assert_eq!(calls("f = (r) { m(..r, a = inner(1)) }"), ["inner"]);
-    assert_eq!(calls("f = (r) { r |> m(1) }"), Vec::<String>::new());
+    // A pipe into an ordinary call still visits that call.
+    assert_eq!(calls("f = (r) { r |> m(1) }"), ["m"]);
 }
 
 #[test]
 fn a_function_type_is_visited_as_parameters_result_error_environment() {
     assert_eq!(
-        type_calls("x: (a(Int)) <- (b(Int), Fail(c(Int))) -> d(Int)"),
+        type_calls("x: (a(Int)) <- (S(b(Int)), Fail(c(Int))) -> d(Int)"),
         ["a", "d", "c", "b"]
     );
 }
@@ -721,7 +725,7 @@ fn snippets_walk_as_their_lowered_trees() {
         "f = (a, b) -> Int { g(a) |> h(b) }",
         "f = (0, x) <- (s: S) -> Int { g(s, x) } | (n, _) <- (t: T) { h(n, t, s) }",
         "f = (x) { x |> (Some(y)) { g(y) } | (None) { h(x) } }",
-        "f = (x) { x |> ((a) { g(a) }) }",
+        "f = (x) { x |> (a) -> Int { g(a) } }",
         "f = (x) { y = (z) { y(z) }  w = (y, [y(1)], C(y(2)), y(3) |> C)  w(y) }",
         "f = (r) { C(..r, a = g(r)) |> h }",
         "f = () { g(1) <- (h(2), k) }",
@@ -730,7 +734,7 @@ fn snippets_walk_as_their_lowered_trees() {
         "f = (C(k = v), D(k2 = _), E(a = b: Int, ..)) { g(v, k, k2, a, b) }",
         "f = ((a, b) = c, [d, ..e]) { g(a, b, c, d, e) }",
         "f = (<<a:u(8), b:bytes(g(a))>>) { h(a, b) }",
-        "f = (x) ? g(x) { h(x) } | (y | y) { k(y) }",
+        "f = (x ? g(x)) { h(x) } | (y | y) { k(y) }",
         "f = (x) { \"a\\(g(x))b\" }",
         "f = (x) { core.never(x) }",
         "x: (m(Int), a = n(Int)) <- (S, Fail(o(Int)), ..N) -> p(Int)",

@@ -313,7 +313,7 @@ mod tests {
         assert!(delayed("g((0) { hole } | (_) { 1 })"));
         assert!(!delayed("x |> (0) { hole } | (_) { 1 }"));
         assert!(delayed("x |> (0) { (y) { hole } } | (_) { 1 }"));
-        assert!(delayed("x |> ((y) -> Int { hole })"));
+        assert!(delayed("x |> (y) -> Int { hole }"));
         assert!(!delayed("(x |> (0) { 1 } | (_) { 2 }) + hole"));
     }
 

@@ -34,7 +34,7 @@ mod tests {
 
     #[test]
     fn value_names_are_those_of_the_lowered_tree() {
-        let source = "T = (Int)\nx: Int\n(a, [b, ..c]) = f()\nC(k = d) = g()\ne: Int = 1";
+        let source = "T = (Int)\nx: Int\n(a, [b, ..c]) = f()\n[C(k = d)] = g()\ne: Int = 1";
         let (module, errors) = ilang_syntax::syn3::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
         let (lowered, errors) = ilang_syntax::syn3::lower::lower(&module);

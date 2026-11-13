@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn expression_quote_becomes_service_calls_and_an_import() {
-        let mut m = module("(= f (-> (, x) _ '(g ~x (, ~..x))))");
+        let mut m = module("(= f (-> (, x) _ `(g ~x (, ~..x))))");
         let mut templates = Vec::new();
         let errors = lower_expression_quotes(&mut m, 7, &mut templates);
         assert!(errors.is_empty(), "{errors:?}");
@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     fn pattern_quote_gets_a_slot_and_its_captures() {
-        let mut m = module("(= f (-> (, '(g ~a ~..rest)) _ a))");
+        let mut m = module("(= f (-> (, `(g ~a ~..rest)) _ a))");
         let ItemKind::Bind(binding) = &m.items[0].kind else {
             panic!()
         };
@@ -313,9 +313,9 @@ mod tests {
             let document = crate::lisp::parse3(source).unwrap();
             document.datums.into_iter().next().unwrap()
         };
-        assert!(read_pattern(&quote("'(a ~..x b)")).is_err());
-        assert!(read_pattern(&quote("'(a ~..x)")).is_ok());
-        assert!(check_expression(&quote("'(a ~..x b)")).is_ok());
-        assert!(check_expression(&quote("'~..x")).is_err());
+        assert!(read_pattern(&quote("`(a ~..x b)")).is_err());
+        assert!(read_pattern(&quote("`(a ~..x)")).is_ok());
+        assert!(check_expression(&quote("`(a ~..x b)")).is_ok());
+        assert!(check_expression(&quote("`~..x")).is_err());
     }
 }
