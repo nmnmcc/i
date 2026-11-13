@@ -889,6 +889,11 @@ impl<'a> Lowerer<'a> {
             .position(|t| Some(t.module) == prelude && t.name == "Fail")
             .map(|i| TypeRef::Custom(TypeId(i as u32)));
         let mut all: Vec<TypeRef> = self.typed.services.values().copied().collect();
+        for supply in self.typed.env_supplies.values() {
+            match supply {
+                ilang_check::types::EnvSupply::Row(keys) | ilang_check::types::EnvSupply::Data(keys) => all.extend(keys),
+            }
+        }
         let key = |t: &TypeRef| match t {
             TypeRef::Custom(id) => (
                 u8::from(self.program.types[id.0 as usize].host.is_some()),
@@ -2183,12 +2188,14 @@ impl<'a> Lowerer<'a> {
                     next += 1;
                     self.bind_checked(&mut fx, &mut out, pattern, v, pattern.span.start);
                 }
-                Param::Env { var, name, .. } => {
-                    let service = self.service(module, name.span);
+                Param::Env { rest, var, name, .. } => {
+                    let value = if *rest { Value::Environment(Env::Param) } else {
+                        Value::Service(Env::Param, self.service(module, name.span))
+                    };
                     let l = fx.var(*var);
                     out.push(Stmt::Let {
                         dst: l,
-                        value: Value::Service(Env::Param, service),
+                        value,
                         site: None,
                     });
                 }
@@ -2636,6 +2643,25 @@ impl<'a> Lowerer<'a> {
                     // The value uses the environment from outside the
                     // statement (§4.8 rule 9).
                     let v = self.expr(fx, out, value);
+                    if let Some(supply) = self.typed.env_supplies.get(&(fx.module, *span)) {
+                        let mut entries: Vec<(u32, Value)> = match supply {
+                            ilang_check::types::EnvSupply::Row(keep) => self.services.iter()
+                                .filter(|(ty, _)| !keep.contains(ty))
+                                .map(|(_, id)| (*id, Value::CapturedService(v.clone(), *id)))
+                                .collect(),
+                            ilang_check::types::EnvSupply::Data(keys) => keys.iter().enumerate()
+                                .map(|(i, ty)| (self.services[ty], Value::Field(v.clone(), i as u32)))
+                                .collect(),
+                        };
+                        entries.sort_by_key(|(id, _)| *id);
+                        for (service, value) in entries {
+                            let value = let_value(fx, out, value, None);
+                            let dst = fx.local(LocalType::Env);
+                            out.push(Stmt::LetEnv { dst, env: fx.env, service, value });
+                            fx.env = Env::Local(dst);
+                        }
+                        continue;
+                    }
                     let service = self.service(fx.module, *span);
                     let dst = fx.local(LocalType::Env);
                     out.push(Stmt::LetEnv {

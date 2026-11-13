@@ -741,7 +741,7 @@ impl Solver {
         }
     }
 
-    fn mode(&self, t: &Ty) -> Mode {
+    pub(super) fn mode(&self, t: &Ty) -> Mode {
         match t {
             Ty::Var(v) => self.var(*v).row,
             Ty::Union(ms) | Ty::Inter(ms) => {
@@ -2598,6 +2598,54 @@ impl Solver {
             }
         }
         None
+    }
+
+    /// Remove an opaque captured row. Unlike a keyed provider this does
+    /// not install a handler obligation: the same row is supplied whole.
+    pub fn env_without_row(&mut self, need: &Ty, row: &Ty) -> Ty {
+        fn go(s: &mut Solver, need: &Ty, row: &Ty, seen: &mut HashSet<V>) -> Ty {
+            if need == row { return Ty::Never; }
+            match need {
+                Ty::Union(ms) => {
+                    let parts = ms.iter().map(|m| go(s, m, row, seen)).collect();
+                    s.env_union(parts)
+                }
+                Ty::Var(v) => {
+                    if let Ty::Var(r) = row
+                        && s.reach(vec![*v], false).0.contains(r) {
+                        return Ty::Never;
+                    }
+                    if !seen.insert(*v) { return Ty::Never; }
+                    let lower = s.var(*v).lower.clone();
+                    if lower.is_empty() { return need.clone(); }
+                    let parts = lower.iter().map(|m| go(s, m, row, seen)).collect();
+                    s.env_union(parts)
+                }
+                Ty::Diff(base, hs) => {
+                    let base = go(s, base, row, seen);
+                    s.env_diff(base, hs.clone())
+                }
+                _ => need.clone(),
+            }
+        }
+        go(self, need, row, &mut HashSet::default())
+    }
+
+    /// Written keys reachable in a need, including through inferred rows.
+    pub fn env_keys(&self, need: &Ty) -> Vec<TypeRef> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::default();
+        let mut todo = vec![need.clone()];
+        while let Some(t) = todo.pop() {
+            match t {
+                Ty::Con(Head::Named(r), ..) => { if !out.contains(&r) { out.push(r); } }
+                Ty::Union(ms) => todo.extend(ms),
+                Ty::Var(v) if seen.insert(v) => todo.extend(self.var(v).lower.clone()),
+                Ty::Diff(base, _) => todo.push(*base),
+                _ => {}
+            }
+        }
+        out
     }
 
     /// Remove the services provided by `T` from the need `M`; the provider

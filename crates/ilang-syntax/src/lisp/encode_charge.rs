@@ -415,7 +415,7 @@ pub(super) fn item<E>(
             }
             Param(param) => match param {
                 crate::ast::Param::Pattern(p) => work.push(Pattern(p)),
-                crate::ast::Param::Env { name, ty } => {
+                crate::ast::Param::Env { name, ty, .. } => {
                     bracket(&mut f, &mut work, 3)?;
                     work.push(Type(ty));
                     work.push(Atom(&name.name));

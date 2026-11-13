@@ -30,6 +30,7 @@ pub fn callee(c: &mut Callee, map: &mut impl FnMut(&mut Atom)) {
 pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
     match v {
         Value::Atom(a)
+        | Value::CapturedService(a, _)
         | Value::Field(a, _)
         | Value::RecGet(a, _)
         | Value::ListHead(a)
@@ -57,7 +58,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
             args.iter_mut().for_each(&mut *map);
             env(e, map);
         }
-        Value::Service(e, _) => env(e, map),
+        Value::Service(e, _) | Value::Environment(e) => env(e, map),
         Value::Closure { captures, .. } => captures.iter_mut().for_each(map),
         Value::Record { fields, .. } => fields.iter_mut().for_each(map),
         Value::RecNew(fields) => fields.iter_mut().for_each(|(_, a)| map(a)),

@@ -403,6 +403,14 @@ pub enum NumericFact {
 /// The result of type checking: the shown types, and what the code
 /// generator needs. Places are keyed by the module and the span of the
 /// node in the HIR, which is unique among the nodes of one kind.
+#[derive(Clone, Debug)]
+pub enum EnvSupply {
+    /// An opaque row; these explicit keys keep their caller's services.
+    Row(Vec<TypeRef>),
+    /// Positions of a closed data value, in order.
+    Data(Vec<TypeRef>),
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
     pub typed_expansions: HashMap<(ModuleId, Span), crate::typed_macro::Output>,
@@ -456,6 +464,7 @@ pub struct Typed {
     /// by the span of its name, and of each environment statement, by the
     /// span of the statement (§9.2). Aliases are expanded.
     pub services: HashMap<(ModuleId, Span), TypeRef>,
+    pub env_supplies: HashMap<(ModuleId, Span), EnvSupply>,
     /// Whether each top-level binding was generalized (§4.7): its value is
     /// a direct value, as are the values of its group.
     pub generalized: HashMap<BindingRef, bool>,

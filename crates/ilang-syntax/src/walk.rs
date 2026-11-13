@@ -137,7 +137,7 @@ impl Walk for Stmt {
         match self {
             Self::Bind(b) => b.walk(v),
             Self::Expr(e) => e.walk(v),
-            Self::Env { ty, value, span } => {
+            Self::Env { ty, value, span, .. } => {
                 ty.walk(v);
                 value.walk(v);
                 span.walk(v);
@@ -149,7 +149,7 @@ impl Walk for Param {
     fn walk(&mut self, v: &mut impl Visitor) {
         match self {
             Self::Pattern(p) => p.walk(v),
-            Self::Env { name, ty } => {
+            Self::Env { name, ty, .. } => {
                 name.walk(v);
                 ty.walk(v);
             }

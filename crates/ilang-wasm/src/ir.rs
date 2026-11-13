@@ -307,6 +307,10 @@ pub enum Value {
     OpEnv(Op, Vec<Atom>, Env),
     /// The service with this id in the environment (§9.2).
     Service(Env, u32),
+    /// Opaque environment value captured by a rest service pattern.
+    Environment(Env),
+    /// Read a service from an opaque captured environment.
+    CapturedService(Atom, u32),
     Closure {
         func: FuncId,
         captures: Vec<Atom>,

@@ -3586,7 +3586,7 @@ impl<'a> Resolver<'a> {
                     });
                     Stmt::Bind(binding)
                 }
-                ast::Stmt::Env { ty, value, span } => {
+                ast::Stmt::Env { ty, value, span, spread } => {
                     let ty = self.ty(ty);
                     // `_`: the key is read from the value (syntax three).
                     if !matches!(ty.kind, TypeKind::Hole) {
@@ -3594,6 +3594,7 @@ impl<'a> Resolver<'a> {
                     }
                     let value = self.expr(value);
                     Stmt::Env {
+                        spread: *spread,
                         ty,
                         value,
                         span: *span,
@@ -3650,11 +3651,14 @@ impl<'a> Resolver<'a> {
                     }
                     params.push(Param::Pattern { pattern, label });
                 }
-                ast::Param::Env { name, ty } => {
+                ast::Param::Env { name, ty, rest } => {
                     let ty = self.ty(ty);
                     // §9.2: two environment parameters of one function may
                     // not have the same type constructor.
-                    if let Some(head) = self.env_type(&ty) {
+                    if *rest && !matches!(ty.kind, TypeKind::Var(_)) {
+                        self.error(code::ENV_TYPE, ty.span, "a rest service pattern needs a type parameter of the function (§6.8)");
+                    }
+                    if !rest && let Some(head) = self.env_type(&ty) {
                         if env_heads.contains(&head) {
                             let tname = self.type_name(head);
                             self.error(
@@ -3678,6 +3682,7 @@ impl<'a> Resolver<'a> {
                         span: name.span,
                     });
                     params.push(Param::Env {
+                        rest: *rest,
                         var,
                         name: name.clone(),
                         ty,

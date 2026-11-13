@@ -140,6 +140,8 @@ pub enum Stmt {
     Bind(Binding),
     /// `! T = e` (§6.10, §9.2).
     Env {
+        /// Supply a whole data value or an opaque environment row.
+        spread: bool,
         ty: TypeExpr,
         value: Expr,
         span: Span,
@@ -336,6 +338,8 @@ pub enum Param {
     Pattern(Pattern),
     /// `name ! T` (§6.11).
     Env {
+        /// A syntax-three `..name: N` service pattern.
+        rest: bool,
         name: Ident,
         ty: TypeExpr,
     },

@@ -205,6 +205,7 @@ pub(crate) struct Checker<'a> {
     pub(super) recovery: bool,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
+    row_value_allowed: bool,
     label_key_slots: HashMap<VarId, Vec<(TyVarId, usize)>>,
     label_declared_vars: HashSet<TyVarId>,
     pub(super) label_key_values: HashMap<VarId, super::records::Label>,
@@ -297,6 +298,7 @@ impl<'a> Checker<'a> {
             reads: super::value_types::Reads::default(),
             recovery: false,
             tyvars: HashMap::new(),
+            row_value_allowed: false,
             written: HashMap::new(),
             kvars: HashMap::new(),
             effects: Vec::new(),
@@ -1983,7 +1985,12 @@ impl<'a> Checker<'a> {
         if observe {
             self.effects.push(Effects::default());
         }
+        let row_allowed = std::mem::take(&mut self.row_value_allowed);
         let result = self.infer_k_inner(e, expected);
+        if self.s.mode(&result.0) == Mode::Env && !row_allowed {
+            self.error(code::ENV_TYPE, e.span, "an environment row may only be bound, captured or provided after `<-`; it is not ordinary data (§9.4)");
+        }
+        self.row_value_allowed = row_allowed;
         if observe {
             let effects = self.pop_effects(e.span);
             self.add_env(effects.clone());
@@ -3243,7 +3250,42 @@ impl<'a> Checker<'a> {
                         );
                     }
                 }
-                Stmt::Env { ty, value, span } if matches!(ty.kind, TypeKind::Hole) => {
+                Stmt::Env { spread: true, value, span, .. } => {
+                    let saved = self.row_value_allowed;
+                    self.row_value_allowed = true;
+                    let (v, k) = self.infer_k(value, &Ty::Top);
+                    self.row_value_allowed = saved;
+                    self.effects.push(Effects::default());
+                    let a = self.block(&stmts[i + 1..], *span, expected);
+                    let env = self.pop_effects(*span);
+                    let rest = if self.s.mode(&v) == Mode::Env {
+                        let rest = self.s.env_without_row(&env, &v);
+                        let keys = self.s.env_keys(&rest);
+                        self.out.env_supplies.insert((self.module, *span), super::EnvSupply::Row(keys));
+                        rest
+                    } else if let Ty::Con(Head::Tuple(_), _, parts) = &k {
+                        let mut keys = Vec::new();
+                        for part in parts {
+                            if let Some(Head::Named(r)) = part.head() {
+                                if keys.contains(&r) {
+                                    self.error(code::ENV_TYPE, value.span, "provided data has two parts with one service key (§9.2)");
+                                }
+                                keys.push(r);
+                            } else {
+                                self.error(code::ENV_TYPE, value.span, "each provided part must have one known service type (§9.2)");
+                            }
+                        }
+                        self.out.env_supplies.insert((self.module, *span), super::EnvSupply::Data(keys));
+                        self.s.env_diff(env, parts.clone())
+                    } else {
+                        self.error(code::ENV_TYPE, value.span, "a whole provide needs positional data or a captured environment row (§9.2)");
+                        env
+                    };
+                    self.flush(*span, None);
+                    self.add_env(rest);
+                    return a;
+                }
+                Stmt::Env { ty, value, span, .. } if matches!(ty.kind, TypeKind::Hole) => {
                     // Syntax three, `r <- (e1)` (§2.10.2): the key is the
                     // type constructor of the known type of `e1`.
                     let (v, k) = self.infer_k(value, &Ty::Top);
@@ -3278,7 +3320,7 @@ impl<'a> Checker<'a> {
                     self.add_env(rest);
                     return a;
                 }
-                Stmt::Env { ty, value, span } => {
+                Stmt::Env { ty, value, span, .. } => {
                     // `! T = e1` and the rest `r`: `A ^ E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
@@ -3372,6 +3414,7 @@ impl<'a> Checker<'a> {
         };
         let mut params = Vec::new();
         let mut env_tys = Vec::new();
+        let mut rest_env = false;
         let mut fails = false;
         for p in &f.params {
             match p {
@@ -3398,13 +3441,14 @@ impl<'a> Checker<'a> {
                     self.fit_known(pattern, &k, false);
                     params.push((label.clone(), t));
                 }
-                Param::Env { var, name, ty } => {
+                Param::Env { var, name, ty, rest } => {
+                    rest_env |= rest;
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, name.span), r);
                     }
-                    let k = self.kconv(ty, &HashMap::new());
+                    let k = if *rest { t.clone() } else { self.kconv(ty, &HashMap::new()) };
                     self.kvars.insert(*var, k);
                     self.locals.insert(*var, Scheme::mono(t.clone()));
                     env_tys.push(t);
@@ -3463,7 +3507,12 @@ impl<'a> Checker<'a> {
         self.function_depth -= 1;
         self.active_key_parameters.pop();
         let known = self.fn_known(f, &expected, body_known);
-        let env = self.pop_effects(f.span);
+        let mut env = self.pop_effects(f.span);
+        if rest_env {
+            let declared = self.env_union(env_tys.clone(), f.span);
+            self.sub_env(&env, &declared, f.body.span, Some(f.span));
+            env = Ty::Never;
+        }
         let assert = Ty::named(self.b.assert, Vec::new());
         let t = match (ret, &f.ret) {
             (Some((value, _)), Some(written)) if inferred_needs => {
@@ -3557,7 +3606,10 @@ impl<'a> Checker<'a> {
             self.own_known(b);
         }
         let expected = self.binding_expected(b);
+        let saved = self.row_value_allowed;
+        self.row_value_allowed = matches!(b.pattern.kind, PatternKind::Var(_) | PatternKind::Typed { .. });
         let (a, k) = self.infer_k(&b.value, &expected);
+        self.row_value_allowed = saved;
         if direct {
             for binder in &binders {
                 self.recursive_bindings.remove(binder);

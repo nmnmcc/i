@@ -909,18 +909,19 @@ impl Cx<'_> {
                 o::Stmt::Env {
                     value,
                     span: env_span,
+                    spread,
                     ..
                 } => {
                     // §7.3: consecutive statements whose values are direct
                     // values are one provide; others nest, because a later
                     // value may need an earlier service.
-                    let mut provided = vec![n::DItem::Pos(self.expr(value))];
+                    let mut provided = vec![if *spread { n::DItem::Spread(self.expr(value)) } else { n::DItem::Pos(self.expr(value)) }];
                     let mut i = i;
                     while is_direct(value)
-                        && let Some(o::Stmt::Env { value: next, .. }) = stmts.get(i + 1)
+                        && let Some(o::Stmt::Env { value: next, spread, .. }) = stmts.get(i + 1)
                         && is_direct(next)
                     {
-                        provided.push(n::DItem::Pos(self.expr(next)));
+                        provided.push(if *spread { n::DItem::Spread(self.expr(next)) } else { n::DItem::Pos(self.expr(next)) });
                         i += 1;
                     }
                     let rest_span = Span::new(env_span.end, span.end.max(env_span.end));
@@ -1013,8 +1014,8 @@ impl Cx<'_> {
                     choices: vec![self.pattern(p, true)],
                 }),
                 // §7.3: the service pattern, in parameter order.
-                o::Param::Env { name, ty } => services.push(n::SItem {
-                    rest: false,
+                o::Param::Env { name, ty, rest } => services.push(n::SItem {
+                    rest: *rest,
                     name: id(name),
                     ty: self.ty(ty),
                 }),

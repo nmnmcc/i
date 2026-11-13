@@ -421,6 +421,8 @@ pub enum Stmt {
     Bind(Binding),
     /// `! T = e` (§6.10, §9.2). `ty` is one named type.
     Env {
+        /// Supply a whole data value or an opaque environment row.
+        spread: bool,
         ty: Type,
         value: Expr,
         span: Span,
@@ -550,7 +552,7 @@ pub enum Param {
         label: Option<String>,
     },
     /// `name ! T` (§6.11). `ty` is one named type.
-    Env { var: VarId, name: Ident, ty: Type },
+    Env { rest: bool, var: VarId, name: Ident, ty: Type },
 }
 
 #[derive(Clone, Debug)]

@@ -4,8 +4,7 @@
 //!
 //! The checker of this stage is today's, so the forms that only the later
 //! stages can type are compile errors here, each naming its stage: a chain
-//! with several shape groups (stage 9), `..name: N` in a service pattern
-//! (stage E6), a key on a parameter (stage 9), keys in data patterns
+//! with several shape groups (stage 9), a key on a parameter (stage 9), keys in data patterns
 //! (stage 6).
 //!
 //! Two things have no spelling in today's syntax and are passed on as
@@ -548,6 +547,7 @@ impl Cx {
                                 );
                             }
                             envs.push(o::Stmt::Env {
+                                spread: false,
                                 ty: ty(o::TypeKind::Hole, e.span.0),
                                 value,
                                 span: e.span.0,
@@ -557,17 +557,21 @@ impl Cx {
                             l.span.0,
                             "a provided service has no label: it is keyed by its type (§2.10.2)",
                         ),
-                        n::DItem::Spread(e) => self.error(
-                            e.span.0,
-                            "providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet",
-                        ),
+                        n::DItem::Spread(e) => envs.insert(0, o::Stmt::Env {
+                            spread: true,
+                            ty: ty(o::TypeKind::Hole, e.span.0),
+                            value: self.expr(e),
+                            span: e.span.0,
+                        }),
                     }
                 }
             }
-            _ => self.error(
-                services.span.0,
-                "providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-            ),
+            _ => envs.push(o::Stmt::Env {
+                spread: true,
+                ty: ty(o::TypeKind::Hole, services.span.0),
+                value: self.expr(services),
+                span: services.span.0,
+            }),
         }
         stmts.extend(envs);
         match &target.kind {
@@ -585,14 +589,8 @@ impl Cx {
 
     fn params_of(&mut self, f: &n::Function, params: &mut Vec<o::Param>) {
         for s in f.services.iter().flatten() {
-            if s.rest {
-                self.error(
-                    s.name.span.0,
-                    "`..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
-                );
-                continue;
-            }
             params.push(o::Param::Env {
+                rest: s.rest,
                 name: id(&s.name),
                 ty: self.ty(&s.ty),
             });

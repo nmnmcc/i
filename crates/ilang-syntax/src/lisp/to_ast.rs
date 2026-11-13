@@ -597,6 +597,7 @@ async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
                         && symbol(h, "!")
                     {
                         params.push(Param::Env {
+                            rest: false,
                             name: ident(n)?,
                             ty: type_child(s, ty).await?,
                         });
@@ -777,6 +778,7 @@ async fn statement_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Stmt> {
     if let Some([h, left, right]) = round(d) {
         if symbol(h, "!") {
             return Ok(Stmt::Env {
+                spread: false,
                 ty: type_child(s, left).await?,
                 value: expression_child(s, right).await?,
                 span: d.span,

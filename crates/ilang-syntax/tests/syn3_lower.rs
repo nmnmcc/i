@@ -110,8 +110,6 @@ fn forms_of_later_stages_are_errors() {
         "area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n",
         "stage 9",
     );
-    bad("keep = (f: Int) <- (..env: N) { f }\n", "stage E6");
-    bad("f = (x) { g(x) <- env }\n", "stage E6");
 }
 
 /// The Lisp surface: `std/src/test.is`, converted and read back, is the
@@ -160,4 +158,19 @@ fn written_full_type_is_closed() {
 fn repeated_type_parameter_kept() {
     let out = shown("pair = <A, A>(x: A) { (x, x) }\n");
     assert!(out.contains("pair(A, A)"), "{out}");
+}
+
+#[test]
+fn rest_service_heads_and_whole_provides_lower() {
+    use ilang_syntax::ast::{ExprKind, ItemKind, Param, Stmt};
+    let source = "keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) { (x) { f(x) <- env } }";
+    let (module, diags) = syn3::parse_lowered(source);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else { panic!() };
+    let ExprKind::Fn(f) = &binding.value.kind else { panic!() };
+    assert!(matches!(&f.params[1], Param::Env { rest: true, name, .. } if name.name == "env"));
+    let Stmt::Expr(inner) = &f.body.stmts[0] else { panic!() };
+    let ExprKind::Fn(inner) = &inner.kind else { panic!() };
+    assert!(matches!(&inner.body.stmts[0], Stmt::Env { spread: true, .. }));
+    assert!(syn3::parse_lowered("f = <N>() <- (..env: N, db: Db) { Nil }").1.iter().any(|d| d.message.contains("last item")));
 }
