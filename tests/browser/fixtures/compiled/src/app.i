@@ -9,7 +9,7 @@
 (
 	Console
 	Storage
-	Clock
+	Clock(..)
 	greet
 	lookup
 	distance

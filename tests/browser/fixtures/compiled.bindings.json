@@ -1,10 +1,10 @@
 {
-  "artifact_digest": "sha256-0d11fe05b902cc549ba9cad0c34afd18ef905495aaeca4b5b0a3b9567f333b50",
+  "artifact_digest": "sha256-c6430c68f130690892a1003236d92f4817e1add16c0994e240fa22d6b4919d81",
   "declarations": [
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/app",
-      "module_digest": "sha256-80431c631dc1c5c0015cee84d02f0c3e68d324473b7698c5a74bd53f314ee6fb",
+      "module_digest": "sha256-d6dc2a8a72056c24cf0ca6740f9bfcefacec36f881a1ac9bb5953a00729805fe",
       "declaration": "hypot",
       "namespace": "app:math/v1",
       "name": "hypot",
@@ -20,7 +20,24 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
+      "module": "app/ints",
+      "module_digest": "sha256-c1bb78a45d45eeed3fd5623997cb73640442c9804ded7cb3e838d6e6ee51cc0b",
+      "declaration": "foreign_echo",
+      "namespace": "custom",
+      "name": "echo_int",
+      "kind": "external",
+      "signature": {
+        "params": [
+          "int"
+        ],
+        "result": "int",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "get_a",
@@ -35,7 +52,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "get_b",
@@ -50,7 +67,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "echo_a",
@@ -67,7 +84,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "echo_b",
@@ -84,9 +101,9 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/app",
-      "module_digest": "sha256-80431c631dc1c5c0015cee84d02f0c3e68d324473b7698c5a74bd53f314ee6fb",
+      "module_digest": "sha256-d6dc2a8a72056c24cf0ca6740f9bfcefacec36f881a1ac9bb5953a00729805fe",
       "declaration": "Console.print",
       "namespace": "app:console/v1",
       "name": "print",
@@ -101,9 +118,9 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/app",
-      "module_digest": "sha256-80431c631dc1c5c0015cee84d02f0c3e68d324473b7698c5a74bd53f314ee6fb",
+      "module_digest": "sha256-d6dc2a8a72056c24cf0ca6740f9bfcefacec36f881a1ac9bb5953a00729805fe",
       "declaration": "Storage.read",
       "namespace": "app:storage/v1",
       "name": "read",
@@ -120,9 +137,9 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/app",
-      "module_digest": "sha256-80431c631dc1c5c0015cee84d02f0c3e68d324473b7698c5a74bd53f314ee6fb",
+      "module_digest": "sha256-d6dc2a8a72056c24cf0ca6740f9bfcefacec36f881a1ac9bb5953a00729805fe",
       "declaration": "Clock.later",
       "namespace": "app:clock/v1",
       "name": "later",
@@ -139,9 +156,9 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/app",
-      "module_digest": "sha256-80431c631dc1c5c0015cee84d02f0c3e68d324473b7698c5a74bd53f314ee6fb",
+      "module_digest": "sha256-d6dc2a8a72056c24cf0ca6740f9bfcefacec36f881a1ac9bb5953a00729805fe",
       "declaration": "Clock.tick",
       "namespace": "app:clock/v1",
       "name": "tick",
@@ -156,7 +173,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "SyncA.get_a",
@@ -171,7 +188,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "SyncB.get_b",
@@ -186,7 +203,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "AsyncA.get_a",
@@ -201,7 +218,7 @@
       }
     },
     {
-      "package": "sha256-68f57be927982efb17b288c70b5e02af1b404bb985d4e1f8fceb1c20f3f8367b",
+      "package": "sha256-131a1e4efae2e294421e37952e21422314c82ba20e68cf210b507a3f6396098e",
       "module": "app/opaque",
       "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "AsyncB.get_b",

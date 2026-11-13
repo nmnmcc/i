@@ -111,4 +111,4 @@ annotated_call : Int
 187:33: warning[W0503]: the two sides have the known types `Int | String` and `Float`, which can never be equal, so `==` is always `False` (§6.9)
 195:17: warning[W0503]: the two sides have the known types `Int | String` and `Nil`, which can never be equal, so `==` is always `False` (§6.9)
 201:2: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-210:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+210:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u: User) { u.name }`, or give the function where a type is expected, for example `get_name: (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)

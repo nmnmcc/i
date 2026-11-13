@@ -222,3 +222,16 @@ test("compiled opaque boundaries preserve nominal identity", async ({ page }) =>
   }, `(${load})`);
   expect(result).toBe(true);
 });
+
+test("ABI 5 Int boundaries cross compiled imports, exports and async replies", async ({ page }) => {
+  await page.goto("/tests/browser/harness.html");
+  const count = await page.evaluate(async () => {
+    const { instantiate, GuestError } = await import("/bindings/javascript/ilang.mjs");
+    const { compiledImports, checkIntegers } = await import("/tests/browser/fixture-abi.mjs");
+    const guest = await instantiate("/tests/browser/fixtures/compiled.wasm", {
+      imports: compiledImports(GuestError, [], { tick: async n => n }),
+    });
+    return checkIntegers(guest, GuestError);
+  });
+  expect(count).toBe(13);
+});

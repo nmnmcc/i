@@ -311,3 +311,28 @@ jobs:
           path: tests/review/cases/**/actual.json
           if-no-files-found: ignore
           retention-days: 14
+
+  docs:
+    name: verify (documentation site)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Install and build the site
+        working-directory: docs
+        run: |
+          devenv shell -- npm ci
+          devenv shell -- npm run build
+          devenv shell -- npm run check:links
+          devenv shell -- npm run check:examples

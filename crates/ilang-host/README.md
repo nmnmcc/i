@@ -73,7 +73,7 @@ unusable.
 | --- | --- | --- |
 | `nil` | none | `Value::Nil` |
 | `bool` | `i32` 0 or 1 | `Value::Bool` |
-| `int` | sign, address, count (`i32`) | `Value::Int(BigInt)` |
+| `int` | sign, address or inline signed value, count (`i32`) | `Value::Int(BigInt)` |
 | `float` | finite `f64` | `Value::Float` |
 | `string` | address, UTF-8 length | `Value::String` |
 | `bit_array` | address, number of bits | `Value::BitArray` |

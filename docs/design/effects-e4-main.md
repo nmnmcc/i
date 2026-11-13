@@ -272,3 +272,46 @@ match main, b1/r6 match main exactly, and all active parser diagnostic registrat
 five explicitly retired E6 implementation guards described above. `git diff --check` passes throughout. No unfiltered corpus,
 unfiltered spec or full-workspace Rust test run is substituted for the
 coordinator's gates. The coordinator retains the final b1/r6 corpus recording.
+
+## Integration with origin/main e44514d4
+
+The next coordinator request merges `refs/remotes/origin/main` at
+`e44514d46690ea9e25486c95a34d616fcf86f6a8`, without fetching or touching the
+main checkout. Its ABI-5 change is `09571bffa`, reached through the cited
+merge `c445df13e`. That merge message has no regeneration details; the
+underlying ABI commit explicitly says:
+`I=$PWD/target/release/i bash scripts/build-abi-fixture.sh`.
+
+Conflict decisions:
+
+- Keep the E3 whole-row `N` scheme in `known_pipe_left.out`, and main's full
+  E0506 guidance. No error line is removed.
+- Keep main's syntax-three branch spelling in the list documentation; list
+  implementation and assertions are unchanged.
+- Keep the exact stop check at the merged source call. This lane retains
+  `distance = (a: Float, b: Float) -> Float { hypot(a, b) }`, so `hypot` starts
+  at `app/app:41:44`, rather than the unannotated main source's `41:35`.
+  Preserve the additional ABI-5 Node/browser tests from main.
+- Start the snippet config with the union. An identity audit then removes
+  81 absent-source records (77 obsolete host-data classifications, four
+  obsolete fragment renderers). Preserve all live entries from both sides
+  and the positive E6 keep example, rather than resurrecting its obsolete
+  not-implemented guard. The existing mixed-data negative remains.
+- Select main's conflicted Wasm binaries and binding sidecars, then rebuild
+  them exclusively with the merged compiler and the repository fixture
+  script. No generated binary or sidecar is manually edited.
+
+Spec §11.7: “The position of an expression is the position of its first token.”
+The whole-row/E6 decisions retain the quoted §9.2/§9.4 and syntax-3 §2.10.8
+rules above. ABI §B.2 says: “An inline `Int` has no buffer and its second
+`i32` is never checked as an address or freed.” Generated fixtures must be
+ABI 5; the hand-written legacy fixtures remain ABI 3, and hosts read 3–5.
+
+Verification on this new base: workspace all-targets check and release
+build pass. The fixture script regenerates and validates all five ABI-5
+modules and sidecars; legacy hand-written fixtures remain ABI 3. Their five
+binding contracts equal main after digest normalization. The requested
+checker/Wasm/host tests, spec 9/9.7/9.9/11 at both opts, std O0, Node tests,
+formatting, strict clippy, and the directly invoked snippet gate follow. This section
+is updated with results before handover; previous-base O2/browser/generation
+results above are historical and are not claimed as reruns of this merge.
