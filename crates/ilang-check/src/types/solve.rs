@@ -3603,7 +3603,10 @@ mod literal_tests {
             );
             assert!(s.failures.is_empty());
             assert!(s.var(variable(&a)).upper.is_empty());
-            assert_eq!(s.var(variable(&result)).lower, [int.clone()]);
+            assert_eq!(
+                s.var(variable(&result)).lower.as_slice(),
+                std::slice::from_ref(&int)
+            );
 
             let mut s = solver();
             let a = s.fresh();
@@ -3647,7 +3650,7 @@ mod literal_tests {
 
             let mut s = solver();
             let (a, b) = (s.fresh(), s.fresh());
-            let mut operands = vec![
+            let mut operands = [
                 Ty::tuple(vec![a.clone(), int.clone()]),
                 Ty::tuple(vec![string.clone(), b.clone()]),
             ];

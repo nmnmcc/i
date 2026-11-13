@@ -34,8 +34,8 @@ the universal property.
 
 ## 1. The algebraic base
 
-**Verdict: the order-dependent inference defect is fixed in `685a1b04c`
-by reporting E0504 when the solver cannot find a principal type (§4.7).
+**Verdict: the order-dependent inference defect is fixed in `685a1b04c`,
+with follow-ups `cde147079` and `c51d1d5a5`, by reporting E0504 when the solver cannot find a principal type (§4.7).
 This is a conservative rejection, not a completeness proof or a general
 representation of relational intersection constraints. The cited calculi
 and the finite/cofinite scalar component retain their separate arguments.**
@@ -171,12 +171,14 @@ current compiler's principal inference/solution preservation, **not** a
 proof that no principal scheme can exist in a better account of the
 language. Neither annotations nor tests are changed to hide it.
 
-**Correction (`685a1b04c`, with proof-budget follow-up `cde147079`).**
+**Correction (`685a1b04c`, `cde147079`, `c51d1d5a5`).**
 The two operand orders now receive E0504 at
 `x + 1`: the solver cannot infer a principal solution from the different
 successful specializations. It first checks whether an existing bound
-already proves the goal, then tries alternatives in isolated states.
-No failed alternative leaves bounds behind. Each read-only alternative gets
+already proves the goal. It retains a successful structural constructor
+proof, then tries competing variable alternatives in isolated states.
+A unique remaining variable constraint keeps its ordinary diagnostic and
+recovery behavior. No failed speculative trial leaves bounds behind. Each read-only alternative gets
 its own proof budget, so an expensive earlier member cannot prevent a later
 proof. An ambiguous subproblem is not discarded as though it had no solutions. The definition-only probe
 also receives E0504. This intentionally removes the old accepted,
@@ -199,8 +201,8 @@ counterexample.
 **Verdict: holds for merging fully determined, compatible entries, because
 the merge is their unique prescribed meet; not shown for the full open-row
 system. The missed deferred E0515 rejection below is fixed in `161d07271`,
-with follow-ups `c9193f54c`, `cde147079` and `31e59eb2d`; this is a soundness
-correction.**
+with follow-ups `c9193f54c`, `cde147079`, `31e59eb2d` and `c51d1d5a5`;
+this is a soundness correction.**
 
 [§9.2, “Merging”](../spec.md#92-services) says that merging needs takes their
 intersection. Its next paragraph makes an empty service intersection an
@@ -356,7 +358,8 @@ deferred meet's metadata. This is a candidate explanation for the observed
 loss, not a traced causal diagnosis. The scalar/ground proof and the
 `freshen` metadata-copying branch do not cover this path.
 
-**Correction (`161d07271`, `c9193f54c`, `cde147079`, `31e59eb2d`).**
+**Correction (`161d07271`, `c9193f54c`, `cde147079`, `31e59eb2d`,
+`c51d1d5a5`).**
 The traced loss was at
 generalization: `has_obligations` ignored `need_meet`, so `generalize`
 rebuilt the simplified intersection without its marked variable or service
@@ -370,7 +373,11 @@ quantified graph with one map, stopping at nongeneralized variables and
 keeping the receiver's own bounds distinct from the meet's bounds. Handler
 discovery keeps its existing directed traversal. A regression checks a
 conflict in a fresh receiver instance while the original quantified bounds
-remain unchanged. Callback need fitting preserves the late `NeedMeet` and
+remain unchanged. Freshening retains input provenance for value variables
+connected to a meet, so provisional lower bounds alone do not close them.
+Equal concrete lower and upper bounds still determine an input. The
+ordinary-value control passes in both need orders. Callback need fitting
+preserves the late `NeedMeet` and
 its service pair instead of replacing it with a generic form mismatch. The callback helper alone remains admissible, as do
 compatible callback instances; the disjoint callback instance reports
 E0515 under §9.2. Fixtures under `tests/spec/9/` and checker tests cover the
@@ -1007,6 +1014,22 @@ probes cannot promote them to established guarantees. §4.2's literal
 paragraph also says “inference still finds principal types”; its scalar
 closure argument should be read with this limitation. This lane's spec
 edit is deliberately confined to §4.7.
+
+### Correction verification (2026-11-14)
+
+The wrapped checker run on `c51d1d5a5` completed at 06:53 with **325 passed,
+4 existing stress tests ignored, and only
+`spec_corpus_reverse_order_and_recovery` filtered out**. Every existing
+golden, including every error line, is unchanged. The focused `deferred`
+row-scheme filter passed both tests: the local/imported callback rejection
+and the lower-bound-only acceptance control. `cargo fmt --all -- --check`
+and both unstaged/staged `git diff --check` checks passed.
+
+Two test-only clippy suggestions were then applied without changing the
+assertions' meaning or compiler logic. The unit/clippy retry, release CLI
+build, spec filters `4.4/`, `4.5/`, `9/`, std O0/O2, filtered `review-k4`
+corpus and short generation checks are pending. These are later gates,
+not claimed green by the checker result above.
 
 ## Unproven parts
 
