@@ -212,16 +212,66 @@ impl Query<'_> {
                 out.push(t);
             }
         }
+        let mut named = Vec::new();
         for c in clauses {
             for p in &c.patterns {
                 if let PatternKind::Constructor { ctor, .. } = &p.kind
-                    && !out.contains(&ctor.ty)
+                    && !named.contains(&ctor.ty)
                 {
-                    out.push(ctor.ty);
+                    named.push(ctor.ty);
                 }
             }
         }
+        // When the subject's type is not known, the members of the declared
+        // union of a named constructor's type (syntax three §2.8), in the
+        // union's order: the former constructors of its sum.
+        // When the subject's known members are all in the declared union of
+        // a named constructor's type (syntax three §2.8), the members of that
+        // union in written order: the former constructors of its sum.
+        if let Some(&first) = named.first() {
+            let union = self.union_of(first);
+            if !union.is_empty() && out.iter().all(|t| union.contains(t)) {
+                out = union;
+            }
+        }
+        for t in named {
+            if !out.contains(&t) {
+                out.push(t);
+            }
+        }
         out
+    }
+
+    /// The members of the smallest declared union of labelled types that
+    /// has `t` as a member, in written order; empty when there is none.
+    fn union_of(&self, t: TypeId) -> Vec<TypeId> {
+        let p = self.program;
+        let mut best: Option<Vec<TypeId>> = None;
+        for def in &p.types {
+            let TypeBody::Alias(body) = &def.body else {
+                continue;
+            };
+            let TypeKind::Union(ms) = &body.kind else {
+                continue;
+            };
+            let members: Option<Vec<TypeId>> = ms
+                .iter()
+                .map(|m| match &m.kind {
+                    TypeKind::Named {
+                        ty: TypeRef::Custom(id),
+                        ..
+                    } if matches!(p.ty(*id).body, TypeBody::Custom(_)) => Some(*id),
+                    _ => None,
+                })
+                .collect();
+            if let Some(members) = members
+                && members.contains(&t)
+                && best.as_ref().is_none_or(|b| members.len() < b.len())
+            {
+                best = Some(members);
+            }
+        }
+        best.unwrap_or_default()
     }
 
     pub(crate) fn context_completions(&self, m: ModuleId, offset: u32) -> Vec<Completion> {
