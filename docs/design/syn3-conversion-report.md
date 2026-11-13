@@ -320,3 +320,11 @@ or replaced template strings were removed without changing retained entries.
 The inventory retry passes all **4,728** texts with **five** exact tracked-error
 entries (two E6 examples and three historical invalid inputs). Both provided
 service and environment examples still have their explicit E6 reasons.
+
+The new `syn3_fixtures` CLI binary passes after the imported formatter's
+source moves were mapped to the same call sites. `multi_value_call`'s `f` call
+moved from 21:24 to 22:16; the three `no_shape` calls and three
+`select_reject` bindings moved with formatting. Error codes and messages are
+unchanged. The `scale` type keeps its actual `by` key and writes `by = Int`.
+The fixture library helper now checks a syntax-three AST/printer round trip
+instead of converting a library that is already converted.
