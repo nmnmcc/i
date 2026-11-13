@@ -942,7 +942,12 @@ impl<'p> Emitter<'p> {
                 )
             }
             Value::Service(env, id) => {
-                format!("(array.get $env {} (i32.const {id}))", env_text(*env))
+                let read = format!("(array.get $env {} (i32.const {id}))", env_text(*env));
+                if self.p.lazy_services.contains(id) {
+                    format!("(call $service_force {read} {})", env_text(*env))
+                } else {
+                    read
+                }
             }
             Value::Closure {
                 func,

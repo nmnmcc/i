@@ -456,7 +456,7 @@ pub(super) const EFFECTS: &str = r#"
   (return_call $boundary_core
     (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
       (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)
-      (ref.null eq) (i32.const 0))
+      (ref.null eq) (i32.const 0) (ref.null eq) (ref.null eq))
     (local.get $env) (local.get $body) (ref.null $sub) (ref.null eq) (i32.const 0)))
 
 ;; Kept with these parameters for `emit/host.rs`. `rest`, `cancel` and
@@ -535,7 +535,29 @@ pub(super) const EFFECTS: &str = r#"
 (func $light_new (result eqref)
   (struct.new $boundary (i32.const 11) (i32.const 0) (i64.extend_i32_u (call $shadow_depth)) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)
-    (ref.null eq) (i32.const 0)))
+    (ref.null eq) (i32.const 0) (ref.null eq) (ref.null eq)))
+
+;; A provided value made later (`Stmt::LetEnv` of a light boundary's
+;; handle): the light boundary `b` stands for the value `builder(b)` in the
+;; environment until a service read needs it (`$service_force`).
+(func $light_lazy (param $b eqref) (param $builder eqref) (result eqref)
+  (struct.set $boundary 11 (ref.cast (ref $boundary) (local.get $b)) (local.get $builder))
+  (ref.null eq))
+
+;; The value of a service read from the environment: a light boundary that
+;; stands for a provided value gives that value, made once (the same value
+;; at every read); anything else is the value.
+(func $service_force (param $v eqref) (param $env (ref null $env)) (result eqref)
+  (local $b (ref $boundary)) (local $m eqref)
+  (if (i32.eqz (ref.test (ref $boundary) (local.get $v))) (then (return (local.get $v))))
+  (local.set $b (ref.cast (ref $boundary) (local.get $v)))
+  (if (ref.is_null (struct.get $boundary 11 (local.get $b))) (then (return (local.get $v))))
+  (local.set $m (struct.get $boundary 12 (local.get $b)))
+  (if (ref.is_null (local.get $m))
+    (then
+      (local.set $m (call $call1 (struct.get $boundary 11 (local.get $b)) (local.get $b) (local.get $env)))
+      (struct.set $boundary 12 (local.get $b) (local.get $m))))
+  (local.get $m))
 
 ;; The body of the light boundary `b` gave `r`.
 (func $light_done (param $b eqref) (param $r eqref) (result eqref)
@@ -832,7 +854,10 @@ pub(super) const EFFECTS: &str = r#"
 pub(super) const TYPES: &str = r#"
 (type $boundary (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
-  (field (ref null $call)) (field (mut i32)) (field (mut eqref)) (field (mut i32)))))
+  (field (ref null $call)) (field (mut i32)) (field (mut eqref)) (field (mut i32))
+  ;; 11 for a light boundary that stands for a provided value: the function
+  ;; that makes the value from the boundary; 12 the value once made.
+  (field (mut eqref)) (field (mut eqref)))))
 ;; The value of `$error` for `control.escape(b, v)`: the boundary and the value.
 (type $escaped (struct (field (ref $boundary)) (field eqref)))
 (rec

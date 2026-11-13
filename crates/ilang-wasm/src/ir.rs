@@ -840,6 +840,9 @@ pub struct Program {
     pub globals: u32,
     /// The number of service ids, at least 1 for `Assert` (§9.2).
     pub services: u32,
+    /// The service ids that a light boundary may provide lazily (its handle
+    /// stands for the value, `Value::Light`): reads of them force it.
+    pub lazy_services: std::collections::BTreeSet<u32>,
     pub request_owner: Option<u32>,
     /// The code of `ilang_start` after the tables are installed.
     pub start: Option<Func>,
