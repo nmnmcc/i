@@ -473,8 +473,6 @@ to_codepoint_strings = (string: String) -> List(String) {
 	list.map(core.codepoints(string), (c) { core.from_codepoints([c]) })
 }
 
-/// The codepoint with this number, or `Error(Nil)` when it is not a Unicode
-/// scalar value (0 to 0x10FFFF, but not 0xD800 to 0xDFFF).
 _utf_codepoint_result = (value: Int) -> Result(UtfCodepoint, Nil) {
 	core.int_to_codepoint(value)
 }
@@ -762,7 +760,10 @@ fold = <A, N>(string: String, from: A, with: (A, UtfCodepoint) <- N -> A) -> A {
 	list.fold(core.codepoints(string), from, with)
 }
 
+/// The codepoint with this number, raising `Nil` when it is not a Unicode
+/// scalar value (0 to 0x10FFFF, but not 0xD800 to 0xDFFF).
+///
 /// Reports failure through `Fail(Nil)`.
-utf_codepoint = (value: Int) <- (Fail(Nil)) -> UtfCodepoint {
+utf_codepoint = (value: Int) -> UtfCodepoint {
 	fail.from_result(_utf_codepoint_result(value))
 }

@@ -15,8 +15,13 @@ handling, including every success/error assertion. Function-valued uses are
 adapted with a function literal; piped calls keep their first argument.
 Arguments containing calls are evaluated before entering the adapter catch,
 so their errors still reach the caller (notably URI escape validation).
+The power-pipe and chained-slice tests keep named function calls in their
+pipelines, catching around the pipeline while retaining the original values.
 Parameter names in this table document arguments, rather than type labels.
-Implicit needs of the original bodies continue to be inferred.
+The table shows the inferred Fail need. Wrapper literal heads omit it, following
+§2.10.1: "A function that needs a service only to pass it on writes nothing:
+the need passes down by R2." Their call to `fail.from_result` infers Fail;
+the other needs of original bodies also continue to be inferred.
 
 Per-function choices for Result data:
 
@@ -123,3 +128,7 @@ error, and §2.10.6 puts both library and service failures through Fail.
 | `uri.decode_component` | `(text: String) -> Result(String, CodecError)` | `(text: String) <- (Fail(CodecError)) -> String` | `std/test/uri_test.i` |
 | `uri.decode_bytes` | `(text: String) -> Result(BitArray, CodecError)` | `(text: String) <- (Fail(CodecError)) -> BitArray` | `std/test/uri_test.i` |
 | `uri.parse_query` | `(query: String) -> Result(List((String, String)), CodecError)` | `(query: String) <- (Fail(CodecError)) -> List((String, String))` | `std/src/http.i`, `std/test/uri_test.i` |
+
+Public documentation follows the new API. The original descriptions moved from
+private helpers to public wrappers; examples that show Result values now use
+`fail.catch`. Existing Result-data combinator examples adapt their callbacks.

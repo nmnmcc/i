@@ -74,27 +74,39 @@ test("sampling_and_map_laws", () {
 })
 
 test("integer_rules", () {
-	assert(fail.catch(() { property.int(3, 2) }) == Error(property.InvalidRange(3, 2)))
-	assert(fail.catch(() { property.element([]) }) == Error(property.EmptyChoice))
+	assert(
+		fail.catch(() { property.int(3, 2) }) ==
+			Error(property.InvalidRange(3, 2)),
+	)
+	assert(
+		fail.catch(() { property.element([]) }) == Error(property.EmptyChoice),
+	)
 	assert(
 		{
-e4_call_arg_0 = property.constant(0)
-e4_call_arg_1 = -1
-e4_call_arg_2 = 2
-fail.catch(() { property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
-} ==
+			e4_call_arg_0 = property.constant(0)
+			e4_call_arg_1 = -1
+			e4_call_arg_2 = 2
+			fail.catch(() {
+				property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+			})
+		} ==
 			Error(property.InvalidLength(-1, 2)),
 	)
 	assert(
 		{
-e4_call_arg_0 = property.constant(0)
-e4_call_arg_1 = 3
-e4_call_arg_2 = 2
-fail.catch(() { property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
-} ==
+			e4_call_arg_0 = property.constant(0)
+			e4_call_arg_1 = 3
+			e4_call_arg_2 = 2
+			fail.catch(() {
+				property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+			})
+		} ==
 			Error(property.InvalidLength(3, 2)),
 	)
-	assert(fail.catch(() { property.string(-2) }) == Error(property.InvalidLength(0, -2)))
+	assert(
+		fail.catch(() { property.string(-2) }) ==
+			Error(property.InvalidLength(0, -2)),
+	)
 	Ok(gen) = fail.catch(() { property.int(0, 10) })
 	t = find_ten(gen, 0)
 	assert(
@@ -464,11 +476,13 @@ test("attempt_streams_seed_and_prefixes", () {
 
 test("list_order_and_generated_bounds", () {
 	Ok(gen) = {
-e4_call_arg_0 = property.constant(7)
-e4_call_arg_1 = 0
-e4_call_arg_2 = 4
-fail.catch(() { property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
-}
+		e4_call_arg_0 = property.constant(7)
+		e4_call_arg_1 = 0
+		e4_call_arg_2 = 4
+		fail.catch(() {
+			property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+		})
+	}
 	find_four = (seed: Int) -> property.Tree(List(Int)) {
 		assert(seed < 1000)
 		t = root(gen, 4, seed)
@@ -497,11 +511,13 @@ fail.catch(() { property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
 	assert(
 		property.sample(
 			{
-e4_call_arg_0 = property.make((_, _) { None })
-e4_call_arg_1 = 1
-e4_call_arg_2 = 1
-fail.catch(() { property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
-} |>
+				e4_call_arg_0 = property.make((_, _) { None })
+				e4_call_arg_1 = 1
+				e4_call_arg_2 = 1
+				fail.catch(() {
+					property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+				})
+			} |>
 				(Ok(g)) { g }
 				| (Error(_)) { property.constant([]) },
 			1,
@@ -620,7 +636,9 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 				{ t.value |> (True) { [False] } | (False) { [] } },
 		)
 	})
-	Ok(choices) = fail.catch(() { property.element(["first", "second", "first"]) })
+	Ok(choices) = fail.catch(() {
+		property.element(["first", "second", "first"])
+	})
 	list.each(list.range(0, 49), (seed) {
 		t = root(choices, 0, seed)
 		assert(t.value == "first" || t.value == "second")

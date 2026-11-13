@@ -120,8 +120,6 @@ is_absolute = (path: String) -> Bool {
 	path |> ("/" <> _) { True } | (_) { False }
 }
 
-/// A lexical route from one location to another. Different roots and unmatched
-/// parents in the base are errors. Neither location is implicitly a file.
 _relative_result = (from: String, to: String) -> Result(String, RelativeError) {
 	a = clean(from)
 	b = clean(to)
@@ -187,7 +185,10 @@ clean_segments = (path: String) -> List(String) {
 	path |> (".") { [] } | (_) { list.filter(segments(path), (p) { p != "" }) }
 }
 
+/// A lexical route from one location to another. Different roots and unmatched
+/// parents in the base are errors. Neither location is implicitly a file.
+///
 /// Reports failure through `Fail(RelativeError)`.
-relative = (from: String, to: String) <- (Fail(RelativeError)) -> String {
+relative = (from: String, to: String) -> String {
 	fail.from_result(_relative_result(from, to))
 }

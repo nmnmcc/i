@@ -3,7 +3,9 @@
 
 Run from the repository root. --write applies the reviewed conversion and
 writes docs/design/effects-e4.md. Without --write, print the candidate list.
-Only std/**/*.i and examples/**/*.i are changed. Tokens in strings/comments
+Only std/**/*.i and examples/**/*.i are changed. Review the generated output;
+manual follow-ups in effects-e4.md retain resource lifetime, existing catches,
+and direct named-call pipeline test coverage. Tokens in strings/comments
 are left alone. The generated private helpers preserve the algorithms and
 module-local Result composition; public functions raise precisely the helper's
 error with fail.from_result. This is a one-shot migration, not a formatter.
@@ -232,7 +234,7 @@ def main():
         if own:
             for f in own:
                 s += (f'\n/// Reports failure through `Fail({compact(f["e"])})`.\n'
-                      f'{f["name"]} = {f["new"]} {{\n'
+                      f'{f["name"]} = {f["tp"]}({f["params"]}) -> {f["a"]} {{\n'
                       f'\tfail.from_result(_{f["name"]}_result({", ".join(f["names"])}))\n}}\n')
         if own or seen:
             p.write_text(fail_import(s))
@@ -245,8 +247,8 @@ Reviewed against syntax-3 §7.2 row E4 and §2.10.6:
 > `lib/i` that return `Result` today (`json.parse`, `float.divide`, …) change
 > in stage E4.
 
-The table lists exported operations with a written `Result` return type in
-`std/src`; each now raises its existing error. The private `_name_result`
+The table lists exported operations with written or inferred `Result` return
+types in `std/src`; each now raises its existing error. The private `_name_result`
 helpers retain the original implementation and same-module Result composition.
 Other std and example callers use `fail.catch` to keep their previous Result
 handling, including every success/error assertion. Function-valued uses are
@@ -272,8 +274,10 @@ Per-function choices for Result data:
 
 Only `std/**`, examples, this table, and the migration script are owned here.
 The `resource.acquire`/`Scope` library change in §2.10.9 requires `lib/i`, which
-this lane is explicitly instructed not to edit; its std caller remains on the
-current three-argument API pending the library owner's conversion.
+this lane is explicitly instructed not to edit. Convert its std log.file
+caller separately using unchanged resource.ensure to retain per-entry release.
+Review pre-existing catches (especially random_bytes_service_error) and piped
+calls in tests before committing the generated rewrite.
 
 | Function | Old type | New type | Callers adapted (module-local calls retain private helpers) |
 |---|---|---|---|

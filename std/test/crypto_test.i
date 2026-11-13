@@ -510,10 +510,10 @@ test("sha512_million_a", () {
 test("hmac_sha256_rfc4231_1", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-e4_call_arg_1 = unhex("4869205468657265")
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			e4_call_arg_1 = unhex("4869205468657265")
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7",
@@ -526,10 +526,12 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha256_rfc4231_2", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("4a656665")
-e4_call_arg_1 = unhex("7768617420646f2079612077616e7420666f72206e6f7468696e673f")
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("4a656665")
+			e4_call_arg_1 = unhex(
+				"7768617420646f2079612077616e7420666f72206e6f7468696e673f",
+			)
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
@@ -542,12 +544,12 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha256_rfc4231_3", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-e4_call_arg_1 = unhex(
+			e4_call_arg_0 = unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			e4_call_arg_1 = unhex(
 				"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 			)
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe",
@@ -560,12 +562,14 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha256_rfc4231_4", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("0102030405060708090a0b0c0d0e0f10111213141516171819")
-e4_call_arg_1 = unhex(
+			e4_call_arg_0 = unhex(
+				"0102030405060708090a0b0c0d0e0f10111213141516171819",
+			)
+			e4_call_arg_1 = unhex(
 				"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
 			)
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b",
@@ -578,10 +582,10 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha256_rfc4231_5", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
-e4_call_arg_1 = unhex("546573742057697468205472756e636174696f6e")
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
+			e4_call_arg_1 = unhex("546573742057697468205472756e636174696f6e")
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"a3b6167473100ee06e0c796c2955552bfa6f7c0a6a8aef8b93f860aab0cd20c5",
@@ -594,14 +598,14 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha256_rfc4231_6", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374",
 			)
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54",
@@ -614,14 +618,14 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha256_rfc4231_7", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e",
 			)
-fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2",
@@ -634,10 +638,10 @@ fail.catch(() { crypto.hmac_sha256(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_1", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-e4_call_arg_1 = unhex("4869205468657265")
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+			e4_call_arg_1 = unhex("4869205468657265")
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"87aa7cdea5ef619d4ff0b4241a1d6cb02379f4e2ce4ec2787ad0b30545e17cdedaa833b7d6b8a702038b274eaea3f4e4be9d914eeb61f1702e696c203a126854",
@@ -650,10 +654,12 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_2", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("4a656665")
-e4_call_arg_1 = unhex("7768617420646f2079612077616e7420666f72206e6f7468696e673f")
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("4a656665")
+			e4_call_arg_1 = unhex(
+				"7768617420646f2079612077616e7420666f72206e6f7468696e673f",
+			)
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737",
@@ -666,12 +672,12 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_3", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-e4_call_arg_1 = unhex(
+			e4_call_arg_0 = unhex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			e4_call_arg_1 = unhex(
 				"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 			)
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"fa73b0089d56a284efb0f0756c890be9b1b5dbdd8ee81a3655f83e33b2279d39bf3e848279a722c806b485a47e67c807b946a337bee8942674278859e13292fb",
@@ -684,12 +690,14 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_4", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("0102030405060708090a0b0c0d0e0f10111213141516171819")
-e4_call_arg_1 = unhex(
+			e4_call_arg_0 = unhex(
+				"0102030405060708090a0b0c0d0e0f10111213141516171819",
+			)
+			e4_call_arg_1 = unhex(
 				"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
 			)
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"b0ba465637458c6990e5a8c5f61d4af7e576d97ff94b872de76f8050361ee3dba91ca5c11aa25eb4d679275cc5788063a5f19741120c4f2de2adebeb10a298dd",
@@ -702,10 +710,10 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_5", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
-e4_call_arg_1 = unhex("546573742057697468205472756e636174696f6e")
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
+			e4_call_arg_1 = unhex("546573742057697468205472756e636174696f6e")
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"415fad6271580a531d4179bc891d87a650188707922a4fbb36663a1eb16da008711c5b50ddd0fc235084eb9d3364a1454fb2ef67cd1d29fe6773068ea266e96b",
@@ -718,14 +726,14 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_6", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374",
 			)
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"80b24263c7c1a3ebb71493c1dd7be8b49b46d1f41b4aeec1121b013783f8f3526b56d037e05f2598bd0fd2215d6a1e5295e64f73f63f0aec8b915a985d786598",
@@ -738,14 +746,14 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hmac_sha512_rfc4231_7", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e",
 			)
-fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				unhex(
 					"e37b6a775dc87dbaa4dfa9f96e5e3ffddebd71f8867289865df5a32d20cdc944b6022cac3c4982b10d5eeb55c3e4de15134676fb6de0446065c97440fa8c6a58",
@@ -758,10 +766,14 @@ fail.catch(() { crypto.hmac_sha512(e4_call_arg_0, e4_call_arg_1) })
 test("hkdf_sha256_rfc5869_1", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("000102030405060708090a0b0c")
-e4_call_arg_1 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-fail.catch(() { crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("000102030405060708090a0b0c")
+			e4_call_arg_1 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			fail.catch(() {
+				crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1)
+			})
+		} ==
 			Ok(
 				unhex(
 					"077709362c2e32df0ddc3f0dc47bba6390b6c73bb50f9c3122ec844ad7c2b3e5",
@@ -770,12 +782,21 @@ fail.catch(() { crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-e4_call_arg_1 = unhex("000102030405060708090a0b0c")
-e4_call_arg_2 = unhex("f0f1f2f3f4f5f6f7f8f9")
-e4_call_arg_3 = 42
-fail.catch(() { crypto.hkdf_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			e4_call_arg_1 = unhex("000102030405060708090a0b0c")
+			e4_call_arg_2 = unhex("f0f1f2f3f4f5f6f7f8f9")
+			e4_call_arg_3 = 42
+			fail.catch(() {
+				crypto.hkdf_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
@@ -788,14 +809,16 @@ fail.catch(() { crypto.hkdf_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, 
 test("hkdf_sha256_rfc5869_2", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
 			)
-fail.catch(() { crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() {
+				crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1)
+			})
+		} ==
 			Ok(
 				unhex(
 					"06a6b88c5853361a06104c9ceb35b45cef760014904671014a193f40c15fc244",
@@ -804,18 +827,25 @@ fail.catch(() { crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
 			)
-e4_call_arg_2 = unhex(
+			e4_call_arg_2 = unhex(
 				"b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
 			)
-e4_call_arg_3 = 82
-fail.catch(() { crypto.hkdf_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_3 = 82
+			fail.catch(() {
+				crypto.hkdf_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87",
@@ -828,10 +858,14 @@ fail.catch(() { crypto.hkdf_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, 
 test("hkdf_sha256_rfc5869_3", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("")
-e4_call_arg_1 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-fail.catch(() { crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("")
+			e4_call_arg_1 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			fail.catch(() {
+				crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1)
+			})
+		} ==
 			Ok(
 				unhex(
 					"19ef24a32c717b167f33a91d6f648bdf96596776afdb6377ac434c1c293ccb04",
@@ -840,12 +874,21 @@ fail.catch(() { crypto.hkdf_extract_sha256(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-e4_call_arg_1 = unhex("")
-e4_call_arg_2 = unhex("")
-e4_call_arg_3 = 42
-fail.catch(() { crypto.hkdf_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			e4_call_arg_1 = unhex("")
+			e4_call_arg_2 = unhex("")
+			e4_call_arg_3 = 42
+			fail.catch(() {
+				crypto.hkdf_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
@@ -858,10 +901,14 @@ fail.catch(() { crypto.hkdf_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, 
 test("hkdf_sha512_rfc5869_1", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("000102030405060708090a0b0c")
-e4_call_arg_1 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-fail.catch(() { crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("000102030405060708090a0b0c")
+			e4_call_arg_1 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			fail.catch(() {
+				crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1)
+			})
+		} ==
 			Ok(
 				unhex(
 					"665799823737ded04a88e47e54a5890bb2c3d247c7a4254a8e61350723590a26c36238127d8661b88cf80ef802d57e2f7cebcf1e00e083848be19929c61b4237",
@@ -870,12 +917,21 @@ fail.catch(() { crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-e4_call_arg_1 = unhex("000102030405060708090a0b0c")
-e4_call_arg_2 = unhex("f0f1f2f3f4f5f6f7f8f9")
-e4_call_arg_3 = 42
-fail.catch(() { crypto.hkdf_sha512(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			e4_call_arg_1 = unhex("000102030405060708090a0b0c")
+			e4_call_arg_2 = unhex("f0f1f2f3f4f5f6f7f8f9")
+			e4_call_arg_3 = 42
+			fail.catch(() {
+				crypto.hkdf_sha512(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"832390086cda71fb47625bb5ceb168e4c8e26a1a16ed34d9fc7fe92c1481579338da362cb8d9f925d7cb",
@@ -888,14 +944,16 @@ fail.catch(() { crypto.hkdf_sha512(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, 
 test("hkdf_sha512_rfc5869_2", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
 			)
-fail.catch(() { crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			fail.catch(() {
+				crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1)
+			})
+		} ==
 			Ok(
 				unhex(
 					"35672542907d4e142c00e84499e74e1de08be86535f924e022804ad775dde27ec86cd1e5b7d178c74489bdbeb30712beb82d4f97416c5a94ea81ebdf3e629e4a",
@@ -904,18 +962,25 @@ fail.catch(() { crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
 			)
-e4_call_arg_1 = unhex(
+			e4_call_arg_1 = unhex(
 				"606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
 			)
-e4_call_arg_2 = unhex(
+			e4_call_arg_2 = unhex(
 				"b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
 			)
-e4_call_arg_3 = 82
-fail.catch(() { crypto.hkdf_sha512(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_3 = 82
+			fail.catch(() {
+				crypto.hkdf_sha512(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"ce6c97192805b346e6161e821ed165673b84f400a2b514b2fe23d84cd189ddf1b695b48cbd1c8388441137b3ce28f16aa64ba33ba466b24df6cfcb021ecff235f6a2056ce3af1de44d572097a8505d9e7a93",
@@ -928,10 +993,14 @@ fail.catch(() { crypto.hkdf_sha512(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, 
 test("hkdf_sha512_rfc5869_3", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("")
-e4_call_arg_1 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-fail.catch(() { crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = unhex("")
+			e4_call_arg_1 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			fail.catch(() {
+				crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1)
+			})
+		} ==
 			Ok(
 				unhex(
 					"fd200c4987ac491313bd4a2a13287121247239e11c9ef82802044b66ef357e5b194498d0682611382348572a7b1611de54764094286320578a863f36562b0df6",
@@ -940,12 +1009,21 @@ fail.catch(() { crypto.hkdf_extract_sha512(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = unhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
-e4_call_arg_1 = unhex("")
-e4_call_arg_2 = unhex("")
-e4_call_arg_3 = 42
-fail.catch(() { crypto.hkdf_sha512(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex(
+				"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+			)
+			e4_call_arg_1 = unhex("")
+			e4_call_arg_2 = unhex("")
+			e4_call_arg_3 = 42
+			fail.catch(() {
+				crypto.hkdf_sha512(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"f5fa02b18298a72a8c23898a8703472c6eb179dc204c03425c970e3b164bf90fff22d04836d0e2343bac",
@@ -958,12 +1036,19 @@ fail.catch(() { crypto.hkdf_sha512(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, 
 test("pbkdf2_rfc6070_sha256_1", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("70617373776f7264")
-e4_call_arg_1 = unhex("73616c74")
-e4_call_arg_2 = 1
-e4_call_arg_3 = 32
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex("70617373776f7264")
+			e4_call_arg_1 = unhex("73616c74")
+			e4_call_arg_2 = 1
+			e4_call_arg_3 = 32
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b",
@@ -976,12 +1061,19 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_2", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("70617373776f7264")
-e4_call_arg_1 = unhex("73616c74")
-e4_call_arg_2 = 2
-e4_call_arg_3 = 32
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex("70617373776f7264")
+			e4_call_arg_1 = unhex("73616c74")
+			e4_call_arg_2 = 2
+			e4_call_arg_3 = 32
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43",
@@ -994,12 +1086,19 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_3", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("70617373776f7264")
-e4_call_arg_1 = unhex("73616c74")
-e4_call_arg_2 = 4096
-e4_call_arg_3 = 32
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex("70617373776f7264")
+			e4_call_arg_1 = unhex("73616c74")
+			e4_call_arg_2 = 4096
+			e4_call_arg_3 = 32
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a",
@@ -1012,14 +1111,23 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_4", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("70617373776f726450415353574f524470617373776f7264")
-e4_call_arg_1 = unhex(
+			e4_call_arg_0 = unhex(
+				"70617373776f726450415353574f524470617373776f7264",
+			)
+			e4_call_arg_1 = unhex(
 				"73616c7453414c5473616c7453414c5473616c7453414c5473616c7453414c5473616c74",
 			)
-e4_call_arg_2 = 4096
-e4_call_arg_3 = 40
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_2 = 4096
+			e4_call_arg_3 = 40
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"348c89dbcbd32b2f32d814b8116e84cf2b17347ebc1800181c4e2a1fb8dd53e1c635518c7dac47e9",
@@ -1032,12 +1140,19 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_5", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("7061737300776f7264")
-e4_call_arg_1 = unhex("7361006c74")
-e4_call_arg_2 = 4096
-e4_call_arg_3 = 16
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex("7061737300776f7264")
+			e4_call_arg_1 = unhex("7361006c74")
+			e4_call_arg_2 = 4096
+			e4_call_arg_3 = 16
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(unhex("89b69d0516f829893c696226650a8687")),
 	)
 	Nil
@@ -1046,12 +1161,19 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_6", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("")
-e4_call_arg_1 = unhex("")
-e4_call_arg_2 = 1
-e4_call_arg_3 = 64
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_0 = unhex("")
+			e4_call_arg_1 = unhex("")
+			e4_call_arg_2 = 1
+			e4_call_arg_3 = 64
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"f7ce0b653d2d72a4108cf5abe912ffdd777616dbbb27a70e8204f3ae2d0f6fad89f68f4811d1e87bcc3bd7400a9ffd29094f0184639574f39ae5a1315217bcd7",
@@ -1064,12 +1186,20 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_7", () {
 	assert(
 		{
-e4_call_arg_0 = unhex("70")
-e4_call_arg_1 = unhex("73")
-e4_call_arg_2 = 3
-e4_call_arg_3 = 0
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} == Ok(unhex("")),
+			e4_call_arg_0 = unhex("70")
+			e4_call_arg_1 = unhex("73")
+			e4_call_arg_2 = 3
+			e4_call_arg_3 = 0
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
+			Ok(unhex("")),
 	)
 	Nil
 })
@@ -1077,14 +1207,21 @@ fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2
 test("pbkdf2_rfc6070_sha256_8", () {
 	assert(
 		{
-e4_call_arg_0 = unhex(
+			e4_call_arg_0 = unhex(
 				"6c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e676c6f6e67",
 			)
-e4_call_arg_1 = unhex("73616c74")
-e4_call_arg_2 = 2
-e4_call_arg_3 = 65
-fail.catch(() { crypto.pbkdf2_sha256(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2, e4_call_arg_3) })
-} ==
+			e4_call_arg_1 = unhex("73616c74")
+			e4_call_arg_2 = 2
+			e4_call_arg_3 = 65
+			fail.catch(() {
+				crypto.pbkdf2_sha256(
+					e4_call_arg_0,
+					e4_call_arg_1,
+					e4_call_arg_2,
+					e4_call_arg_3,
+				)
+			})
+		} ==
 			Ok(
 				unhex(
 					"3f601773f7aa41d7d91d967c1044a21abae6e73c001e622934d50675fa9d9df4a22f1aafcb866109cac56f00213fc4cebafe1e511a3d21fabb2e15c43f4de5cca6",
@@ -1135,18 +1272,25 @@ test("unequal_bitlength", () {
 })
 
 test("hmac_alignment", () {
-	assert(fail.catch(() { crypto.hmac_sha256(<<1:u1>>, <<>>) }) == Error(crypto.UnalignedInput))
+	assert(
+		fail.catch(() { crypto.hmac_sha256(<<1:u1>>, <<>>) }) ==
+			Error(crypto.UnalignedInput),
+	)
 	Nil
 })
 
 test("hmac512_alignment", () {
-	assert(fail.catch(() { crypto.hmac_sha512(<<>>, <<1:u1>>) }) == Error(crypto.UnalignedInput))
+	assert(
+		fail.catch(() { crypto.hmac_sha512(<<>>, <<1:u1>>) }) ==
+			Error(crypto.UnalignedInput),
+	)
 	Nil
 })
 
 test("hkdf_negative", () {
 	assert(
-		fail.catch(() { crypto.hkdf_sha256(<<>>, <<>>, <<>>, -1) }) == Error(crypto.InvalidLength),
+		fail.catch(() { crypto.hkdf_sha256(<<>>, <<>>, <<>>, -1) }) ==
+			Error(crypto.InvalidLength),
 	)
 	Nil
 })
@@ -1193,7 +1337,8 @@ test("pbkdf_negative_iterations", () {
 
 test("pbkdf_negative_length", () {
 	assert(
-		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 1, -1) }) == Error(crypto.InvalidLength),
+		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 1, -1) }) ==
+			Error(crypto.InvalidLength),
 	)
 	Nil
 })
@@ -1224,7 +1369,10 @@ test("random_bytes_fake", () {
 
 test("random_bytes_negative", () {
 	{
-		assert(fail.catch(() { crypto.random_bytes(-1) }) == Error(crypto.InvalidLength))
+		assert(
+			fail.catch(() { crypto.random_bytes(-1) }) ==
+				Error(crypto.InvalidLength),
+		)
 		Nil
 	} <- (
 		process.Entropy(

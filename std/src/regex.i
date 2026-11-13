@@ -545,8 +545,6 @@ lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
 		}
 }
 
-/// Compiles to an immutable NFA, or an error at a scalar position.
-/// `regex.compile("(?<word>\\w+)")`.
 _compile_result = (pattern: String) -> Result(Regex, RegexError) {
 	fail.catch(() {
 		p = Parser(
@@ -1076,7 +1074,10 @@ table = (hex: String) -> BitArray {
 		| (Error(_)) { panic("regex: Unicode table encoding") }
 }
 
+/// Compiles to an immutable NFA, or an error at a scalar position.
+/// `fail.catch(() { regex.compile("(?<word>\\w+)") })`.
+///
 /// Reports failure through `Fail(RegexError)`.
-compile = (pattern: String) <- (Fail(RegexError)) -> Regex {
+compile = (pattern: String) -> Regex {
 	fail.from_result(_compile_result(pattern))
 }

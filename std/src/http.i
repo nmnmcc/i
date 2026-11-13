@@ -423,9 +423,9 @@ make_headers = (xs: List((String, BitArray))) -> Headers {
 
 text_unchecked = (xs: List(Int)) -> String {
 	{
-e4_call_arg_0 = bits(xs)
-fail.catch(() { bit_array.to_string(e4_call_arg_0) })
-} |>
+		e4_call_arg_0 = bits(xs)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid internal text") }
 }
@@ -731,9 +731,9 @@ bits = (xs: List(Int)) -> BitArray {
 
 text = (xs: List(Int)) -> String {
 	{
-e4_call_arg_0 = bits(xs)
-fail.catch(() { bit_array.to_string(e4_call_arg_0) })
-} |>
+		e4_call_arg_0 = bits(xs)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(s)) { s }
 		| (Error(_)) { fail.raise(BadMessage("invalid UTF-8")) }
 }
@@ -921,9 +921,9 @@ lowercase = (s: String) -> String {
 		{ x >= 65 && x <= 90 } |> (True) { x + 32 } | (False) { x }
 	})
 	{
-e4_call_arg_0 = bits(raw)
-fail.catch(() { bit_array.to_string(e4_call_arg_0) })
-} |>
+		e4_call_arg_0 = bits(raw)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid internal text") }
 }
@@ -1551,7 +1551,9 @@ post = (url: String, body: BitArray) -> Response {
 	)
 }
 
-_body_text_result = (res: Response) { fail.catch(() { bit_array.to_string(res.body) }) }
+_body_text_result = (res: Response) {
+	fail.catch(() { bit_array.to_string(res.body) })
+}
 
 follow = (pool: task.Ref(Pool), req: Request, count: Int) {
 	{ count > 10 } |>
@@ -2024,17 +2026,17 @@ has_token = (hs: Headers, name: String, value: String) -> Bool {
 }
 
 /// Reports failure through `Fail(uri.CodecError)`.
-parse_query = (query: String) <- (Fail(uri.CodecError)) -> List((String, String)) {
+parse_query = (query: String) -> List((String, String)) {
 	fail.from_result(_parse_query_result(query))
 }
 
 /// Reports failure through `Fail(Nil)`.
-body_text = (res: Response) <- (Fail(Nil)) -> String {
+body_text = (res: Response) -> String {
 	fail.from_result(_body_text_result(res))
 }
 
 /// Reports failure through `Fail(BodyError)`.
-body_json = (res: Response) <- (Fail(BodyError)) -> json.Json {
+body_json = (res: Response) -> json.Json {
 	fail.from_result(_body_json_result(res))
 }
 
@@ -2042,6 +2044,4 @@ body_json = (res: Response) <- (Fail(BodyError)) -> json.Json {
 body_decode = <A>(
 	res: Response,
 	codec: schema.Schema(A, schema.SchemaError)
-) <- (Fail(BodyError)) -> A {
-	fail.from_result(_body_decode_result(res, codec))
-}
+) -> A { fail.from_result(_body_decode_result(res, codec)) }

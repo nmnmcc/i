@@ -869,9 +869,13 @@ test("range_sum_test", () {
 	Nil
 })
 
-test("power_two_squared_test", () { assert(fail.catch(() { int.power(2, 2) }) == Ok(4)) })
+test("power_two_squared_test", () {
+	assert(fail.catch(() { int.power(2, 2) }) == Ok(4))
+})
 
-test("power_negative_cubed_test", () { assert(fail.catch(() { int.power(-5, 3) }) == Ok(-125)) })
+test("power_negative_cubed_test", () {
+	assert(fail.catch(() { int.power(-5, 3) }) == Ok(-125))
+})
 
 test("power_zero_exponent_test", () {
 	assert(fail.catch(() { int.power(10, 0) }) == Ok(1))
@@ -879,15 +883,23 @@ test("power_zero_exponent_test", () {
 })
 
 test("power_big_test", () {
-	assert(fail.catch(() { int.power(2, 100) }) == Ok(1267650600228229401496703205376))
-	assert(fail.catch(() { int.power(10, 30) }) == Ok(1_000_000_000_000_000_000_000_000_000_000))
+	assert(
+		fail.catch(() { int.power(2, 100) }) ==
+			Ok(1267650600228229401496703205376),
+	)
+	assert(
+		fail.catch(() { int.power(10, 30) }) ==
+			Ok(1_000_000_000_000_000_000_000_000_000_000),
+	)
 })
 
 test("power_negative_exponent_test", () {
 	assert(fail.catch(() { int.power(2, -1) }) == Error(Nil))
 })
 
-test("power_pipe_test", () { assert({ 3 |> (e4_pipe_value) { fail.catch(() { int.power(e4_pipe_value, 4) }) } } == Ok(81)) })
+test("power_pipe_test", () {
+	assert(fail.catch(() { 3 |> int.power(4) }) == Ok(81))
+})
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
@@ -924,13 +936,17 @@ test("to_base_more_test", () {
 	assert(fail.catch(() { int.to_base(1, 37) }) == Error(Nil))
 	assert(fail.catch(() { int.to_base(1, 1) }) == Error(Nil))
 	big = 1267650600228229401496703205376
-	assert(fail.catch(() { int.to_base(big, 2) }) == Ok("1" <> string.repeat("0", 100)))
+	assert(
+		fail.catch(() { int.to_base(big, 2) }) ==
+			Ok("1" <> string.repeat("0", 100)),
+	)
 	assert(
 		{
-e4_call_arg_0 = int.to_base16(big)
-e4_call_arg_1 = 16
-fail.catch(() { int.parse_base(e4_call_arg_0, e4_call_arg_1) })
-} == Ok(big),
+			e4_call_arg_0 = int.to_base16(big)
+			e4_call_arg_1 = 16
+			fail.catch(() { int.parse_base(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(big),
 	)
 })
 

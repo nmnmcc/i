@@ -218,48 +218,72 @@ test("concat_complex_2_test", () {
 })
 
 test("slice_full_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"hello":utf8>>, 0, 5) }) == Ok(<<"hello":utf8>>))
+	assert(
+		fail.catch(() { bit_array.slice(<<"hello":utf8>>, 0, 5) }) ==
+			Ok(<<"hello":utf8>>),
+	)
 	Nil
 })
 
 test("slice_empty_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"hello":utf8>>, 0, 0) }) == Ok(<<"":utf8>>))
+	assert(
+		fail.catch(() { bit_array.slice(<<"hello":utf8>>, 0, 0) }) ==
+			Ok(<<"":utf8>>),
+	)
 	Nil
 })
 
 test("slice_middle_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"hello":utf8>>, 2, 2) }) == Ok(<<"ll":utf8>>))
+	assert(
+		fail.catch(() { bit_array.slice(<<"hello":utf8>>, 2, 2) }) ==
+			Ok(<<"ll":utf8>>),
+	)
 	Nil
 })
 
 test("slice_negative_length_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"hello":utf8>>, 5, -2) }) == Ok(<<"lo":utf8>>))
+	assert(
+		fail.catch(() { bit_array.slice(<<"hello":utf8>>, 5, -2) }) ==
+			Ok(<<"lo":utf8>>),
+	)
 	Nil
 })
 
 test("slice_empty_string_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"":utf8>>, 0, 0) }) == Ok(<<"":utf8>>))
+	assert(
+		fail.catch(() { bit_array.slice(<<"":utf8>>, 0, 0) }) ==
+			Ok(<<"":utf8>>),
+	)
 	Nil
 })
 
 test("slice_out_of_bounds_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"hello":utf8>>, 6, 0) }) == Error(Nil))
+	assert(
+		fail.catch(() { bit_array.slice(<<"hello":utf8>>, 6, 0) }) ==
+			Error(Nil),
+	)
 	Nil
 })
 
 test("slice_invalid_negative_test", () {
-	assert(fail.catch(() { bit_array.slice(<<"hello":utf8>>, 1, -2) }) == Error(Nil))
+	assert(
+		fail.catch(() { bit_array.slice(<<"hello":utf8>>, 1, -2) }) ==
+			Error(Nil),
+	)
 	Nil
 })
 
 test("slice_negative_start_test", () {
 	assert(
 		{
-e4_call_arg_0 = bit_array.from_string("hello")
-e4_call_arg_1 = -1
-e4_call_arg_2 = 1
-fail.catch(() { bit_array.slice(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
-} == Error(Nil),
+			e4_call_arg_0 = bit_array.from_string("hello")
+			e4_call_arg_1 = -1
+			e4_call_arg_2 = 1
+			fail.catch(() {
+				bit_array.slice(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+			})
+		} ==
+			Error(Nil),
 	)
 	Nil
 })
@@ -267,11 +291,14 @@ fail.catch(() { bit_array.slice(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
 test("slice_length_too_long_test", () {
 	assert(
 		{
-e4_call_arg_0 = bit_array.from_string("hello")
-e4_call_arg_1 = 1
-e4_call_arg_2 = 6
-fail.catch(() { bit_array.slice(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
-} == Error(Nil),
+			e4_call_arg_0 = bit_array.from_string("hello")
+			e4_call_arg_1 = 1
+			e4_call_arg_2 = 6
+			fail.catch(() {
+				bit_array.slice(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+			})
+		} ==
+			Error(Nil),
 	)
 	Nil
 })
@@ -279,9 +306,12 @@ fail.catch(() { bit_array.slice(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2) })
 test("slice_chained_test", () {
 	assert(
 		{
-			bit_array.from_string("ab")
-				|> (e4_pipe_value) { fail.catch(() { bit_array.slice(e4_pipe_value, 1, 1) }) }
-				|> result.then((b) { fail.catch(() { bit_array.slice(b, 0, 1) }) })
+			fail.catch(() {
+				bit_array.from_string("ab") |> bit_array.slice(1, 1)
+			})
+				|> result.then((b) {
+					fail.catch(() { b |> bit_array.slice(0, 1) })
+				})
 		} ==
 			Ok(<<"b":utf8>>),
 	)
@@ -289,17 +319,21 @@ test("slice_chained_test", () {
 })
 
 test("slice_unaligned_error_test", () {
-	assert(fail.catch(() { bit_array.slice(<<0, 1, 2:u7>>, 0, 3) }) == Error(Nil))
+	assert(
+		fail.catch(() { bit_array.slice(<<0, 1, 2:u7>>, 0, 3) }) == Error(Nil),
+	)
 	Nil
 })
 
 test("slice_large_error_test", () {
 	assert(
-		fail.catch(() { bit_array.slice(
-			<<0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15>>,
-			8,
-			12,
-		) }) ==
+		fail.catch(() {
+			bit_array.slice(
+				<<0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15>>,
+				8,
+				12,
+			)
+		}) ==
 			Error(Nil),
 	)
 	Nil
@@ -316,7 +350,9 @@ test("to_string_empty_utf8_test", () {
 })
 
 test("to_string_hello_test", () {
-	assert(fail.catch(() { bit_array.to_string(<<"Hello":utf8>>) }) == Ok("Hello"))
+	assert(
+		fail.catch(() { bit_array.to_string(<<"Hello":utf8>>) }) == Ok("Hello"),
+	)
 	Nil
 })
 
@@ -331,7 +367,10 @@ test("to_string_invalid_test", () {
 })
 
 test("to_string_unaligned_error_test", () {
-	assert(fail.catch(() { bit_array.to_string(<<"ø":utf8, 2:u4>>) }) == Error(Nil))
+	assert(
+		fail.catch(() { bit_array.to_string(<<"ø":utf8, 2:u4>>) }) ==
+			Error(Nil),
+	)
 	Nil
 })
 
@@ -429,17 +468,25 @@ test("base64_encode_unaligned_3_test", () {
 })
 
 test("base64_decode_padded_test", () {
-	assert(fail.catch(() { bit_array.base64_decode("/3/+/A==") }) == Ok(<<255, 127, 254, 252>>))
+	assert(
+		fail.catch(() { bit_array.base64_decode("/3/+/A==") }) ==
+			Ok(<<255, 127, 254, 252>>),
+	)
 	Nil
 })
 
 test("base64_decode_unpadded_test", () {
-	assert(fail.catch(() { bit_array.base64_decode("/3/+/A") }) == Ok(<<255, 127, 254, 252>>))
+	assert(
+		fail.catch(() { bit_array.base64_decode("/3/+/A") }) ==
+			Ok(<<255, 127, 254, 252>>),
+	)
 	Nil
 })
 
 test("base64_decode_zeros_test", () {
-	assert(fail.catch(() { bit_array.base64_decode("AAAA") }) == Ok(<<0, 0, 0>>))
+	assert(
+		fail.catch(() { bit_array.base64_decode("AAAA") }) == Ok(<<0, 0, 0>>),
+	)
 	Nil
 })
 
@@ -484,18 +531,25 @@ test("base64_url_encode_empty_test", () {
 
 test("base64_url_decode_padded_test", () {
 	assert(
-		fail.catch(() { bit_array.base64_url_decode("_3_-_A==") }) == Ok(<<255, 127, 254, 252>>),
+		fail.catch(() { bit_array.base64_url_decode("_3_-_A==") }) ==
+			Ok(<<255, 127, 254, 252>>),
 	)
 	Nil
 })
 
 test("base64_url_decode_unpadded_test", () {
-	assert(fail.catch(() { bit_array.base64_url_decode("_3_-_A") }) == Ok(<<255, 127, 254, 252>>))
+	assert(
+		fail.catch(() { bit_array.base64_url_decode("_3_-_A") }) ==
+			Ok(<<255, 127, 254, 252>>),
+	)
 	Nil
 })
 
 test("base64_url_decode_zeros_test", () {
-	assert(fail.catch(() { bit_array.base64_url_decode("AAAA") }) == Ok(<<0, 0, 0>>))
+	assert(
+		fail.catch(() { bit_array.base64_url_decode("AAAA") }) ==
+			Ok(<<0, 0, 0>>),
+	)
 	Nil
 })
 
@@ -511,9 +565,11 @@ test("base64_url_decode_invalid_test", () {
 
 test("base64_decode_crash_regression_1_test", () {
 	assert(
-		fail.catch(() { bit_array.base64_decode(
-			"aGktdGhlcmU.uWUWvrAleKQ2jsWcU97H-RPJ5qRRcE_s",
-		) }) ==
+		fail.catch(() {
+			bit_array.base64_decode(
+				"aGktdGhlcmU.uWUWvrAleKQ2jsWcU97H-RPJ5qRRcE_s",
+			)
+		}) ==
 			Error(Nil),
 	)
 	Nil
@@ -593,27 +649,41 @@ test("base16_decode_f_test", () {
 })
 
 test("base16_decode_fo_test", () {
-	assert(fail.catch(() { bit_array.base16_decode("666F") }) == Ok(<<"fo":utf8>>))
+	assert(
+		fail.catch(() { bit_array.base16_decode("666F") }) == Ok(<<"fo":utf8>>),
+	)
 	Nil
 })
 
 test("base16_decode_foo_test", () {
-	assert(fail.catch(() { bit_array.base16_decode("666F6F") }) == Ok(<<"foo":utf8>>))
+	assert(
+		fail.catch(() { bit_array.base16_decode("666F6F") }) ==
+			Ok(<<"foo":utf8>>),
+	)
 	Nil
 })
 
 test("base16_decode_foob_test", () {
-	assert(fail.catch(() { bit_array.base16_decode("666F6F62") }) == Ok(<<"foob":utf8>>))
+	assert(
+		fail.catch(() { bit_array.base16_decode("666F6F62") }) ==
+			Ok(<<"foob":utf8>>),
+	)
 	Nil
 })
 
 test("base16_decode_fooba_test", () {
-	assert(fail.catch(() { bit_array.base16_decode("666F6F6261") }) == Ok(<<"fooba":utf8>>))
+	assert(
+		fail.catch(() { bit_array.base16_decode("666F6F6261") }) ==
+			Ok(<<"fooba":utf8>>),
+	)
 	Nil
 })
 
 test("base16_decode_foobar_test", () {
-	assert(fail.catch(() { bit_array.base16_decode("666F6F626172") }) == Ok(<<"foobar":utf8>>))
+	assert(
+		fail.catch(() { bit_array.base16_decode("666F6F626172") }) ==
+			Ok(<<"foobar":utf8>>),
+	)
 	Nil
 })
 
@@ -851,23 +921,23 @@ test("base64_round_trip_test", () {
 	check = (bytes: BitArray) {
 		assert(
 			{
-e4_call_arg_0 = bit_array.base64_encode(bytes, True)
-fail.catch(() { bit_array.base64_decode(e4_call_arg_0) })
-} ==
+				e4_call_arg_0 = bit_array.base64_encode(bytes, True)
+				fail.catch(() { bit_array.base64_decode(e4_call_arg_0) })
+			} ==
 				Ok(bytes),
 		)
 		assert(
 			{
-e4_call_arg_0 = bit_array.base64_encode(bytes, False)
-fail.catch(() { bit_array.base64_decode(e4_call_arg_0) })
-} ==
+				e4_call_arg_0 = bit_array.base64_encode(bytes, False)
+				fail.catch(() { bit_array.base64_decode(e4_call_arg_0) })
+			} ==
 				Ok(bytes),
 		)
 		assert(
 			{
-e4_call_arg_0 = bit_array.base64_url_encode(bytes, True)
-fail.catch(() { bit_array.base64_url_decode(e4_call_arg_0) })
-} ==
+				e4_call_arg_0 = bit_array.base64_url_encode(bytes, True)
+				fail.catch(() { bit_array.base64_url_decode(e4_call_arg_0) })
+			} ==
 				Ok(bytes),
 		)
 	}
@@ -892,8 +962,14 @@ test("base64_rfc4648_test", () {
 	assert(bit_array.base64_encode(<<"foob":utf8>>, True) == "Zm9vYg==")
 	assert(bit_array.base64_encode(<<"fooba":utf8>>, True) == "Zm9vYmE=")
 	assert(bit_array.base64_encode(<<"foobar":utf8>>, True) == "Zm9vYmFy")
-	assert(fail.catch(() { bit_array.base64_decode("Zm9vYmE=") }) == Ok(<<"fooba":utf8>>))
-	assert(fail.catch(() { bit_array.base64_decode("Zm9vYmE") }) == Ok(<<"fooba":utf8>>))
+	assert(
+		fail.catch(() { bit_array.base64_decode("Zm9vYmE=") }) ==
+			Ok(<<"fooba":utf8>>),
+	)
+	assert(
+		fail.catch(() { bit_array.base64_decode("Zm9vYmE") }) ==
+			Ok(<<"fooba":utf8>>),
+	)
 })
 
 test("base64_invalid_test", () {
@@ -901,7 +977,10 @@ test("base64_invalid_test", () {
 	assert(fail.catch(() { bit_array.base64_decode("Zm9v!") }) == Error(Nil))
 	assert(fail.catch(() { bit_array.base64_decode("Zm=v") }) == Error(Nil))
 	assert(fail.catch(() { bit_array.base64_decode("-_8") }) == Error(Nil))
-	assert(fail.catch(() { bit_array.base64_url_decode("-_8") }) == Ok(<<251, 255>>))
+	assert(
+		fail.catch(() { bit_array.base64_url_decode("-_8") }) ==
+			Ok(<<251, 255>>),
+	)
 })
 
 test("base64_long_test", () {
@@ -913,7 +992,10 @@ test("base64_long_test", () {
 
 test("base16_more_test", () {
 	assert(bit_array.base16_encode(<<255, 1, 171>>) == "FF01AB")
-	assert(fail.catch(() { bit_array.base16_decode("ff01Ab") }) == Ok(<<255, 1, 171>>))
+	assert(
+		fail.catch(() { bit_array.base16_decode("ff01Ab") }) ==
+			Ok(<<255, 1, 171>>),
+	)
 	assert(fail.catch(() { bit_array.base16_decode("f") }) == Error(Nil))
 	assert(fail.catch(() { bit_array.base16_decode("zz") }) == Error(Nil))
 	assert(bit_array.base16_encode(<<15:u4>>) == "F0")
@@ -926,6 +1008,11 @@ test("concat_many_test", () {
 })
 
 test("slice_negative_take_test", () {
-	assert(fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 3, -2) }) == Ok(<<2, 3>>))
-	assert(fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 1, -2) }) == Error(Nil))
+	assert(
+		fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 3, -2) }) ==
+			Ok(<<2, 3>>),
+	)
+	assert(
+		fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 1, -2) }) == Error(Nil),
+	)
 })

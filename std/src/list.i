@@ -8,7 +8,7 @@
 ////
 //// Functions that may find nothing give an `Option` (`first`, `find`,
 //// `at`, …). Functions that take a function as an argument have the errors
-//// and the environment of that function (`^ E ! N`), so the argument may
+//// and the needs of that function (`<- N`, including `Fail(E)`), so the argument may
 //// itself raise errors or need services.
 (
 	i/fail
@@ -218,7 +218,7 @@ filter = <A, N>(list: List(A), keeping: (A) <- N -> Bool) -> List(A) {
 /// results.
 ///
 /// ```i
-/// list.filter_map(["1", "x", "3"], (s) { option.from_result(int.parse(s)) })  // [1, 3]
+/// list.filter_map(["1", "x", "3"], (s) { option.from_result(fail.catch(() { int.parse(s) })) })  // [1, 3]
 /// ```
 filter_map = <A, B, N>(list: List(A), with: (A) <- N -> Option(B)) -> List(B) {
 	go = (rest, acc) {
@@ -303,7 +303,7 @@ index_map = <A, B, N>(list: List(A), with: (A, Int) <- N -> B) -> List(B) {
 /// not called again.
 ///
 /// ```i
-/// list.try_map(["1", "2"], int.parse)  // Ok([1, 2])
+/// list.try_map(["1", "2"], (e4_arg_0) { fail.catch(() { int.parse(e4_arg_0) }) })  // Ok([1, 2])
 /// ```
 try_map = <A, B, F, N>(over: List(A), with: (A) <- N -> Result(B, F)) -> Result(
 	List(B),
@@ -463,7 +463,7 @@ try_fold = <A, Acc, F, N>(
 ///
 /// ```i
 /// list.fold_until([1, 2, 3, 4], 0, (acc, x) {
-///   { x < 3 } |> { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
+/// { x < 3 } |> { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
 /// })  // 3
 /// ```
 fold_until = <A, Acc, N>(
@@ -529,8 +529,10 @@ zip = <A, B>(list: List(A), with: List(B)) -> List((A, B)) {
 	go(list, with, [])
 }
 
-/// Like `zip`, but `Error(Nil)` when the lists have different lengths.
-_strict_zip_result = <A, B>(list: List(A), with: List(B)) -> Result(List((A, B)), Nil) {
+_strict_zip_result = <A, B>(list: List(A), with: List(B)) -> Result(
+	List((A, B)),
+	Nil,
+) {
 	go = (xs, ys, acc) {
 		(xs, ys) |>
 			(([], [])) { Ok(reverse(acc)) }
@@ -1147,7 +1149,9 @@ min = <A, N>(over: List(A), with: (A, A) <- N -> Order) -> Option(A) {
 		}
 }
 
+/// Like `zip`, but Raises `Nil` when the lists have different lengths.
+///
 /// Reports failure through `Fail(Nil)`.
-strict_zip = <A, B>(list: List(A), with: List(B)) <- (Fail(Nil)) -> List((A, B)) {
+strict_zip = <A, B>(list: List(A), with: List(B)) -> List((A, B)) {
 	fail.from_result(_strict_zip_result(list, with))
 }

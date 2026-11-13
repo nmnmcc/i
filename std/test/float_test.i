@@ -934,7 +934,9 @@ test("parse_invalid_forms_test", () {
 		"1.0e99999999999999999999",
 		"0.0e99999999999999999x",
 	]
-	list.each(bad, (text) { assert(fail.catch(() { float.parse(text) }) == Error(Nil)) })
+	list.each(bad, (text) {
+		assert(fail.catch(() { float.parse(text) }) == Error(Nil))
+	})
 	Ok(negative_zero) = fail.catch(() { float.parse("-0.0e99999999999999999") })
 	assert(float.to_string(negative_zero) == "-0.0")
 })
@@ -968,9 +970,9 @@ test("round_trip_test", () {
 				input = magnitude + sign
 				value = core.float_from_bits(input)
 				Ok(decoded) = {
-e4_call_arg_0 = float.to_string(value)
-fail.catch(() { float.parse(e4_call_arg_0) })
-}
+					e4_call_arg_0 = float.to_string(value)
+					fail.catch(() { float.parse(e4_call_arg_0) })
+				}
 				assert(core.float_to_bits(decoded) == input)
 				go(next, count - 1)
 			}
@@ -988,7 +990,10 @@ test("power_int_test", () {
 	assert(fail.catch(() { float.power(0.0, -1) }) == Error(Nil))
 	assert(fail.catch(() { float.power(10.0, 400) }) == Error(Nil))
 	assert(fail.catch(() { float.power(10.0, -400) }) == Ok(0.0))
-	assert(fail.catch(() { float.power(-.1.0, 1_000_000_000_000_000_000_001) }) == Ok(-.1.0))
+	assert(
+		fail.catch(() { float.power(-.1.0, 1_000_000_000_000_000_000_001) }) ==
+			Ok(-.1.0),
+	)
 	assert(fail.catch(() { float.power(1.1, 2) }) == Ok(1.2100000000000002))
 	assert(fail.catch(() { float.power(10.0, 22) }) == Ok(1.0e22))
 })
@@ -997,7 +1002,9 @@ test("real_power_test", () {
 	assert(fail.catch(() { float.real_power(16.0, 0.5) }) == Ok(4.0))
 	// fdlibm is within one ulp: the correctly rounded result is
 	// 22.627416997969522, one ulp above.
-	assert(fail.catch(() { float.real_power(8.0, 1.5) }) == Ok(22.62741699796952))
+	assert(
+		fail.catch(() { float.real_power(8.0, 1.5) }) == Ok(22.62741699796952),
+	)
 	assert(fail.catch(() { float.real_power(-.8.0, 0.5) }) == Error(Nil))
 	assert(fail.catch(() { float.real_power(0.0, -.0.5) }) == Error(Nil))
 	assert(fail.catch(() { float.real_power(2.0, 1024.0) }) == Error(Nil))
@@ -1012,7 +1019,9 @@ test("exponential_logarithm_test", () {
 	assert(fail.catch(() { float.exponential(-.1000.0) }) == Ok(0.0))
 	assert(fail.catch(() { float.logarithm(1.0) }) == Ok(0.0))
 	assert(fail.catch(() { float.logarithm(2.718281828459045) }) == Ok(1.0))
-	assert(fail.catch(() { float.logarithm(5.0e-324) }) == Ok(-.744.4400719213812))
+	assert(
+		fail.catch(() { float.logarithm(5.0e-324) }) == Ok(-.744.4400719213812),
+	)
 	assert(fail.catch(() { float.logarithm(-.1.0) }) == Error(Nil))
 	Ok(x) = fail.catch(() { float.logarithm(10.0) })
 	assert(fail.catch(() { float.exponential(x) }) == Ok(10.000000000000002))
@@ -1844,7 +1853,10 @@ test("inverse_and_norm_special_values_test", () {
 	)
 	assert(fail.catch(() { float.acos(1.0) }) == Ok(0.0))
 	assert(fail.catch(() { float.acos(-.1.0) }) == Ok(float.pi))
-	assert(fail.catch(() { float.hypot(float.max_finite, float.max_finite) }) == Error(Nil))
+	assert(
+		fail.catch(() { float.hypot(float.max_finite, float.max_finite) }) ==
+			Error(Nil),
+	)
 	assert(fail.catch(() { float.hypot(negative_zero, 0.0) }) == Ok(0.0))
 	assert(float.atan2(0.0, negative_zero) == float.pi)
 	assert(float.atan2(negative_zero, negative_zero) == -.float.pi)
@@ -1872,7 +1884,10 @@ test("hypot_symmetry_property", () {
 			(x, y) = pair
 			a = core.to_float(x) /. 100.0
 			b = core.to_float(y) /. 100.0
-			assert(fail.catch(() { float.hypot(a, b) }) == fail.catch(() { float.hypot(b, a) }))
+			assert(
+				fail.catch(() { float.hypot(a, b) }) ==
+					fail.catch(() { float.hypot(b, a) }),
+			)
 		},
 		core.inspect,
 	)
@@ -2468,7 +2483,10 @@ test("trig_special_values_test", () {
 	Ok(t) = fail.catch(() { float.tan(negative_zero) })
 	assert(core.float_to_bits(t) == 9223372036854775808)
 	assert(float.sin(float.min_positive) == float.min_positive)
-	assert(fail.catch(() { float.tan(float.min_positive) }) == Ok(float.min_positive))
+	assert(
+		fail.catch(() { float.tan(float.min_positive) }) ==
+			Ok(float.min_positive),
+	)
 	assert(float.cos(float.min_positive) == 1.0)
 })
 

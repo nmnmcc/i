@@ -61,13 +61,25 @@ test("path_relative_examples", () {
 	assert(fail.catch(() { path.relative("/a/b", "/a/c") }) == Ok("../c"))
 	assert(fail.catch(() { path.relative("../a", "../b") }) == Ok("../b"))
 	assert(fail.catch(() { path.relative("..", "../a") }) == Ok("a"))
-	assert(fail.catch(() { path.relative("..", ".") }) == Error(path.UnknownParent))
-	assert(fail.catch(() { path.relative("a", "/a") }) == Error(path.DifferentRoots))
-	assert(fail.catch(() { path.relative("/a", "a") }) == Error(path.DifferentRoots))
+	assert(
+		fail.catch(() { path.relative("..", ".") }) ==
+			Error(path.UnknownParent),
+	)
+	assert(
+		fail.catch(() { path.relative("a", "/a") }) ==
+			Error(path.DifferentRoots),
+	)
+	assert(
+		fail.catch(() { path.relative("/a", "a") }) ==
+			Error(path.DifferentRoots),
+	)
 	assert(fail.catch(() { path.relative("/a/./", "/a") }) == Ok("."))
 	assert(fail.catch(() { path.relative("", "") }) == Ok("."))
 	assert(fail.catch(() { path.relative(".", "../é") }) == Ok("../é"))
-	assert(fail.catch(() { path.relative("../../a", "../a") }) == Error(path.UnknownParent))
+	assert(
+		fail.catch(() { path.relative("../../a", "../a") }) ==
+			Error(path.UnknownParent),
+	)
 	Nil
 })
 

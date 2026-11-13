@@ -738,7 +738,8 @@ test("strict_zip_empty_first_error_test", () {
 
 test("strict_zip_equal_length_ok_test", () {
 	assert(
-		fail.catch(() { list.strict_zip([1, 2, 3], [4, 5, 6]) }) == Ok([(1, 4), (2, 5), (3, 6)]),
+		fail.catch(() { list.strict_zip([1, 2, 3], [4, 5, 6]) }) ==
+			Ok([(1, 4), (2, 5), (3, 6)]),
 	)
 	Nil
 })

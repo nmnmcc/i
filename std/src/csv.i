@@ -37,9 +37,6 @@ CsvError = (line = Int, column = Int, reason = String)
 /// Comma delimiter, infer row width, LF output.
 defaults = () -> Options { Options(delimiter = 44, fields = 0, crlf = False) }
 
-/// A single scalar delimiter, expected width (0 infer, negative variable),
-/// and output line ending. Quotes, NUL, CR, LF, U+FFFD are invalid delimiters.
-/// `csv.options(";", -1, True)`.
 _options_result = (delimiter: String, fields: Int, crlf: Bool) -> Result(
 	Options,
 	CsvError,
@@ -365,13 +362,10 @@ rows = <E, N>(
 	) { result |> (Error(e)) { Error(e) } | (Ok(ReadRow(row, _))) { Ok(row) } })
 }
 
-/// Parses comma-separated text, inferring the width from the first row.
-/// `csv.parse("a,b\n1,2\n")` gives `Ok([["a", "b"], ["1", "2"]])`.
 _parse_result = (input: String) -> Result(List(List(String)), CsvError) {
 	_parse_with_result(input, defaults())
 }
 
-/// Parses with an explicit delimiter and row-width policy.
 _parse_with_result = (input: String, config: Options) -> Result(
 	List(List(String)),
 	CsvError,
@@ -450,7 +444,6 @@ records = <E, N>(
 	})
 }
 
-/// Header-mode convenience parser: `csv.parse_header("name\ni\n", csv.defaults())`.
 _parse_header_result = (input: String, config: Options) -> Result(
 	List(dict.Dict(String, String)),
 	CsvError,
@@ -465,22 +458,20 @@ _parse_header_result = (input: String, config: Options) -> Result(
 	})
 }
 
-/// Decodes a named row as a JSON object of strings using an ordinary schema.
-/// Compose `schema.string` with `schema.map` for domain conversions.
 _decode_result = <A, E>(
 	codec: schema.Schema(A, E),
 	row: dict.Dict(String, String)
 ) -> Result(A, E) {
 	{
-e4_call_arg_0 = codec
-e4_call_arg_1 = json.Object(
+		e4_call_arg_0 = codec
+		e4_call_arg_1 = json.Object(
 			list.map(dict.to_list(row), (entry) {
 				(k, v) = entry
 				(k, json.Text(v))
 			}),
 		)
-fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
-}
+		fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+	}
 }
 
 quote = (field: String, delimiter: String, single_empty: Bool) -> String {
@@ -517,30 +508,42 @@ print_with = (rows: List(List(String)), config: Options) -> String {
 	)
 }
 
+/// A single scalar delimiter, expected width (0 infer, negative variable),
+/// and output line ending. Quotes, NUL, CR, LF, U+FFFD are invalid delimiters.
+/// `fail.catch(() { csv.options(";", -1, True) })`.
+///
 /// Reports failure through `Fail(CsvError)`.
-options = (delimiter: String, fields: Int, crlf: Bool) <- (Fail(CsvError)) -> Options {
+options = (delimiter: String, fields: Int, crlf: Bool) -> Options {
 	fail.from_result(_options_result(delimiter, fields, crlf))
 }
 
+/// Parses comma-separated text, inferring the width from the first row.
+/// `fail.catch(() { csv.parse("a,b\n1,2\n") })` gives `Ok([["a", "b"], ["1", "2"]])`.
+///
 /// Reports failure through `Fail(CsvError)`.
-parse = (input: String) <- (Fail(CsvError)) -> List(List(String)) {
+parse = (input: String) -> List(List(String)) {
 	fail.from_result(_parse_result(input))
 }
 
+/// Parses with an explicit delimiter and row-width policy.
+///
 /// Reports failure through `Fail(CsvError)`.
-parse_with = (input: String, config: Options) <- (Fail(CsvError)) -> List(List(String)) {
+parse_with = (input: String, config: Options) -> List(List(String)) {
 	fail.from_result(_parse_with_result(input, config))
 }
 
+/// Header-mode convenience parser: `fail.catch(() { csv.parse_header("name\ni\n", csv.defaults()) })`.
+///
 /// Reports failure through `Fail(CsvError)`.
-parse_header = (input: String, config: Options) <- (Fail(CsvError)) -> List(dict.Dict(String, String)) {
-	fail.from_result(_parse_header_result(input, config))
-}
+parse_header = (input: String, config: Options) -> List(
+	dict.Dict(String, String),
+) { fail.from_result(_parse_header_result(input, config)) }
 
+/// Decodes a named row as a JSON object of strings using an ordinary schema.
+/// Compose `schema.string` with `schema.map` for domain conversions.
+///
 /// Reports failure through `Fail(E)`.
 decode = <A, E>(
 	codec: schema.Schema(A, E),
 	row: dict.Dict(String, String)
-) <- (Fail(E)) -> A {
-	fail.from_result(_decode_result(codec, row))
-}
+) -> A { fail.from_result(_decode_result(codec, row)) }

@@ -167,9 +167,9 @@ read_string = (xs: List(Int), at: Int, acc: List(BitArray)) -> (
 		}
 		| ([34, ..tail]) {
 			{
-e4_call_arg_0 = bit_array.concat(list.reverse(acc))
-fail.catch(() { bit_array.to_string(e4_call_arg_0) })
-} |>
+				e4_call_arg_0 = bit_array.concat(list.reverse(acc))
+				fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+			} |>
 				(Ok(s)) { (s, tail, at + 1) }
 				| (Error(_)) {
 					fail.raise(JsonError(offset = at, reason = "invalid UTF-8"))
@@ -411,9 +411,9 @@ octets = (bits: BitArray) -> List(Int) {
 
 text_bytes = (xs: List(Int)) -> String {
 	{
-e4_call_arg_0 = bit_array.concat(list.map(xs, (x) { <<x>> }))
-fail.catch(() { bit_array.to_string(e4_call_arg_0) })
-} |>
+		e4_call_arg_0 = bit_array.concat(list.map(xs, (x) { <<x>> }))
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(s)) { s }
 		| (Error(_)) { panic("json: invalid internal text") }
 }
@@ -557,6 +557,4 @@ hex_char = (n: Int) -> Int {
 }
 
 /// Reports failure through `Fail(JsonError)`.
-parse = (text: String) <- (Fail(JsonError)) -> Json {
-	fail.from_result(_parse_result(text))
-}
+parse = (text: String) -> Json { fail.from_result(_parse_result(text)) }

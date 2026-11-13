@@ -29,15 +29,17 @@ test("json_values", () {
 		Ok(v) = fail.catch(() { json.parse(s) })
 		assert(
 			{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+				e4_call_arg_0 = json.print(v)
+				fail.catch(() { json.parse(e4_call_arg_0) })
+			} ==
+				Ok(v),
 		)
 		assert(
 			{
-e4_call_arg_0 = json.pretty(v, 2)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+				e4_call_arg_0 = json.pretty(v, 2)
+				fail.catch(() { json.parse(e4_call_arg_0) })
+			} ==
+				Ok(v),
 		)
 	})
 	bad = [
@@ -56,7 +58,11 @@ fail.catch(() { json.parse(e4_call_arg_0) })
 		"\"\\uD800\\u0041\"",
 	]
 	list.each(bad, (s) {
-		assert(fail.catch(() { json.parse(s) }) |> (Error(_)) { True } | (_) { False })
+		assert(
+			fail.catch(() { json.parse(s) }) |>
+				(Error(_)) { True }
+				| (_) { False },
+		)
 	})
 	assert(
 		json.field(json.Object([("x", json.Integer(1))]), "x") ==
@@ -147,13 +153,18 @@ test("json_conformance_cases", () {
 		Ok(v) = fail.catch(() { json.parse(s) })
 		assert(
 			{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+				e4_call_arg_0 = json.print(v)
+				fail.catch(() { json.parse(e4_call_arg_0) })
+			} ==
+				Ok(v),
 		)
 	})
 	list.each(invalid, (s) {
-		assert(fail.catch(() { json.parse(s) }) |> (Error(_)) { True } | (_) { False })
+		assert(
+			fail.catch(() { json.parse(s) }) |>
+				(Error(_)) { True }
+				| (_) { False },
+		)
 	})
 })
 
@@ -172,15 +183,17 @@ test("json_generated_strings", () {
 			value = json.Object([("value", json.Text(s))])
 			assert(
 				{
-e4_call_arg_0 = json.print(value)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(value),
+					e4_call_arg_0 = json.print(value)
+					fail.catch(() { json.parse(e4_call_arg_0) })
+				} ==
+					Ok(value),
 			)
 			assert(
 				{
-e4_call_arg_0 = json.pretty(value, 2)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(value),
+					e4_call_arg_0 = json.pretty(value, 2)
+					fail.catch(() { json.parse(e4_call_arg_0) })
+				} ==
+					Ok(value),
 			)
 		},
 		core.inspect,
@@ -191,9 +204,10 @@ test("json_valid_0_null", () {
 	Ok(v) = fail.catch(() { json.parse(" null ") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -201,9 +215,10 @@ test("json_valid_1_true", () {
 	Ok(v) = fail.catch(() { json.parse("true") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -211,9 +226,10 @@ test("json_valid_2_false", () {
 	Ok(v) = fail.catch(() { json.parse("false") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -221,9 +237,10 @@ test("json_valid_3_0", () {
 	Ok(v) = fail.catch(() { json.parse("-0") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -231,9 +248,10 @@ test("json_valid_4_10", () {
 	Ok(v) = fail.catch(() { json.parse("10") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -241,9 +259,10 @@ test("json_valid_5_12", () {
 	Ok(v) = fail.catch(() { json.parse("-12") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -251,9 +270,10 @@ test("json_valid_6_0_0", () {
 	Ok(v) = fail.catch(() { json.parse("0.0") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -261,9 +281,10 @@ test("json_valid_7_0_1", () {
 	Ok(v) = fail.catch(() { json.parse("-0.1") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -271,9 +292,10 @@ test("json_valid_8_12_34", () {
 	Ok(v) = fail.catch(() { json.parse("12.34") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -281,9 +303,10 @@ test("json_valid_9_1e_2", () {
 	Ok(v) = fail.catch(() { json.parse("1E+2") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -291,9 +314,10 @@ test("json_valid_10_1e_2", () {
 	Ok(v) = fail.catch(() { json.parse("1e-2") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -301,9 +325,10 @@ test("json_valid_11_empty", () {
 	Ok(v) = fail.catch(() { json.parse("[ ]") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -311,9 +336,10 @@ test("json_valid_12_empty", () {
 	Ok(v) = fail.catch(() { json.parse("{ }") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -321,9 +347,10 @@ test("json_valid_13_1_2_3", () {
 	Ok(v) = fail.catch(() { json.parse("[1,2,3]") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -331,9 +358,10 @@ test("json_valid_14_empty", () {
 	Ok(v) = fail.catch(() { json.parse("[[],{}]") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -341,9 +369,10 @@ test("json_valid_15_x_true", () {
 	Ok(v) = fail.catch(() { json.parse("{\"x\":true}") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -351,9 +380,10 @@ test("json_valid_16_x_1_x_2", () {
 	Ok(v) = fail.catch(() { json.parse("{\"x\":1,\"x\":2}") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -361,9 +391,10 @@ test("json_valid_17_empty", () {
 	Ok(v) = fail.catch(() { json.parse("\"\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -371,9 +402,10 @@ test("json_valid_18_empty", () {
 	Ok(v) = fail.catch(() { json.parse("\"/\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -381,9 +413,10 @@ test("json_valid_19_empty", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\/\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -391,9 +424,10 @@ test("json_valid_20_empty", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\\\\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -401,9 +435,10 @@ test("json_valid_21_empty", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\\"\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -411,9 +446,10 @@ test("json_valid_22_b_f_n_r_t", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\b\\f\\n\\r\\t\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -421,9 +457,10 @@ test("json_valid_23_u0000", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\u0000\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -431,9 +468,10 @@ test("json_valid_24_u00e9", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\u00e9\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -441,9 +479,10 @@ test("json_valid_25_ud834_udd1e", () {
 	Ok(v) = fail.catch(() { json.parse("\"\\uD834\\uDD1E\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -451,9 +490,10 @@ test("json_valid_26_empty", () {
 	Ok(v) = fail.catch(() { json.parse("\"你好\"") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -461,9 +501,10 @@ test("json_valid_27_true_false_null", () {
 	Ok(v) = fail.catch(() { json.parse("[true,false,null]") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -471,9 +512,10 @@ test("json_valid_28_a_1", () {
 	Ok(v) = fail.catch(() { json.parse(" { \"a\" : [1] } ") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -481,9 +523,10 @@ test("json_valid_29_a_b", () {
 	Ok(v) = fail.catch(() { json.parse("[\"a\",\"b\"]") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
@@ -491,180 +534,347 @@ test("json_valid_30_a_b", () {
 	Ok(v) = fail.catch(() { json.parse("{\"a\":{},\"b\":[]}") })
 	assert(
 		{
-e4_call_arg_0 = json.print(v)
-fail.catch(() { json.parse(e4_call_arg_0) })
-} == Ok(v),
+			e4_call_arg_0 = json.print(v)
+			fail.catch(() { json.parse(e4_call_arg_0) })
+		} ==
+			Ok(v),
 	)
 })
 
 test("json_invalid_0_empty", () {
-	assert(fail.catch(() { json.parse("") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_1_empty", () {
-	assert(fail.catch(() { json.parse(" ") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse(" ") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_2_null", () {
-	assert(fail.catch(() { json.parse("Null") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("Null") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_3_true", () {
-	assert(fail.catch(() { json.parse("TRUE") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("TRUE") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_4_undefined", () {
-	assert(fail.catch(() { json.parse("undefined") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("undefined") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_5_nan", () {
-	assert(fail.catch(() { json.parse("nan") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("nan") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_6_empty", () {
-	assert(fail.catch(() { json.parse("-") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("-") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_7_1", () {
-	assert(fail.catch(() { json.parse("+1") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("+1") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_8_00", () {
-	assert(fail.catch(() { json.parse("00") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("00") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_9_01", () {
-	assert(fail.catch(() { json.parse("01") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("01") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_10_01", () {
-	assert(fail.catch(() { json.parse("-01") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("-01") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_11_1", () {
-	assert(fail.catch(() { json.parse(".1") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse(".1") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_12_1", () {
-	assert(fail.catch(() { json.parse("1.") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("1.") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_13_1e", () {
-	assert(fail.catch(() { json.parse("1e") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("1e") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_14_1e", () {
-	assert(fail.catch(() { json.parse("1e+") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("1e+") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_15_1e", () {
-	assert(fail.catch(() { json.parse("1e-") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("1e-") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_16_empty", () {
-	assert(fail.catch(() { json.parse("[") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("[") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_17_empty", () {
-	assert(fail.catch(() { json.parse("]") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("]") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_18_1", () {
-	assert(fail.catch(() { json.parse("[1") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("[1") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_19_1", () {
-	assert(fail.catch(() { json.parse("[1,]") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("[1,]") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_20_1", () {
-	assert(fail.catch(() { json.parse("[,1]") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("[,1]") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_21_1_2", () {
-	assert(fail.catch(() { json.parse("[1 2]") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("[1 2]") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_22_empty", () {
-	assert(fail.catch(() { json.parse("{") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_23_empty", () {
-	assert(fail.catch(() { json.parse("}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_24_empty", () {
-	assert(fail.catch(() { json.parse("{,}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{,}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_25_a", () {
-	assert(fail.catch(() { json.parse("{\"a\"}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{\"a\"}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_26_a", () {
-	assert(fail.catch(() { json.parse("{\"a\":}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{\"a\":}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_27_a_1", () {
-	assert(fail.catch(() { json.parse("{\"a\":1,}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{\"a\":1,}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_28_a_1", () {
-	assert(fail.catch(() { json.parse("{a:1}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{a:1}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_29_a_1", () {
-	assert(fail.catch(() { json.parse("{\"a\" 1}") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{\"a\" 1}") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_30_empty", () {
-	assert(fail.catch(() { json.parse("\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_31_empty", () {
-	assert(fail.catch(() { json.parse("\"\\\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"\\\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_32_x", () {
-	assert(fail.catch(() { json.parse("\"\\x\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"\\x\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_33_u12", () {
-	assert(fail.catch(() { json.parse("\"\\u12\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"\\u12\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_34_uzzzz", () {
-	assert(fail.catch(() { json.parse("\"\\uZZZZ\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"\\uZZZZ\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_35_ud800", () {
-	assert(fail.catch(() { json.parse("\"\\uD800\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"\\uD800\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_36_udc00", () {
-	assert(fail.catch(() { json.parse("\"\\uDC00\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"\\uDC00\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_37_ud800_u0041", () {
 	assert(
-		fail.catch(() { json.parse("\"\\uD800\\u0041\"") }) |> (Error(_)) { True } | (_) { False },
+		fail.catch(() { json.parse("\"\\uD800\\u0041\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
 	)
 })
 
 test("json_invalid_38_true_false", () {
-	assert(fail.catch(() { json.parse("true false") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("true false") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_39_nullx", () {
-	assert(fail.catch(() { json.parse("nullx") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("nullx") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_40_empty", () {
-	assert(fail.catch(() { json.parse("{}[]") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("{}[]") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_invalid_41_a_n", () {
-	assert(fail.catch(() { json.parse("\"a\n\"") }) |> (Error(_)) { True } | (_) { False })
+	assert(
+		fail.catch(() { json.parse("\"a\n\"") }) |>
+			(Error(_)) { True }
+			| (_) { False },
+	)
 })
 
 test("json_float_overflow", () {
@@ -683,9 +893,9 @@ test("json_arbitrary_integer", () {
 // E4: successful operations return values, and the same parse error is data
 // only after catch (syntax-3 §2.10.6, Library style).
 test("e4_json_parse_fail", () {
-    assert(json.parse("null") == json.Null)
-    assert(
-        fail.catch(() { json.parse("{") }) ==
-            Error(json.JsonError(offset = 1, reason = "expected object key")),
-    )
+	assert(json.parse("null") == json.Null)
+	assert(
+		fail.catch(() { json.parse("{") }) ==
+			Error(json.JsonError(offset = 1, reason = "expected object key")),
+	)
 })

@@ -12,15 +12,17 @@
 round_trip = (u: uri.Uri) -> Nil {
 	assert(
 		{
-e4_call_arg_0 = uri.to_string(u)
-fail.catch(() { uri.parse(e4_call_arg_0) })
-} == Ok(u),
+			e4_call_arg_0 = uri.to_string(u)
+			fail.catch(() { uri.parse(e4_call_arg_0) })
+		} ==
+			Ok(u),
 	)
 	assert(
 		{
-e4_call_arg_0 = uri.parts(u)
-fail.catch(() { uri.build(e4_call_arg_0) })
-} == Ok(u),
+			e4_call_arg_0 = uri.parts(u)
+			fail.catch(() { uri.build(e4_call_arg_0) })
+		} ==
+			Ok(u),
 	)
 	Nil
 }
@@ -95,9 +97,9 @@ test("uri_raw_parts", () {
 	)
 	assert(
 		{
-e4_call_arg_0 = uri.parts(parse_good("/%FF")).path
-fail.catch(() { uri.decode_component(e4_call_arg_0) })
-} ==
+			e4_call_arg_0 = uri.parts(parse_good("/%FF")).path
+			fail.catch(() { uri.decode_component(e4_call_arg_0) })
+		} ==
 			Error(uri.InvalidUtf8),
 	)
 	Nil
@@ -502,15 +504,15 @@ test("uri_build_errors", () {
 	// U8 build checks query grammar before the path's cross-field constraints.
 	assert(
 		{
-e4_call_arg_0 = uri.Parts(
+			e4_call_arg_0 = uri.Parts(
 				scheme = None,
 				authority = None,
 				path = "a:b",
 				query = Some("["),
 				fragment = None,
 			)
-fail.catch(() { uri.build(e4_call_arg_0) })
-} ==
+			fail.catch(() { uri.build(e4_call_arg_0) })
+		} ==
 			Error(
 				uri.UriError(
 					part = uri.QueryPart,
@@ -580,26 +582,26 @@ test("uri_rfc_resolution", () {
 	list.each(cases, (pair) {
 		(reference, expected) = pair
 		Ok(u) = {
-e4_call_arg_0 = base
-e4_call_arg_1 = parse_good(reference)
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-}
+			e4_call_arg_0 = base
+			e4_call_arg_1 = parse_good(reference)
+			fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+		}
 		assert(uri.to_string(u) == expected)
 		round_trip(u)
 	})
 	// U5: no inherited base fragment; empty authority paths merge with a slash.
 	Ok(u) = {
-e4_call_arg_0 = parse_good("x://h#old")
-e4_call_arg_1 = parse_good("a")
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-}
+		e4_call_arg_0 = parse_good("x://h#old")
+		e4_call_arg_1 = parse_good("a")
+		fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+	}
 	assert(uri.to_string(u) == "x://h/a")
 	round_trip(u)
 	Ok(v) = {
-e4_call_arg_0 = parse_good("x:a#old")
-e4_call_arg_1 = parse_good("")
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-}
+		e4_call_arg_0 = parse_good("x:a#old")
+		e4_call_arg_1 = parse_good("")
+		fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+	}
 	assert(uri.to_string(v) == "x:a")
 	round_trip(v)
 	Nil
@@ -613,18 +615,19 @@ test("uri_resolution_validation", () {
 	list.each(["/.//h", "/a/..//h", "/.//a:b", "x:/.//h"], (s) {
 		assert(
 			{
-e4_call_arg_0 = base
-e4_call_arg_1 = parse_good(s)
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-} == bad,
+				e4_call_arg_0 = base
+				e4_call_arg_1 = parse_good(s)
+				fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+			} ==
+				bad,
 		)
 	})
 	assert(
 		{
-e4_call_arg_0 = parse_good("a")
-e4_call_arg_1 = parse_good("/.//h")
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = parse_good("a")
+			e4_call_arg_1 = parse_good("/.//h")
+			fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				uri.UriError(
 					part = uri.WholePart,
@@ -635,10 +638,10 @@ fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
 	)
 	assert(
 		{
-e4_call_arg_0 = parse_good("a")
-e4_call_arg_1 = parse_good("x:b")
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-} ==
+			e4_call_arg_0 = parse_good("a")
+			e4_call_arg_1 = parse_good("x:b")
+			fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				uri.UriError(
 					part = uri.WholePart,
@@ -648,10 +651,10 @@ fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
 			),
 	)
 	Ok(u) = {
-e4_call_arg_0 = parse_good("x://host/a")
-e4_call_arg_1 = parse_good("/.//h")
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-}
+		e4_call_arg_0 = parse_good("x://host/a")
+		e4_call_arg_1 = parse_good("/.//h")
+		fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+	}
 	assert(uri.to_string(u) == "x://host//h")
 	round_trip(u)
 	Nil
@@ -699,9 +702,9 @@ test("uri_ip_literals", () {
 	list.each(invalid, (host) {
 		assert(
 			{
-e4_call_arg_0 = string.concat(["x://[", host, "]"])
-fail.catch(() { uri.parse(e4_call_arg_0) })
-} ==
+				e4_call_arg_0 = string.concat(["x://[", host, "]"])
+				fail.catch(() { uri.parse(e4_call_arg_0) })
+			} ==
 				Error(
 					uri.UriError(
 						part = uri.HostPart,
@@ -719,9 +722,14 @@ test("uri_codecs", () {
 	assert(uri.encode_component("AZaz09-._~") == "AZaz09-._~")
 	assert(fail.catch(() { uri.decode_component("%252F+") }) == Ok("%2F+"))
 	assert(fail.catch(() { uri.decode_component("%c3%a9%00") }) == Ok("é\u{0}"))
-	assert(fail.catch(() { uri.decode_component("a b/?#[]") }) == Ok("a b/?#[]"))
+	assert(
+		fail.catch(() { uri.decode_component("a b/?#[]") }) == Ok("a b/?#[]"),
+	)
 	assert(fail.catch(() { uri.decode_bytes("%FF%00") }) == Ok(<<255, 0>>))
-	assert(fail.catch(() { uri.encode_bytes(<<1:u1>>) }) == Error(uri.UnalignedBits))
+	assert(
+		fail.catch(() { uri.encode_bytes(<<1:u1>>) }) ==
+			Error(uri.UnalignedBits),
+	)
 	list.each([
 		"%FF",
 		"%C0%AF",
@@ -730,13 +738,27 @@ test("uri_codecs", () {
 		"%C3",
 		"%ED%A0%80",
 		"%F4%90%80%80",
-	], (s) { assert(fail.catch(() { uri.decode_component(s) }) == Error(uri.InvalidUtf8)) })
+	], (s) {
+		assert(
+			fail.catch(() { uri.decode_component(s) }) ==
+				Error(uri.InvalidUtf8),
+		)
+	})
 	list.each([("%", 0), ("a%2", 1), ("abc%GG", 3)], (pair) {
 		(s, at) = pair
-		assert(fail.catch(() { uri.decode_bytes(s) }) == Error(uri.BadEscape(offset = at)))
-		assert(fail.catch(() { uri.decode_component(s) }) == Error(uri.BadEscape(offset = at)))
+		assert(
+			fail.catch(() { uri.decode_bytes(s) }) ==
+				Error(uri.BadEscape(offset = at)),
+		)
+		assert(
+			fail.catch(() { uri.decode_component(s) }) ==
+				Error(uri.BadEscape(offset = at)),
+		)
 	})
-	assert(fail.catch(() { uri.decode_component("aé") }) == Error(uri.NonAscii(offset = 1)))
+	assert(
+		fail.catch(() { uri.decode_component("aé") }) ==
+			Error(uri.NonAscii(offset = 1)),
+	)
 	all_bytes = bit_array.concat(
 		list.map(list.range(0, 255), (n) { <<n>> }),
 	)
@@ -745,9 +767,10 @@ test("uri_codecs", () {
 	list.each(["", "hello", "é🙂\u{0} /%+", "-._~", "%252e"], (s) {
 		assert(
 			{
-e4_call_arg_0 = uri.encode_component(s)
-fail.catch(() { uri.decode_component(e4_call_arg_0) })
-} == Ok(s),
+				e4_call_arg_0 = uri.encode_component(s)
+				fail.catch(() { uri.decode_component(e4_call_arg_0) })
+			} ==
+				Ok(s),
 		)
 	})
 	Nil
@@ -758,11 +781,25 @@ test("uri_forms", () {
 		fail.catch(() { uri.parse_query("a+b=c%2Bd&k&k=&a=2") }) ==
 			Ok([("a b", "c+d"), ("k", ""), ("k", ""), ("a", "2")]),
 	)
-	assert(fail.catch(() { uri.parse_query("&&x=1;2&&") }) == Ok([("x", "1;2")]))
-	assert(fail.catch(() { uri.parse_query("x=1&y=%GG") }) == Error(uri.BadEscape(offset = 6)))
-	assert(fail.catch(() { uri.parse_query("&&%GG=x") }) == Error(uri.BadEscape(offset = 2)))
-	assert(fail.catch(() { uri.parse_query("x=1&é=2") }) == Error(uri.NonAscii(offset = 4)))
-	assert(fail.catch(() { uri.parse_query("x=1&y=%FF") }) == Error(uri.InvalidUtf8))
+	assert(
+		fail.catch(() { uri.parse_query("&&x=1;2&&") }) == Ok([("x", "1;2")]),
+	)
+	assert(
+		fail.catch(() { uri.parse_query("x=1&y=%GG") }) ==
+			Error(uri.BadEscape(offset = 6)),
+	)
+	assert(
+		fail.catch(() { uri.parse_query("&&%GG=x") }) ==
+			Error(uri.BadEscape(offset = 2)),
+	)
+	assert(
+		fail.catch(() { uri.parse_query("x=1&é=2") }) ==
+			Error(uri.NonAscii(offset = 4)),
+	)
+	assert(
+		fail.catch(() { uri.parse_query("x=1&y=%FF") }) ==
+			Error(uri.InvalidUtf8),
+	)
 	assert(
 		fail.catch(() { uri.parse_query("a=b=c&=&a&a=") }) ==
 			Ok([("a", "b=c"), ("", ""), ("a", ""), ("a", "")]),
@@ -778,9 +815,10 @@ test("uri_forms", () {
 			pairs = [(a, b), (b, a), (a, a)]
 			assert(
 				{
-e4_call_arg_0 = uri.build_query(pairs)
-fail.catch(() { uri.parse_query(e4_call_arg_0) })
-} == Ok(pairs),
+					e4_call_arg_0 = uri.build_query(pairs)
+					fail.catch(() { uri.parse_query(e4_call_arg_0) })
+				} ==
+					Ok(pairs),
 			)
 		})
 	})
@@ -884,10 +922,10 @@ test("uri_long_inputs", () {
 	)
 	base = parse_good(text)
 	Ok(u) = {
-e4_call_arg_0 = base
-e4_call_arg_1 = parse_good(".")
-fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
-}
+		e4_call_arg_0 = base
+		e4_call_arg_1 = parse_good(".")
+		fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
+	}
 	assert(
 		uri.to_string(u) ==
 			string.concat(["x://", long, ":", string.repeat("9", 20000), "/"]),
@@ -895,16 +933,18 @@ fail.catch(() { uri.resolve(e4_call_arg_0, e4_call_arg_1) })
 	round_trip(u)
 	assert(
 		{
-e4_call_arg_0 = uri.encode_component(long)
-fail.catch(() { uri.decode_component(e4_call_arg_0) })
-} == Ok(long),
+			e4_call_arg_0 = uri.encode_component(long)
+			fail.catch(() { uri.decode_component(e4_call_arg_0) })
+		} ==
+			Ok(long),
 	)
 	pairs = [(long, long), ("", long)]
 	assert(
 		{
-e4_call_arg_0 = uri.build_query(pairs)
-fail.catch(() { uri.parse_query(e4_call_arg_0) })
-} == Ok(pairs),
+			e4_call_arg_0 = uri.build_query(pairs)
+			fail.catch(() { uri.parse_query(e4_call_arg_0) })
+		} ==
+			Ok(pairs),
 	)
 	Nil
 })

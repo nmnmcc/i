@@ -2,9 +2,9 @@
 ////
 //// A Float operation whose result is not finite stops the program
 //// (§11.3), so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;
-//// `divide` gives `Error(Nil)` for a zero divisor instead. Functions here
-//// that could give a result that is not finite, such as `power`, give
-//// `Error(Nil)` in its place, so they never stop the program.
+//// `divide` raises `Nil` for a zero divisor instead. Functions here
+//// that could give a result that is not finite, such as `power`, raise
+//// `Nil` in its place; handle these errors with `fail.catch`.
 (
 	i/fail
 	i/core
@@ -97,18 +97,6 @@ significand_limit = 9007199254740992
 /// ```
 to_string = (x: Float) -> String { core.inspect(x) }
 
-/// Reads a Float: an optional `-` or `+`, one or more digits, `.`, one or
-/// more digits, and then an optional exponent: `e` or `E`, an optional `-`
-/// or `+`, and one or more digits. The result is the nearest Float, with
-/// ties to even, worked out with exact integers. Text that is not in this
-/// form, or a number too big for a Float, gives `Error(Nil)`. A number too
-/// small for a Float gives `0.0` with its sign.
-///
-/// ```i
-/// float.parse("1.5")      // Ok(1.5)
-/// float.parse("-2.0e-3")  // Ok(-0.002)
-/// float.parse("1")        // Error(Nil)
-/// ```
 _parse_result = (text: String) -> Result(Float, Nil) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
@@ -459,16 +447,6 @@ to_precision = (x: Float, precision: Int) -> Float {
 		}
 }
 
-/// `base` to the power of a whole number. A negative exponent gives the
-/// inverse: `power(2.0, -1)` is `0.5`. `0.0` with a negative exponent, and a
-/// result too big for a Float, give `Error(Nil)`. The result is within one
-/// unit in the last place of the exact power, and exact when the exact power
-/// is a Float.
-///
-/// ```i
-/// float.power(2.0, 10)  // Ok(1024.0)
-/// float.power(-.2.0, -1)  // Ok(-.0.5)
-/// ```
 _power_result = (base: Float, of: Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |>
 		(True) { Error(Nil) }
@@ -490,12 +468,6 @@ _power_result = (base: Float, of: Int) -> Result(Float, Nil) {
 		}
 }
 
-/// The square root. A negative number gives `Error(Nil)`.
-///
-/// ```i
-/// float.square_root(4.0)   // Ok(2.0)
-/// float.square_root(-1.0)  // Error(Nil)
-/// ```
 _square_root_result = (x: Float) -> Result(Float, Nil) {
 	{ x <. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(core.sqrt(x)) }
 }
@@ -514,17 +486,10 @@ product = (numbers: List(Float)) -> Float {
 	go(numbers, 1.0)
 }
 
-/// `a /. by`, or `Error(Nil)` when `by` is `0.0`.
 _divide_result = (a: Float, by: Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> (True) { Error(Nil) } | (False) { Ok(a /. by) }
 }
 
-/// The remainder of `a` divided by `by`, rounded down, with the sign of
-/// `by`, or `Error(Nil)` when `by` is `0.0`.
-///
-/// ```i
-/// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
-/// ```
 _modulo_result = (a: Float, by: Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |>
 		(True) { Error(Nil) }
@@ -540,12 +505,6 @@ subtract = (a: Float, b: Float) -> Float { a -. b }
 /// `a *. b`, as a function.
 multiply = (a: Float, b: Float) -> Float { a *. b }
 
-/// `e` to the power `x`. A result too big for a Float gives `Error(Nil)`;
-/// that is for `x` greater than about 709.78.
-///
-/// ```i
-/// float.exponential(1.0)  // Ok(2.718281828459045)
-/// ```
 _exponential_result = (x: Float) -> Result(Float, Nil) {
 	{ x >. 7.09782712893383973096e2 } |>
 		(True) { Error(Nil) }
@@ -560,26 +519,10 @@ _exponential_result = (x: Float) -> Result(Float, Nil) {
 		}
 }
 
-/// The natural logarithm (base `e`). `0.0` and negative numbers give
-/// `Error(Nil)`.
-///
-/// ```i
-/// float.logarithm(1.0)  // Ok(0.0)
-/// float.logarithm(0.0)  // Error(Nil)
-/// ```
 _logarithm_result = (x: Float) -> Result(Float, Nil) {
 	{ x <=. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(log_positive(x)) }
 }
 
-/// `base` to the power `of`, for any Float exponent. A negative base with
-/// an exponent that is not a whole number, `0.0` with a negative exponent,
-/// and a result too big for a Float give `Error(Nil)`. The result is within
-/// one unit in the last place of the exact power.
-///
-/// ```i
-/// float.real_power(16.0, 0.5)  // Ok(4.0)
-/// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
-/// ```
 _real_power_result = (base: Float, of: Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
@@ -1011,7 +954,6 @@ asin_ratio = (z: Float) -> Float {
 	p /. q
 }
 
-/// The arcsine in radians; inputs outside [-1, 1] give Error(Nil).
 _asin_result = (x: Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
@@ -1064,7 +1006,6 @@ _asin_result = (x: Float) -> Result(Float, Nil) {
 		}
 }
 
-/// The arccosine in radians; inputs outside [-1, 1] give Error(Nil).
 _acos_result = (x: Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
@@ -1275,7 +1216,6 @@ atan2 = (y: Float, x: Float) -> Float {
 /// Convert degrees to radians.
 radians = (degrees: Float) -> Float { degrees *. 0.017453292519943295 }
 
-/// Convert radians to degrees, returning an error if the result overflows.
 _degrees_result = (radians: Float) -> Result(Float, Nil) {
 	{ abs(radians) >. 3.1375664143845866e306 } |>
 		(True) { Error(Nil) }
@@ -1292,7 +1232,6 @@ hypot_square = (x: Float) -> (Float, Float) {
 	(hi, lo)
 }
 
-/// The Euclidean length of (x, y), returning an error on overflow.
 _hypot_result = (x: Float, y: Float) -> Result(Float, Nil) {
 	a = max(abs(x), abs(y))
 	b = min(abs(x), abs(y))
@@ -1539,7 +1478,6 @@ trig_tan = (input: Float, tail: Float, odd: Bool) -> Float {
 		}
 }
 
-/// Tangent of an angle in radians.
 _tan_result = (x: Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a <. 0.7853981633974483 } |>
@@ -1560,67 +1498,126 @@ _tan_result = (x: Float) -> Result(Float, Nil) {
 		}
 }
 
+/// Reads a Float: an optional `-` or `+`, one or more digits, `.`, one or
+/// more digits, and then an optional exponent: `e` or `E`, an optional `-`
+/// or `+`, and one or more digits. The result is the nearest Float, with
+/// ties to even, worked out with exact integers. Text that is not in this
+/// form, or a number too big for a Float, raises `Nil`. A number too
+/// small for a Float gives `0.0` with its sign.
+///
+/// ```i
+/// fail.catch(() { float.parse("1.5") })      // Ok(1.5)
+/// fail.catch(() { float.parse("-2.0e-3") })  // Ok(-0.002)
+/// fail.catch(() { float.parse("1") })        // Error(Nil)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-parse = (text: String) <- (Fail(Nil)) -> Float {
-	fail.from_result(_parse_result(text))
-}
+parse = (text: String) -> Float { fail.from_result(_parse_result(text)) }
 
+/// `base` to the power of a whole number. A negative exponent gives the
+/// inverse: `power(2.0, -1)` is `0.5`. `0.0` with a negative exponent, and a
+/// result too big for a Float, raise `Nil`. The result is within one
+/// unit in the last place of the exact power, and exact when the exact power
+/// is a Float.
+///
+/// ```i
+/// fail.catch(() { float.power(2.0, 10) })  // Ok(1024.0)
+/// fail.catch(() { float.power(-.2.0, -1) })  // Ok(-.0.5)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-power = (base: Float, of: Int) <- (Fail(Nil)) -> Float {
+power = (base: Float, of: Int) -> Float {
 	fail.from_result(_power_result(base, of))
 }
 
+/// The square root. A negative number raises `Nil`.
+///
+/// ```i
+/// fail.catch(() { float.square_root(4.0) })   // Ok(2.0)
+/// fail.catch(() { float.square_root(-1.0) })  // Error(Nil)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-square_root = (x: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_square_root_result(x))
-}
+square_root = (x: Float) -> Float { fail.from_result(_square_root_result(x)) }
 
+/// `a /. by`, raising `Nil` when `by` is `0.0`.
+///
 /// Reports failure through `Fail(Nil)`.
-divide = (a: Float, by: Float) <- (Fail(Nil)) -> Float {
+divide = (a: Float, by: Float) -> Float {
 	fail.from_result(_divide_result(a, by))
 }
 
+/// The remainder of `a` divided by `by`, rounded down, with the sign of
+/// `by`, raising `Nil` when `by` is `0.0`.
+///
+/// ```i
+/// fail.catch(() { float.modulo(13.3, 3.3) })  // Ok(0.10000000000000053)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-modulo = (a: Float, by: Float) <- (Fail(Nil)) -> Float {
+modulo = (a: Float, by: Float) -> Float {
 	fail.from_result(_modulo_result(a, by))
 }
 
+/// `e` to the power `x`. A result too big for a Float raises `Nil`;
+/// that is for `x` greater than about 709.78.
+///
+/// ```i
+/// fail.catch(() { float.exponential(1.0) })  // Ok(2.718281828459045)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-exponential = (x: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_exponential_result(x))
-}
+exponential = (x: Float) -> Float { fail.from_result(_exponential_result(x)) }
 
+/// The natural logarithm (base `e`). `0.0` and negative numbers raise
+/// `Nil`.
+///
+/// ```i
+/// fail.catch(() { float.logarithm(1.0) })  // Ok(0.0)
+/// fail.catch(() { float.logarithm(0.0) })  // Error(Nil)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-logarithm = (x: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_logarithm_result(x))
-}
+logarithm = (x: Float) -> Float { fail.from_result(_logarithm_result(x)) }
 
+/// `base` to the power `of`, for any Float exponent. A negative base with
+/// an exponent that is not a whole number, `0.0` with a negative exponent,
+/// and a result too big for a Float raise `Nil`. The result is within
+/// one unit in the last place of the exact power.
+///
+/// ```i
+/// fail.catch(() { float.real_power(16.0, 0.5) })  // Ok(4.0)
+/// fail.catch(() { float.real_power(-.8.0, 1.0 /. 3.0) })  // Error(Nil)
+/// ```
+///
 /// Reports failure through `Fail(Nil)`.
-real_power = (base: Float, of: Float) <- (Fail(Nil)) -> Float {
+real_power = (base: Float, of: Float) -> Float {
 	fail.from_result(_real_power_result(base, of))
 }
 
+/// The arcsine in radians; inputs outside [-1, 1] raise Nil.
+///
 /// Reports failure through `Fail(Nil)`.
-asin = (x: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_asin_result(x))
-}
+asin = (x: Float) -> Float { fail.from_result(_asin_result(x)) }
 
+/// The arccosine in radians; inputs outside [-1, 1] raise Nil.
+///
 /// Reports failure through `Fail(Nil)`.
-acos = (x: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_acos_result(x))
-}
+acos = (x: Float) -> Float { fail.from_result(_acos_result(x)) }
 
+/// Convert radians to degrees, returning an error if the result overflows.
+///
 /// Reports failure through `Fail(Nil)`.
-degrees = (radians: Float) <- (Fail(Nil)) -> Float {
+degrees = (radians: Float) -> Float {
 	fail.from_result(_degrees_result(radians))
 }
 
+/// The Euclidean length of (x, y), returning an error on overflow.
+///
 /// Reports failure through `Fail(Nil)`.
-hypot = (x: Float, y: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_hypot_result(x, y))
-}
+hypot = (x: Float, y: Float) -> Float { fail.from_result(_hypot_result(x, y)) }
 
+/// Tangent of an angle in radians.
+///
 /// Reports failure through `Fail(Nil)`.
-tan = (x: Float) <- (Fail(Nil)) -> Float {
-	fail.from_result(_tan_result(x))
-}
+tan = (x: Float) -> Float { fail.from_result(_tan_result(x)) }

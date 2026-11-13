@@ -45,52 +45,59 @@ test("time_units", () {
 test("time_arithmetic", () {
 	assert(
 		{
-e4_call_arg_0 = time.nanoseconds(-5)
-e4_call_arg_1 = 2
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Ok(time.nanoseconds(-2)),
+			e4_call_arg_0 = time.nanoseconds(-5)
+			e4_call_arg_1 = 2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(-2)),
 	)
 	assert(
 		{
-e4_call_arg_0 = time.nanoseconds(5)
-e4_call_arg_1 = -2
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Ok(time.nanoseconds(-2)),
+			e4_call_arg_0 = time.nanoseconds(5)
+			e4_call_arg_1 = -2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(-2)),
 	)
 	assert(
 		{
-e4_call_arg_0 = time.nanoseconds(-5)
-e4_call_arg_1 = -2
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Ok(time.nanoseconds(2)),
+			e4_call_arg_0 = time.nanoseconds(-5)
+			e4_call_arg_1 = -2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(2)),
 	)
 	assert(
 		{
-e4_call_arg_0 = time.nanoseconds(5)
-e4_call_arg_1 = 2
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Ok(time.nanoseconds(2)),
+			e4_call_arg_0 = time.nanoseconds(5)
+			e4_call_arg_1 = 2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(2)),
 	)
 	assert(
 		{
-e4_call_arg_0 = time.seconds(1)
-e4_call_arg_1 = 0
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Error(time.DivisionByZero),
+			e4_call_arg_0 = time.seconds(1)
+			e4_call_arg_1 = 0
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(time.DivisionByZero),
 	)
 	assert(
 		{
-e4_call_arg_0 = time.nanoseconds(0)
-e4_call_arg_1 = 0
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Error(time.DivisionByZero),
+			e4_call_arg_0 = time.nanoseconds(0)
+			e4_call_arg_1 = 0
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(time.DivisionByZero),
 	)
 	assert(
 		{
-e4_call_arg_0 = time.nanoseconds(0)
-e4_call_arg_1 = -2
-fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
-} == Ok(time.nanoseconds(0)),
+			e4_call_arg_0 = time.nanoseconds(0)
+			e4_call_arg_1 = -2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(0)),
 	)
 	assert(
 		time.scale(time.nanoseconds(-2), 2) != time.nanoseconds(-5),

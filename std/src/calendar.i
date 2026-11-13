@@ -1,6 +1,6 @@
 //// Proleptic Gregorian dates for all integer years, and explicit fixed offsets.
 //// Date, TimeOfDay and Offset have private constructors; Civil, Weekday and
-//// CalendarError expose their constructors. All validation returns Result.
+//// CalendarError expose their constructors. Validation failures use Fail(CalendarError).
 ////
 //// C1: leap years divide by 4, except centuries not divisible by 400. Year 0
 //// is 1 BCE. Months are 1..12; validate month before day, with no 1582 gap.
@@ -19,7 +19,7 @@
 ////
 //// Laws: from_day_number(day_number(d)) = d; day_number(from_day_number(n))
 //// = n; at(to_instant(c,o),o) = c; to_instant(at(t,o),o) = t;
-//// parse(format(c,o)) = Ok((c,o)); add_days(d,days_between(d,e)) = e.
+//// parse(format(c,o)) = (c,o); add_days(d,days_between(d,e)) = e.
 ////
 //// Public values:
 //// Date { Date(Int, Int, Int) }, TimeOfDay { TimeOfDay(Int, Int, Int, Int) }
@@ -29,16 +29,16 @@
 //// CalendarError { BadMonth BadDay BadHour BadMinute BadSecond
 ////                 BadNanosecond BadOffset BadText }
 ////
-//// date: (year: Int, month: Int, day: Int) -> Result(Date, CalendarError)
+//// date: (year: Int, month: Int, day: Int) <- (Fail(CalendarError)) -> Date
 //// time_of_day: (hour: Int, minute: Int, second: Int, nanosecond: Int)
-////              -> Result(TimeOfDay, CalendarError)
-//// offset: (minutes: Int) -> Result(Offset, CalendarError)
+////              <- (Fail(CalendarError)) -> TimeOfDay
+//// offset: (minutes: Int) <- (Fail(CalendarError)) -> Offset
 //// utc: () -> Offset
 //// date_parts: (date: Date) -> (Int, Int, Int)
 //// time_parts: (time: TimeOfDay) -> (Int, Int, Int, Int)
 //// offset_minutes: (offset: Offset) -> Int
 //// is_leap_year: (year: Int) -> Bool
-//// days_in_month: (year: Int, month: Int) -> Result(Int, CalendarError)
+//// days_in_month: (year: Int, month: Int) <- (Fail(CalendarError)) -> Int
 //// day_number: (date: Date) -> Int
 //// from_day_number: (day: Int) -> Date
 //// weekday: (date: Date) -> Weekday
@@ -46,7 +46,7 @@
 //// days_between: (start: Date, end: Date) -> Int
 //// at: (instant: time.Instant, offset: Offset) -> Civil
 //// to_instant: (civil: Civil, offset: Offset) -> time.Instant
-//// parse: (text: String) -> Result((Civil, Offset), CalendarError)
+//// parse: (text: String) <- (Fail(CalendarError)) -> (Civil, Offset)
 //// format: (civil: Civil, offset: Offset) -> String
 ////
 //// No month/year addition policy is implicit. Conversion uses a fixed number
@@ -136,7 +136,10 @@ _days_in_month_result = (year: Int, month: Int) -> Result(Int, CalendarError) {
 		| (_) { Error(BadMonth) }
 }
 
-_date_result = (year: Int, month: Int, day: Int) -> Result(Date, CalendarError) {
+_date_result = (year: Int, month: Int, day: Int) -> Result(
+	Date,
+	CalendarError,
+) {
 	_days_in_month_result(year, month) |>
 		(Error(e)) { Error(e) }
 		| (Ok(count)) {
@@ -146,10 +149,12 @@ _date_result = (year: Int, month: Int, day: Int) -> Result(Date, CalendarError) 
 		}
 }
 
-_time_of_day_result = (hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(
-	TimeOfDay,
-	CalendarError,
-) {
+_time_of_day_result = (
+	hour: Int,
+	minute: Int,
+	second: Int,
+	nanosecond: Int
+) -> Result(TimeOfDay, CalendarError) {
 	{ hour < 0 || hour > 23 } |>
 		(True) { Error(BadHour) }
 		| (False) {
@@ -472,26 +477,29 @@ now = () { at(time.now(), utc()) }
 format_now = () { format(now(), utc()) }
 
 /// Reports failure through `Fail(CalendarError)`.
-days_in_month = (year: Int, month: Int) <- (Fail(CalendarError)) -> Int {
+days_in_month = (year: Int, month: Int) -> Int {
 	fail.from_result(_days_in_month_result(year, month))
 }
 
 /// Reports failure through `Fail(CalendarError)`.
-date = (year: Int, month: Int, day: Int) <- (Fail(CalendarError)) -> Date {
+date = (year: Int, month: Int, day: Int) -> Date {
 	fail.from_result(_date_result(year, month, day))
 }
 
 /// Reports failure through `Fail(CalendarError)`.
-time_of_day = (hour: Int, minute: Int, second: Int, nanosecond: Int) <- (Fail(CalendarError)) -> TimeOfDay {
+time_of_day = (
+	hour: Int,
+	minute: Int,
+	second: Int,
+	nanosecond: Int
+) -> TimeOfDay {
 	fail.from_result(_time_of_day_result(hour, minute, second, nanosecond))
 }
 
 /// Reports failure through `Fail(CalendarError)`.
-offset = (minutes: Int) <- (Fail(CalendarError)) -> Offset {
-	fail.from_result(_offset_result(minutes))
-}
+offset = (minutes: Int) -> Offset { fail.from_result(_offset_result(minutes)) }
 
 /// Reports failure through `Fail(CalendarError)`.
-parse = (text: String) <- (Fail(CalendarError)) -> (Civil, Offset) {
+parse = (text: String) -> (Civil, Offset) {
 	fail.from_result(_parse_result(text))
 }
