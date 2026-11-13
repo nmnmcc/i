@@ -606,7 +606,6 @@ impl Syntax {
         Ok(())
     }
 
-
     /// [`Syntax::show_as`] in the rows of syntax three (§6.8): the datum is
     /// read for `position` by the reader of syntax three and written by its
     /// printer. The tree may be of any depth.

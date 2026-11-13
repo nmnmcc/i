@@ -555,7 +555,7 @@ pub fn print_module(module: &crate::ast::Module) -> String {
     crate::deep::deep(|| crate::rows::to_lisp(module))
 }
 pub fn print_with_comments(source: &str, module: &crate::ast::Module) -> (String, Vec<Span>) {
-    crate::deep::deep(|| crate::surface::module_comments(
-        source, module, crate::rows::to_lisp(module), false, true,
-    ))
+    crate::deep::deep(|| {
+        crate::surface::module_comments(source, module, crate::rows::to_lisp(module), false, true)
+    })
 }

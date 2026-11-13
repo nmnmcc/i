@@ -47,7 +47,6 @@ pub struct MacroDefinition {
     pub signature: Option<usize>,
 }
 
-
 /// An unevaluated syntax argument, with its optional written call label.
 #[derive(Clone, Debug)]
 pub struct MacroArgument {

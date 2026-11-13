@@ -1,9 +1,9 @@
 //! Private legacy lexer; production token and comment types stay shared.
-pub use syntax3::lexer::{Comment, DocComment, Lexed};
-use crate::{Code, Diagnostic};
 use crate::span::Span;
 use crate::token::{StringPart, Token, TokenKind as T};
+use crate::{Code, Diagnostic};
 use num_bigint::BigUint;
+pub use syntax3::lexer::{Comment, DocComment, Lexed};
 pub fn lex(source: &str) -> Lexed {
     lex_surface(source, false, false)
 }

@@ -3,7 +3,9 @@ use super::{Datum, DatumKind as K, Document};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 type Result<T> = std::result::Result<T, Diagnostic>;
-pub fn normal_source(document: &Document) -> Result<String> { normal_source3(document) }
+pub fn normal_source(document: &Document) -> Result<String> {
+    normal_source3(document)
+}
 /// The depth up to which a datum is read and printed on the caller's stack.
 const DIRECT_DEPTH: usize = 64;
 
@@ -212,15 +214,17 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
 pub fn normal_source3(document: &Document) -> Result<String> {
     crate::syn3::deep::deep(|| {
         let (module, errors) = crate::syn3::lisp::from_document(document);
-        if let Some(error) = errors.into_iter().next() { return Err(error); }
+        if let Some(error) = errors.into_iter().next() {
+            return Err(error);
+        }
         Ok(crate::syn3::print_tree(&module, false))
     })
 }
 #[cfg(test)]
 mod deep_tests {
-    use migration_syntax::span::Span;
+    use migration_syntax::lisp::to_source::{normal_source, normal_with_comments, show_as};
     use migration_syntax::lisp::{Datum, DatumKind as K, Document};
-    use migration_syntax::lisp::to_source::{show_as, normal_source, normal_with_comments};
+    use migration_syntax::span::Span;
     fn datum(kind: K) -> Datum {
         Datum {
             kind,
@@ -246,7 +250,9 @@ mod deep_tests {
     fn render_deep_calls_without_host_stack_growth() {
         for depth in [1000, 10000] {
             let d = nest(depth, "f");
-            let s = migration_syntax::lisp::render::render(&d, migration_syntax::lisp::render::P::Expr).unwrap();
+            let s =
+                migration_syntax::lisp::render::render(&d, migration_syntax::lisp::render::P::Expr)
+                    .unwrap();
             assert_eq!(s, format!("{}x{}", "f(".repeat(depth), ")".repeat(depth)));
         }
     }
@@ -284,7 +290,9 @@ mod deep_tests {
                 datum(K::Curly(vec![bind])),
             ]));
         }
-        let output = migration_syntax::lisp::render::render(&d, migration_syntax::lisp::render::P::Expr).unwrap();
+        let output =
+            migration_syntax::lisp::render::render(&d, migration_syntax::lisp::render::P::Expr)
+                .unwrap();
         assert_eq!(
             output,
             format!("{}x{}", "f({ v = ".repeat(10000), " })".repeat(10000))
@@ -409,7 +417,8 @@ mod deep_tests {
         let d = datum(K::Square(
             (0..10000).map(|_| datum(K::Name("x".into()))).collect(),
         ));
-        let s = migration_syntax::lisp::render::render(&d, migration_syntax::lisp::render::P::Expr).unwrap();
+        let s = migration_syntax::lisp::render::render(&d, migration_syntax::lisp::render::P::Expr)
+            .unwrap();
         assert_eq!(s, format!("[{}]", vec!["x"; 10000].join(", ")));
     }
 }
@@ -417,9 +426,9 @@ mod deep_tests {
 #[cfg(test)]
 mod record_tests {
     type Result<T> = std::result::Result<T, migration_syntax::Diagnostic>;
-    use migration_syntax::lisp::{Datum, DatumKind as K};
-    use migration_syntax::lisp::render::{P, render};
     use migration_syntax::lisp::parse;
+    use migration_syntax::lisp::render::{P, render};
+    use migration_syntax::lisp::{Datum, DatumKind as K};
 
     fn render_one(input: &str, p: P) -> Result<String> {
         let document = parse(input).unwrap();
@@ -499,9 +508,13 @@ mod record_tests {
 pub fn normal_with_comments(source: &str, document: &Document) -> Result<(String, Vec<Span>)> {
     crate::deep::deep(|| {
         let (module, errors) = crate::rows::from_document(document);
-        if let Some(error) = errors.into_iter().next() { return Err(error); }
+        if let Some(error) = errors.into_iter().next() {
+            return Err(error);
+        }
         let output = normal_source3(document)?;
-        Ok(crate::surface::module_comments(source, &module, output, true, false))
+        Ok(crate::surface::module_comments(
+            source, &module, output, true, false,
+        ))
     })
 }
 

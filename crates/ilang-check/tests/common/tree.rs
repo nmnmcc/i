@@ -10,9 +10,9 @@
 
 /// The tree before syntax three.
 pub mod old {
-    use migration_syntax as ilang_syntax;
     use ilang_syntax::ast::{Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Stmt, TypeExpr};
     use ilang_syntax::span::Span;
+    use migration_syntax as ilang_syntax;
 
     /// The statements of the function that the binding `item` gives.
     pub fn statements(module: &mut Module, item: usize) -> &mut Vec<Stmt> {

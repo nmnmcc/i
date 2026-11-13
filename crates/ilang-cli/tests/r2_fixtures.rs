@@ -76,7 +76,9 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
                 }
                 for attribute in &item.attributes {
                     if attribute.module.is_none() && attribute.name.name == "host" {
-                        let Some(DItem::Pos(value)) = attribute.args.as_deref().and_then(|args| args.first()) else {
+                        let Some(DItem::Pos(value)) =
+                            attribute.args.as_deref().and_then(|args| args.first())
+                        else {
                             panic!("host attribute has its namespace argument")
                         };
                         let ExprKind::String(namespace) = &value.kind else {
@@ -92,8 +94,18 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
                 }
             }
             assert_eq!(entries, 1, "one main in {}", file.display());
-            let exports_group = module.exports.iter().map(|item| item.span.0).reduce(ilang_syntax::span::Span::to).map(|span| group(&text, span));
-            let imports_group = module.imports.iter().map(|item| item.span.0).reduce(ilang_syntax::span::Span::to).map(|span| group(&text, span));
+            let exports_group = module
+                .exports
+                .iter()
+                .map(|item| item.span.0)
+                .reduce(ilang_syntax::span::Span::to)
+                .map(|span| group(&text, span));
+            let imports_group = module
+                .imports
+                .iter()
+                .map(|item| item.span.0)
+                .reduce(ilang_syntax::span::Span::to)
+                .map(|span| group(&text, span));
             if let Some((start, end)) = exports_group {
                 edits.push((start, end, exports));
             } else {

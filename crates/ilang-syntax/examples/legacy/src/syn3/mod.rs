@@ -1,6 +1,6 @@
 pub use syntax3::syn3::*;
-pub mod lisp;
 pub mod convert;
+pub mod lisp;
 pub mod lower;
 /// Reads a normal-surface file of syntax three into the current tree.
 pub fn parse_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic>) {
@@ -30,4 +30,3 @@ pub fn print_current(module: &crate::ast::Module, lisp: bool) -> String {
         print_module(&module)
     }
 }
-

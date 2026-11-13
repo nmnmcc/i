@@ -1709,4 +1709,3 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
 }
 
 // ---- Quotes of the older Lisp rows ----
-

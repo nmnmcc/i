@@ -24,8 +24,8 @@ mod groups;
 mod pre;
 
 use super::*;
-use ilang_syntax::syn3::ast::resolved as o;
 use ilang_syntax::syn3::ast as n;
+use ilang_syntax::syn3::ast::resolved as o;
 use ilang_syntax::syn3::walk as nwalk;
 use pre::{
     AndPlan, ChainKind, Inner, Pre, addr, and_plan, attribute_call, attribute_strings, chain_kind,

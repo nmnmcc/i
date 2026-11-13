@@ -90,7 +90,9 @@ pub struct Transition {
 impl Transition {
     pub fn extend(&mut self, other: &Self) {
         if let Some(native) = &other.native {
-            self.native.get_or_insert_with(Default::default).extend(native);
+            self.native
+                .get_or_insert_with(Default::default)
+                .extend(native);
         }
         self.complete |= other.complete;
         self.parameters.extend(other.parameters.clone());
@@ -109,7 +111,8 @@ impl Transition {
         self.patterns.insert(span);
     }
     pub fn is_expression(&self, span: Span) -> bool {
-        self.expressions.contains(&span) || self.native.as_ref().is_some_and(|n| n.is_expression(span))
+        self.expressions.contains(&span)
+            || self.native.as_ref().is_some_and(|n| n.is_expression(span))
     }
     pub fn is_type(&self, span: Span) -> bool {
         self.types.contains(&span) || self.native.as_ref().is_some_and(|n| n.is_type(span))
@@ -121,14 +124,27 @@ impl Transition {
         self.complete || self.native.as_ref().is_some_and(|n| n.is_complete())
     }
     pub fn formals(&self, binding: Span, pattern: Span) -> Option<&[(String, Span)]> {
-        self.parameters.get(&(binding, pattern)).map(Vec::as_slice).or_else(|| self.native.as_ref().and_then(|n| n.formals(binding, pattern)))
+        self.parameters
+            .get(&(binding, pattern))
+            .map(Vec::as_slice)
+            .or_else(|| {
+                self.native
+                    .as_ref()
+                    .and_then(|n| n.formals(binding, pattern))
+            })
     }
     pub fn sum_members(&self, parent: Span) -> Option<&[Span]> {
-        self.sums.get(&parent).map(Vec::as_slice).or_else(|| self.native.as_ref().and_then(|n| n.sum_members(parent)))
+        self.sums
+            .get(&parent)
+            .map(Vec::as_slice)
+            .or_else(|| self.native.as_ref().and_then(|n| n.sum_members(parent)))
     }
     /// Read-only native facts remain shared; old recording deltas stay private.
     pub fn from_native(native: &syntax3::syn3::facts::Transition) -> Self {
-        Self { native: Some(native.clone()), ..Self::default() }
+        Self {
+            native: Some(native.clone()),
+            ..Self::default()
+        }
     }
 }
 
@@ -986,7 +1002,10 @@ impl Cx {
                 }
             }
         }
-        let original = self.transition.formals(b.span.0, b.pattern.span.0).map(|p| p.to_vec());
+        let original = self
+            .transition
+            .formals(b.span.0, b.pattern.span.0)
+            .map(|p| p.to_vec());
         let mark = self.rows.len();
         self.rows.extend(generics.iter().map(|g| Row {
             name: g.name.clone(),

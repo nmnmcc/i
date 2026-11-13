@@ -1,8 +1,10 @@
 //! Compatibility namespace for the syntax-three tree now at the crate root.
-pub use crate::{ast, deep, facts, group, rows as lisp, surface, walk, print};
-pub use crate::parse::{parse_module, parse_expr, parse_type, parse_pattern, pipe_target};
-pub use crate::print::{MAX_CALL_DEPTH, WIDTH, call_depth, format, print_expr, print_module,
-    print_pattern, print_type, print_with_comments, string_literal, record_label};
+pub use crate::parse::{parse_expr, parse_module, parse_pattern, parse_type, pipe_target};
+pub use crate::print::{
+    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_expr, print_module, print_pattern, print_type,
+    print_with_comments, record_label, string_literal,
+};
+pub use crate::{ast, deep, facts, group, print, rows as lisp, surface, walk};
 /// Temporary integration switch for the remaining non-engine tree readers.
 /// Keep off until the rows, macro engine and resolver have moved together.
 pub const FINAL_AST_READERS: bool = true;

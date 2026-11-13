@@ -277,8 +277,9 @@ fn expr(s: &Syntax) -> Syntax {
 }
 
 // Native normalization is shared with the production reader.
-pub use syntax3::lisp::source_syntax::{Mode3, normalize3, normalize_expression,
-    normalize_type, normalize_pattern, normalize_item};
+pub use syntax3::lisp::source_syntax::{
+    Mode3, normalize_expression, normalize_item, normalize_pattern, normalize_type, normalize3,
+};
 
 fn item(s: &Syntax, kind: &crate::ast::ItemKind) -> Syntax {
     if ROWS3 {
@@ -661,7 +662,7 @@ mod tests {
                 continue;
             };
             for datum in document.iter() {
-                let Ok(item) = lisp::position::item(datum) else {
+                let Ok(item) = lisp::item_from_datum(datum) else {
                     // A header, or a file that is an error on purpose.
                     continue;
                 };

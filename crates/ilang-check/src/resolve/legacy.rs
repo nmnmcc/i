@@ -15,9 +15,9 @@ type Parsed = BaselineParsed;
 use crate::code;
 use crate::types::{Head, HostType, ShapeId, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
-use migration_syntax::ast;
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
+use migration_syntax::ast;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
@@ -4874,7 +4874,6 @@ fn same_name_part(p: &ast::Pattern) -> Option<&ast::Pattern> {
     }
 }
 
-
 #[derive(Clone)]
 struct BaselineParsed {
     package: PackageId,
@@ -4892,11 +4891,20 @@ pub(super) fn resolve_transition(
     modules: &[ast::Module],
 ) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
-        let parsed: Vec<_> = parsed.iter().zip(modules).map(|(p, m)| BaselineParsed {
-            package: p.package, path: p.path.clone(), source: p.source, kind: p.kind,
-            ast: m.clone(), scoped: p.scoped.clone(),
-            compiler_generated: p.compiler_generated, typed_macros: p.typed_macros.clone(),
-        }).collect();
+        let parsed: Vec<_> = parsed
+            .iter()
+            .zip(modules)
+            .map(|(p, m)| BaselineParsed {
+                package: p.package,
+                path: p.path.clone(),
+                source: p.source,
+                kind: p.kind,
+                ast: m.clone(),
+                scoped: p.scoped.clone(),
+                compiler_generated: p.compiler_generated,
+                typed_macros: p.typed_macros.clone(),
+            })
+            .collect();
         resolve_lowered(graph, &parsed)
     })
 }

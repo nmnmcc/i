@@ -841,3 +841,12 @@ No diagnostic golden has changed. Initial all-target failures are explained
 in the verification ledger; private standalone checks and the complete
 deletion gate still follow. Green3 remains the landable prefix until they
 pass. Formatting and the private lockfile are next.
+
+
+07:20 standalone milestone: all104 changed Rust files are formatted, both
+trailing-blank-line notices are fixed, and the private migration package
+passes its locked all-target check including three binaries and unit-test
+compilation. Its copied corpus reader now uses the same public item reader
+as the retained workspace assertion. The standalone lockfile is retained.
+Workspace compile and private compile are green; the full deletion matrix
+starts next and remains required before a green4 claim.

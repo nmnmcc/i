@@ -51,7 +51,6 @@ pub struct Local {
     pub fn_only: Option<u32>,
 }
 
-
 pub trait Hook {
     type Error;
     fn is_macro(

@@ -7,11 +7,11 @@
 //! The first difference of each file is printed, and the count of equal
 //! files.
 
+use crate as ilang_check;
 use ilang_check::hir::{ModuleId, Program};
 use ilang_check::{Parsed, resolve};
 use ilang_package::{Diagnostic, LoadOptions, PackageGraph};
 use migration_syntax::syn3;
-use crate as ilang_check;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -254,7 +254,8 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
         assert!(!old_templates.is_empty());
         assert_eq!(old_templates.len(), new_templates.len());
     }
-    let (old_program, old_diags) = super::legacy::resolve_transition(&graph, &lowered, &lowered_modules);
+    let (old_program, old_diags) =
+        super::legacy::resolve_transition(&graph, &lowered, &lowered_modules);
     totals.lowering += expected.len();
     totals.diagnostics += old_diags.len();
     totals.bindings += old_program

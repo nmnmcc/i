@@ -1,31 +1,38 @@
-use crate::{Code, Diagnostic};
 use crate::token::{Token, TokenKind as T};
+use crate::{Code, Diagnostic};
 pub use syntax3::lisp::*;
+pub mod comments;
 pub mod encode;
 pub mod encode_charge;
-pub mod source_syntax;
 pub mod quote_lower;
-pub mod comments;
+pub mod source_syntax;
 pub use encode::{SourceEncoder, expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use encode_charge::SyntaxCharge;
-mod to_ast;
 mod from_ast;
-pub mod to_source;
 pub mod render;
+mod to_ast;
+pub mod to_source;
 pub(crate) mod trampoline;
-pub use to_ast::{parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type};
 pub use from_ast::{print_module, print_with_comments};
+pub use to_ast::{
+    parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type,
+};
 pub use to_source::{normal_source, normal_with_comments};
-pub fn parse_legacy(source: &str) -> Result<Document, Vec<Diagnostic>> { parse_lexed(crate::lexer::lex_lisp(source)) }
+pub fn parse_legacy(source: &str) -> Result<Document, Vec<Diagnostic>> {
+    parse_lexed(crate::lexer::lex_lisp(source))
+}
 pub fn parse_source_legacy(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
     match parse_legacy(source).and_then(|d| parse_module(&d).map_err(|e| vec![e])) {
-        Ok(m) => (m, Vec::new()), Err(e) => (Default::default(), e)
+        Ok(m) => (m, Vec::new()),
+        Err(e) => (Default::default(), e),
     }
 }
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
     let (tree, mut errors) = crate::syn3::lisp::from_lisp(source);
     let (tree, more) = crate::syn3::lower::lower_lisp(&tree);
-    errors.extend(more); errors.sort_by_key(|d| (d.span.start, d.span.end)); (tree, errors)
+    errors.extend(more);
+    errors.sort_by_key(|d| (d.span.start, d.span.end));
+    (tree, errors)
 }
 fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> {
     if !lexed.diagnostics.is_empty() {

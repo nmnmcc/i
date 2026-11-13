@@ -455,3 +455,27 @@ non-workspace historical printer copy. No production normal dependency
 points to ilang-syntax-migration (verified in all four consumer manifests).
 `git diff --check` passes; no .out or .expect.json diagnostic golden changes.
 This compiling checkpoint is not the full green deletion gate.
+
+
+## Formatting and private standalone milestone (07:20)
+
+- Direct rustfmt on104 changed Rust files: PASS. The exact argv is recorded
+  in target/fa-r3/delete-format-argv.json; command prefix is
+  `direnv exec /home/agent/Programming/i rustfmt --edition 2024 --config skip_children=true`.
+  This fixes the two blank-line-at-EOF notices from the compiling checkpoint.
+- `git diff --check`: PASS after formatting. The compiling checkpoint's
+  staged check had reported those two notices; they are not hidden as a pass.
+- First standalone check (below):101, one copied source-normalization corpus
+  test called private position::item; switched to equivalent public
+  item_from_datum, retaining every assertion.
+- Locked standalone check: PASS, library/unit-test target and all three
+  migration binaries compile. Historical printer has one unused helper
+  warning; production is not linked to this package.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --all-targets --target-dir target --offline --message-format=short
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo check --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --all-targets --target-dir target --locked --message-format=short
+```
+
+Logs: target/fa-r3/private-check1.log and private-check2.log. Full deletion
+verification follows; no full-green claim is made by this milestone.

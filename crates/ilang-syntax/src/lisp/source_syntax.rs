@@ -43,7 +43,6 @@ fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     // Keep the written rows and occurrence spans when macro syntax uses
     // syntax three. The inactive legacy path needs its old-row adapter.
     Syntax::from_datum(datum, scope)
-
 }
 fn symbol(s: &Syntax, expected: &str) -> bool {
     matches!(s.node(), Node::Symbol(value) if value == expected)
@@ -321,14 +320,14 @@ pub fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
 }
 #[cfg(test)]
 mod tests {
+    use migration_syntax::lisp::source_syntax::source_item_syntax;
     use migration_syntax::lisp::source_syntax::*;
-    use migration_syntax::lisp::syntax::{Scope, Syntax, Node};
-    use migration_syntax::span::Span;
-    use migration_syntax::lisp::syntax::ROWS3;
-    use migration_syntax::lisp::source_syntax::{normalize_expression as expr, normalize_type as ty};
     use migration_syntax::lisp::source_syntax::{
-        source_item_syntax,
+        normalize_expression as expr, normalize_type as ty,
     };
+    use migration_syntax::lisp::syntax::ROWS3;
+    use migration_syntax::lisp::syntax::{Node, Scope, Syntax};
+    use migration_syntax::span::Span;
     use std::collections::BTreeSet;
 
     #[test]
@@ -619,7 +618,8 @@ mod tests {
                 for mode in [Mode3::Expr, Mode3::Type, Mode3::Statement, Mode3::ValueItem] {
                     assert_eq!(normalize3(&value, mode).show(), "x");
                 }
-                let f = Syntax::from_datum(&migration_syntax::lisp::parse("f").unwrap()[0], &scope());
+                let f =
+                    Syntax::from_datum(&migration_syntax::lisp::parse("f").unwrap()[0], &scope());
                 let mut call = value.clone();
                 for _ in 0..20_000 {
                     call = Syntax::make(Node::Round(vec![f.clone(), call]), &f).unwrap();

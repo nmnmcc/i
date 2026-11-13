@@ -44,10 +44,7 @@ pub fn render(d: &Datum, pos: P) -> Result<String> {
     render_anchored(d, pos).map(|(text, _)| text)
 }
 
-pub fn render_anchored(
-    d: &Datum,
-    pos: P,
-) -> Result<(String, Vec<(crate::span::Span, usize)>)> {
+pub fn render_anchored(d: &Datum, pos: P) -> Result<(String, Vec<(crate::span::Span, usize)>)> {
     let mut out = String::new();
     let mut anchors = Vec::new();
     let mut boundary = false;

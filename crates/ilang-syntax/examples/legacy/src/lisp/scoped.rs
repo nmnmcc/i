@@ -544,8 +544,7 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::expr_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        let mut old = crate::syn3::lower::lower_expr(&tree)
-            .map_err(|error| self.error(error))?;
+        let mut old = crate::syn3::lower::lower_expr(&tree).map_err(|error| self.error(error))?;
         self.transition.record_expression(&mut old);
         self.transition.expression(tree.span.0);
         Ok(tree)
@@ -558,8 +557,8 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::pattern_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        let mut old = crate::syn3::lower::lower_pattern(&tree)
-            .map_err(|error| self.error(error))?;
+        let mut old =
+            crate::syn3::lower::lower_pattern(&tree).map_err(|error| self.error(error))?;
         self.transition.record_pattern(&mut old);
         self.transition.pattern(tree.span.0);
         Ok(tree)
@@ -572,7 +571,8 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::type_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        syntax3::syn3::facts::Transition::validate_type(&tree).map_err(|error| self.error(error))?;
+        syntax3::syn3::facts::Transition::validate_type(&tree)
+            .map_err(|error| self.error(error))?;
         self.transition.ty(tree.span.0);
         Ok(tree)
     }
@@ -584,8 +584,7 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::items_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        let mut old = crate::syn3::lower::lower_items(&tree)
-            .map_err(|error| self.error(error))?;
+        let mut old = crate::syn3::lower::lower_items(&tree).map_err(|error| self.error(error))?;
         self.transition.record_items(&mut old);
         Ok(tree)
     }

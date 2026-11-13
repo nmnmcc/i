@@ -1,6 +1,6 @@
-pub use syntax3::syn3::lisp::*;
 use crate::lisp::{Datum, DatumKind as K};
 use crate::span::Span;
+pub use syntax3::syn3::lisp::*;
 fn round<'a>(d: &'a Datum, head: &str) -> Option<&'a [Datum]> {
     match &d.kind {
         K::Round(parts) => match parts.first().map(|p| &p.kind) {

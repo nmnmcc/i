@@ -1,5 +1,5 @@
 use super::syntax::SyntaxError;
-pub use syntax3::lisp::expansion::{MacroDefinition, MacroArgument, ExpansionSession};
+pub use syntax3::lisp::expansion::{ExpansionSession, MacroArgument, MacroDefinition};
 pub fn definitions(
     module: &crate::ast::Module,
     lisp: bool,

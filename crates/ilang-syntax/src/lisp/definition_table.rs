@@ -1,8 +1,6 @@
 //! Definition-query answers with caller-supplied hygienic name resolution.
 use super::definition_schedule::Mode;
-use super::definitions::{
-    TypeQuery, builtin_definition, freshen_parameters, type_query,
-};
+use super::definitions::{TypeQuery, builtin_definition, freshen_parameters, type_query};
 use super::syntax::{Scope, Syntax};
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -10,7 +8,6 @@ use std::hash::Hash;
 /// One definition, retained in its written form until it is ready.
 #[derive(Clone)]
 pub enum Definition {
-
     /// A written definition in the tree of syntax three, answered in the
     /// rows of syntax-3.md §6.8 whatever `NEW_ROWS` says. Made by
     /// [`Definition::tree`] or [`Definition::tree_with_datum`]; this is the
@@ -110,13 +107,13 @@ struct Entry {
 impl Entry {
     fn new(definition: Definition) -> Self {
         if let Definition::Tree { item, .. } = &definition {
-            assert!(matches!(item.kind, crate::syn3::ast::ItemKind::TypeDef(_)),
-                "definition table accepts type definitions only");
+            assert!(
+                matches!(item.kind, crate::syn3::ast::ItemKind::TypeDef(_)),
+                "definition table accepts type definitions only"
+            );
         }
         Self { definition }
     }
-
-
 }
 
 /// Maps resolved identities to definitions. Lookup is injected by the
@@ -162,8 +159,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
         assert!(
             matches!(
                 definition,
-                Definition::Tree { ready: true, .. }
-                    | Definition::Expanded { ready: true, .. }
+                Definition::Tree { ready: true, .. } | Definition::Expanded { ready: true, .. }
             ),
             "a finished definition must be ready"
         );
@@ -246,8 +242,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .get(&key)
             .expect("resolved definition identity must be registered");
         let syntax = match &definition.definition {
-            Definition::Tree { ready: false, .. }
-            | Definition::Expanded { ready: false, .. } => {
+            Definition::Tree { ready: false, .. } | Definition::Expanded { ready: false, .. } => {
                 return Ok(QueryResult::Deferred {
                     at: parsed.name.clone(),
                 });

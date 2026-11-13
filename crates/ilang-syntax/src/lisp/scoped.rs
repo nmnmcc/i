@@ -544,10 +544,13 @@ impl ScopedSource {
         Ok(tree)
     }
 
-    pub fn expression(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<crate::syn3::ast::Expr, ScopedError> {
+    pub fn expression(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<crate::syn3::ast::Expr, ScopedError> {
         self.expression3(syntax, call_site)
     }
-
 }
 
 #[cfg(test)]

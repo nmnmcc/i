@@ -43,9 +43,10 @@ mod tests {
         for item in &lowered.items {
             match &item.kind {
                 migration_syntax::ast::ItemKind::Binding(binding) => {
-                    migration_syntax::macro_body_walk::for_each_binder(&binding.pattern, |name, span| {
-                        old.push((name, span))
-                    })
+                    migration_syntax::macro_body_walk::for_each_binder(
+                        &binding.pattern,
+                        |name, span| old.push((name, span)),
+                    )
                 }
                 migration_syntax::ast::ItemKind::Declaration { name, .. } => {
                     old.push((name.name.as_str(), name.span))

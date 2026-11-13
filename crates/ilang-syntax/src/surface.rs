@@ -223,12 +223,27 @@ pub fn lisp_to_normal(source: &str) -> Converted {
 /// Transfer comments for an already-read native module. The source spans of
 /// that module and the spans of its printed/read-back tree identify anchors.
 pub(crate) fn module_comments(
-    source: &str, module: &Module, output: String, input_lisp: bool, output_lisp: bool,
+    source: &str,
+    module: &Module,
+    output: String,
+    input_lisp: bool,
+    output_lisp: bool,
 ) -> (String, Vec<Span>) {
-    let input = if input_lisp { lex3_lisp(source) } else { lex3(source) };
-    let (back, _) = if output_lisp { crate::rows::from_lisp(&output) }
-        else { crate::parse::parse_module(&output) };
-    let printed = if output_lisp { lex3_lisp(&output) } else { lex3(&output) };
+    let input = if input_lisp {
+        lex3_lisp(source)
+    } else {
+        lex3(source)
+    };
+    let (back, _) = if output_lisp {
+        crate::rows::from_lisp(&output)
+    } else {
+        crate::parse::parse_module(&output)
+    };
+    let printed = if output_lisp {
+        lex3_lisp(&output)
+    } else {
+        lex3(&output)
+    };
     let from = anchors(module, &input);
     let to = anchors(&back, &printed);
     transfer(source, &input, output, &from, &to)

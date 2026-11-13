@@ -153,7 +153,6 @@ pub fn builtin_definition_rows(
     ))
 }
 
-
 /// A written type definition of the tree of syntax three as a query answer
 /// in the rows of §6.8, with fresh identities for its type parameters. This is
 /// [`source_definition`] for the new `Item`; a sum is the item
@@ -281,7 +280,6 @@ pub fn type_query(of: &Syntax) -> Result<TypeQuery, super::syntax::SyntaxError> 
 pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxError> {
     expanded_definition_rows(item, answer, NEW_ROWS)
 }
-
 
 fn is_symbol(s: &Syntax, text: &str) -> bool {
     matches!(s.node(), Node::Symbol(x) if x == text)
@@ -708,18 +706,33 @@ pub fn freshen_duplicate_heads_rows(
 }
 
 /// Answer a written native type definition with fresh parameter identities.
-pub fn source_definition(item: &crate::syn3::ast::Item, source: &str, scope: &Scope, answer: u64) -> Syntax {
+pub fn source_definition(
+    item: &crate::syn3::ast::Item,
+    source: &str,
+    scope: &Scope,
+    answer: u64,
+) -> Syntax {
     let span = item.span.0;
     let lisp = source[span.start as usize..span.end as usize].starts_with('(');
     let tree = super::source_tree::SourceTree::read(scope, source, lisp);
-    let datum = tree.item_datum(span).expect("written definition has its tree item");
+    let datum = tree
+        .item_datum(span)
+        .expect("written definition has its tree item");
     tree_definition_from_datum(&datum, scope, answer)
 }
-pub fn source_definition_from_syntax(_item: &crate::syn3::ast::Item, syntax: &Syntax, answer: u64) -> Syntax {
+pub fn source_definition_from_syntax(
+    _item: &crate::syn3::ast::Item,
+    syntax: &Syntax,
+    answer: u64,
+) -> Syntax {
     expanded_definition(syntax, answer).expect("a written type definition remains valid")
 }
 /// Definition answers use the final item rows. The obsolete flag remains only
 /// until callers of the Rust helper finish their API migration.
-pub fn expanded_definition_rows(item: &Syntax, answer: u64, _new_rows: bool) -> Result<Syntax, SyntaxError> {
+pub fn expanded_definition_rows(
+    item: &Syntax,
+    answer: u64,
+    _new_rows: bool,
+) -> Result<Syntax, SyntaxError> {
     expanded_definition_new(item, answer)
 }

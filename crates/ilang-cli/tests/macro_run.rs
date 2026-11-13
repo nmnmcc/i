@@ -2841,7 +2841,8 @@ fn type_macro_keeps_its_standalone_need_channel() {
     // Keep the complete five answers as the independent historical oracle.
     // §4 of syn3-final-ast.md removes the old production engine/tree; its
     // standalone function-need and grouping boundaries remain asserted.
-    let oracle: serde_json::Value = serde_json::from_str(include_str!("fixtures/type_macro_engine_boundary.json")).unwrap();
+    let oracle: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/type_macro_engine_boundary.json")).unwrap();
     let cases = oracle["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 5);
     let dir = tempfile::tempdir().unwrap();

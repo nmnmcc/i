@@ -272,7 +272,6 @@ impl<'a> BodyEngine<'a> {
     }
 }
 
-
 pub(crate) fn metered_error(
     error: MeteredError,
     macro_name: &str,

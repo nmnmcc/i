@@ -13,24 +13,32 @@
 type Parsed = crate::Parsed;
 use crate::code;
 use crate::hir::*;
-use ilang_syntax::syn3::ast::resolved::Ident;
 use crate::types::{Head, HostType, ShapeId, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
+use ilang_syntax::syn3::ast::resolved::Ident;
 
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 
-
 /// Names and spans needed by shared import/export rules; no syntax nodes.
-struct SourceImport { alias: Option<Ident>, names: Vec<Ident>, path: Vec<Ident>, span: Span }
-struct SourceExport { name: Ident, constructors: bool, span: Span }
+struct SourceImport {
+    alias: Option<Ident>,
+    names: Vec<Ident>,
+    path: Vec<Ident>,
+    span: Span,
+}
+struct SourceExport {
+    name: Ident,
+    constructors: bool,
+    span: Span,
+}
+#[cfg(test)]
+mod differential;
 #[cfg(test)]
 #[allow(dead_code)]
 mod legacy;
-#[cfg(test)]
-mod differential;
 mod three;
 pub use three::lowering_errors;
 pub(crate) use three::source_facts;
@@ -76,7 +84,6 @@ fn resolve_native(
         three::resolve3(graph, parsed, &modules, &transitions, report_errors)
     })
 }
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Entry {
@@ -195,7 +202,6 @@ type Table = std::rc::Rc<Vec<(ShapeId, ValueRef)>>;
 /// call with one argument per shape group, labelled by the shape.
 const MULTI: &str = "%multi";
 
-
 /// The shape that a group label of the transition form writes: the number
 /// of positions, then each label after a comma.
 fn shape_of_text(text: &str) -> ShapeId {
@@ -218,7 +224,6 @@ fn shape_shown(shape: ShapeId) -> String {
 fn is_upper(name: &str) -> bool {
     name.starts_with(|c: char| c.is_ascii_uppercase())
 }
-
 
 impl<'a> Resolver<'a> {
     fn resolved_quote(
@@ -478,7 +483,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-
     /// §2.4.
     fn exports(&mut self, m: ModuleId, items: &[SourceExport]) {
         let mi = m.0 as usize;
@@ -575,7 +579,6 @@ impl<'a> Resolver<'a> {
     }
 
     // ---- Phase 2: imports (§2.3) ----
-
 
     /// The module that an import path names (§2.1).
     fn import_target(&mut self, item: &SourceImport) -> Option<ModuleId> {
@@ -752,7 +755,6 @@ impl<'a> Resolver<'a> {
         }
     }
 
-
     /// `imports` gives the written imports of a module: the path and the
     /// span of each.
     fn import_circles_of(&mut self, imports: &dyn Fn(usize) -> Vec<(Vec<String>, Span)>) {
@@ -818,7 +820,6 @@ impl<'a> Resolver<'a> {
     }
 
     // ---- Phase 3: type definitions (§4.3) ----
-
 
     /// The part of `early_types` that reads no tree.
     fn early_type_checks(&mut self) {
@@ -959,7 +960,6 @@ impl<'a> Resolver<'a> {
             );
         }
     }
-
 
     /// §4.3: an alias may not use itself, directly or through other aliases.
     fn alias_circles(&mut self) {
@@ -1220,12 +1220,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn value_type(
-        &mut self,
-        module: Option<&Ident>,
-        name: &Ident,
-        span: Span,
-    ) -> TypeKind {
+    fn value_type(&mut self, module: Option<&Ident>, name: &Ident, span: Span) -> TypeKind {
         let pending = |n: &str, span: Span| {
             self.pending
                 .iter()
@@ -1272,7 +1267,6 @@ impl<'a> Resolver<'a> {
             _ => TypeKind::Error,
         }
     }
-
 
     /// A label of data is a `name` (syntax-3 §2.3): not a string that is
     /// not a name, an `UpName`, or a label parameter.
@@ -1727,7 +1721,6 @@ impl<'a> Resolver<'a> {
 
     // ---- Phase 4: values ----
 
-
     /// A quiet lookup, after imports are known (§3.10 and §3.11).
     fn unqualified_type(&self, name: &str) -> Option<TypeRef> {
         self.scopes[self.cur.0 as usize]
@@ -1777,7 +1770,6 @@ impl<'a> Resolver<'a> {
         self.ty_frames.push(TyFrame { names });
         vars
     }
-
 
     fn check_binder(&mut self, name: &str, span: Span, top: bool, type_parameter: bool) {
         let parsed = &self.parsed[self.cur.0 as usize];
@@ -2088,9 +2080,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-
     // ---- Shape groups (syntax three §2.6) ----
-
 
     /// The selection table of a resolved callee, when it is a name with one.
     fn table_of(&self, callee: &Expr) -> Option<Table> {
@@ -2100,7 +2090,6 @@ impl<'a> Resolver<'a> {
             _ => None,
         }
     }
-
 
     /// The table that a local binding gives its one name: the binding is
     /// a multi chain over local group bindings, or a direct alias.
@@ -2125,7 +2114,6 @@ impl<'a> Resolver<'a> {
             self.local_tables.insert(binder.var, table);
         }
     }
-
 
     /// Provider contracts are classified after aliases and imports resolve.
     /// A syntactically bare alias can still hide an inference hole.
@@ -2167,7 +2155,6 @@ impl<'a> Resolver<'a> {
         false
     }
 
-
     fn param_name(&mut self, all: &[Binder], name: &str, span: Span) {
         if all
             .iter()
@@ -2180,7 +2167,6 @@ impl<'a> Resolver<'a> {
             );
         }
     }
-
 
     fn bind(
         &mut self,
@@ -2217,7 +2203,6 @@ impl<'a> Resolver<'a> {
         binders.push(b.clone());
         b
     }
-
 
     // ---- Phase 5: exported types (§2.4) ----
 
@@ -2546,7 +2531,6 @@ fn named_types(t: &Type, out: &mut Vec<TypeId>) {
     }
 }
 
-
 /// Calls `f` on each type directly inside `t`.
 fn for_each_child(t: &Type, f: &mut dyn FnMut(&Type)) {
     match &t.kind {
@@ -2751,7 +2735,6 @@ fn projectable_body(
     }
 }
 
-
 #[derive(Clone, Debug)]
 pub(crate) struct ExpansionScope {
     locals: Vec<Frame>,
@@ -2844,7 +2827,6 @@ pub fn typed_output(
             .unwrap_or_default(),
     )
 }
-
 
 pub(crate) fn normalize_source(
     module: &ilang_syntax::syn3::ast::Module,

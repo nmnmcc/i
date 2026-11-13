@@ -233,9 +233,9 @@ pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, 
 
 #[cfg(test)]
 mod tests {
+    use migration_syntax::lisp::expansion::MacroDefinition;
     use migration_syntax::lisp::expansion3::*;
     use migration_syntax::lisp::syntax::SyntaxError;
-    use migration_syntax::lisp::expansion::MacroDefinition;
 
     /// The answer on the tree of syntax three and the answer on its
     /// lowering are the same.

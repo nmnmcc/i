@@ -4,7 +4,6 @@
 //! source file of the repository.
 use ilang_macro::body_walk3::{self, Hook, Local};
 use ilang_macro::{body_engine3, call3};
-use migration_syntax::{macro_body_walk as body_walk, macro_call as call};
 use ilang_syntax::{
     span::Span,
     syn3::ast::{
@@ -12,6 +11,7 @@ use ilang_syntax::{
         Stmt, TItem, Type, TypeKind,
     },
 };
+use migration_syntax::{macro_body_walk as body_walk, macro_call as call};
 
 fn module(source: &str) -> Module {
     let (module, diags) = ilang_syntax::syn3::parse_module(source);
@@ -669,7 +669,12 @@ impl body_walk::Hook for Old {
         unreachable!()
     }
     fn depth_error(&mut self, _: Span) {}
-    fn is_direct(&mut self, e: &migration_syntax::ast::Expr, _: &[body_walk::Local], _: u32) -> bool {
+    fn is_direct(
+        &mut self,
+        e: &migration_syntax::ast::Expr,
+        _: &[body_walk::Local],
+        _: u32,
+    ) -> bool {
         let direct = old_is_direct(e, &self.aliases);
         self.direct.insert(at(e.span), direct);
         direct
@@ -836,8 +841,13 @@ fn repository_sources_walk_as_their_lowered_trees() {
 
 // The private oracle owns its walker locals. Compare the same source facts.
 fn visible_old(locals: &[body_walk::Local], depth: u32) -> Vec<(String, (u32, u32))> {
-    let locals: Vec<_> = locals.iter().map(|l| Local {
-        name: l.name.clone(), span: l.span, fn_only: l.fn_only,
-    }).collect();
+    let locals: Vec<_> = locals
+        .iter()
+        .map(|l| Local {
+            name: l.name.clone(),
+            span: l.span,
+            fn_only: l.fn_only,
+        })
+        .collect();
     visible(&locals, depth)
 }
