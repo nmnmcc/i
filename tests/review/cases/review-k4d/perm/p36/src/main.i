@@ -6,7 +6,7 @@ both = () -> Int { pong(2) }
 
 T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }

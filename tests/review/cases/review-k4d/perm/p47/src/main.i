@@ -18,7 +18,7 @@ closed = () {
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)
 }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }

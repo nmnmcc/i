@@ -41,7 +41,7 @@ get = () <- (d: Dep) { d.v }
 
 run = <A, N>(body: () <- N -> A) { body() }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }

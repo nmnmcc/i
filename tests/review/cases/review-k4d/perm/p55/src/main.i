@@ -16,7 +16,7 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }

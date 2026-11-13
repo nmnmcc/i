@@ -24,7 +24,7 @@ fr = () { run(() { use() }) }
 
 pong = (n: Int) { ping(n) + uset(1) }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }

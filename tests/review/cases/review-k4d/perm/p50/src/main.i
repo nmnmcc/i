@@ -33,7 +33,7 @@ get = () <- (d: Dep) { d.v }
 
 ping = (n: Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }

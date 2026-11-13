@@ -10,7 +10,7 @@ closed = () {
 
 S(N) = (f = () <- N -> Int)
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), ..N) -> Int = () <- (s: S(N)) -> Int {
 	S(f = f) = s
 	f()
 }
