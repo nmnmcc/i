@@ -323,4 +323,80 @@ const BASE_WAT: &str = r#"
       (local.set $cursor (call $list_tail (local.get $cursor)))
       (br $digit)))
   (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign))) (local.get $a)))
+;; The number of base 2^30 digits of the magnitude.
+(func $big_size (param $v eqref) (result eqref)
+  (local $a (ref $limbs)) (local $n i32)
+  (local.set $a (call $int_limbs (local.get $v)))
+  (local.set $n (call $mag_len (local.get $a)))
+  (if (i32.eqz (local.get $n)) (then (return (ref.i31 (i32.const 0)))))
+  (ref.i31 (i32.div_u
+    (i32.add
+      (i32.sub (i32.mul (local.get $n) (i32.const 32))
+        (i32.clz (array.get $limbs (local.get $a) (i32.sub (local.get $n) (i32.const 1)))))
+      (i32.const 29))
+    (i32.const 30))))
+
+;; The base 2^30 digit of the magnitude at this index, 0 past the end. A
+;; small Int is read without making its limbs.
+(func $big_limb (param $v eqref) (param $index eqref) (result eqref)
+  (local $a (ref null $limbs)) (local $n i32) (local $position i64) (local $word i32)
+  (local $window i64) (local $x i64)
+  (local.set $position
+    (i64.mul (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $index)))) (i64.const 30)))
+  (if (ref.test (ref i31) (local.get $v))
+    (then
+      (local.set $x (i64.extend_i32_s (i31.get_s (ref.cast (ref i31) (local.get $v)))))
+      (if (i64.lt_s (local.get $x) (i64.const 0)) (then (local.set $x (i64.sub (i64.const 0) (local.get $x)))))
+      (if (i64.ge_u (local.get $position) (i64.const 60)) (then (return (ref.i31 (i32.const 0)))))
+      (return (ref.i31 (i32.wrap_i64 (i64.and (i64.shr_u (local.get $x) (local.get $position))
+        (i64.const 1073741823)))))))
+  (local.set $a (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v))))
+  (local.set $n (array.len (local.get $a)))
+  (local.set $word (i32.wrap_i64 (i64.shr_u (local.get $position) (i64.const 5))))
+  (if (i32.ge_u (local.get $word) (local.get $n)) (then (return (ref.i31 (i32.const 0)))))
+  (local.set $window (i64.extend_i32_u (array.get $limbs (local.get $a) (local.get $word))))
+  (if (i32.lt_u (i32.add (local.get $word) (i32.const 1)) (local.get $n))
+    (then
+      (local.set $window
+        (i64.or (local.get $window)
+          (i64.shl
+            (i64.extend_i32_u (array.get $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1))))
+            (i64.const 32))))))
+  (ref.i31 (i32.wrap_i64
+    (i64.and (i64.shr_u (local.get $window) (i64.and (local.get $position) (i64.const 31)))
+      (i64.const 1073741823)))))
+
+;; The Int with this sign and these base 2^30 digits, most significant first.
+(func $big_from_top (param $sign eqref) (param $digits eqref) (result eqref)
+  (local $count i32) (local $cursor eqref) (local $a (ref $limbs))
+  (local $position i32) (local $word i32) (local $value i64)
+  (local.set $cursor (local.get $digits))
+  (block $counted
+    (loop $count_digits
+      (br_if $counted (call $list_is_empty (local.get $cursor)))
+      (local.set $count (i32.add (local.get $count) (i32.const 1)))
+      (local.set $cursor (call $list_tail (local.get $cursor)))
+      (br $count_digits)))
+  (local.set $a
+    (array.new_default $limbs
+      (i32.add (i32.div_u (i32.mul (local.get $count) (i32.const 30)) (i32.const 32)) (i32.const 2))))
+  (local.set $cursor (local.get $digits))
+  (local.set $position (i32.mul (local.get $count) (i32.const 30)))
+  (block $done
+    (loop $digit
+      (br_if $done (call $list_is_empty (local.get $cursor)))
+      (local.set $position (i32.sub (local.get $position) (i32.const 30)))
+      (local.set $word (i32.shr_u (local.get $position) (i32.const 5)))
+      (local.set $value
+        (i64.shl
+          (i64.extend_i32_u (i31.get_s (ref.cast (ref i31) (call $list_head (local.get $cursor)))))
+          (i64.extend_i32_u (i32.and (local.get $position) (i32.const 31)))))
+      (array.set $limbs (local.get $a) (local.get $word)
+        (i32.or (array.get $limbs (local.get $a) (local.get $word)) (i32.wrap_i64 (local.get $value))))
+      (array.set $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1))
+        (i32.or (array.get $limbs (local.get $a) (i32.add (local.get $word) (i32.const 1)))
+          (i32.wrap_i64 (i64.shr_u (local.get $value) (i64.const 32)))))
+      (local.set $cursor (call $list_tail (local.get $cursor)))
+      (br $digit)))
+  (call $int_pack (i31.get_s (ref.cast (ref i31) (local.get $sign))) (local.get $a)))
 "#;

@@ -2,14 +2,15 @@
 //// runtime adds, subtracts, multiplies, divides, compares and writes small
 //// Ints itself, and calls these functions when an operand is large.
 ////
-//// A magnitude here is a list of digits in base 2^30, least significant
-//// first, with no zero digit at the end. Every number this code computes
-//// with is below 2^62, where the runtime does the arithmetic in 64 bits
-//// itself, so this code never calls itself through the runtime: a digit
-//// product with a carry is below 2^61.
+//// The runtime keeps a large Int as its sign and an array of 32-bit limbs.
+//// This code reads its digits in base 2^30 in place, by index (`size`,
+//// `limb`), and builds each result once from its digits (`from_top`,
+//// `from_digits`). Division and the text form work on lists of digits
+//// (`digits`). Every number this code computes with is below 2^62, where
+//// the runtime does the arithmetic in 64 bits itself, so this code never
+//// calls itself through the runtime: a digit product is below 2^60.
 ////
-//// The three private primitives convert between an Int and its sign and
-//// digits. They are not part of the language (§13).
+//// The private primitives are not part of the language (§13).
 
 (
 	i/core
@@ -38,6 +39,19 @@ digits: (Int) -> List(Int)
 @external("ilang:big", "from_digits")
 from_digits: (sign: Int, digits: List(Int)) -> Int
 
+/// The number of digits of the magnitude, in base 2^30.
+@external("ilang:big", "size")
+size: (Int) -> Int
+
+/// The digit of the magnitude at `index`, in base 2^30; 0 past the end.
+@external("ilang:big", "limb")
+limb: (x: Int, index: Int) -> Int
+
+/// The Int with this sign and these digits in base 2^30, most significant
+/// first; zero digits in front are allowed.
+@external("ilang:big", "from_top")
+from_top: (sign: Int, digits: List(Int)) -> Int
+
 /// -1, 0 or 1, as `a` is less than, equal to or greater than `b`.
 compare = (a: Int, b: Int) -> Int {
 	sa = sign(a)
@@ -49,7 +63,37 @@ compare = (a: Int, b: Int) -> Int {
 		}
 		True -> { sa == 0 } |> {
 			True  -> 0
-			False -> sa * magnitude_compare(digits(a), digits(b))
+			False -> sa * magnitude_order(a, b)
+		}
+	}
+}
+
+// -1, 0 or 1 for the magnitudes, digit by digit from the top.
+magnitude_order = (a: Int, b: Int) -> Int {
+	na = size(a)
+	nb = size(b)
+	{ na == nb } |> {
+		True -> order_from(a, b, na - 1)
+		False -> { na < nb } |> {
+			True  -> -1
+			False -> 1
+		}
+	}
+}
+
+order_from = (a: Int, b: Int, i: Int) -> Int {
+	{ i < 0 } |> {
+		True -> 0
+		False -> {
+			x = limb(a, i)
+			y = limb(b, i)
+			{ x == y } |> {
+				True -> order_from(a, b, i - 1)
+				False -> { x < y } |> {
+					True  -> -1
+					False -> 1
+				}
+			}
 		}
 	}
 }
@@ -65,18 +109,46 @@ signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
 	{ sb == 0 } |> {
 		True -> a
 		False -> { sa == 0 } |> {
-			True -> from_digits(sb, digits(b))
-			False -> {
-				da = digits(a)
-				db = digits(b)
-				{ sa == sb } |> {
-					True -> from_digits(sa, magnitude_add(da, db, 0, []))
-					False -> magnitude_compare(da, db) |> {
-						0 -> 0
-						1 -> from_digits(sa, magnitude_subtract(da, db, 0, []))
-						_ -> from_digits(sb, magnitude_subtract(db, da, 0, []))
-					}
+			True -> { sb == sign(b) } |> {
+				True  -> b
+				False -> -b
+			}
+			False -> { sa == sb } |> {
+				True -> from_top(sa, add_up(a, b, 0, max(size(a), size(b)), 0, []))
+				False -> magnitude_order(a, b) |> {
+					0 -> 0
+					1 -> from_top(sa, subtract_up(a, b, 0, size(a), 0, []))
+					_ -> from_top(sb, subtract_up(b, a, 0, size(b), 0, []))
 				}
+			}
+		}
+	}
+}
+
+// The digits of |a| + |b| from digit `i` up, most significant first in
+// front of `acc`.
+add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(Int) {
+	{ i == n } |> {
+		True -> [carry, ..acc]
+		False -> {
+			sum = limb(a, i) + limb(b, i) + carry
+			{ sum >= 1073741824 } |> {
+				True  -> add_up(a, b, i + 1, n, 1, [sum - 1073741824, ..acc])
+				False -> add_up(a, b, i + 1, n, 0, [sum, ..acc])
+			}
+		}
+	}
+}
+
+// The digits of |a| - |b|, where |a| is at least |b|.
+subtract_up = (a: Int, b: Int, i: Int, n: Int, borrow: Int, acc: List(Int)) -> List(Int) {
+	{ i == n } |> {
+		True -> acc
+		False -> {
+			difference = limb(a, i) - limb(b, i) - borrow
+			{ difference < 0 } |> {
+				True  -> subtract_up(a, b, i + 1, n, 1, [difference + 1073741824, ..acc])
+				False -> subtract_up(a, b, i + 1, n, 0, [difference, ..acc])
 			}
 		}
 	}
@@ -86,16 +158,80 @@ signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
 multiply = (a: Int, b: Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |> {
-		True  -> 0
+		True -> 0
 		False -> {
-			da = digits(a)
-			db = digits(b)
-			// One row for each digit of the shorter one.
-			{ length(da, 0) <= length(db, 0) } |> {
-				True  -> from_digits(s, magnitude_multiply(da, db, [], []))
-				False -> from_digits(s, magnitude_multiply(db, da, [], []))
+			na = size(a)
+			nb = size(b)
+			{ na == 1 || nb == 1 } |> {
+				True -> {
+					(x, d, n) = { na == 1 } |> {
+						True  -> (b, limb(a, 0), nb)
+						False -> (a, limb(b, 0), na)
+					}
+					from_top(s, scale_up(x, d, 0, n, 0, []))
+				}
+				False -> from_top(s, columns(a, b, na, nb, 0, 0, []))
 			}
 		}
+	}
+}
+
+// |x| × d for one digit d.
+scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(Int) {
+	{ i == n } |> {
+		True -> [carry, ..acc]
+		False -> {
+			p = limb(x, i) * d + carry
+			scale_up(x, d, i + 1, n, p / 1073741824, [p % 1073741824, ..acc])
+		}
+	}
+}
+
+// Product scanning: digit k of |a| × |b| is the sum of the products of the
+// digits i and k - i, with the carry of the digits below. Each product is
+// split at 2^30, so the two sums stay below 2^62 for any size.
+columns = (a: Int, b: Int, na: Int, nb: Int, k: Int, carry: Int, acc: List(Int)) -> List(Int) {
+	{ k == na + nb - 1 } |> {
+		True -> spill(carry, acc)
+		False -> {
+			first = max(0, k - nb + 1)
+			(low, high) = column(a, b, first, min(k, na - 1), k, 0, 0)
+			total = low + carry
+			next = total / 1073741824 + high
+			columns(a, b, na, nb, k + 1, next, [total % 1073741824, ..acc])
+		}
+	}
+}
+
+column = (a: Int, b: Int, i: Int, last: Int, k: Int, low: Int, high: Int) -> (Int, Int) {
+	{ i > last } |> {
+		True -> (low, high)
+		False -> {
+			p = limb(a, i) * limb(b, k - i)
+			column(a, b, i + 1, last, k, low + p % 1073741824, high + p / 1073741824)
+		}
+	}
+}
+
+// The digits of the last carry in front of `acc`.
+spill = (carry: Int, acc: List(Int)) -> List(Int) {
+	{ carry == 0 } |> {
+		True  -> acc
+		False -> spill(carry / 1073741824, [carry % 1073741824, ..acc])
+	}
+}
+
+max = (a: Int, b: Int) -> Int {
+	{ a > b } |> {
+		True  -> a
+		False -> b
+	}
+}
+
+min = (a: Int, b: Int) -> Int {
+	{ a < b } |> {
+		True  -> a
+		False -> b
 	}
 }
 
@@ -188,37 +324,6 @@ magnitude_compare = (x: List(Int), y: List(Int)) -> Int {
 		}
 	}
 }
-
-compare_from_top = (x: List(Int), y: List(Int)) -> Int {
-	(x, y) |> {
-		([a, ..xs], [b, ..ys]) -> { a == b } |> {
-			True -> compare_from_top(xs, ys)
-			False -> { a < b } |> {
-				True  -> -1
-				False -> 1
-			}
-		}
-		_ -> 0
-	}
-}
-
-// `x + y + carry`, the result reversed onto `acc` and turned round.
-magnitude_add = (x: List(Int), y: List(Int), carry: Int, acc: List(Int)) -> List(Int) {
-	(x, y) |> {
-		([], []) -> reverse([carry, ..acc], [])
-		([a, ..xs], []) -> add_digit(a + carry, xs, [], acc)
-		([], [b, ..ys]) -> add_digit(b + carry, [], ys, acc)
-		([a, ..xs], [b, ..ys]) -> add_digit(a + b + carry, xs, ys, acc)
-	}
-}
-
-add_digit = (sum: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int) {
-	{ sum >= 1073741824 } |> {
-		True  -> magnitude_add(x, y, 1, [sum - 1073741824, ..acc])
-		False -> magnitude_add(x, y, 0, [sum, ..acc])
-	}
-}
-
 // `x - y - borrow`, where `x` is at least `y`.
 magnitude_subtract = (x: List(Int), y: List(Int), borrow: Int, acc: List(Int)) -> List(Int) {
 	(x, y) |> {
@@ -234,44 +339,6 @@ subtract_digit = (difference: Int, x: List(Int), y: List(Int), acc: List(Int)) -
 		False -> magnitude_subtract(x, y, 0, [difference, ..acc])
 	}
 }
-
-// `x × d` for one digit `d`, with the carry `carry`.
-multiply_digit = (x: List(Int), d: Int, carry: Int, acc: List(Int)) -> List(Int) {
-	x |> {
-		[] -> reverse([carry, ..acc], [])
-		[a, ..xs] -> {
-			p = a * d + carry
-			multiply_digit(xs, d, p / 1073741824, [p % 1073741824, ..acc])
-		}
-	}
-}
-
-// Schoolbook multiplication: `shift` is the zero digits before each row.
-magnitude_multiply = (
-	x: List(Int)
-	y: List(Int)
-	shift: List(Int)
-	acc: List(Int)
-) -> List(Int) {
-	x |> {
-		[] -> acc
-		[d, ..ds] -> {
-			row = { d == 0 } |> {
-				True  -> []
-				False -> prepend(shift, multiply_digit(y, d, 0, []))
-			}
-			magnitude_multiply(ds, y, [0, ..shift], magnitude_add(acc, row, 0, []))
-		}
-	}
-}
-
-prepend = (front: List(Int), back: List(Int)) -> List(Int) {
-	front |> {
-		[]        -> back
-		[d, ..ds] -> [d, ..prepend(ds, back)]
-	}
-}
-
 // Quotient and remainder of magnitudes; `y` is not zero.
 magnitude_divide = (x: List(Int), y: List(Int)) -> (List(Int), List(Int)) {
 	{ magnitude_compare(x, y) < 0 } |> {
@@ -393,6 +460,30 @@ correct = (r: List(Int), y: List(Int), digit: Int) -> (Int, List(Int)) {
 	{ magnitude_compare(r, y) >= 0 } |> {
 		True  -> correct(magnitude_subtract(r, y, 0, []), y, digit + 1)
 		False -> (digit, r)
+	}
+}
+
+compare_from_top = (x: List(Int), y: List(Int)) -> Int {
+	(x, y) |> {
+		([a, ..xs], [b, ..ys]) -> { a == b } |> {
+			True -> compare_from_top(xs, ys)
+			False -> { a < b } |> {
+				True  -> -1
+				False -> 1
+			}
+		}
+		_ -> 0
+	}
+}
+
+// `x × d` for one digit `d`, with the carry `carry`.
+multiply_digit = (x: List(Int), d: Int, carry: Int, acc: List(Int)) -> List(Int) {
+	x |> {
+		[] -> reverse([carry, ..acc], [])
+		[a, ..xs] -> {
+			p = a * d + carry
+			multiply_digit(xs, d, p / 1073741824, [p % 1073741824, ..acc])
+		}
 	}
 }
 
