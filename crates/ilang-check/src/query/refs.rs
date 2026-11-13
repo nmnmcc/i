@@ -313,7 +313,30 @@ impl Query<'_> {
         if let Target::Module(t) = r.target {
             return self.rename_module(m, t, new_name);
         }
-        let refs = self.references(&r.target, r.owner, &self.own_modules());
+        let mut refs = self.references(&r.target, r.owner, &self.own_modules());
+        // A type with one constructor of its own name is one thing (syntax
+        // three §2.8): renaming either renames both.
+        let twin = match &r.target {
+            Target::Ctor(c) if self.program.ty(c.ty).name == old => {
+                Some(Target::Type(TypeRef::Custom(c.ty)))
+            }
+            Target::Type(TypeRef::Custom(t))
+                if matches!(&self.program.ty(*t).body, TypeBody::Custom(cs)
+                    if cs.len() == 1 && cs[0].name == old) =>
+            {
+                Some(Target::Ctor(CtorRef { ty: *t, index: 0 }))
+            }
+            _ => None,
+        };
+        if let Some(twin) = twin {
+            for extra in self.references(&twin, r.owner, &self.own_modules()) {
+                if !refs.iter().any(|x| {
+                    x.location.source == extra.location.source && x.location.span == extra.location.span
+                }) {
+                    refs.push(extra);
+                }
+            }
+        }
         self.check_conflicts(&r, &refs, new_name)?;
         let mut edits = Vec::new();
         for reference in refs {

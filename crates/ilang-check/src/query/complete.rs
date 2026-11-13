@@ -152,19 +152,10 @@ impl Query<'_> {
         subject: &Expr,
         clauses: &[Clause],
     ) -> Vec<TypeId> {
+        // The members of the subject's type (a sum is a union of
+        // one-constructor types, syntax three §2.8), then the types of the
+        // constructors that the clauses name.
         let mut out = Vec::new();
-        for c in clauses {
-            for p in &c.patterns {
-                if let PatternKind::Constructor { ctor, .. } = &p.kind
-                    && !out.contains(&ctor.ty)
-                {
-                    out.push(ctor.ty);
-                }
-            }
-        }
-        if !out.is_empty() {
-            return out;
-        }
         let types = match &subject.kind {
             ExprKind::Name(ValueRef::Local(v)) => {
                 let v = match self.canonical(m, Target::Local(*v)) {
@@ -187,6 +178,15 @@ impl Query<'_> {
                 && !out.contains(&t)
             {
                 out.push(t);
+            }
+        }
+        for c in clauses {
+            for p in &c.patterns {
+                if let PatternKind::Constructor { ctor, .. } = &p.kind
+                    && !out.contains(&ctor.ty)
+                {
+                    out.push(ctor.ty);
+                }
             }
         }
         out

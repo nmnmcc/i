@@ -753,7 +753,9 @@ fn query_type_definition_signature_and_hints() {
         f.graph.sources.get(types[0].source).text
             [types[0].span.start as usize..types[0].span.end as usize]
             .to_string(),
-        "Shape"
+        // `c = Circle(…)` has the type `Circle`: a constructor's type is its
+        // own (syntax three §2.8).
+        "Circle"
     );
     let s = q
         .signature_help(m, f.at("app/main", "area(c)", 0, 5))
@@ -776,7 +778,8 @@ fn query_completion_context() {
         CompletionContext::Type
     );
     match q.completion_context(shapes, f.at("app/shapes", "Dot -> 0", 0, 0)) {
-        CompletionContext::Pattern { types } => assert_eq!(types.len(), 1),
+        // The members of `Shape = Circle | Dot` (syntax three §2.8).
+        CompletionContext::Pattern { types } => assert_eq!(types.len(), 2),
         other => panic!("{other:?}"),
     }
     let main = f.module("app/main");
