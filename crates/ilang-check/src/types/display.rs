@@ -964,12 +964,10 @@ impl Norm<'_> {
                     values,
                     args.into_iter()
                         .zip(rows)
-                        .map(|(a, row)| {
-                            if row != Mode::Value {
-                                self.env(a)
-                            } else {
-                                self.norm(a)
-                            }
+                        .map(|(a, row)| match row {
+                            Mode::Env => self.services(a),
+                            Mode::Row => self.env(a),
+                            Mode::Value => self.norm(a),
                         })
                         .collect(),
                 )
@@ -1026,7 +1024,9 @@ impl Norm<'_> {
                 hs.into_iter().map(|h| self.norm(h)).collect(),
             ),
             Ty::Union(ms) => {
-                let ms: Vec<Ty> = ms.into_iter().map(|m| self.norm(m)).collect();
+                let mut flat = Vec::new();
+                super::solve::flatten_union(&ms, &mut flat);
+                let ms: Vec<Ty> = flat.into_iter().map(|m| self.norm(m)).collect();
                 let ms = if directed { self.meet_forms(ms) } else { ms };
                 self.union_in(ms, true)
             }
@@ -1034,21 +1034,15 @@ impl Norm<'_> {
         }
     }
 
-    /// Members with one constructor, equal value sets, and no invariant
-    /// parameter, put together by value intersection.
+    /// Members with one constructor and equal value sets, put together by
+    /// value intersection. The solver has checked invariant arguments.
     fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
         let mut out: Vec<Ty> = Vec::new();
         for m in ms {
             if self.s.vacuous(&m) {
                 continue;
             }
-            let directed = |t: &Ty| match t {
-                Ty::Con(h, _, xs) if !xs.is_empty() => {
-                    self.s.variances(*h, xs.len()).all(|v| v != Variance::Inv)
-                }
-                _ => false,
-            };
-            if directed(&m)
+            if m.head().is_some()
                 && let Some(i) = out
                     .iter()
                     .position(|o| o.head() == m.head() && o.values() == m.values())
@@ -1413,7 +1407,11 @@ impl Norm<'_> {
                         })
                         .collect(),
                     ret: pick(f.ret, g.ret, Variance::Co),
-                    env: pick(f.env, g.env, Variance::Co),
+                    env: if union {
+                        self.services(Ty::Union(vec![f.env, g.env]))
+                    } else {
+                        pick(f.env, g.env, Variance::Co)
+                    },
                 }))
             }
             (a, _) => a,

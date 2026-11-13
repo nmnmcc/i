@@ -43,10 +43,12 @@ fn mutual_service_rows_have_canonical_member_and_variable_order() {
 
 #[test]
 fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
-    // F1 ruling: an annotation may omit a difference only when its
-    // same-form obligation holds for every instance of the shown scheme.
-    let source = "Svc(A) = (A)
-wrap = <N>(body: () <- N -> Int, svc: Svc(String)) -> Int { body() <- (svc) }";
+    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
+    // An invariant service still retains a hidden same-form obligation.
+    let source = "Svc(A) = (A, (A) -> Nil)
+wrap: <N>(() <- N -> Int, Svc(String)) <- N -> Int = (body, svc) {
+ body() <- (svc)
+}";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -71,20 +73,18 @@ example = () { wrap(() { Nil }) }",
 }
 
 #[test]
-fn closed_row_aliases_check_forms_before_merging_arguments() {
-    // F2's rule applies before normalization can combine S's arguments.
-    // Ordinary covariance must not turn these two service forms into one.
+fn closed_row_aliases_merge_by_the_defined_direction() {
+    // §4.4: “when they have the same one, it is that type constructor
+    // with each pair of arguments put together the other way round”.
+    // A row parameter follows the same rule as any other parameter.
     let source = "Dep = ()
 S(N) = (() <- N -> Nil)
 T(N) = (() <- N -> Nil)
 Bad = T(S(Never) | S(Dep))
 use = (x: Bad) { x }";
-    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
-    let checked = ilang_check::check(&graph);
-    assert!(
-        checked.diags.iter().any(|d| d.code == "E0515"),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
+    assert_eq!(
+        types(source),
+        types(&source.replace("S(Never) | S(Dep)", "S(Never)"))
     );
     // Variance still applies to the row as a whole, as F2 explicitly says.
     types(
@@ -169,13 +169,18 @@ wrap = <N>(body: () <- (S(Never), ..N) -> Nil, svc: S(Never)) -> Nil {
 
 #[test]
 fn written_row_algebra_keeps_its_mode_before_normalization() {
-    // F2 requires equal service arguments also before any variables or
-    // instantiation exist. Ordinary value variance must not merge them.
+    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
+    // Keep the original algebra/alias coverage with an invariant row
+    // parameter; directed parameters now follow ordinary intersection.
     let head = "Dep = ()
 S(N) = (() <- N -> Nil)
 T(N) = (() <- N -> Nil)
 Alias(N) = T(N)
 ";
+    let invariant_head = head.replace(
+        "S(N) = (() <- N -> Nil)",
+        "S(N) = (() <- N -> Nil, (N) -> Nil)",
+    );
     for op in ["|", "&", "-"] {
         let row = ["S(Never)", op, "S(Dep)"].join(" ");
         for written in [
@@ -186,13 +191,18 @@ Alias(N) = T(N)
             format!("() <- (Fail({row})) -> Nil"),
         ] {
             let source = format!(
-                "{head}use = (x: {written}) {{ x }}
+                "{invariant_head}use = (x: {written}) {{ x }}
 "
             );
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
             let checked = ilang_check::check(&graph);
+            let expected = if op == "-" || written.contains("Fail(") {
+                "E0515"
+            } else {
+                "E0503"
+            };
             assert!(
-                checked.diags.iter().any(|d| d.code == "E0515"),
+                checked.diags.iter().any(|d| d.code == expected),
                 "{source}: {:?}",
                 graph.sources.render_all(&checked.diags)
             );
@@ -202,12 +212,9 @@ Alias(N) = T(N)
 S(N) = (() <- N -> Nil)
 Bad = S(Never) | S(Dep)
 use = (body: () <- (Bad) -> Nil) { body() }";
-    let (graph, _, _) = common::check_files(&[("src/main.i", alias)]);
-    let checked = ilang_check::check(&graph);
-    assert!(
-        checked.diags.iter().any(|d| d.code == "E0515"),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
+    assert_eq!(
+        types(alias),
+        types(&alias.replace("S(Never) | S(Dep)", "S(Never)"))
     );
     // Value unions keep ordinary variance; distinct row constructors may
     // also coexist. Neither is a same-form collision under rule 4.
@@ -265,4 +272,44 @@ one = () -> Nil { fail.raise(1) }
 two = () -> Nil { fail.raise(2) }
 pick = (b: Bool) { b |> (True) { one } | (False) { two } }",
     );
+}
+
+#[test]
+fn a_directed_row_handler_keeps_the_callback_row_open() {
+    // §4.4: the need is an intersection; §4.5 rule 6 also determines
+    // the direction of N. Handling S(N) must not put S(N) inside N.
+    let shown = types(
+        "S(N) = (f = () <- N -> Int)
+use = <N>() <- (s: S(N)) { s.f() }
+wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
+    );
+    assert_eq!(shown["app/main.wrap"], "(svc = S(A)) <- A -> Int");
+}
+
+#[test]
+fn a_function_union_shows_the_intersection_of_its_service_needs() {
+    // §4.4 puts function environments together by the need merge of §9.2.
+    let shown = types(
+        "Yield(A) = ((A) -> Nil)
+one = () <- (s: Yield(Int)) { Nil }
+two = () <- (s: Yield(String)) { Nil }
+fns = [one, two]",
+    );
+    assert_eq!(
+        shown["app/main.fns"],
+        "List(() <- (Yield(Int | String)) -> Nil)"
+    );
+}
+
+#[test]
+fn equal_invariant_arguments_do_not_block_other_argument_meets() {
+    // §4.4: invariant arguments must be equal; the remaining arguments
+    // still follow their defined directions in the same service entry.
+    let shown = types(
+        "Cell(I, A) = (state = I, put = (I) -> Nil, value = A)
+one = () <- (s: Cell(Int, Int)) { Nil }
+two = () <- (s: Cell(Int, 1)) { Nil }
+both = () { one() two() }",
+    );
+    assert_eq!(shown["app/main.both"], "() <- (Cell(Int, 1)) -> Nil");
 }

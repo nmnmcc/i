@@ -38,6 +38,16 @@ fn record_proof_preserves_environment_mode_inside_nominal_arguments() {
         ),
         super::Verdict::Proven
     );
+    // §4.5 rule 4: the provider is compared in reverse as a value.
+    assert_eq!(
+        super::prove(
+            &s,
+            &right,
+            &left,
+            &mut super::Demand::new(super::Demand::LIMIT, true)
+        ),
+        super::Verdict::Proven
+    );
 }
 
 #[test]
