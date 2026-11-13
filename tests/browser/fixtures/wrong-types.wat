@@ -58,7 +58,7 @@
   (func (export "calls") (result i32) (global.get $calls))
 
   (@custom "ilang.abi"
-    "{\"version\":4,"
+    "{\"version\":3,"
     "\"entry\":null,"
     "\"tests\":[],"
     "\"exports\":{"
