@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse tracked Lisp files and generated CLI macro fragments with syntax three.
+"""Parse repository Lisp files and generated CLI macro fragments with syntax three.
 Run scripts/old-syntax-check first to build the shared parser driver.
 """
 import os
@@ -19,7 +19,10 @@ for name in ['crates/ilang-cli/tests/macro_run.rs', 'crates/ilang-cli/tests/type
     for start, _, value in check['rust_strings'](host):
         source = None
         if value.startswith('(,') and '(@ macro' in value:
-            source = value
+            # The declared() format string is rendered with its first actual
+            # caller. Its signature/body arguments are also parsed separately.
+            source = value.replace('{signature}', 'm (-> (, Int) Int)').replace(
+                '{body}', '(-> (, value) _ `7)')
         elif value.startswith('(->'):
             source = '(@ macro (= m ' + value + '))\n'
         elif re.match(r'^m \(->', value):
@@ -41,4 +44,4 @@ for (name, _) in sources:
         failures.append(name + ': ' + '; '.join(code + ': ' + bytes.fromhex(message).decode() for code, message in diagnostics))
 if failures:
     raise SystemExit('\n'.join(failures))
-print(f'syn3-lisp-check: {len(files)} tracked .is files and {len(sources)-len(files)} CLI macro source fragments parsed')
+print(f'syn3-lisp-check: {len(files)} repository .is files and {len(sources)-len(files)} CLI macro source fragments parsed')
