@@ -76,7 +76,9 @@ lane runs; the lists it names are the authority.
    `types::pattern::shared_place_tests`.
 3. **`()` as a value is the empty data** of type `()` (§7.1 row 7): `f = (()) { 1 }`
    is called as `f(())` (fixture `tests/spec/7/syn3_empty_data_argument.i`).
-   The Lisp surface reads `()` as the same empty tuple.
+   The Lisp source surface writes this as `(,)` (§14.3); `()` has no source
+   position. The transitional AST adapter also reads its internal `()`
+   encoding as an empty tuple so its old printer can round-trip this tree.
 4. **Lowercase type parameters** (`Codec(d, e) = …`): the old compiler read
    the head and rejected it (E0232); syntax three rejects it in the parser
    (E0101, §3.2), so the rest of such a file is no longer checked. The
@@ -95,3 +97,64 @@ lane runs; the lists it names are the authority.
   member is not written as a type elsewhere (`syn3/lower.rs`; test
   `syn3_lower::one_member_alias_keeps_a_type_written_as_a_type`).
 - The legacy printer refused the empty tuple that `()` now lowers to.
+
+## Recovery after the 11:08 reboot (2026-11-13)
+
+- Reviewed every saved diff and committed the recovery changes as `9083a2d6`.
+- Merged the language-server lane `lane/cG2` (`9df9e1e4`) without conflicts
+  in `df3c5d95`. The saved head lowering includes its `Fail(E)` fix. The
+  lowering regression also checks the inferred value and environment holes,
+  and an error entry written only on a later branch.
+- `cargo check --workspace --all-targets --locked` passed. The initial
+  `syn3_lower` run with `--features legacy` passed all 15 tests. Further
+  verification is in progress; command logs are in `target/conv-r2/`.
+- Removed 107 stale old-syntax inventory records: 61 for files removed by
+  earlier commits (the former `parse.rs`, `syn2.rs` and `golden/` parser suite),
+  and 46 for literal/file texts no longer present after conversion. These
+  identities matched no current source. Current snippets continue to be
+  extracted and checked; diagnostic changes are reviewed separately.
+
+### Reviewed checker golden changes
+
+The initial full checker run found five golden mismatches. Each was reviewed
+against the printed actual output before updating its expectation:
+
+- `basics`: `unit` is `()` instead of `Record`, as §6.4's empty data requires.
+- `known_types`: the migrated `annotated(1)` is a valid positional call and
+  returns `Int`. Its old annotation-label error disappears; without an error
+  the existing unused-binding warnings are no longer suppressed. All known
+  type comparison warnings stay. §3: "a function type has no parameter names";
+  §6.8: `(name: T)` is positional and labels require `label = p`.
+- `labels`: migrated successful calls are positional and return their written
+  result. The intentional calls with labels still check rejection in this
+  transitional front end, duplicate arguments, missing arity and unknown
+  constructor fields. The inferred hole of `f(1)` now receives `1`; its old
+  label-resolution failure no longer forces `Never`. The comments now state
+  the migrated cases' intent. Final data-shaped call checking is stage 7.
+- `may_fail_group`: the same three provably impossible fitted literal
+  patterns now receive the W0505 described in behaviour change 1. The
+  top-level `Assert` error is retained unchanged.
+- `type_params`: the lowercase-head parser error was split into the existing
+  independent `front_end` case. The fixture now reaches all seven original
+  checker conditions: the type-head collision, free type, duplicate variable,
+  function variable collision, applied variable, missing type and lowercase
+  value. No checker failure was removed to bless this output.
+
+### Recovery verification milestones
+
+- Syntax: the initial full run passed all but three targets. The focused
+  retry passed `format` (2), `lisp_record` (6), `lisp_syntax` (46) and
+  `syn3_lower` (16), including the new empty-data source regression.
+- Checker: every target except `types` passed in the initial full run, with
+  `spec_corpus_reverse_order_and_recovery` skipped as instructed. The focused
+  `types` retry passed all 5 tests after the reviewed changes above.
+- Macro: all 9 tests passed.
+- Wasm: every target except `control_lazy` passed initially. Three converted
+  providers incorrectly used `Out(print = …)` for `Out = (put = …)`; these
+  now name `put`. For all six stop traces, the old call sites were identified
+  in `019f9e19^` and the same calls located in the assembled converted source.
+  Only their line/column coordinates changed. Messages and frame order remain
+  pinned exactly (§11.7; syntax-3 §2.10.5 provides add no call frame). The
+  focused `control_lazy` retry passed all 17 tests.
+- LSP: all 8 unit tests and 98 protocol tests passed, including
+  `lsp_hover_errors_and_environment` and the latency bound.
