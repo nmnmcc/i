@@ -719,3 +719,23 @@ The first std O0 run found the same erased generator callback/provider A
 in std/test/list_test.i. Kept those annotations directly on the literals,
 using the already-verified spec helper pattern. Entry compilation now
 passes and the std O0 suite is executing; O2 and corpus remain pending.
+
+The complete K4 check-only audit found 53 conversion gaps. Of these, 51 now
+match batch2's check exits and error-code sets in one focused 51-case run:
+24 two-row annotations retain both rows through a named transparent alias;
+written recursive needs stay on the binding; callback/provider types remain
+on literals/parameters where inference needs them. Five malformed programs
+retain their original error intent in syntax three: unsupported block-comment
+delimiters, a service statement without an expression, a typed binding in an
+expression position, and a block ending in a binding. Their parser inventory
+entries were individually explained and rekeyed, and their batch2 E0101 or
+E0105 sets are unchanged. No corpus observation was changed by this audit.
+
+Two copies of p1 still differ from batch2 (accepted instead of E0515).
+An experiment preferring a provider's known binding form failed its new
+regression twice; it was saved under target/conv-tonight and discarded,
+including its uncommitted reproducer. Existing committed tests and production
+code remain unchanged. The source-only p1 experiments were also discarded.
+Std O0 and O2 now both pass all 2,170 tests. Workspace all-feature clippy and
+the full requested compiler-package rerun pass. Complete K4 recording and
+zero-failure validation remain required; this checkpoint is not landable.
