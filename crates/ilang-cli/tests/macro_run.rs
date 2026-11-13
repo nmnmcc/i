@@ -2721,3 +2721,51 @@ fn syntax_macro_call_labels_require_explicit_parameter_labels() {
         }
     }
 }
+
+#[test]
+fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
+    let macros = include_str!("../../../tests/spec/14.7/mp13_forward_definition/src/macros.is");
+    for items in [
+        "m.inspect(T)\nm.emit(T)",
+        "m.emit(T)\nm.inspect(T)",
+        "m.inspect(Missing)\nm.emit(T)",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
+        std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
+        std::fs::write(
+            dir.path().join("src/main.i"),
+            format!("(m = probe/macros)\n{items}\nmain = () {{ Nil }}\n"),
+        )
+        .unwrap();
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        if items.contains("Missing") {
+            assert!(
+                checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+            assert!(
+                errors.contains("Missing") && errors.contains("no definition"),
+                "{errors}"
+            );
+        } else {
+            assert!(
+                !checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+        }
+    }
+}
