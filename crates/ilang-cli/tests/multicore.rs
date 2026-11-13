@@ -564,8 +564,7 @@ fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> Stri
 fn echo_connections_are_served_on_several_workers() {
     let dir = project(
         "echo8",
-        &format!(
-            "(
+        "(
 	i/net
 	i/task
 	i/stdio
@@ -573,33 +572,32 @@ fn echo_connections_are_served_on_several_workers() {
 	i/resource
 )
 
-echo = (stream) {{
+echo = (stream) {
 	bytes = net.read(stream, 65536)
-	core.bit_size(bytes) |> {{
+	core.bit_size(bytes) |> {
 		0 -> Nil
-		_ -> {{
+		_ -> {
 			net.write(stream, bytes)
 			echo(stream)
-		}}
-	}}
-}}
+		}
+	}
+}
 
-serve = (listener, scope) {{
+serve = (listener, scope) {
 	stream = net.accept(listener)
-	task.go(scope, () {{
-		resource.ensure(() {{ echo(stream) }}, () {{ net.close_stream(stream) }})
-	}})
+	task.go(scope, () {
+		resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
+	})
 	serve(listener, scope)
-}}
+}
 
 // Program entry.
-main = () {{
+main = () {
 	listener = net.listen(\"127.0.0.1\", 0)
 	stdio.print(\"listening \" <> core.inspect(net.local_port(listener)))
-	task.scope((scope) {{ serve(listener, scope) }})
-}}
-"
-        ),
+	task.scope((scope) { serve(listener, scope) })
+}
+",
     );
     let stderr = serve_clients(&dir, Some(8), 8);
     let mut workers: Vec<&str> = stderr
