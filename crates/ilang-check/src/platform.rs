@@ -125,14 +125,28 @@ pub fn stub(p: &Program, t: &Typed, entry: DefId, target: Target) -> Result<Stub
                     let host = ty.host.as_ref().expect("host");
                     stub.is_async |= host.is_request || host.is_async;
                 } else {
-                    errors.push(not_provided(p, entry, &format!("{path}.{}", ty.name), target));
+                    errors.push(not_provided(
+                        p,
+                        entry,
+                        &format!("{path}.{}", ty.name),
+                        target,
+                    ));
                 }
             }
-            _ => errors.push(not_provided(p, entry, &format!("{path}.{}", ty.name), target)),
+            _ => errors.push(not_provided(
+                p,
+                entry,
+                &format!("{path}.{}", ty.name),
+                target,
+            )),
         }
     }
     stub.is_async = target != Wasi && (stub.is_async || stub.tasks);
-    if errors.is_empty() { Ok(stub) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(stub)
+    } else {
+        Err(errors)
+    }
 }
 
 /// The stubs of every eligible entry.

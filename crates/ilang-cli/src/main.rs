@@ -662,7 +662,8 @@ fn check(project: &Path, offline: bool, types: bool, target: Option<Target>) -> 
             && !checked.diags.iter().any(Diagnostic::is_error)
             && let (Some(program), Some(typed)) = (&checked.program, &checked.types)
         {
-            for stub in ilang_check::platform::stubs(program, typed, target.platform()).into_values()
+            for stub in
+                ilang_check::platform::stubs(program, typed, target.platform()).into_values()
             {
                 if let Err(more) = stub {
                     diags.extend(more);

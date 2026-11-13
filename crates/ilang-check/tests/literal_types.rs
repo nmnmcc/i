@@ -471,7 +471,8 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
     }
     // The old environments `! Int - Int` and `! String - String` cannot be
     // written: a need list holds named service types only (syntax-3 §3.1).
-    for env in ["Never"] {
+    {
+        let env = "Never";
         let (ds, _) = check(
             &"@host(\"app\")\nSvc = (get = () <- (BoundaryType) -> String)\n"
                 .replace("BoundaryType", env),

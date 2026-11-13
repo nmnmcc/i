@@ -1,9 +1,9 @@
 //! `i check --types` prints the type of every top-level name.
 
-#[path = "common/test_project.rs"]
-mod test_project;
 #[path = "common/syn3_pending.rs"]
 mod syn3_pending;
+#[path = "common/test_project.rs"]
+mod test_project;
 use syn3_pending::syn3_pending;
 
 use std::process::Command;
@@ -119,7 +119,8 @@ main = <N>() {
         assert!(
             // Syntax three prints a need as `<- (…)` (spec §6.8 table, "Function
             // type with a need": `(T) <- (Db, Log) -> R`).
-            String::from_utf8_lossy(&out.stdout).contains("app/main.main : () <- (S(N), ..N) -> Nil"),
+            String::from_utf8_lossy(&out.stdout)
+                .contains("app/main.main : () <- (S(N), ..N) -> Nil"),
             "{}",
             String::from_utf8_lossy(&out.stdout)
         );
@@ -160,10 +161,7 @@ main = () { apply() <- (S(() { read() })) }";
         let source = if supplied {
             // `Dependency = ()` makes the value `Dependency` (syntax-3.md
             // §5.2.3: "when `D` is `()`, the value `T`").
-            source.replace(
-                "apply() <- (S(",
-                "apply() <- (Dependency, S(",
-            )
+            source.replace("apply() <- (S(", "apply() <- (Dependency, S(")
         } else {
             source.to_string()
         };

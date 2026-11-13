@@ -769,7 +769,12 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
     let mut stubs: Vec<_> = ilang_check::platform::stubs(p, t, target.platform())
         .into_iter()
         .collect();
-    stubs.sort_by_key(|(entry, _)| (p.module(entry.module).path.clone(), p.def(*entry).name.clone()));
+    stubs.sort_by_key(|(entry, _)| {
+        (
+            p.module(entry.module).path.clone(),
+            p.def(*entry).name.clone(),
+        )
+    });
     for (entry, stub) in stubs {
         let stub = stub.map_err(|ds| problems(&graph, &ds))?;
         println!(

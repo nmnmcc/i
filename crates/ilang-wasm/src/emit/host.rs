@@ -574,7 +574,6 @@ pub(super) fn effects() -> String {
     out
 }
 
-
 impl<'p> Emitter<'p> {
     /// Starts an import of an async host service (B.4) with a new request
     /// id from the request table, returning the cell immediately.
