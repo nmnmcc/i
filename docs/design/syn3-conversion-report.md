@@ -187,3 +187,30 @@ The retry passed: **4,713** extracted snippets/files/fences, exact expected
 messages matched, **6** future-track entries. No blanket parser exemption or
 expectation regeneration was used. Checker clippy also passed with
 `--all-targets --locked -- -D warnings`.
+
+### Release, standard library, and five negative review observations
+
+- Release build passed; `i fmt --check std lib examples` passed unchanged.
+- `i test --project std --opt 0` passed all **2,169** tests.
+- A corpus run selected only `review-runtime/echo-types`, `review-s6/probe`,
+  `review-std1/factory`, `review-std1/tree` and `review-std1/variance`. The first
+  run reported only observation differences; all five still rejected with
+  exit 1 and empty stdout. Every stderr diff was inspected before updating.
+- `probe`, `factory`, `tree` and `variance` now stop at the lowercase-head
+  E0101 parser errors described above, before their former E0232 and dependent
+  checker errors. `variance` retains all four erroneous head sites.
+- `echo-types` materializes its preserved `.invalid/src/main.i`, explicitly
+  listed in `syn3-unconvertible.txt`. Its old `import(...)` is an ordinary call
+  under the new grammar: the two positional imports after labelled items give
+  E0110; its two old clause arrows give E0101. The converted task stub adds two
+  lowercase-head E0101 errors. These are the exact negative errors already
+  pinned by the syntax inventory. No source of this historical invalid input
+  was changed to make the observation pass.
+- The five observations keep their original **10 second** bounds, commands,
+  exit codes and empty stdout. Only reviewed stderr and compiler metadata
+  changed. The filtered retry passed all five with no failures. The unfiltered
+  review corpus remains the coordinator's gate.
+
+Of the inventory's six tracked-error records, three are the explicitly
+staged spec examples and three are preserved historical invalid T3 inputs;
+all six are always parsed and compared to their exact diagnostic lists.

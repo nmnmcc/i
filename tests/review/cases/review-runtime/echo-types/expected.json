@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "045dd7dc8590cba93ec27bd6f7f03d49a995deaa",
+  "binary_sha256": "c1ef55233cb94ac719e5a0eec5514ed86d3fa9a27e7a9243802c618099483270",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:14: error[E0101]: expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead of `if`\n1 error\n"
+      "stderr": "src/main.i:2:41: error[E0110]: an item by position may not come after an item by label\nsrc/main.i:2:49: error[E0110]: an item by position may not come after an item by label\nsrc/main.i:5:10: error[E0101]: expected an expression, found `->`\nsrc/main.i:6:11: error[E0101]: expected an expression, found `->`\nsrc/task.i:3:1: error[E0101]: the head of a data type or an opaque type has only type parameters\nsrc/task.i:4:1: error[E0101]: the head of a data type or an opaque type has only type parameters\n6 errors\n"
     }
   }
 }
